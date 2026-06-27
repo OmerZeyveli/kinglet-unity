@@ -1,0 +1,31 @@
+# ── OS cruft ──────────────────────────────────
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Editor / IDE ──────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Logs / temp / backups ─────────────────────
+*.log
+*.tmp
+*.bak
+*.orig
+
+# ── Secrets (savunma amaçlı; repo'da olmamalı) ─
+.env
+.env.*
+
+# ── Repo İÇİNDE test Unity projesi açarsan aç ──
+# (tercihen ayrı projede test et; gerekirse bunları aç)
+# [Ll]ibrary/
+# [Tt]emp/
+# [Oo]bj/
+# [Bb]uild/

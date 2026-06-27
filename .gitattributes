@@ -1,0 +1,3 @@
+# Tüm metni normalize et; shell script'leri LF tut (Linux/WSL/macOS'ta çalışsın)
+* text=auto
+*.sh text eol=lf
