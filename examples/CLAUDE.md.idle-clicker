@@ -1,0 +1,68 @@
+# Idle / Clicker — Project Configuration
+
+## Project Overview
+- **Unity Version:** 2022.3 LTS
+- **Render Pipeline:** URP (mobile optimized)
+- **Genre:** Idle / clicker / incremental
+- **Target Platform:** iOS + Android
+- **Target FPS:** 30 (battery-friendly, idle game)
+
+## Architecture
+
+### Assembly Structure
+```
+MyGame.Core         — events, utilities, big number math
+MyGame.Economy      — currencies, generators, upgrades, prestige
+MyGame.Gameplay     — tap handler, automation, milestones
+MyGame.Meta         — offline progress, daily rewards, achievements
+MyGame.UI           — currency display, upgrade list, prestige screen
+MyGame.Systems      — audio, save, ads, IAP, analytics, notifications
+```
+
+### Key Systems
+- **Currency System** — multiple currencies (gold, gems, prestige tokens)
+- **Generator System** — auto-income sources, upgradeable
+- **Upgrade System** — exponential cost scaling (cost × 1.15^level)
+- **Tap Income** — tap to earn, upgradeable tap value
+- **Offline Progress** — calculate earnings while away (capped at 8hrs, 50% efficiency)
+- **Prestige System** — reset progress for permanent multipliers
+- **Daily Rewards** — consecutive day bonuses
+- **Monetization** — rewarded ads (2x offline, 2x income boost), IAP (currency packs)
+
+### Scene Structure
+- `S_Bootstrap` — persistent services (save, ads, IAP, notifications)
+- `S_Game` — single scene (main game + all UI overlays)
+
+## Skills to Load
+- `mobile` — ASTC textures, draw call budget, thermal management, safe areas
+- `idle-clicker` — big numbers, offline progress, prestige, upgrade trees
+- `save-system` — auto-save on every purchase, offline time tracking
+- `ui-toolkit` — upgrade lists, currency displays, animated counters
+- `audio` — satisfying tap sounds, milestone fanfares
+- `dotween` — number counter animations, UI transitions
+
+## Rules
+Follow all rules in `.claude/rules/`.
+
+## Key Conventions
+- **Big numbers** — use formatted display (1.23K, 4.56M, 7.89B, etc.)
+- **Auto-save** — save on every purchase, OnApplicationPause, OnApplicationQuit
+- **Offline progress** — calculate on launch, show "Welcome back!" popup
+- **30fps cap** — idle games don't need 60fps, saves battery
+- **Minimal Update** — update currency display every 0.1s, not every frame
+- **Exponential scaling** — both costs and rewards grow exponentially
+- **No skill required** — progress = time + strategic upgrade choices
+- **Safe area** — all UI respects Screen.safeArea
+- **Notification hooks** — remind players to collect offline earnings
+
+## Input Map
+```
+Player:
+  Tap to Earn — Primary Touch
+  Buy Upgrade — Tap upgrade button
+  Prestige — Tap prestige button (with confirmation)
+  Navigate — Swipe between tabs / tap tab buttons
+```
+
+## MCP Integration
+Unity MCP at `http://localhost:8080/mcp`. Use for UI screen building and build configuration.

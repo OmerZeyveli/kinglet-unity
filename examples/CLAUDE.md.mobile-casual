@@ -1,0 +1,67 @@
+# Mobile Casual — Project Configuration
+
+## Project Overview
+- **Unity Version:** 2022.3 LTS
+- **Render Pipeline:** URP (optimized for mobile)
+- **Genre:** Casual puzzle / hyper-casual
+- **Target Platform:** iOS + Android
+- **Target FPS:** 30 (60 on high-end)
+
+## Architecture
+
+### Assembly Structure
+```
+MyGame.Core         — events, pooling, utilities
+MyGame.Gameplay     — game mechanics, scoring, progression
+MyGame.UI           — menus, HUD, popups, shop
+MyGame.Systems      — audio, save, analytics, ads, IAP
+MyGame.Editor       — level editor tools
+```
+
+### Key Systems
+- **Game Loop** — simple state machine (Menu → Playing → GameOver → Menu)
+- **Scoring** — score + combo multiplier, high score persistence
+- **Progression** — level unlock, star rating, currency
+- **Touch Input** — tap, swipe, drag via Input System
+- **Monetization** — ad integration points (interstitial, rewarded), IAP hooks
+- **Analytics** — event tracking hooks (level_start, level_complete, ad_watched)
+
+### Scene Structure
+- `S_Bootstrap` — persistent services
+- `S_MainMenu` — play button, settings, shop
+- `S_Game` — single game scene (levels loaded as config, not separate scenes)
+
+## Skills to Load
+- `mobile` — ASTC textures, draw call budget, thermal management, safe areas
+- `ui-toolkit` — responsive UI, safe area handling
+- `save-system` — PlayerPrefs for settings, JSON for progress
+- `object-pooling` — pool everything that spawns
+- `state-machine` — game state management
+- `audio` — compressed audio, pooled sources
+- `addressables` — optional content download
+
+## Rules
+Follow all rules in `.claude/rules/`.
+
+## Key Conventions
+- **Performance budget:** <100 draw calls, <50k triangles, <150MB memory
+- **Texture sizes:** 512 max for UI, 256 for game objects, ASTC compression
+- **Audio:** ADPCM for SFX, Vorbis quality 40% for music, load on demand
+- **No LINQ anywhere** — manual loops only
+- **Pool everything** — no runtime Instantiate/Destroy during gameplay
+- **Target 30fps** for battery life, unlock 60fps as option
+- **Safe area** — all UI respects Screen.safeArea for notched devices
+- **Build size** — target <100MB initial download, Addressables for extra content
+- **Touch input** — minimum tap target 44x44pt, swipe threshold 50px
+- **Offline-first** — game works without internet, sync when available
+
+## Input Map
+```
+Player:
+  Tap — Primary Touch
+  Swipe — Touch Delta
+  Drag — Touch Press + Position
+```
+
+## MCP Integration
+Unity MCP at `http://localhost:8080/mcp`. Use for UI screen building and build configuration.

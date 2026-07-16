@@ -1,0 +1,78 @@
+// ============================================================================
+// TEMPLATE: System (MVS Architecture)
+// ============================================================================
+// Purpose:
+//   Plain C# class that owns and mutates Models. Contains all game logic.
+//   Registered in VContainer as a singleton. Communicates with other Systems
+//   via MessagePipe. Uses constructor injection for dependencies.
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}    — Full namespace (e.g., MyGame.Player)
+//   {{CLASS_NAME}}   — PascalCase class name (e.g., PlayerSystem)
+//   {{DESCRIPTION}}  — One-line summary of what this system does
+//   {{MODEL_CLASS}}  — The Model class this system owns (e.g., PlayerModel)
+//
+// Conventions enforced:
+//   - Constructor injection (no [Inject] attribute needed for VContainer)
+//   - IDisposable for cleanup (cancel tokens, dispose subscriptions)
+//   - Private fields use m_ prefix
+//   - sealed class by default
+//   - No MonoBehaviour, no Unity lifecycle methods
+//
+// VContainer registration:
+//   builder.Register<{{CLASS_NAME}}>(Lifetime.Singleton)
+//       .AsImplementedInterfaces().AsSelf();
+// ============================================================================
+
+using System;
+using System.Threading;
+using UnityEngine;
+using VContainer;
+using MessagePipe;
+using Cysharp.Threading.Tasks;
+
+namespace {{NAMESPACE}}
+{
+    /// <summary>
+    /// {{DESCRIPTION}}
+    /// </summary>
+    public sealed class {{CLASS_NAME}} : IDisposable
+    {
+        // ══════════════════════════════════════════════════════════════
+        // Dependencies
+        // ══════════════════════════════════════════════════════════════
+
+        private readonly {{MODEL_CLASS}} m_Model;
+        // private readonly IPublisher<SomeMessage> m_SomePublisher;
+
+        private readonly CancellationTokenSource m_Cts = new();
+
+        // ══════════════════════════════════════════════════════════════
+        // Constructor
+        // ══════════════════════════════════════════════════════════════
+
+        [Inject]
+        public {{CLASS_NAME}}({{MODEL_CLASS}} model)
+        {
+            m_Model = model;
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Public Methods
+        // ══════════════════════════════════════════════════════════════
+
+        // ══════════════════════════════════════════════════════════════
+        // Private Methods
+        // ══════════════════════════════════════════════════════════════
+
+        // ══════════════════════════════════════════════════════════════
+        // IDisposable
+        // ══════════════════════════════════════════════════════════════
+
+        public void Dispose()
+        {
+            m_Cts.Cancel();
+            m_Cts.Dispose();
+        }
+    }
+}

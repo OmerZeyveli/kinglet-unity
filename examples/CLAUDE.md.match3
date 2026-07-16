@@ -1,0 +1,69 @@
+# Match-3 Puzzle — Project Configuration
+
+## Project Overview
+- **Unity Version:** 2022.3 LTS
+- **Render Pipeline:** URP (2D Renderer, mobile optimized)
+- **Genre:** Match-3 puzzle
+- **Target Platform:** iOS + Android
+- **Target FPS:** 60 (smooth tile animations)
+
+## Architecture
+
+### Assembly Structure
+```
+MyGame.Core         — events, pooling, utilities
+MyGame.Board        — grid, tiles, matching, cascade, special tiles
+MyGame.Gameplay     — levels, objectives, scoring, combos, boosters
+MyGame.Meta         — lives, energy, currencies, progression, shop
+MyGame.UI           — HUD, level select, shop, popups
+MyGame.Systems      — audio, save, ads, IAP, analytics
+MyGame.Editor       — level editor tools
+```
+
+### Key Systems
+- **Board System** — NxM grid, tile types, swap detection, match-3+ logic
+- **Cascade System** — gravity, refill, chain combo detection
+- **Special Tiles** — striped (row/col clear), wrapped (3x3), color bomb (all of one type)
+- **Level Objectives** — score target, clear blockers, collect items, reach bottom
+- **Lives System** — 5 lives, 30-min regen, rewarded ad for extra life
+- **Progression** — 100+ levels, level packs, star ratings (1-3)
+- **Booster System** — pre-game and in-game boosters (purchasable)
+
+### Scene Structure
+- `S_Bootstrap` — persistent services (save, audio, ads, IAP)
+- `S_Meta` — map/level select screen
+- `S_Game` — gameplay board (level config loaded as data)
+
+## Skills to Load
+- `mobile` — ASTC textures, draw call budget, safe areas
+- `match3` — grid system, matching, cascades, special tiles
+- `object-pooling` — pool all tiles and effects
+- `state-machine` — game states, board states
+- `save-system` — level progress, stars, currencies
+- `audio` — tile pop sounds, combo chains
+- `ui-toolkit` — level select grid, shop UI
+- `dotween` — smooth tile animations
+
+## Rules
+Follow all rules in `.claude/rules/`.
+
+## Key Conventions
+- **All tile operations are grid-based** — visual position lerps to grid position
+- **Pool all tiles** — never Instantiate/Destroy during gameplay
+- **Cascade loop** — match → destroy → gravity → refill → re-check (repeat until stable)
+- **Touch input** — drag tile to adjacent cell, snap to H/V direction
+- **Animations via DOTween** — tile movement, scaling, color transitions
+- **Level data as JSON** — board layout, objectives, available tile types per level
+- **Star rating** — moves taken vs par moves
+- **Safe area** — board and UI respect notched devices
+
+## Input Map
+```
+Player:
+  Select Tile — Touch Press on tile
+  Swap — Drag to adjacent tile (H/V only)
+  Use Booster — Tap booster button, then tap target tile
+```
+
+## MCP Integration
+Unity MCP at `http://localhost:8080/mcp`. Use for UI screen building and board setup.

@@ -1,0 +1,53 @@
+// ============================================================================
+// TEMPLATE: ScriptableObject
+// ============================================================================
+// Purpose:
+//   Data container that lives as an asset in the Project window. Use this for
+//   configuration data, item definitions, ability stats, event channels, and
+//   any shared data that multiple objects need to read at runtime.
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}    — Full namespace (e.g., MyGame.Data)
+//   {{CLASS_NAME}}   — PascalCase class name (e.g., WeaponConfig)
+//   {{DESCRIPTION}}  — One-line summary of the data this asset holds
+//   {{PROJECT_NAME}} — Project or module name for the asset menu path
+//
+// Conventions enforced:
+//   - sealed class by default (unseal only when inheritance is intended)
+//   - CreateAssetMenu attribute for easy asset creation in the Editor
+//   - [SerializeField] private fields with m_ prefix (no public fields)
+//   - Read-only properties to expose data without allowing external mutation
+//   - Section headers with unicode box-drawing characters for scanability
+// ============================================================================
+
+using UnityEngine;
+
+namespace {{NAMESPACE}}
+{
+    /// <summary>
+    /// {{DESCRIPTION}}
+    /// </summary>
+    [CreateAssetMenu(
+        fileName = "New{{CLASS_NAME}}",
+        menuName = "{{PROJECT_NAME}}/{{CLASS_NAME}}",
+        order = 0)]
+    public sealed class {{CLASS_NAME}} : ScriptableObject
+    {
+        // ══════════════════════════════════════════════════════════════
+        // Data
+        // ══════════════════════════════════════════════════════════════
+
+        [Header("Configuration")]
+        [SerializeField] private string m_DisplayName;
+
+        // ══════════════════════════════════════════════════════════════
+        // Properties
+        // ══════════════════════════════════════════════════════════════
+
+        public string DisplayName => m_DisplayName;
+
+        // ══════════════════════════════════════════════════════════════
+        // Methods
+        // ══════════════════════════════════════════════════════════════
+    }
+}

@@ -1,0 +1,81 @@
+# 2D Platformer — Project Configuration
+
+## Project Overview
+- **Unity Version:** 2022.3 LTS
+- **Render Pipeline:** URP (2D Renderer)
+- **Genre:** 2D side-scrolling platformer
+- **Target Platform:** iOS + Android
+- **Target FPS:** 60 (30fps on low-end)
+
+## Architecture
+
+### Assembly Structure
+```
+MyGame.Core         — events, pooling, utilities, state machine
+MyGame.Gameplay     — player controller, enemies, items, level systems
+MyGame.Systems      — audio, save, UI, input
+MyGame.Editor       — custom inspectors, level tools
+```
+
+### Key Systems
+- **Player Controller** — Rigidbody2D-based, coyote time, input buffering, variable jump height
+- **State Machine** — generic FSM for player states (Idle, Run, Jump, Fall, WallSlide, Dash)
+- **Level System** — Tilemap-based, chunk loading for large levels
+- **Enemy AI** — state machine per enemy type (Patrol, Chase, Attack)
+- **Collectibles** — object-pooled pickups with magnet effect
+- **Checkpoint System** — serializable spawn points with state snapshot
+
+### Scene Structure
+- `S_Bootstrap` — persistent services (audio, save, input)
+- `S_MainMenu` — title screen, settings
+- `S_Level_01` through `S_Level_XX` — game levels (additive loaded)
+
+## Skills to Load
+- `mobile` — ASTC textures, draw call budget, thermal management, safe areas
+- `character-controller` — coyote time, input buffer, wall jump
+- `platformer-2d` — level design patterns, boss patterns
+- `state-machine` — player and enemy states
+- `physics` — 2D colliders, layers, one-way platforms
+- `animation` — Animator controllers, blend trees
+- `save-system` — checkpoint persistence
+- `input-system` — touch input, virtual buttons
+
+## Rules
+Follow all rules in `.claude/rules/`:
+- `.claude/rules/csharp-unity.md`
+- `.claude/rules/performance.md`
+- `.claude/rules/serialization.md`
+- `.claude/rules/architecture.md`
+- `.claude/rules/unity-specifics.md`
+
+## Key Conventions
+- Player physics in `FixedUpdate`, input reading in `Update`
+- Cache `Rigidbody2D`, `BoxCollider2D`, `Animator` in `Awake`
+- Use `Physics2D.OverlapCircle` for ground/wall detection (non-alloc)
+- Pool all frequently spawned objects (enemies, projectiles, particles, collectibles)
+- Tilemap for level geometry, Prefabs for interactive objects
+- `[SerializeField]` with `[Header]` for all tweakable parameters
+
+## Input Map
+```
+Player:
+  Move — Virtual Joystick (left side of screen)
+  Jump — Virtual Button (right side, bottom)
+  Dash — Virtual Button (right side, upper)
+  Attack — Virtual Button (right side, middle)
+  Interact — Tap on interactable object
+```
+
+## Physics Layers
+```
+0: Default
+6: Player
+7: Ground
+8: Enemy
+9: Projectile
+10: Collectible
+11: OneWayPlatform
+```
+
+## MCP Integration
+Unity MCP at `http://localhost:8080/mcp`. Use for scene setup, physics layer configuration, and testing.

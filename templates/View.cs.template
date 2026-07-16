@@ -1,0 +1,87 @@
+// ============================================================================
+// TEMPLATE: View (MVS Architecture)
+// ============================================================================
+// Purpose:
+//   MonoBehaviour that observes a Model via ReactiveProperty.Subscribe() and
+//   renders state to the UI or scene. Forwards user input to a System.
+//   Contains NO game logic — only data binding and visual updates.
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}     — Full namespace (e.g., MyGame.Player)
+//   {{CLASS_NAME}}    — PascalCase class name (e.g., PlayerView)
+//   {{DESCRIPTION}}   — One-line summary of what this view displays
+//   {{MODEL_CLASS}}   — The Model this view observes (e.g., PlayerModel)
+//   {{SYSTEM_CLASS}}  — The System this view calls for actions (e.g., PlayerSystem)
+//
+// Conventions enforced:
+//   - Method injection via [Inject] Construct() (not constructor — MonoBehaviour)
+//   - Subscribe to Model in Start(), dispose in OnDestroy()
+//   - CompositeDisposable for subscription cleanup
+//   - [SerializeField] private for UI references with m_ prefix
+//   - sealed class by default
+//
+// VContainer registration:
+//   builder.RegisterComponentInHierarchy<{{CLASS_NAME}}>();
+// ============================================================================
+
+using System;
+using UnityEngine;
+using UnityEngine.UI;
+using VContainer;
+using R3;
+
+namespace {{NAMESPACE}}
+{
+    /// <summary>
+    /// {{DESCRIPTION}}
+    /// </summary>
+    public sealed class {{CLASS_NAME}} : MonoBehaviour
+    {
+        // ══════════════════════════════════════════════════════════════
+        // Serialized Fields (UI References)
+        // ══════════════════════════════════════════════════════════════
+
+        [Header("UI")]
+        [SerializeField] private Slider m_HealthBar;
+
+        // ══════════════════════════════════════════════════════════════
+        // Injected Dependencies
+        // ══════════════════════════════════════════════════════════════
+
+        private {{MODEL_CLASS}} m_Model;
+        private {{SYSTEM_CLASS}} m_System;
+        private readonly CompositeDisposable m_Disposables = new();
+
+        // ══════════════════════════════════════════════════════════════
+        // Injection (VContainer method injection for MonoBehaviour)
+        // ══════════════════════════════════════════════════════════════
+
+        [Inject]
+        public void Construct({{MODEL_CLASS}} model, {{SYSTEM_CLASS}} system)
+        {
+            m_Model = model;
+            m_System = system;
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Unity Lifecycle
+        // ══════════════════════════════════════════════════════════════
+
+        private void Start()
+        {
+            // Bind Model state to UI
+            m_Model.Health
+                .Subscribe(hp => m_HealthBar.value = hp / 100f)
+                .AddTo(m_Disposables);
+        }
+
+        private void OnDestroy()
+        {
+            m_Disposables.Dispose();
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Input Forwarding (View → System)
+        // ══════════════════════════════════════════════════════════════
+    }
+}

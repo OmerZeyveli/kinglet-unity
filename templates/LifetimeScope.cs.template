@@ -1,0 +1,72 @@
+// ============================================================================
+// TEMPLATE: LifetimeScope (VContainer Composition Root)
+// ============================================================================
+// Purpose:
+//   VContainer composition root that wires all Models, Systems, Views, and
+//   MessagePipe brokers for a scope (scene, feature, or app-wide).
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}   — Full namespace (e.g., MyGame.Core)
+//   {{CLASS_NAME}}  — PascalCase class name (e.g., GameLifetimeScope)
+//   {{DESCRIPTION}} — One-line summary of what this scope covers
+//
+// Conventions enforced:
+//   - Models registered as Singleton (shared state within scope)
+//   - Systems registered as Singleton with AsImplementedInterfaces().AsSelf()
+//   - Views registered via RegisterComponentInHierarchy (scene binding)
+//   - MessagePipe brokers registered per message type
+//   - sealed class by default
+//
+// Scope hierarchy:
+//   RootLifetimeScope        — app-wide (audio, save, settings)
+//     └─ SceneLifetimeScope  — per-scene (gameplay systems and models)
+//          └─ Child scopes   — per-feature (UI popups, spawned entities)
+// ============================================================================
+
+using MessagePipe;
+using VContainer;
+using VContainer.Unity;
+
+namespace {{NAMESPACE}}
+{
+    /// <summary>
+    /// {{DESCRIPTION}}
+    /// </summary>
+    public sealed class {{CLASS_NAME}} : LifetimeScope
+    {
+        protected override void Configure(IContainerBuilder builder)
+        {
+            // ══════════════════════════════════════════════════════════
+            // Models — pure state containers (Singleton per scope)
+            // ══════════════════════════════════════════════════════════
+
+            // builder.Register<PlayerModel>(Lifetime.Singleton);
+
+            // ══════════════════════════════════════════════════════════
+            // Systems — game logic (Singleton, exposes interfaces)
+            // ══════════════════════════════════════════════════════════
+
+            // builder.Register<PlayerSystem>(Lifetime.Singleton)
+            //     .AsImplementedInterfaces().AsSelf();
+
+            // Use RegisterEntryPoint for Systems that need ITickable/IStartable:
+            // builder.RegisterEntryPoint<GameLoopSystem>();
+
+            // ══════════════════════════════════════════════════════════
+            // Views — MonoBehaviours found in scene hierarchy
+            // ══════════════════════════════════════════════════════════
+
+            // builder.RegisterComponentInHierarchy<PlayerView>();
+
+            // ══════════════════════════════════════════════════════════
+            // MessagePipe — zero-alloc pub/sub messaging
+            // ══════════════════════════════════════════════════════════
+
+            var messagePipeOptions = builder.RegisterMessagePipe();
+
+            // Register one broker per message type:
+            // builder.RegisterMessageBroker<PlayerDiedMessage>(messagePipeOptions);
+            // builder.RegisterMessageBroker<ScoreChangedMessage>(messagePipeOptions);
+        }
+    }
+}

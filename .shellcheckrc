@@ -1,0 +1,14 @@
+# shellcheck config for everything-claude-unity hooks
+#
+# All hooks follow the pattern:
+#   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+#   source "${SCRIPT_DIR}/_lib.sh"
+# Tell shellcheck where to resolve the dynamic source path.
+external-sources=true
+source-path=SCRIPTDIR
+
+# SC2034 (unused variable) — disabled because the hook convention relies on
+# cross-file indirection: hooks set HOOK_PROFILE_LEVEL and _lib.sh reads it;
+# _lib.sh exports UNITY_* path variables that hooks dereference at runtime.
+# Shellcheck cannot see these cross-file relationships.
+disable=SC2034

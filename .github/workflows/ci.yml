@@ -1,0 +1,182 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y jq shellcheck
+
+      - name: Shellcheck hook scripts
+        run: shellcheck -x .claude/hooks/*.sh
+
+      - name: Validate settings.json
+        run: jq . .claude/settings.json > /dev/null
+
+      - name: Validate plugin manifests
+        run: |
+          jq . .claude-plugin/plugin.json > /dev/null
+          jq . .claude-plugin/marketplace.json > /dev/null
+
+      - name: Validate agent frontmatter
+        run: |
+          FAIL=0
+          for file in .claude/agents/*.md; do
+            # Extract YAML between first two --- delimiters
+            YAML=$(sed -n '/^---$/,/^---$/p' "$file" | head -n -1 | tail -n +2)
+            for field in "name:" "description:" "model:" "tools:"; do
+              if ! echo "$YAML" | grep -q "$field"; then
+                echo "FAIL: $file missing $field"
+                FAIL=1
+              fi
+            done
+          done
+          exit $FAIL
+
+      - name: Validate command frontmatter
+        run: |
+          FAIL=0
+          for file in .claude/commands/*.md; do
+            YAML=$(sed -n '/^---$/,/^---$/p' "$file" | head -n -1 | tail -n +2)
+            for field in "name:" "description:"; do
+              if ! echo "$YAML" | grep -q "$field"; then
+                echo "FAIL: $file missing $field"
+                FAIL=1
+              fi
+            done
+          done
+          exit $FAIL
+
+      - name: Validate skill frontmatter
+        run: |
+          FAIL=0
+          for file in $(find .claude/skills -name "SKILL.md"); do
+            YAML=$(sed -n '/^---$/,/^---$/p' "$file" | head -n -1 | tail -n +2)
+            for field in "name:" "description:"; do
+              if ! echo "$YAML" | grep -q "$field"; then
+                echo "FAIL: $file missing $field"
+                FAIL=1
+              fi
+            done
+          done
+          exit $FAIL
+
+      - name: Verify command files exist for README references
+        run: |
+          FAIL=0
+          # Extract command names from README command section
+          for cmd in $(grep -oP '/unity-\w+' README.md | sort -u); do
+            CMD_NAME="${cmd#/}"
+            if [ ! -f ".claude/commands/${CMD_NAME}.md" ]; then
+              echo "WARNING: README references $cmd but .claude/commands/${CMD_NAME}.md not found"
+            fi
+          done
+          # Warnings only — some references may be to skills, not commands
+
+      - name: Cross-validate settings.json hooks
+        run: |
+          FAIL=0
+          # Every hook path in settings.json must exist as a file
+          for hook_path in $(jq -r '.. | .command? // empty' .claude/settings.json | sort -u); do
+            if [ ! -f "$hook_path" ]; then
+              echo "FAIL: settings.json references $hook_path but file not found"
+              FAIL=1
+            fi
+          done
+          # Every .sh in hooks/ (except _lib.sh) should be referenced in settings.json
+          for hook_file in .claude/hooks/*.sh; do
+            basename=$(basename "$hook_file")
+            if [ "$basename" = "_lib.sh" ]; then continue; fi
+            if ! grep -q "$basename" .claude/settings.json; then
+              echo "WARNING: $basename exists but is not referenced in settings.json"
+            fi
+          done
+          exit $FAIL
+
+      - name: Validate agent tool restrictions
+        run: |
+          FAIL=0
+          for file in .claude/agents/*.md; do
+            YAML=$(sed -n '/^---$/,/^---$/p' "$file" | head -n -1 | tail -n +2)
+            MODEL=$(echo "$YAML" | grep "^model:" | awk '{print $2}')
+            TOOLS=$(echo "$YAML" | grep "^tools:" | sed 's/^tools: *//')
+            NAME=$(basename "$file" .md)
+
+            # Haiku agents must be read-only (no Write, Edit, or Bash)
+            if [ "$MODEL" = "haiku" ]; then
+              for forbidden in "Write" "Edit" "Bash"; do
+                if echo "$TOOLS" | grep -qw "$forbidden"; then
+                  echo "FAIL: $NAME (haiku) has forbidden tool: $forbidden"
+                  FAIL=1
+                fi
+              done
+            fi
+
+            # Reviewer/critic agents must not have Write or Edit
+            if echo "$NAME" | grep -qE '(reviewer|critic|linter)'; then
+              for forbidden in "Write" "Edit"; do
+                if echo "$TOOLS" | grep -qw "$forbidden"; then
+                  echo "FAIL: $NAME (read-only role) has forbidden tool: $forbidden"
+                  FAIL=1
+                fi
+              done
+            fi
+          done
+          exit $FAIL
+
+      - name: Validate C# templates
+        run: |
+          FAIL=0
+          for file in templates/*.cs.template; do
+            # Check balanced braces
+            OPEN=$(grep -o '{' "$file" | wc -l | tr -d ' ')
+            CLOSE=$(grep -o '}' "$file" | wc -l | tr -d ' ')
+            if [ "$OPEN" != "$CLOSE" ]; then
+              echo "FAIL: $file has unbalanced braces (open: $OPEN, close: $CLOSE)"
+              FAIL=1
+            fi
+          done
+          exit $FAIL
+
+      - name: Validate skill quality
+        run: |
+          # Warnings only — advisory checks
+          for file in $(find .claude/skills -name "SKILL.md"); do
+            HAS_EXAMPLE=$(grep -c '```' "$file" || true)
+            if [ "$HAS_EXAMPLE" -lt 2 ]; then
+              echo "WARNING: $file has no code examples (expected fenced code blocks)"
+            fi
+            HAS_ANTIMATCH=$(grep -ciE '(common mistake|do not|avoid|never|bad|wrong)' "$file" || true)
+            if [ "$HAS_ANTIMATCH" -eq 0 ]; then
+              echo "WARNING: $file has no anti-pattern guidance"
+            fi
+          done
+
+      - name: Validate benchmark scenarios
+        run: |
+          if [ -d "benchmarks/scenarios" ]; then
+            FAIL=0
+            for file in benchmarks/scenarios/*.json; do
+              if ! jq . "$file" > /dev/null 2>&1; then
+                echo "FAIL: $file is not valid JSON"
+                FAIL=1
+              fi
+              HAS_NAME=$(jq -r '.name // empty' "$file")
+              if [ -z "$HAS_NAME" ]; then
+                echo "FAIL: $file missing 'name' field"
+                FAIL=1
+              fi
+            done
+            exit $FAIL
+          fi
+
+      - name: Run test suite
+        run: bash tests/run-tests.sh

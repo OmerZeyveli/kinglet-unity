@@ -1,0 +1,64 @@
+// ============================================================================
+// TEMPLATE: MonoBehaviour
+// ============================================================================
+// Purpose:
+//   Standard MonoBehaviour script for Unity GameObjects. Use this for any
+//   component that attaches to a GameObject and participates in the Unity
+//   lifecycle (Awake, Start, Update, OnDestroy, etc.).
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}   — Full namespace (e.g., MyGame.Player)
+//   {{CLASS_NAME}}  — PascalCase class name (e.g., PlayerController)
+//   {{DESCRIPTION}} — One-line summary of what this component does
+//
+// Conventions enforced:
+//   - sealed class by default (unseal only when inheritance is intended)
+//   - [SerializeField] private fields with m_ prefix (no public fields)
+//   - Cached references section to keep GetComponent calls in Awake
+//   - OnDestroy cleanup section to prevent leaks
+//   - Section headers with unicode box-drawing characters for scanability
+// ============================================================================
+
+using UnityEngine;
+
+namespace {{NAMESPACE}}
+{
+    /// <summary>
+    /// {{DESCRIPTION}}
+    /// </summary>
+    public sealed class {{CLASS_NAME}} : MonoBehaviour
+    {
+        // ══════════════════════════════════════════════════════════════
+        // Fields
+        // ══════════════════════════════════════════════════════════════
+
+        [Header("Configuration")]
+        [SerializeField] private float m_ExampleField;
+
+        // ══════════════════════════════════════════════════════════════
+        // Cached References
+        // ══════════════════════════════════════════════════════════════
+
+        // ══════════════════════════════════════════════════════════════
+        // Unity Lifecycle
+        // ══════════════════════════════════════════════════════════════
+
+        private void Awake()
+        {
+            // Cache GetComponent calls here
+        }
+
+        private void OnDestroy()
+        {
+            // Unsubscribe events, kill tweens, release resources
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Public Methods
+        // ══════════════════════════════════════════════════════════════
+
+        // ══════════════════════════════════════════════════════════════
+        // Private Methods
+        // ══════════════════════════════════════════════════════════════
+    }
+}

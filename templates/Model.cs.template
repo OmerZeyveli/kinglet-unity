@@ -1,0 +1,53 @@
+// ============================================================================
+// TEMPLATE: Model (MVS Architecture)
+// ============================================================================
+// Purpose:
+//   Pure C# data class that holds state via ReactiveProperty<T>. Part of the
+//   Model-View-System (MVS) pattern. Models contain NO logic, NO Unity API
+//   calls, and NO MonoBehaviour inheritance. They are owned by Systems and
+//   observed by Views.
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}   — Full namespace (e.g., MyGame.Player)
+//   {{CLASS_NAME}}  — PascalCase class name (e.g., PlayerModel)
+//   {{DESCRIPTION}} — One-line summary of the state this model holds
+//
+// Conventions enforced:
+//   - No using UnityEngine (except UnityEngine for Vector3/Quaternion value types)
+//   - No MonoBehaviour, no ScriptableObject
+//   - State exposed via ReactiveProperty<T> for observable bindings
+//   - Computed properties derived from reactive state
+//   - sealed class by default
+//
+// Note: If your project uses UniRx instead of R3, change "using R3;" to
+//       "using UniRx;" and adjust ReactiveProperty usage accordingly.
+// ============================================================================
+
+using UnityEngine;
+using R3;
+
+namespace {{NAMESPACE}}
+{
+    /// <summary>
+    /// {{DESCRIPTION}}
+    /// </summary>
+    public sealed class {{CLASS_NAME}}
+    {
+        // ══════════════════════════════════════════════════════════════
+        // Reactive State
+        // ══════════════════════════════════════════════════════════════
+
+        public ReactiveProperty<int> Health { get; } = new(100);
+        public ReactiveProperty<Vector3> Position { get; } = new(Vector3.zero);
+
+        // ══════════════════════════════════════════════════════════════
+        // Computed Properties
+        // ══════════════════════════════════════════════════════════════
+
+        public bool IsDead => Health.Value <= 0;
+
+        // ══════════════════════════════════════════════════════════════
+        // Plain State (non-reactive, for internal bookkeeping)
+        // ══════════════════════════════════════════════════════════════
+    }
+}

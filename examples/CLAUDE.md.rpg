@@ -1,0 +1,82 @@
+# RPG — Project Configuration
+
+## Project Overview
+- **Unity Version:** 2022.3 LTS
+- **Render Pipeline:** URP
+- **Genre:** Action RPG (Diablo-like / top-down)
+- **Target Platform:** iOS + Android
+- **Target FPS:** 30 (60fps on high-end)
+
+## Architecture
+
+### Assembly Structure
+```
+MyRPG.Core          — events, pooling, utilities, state machine, math
+MyRPG.Stats         — stat system, modifiers, level/XP
+MyRPG.Items         — inventory, equipment, crafting, loot
+MyRPG.Combat        — damage, abilities, cooldowns, status effects
+MyRPG.Quests        — quest definitions, objectives, tracking
+MyRPG.Dialogue      — dialogue trees, NPC interaction
+MyRPG.World         — scene management, spawners, interactables
+MyRPG.UI            — HUD, menus, inventory UI, dialogue UI
+MyRPG.Systems       — audio, save/load, settings, localization
+MyRPG.Editor        — quest editor, stat balancer, loot table editor
+```
+
+### Key Systems
+- **Stat System** — BaseStat + StatModifier (flat, percent add, percent multiply), ordering
+- **Inventory** — slot-based, stackable items, equipment slots, weight/capacity
+- **Combat** — real-time abilities, cooldowns, status effects (DoT, buff, debuff)
+- **Quest System** — QuestDefinition SO, objectives (Kill/Collect/Talk/Location), rewards
+- **Dialogue** — SO-based dialogue tree, choices, conditions, events
+- **Save System** — ISaveable on all persistent objects, JSON save files, auto-save
+- **Loot System** — weighted random tables, rarity tiers, procedural stats
+
+### Scene Structure
+- `S_Bootstrap` — persistent services (save, audio, input)
+- `S_MainMenu` — title, character select, load game
+- `S_Town` — hub area (shops, quest givers, crafting)
+- `S_Dungeon_XX` — dungeon levels (procedurally generated or hand-crafted)
+- `S_Boss_XX` — boss arenas
+
+## Skills to Load
+- `mobile` — ASTC textures, draw call budget, thermal management, safe areas
+- `rpg` — stat system, quests, skill trees, combat
+- `inventory-system` — items, equipment, crafting
+- `dialogue-system` — NPC conversations
+- `save-system` — full game state persistence
+- `state-machine` — game states, enemy AI, ability states
+- `procedural-generation` — dungeon generation, loot tables
+- `character-controller` — top-down movement (virtual joystick)
+- `navmesh` — enemy pathfinding
+- `ui-toolkit` — complex UI screens (safe area, touch targets)
+- `addressables` — asset loading, download-on-demand content
+
+## Rules
+Follow all rules in `.claude/rules/`.
+
+## Key Conventions
+- ALL game data is ScriptableObjects (items, abilities, enemies, quests, dialogue)
+- Stats use modifier stacking: Flat → PercentAdd → PercentMultiply
+- Equipment modifies stats by adding/removing StatModifiers
+- Abilities are ScriptableObjects with cooldown, cost, effect list
+- Status effects are timed stat modifiers + visual effects
+- Save system serializes by ISaveable.SaveKey → JSON data
+- Quests track progress via objective counters, fire events on complete
+
+## Input Map
+```
+Player:
+  Move — Virtual Joystick (left side)
+  Aim — Virtual Joystick (right side) / tap target
+  Attack — Auto-attack when in range / tap enemy
+  Ability1-4 — Skill buttons (bottom-right HUD)
+  Interact — Tap on NPC/object
+  Inventory — Inventory icon (top-right)
+  QuestLog — Quest icon (top-right)
+  Map — Map icon (top-left)
+  Dodge — Swipe or dodge button
+```
+
+## MCP Integration
+Unity MCP at `http://localhost:8080/mcp`. Use for dungeon scene construction, NPC placement, UI screen building.
