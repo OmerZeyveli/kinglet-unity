@@ -168,7 +168,7 @@ examples/CLAUDE.md.rpg	ecu	1.5.0	examples/CLAUDE.md.rpg	06ee9968fd08c22f512b41c7
 .gitignore	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 install.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 LICENSE	original	-	-	-	original	root-path-collides-with-ecu-but-ours
-MCP-SETUP.md	original	-	-	-	original	-
+MCP-SETUP.md	original	-	-	-	original	corrected against a live bridge: port is a machine-local EditorPref we cannot see; Unity official MCP shares no tool names
 MERGE-NOTES.md	original	-	-	-	original	-
 provenance-skip.tsv	original	-	-	-	original	-
 provenance.tsv	original	-	-	-	original	-

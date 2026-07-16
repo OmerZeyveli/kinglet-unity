@@ -64,8 +64,28 @@ This installs `com.coplaydev.unity-mcp` (the "MCP for Unity" editor package). Sw
    and registers it with the Claude CLI. Install Python/uv first if it flags them missing.
 3. If the bridge isn't already running, click **Start Bridge** (a.k.a. "Start Server").
 
-The bridge serves on `http://localhost:8080/mcp`, which matches the `settings.json` we ship. Keep the
-Unity Editor open while you work — the MCP tools talk to the live Editor.
+Keep the Unity Editor open while you work — the MCP tools talk to the live Editor.
+
+### If port 8080 is taken
+
+`settings.json` ships `http://localhost:8080/mcp` because that is the bridge's default. **We cannot
+detect the real one.** The Editor stores its HTTP URL in a machine-local EditorPref, not in the
+project — so if you change it in the MCP window, nothing in your repo records that, and the shipped
+default silently stops matching.
+
+This is not hypothetical: on a machine where an unrelated service already held 8080, `settings.json`
+pointed at that service instead of Unity. Worse, a naive reachability check *passes* — the other
+service answers HTTP perfectly well. It just isn't Unity.
+
+Set the port in the MCP window, then record it where per-machine settings belong:
+
+```jsonc
+// .claude/settings.local.json — gitignored, overrides settings.json
+{ "mcpServers": { "unityMCP": { "url": "http://127.0.0.1:8081/mcp" } } }
+```
+
+`./scripts/studio-doctor.sh --project-dir <project>` reads that file first and speaks JSON-RPC to
+whatever answers, so it tells you when something other than Unity is on the line.
 
 ---
 
@@ -82,19 +102,27 @@ the MCP window, and (c) `python3 --version` ≥ 3.10 and `uv --version` both suc
 
 ---
 
-## Switching to Unity's official MCP (optional)
+## Unity's official MCP is a different thing entirely
 
-cloud-nine-unity is **CoplayDev-only** by design, but nothing locks you in. If you later migrate to
-Unity's official MCP server, you would (instructions only — no code shipped here):
+Unity 6 ships its own MCP with `com.unity.ai.assistant`, run through a relay
+(`~/.unity/relay/relay_* --mcp`, stdio). **If you already have that, you do not have what this
+toolkit targets.** Both can be registered at once and both will say "Connected" — they are separate
+servers driving the same Editor.
 
-1. **Re-point the server** in your project's `.claude/settings.json`: replace the `unityMCP` entry
-   under `mcpServers` with the official server's connection (its relay command/URL, per Unity's MCP
-   docs). Keep the key name or update references consistently.
-2. **Update the tool names** in `.claude/skills/core/unity-mcp-patterns/SKILL.md`. CoplayDev exposes
-   `snake_case` tools (`manage_scene`, `manage_gameobject`, `batch_execute`, `read_console`,
-   `create_script`, …); the official server uses different names. Revise that skill's tool table —
-   and any `unity-*` agent that names tools directly — so the guidance stays accurate. It's an
-   ordinary file in this toolkit, so edit it freely; if you're sending the change back as a PR, see
-   `CONTRIBUTING.md` on marking it `modified` in `provenance.tsv`.
+They are not variants of one API. Measured side by side against the same running Editor:
 
-This toolkit does not support running both MCP servers at once — pick one.
+| | CoplayDev (what we target) | Unity official relay |
+|---|---|---|
+| Tools | 42 | 7 |
+| Naming | `snake_case` — `manage_scene`, `read_console` | `PascalCase` — `Unity_GetConsoleLogs`, `Unity_RunCommand` |
+| Shape | many typed tools, one per domain | one C# execution tool + screen captures + asset generation |
+| Overlap with our skill | complete | **none** |
+
+Every tool name in `unity-mcp-patterns`, and every `unity-*` agent that calls one, assumes CoplayDev.
+On the official relay **not one of them exists**. Migrating is not "update the tool names" — there is
+no mapping to update. `manage_gameobject`, `manage_prefabs`, `manage_scene` have no counterpart;
+the official server expects you to write C# and hand it to `Unity_RunCommand`. That is a rewrite of
+the skill and of the agents that name tools, against a fundamentally different design.
+
+So: pick CoplayDev, and keep the official relay for the things it is good at (scene captures, asset
+generation) if you want both — but do not expect this toolkit's guidance to apply to it.
