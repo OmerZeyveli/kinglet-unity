@@ -1,0 +1,85 @@
+# RPG — Project Configuration
+
+## Project Overview
+- **Unity Version:** 2022.3 LTS
+- **Render Pipeline:** URP
+- **Genre:** Action RPG (Diablo-like / top-down)
+- **Target Platform:** PC (Steam) + Console (PS5 / Xbox)
+- **Target FPS:** 60 baseline (min-spec PC and console performance mode); uncapped on high-refresh displays
+
+## Architecture
+
+### Assembly Structure
+```
+MyRPG.Core          — events, pooling, utilities, state machine, math
+MyRPG.Stats         — stat system, modifiers, level/XP
+MyRPG.Items         — inventory, equipment, crafting, loot
+MyRPG.Combat        — damage, abilities, cooldowns, status effects
+MyRPG.Quests        — quest definitions, objectives, tracking
+MyRPG.Dialogue      — dialogue trees, NPC interaction
+MyRPG.World         — scene management, spawners, interactables
+MyRPG.UI            — HUD, menus, inventory UI, dialogue UI
+MyRPG.Systems       — audio, save/load, settings, localization
+MyRPG.Editor        — quest editor, stat balancer, loot table editor
+```
+
+### Key Systems
+- **Stat System** — BaseStat + StatModifier (flat, percent add, percent multiply), ordering
+- **Inventory** — slot-based, stackable items, equipment slots, weight/capacity
+- **Combat** — real-time abilities, cooldowns, status effects (DoT, buff, debuff)
+- **Quest System** — QuestDefinition SO, objectives (Kill/Collect/Talk/Location), rewards
+- **Dialogue** — SO-based dialogue tree, choices, conditions, events
+- **Save System** — ISaveable on all persistent objects, JSON save files, auto-save
+- **Loot System** — weighted random tables, rarity tiers, procedural stats
+
+### Scene Structure
+- `S_Bootstrap` — persistent services (save, audio, input)
+- `S_MainMenu` — title, character select, load game
+- `S_Town` — hub area (shops, quest givers, crafting)
+- `S_Dungeon_XX` — dungeon levels (procedurally generated or hand-crafted)
+- `S_Boss_XX` — boss arenas
+
+## Skills to Load
+- `rpg` — stat system, quests, skill trees, combat
+- `inventory-system` — items, equipment, crafting
+- `dialogue-system` — NPC conversations
+- `save-system` — full game state persistence
+- `state-machine` — game states, enemy AI, ability states
+- `procedural-generation` — dungeon generation, loot tables
+- `character-controller` — top-down movement (WASD + mouse aim / gamepad twin-stick)
+- `navmesh` — enemy pathfinding
+- `ui-toolkit` — complex UI screens (ultrawide anchoring, gamepad focus navigation)
+- `addressables` — asset loading, DLC and post-launch content
+
+## Rules
+Follow all rules in `.claude/rules/`. Platform guidance — PC/console performance budgets, BC7/BC5
+texture compression, input and display handling — comes from `.claude/rules/pc-console.md`, which is
+always in force; there is no platform skill to load.
+
+## Key Conventions
+- ALL game data is ScriptableObjects (items, abilities, enemies, quests, dialogue)
+- Stats use modifier stacking: Flat → PercentAdd → PercentMultiply
+- Equipment modifies stats by adding/removing StatModifiers
+- Abilities are ScriptableObjects with cooldown, cost, effect list
+- Status effects are timed stat modifiers + visual effects
+- Save system serializes by ISaveable.SaveKey → JSON data
+- Quests track progress via objective counters, fire events on complete
+
+## Input Map
+```
+Player:
+  Move — WASD / Left Stick
+  Aim — Mouse position / Right Stick
+  Attack — Left Mouse / Right Trigger
+  Ability1-4 — 1-4 keys / Face buttons + shoulders
+  Interact — E / A button (nearest interactable)
+  Inventory — I / Y button
+  QuestLog — J / D-pad Up
+  Map — M / D-pad Down
+  Dodge — Space / B button
+```
+Every binding is rebindable, and the HUD swaps prompts when the player switches between keyboard/mouse
+and gamepad mid-session (see `.claude/rules/pc-console.md`).
+
+## MCP Integration
+Unity MCP at `http://localhost:8080/mcp`. Use for dungeon scene construction, NPC placement, UI screen building.

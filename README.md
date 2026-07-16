@@ -1,56 +1,66 @@
 # cloud-nine-unity
 
-**A PC/console design-and-production overlay for [everything-claude-unity (ECU)](https://github.com/XeldarAlz/everything-claude-unity).**
+**A standalone, PC/console-focused Claude Code toolkit for Unity 6.** One repo, one installer.
 
-cloud-nine-unity is **not a standalone toolkit.** It is an *overlay*: you install ECU first, then
-apply this on top. It adds a **game-design and production discipline** — design agents, GDD/ADR/
-sprint workflows, and a PC/console rules addendum — adapted from
-[Claude-Code-Game-Studios (Donchitos)](https://github.com/Donchitos/Claude-Code-Game-Studios) and
-fitted to ECU's conventions. It targets the open-source
-[CoplayDev Unity MCP](https://github.com/CoplayDev/unity-mcp) that ECU already wires up.
+It gives Claude Code two layers for your Unity project: an **engineering** layer that drives the
+Unity Editor over MCP (coder, reviewer, optimizer, scene-builder agents; `/unity-*` commands; safety
+hooks; architecture rules), and a **design & production** layer that writes GDDs, ADRs, and sprint
+plans into `docs/`.
 
-> **Honest positioning:** ECU gives you the *engineering* side (Unity coder/reviewer agents,
-> `unity-*` commands, architecture rules, hooks, MCP). This overlay adds the *design & production*
-> side and narrows the focus to PC/console. No "toolkit from scratch" claims — the heavy lifting is
-> ECU's and Donchitos's; this glues a focused slice of them together. Built and tested against
-> **ECU v1.5.0**.
+> **Honest positioning:** almost none of this is written from scratch. The engineering layer is
+> [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (MIT), vendored
+> wholesale. The design layer is adapted from
+> [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) (MIT). What this
+> project adds is the merge: one installer instead of two, PC/console instead of mobile, a provenance
+> manifest so you can see exactly whose code is whose, and fixes to a handful of upstream defects —
+> including one that destroyed your `CLAUDE.md` on re-install. See [CREDITS.md](CREDITS.md) and
+> [MERGE-NOTES.md](MERGE-NOTES.md).
 
 ---
 
 ## What's opinionated
 
-- **PC / Console only.** Nothing mobile-specific. Keyboard/mouse + gamepad (with rebinding), no
-  touch. Desktop/console performance framing (see `pc-console.md`).
+- **PC / console only.** No mobile. Keyboard/mouse + gamepad with rebinding, no touch. Desktop and
+  console performance framing throughout. This is enforced by a test, not just requested.
 - **Fixed architecture:** Unity 6 · C# · **VContainer** (DI) + **MessagePipe** (messaging) +
-  **UniTask** (async) + New Input System — inherited from ECU and preserved, not re-litigated.
-- **Medium-weight process.** Enough structure for a solo dev or small team; none of the heavy
-  full-studio gate ceremony. Senior "creative/technical director" reviews are *optional*, not gates.
-- **CoplayDev MCP only.** One MCP server (the one ECU already points at). A short migration note for
-  Unity's official MCP is in `MCP-SETUP.md`, but the overlay supports one at a time.
+  **UniTask** (async) + New Input System. Legacy `Input.*` is blocked by a hook.
+- **Medium-weight process.** Enough structure for a solo dev or small team. Senior
+  "creative/technical director" reviews are optional, not gates.
+- **One MCP.** The open-source [CoplayDev Unity MCP](https://github.com/CoplayDev/unity-mcp) bridge,
+  preconfigured in `settings.json`. A migration note for Unity's official MCP is in
+  [MCP-SETUP.md](MCP-SETUP.md), but only one at a time is supported.
 
----
+## What's in the box
 
-## What it adds (on top of ECU)
+Installed into your project's `.claude/`:
 
-**8 design/production agents** (a documentation layer — they write design docs to `docs/`, they do
-**not** write C# or drive the editor):
+| | Count | |
+|---|---|---|
+| **Agents** | 28 | 20 engineering (`unity-coder`, `unity-reviewer`, `unity-optimizer`, …) + 8 design |
+| **Commands** | 36 | 27 `/unity-*` + 9 design/production |
+| **Skills** | 39 | Unity subsystems, gameplay patterns, genres, third-party packages |
+| **Hooks** | 25 | Safety and quality gates (5 blocking, the rest advisory) |
+| **Rules** | 6 | 5 spine rules + `pc-console.md` |
+| **Templates** | 5 | GDD, ADR, sprint plan, game concept, systems index |
+
+### The design & production layer
+
+These 8 agents are a **documentation layer** — they write design docs to `docs/`. They do not write
+C# or drive the editor; the engineering agents own that.
 
 | Agent | Role |
 |-------|------|
 | `game-designer` | Core loops, systems, progression, balance |
 | `systems-designer` | Formulas, interaction matrices, economy/loot tuning |
 | `level-designer` | Spatial layouts, encounters, pacing |
-| `narrative-director`* | Story architecture, world direction, dialogue strategy |
-| `writer`* | Dialogue, lore, item text, barks |
-| `world-builder`* | Factions, history, geography, lore consistency |
+| `narrative-director`\* | Story architecture, world direction, dialogue strategy |
+| `writer`\* | Dialogue, lore, item text, barks |
+| `world-builder`\* | Factions, history, geography, lore consistency |
 | `creative-director` | Vision keeper / senior design reviewer (verdict role) |
 | `technical-director` | Architecture authority / feasibility reviewer (writes ADRs) |
 
-\* Narrative trio is **optional** — for narrative-heavy games. If your game isn't story-driven, you
-can simply delete `narrative-director.md`, `writer.md`, and `world-builder.md` from
-`.claude/agents/` after install. Harmless to leave in place.
-
-**9 commands:**
+\* The narrative trio is optional — delete those three files from `.claude/agents/` if your game
+isn't story-driven. Harmless to leave.
 
 | Command | What it does |
 |---------|--------------|
@@ -64,60 +74,49 @@ can simply delete `narrative-director.md`, `writer.md`, and `world-builder.md` f
 | `/estimate` | Structured effort estimate with confidence |
 | `/retrospective` | Sprint/milestone retrospective with action items |
 
-**1 rule:** `pc-console.md` — neutralizes ECU's mobile assumptions; adds PC/console input &
-performance notes. ECU's rules remain the spine and **win on any conflict.**
-
-**5 templates** (install to `.claude/templates/`): `game-design-document`,
-`architecture-decision-record`, `sprint-plan`, `game-concept`, `systems-index`.
-
-> Design and production documents are written into a `docs/` tree (`docs/design`, `docs/adr`,
-> `docs/production`) **in your Unity project** — created on demand by the commands. They are not part
-> of this overlay repo, and they live outside `Assets/` so Unity doesn't import them.
+Design and production documents are written into a `docs/` tree in **your Unity project**, created on
+demand, outside `Assets/` so Unity doesn't import them.
 
 ---
 
 ## Installation
 
-Order matters: **ECU → overlay → MCP.**
-
-### 1. Install ECU into your Unity project
-
-Follow [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity)'s own
-instructions (clone it, then run its `install.sh --project-dir /path/to/your/UnityProject`). This
-creates `.claude/` in your project with ECU's agents, commands, rules, hooks, and `settings.json`.
-
-### 2. Apply this overlay
-
 ```bash
-git clone https://github.com/<you>/cloud-nine-unity.git
+git clone https://github.com/OmerZeyveli/cloud-nine-unity.git
 cd cloud-nine-unity
 ./install.sh --project-dir /path/to/your/UnityProject
-# optional: also add the CoplayDev MCP package to Packages/manifest.json
+
+# optionally add the CoplayDev MCP package to Packages/manifest.json at the same time
 ./install.sh --project-dir /path/to/your/UnityProject --with-mcp
 ```
 
-`install.sh` checks that ECU is present, then copies the overlay's agents/commands/rules/templates
-**next to** ECU's under `.claude/` — it **warns and skips** on any filename clash and never
-overwrites. It does **not** touch ECU's `settings.json` (just verifies the MCP entry exists).
+That's the whole thing. There is no prerequisite toolkit to install first.
 
-### 3. Set up the Unity MCP
+The installer scans your project (Unity version, render pipeline, packages, asmdefs, scenes), copies
+the payload into `.claude/`, and generates a `CLAUDE.md` with a vision section for you to fill in and
+an auto-detected facts section. Use `--dry-run` to see what it would do, `--yes` for
+non-interactive.
 
-Follow **[MCP-SETUP.md](MCP-SETUP.md)**: add the CoplayDev package via Package Manager git URL,
-run **Window → MCP for Unity → Auto-Setup**, start the bridge, and verify from Claude Code with
-*"What's in the current scene?"* (Python 3.10+ and `uv` required; **no API key**).
+**Re-installing is safe.** Every file written is recorded in `.claude/state/install-receipt.tsv` with
+its checksum. On upgrade, files you edited are reported and kept. In `CLAUDE.md`, only the region
+between the `cloud-nine-unity:generated` markers is refreshed — your prose is left byte-for-byte.
+
+### Then set up the MCP bridge
+
+Follow **[MCP-SETUP.md](MCP-SETUP.md)**: add the CoplayDev package via Package Manager git URL, run
+**Window → MCP for Unity → Auto-Setup**, start the bridge, and verify from Claude Code with *"What's
+in the current scene?"* (Python 3.10+ and `uv` required; no API key.)
 
 ### Health check & uninstall
 
 ```bash
-./scripts/studio-doctor.sh --project-dir /path/to/your/UnityProject   # checks Python/uv/MCP + files
-./uninstall.sh --project-dir /path/to/your/UnityProject               # removes only overlay files
+./scripts/studio-doctor.sh --project-dir /path/to/your/UnityProject
+./uninstall.sh --project-dir /path/to/your/UnityProject
 ```
 
-### Fill in your project
-
-Copy `CLAUDE.md` (the end-user **template**) into your project root (or merge it into the one ECU
-generated) and fill in the `FILL:` markers — genre, pillars, vision, scope. The architecture
-section is fixed on purpose.
+`uninstall.sh` removes only files listed in the receipt whose checksum still matches — so anything
+you edited, and anything you wrote yourself, stays. Without a receipt it refuses rather than
+guessing.
 
 ---
 
@@ -129,40 +128,41 @@ section is fixed on purpose.
 /map-systems                        → docs/design/systems-index.md
 /design-system player-controller    → docs/design/player-controller.md
 /design-review docs/design/player-controller.md
-/unity-feature  (ECU — implements the approved GDD in the editor via MCP)
+/unity-feature                      → implements the approved GDD in the editor via MCP
 /sprint-plan new                    → docs/production/sprints/sprint-1.md
 /scope-check sprint-1   ·   /retrospective sprint-1
 ```
 
 ---
 
-## Compatibility note (please read)
+## Provenance
 
-This overlay leans on ECU's file layout: `install.sh` detects ECU via
-`.claude/rules/architecture.md` + `.claude/skills/core/unity-mcp-patterns/SKILL.md`, and drops files
-alongside ECU's. **ECU is actively developed** — if a future release moves or renames those files,
-detection and placement may break. The overlay is pinned to and tested against **ECU v1.5.0**;
-re-verify before using it with a newer ECU.
+Because this repo contains other people's code, it tracks whose:
 
----
+- **`provenance.tsv`** — one row per file: origin (`ecu` / `donchitos` / `original`), upstream
+  version and path, upstream checksum, and whether we modified it. Currently 201 rows: 158 from ECU
+  (120 byte-identical, 38 modified by the mobile strip and the upstream fixes), 22 adapted from
+  Donchitos, 21 original.
+- **`provenance-skip.tsv`** — what we deliberately did *not* vendor, and why. This is what stops a
+  future upstream sync from quietly reintroducing the mobile content.
+- **`scripts/check-provenance.sh`** — validates the manifest in both directions: no rows without
+  files, no files without rows. `--online` re-fetches the pinned upstream and verifies every
+  `verbatim` row still matches.
+- **`.claude/UPSTREAM`** — the pinned versions, shipped into your project alongside
+  **`.claude/NOTICE.md`**, which carries the upstream MIT notices as their licenses require.
 
-## Optional: removing ECU's mobile content
-
-ECU includes a mobile skill and a couple of mobile genres. On a PC/console project they simply never
-trigger, so you can ignore them. If you want a clean tree, you may delete
-`.claude/skills/platform/mobile/` (and `genre/hyper-casual`, `genre/endless-runner`). This is
-optional — `pc-console.md` already tells the agents to ignore mobile assumptions.
+Vendoring trades one risk for another. The old overlay broke whenever ECU moved a file; that risk is
+gone. The new one is staleness — upstream fixes no longer reach us on their own. `provenance.tsv` is
+what makes a future diff against a newer ECU tractable rather than archaeological.
 
 ---
 
 ## Credits & License
 
-- **License:** MIT — see [LICENSE](LICENSE).
-- **Credits & third-party licenses:** [CREDITS.md](CREDITS.md). The design/production layer is
-  **adapted from Donchitos** (attribution required and provided, inline + central); ECU and CoplayDev
-  are integrated dependencies, credited there too.
-- **Build record:** [MERGE-NOTES.md](MERGE-NOTES.md) documents exactly what was taken, adapted, and left out.
+- **License:** MIT — see [LICENSE](LICENSE). Copyright (c) 2026 OmerZeyveli.
+- **Credits & third-party licenses:** [CREDITS.md](CREDITS.md). ECU is vendored and Donchitos is
+  adapted; both are MIT and both are attributed there in full.
+- **Build record:** [MERGE-NOTES.md](MERGE-NOTES.md) — what was taken, adapted, fixed, and left out.
 
 > **Support:** this is a **low-support** project — issues and PRs are welcome but may be slow. See
-> [CONTRIBUTING.md](CONTRIBUTING.md) for where help is most useful (PC/console design skills,
-> production commands).
+> [CONTRIBUTING.md](CONTRIBUTING.md).

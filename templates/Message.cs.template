@@ -1,0 +1,47 @@
+// ============================================================================
+// TEMPLATE: Message (MessagePipe)
+// ============================================================================
+// Purpose:
+//   Readonly struct used as a MessagePipe message for decoupled communication
+//   between Systems and Views. Zero heap allocation. Immutable by design.
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}   — Full namespace (e.g., MyGame.Messages)
+//   {{STRUCT_NAME}} — PascalCase struct name (e.g., PlayerDiedMessage)
+//   {{DESCRIPTION}} — One-line summary of when this message is published
+//
+// Conventions enforced:
+//   - readonly struct (zero allocation, value type)
+//   - All fields are public readonly
+//   - Constructor assigns all fields
+//   - No methods — messages are pure data
+//
+// Registration in LifetimeScope:
+//   builder.RegisterMessageBroker<{{STRUCT_NAME}}>(messagePipeOptions);
+//
+// Publishing:
+//   IPublisher<{{STRUCT_NAME}}> publisher; // injected
+//   publisher.Publish(new {{STRUCT_NAME}}(...));
+//
+// Subscribing:
+//   ISubscriber<{{STRUCT_NAME}}> subscriber; // injected
+//   subscriber.Subscribe(msg => { ... }).AddTo(disposables);
+// ============================================================================
+
+namespace {{NAMESPACE}}
+{
+    /// <summary>
+    /// {{DESCRIPTION}}
+    /// </summary>
+    public readonly struct {{STRUCT_NAME}}
+    {
+        public readonly int Amount;
+        public readonly UnityEngine.Vector3 Position;
+
+        public {{STRUCT_NAME}}(int amount, UnityEngine.Vector3 position)
+        {
+            Amount = amount;
+            Position = position;
+        }
+    }
+}

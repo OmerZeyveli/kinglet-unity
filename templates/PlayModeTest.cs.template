@@ -1,0 +1,81 @@
+// ============================================================================
+// TEMPLATE: PlayMode Test
+// ============================================================================
+// Purpose:
+//   Integration tests that run with the full Unity Player loop active. Use
+//   for testing MonoBehaviour lifecycle (Awake, Start, Update), coroutines,
+//   physics interactions, and any behavior that requires frames to advance.
+//   These are slower than EditMode tests — prefer EditMode when possible.
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}    — Base namespace of the code under test (e.g., MyGame.Player)
+//   {{CLASS_NAME}}   — PascalCase name of the class under test (e.g., PlayerController)
+//   {{TARGET_CLASS}} — Same as CLASS_NAME (used in the summary and commented-out lines)
+//
+// Conventions enforced:
+//   - Test fixture in {{NAMESPACE}}.Tests.Runtime to mirror source layout
+//   - Test class named {{CLASS_NAME}}Tests
+//   - [UnitySetUp] / [UnityTearDown] as IEnumerator for frame-accurate setup
+//   - [UnityTest] returning IEnumerator for tests that need frames to pass
+//   - Test method naming: MethodName_Condition_ExpectedResult
+//   - Arrange / Act / Assert comment structure in every test
+//   - Proper GameObject cleanup in TearDown to prevent scene pollution
+//   - Section headers with unicode box-drawing characters for scanability
+// ============================================================================
+
+using System.Collections;
+using NUnit.Framework;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+namespace {{NAMESPACE}}.Tests.Runtime
+{
+    /// <summary>
+    /// PlayMode tests for {{TARGET_CLASS}}.
+    /// Runs in Play mode with full Unity lifecycle (Awake, Start, Update).
+    /// Use for integration tests and MonoBehaviour behavior validation.
+    /// </summary>
+    [TestFixture]
+    public sealed class {{CLASS_NAME}}Tests
+    {
+        // ══════════════════════════════════════════════════════════════
+        // Setup / Teardown
+        // ══════════════════════════════════════════════════════════════
+
+        private GameObject m_TestObject;
+
+        [UnitySetUp]
+        public IEnumerator SetUp()
+        {
+            m_TestObject = new GameObject("TestObject");
+            yield return null; // Wait one frame for Awake/Start
+        }
+
+        [UnityTearDown]
+        public IEnumerator TearDown()
+        {
+            if (m_TestObject != null)
+            {
+                Object.Destroy(m_TestObject);
+            }
+            yield return null;
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Tests — MethodName_Condition_ExpectedResult
+        // ══════════════════════════════════════════════════════════════
+
+        [UnityTest]
+        public IEnumerator ExampleBehaviour_AfterOneFrame_IsInitialized()
+        {
+            // Arrange
+            // var component = m_TestObject.AddComponent<{{TARGET_CLASS}}>();
+
+            // Act
+            yield return null; // Wait one frame
+
+            // Assert
+            Assert.Pass("Replace with actual test");
+        }
+    }
+}

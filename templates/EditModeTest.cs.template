@@ -1,0 +1,66 @@
+// ============================================================================
+// TEMPLATE: EditMode Test
+// ============================================================================
+// Purpose:
+//   Unit tests that run in the Unity Editor without entering Play mode. These
+//   are fast, deterministic, and require no scene setup. Use for testing pure
+//   logic, data transformations, ScriptableObject configuration, and any code
+//   that does not depend on the Unity lifecycle (Awake, Start, Update).
+//
+// Placeholders to replace:
+//   {{NAMESPACE}}    — Base namespace of the code under test (e.g., MyGame.Player)
+//   {{CLASS_NAME}}   — PascalCase name of the class under test (e.g., HealthSystem)
+//   {{TARGET_CLASS}} — Same as CLASS_NAME (used in the summary for clarity)
+//
+// Conventions enforced:
+//   - Test fixture in {{NAMESPACE}}.Tests.Editor to mirror source layout
+//   - Test class named {{CLASS_NAME}}Tests
+//   - Test method naming: MethodName_Condition_ExpectedResult
+//   - Arrange / Act / Assert comment structure in every test
+//   - SetUp and TearDown stubs to encourage proper test isolation
+//   - Section headers with unicode box-drawing characters for scanability
+// ============================================================================
+
+using NUnit.Framework;
+
+namespace {{NAMESPACE}}.Tests.Editor
+{
+    /// <summary>
+    /// EditMode tests for {{TARGET_CLASS}}.
+    /// Runs in Editor without Play mode — fast, no scene needed.
+    /// </summary>
+    [TestFixture]
+    public sealed class {{CLASS_NAME}}Tests
+    {
+        // ══════════════════════════════════════════════════════════════
+        // Setup / Teardown
+        // ══════════════════════════════════════════════════════════════
+
+        [SetUp]
+        public void SetUp()
+        {
+            // Create test instances, initialize state
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            // Clean up test instances
+        }
+
+        // ══════════════════════════════════════════════════════════════
+        // Tests — MethodName_Condition_ExpectedResult
+        // ══════════════════════════════════════════════════════════════
+
+        [Test]
+        public void ExampleMethod_WhenCalled_ReturnsExpectedResult()
+        {
+            // Arrange
+
+            // Act
+
+            // Assert
+            Assert.Pass("Replace with actual test");
+        }
+    }
+}

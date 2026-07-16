@@ -1,0 +1,40 @@
+// ============================================================================
+// TEMPLATE: Assembly Definition (.asmdef)
+// ============================================================================
+// Purpose:
+//   Defines a compilation unit (assembly) in Unity. Every folder that should
+//   compile independently needs one of these. Use to control dependencies,
+//   speed up compilation, and enforce architectural boundaries.
+//
+// Placeholders to replace:
+//   {{ASSEMBLY_NAME}}   — Dot-separated assembly name (e.g., MyGame.Player)
+//   {{ROOT_NAMESPACE}}  — Root namespace matching the assembly (e.g., MyGame.Player)
+//
+// Conventions enforced:
+//   - Assembly name matches root namespace for consistency
+//   - references array is empty by default — add only explicit dependencies
+//   - allowUnsafeCode is false by default — enable only when necessary
+//   - autoReferenced is true so the assembly is available to other assemblies
+//   - noEngineReferences is false — set true only for pure-logic assemblies
+//
+// Common modifications:
+//   - Add test assemblies to references for test .asmdef files
+//   - Set includePlatforms to ["Editor"] for editor-only assemblies
+//   - Add "UNITY_INCLUDE_TESTS" to defineConstraints for test assemblies
+//   - Set overrideReferences to true and add to precompiledReferences for
+//     third-party DLLs
+// ============================================================================
+{
+    "name": "{{ASSEMBLY_NAME}}",
+    "rootNamespace": "{{ROOT_NAMESPACE}}",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

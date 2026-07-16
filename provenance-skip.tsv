@@ -1,0 +1,31 @@
+# cloud-nine-unity — upstream content we deliberately did NOT vendor
+#
+# The audit trail for what we left behind, so a future ECU bump reports "still skipped" instead of
+# silently reinstating content we removed on purpose. scripts/check-provenance.sh enforces it:
+# every rule=absent path must stay absent, and every rule=ours-wins path must be origin=original.
+#
+# rule:
+#   absent     — this path must NOT exist in the repo. check-provenance.sh fails if it reappears.
+#                This is what makes the mobile strip stick.
+#   ours-wins  — upstream has this path; we ship our own file there instead. The path exists, but
+#                its content is ours and provenance.tsv marks it origin=original.
+#
+# upstream_path<TAB>upstream<TAB>rule<TAB>reason
+benchmarks/	ecu	absent	ECU's own agent-benchmarking harness; meaningless for this toolkit, pure maintenance load
+upgrade.sh	ecu	absent	ECU-specific upgrade flow; superseded by our receipt-driven re-install
+.claude-plugin/	ecu	absent	single-installer distribution only; upstream copy was stale (1.3.0, counts 20/22/41/22)
+.claude/VERSION	ecu	ours-wins	ours to own — vendoring ECU's would claim this toolkit IS ECU 1.5.0
+docs/i18n/	ecu	absent	6 translated READMEs asserting the overlay positioning we remove; unmaintainable solo
+docs/BENCHMARK-GUIDE.md	ecu	absent	documents benchmarks/, which we skip; would dangle
+docs/MCP-SETUP.md	ecu	absent	collides with our root MCP-SETUP.md; ours is CoplayDev-scoped and wins
+README.md	ecu	ours-wins	different product; ours describes the standalone toolkit
+LICENSE	ecu	ours-wins	ours; ECU's notice is reproduced verbatim in CREDITS.md as MIT requires
+CONTRIBUTING.md	ecu	ours-wins	different contribution contract (vendoring, not overlaying)
+CLAUDE.md	ecu	ours-wins	ours is the guide for this repo
+CHANGELOG.md	ecu	absent	ECU's release history would misrepresent ours; we start a fresh one
+.gitignore	ecu	ours-wins	ours predates the vendor and covers the same ground
+.claude/skills/platform/mobile/SKILL.md	ecu	absent	PC/console only. NOT inert upstream: alwaysApply:true + globs **/*.cs loaded it on every C# file
+.claude/skills/genre/hyper-casual/SKILL.md	ecu	absent	mobile genre; globs **/Level*.cs, **/GameManager*.cs pulled ad-monetization guidance into PC projects
+.claude/skills/genre/endless-runner/SKILL.md	ecu	absent	mobile genre; globs **/Chunk*.cs, **/Obstacle*.cs
+examples/CLAUDE.md.hyper-casual	ecu	absent	mobile example
+examples/CLAUDE.md.mobile-casual	ecu	absent	mobile example

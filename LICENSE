@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 cloud-nine-unity contributors
+Copyright (c) 2026 OmerZeyveli
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,9 +22,17 @@ SOFTWARE.
 
 ---
 
-This project is an overlay that adapts files from, depends on, and integrates
-third-party MIT-licensed projects. Their copyright notices and license terms
-are reproduced in CREDITS.md, as required by the MIT License. In particular,
-the design/production agents, commands, and templates under `overlay/` are
-adapted from Claude-Code-Game-Studios (Donchitos), and each adapted file
-carries an inline attribution comment.
+This project vendors and adapts third-party MIT-licensed material. Their
+copyright notices and license terms are reproduced verbatim in CREDITS.md and
+in .claude/NOTICE.md, as the MIT License requires.
+
+  - everything-claude-unity (XeldarAlz) — vendored at v1.5.0. Most of .claude/
+    and the repo's scripts/, tests/, docs/, examples/, and templates/ derive
+    from it.
+  - Claude-Code-Game-Studios (Donchitos) — adapted. The design/production
+    agents, commands, and templates derive from it; each carries an inline
+    attribution comment.
+
+provenance.tsv records, per file, which upstream it came from and whether it
+was modified. .claude/NOTICE.md ships into installed projects so the notices
+travel with the copies, as the license requires.
