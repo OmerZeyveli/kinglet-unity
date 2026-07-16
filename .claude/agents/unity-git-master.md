@@ -124,17 +124,13 @@ Ensure Unity-standard ignores are present:
 Thumbs.db
 
 # Build artifacts
-*.apk
-*.aab
-*.ipa
+Builds/
+Build/
 *.exe
+*.dmg
 
-# Crashlytics
+# Crash reporting
 crashlytics-build.properties
-
-# Gradle (Android)
-ExportedObj/
-.gradle/
 
 # Packages
 Packages/packages-lock.json

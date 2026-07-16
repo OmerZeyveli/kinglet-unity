@@ -4,8 +4,8 @@
 - **Unity Version:** 2022.3 LTS
 - **Render Pipeline:** URP (2D Renderer)
 - **Genre:** 2D side-scrolling platformer
-- **Target Platform:** iOS + Android
-- **Target FPS:** 60 (30fps on low-end)
+- **Target Platform:** PC (Steam) + Console (PS5 / Xbox)
+- **Target FPS:** 60 baseline on min-spec; uncapped on high-refresh displays
 
 ## Architecture
 
@@ -31,14 +31,13 @@ MyGame.Editor       — custom inspectors, level tools
 - `S_Level_01` through `S_Level_XX` — game levels (additive loaded)
 
 ## Skills to Load
-- `mobile` — ASTC textures, draw call budget, thermal management, safe areas
 - `character-controller` — coyote time, input buffer, wall jump
 - `platformer-2d` — level design patterns, boss patterns
 - `state-machine` — player and enemy states
 - `physics` — 2D colliders, layers, one-way platforms
 - `animation` — Animator controllers, blend trees
 - `save-system` — checkpoint persistence
-- `input-system` — touch input, virtual buttons
+- `input-system` — keyboard/mouse and gamepad action maps, runtime rebinding, device switching
 
 ## Rules
 Follow all rules in `.claude/rules/`:
@@ -47,6 +46,7 @@ Follow all rules in `.claude/rules/`:
 - `.claude/rules/serialization.md`
 - `.claude/rules/architecture.md`
 - `.claude/rules/unity-specifics.md`
+- `.claude/rules/pc-console.md` — PC/console input, performance, and display addendum
 
 ## Key Conventions
 - Player physics in `FixedUpdate`, input reading in `Update`
@@ -59,12 +59,13 @@ Follow all rules in `.claude/rules/`:
 ## Input Map
 ```
 Player:
-  Move — Virtual Joystick (left side of screen)
-  Jump — Virtual Button (right side, bottom)
-  Dash — Virtual Button (right side, upper)
-  Attack — Virtual Button (right side, middle)
-  Interact — Tap on interactable object
+  Move — A/D keys / Left Stick
+  Jump — Space / A button
+  Dash — Left Shift / Right Trigger
+  Attack — Left Mouse / X button
+  Interact — E / Y button (nearest interactable)
 ```
+Every binding is rebindable, and UI prompts follow the active device (see `.claude/rules/pc-console.md`).
 
 ## Physics Layers
 ```

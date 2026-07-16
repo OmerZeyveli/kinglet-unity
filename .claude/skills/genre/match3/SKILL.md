@@ -213,9 +213,12 @@ private IEnumerator CascadeLoop()
 | Color bomb + any | Clears all tiles of that color |
 | Color bomb + Color bomb | Clears entire board |
 
-## Touch Input for Swap
+## Swap Input (Mouse + Gamepad)
 
-- Drag threshold: 0.5 cells (half the cell size)
+- **Mouse:** click-drag a tile; drag threshold 0.5 cells (half the cell size). Clicking two adjacent
+  tiles in sequence should swap them too — some players never drag
+- **Gamepad:** move a cell-snapped cursor with D-pad/left stick, confirm to select, then a direction
+  press swaps with that neighbour
 - Only allow horizontal/vertical swaps (snap to nearest direction)
 - Invalid swap: animate swap then swap back
 - Disable input during cascade animation

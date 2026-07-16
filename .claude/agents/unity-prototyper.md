@@ -94,29 +94,34 @@ Report to user:
 - Platform (one-way, moving)
 - Camera: Cinemachine 2D confiner
 
-### Top-Down Prototype (Touch)
-- PlayerController (virtual joystick movement, tap-to-aim)
-- Projectile/weapon system (auto-fire or tap-to-shoot)
+### Top-Down Prototype (Twin-Stick)
+- PlayerController (WASD / left-stick movement, mouse-position or right-stick aim)
+- Projectile/weapon system (hold-to-fire, auto-fire)
 - Enemy spawner (basic wave)
 - Camera: Cinemachine top-down follow
 
-### Endless Runner Prototype (Swipe)
-- LaneRunner (3-lane, swipe left/right, swipe up/down for jump/slide)
+### Lane Runner Prototype (Keyboard + Gamepad)
+- LaneRunner (3-lane, A/D or left-stick to switch lanes, Space to jump, Ctrl to slide)
 - ChunkSpawner (procedural obstacles)
 - SpeedManager (progressive difficulty)
 - Camera: fixed follow behind player
 
-### Hyper-Casual Prototype (Tap)
-- One-tap controller (tap = primary action)
+### One-Button Arcade Prototype
+- Single-action controller (Space / gamepad south = primary action)
 - Obstacle/collectible spawner
 - Score display (Debug.Log for prototype)
 - Camera: fixed angle, auto-follow
 
-### Match-3 Prototype (Touch Drag)
+### Grid Puzzle Prototype (Mouse Drag)
 - Board (grid system, tile spawning)
 - MatchDetector (3+ in a row/column)
-- Touch swap input (drag tile to adjacent)
+- Swap input — mouse click-drag to adjacent tile, plus a gamepad cursor (D-pad move, south to grab)
 - Cascade/gravity/refill loop
+
+### First-Person Prototype (Mouse Look)
+- FPSController (WASD + mouse look, gamepad stick look with sensitivity/invert options)
+- Interaction raycast (look-at + use key)
+- Camera: first-person, configurable FOV
 
 ### Physics Puzzle Prototype
 - Interactable objects (grab, throw)

@@ -32,7 +32,7 @@ Gather project context automatically and ask targeted questions:
 3. **Scan** existing assembly definitions to understand project structure
 4. Ask about:
    - **Performance budget** — target FPS? Memory ceiling? Max draw calls?
-   - **Platform constraints** — mobile thermal throttling? WebGL size limits?
+   - **Platform constraints** — what is the min-spec PC? Fixed console budget? GPU vendor variance (NVIDIA/AMD/Intel)?
    - **Unity subsystems** — physics, UI, animation, audio, networking, addressables?
    - **Data persistence** — does any state need saving? What format?
    - **Multiplayer** — any networked aspects? Authority model?
@@ -43,7 +43,7 @@ For each major component identified in Phase 1-2, systematically explore:
 
 1. **Error states** — what happens when things go wrong? (null references, missing assets, network failure)
 2. **Boundary conditions** — minimum/maximum values, empty collections, zero-duration timers
-3. **Platform differences** — does this behave differently on iOS vs Android? Editor vs build?
+3. **Platform differences** — does this behave differently on PC vs console? Across GPU vendors? Editor vs build? IL2CPP vs Mono?
 4. **Race conditions** — scene transitions, async operations, destruction timing
 5. **Performance under load** — what happens with 100x the expected entities/items/particles?
 6. **Undo/reset** — can the player undo this action? What happens on scene reload?

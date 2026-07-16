@@ -33,7 +33,7 @@ Present a profile report:
 - Bottleneck: CPU / GPU / balanced
 
 **Rendering:**
-- Draw calls: X (budget: <100 mobile, <2000 desktop)
+- Draw calls: X (budget: <1500 min-spec PC, <3000 console, <5000 high-end PC)
 - Batches: X (SRP Batcher efficiency)
 - Triangles: X
 - Set pass calls: X

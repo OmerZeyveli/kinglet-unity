@@ -15,9 +15,9 @@ The URP Pipeline Asset controls global rendering settings. Create via Assets > C
 | Setting | Recommended | Notes |
 |---------|-------------|-------|
 | HDR | Enabled | Required for Bloom and color grading |
-| Anti-Aliasing | MSAA 4x or FXAA | MSAA on mobile, FXAA on desktop |
-| Shadow Resolution | 2048 (desktop) / 1024 (mobile) | Balance quality vs performance |
-| Shadow Cascade Count | 4 (desktop) / 2 (mobile) | More cascades = better shadow distribution |
+| Anti-Aliasing | MSAA 4x | Affordable on desktop/console. Add SMAA or TAA per-camera for edge quality |
+| Shadow Resolution | 2048–4096 | Desktop/console have the headroom; drop it in the low quality preset |
+| Shadow Cascade Count | 4 | More cascades = better shadow distribution |
 | Shadow Distance | 50-150 | Depends on game scale |
 | SRP Batcher | Enabled | Major draw call optimization |
 | Dynamic Batching | Disabled when SRP Batcher is on | They conflict; SRP Batcher is superior |
@@ -133,10 +133,15 @@ public class OutlineRenderPass : ScriptableRenderPass
 
 ## Forward vs Forward+ Renderer
 
-- **Forward**: Traditional forward rendering. Good for mobile, limited additional lights per object.
+- **Forward**: Traditional forward rendering. Limited additional lights per object (default 4). Fine for simple scenes.
 - **Forward+**: Uses clustered lighting. Removes per-object light limit. Better for scenes with many lights. Requires Unity 2022.2+.
 
 Set in the Universal Renderer Data asset under Rendering Path.
+
+**Forward+ is the default choice on desktop and console** — the per-object light limit is the main
+reason to reach for plain Forward, and PC/console GPUs have the headroom for clustered lighting. Deferred
+is also on the table for scenes with heavy light counts. There is no reason to ship the mobile-lean
+renderer preset here.
 
 ## 2D Renderer Setup
 

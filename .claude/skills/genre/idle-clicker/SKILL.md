@@ -232,8 +232,8 @@ public sealed class PrestigeSystem : MonoBehaviour
 
 ```
 Launch → Check offline progress → Show earnings popup
-    → Main screen (tap to earn + automated income)
-        → Buy upgrades (increase tap/auto income)
+    → Main screen (click to earn + automated income)
+        → Buy upgrades (increase click/auto income)
             → Prestige when progress slows
                 → Restart with permanent bonuses
 ```
@@ -241,15 +241,20 @@ Launch → Check offline progress → Show earnings popup
 ## Key Design Rules
 
 - **Exponential growth** — costs and rewards both scale exponentially
-- **Multiple income sources** — tap income, auto generators, prestige bonuses
+- **Multiple income sources** — click income, auto generators, prestige bonuses
 - **Clear next goal** — always show what the player is working toward
 - **Satisfying numbers** — big numbers going up is the core reward
 - **Offline progress** — player must feel rewarded for coming back
 - **No skill required** — progress is time + decisions, not reflexes
 
-## Mobile-Specific
+## PC / Console-Specific
 
-- **Battery friendly** — cap at 30fps, reduce Update frequency for idle generators
-- **Background handling** — `OnApplicationPause` saves state immediately
-- **Notification hooks** — "Your generators have earned 1M gold!" after offline period
+- **Optional frame cap** — an idle game has no reason to render at 240fps. Offer a cap in the
+  settings menu (laptop users and fan noise are the PC analogue of a battery budget), and reduce
+  Update frequency for idle generators regardless
+- **Focus handling** — an idle game gets left running windowed and alt-tabbed away from for hours.
+  Save on `OnApplicationFocus(false)` and `OnApplicationQuit`; keep simulating while unfocused rather
+  than pausing, and never assume the process gets a clean shutdown
+- **Return reward on launch** — PC/console have no push notifications, so the offline-earnings popup
+  ("Your generators earned 1M gold while you were away") carries the whole job of rewarding a return
 - **Minimal UI updates** — update currency display every 0.1s, not every frame

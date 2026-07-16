@@ -1,6 +1,6 @@
 ---
 name: topdown
-description: "Top-down mobile game architecture — virtual joystick/tap-to-move/twin-stick touch movement, room transitions, fog of war, spawner patterns, wave systems, minimap."
+description: "Top-down game architecture — twin-stick gamepad and WASD + mouse-aim movement, click-to-move, room transitions, fog of war, spawner patterns, wave systems, minimap."
 globs: ["**/TopDown*.cs", "**/Room*.cs", "**/Wave*.cs", "**/Spawn*.cs"]
 ---
 
@@ -8,15 +8,19 @@ globs: ["**/TopDown*.cs", "**/Room*.cs", "**/Wave*.cs", "**/Spawn*.cs"]
 
 ## Movement Types
 
-### Virtual Joystick (Mobile Touch)
+Movement and aim are separate concerns in a top-down game. Bind both through the New Input System so
+gamepad and keyboard+mouse are the same code path — only the aim source differs.
+
+### Twin-Stick (Gamepad — primary)
 ```csharp
-public sealed class VirtualJoystickController : MonoBehaviour
+public sealed class TwinStickController : MonoBehaviour
 {
     [SerializeField] private float _moveSpeed = 6f;
-    [SerializeField] private float _joystickDeadZone = 0.1f;
+    [SerializeField] private float _stickDeadZone = 0.1f;
 
     private Rigidbody2D _rb;
     private Vector2 _moveInput;
+    private Vector2 _aimInput;
 
     private void Awake()
     {
@@ -24,50 +28,80 @@ public sealed class VirtualJoystickController : MonoBehaviour
     }
 
     /// <summary>
-    /// Called by virtual joystick UI component
+    /// Bound to the "Move" action — left stick / WASD
     /// </summary>
-    public void SetMoveInput(Vector2 input)
+    public void OnMove(InputAction.CallbackContext context)
     {
-        _moveInput = input.magnitude > _joystickDeadZone ? input : Vector2.zero;
+        Vector2 input = context.ReadValue<Vector2>();
+        _moveInput = input.magnitude > _stickDeadZone ? input : Vector2.zero;
+    }
 
-        // Auto-aim in move direction
-        if (_moveInput.sqrMagnitude > 0.01f)
+    /// <summary>
+    /// Bound to the "Aim" action — right stick (auto-fire while aiming)
+    /// </summary>
+    public void OnAim(InputAction.CallbackContext context)
+    {
+        Vector2 input = context.ReadValue<Vector2>();
+        if (input.magnitude > _stickDeadZone)
         {
-            float angle = Mathf.Atan2(_moveInput.y, _moveInput.x) * Mathf.Rad2Deg - 90f;
-            transform.rotation = Quaternion.Euler(0f, 0f, angle);
+            _aimInput = input;
         }
     }
 
     private void FixedUpdate()
     {
         _rb.linearVelocity = _moveInput.normalized * _moveSpeed;
+
+        // Aim with the right stick; fall back to facing the move direction
+        Vector2 facing = _aimInput.sqrMagnitude > 0.01f ? _aimInput : _moveInput;
+        if (facing.sqrMagnitude > 0.01f)
+        {
+            float angle = Mathf.Atan2(facing.y, facing.x) * Mathf.Rad2Deg - 90f;
+            transform.rotation = Quaternion.Euler(0f, 0f, angle);
+        }
     }
 }
 ```
 
-### Twin-Stick Touch (Two Joysticks)
+### Mouse Aim (Keyboard + Mouse)
 ```csharp
-// Left joystick: movement
-// Right joystick: aim direction (auto-fire when aiming)
-// Common in mobile shooters (Archero, Brawl Stars)
+// Movement reuses the same "Move" action (WASD). Only the aim source changes:
+// instead of the right stick, face the cursor's world position.
+private void AimAtCursor()
+{
+    if (Mouse.current == null) return;
+
+    Vector2 screenPos = Mouse.current.position.ReadValue();
+    Vector3 worldPos = _camera.ScreenToWorldPoint(screenPos);
+    Vector2 toCursor = (Vector2)worldPos - _rb.position;
+
+    if (toCursor.sqrMagnitude > 0.01f)
+    {
+        float angle = Mathf.Atan2(toCursor.y, toCursor.x) * Mathf.Rad2Deg - 90f;
+        transform.rotation = Quaternion.Euler(0f, 0f, angle);
+    }
+}
 ```
 
-### Tap-to-Move (NavMeshAgent)
+Common in twin-stick PC/console shooters (Hades, Enter the Gungeon, Nuclear Throne).
+
+Track the last-used device and swap aim modes on the fly — a player on keyboard+mouse who picks up a
+gamepad should not have to open a menu. Use `InputUser.onChange` or the `PlayerInput` control-scheme
+callbacks; never hard-assume one device is connected.
+
+### Click-to-Move (NavMeshAgent)
 ```csharp
 private NavMeshAgent _agent;
 private Camera _camera;
 
 private void Update()
 {
-    if (UnityEngine.InputSystem.Touchscreen.current == null) return;
+    if (Mouse.current == null) return;
 
-    UnityEngine.InputSystem.Controls.TouchControl touch =
-        UnityEngine.InputSystem.Touchscreen.current.primaryTouch;
-
-    if (touch.press.wasPressedThisFrame)
+    if (Mouse.current.rightButton.wasPressedThisFrame)
     {
-        Vector2 touchPos = touch.position.ReadValue();
-        Ray ray = _camera.ScreenPointToRay(touchPos);
+        Vector2 screenPos = Mouse.current.position.ReadValue();
+        Ray ray = _camera.ScreenPointToRay(screenPos);
         if (Physics.Raycast(ray, out RaycastHit hit, 100f, _groundLayer))
         {
             _agent.SetDestination(hit.point);
@@ -75,6 +109,9 @@ private void Update()
     }
 }
 ```
+
+On gamepad, drive the agent from the left stick directly (`_agent.Move`) rather than synthesizing a
+cursor — click-to-move is a mouse idiom and rarely worth emulating with a stick.
 
 ## Camera Setup
 

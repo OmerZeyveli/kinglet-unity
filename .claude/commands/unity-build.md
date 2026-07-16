@@ -30,8 +30,9 @@ Use the `unity-build-runner` agent to:
 Switch platform if needed via `manage_build`:
 - Set player settings (company, product name, version, bundle ID)
 - Configure platform-specific settings:
-  - **Android**: API level, IL2CPP, ARM64, keystore, AAB format
-  - **iOS**: signing, bundle ID, minimum version, target devices
+  - **Windows / Standalone**: IL2CPP, x86_64, graphics APIs (DX12/DX11), code stripping
+  - **Console (PS5/Xbox)**: platform module present, IL2CPP, title ID from the dev portal
+  - **macOS / Linux**: notarization/signing (macOS), Vulkan (Linux)
 
 ### Step 3: Build
 

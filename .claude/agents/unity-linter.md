@@ -39,7 +39,7 @@ Run through these checks on the target files:
 
 ### Unity-Specific
 - [ ] `UnityEditor` usage guarded with `#if UNITY_EDITOR` in runtime code
-- [ ] Platform defines (`#if UNITY_ANDROID` etc.) have `#else` fallback
+- [ ] Platform defines (`#if UNITY_STANDALONE`, `#if UNITY_GAMECORE`, `#if UNITY_PS5`) have `#else` fallback
 - [ ] File name matches primary class name
 - [ ] No `SendMessage` / `BroadcastMessage`
 - [ ] `Time.deltaTime` in `Update`/`LateUpdate`, `Time.fixedDeltaTime` in `FixedUpdate`

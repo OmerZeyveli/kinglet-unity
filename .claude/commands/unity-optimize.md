@@ -38,10 +38,15 @@ Apply targeted fixes based on profiling data.
 ### Step 5: Verify
 Re-profile to confirm improvement. Compare before/after metrics.
 
-## Performance Budgets (Mobile)
-| Metric | Target |
-|--------|--------|
-| Draw calls | < 100 |
-| Frame time | < 33ms (30fps) |
-| GC alloc/frame | 0 bytes |
-| Texture memory | < 150MB |
+## Performance Budgets
+
+Starting points, not laws — tune against your actual target. Min-spec is the column that decides
+whether someone can play at all, so budget for it first and let the high end scale up via quality
+settings. See the `unity-optimizer` agent for the full table.
+
+| Metric | Min-spec PC | Console (60fps mode) | High-end PC |
+|--------|-------------|----------------------|-------------|
+| Draw calls | < 1500 | < 3000 | < 5000 |
+| Frame time | 16.6ms (60fps @ 1080p low) | 16.6ms (60fps) | 8.3ms (120fps) |
+| VRAM | < 2GB | fixed — tune to the box | < 8GB |
+| GC alloc/frame | 0 bytes | 0 bytes | 0 bytes |

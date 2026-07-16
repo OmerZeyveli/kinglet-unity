@@ -6,7 +6,7 @@ One-page reference for all skills in everything-claude-unity.
 
 ## Overview
 
-41 skills organized into 6 categories. Skills are loaded on-demand based on file glob patterns or loaded always if `alwaysApply: true`. Each skill is a Markdown file at `.claude/skills/<category>/<name>/SKILL.md` with YAML frontmatter.
+39 skills organized into 5 categories. Skills are loaded on-demand based on file glob patterns or loaded always if `alwaysApply: true`. Each skill is a Markdown file at `.claude/skills/<category>/<name>/SKILL.md` with YAML frontmatter.
 
 ---
 
@@ -25,7 +25,6 @@ These skills have `alwaysApply: true` and are loaded for every agent, every sess
 | `event-systems` | Event system patterns -- C# events, UnityEvent, SO event channels, static EventBus. When to use each, zero-allocation patterns. |
 | `object-pooling` | Object pooling patterns -- Unity `ObjectPool<T>`, custom ComponentPool, warm-up strategies, return-to-pool lifecycle. |
 | `scriptable-objects` | ScriptableObject architecture patterns -- event channels, variable references, runtime sets, factory pattern, data containers. |
-| `mobile` | Mobile optimization -- tile-based GPU, ASTC textures, draw call budget (<100), thermal throttling, battery, touch input, safe areas. |
 
 ---
 
@@ -45,6 +44,7 @@ Fundamentals loaded across many contexts.
 | `object-pooling` | Object pooling patterns -- Unity ObjectPool<T>, custom pools | Always loaded |
 | `scriptable-objects` | ScriptableObject architecture -- event channels, runtime sets, factories | Always loaded |
 | `serialization-safety` | FormerlySerializedAs, Unity null checks, SerializeReference | Always loaded |
+| `unity-instincts` | How the atomic instinct learning system works -- observations, distillation, confidence scoring, project vs global scope, promotion/evolution | `.claude/hooks/instinct-*.sh`, `.claude/state/instincts/**/*`, `.claude/commands/unity-instincts.md` |
 | `unity-mcp-patterns` | batch_execute, read_console, resource query patterns | Always loaded |
 
 ---
@@ -70,24 +70,26 @@ Genre-specific architecture and patterns loaded by file glob matching.
 
 | Skill | Description | Glob Patterns |
 |-------|-------------|---------------|
-| `endless-runner` | Procedural chunk spawning, lane-based movement, obstacle patterns, speed ramping, distance scoring | `**/Runner*.cs`, `**/Endless*.cs`, `**/Chunk*.cs`, `**/Obstacle*.cs`, `**/Lane*.cs` |
-| `hyper-casual` | One-tap/swipe controls, instant onboarding, short sessions, ad monetization, minimalist visuals | `**/HyperCasual*.cs`, `**/Level*.cs`, `**/GameManager*.cs` |
 | `idle-clicker` | Big number math, offline progress, prestige/rebirth, upgrade trees, automation, currency systems | `**/Idle*.cs`, `**/Clicker*.cs`, `**/Currency*.cs`, `**/Upgrade*.cs`, `**/Prestige*.cs` |
 | `match3` | Grid system, tile matching, cascade/gravity, special tiles, combo chains, level objectives | `**/Match*.cs`, `**/Grid*.cs`, `**/Tile*.cs`, `**/Board*.cs`, `**/Puzzle*.cs` |
 | `platformer-2d` | Tight controls, level design patterns, collectibles, checkpoints, hazards, boss patterns | `**/Platform*.cs`, `**/Player*.cs`, `**/Level*.cs` |
-| `puzzle` | Grid/board logic, undo system, hint system, level packs, star ratings, touch drag-and-drop | `**/Puzzle*.cs`, `**/Board*.cs`, `**/Grid*.cs`, `**/Hint*.cs`, `**/Undo*.cs` |
+| `puzzle` | Grid/board logic, undo system, hint system, level packs, star ratings, mouse drag-and-drop | `**/Puzzle*.cs`, `**/Board*.cs`, `**/Grid*.cs`, `**/Hint*.cs`, `**/Undo*.cs` |
 | `rpg` | Stat system (base + modifiers), level/XP, skill trees, quest system, turn-based and real-time combat | `**/RPG*.cs`, `**/Stat*.cs`, `**/Quest*.cs`, `**/Skill*.cs`, `**/Level*.cs` |
-| `topdown` | Virtual joystick/tap-to-move/twin-stick, room transitions, fog of war, spawner patterns, wave systems | `**/TopDown*.cs`, `**/Room*.cs`, `**/Wave*.cs`, `**/Spawn*.cs` |
+| `topdown` | Twin-stick / mouse-aim movement, room transitions, fog of war, spawner patterns, wave systems | `**/TopDown*.cs`, `**/Room*.cs`, `**/Wave*.cs`, `**/Spawn*.cs` |
+
+> `endless-runner` and `hyper-casual` were removed — they are mobile genres, and both loaded on
+> generic globs (`**/Level*.cs`, `**/GameManager*.cs`, `**/Chunk*.cs`) that any PC game trips.
+> See `provenance-skip.tsv`.
 
 ---
 
 ## Platform Skills
 
-Platform-specific optimization and configuration.
+_None._ cloud-nine-unity targets PC/console only, so there is no platform-switching layer. Platform
+guidance lives in `.claude/rules/pc-console.md`, which is always in force.
 
-| Skill | Description | Glob Patterns |
-|-------|-------------|---------------|
-| `mobile` | Mobile optimization -- tile-based GPU, ASTC textures, draw call budget, thermal throttling, touch input, safe areas | Always loaded (`**/*.cs`) |
+> Upstream shipped a `mobile` skill here with `alwaysApply: true` and `globs: ["**/*.cs"]` — it
+> loaded on every C# file. It is removed, not disabled. See `provenance-skip.tsv`.
 
 ---
 

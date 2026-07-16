@@ -57,7 +57,7 @@ When the score is below threshold:
 3. **Re-score after each round** — update scores based on answers
 4. **Proceed when threshold is met** — or when the user explicitly opts out
 
-Question style: be direct and specific, not generic. Instead of "What platform?", ask "Is this for mobile (touch input, limited GPU) or desktop (keyboard/mouse, full GPU budget)?"
+Question style: be direct and specific, not generic. Instead of "What platform?", ask "Is this keyboard+mouse first or gamepad first — and does it have to hold 60fps on min-spec, or is the target high-end PC only?"
 
 ## Output: Requirements Document
 

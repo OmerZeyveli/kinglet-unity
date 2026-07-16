@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # warn-platform-defines.sh — WARNING HOOK
-# Checks for #if UNITY_ANDROID / UNITY_IOS etc. without #else fallback.
+# Checks for #if UNITY_PS5 / UNITY_GAMECORE / UNITY_STANDALONE_* etc. without #else fallback.
 # Code inside platform defines is silently excluded on other platforms,
 # which can cause missing functionality or compilation errors.
 # ============================================================================
@@ -50,12 +50,12 @@ if echo "$CONTENT" | grep -qE "#if\s+($PLATFORM_DEFINES)"; then
         echo "  Code inside platform defines is silently excluded on other platforms." >&2
         echo "  Consider adding #else with a fallback or #error for unsupported platforms:" >&2
         echo "" >&2
-        echo "    #if UNITY_ANDROID" >&2
-        echo "        // Android implementation" >&2
-        echo "    #elif UNITY_IOS" >&2
-        echo "        // iOS implementation" >&2
+        echo "    #if UNITY_PS5" >&2
+        echo "        // PS5 implementation" >&2
+        echo "    #elif UNITY_GAMECORE" >&2
+        echo "        // Xbox implementation" >&2
         echo "    #else" >&2
-        echo "        // Default / other platforms" >&2
+        echo "        // Standalone / other platforms" >&2
         echo "    #endif" >&2
     fi
 fi

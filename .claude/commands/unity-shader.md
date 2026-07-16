@@ -13,7 +13,8 @@ Create a shader based on: **$ARGUMENTS**
 
 Use the `unity-shader-dev` agent to:
 
-1. **Determine shader type** — URP Lit, Unlit, custom effect (mobile-optimized, no compute shaders)
+1. **Determine shader type** — URP Lit, Unlit, custom effect, or compute. Compute shaders and VFX
+   Graph are fully available on PC/console; Shader Model 5.0+ is a safe baseline.
 2. **Write the shader** file (`.shader` or `.hlsl`):
    - URP includes and HLSL structure
    - SRP Batcher compatible (CBUFFER_START)

@@ -20,7 +20,7 @@ Your default posture is skeptical. Assume every plan has at least one hidden pro
 
 - **Execution order** — Does the plan depend on Awake/Start ordering across objects? If so, is `[DefaultExecutionOrder]` specified? Cross-object Awake ordering is undefined.
 - **Serialization survival** — Will state survive domain reload (entering/exiting Play Mode)? `static` fields reset. Non-serialized fields reset. `ScriptableObject` instances persist only if they are assets.
-- **Platform divergence** — Does behavior differ between Editor and build? Between mobile and desktop? Between IL2CPP and Mono? Call out any platform assumption.
+- **Platform divergence** — Does behavior differ between Editor and build? Between PC and console? Across GPU vendors (NVIDIA/AMD/Intel)? Between IL2CPP and Mono? Call out any platform assumption.
 - **Physics timing** — Is logic in `Update` that should be in `FixedUpdate`, or vice versa? Is `Time.deltaTime` used in `FixedUpdate`?
 - **Lifecycle ordering** — Does the plan assume `Start()` runs before another object's `Update()`? Does it account for `OnEnable` being called before `Start`?
 - **Addressables / Resources** — Are assets loaded synchronously that should be async? Is there a missing `Release()` call?

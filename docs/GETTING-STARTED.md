@@ -66,19 +66,21 @@ After installation, your project contains:
 
 ```
 .claude/
-  agents/          15 specialized sub-agents (coder, reviewer, verifier, scene-builder, etc.)
-  commands/        17 slash commands (/unity-workflow, /unity-prototype, /unity-doctor, etc.)
-  hooks/            9 safety hooks + _lib.sh (block scene edits, warn on serialization, suggest review)
-  rules/            5 always-loaded coding standards (C# style, performance, architecture)
-  skills/          35 knowledge modules organized by category
+  agents/          28 specialized sub-agents (coder, reviewer, verifier, scene-builder, game-designer, etc.)
+  commands/        36 slash commands (/unity-workflow, /unity-prototype, /unity-doctor, etc.)
+  hooks/           25 hooks + _lib.sh (safety, quality, session, learning)
+  rules/            6 always-loaded coding standards (C# style, performance, architecture, PC/console)
+  skills/          39 knowledge modules organized by category
     core/            Assembly definitions, event systems, object pooling, MCP patterns
     gameplay/        Character controllers, inventory, dialogue, save systems
-    genre/           Genre-specific patterns (FPS, platformer, RPG, etc.)
-    platform/        Platform-specific knowledge (mobile, console, VR)
+    genre/           Genre-specific patterns (RPG, platformer, top-down, match-3, puzzle, idle)
     systems/         Unity subsystems (Input System, Addressables, Cinemachine, etc.)
     third-party/     Third-party integrations (DOTween, UniTask, VContainer, etc.)
   settings.json    Permissions, MCP server config, hook definitions
 ```
+
+There is no `platform/` category. This toolkit targets PC and console only, and that guidance lives
+in `.claude/rules/pc-console.md`, which is always loaded rather than switched on per file.
 
 ---
 

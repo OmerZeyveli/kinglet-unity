@@ -6,7 +6,7 @@ Complete catalog of hooks in everything-claude-unity.
 
 ## Overview
 
-everything-claude-unity includes 22 hooks that provide safety enforcement, quality gates, session management, and learning. Hooks are bash scripts in `.claude/hooks/` configured in `.claude/settings.json`. All hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, state paths, and utility functions.
+everything-claude-unity includes 25 hooks that provide safety enforcement, quality gates, session management, and learning. Hooks are bash scripts in `.claude/hooks/` configured in `.claude/settings.json`. All hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, state paths, and utility functions.
 
 ---
 
@@ -16,7 +16,7 @@ everything-claude-unity includes 22 hooks that provide safety enforcement, quali
 |---------|-------|-------------|----------|
 | `minimal` | 1 | Safety hooks only (5) | Maximum speed, minimal interference |
 | `standard` | 2 | Safety + quality + session (18) | Default -- recommended for most work |
-| `strict` | 3 | Everything including learning + cost (22) | Full observability, data collection |
+| `strict` | 3 | Everything including learning + cost (25) | Full observability, data collection |
 
 Set via: `UNITY_HOOK_PROFILE=standard` in environment or `settings.local.json`.
 
@@ -106,6 +106,14 @@ These hooks run before any Edit or Write tool invocation. Blocking hooks (exit 2
 - **What it does:** Prevents staging `ProjectSettings/` and `Packages/` files via `git add`. These are Unity-managed YAML configs. Manual edits cause merge conflicts and subtle build issues. Use unity-mcp tools instead.
 - **Environment variables:** None
 
+#### bash-gate
+
+- **File:** `bash-gate.sh`
+- **Profile:** standard
+- **Type:** Blocking (exit 2)
+- **What it does:** Destructive Bash gate. The first attempt at a destructive command is denied with an impact list and a demand for a rollback plan; a second attempt proceeds, on the basis that the agent has acknowledged the consequences. Covers Unity-specific danger patterns: `rm -rf Library/|Temp/|Logs/|obj/|Build/` (full reimport, GUID corruption risk), mass `.meta` deletion or rename (breaks every asset reference), `Packages/manifest.json` removal, `ProjectSettings/` wipes, `git reset --hard` / `git clean -fdx`, force-pushes to main/master, and PlayerPrefs CLI wipes.
+- **Environment variables:** None
+
 ---
 
 ### PostToolUse -- Read
@@ -145,7 +153,7 @@ These hooks run after every Edit or Write tool invocation. They warn but do not 
 - **File:** `warn-platform-defines.sh`
 - **Profile:** standard
 - **Type:** Advisory (exit 0)
-- **What it does:** Checks for `#if UNITY_ANDROID` / `UNITY_IOS` etc. without `#else` fallback. Code inside platform defines is silently excluded on other platforms.
+- **What it does:** Checks for `#if UNITY_PS5` / `UNITY_GAMECORE` / `UNITY_STANDALONE_*` etc. without `#else` fallback. Code inside platform defines is silently excluded on other platforms -- a block guarded for console vanishes in the Standalone build and vice versa.
 - **Environment variables:** None
 
 #### quality-gate
@@ -204,6 +212,14 @@ These hooks run after every Edit or Write tool invocation. They warn but do not 
 - **What it does:** Logs every tool call with timestamp and tool name as JSONL for session metrics. The `session-save.sh` Stop hook uses this data to report totals.
 - **Environment variables:** Writes to `UNITY_COST_FILE`
 
+#### instinct-capture
+
+- **File:** `instinct-capture.sh`
+- **Profile:** strict
+- **Type:** Advisory (exit 0)
+- **What it does:** Captures lightweight observations for the instinct learning system on every tool use. Each observation is one JSONL line recording timestamp, project hash, tool name, file, suffix, path tag (`view|system|model|sobject|mono|editor|test|other`), and the hook warning count at capture time. Budgeted to stay under 50ms. `instinct-distill.sh` consumes these at Stop.
+- **Environment variables:** Writes to `UNITY_OBSERVATIONS_FILE` under `UNITY_INSTINCTS_DIR`
+
 ---
 
 ### PreCompact
@@ -258,6 +274,14 @@ These hooks run when the agent stops (conversation ends or user exits).
 - **What it does:** Extracts session patterns when the agent stops. Records which hooks fired and how often, what types of files were edited, and which commands/skills were invoked. Writes session learnings to a persistent JSONL log for later review.
 - **Environment variables:** Reads `UNITY_EDITS_FILE`, `UNITY_WARNINGS_FILE`. Writes to `UNITY_LEARNING_FILE`
 
+#### instinct-distill
+
+- **File:** `instinct-distill.sh`
+- **Profile:** strict
+- **Type:** Advisory (exit 0)
+- **What it does:** Reads the observations captured by `instinct-capture.sh` and distills them into atomic instincts with confidence scores. Heuristic-only -- no LLM, so it is cheap and deterministic. Current heuristics: warning hotspots (a path tag that raises warnings in 30%+ of tool uses across 3+ observations), tool sequences (edits to a tag consistently preceded by reads of a related tag), and hook-specific recurrence (a hook firing 3+ times on the same path tag). Instincts are stored one JSON file each under `.claude/state/instincts/project/<project-hash>/`; confidence starts at 0.3 and rises 0.1 per fresh piece of evidence, capped at 0.9.
+- **Environment variables:** Reads `UNITY_OBSERVATIONS_FILE`. Writes under `UNITY_INSTINCTS_DIR`
+
 #### notify
 
 - **File:** `notify.sh`
@@ -284,10 +308,12 @@ These hooks run when the agent stops (conversation ends or user exits).
 | guard-project-config | PreToolUse | Edit\|Write | standard | Blocking | Block quality config weakening |
 | gateguard | PreToolUse | Edit\|Write | strict | Blocking | Require Read before Edit |
 | block-projectsettings | PreToolUse | Bash | minimal | Blocking | Block git add ProjectSettings/ |
+| bash-gate | PreToolUse | Bash | standard | Blocking | Gate destructive Bash commands |
 | track-reads | PostToolUse | Read | strict | Advisory | Track reads for GateGuard |
 | warn-serialization | PostToolUse | Edit\|Write | standard | Advisory | Warn on renamed SerializeField |
 | warn-filename | PostToolUse | Edit\|Write | standard | Advisory | Warn on file/class name mismatch |
 | warn-platform-defines | PostToolUse | Edit\|Write | standard | Advisory | Warn on platform #if without #else |
+| instinct-capture | PostToolUse | (all) | strict | Advisory | Capture instinct observations |
 | quality-gate | PostToolUse | Edit\|Write | standard | Advisory | Warn on common Unity C# pitfalls |
 | track-edits | PostToolUse | Edit\|Write | standard | Advisory | Track edited files for session |
 | suggest-verify | PostToolUse | Edit\|Write | standard | Advisory | Suggest review after 5+ edits |
@@ -299,6 +325,7 @@ These hooks run when the agent stops (conversation ends or user exits).
 | stop-validate | Stop | (all) | standard | Advisory | Validate all modified C# files |
 | session-save | Stop | (all) | standard | Advisory | Persist session state |
 | auto-learn | Stop | (all) | strict | Advisory | Extract session patterns |
+| instinct-distill | Stop | (all) | strict | Advisory | Distill observations into instincts |
 | notify | Stop | (all) | standard | Advisory | Send notifications |
 
 ---

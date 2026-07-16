@@ -28,24 +28,27 @@ manage_build action:"switch_platform" → target platform (if different)
 
 ### Step 3: Platform-Specific Configuration
 
-**Android:**
-- Set minimum API level (usually 24+)
-- Configure keystore (warn user to set up manually for production)
-- Set IL2CPP backend for release builds
-- ARM64 architecture (disable ARMv7 for modern devices)
-- Set package name (com.company.gamename)
-- Target API level: latest stable
-- Enable Android App Bundle (AAB) for Play Store
-- Configure ProGuard/R8 minification
+**Windows / Standalone (Steam, Epic):**
+- Set IL2CPP backend for release builds (Mono assemblies are trivially decompilable)
+- x86_64 architecture
+- Set company and product name — these decide the `%APPDATA%` save path, so changing them after
+  ship orphans existing saves
+- Configure graphics APIs in priority order (DX12, DX11 fallback; Vulkan for Linux)
+- Set default fullscreen mode and resolution — leave both overridable by the player
+- Enable code stripping for release; verify nothing needed is stripped via `link.xml`
+- Confirm the build is not a Development Build before shipping
 
-**iOS:**
-- Set signing team ID (warn user to configure in Xcode)
-- Set bundle identifier (com.company.gamename)
-- Set minimum iOS version (typically 15.0+)
-- Set target device (iPhone/iPad/both)
-- Enable bitcode only if required by dependencies
-- Configure App Transport Security exceptions if needed
-- Set launch screen storyboard
+**Console (PS5 / Xbox):**
+- Requires the platform module installed plus approved devkit access — warn the user and stop if
+  the target platform is not available in this Unity install
+- IL2CPP only
+- Set the title/product ID from the platform dev portal — never hardcode it in a script
+- Verify certification boilerplate exists: save-data flow, suspend/resume, controller disconnect
+- Profile on real hardware — the console target is fixed, so dev-PC numbers do not transfer
+
+**macOS / Linux (if targeted):**
+- macOS: signing team ID and notarization for distribution outside the App Store; Metal graphics API
+- Linux: Vulkan graphics API, IL2CPP
 
 ### Step 4: Pre-Build Checks
 - `read_console` — ensure no compilation errors
@@ -86,5 +89,5 @@ manage_build action:"set_active_profile" → switch between profiles
 
 - Never modify ProjectSettings/ files directly — use MCP
 - Never build without checking for compilation errors first
-- Never assume keystore/signing credentials are configured
+- Never assume signing credentials or console devkit access are configured
 - Never skip platform switch before build (causes incorrect settings)

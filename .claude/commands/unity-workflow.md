@@ -16,7 +16,7 @@ This command runs a 4-phase pipeline: **Clarify → Plan → Execute → Verify*
 Interview the user to build a complete requirements picture. Ask about:
 
 1. **Core mechanic / feature purpose** — what does it do? What problem does it solve?
-2. **Target platform** — mobile (iOS/Android), desktop, WebGL, VR?
+2. **Target platform** — PC (Windows/macOS/Linux), console (PS5/Xbox), or both? What is the min-spec target?
 3. **Performance constraints** — target FPS? Memory budget? Draw call limit?
 4. **Unity subsystems involved** — physics? UI? animation? audio? networking?
 5. **Integration points** — what existing systems does this touch?

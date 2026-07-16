@@ -21,11 +21,11 @@ This project follows the architecture established by [everything-claude-code](ht
 ```
 .claude/
   settings.json      Configuration: permissions, MCP servers, hook definitions
-  agents/            20 agent definitions (.md files with frontmatter)
-  commands/          22 user-invocable slash commands
-  hooks/             22 shell scripts + _lib.sh (safety, quality, session, learning)
-  rules/              5 always-loaded coding standards
-  skills/            41 knowledge modules in 6 categories
+  agents/            28 agent definitions (.md files with frontmatter)
+  commands/          36 user-invocable slash commands
+  hooks/             25 shell scripts + _lib.sh (safety, quality, session, learning)
+  rules/              6 always-loaded coding standards
+  skills/            39 knowledge modules in 5 categories
   state/             Session state directory (session.json, tracking files)
   VERSION            Installed version for upgrade tracking
 ```
@@ -60,8 +60,8 @@ Agents are Markdown files in `.claude/agents/` with YAML frontmatter that contro
 
 ### Model Selection
 
-- **Opus** -- complex implementation, creative prototyping, debugging, shader writing, plan critique, verification (10 agents)
-- **Sonnet** -- code review, test writing, migration, builds, git operations, security audit, and lite variants (8 agents)
+- **Opus** -- complex implementation, creative prototyping, debugging, shader writing, plan critique, verification, and the senior design/direction roles (14 agents)
+- **Sonnet** -- code review, test writing, migration, builds, git operations, security audit, lite variants, and the specialist design roles (12 agents)
 - **Haiku** -- fastest and cheapest, used for read-only exploration and quick validation (2 agents: `unity-scout`, `unity-linter`)
 
 Some commands support `--quick` (routes to sonnet-tier lite agent) and `--thorough` (routes to opus) flags. See `docs/MODEL-ROUTING.md` for the full routing table.
@@ -105,11 +105,13 @@ Skills are knowledge modules in `.claude/skills/`, organized into categories:
 skills/
   core/              Fundamentals: assembly defs, events, pooling, MCP patterns
   gameplay/          Game systems: character controller, inventory, dialogue, save
-  genre/             Genre patterns: FPS, platformer, RPG
-  platform/          Platform specifics: mobile, console, VR
+  genre/             Genre patterns: RPG, platformer, top-down, match-3, puzzle, idle
   systems/           Unity subsystems: Input System, Cinemachine, Addressables
   third-party/       Third-party: DOTween, UniTask, VContainer
 ```
+
+There is no `platform/` category. This toolkit targets PC and console only, so platform guidance is
+a rule (`.claude/rules/pc-console.md`, always loaded) rather than a skill switched on per file.
 
 ### Discovery
 
@@ -125,7 +127,7 @@ Skills with `alwaysApply: true` in frontmatter (like `unity-mcp-patterns`) are l
 
 Hooks are shell scripts in `.claude/hooks/` configured in `settings.json`. They run automatically at various lifecycle events: before/after tool invocations, before context compaction, on session start, and on session stop.
 
-All 22 hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, and utility functions. Hooks are organized into three **profile levels** -- `minimal` (5 hooks), `standard` (18 cumulative), and `strict` (22 cumulative). Set the active profile via `UNITY_HOOK_PROFILE=standard`.
+All 25 hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, and utility functions. Hooks are organized into three **profile levels** -- `minimal` (5 hooks), `standard` (18 cumulative), and `strict` (25 cumulative). Set the active profile via `UNITY_HOOK_PROFILE=standard`.
 
 ### Event Types
 
@@ -147,6 +149,7 @@ All 22 hooks source a shared library (`_lib.sh`) that provides kill switches, pr
 | `guard-project-config` | PreToolUse | Edit\|Write | standard | Blocking |
 | `gateguard` | PreToolUse | Edit\|Write | strict | Blocking |
 | `block-projectsettings` | PreToolUse | Bash | minimal | Blocking |
+| `bash-gate` | PreToolUse | Bash | standard | Blocking |
 | `track-reads` | PostToolUse | Read | strict | Advisory |
 | `warn-serialization` | PostToolUse | Edit\|Write | standard | Advisory |
 | `warn-filename` | PostToolUse | Edit\|Write | standard | Advisory |
@@ -157,11 +160,13 @@ All 22 hooks source a shared library (`_lib.sh`) that provides kill switches, pr
 | `validate-commit` | PostToolUse | Bash | standard | Advisory |
 | `build-analyze` | PostToolUse | Bash | strict | Advisory |
 | `cost-tracker` | PostToolUse | (all) | strict | Advisory |
+| `instinct-capture` | PostToolUse | (all) | strict | Advisory |
 | `pre-compact` | PreCompact | (all) | minimal | Advisory |
 | `session-restore` | SessionStart | (all) | standard | Advisory |
 | `stop-validate` | Stop | (all) | standard | Advisory |
 | `session-save` | Stop | (all) | standard | Advisory |
 | `auto-learn` | Stop | (all) | strict | Advisory |
+| `instinct-distill` | Stop | (all) | strict | Advisory |
 | `notify` | Stop | (all) | standard | Advisory |
 
 ### Hook Input
@@ -183,6 +188,7 @@ Rules are Markdown files in `.claude/rules/` that are always loaded as context f
 | `serialization.md` | FormerlySerializedAs on renames, field exposure, Unity null checks |
 | `architecture.md` | Composition over inheritance, ScriptableObject data, event channels, no god objects |
 | `unity-specifics.md` | Editor vs runtime guards, lifecycle order, threading, coroutine gotchas |
+| `pc-console.md` | PC/console addendum -- keyboard/mouse + gamepad input, rebinding, min-spec/console/high-end budgets, BC7/BC5 compression, ultrawide and focus handling |
 
 Rules are not optional. They represent hard constraints that every agent follows.
 
@@ -237,7 +243,7 @@ File Tools         MCP Tools
 C# Source Files    Unity Editor
 ```
 
-### Four Agent Categories
+### Five Agent Categories
 
 1. **Read-Only Agents** -- read and analyze only, no file modification or MCP access
    - `unity-reviewer`, `unity-scout`, `unity-linter`, `unity-security-reviewer`, `unity-critic`
@@ -250,6 +256,9 @@ C# Source Files    Unity Editor
 
 4. **Hybrid Agents** -- both code and MCP access
    - `unity-coder`, `unity-coder-lite`, `unity-prototyper`, `unity-fixer`, `unity-fixer-lite`, `unity-optimizer`, `unity-shader-dev`, `unity-network-dev`, `unity-ui-builder`, `unity-verifier`
+
+5. **Design and Production Agents** (cloud-nine-unity overlay) -- author documentation under `docs/`, no code, no MCP
+   - `game-designer`, `systems-designer`, `level-designer`, `creative-director`, `technical-director`, `narrative-director`, `world-builder`, `writer`
 
 ---
 

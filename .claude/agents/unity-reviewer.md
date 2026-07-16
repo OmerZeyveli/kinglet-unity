@@ -52,7 +52,7 @@ You are a senior Unity code reviewer. Review code for correctness, performance, 
 - [ ] **Coroutine lifecycle** — aware that coroutines stop on `SetActive(false)`?
 - [ ] **Execution order** — depending on cross-object Awake/Start ordering?
 - [ ] **DontDestroyOnLoad** — used without clear justification?
-- [ ] **Platform defines** — `#if UNITY_ANDROID` without `#else` fallback?
+- [ ] **Platform defines** — `#if UNITY_GAMECORE` / `#if UNITY_PS5` / `#if UNITY_STANDALONE` without `#else` fallback?
 - [ ] **Time.deltaTime** — used correctly (Update vs FixedUpdate)?
 - [ ] **Transform.SetParent** — using `worldPositionStays: false` when appropriate?
 

@@ -56,7 +56,7 @@ project_info resource → Unity version, platform, render pipeline
 
 Don't assume:
 - The project uses URP (might be Built-in or HDRP)
-- The project targets PC (might be mobile)
+- The build target matches the ship target (a PC/console project can sit on the wrong platform in Build Settings)
 - Certain packages are installed
 
 ## Rule 4: Tool Selection Guide

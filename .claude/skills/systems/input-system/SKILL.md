@@ -342,7 +342,7 @@ using UnityEngine.InputSystem;
 
 public class DeviceDetector : MonoBehaviour
 {
-    public enum InputScheme { KeyboardMouse, Gamepad, Touch }
+    public enum InputScheme { KeyboardMouse, Gamepad }
     public InputScheme CurrentScheme { get; private set; }
 
     public event System.Action<InputScheme> OnSchemeChanged;
@@ -368,7 +368,6 @@ public class DeviceDetector : MonoBehaviour
         {
             Keyboard or Mouse => InputScheme.KeyboardMouse,
             Gamepad => InputScheme.Gamepad,
-            Touchscreen => InputScheme.Touch,
             _ => CurrentScheme
         };
 
@@ -412,50 +411,5 @@ public class LocalMultiplayerManager : MonoBehaviour
     {
         Debug.Log($"Player {playerInput.playerIndex} left");
     }
-}
-```
-
-## Touch Input for Mobile
-
-```csharp
-using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.EnhancedTouch;
-using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
-
-public class TouchInputHandler : MonoBehaviour
-{
-    private void OnEnable()
-    {
-        EnhancedTouchSupport.Enable();
-    }
-
-    private void OnDisable()
-    {
-        EnhancedTouchSupport.Disable();
-    }
-
-    private void Update()
-    {
-        foreach (var touch in Touch.activeTouches)
-        {
-            switch (touch.phase)
-            {
-                case UnityEngine.InputSystem.TouchPhase.Began:
-                    HandleTouchStart(touch.screenPosition);
-                    break;
-                case UnityEngine.InputSystem.TouchPhase.Moved:
-                    HandleTouchMove(touch.screenPosition, touch.delta);
-                    break;
-                case UnityEngine.InputSystem.TouchPhase.Ended:
-                    HandleTouchEnd(touch.screenPosition);
-                    break;
-            }
-        }
-    }
-
-    private void HandleTouchStart(Vector2 pos) { /* ... */ }
-    private void HandleTouchMove(Vector2 pos, Vector2 delta) { /* ... */ }
-    private void HandleTouchEnd(Vector2 pos) { /* ... */ }
 }
 ```

@@ -1,62 +1,83 @@
 # PC / Console Rules
 
-This is the **cloud-nine-unity** overlay's platform addendum. It does **not** replace any ECU
-rule. ECU's `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`, and
-`unity-specifics.md` remain the binding spine — **when anything here and an ECU rule appear to
-conflict, the ECU rule wins.** This file only neutralizes mobile-specific assumptions and adds
-desktop/console input and performance notes.
+The platform spec for this toolkit. cloud-nine-unity ships **no mobile content** — the mobile skill
+and the mobile genre skills were removed at build time, not disabled (see `provenance-skip.tsv`), and
+the agents' mobile guidance was rewritten. So this file does not neutralize anything; it states what
+we target.
 
-## Mobile Assumptions Do Not Apply
+Precedence: `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`, and
+`unity-specifics.md` are the binding spine. This file adds platform specifics on top of them — it
+does not override them. If something here appears to contradict a spine rule, the spine rule wins and
+the contradiction is a bug in this file; report it.
 
-ECU ships a mobile-oriented skill (`.claude/skills/platform/mobile/`) and some examples in
-`performance.md` use mobile framing (TBDR/tile GPUs, ASTC textures, thermal throttling, very low
-draw-call ceilings, touch input, safe-area handling, <100 MB build-size targets). **On a
-PC/console project, ignore those mobile-specific ceilings and constraints.** They are not wrong
-for phones — they simply are not your platform.
+## Targets
 
-> Optional cleanup: if you never ship to mobile, you may delete
-> `.claude/skills/platform/mobile/` and the `genre/hyper-casual` and `genre/endless-runner`
-> skills. Leaving them in place is harmless — they just won't trigger on a PC/console project.
+- **PC** (Steam / Epic / standalone) and **console**. No mobile, no WebGL, no touch.
+- **Unity 6**, URP unless a project states otherwise.
+- **60 FPS is the baseline.** On PC also account for high-refresh displays (120/144 Hz+) — decouple
+  simulation from rendering and never hard-assume 60. Consoles usually ship a 30 or 60 FPS
+  quality/performance mode; budget for the mode you commit to.
 
-The architectural performance rules in `performance.md` that are **platform-independent still
-fully apply**: zero allocations in `Update`/`FixedUpdate`/`LateUpdate`, cache `GetComponent` /
-`Camera.main`, `MaterialPropertyBlock` over `.material`, sprite atlasing, batching, and Canvas
-splitting. "Fewer draw calls is always better" remains true on every platform.
+## Input — Keyboard/Mouse and Gamepad
 
-## Input — Keyboard/Mouse and Gamepad (no touch)
+- **Primary inputs are keyboard + mouse and gamepad.** There is no touch, no on-screen joystick, no
+  gyro, no safe area. Do not add touch controls or 44×44 tap-target reasoning.
+- Use the **New Input System** as `unity-specifics.md` mandates (legacy `Input.*` is blocked by a
+  hook). Author action maps that work for **both** keyboard/mouse and gamepad; the `InputView` is the
+  only place that touches `PlayerControls`.
+- **Support rebinding** (key + button remapping). It is a baseline expectation on PC and a common
+  console requirement. Drive it from the `InputView`; keep Systems input-agnostic — they receive
+  `SetMoveInput(Vector2)`, `Jump()`, and never learn the device.
+- **Handle device switching** mid-session (player drops the keyboard, picks up a pad) and reflect the
+  active device in UI prompts. The `input-system` skill has a `DeviceDetector` worth copying.
+- Console cert commonly requires controller-disconnect handling and a "press any button" /
+  controller-assignment flow. Design for it from the start; retrofitting is painful.
 
-- **Primary inputs are keyboard + mouse and gamepad.** There is no touch, no on-screen joystick,
-  no gyro, and no safe-area. Do not add touch controls or 44×44 tap-target reasoning.
-- Use the **New Input System** exactly as ECU's `unity-specifics.md` mandates (legacy `Input.*`
-  is blocked). Author action maps that work for **both** keyboard/mouse and gamepad; the
-  `InputView` is the only place that touches `PlayerControls`.
-- **Support control rebinding** (key + button remapping) — it is a baseline expectation on PC and
-  a common console requirement. Drive rebinding from the `InputView`; keep Systems input-agnostic
-  (they receive `SetMoveInput(Vector2)`, `Jump()`, etc., and never know the device).
-- Handle **device switching** gracefully (player swaps from keyboard to gamepad mid-session) and
-  reflect the active device in UI prompts where relevant.
-- Console certification commonly requires controller-disconnect handling and a "press any button"
-  / controller-assignment flow — design for it from the start, don't retrofit.
+## Rendering — what you may use
 
-## Performance — Desktop/Console Targets
+Compute shaders and VFX Graph are **fully available on PC and console** and are encouraged where they
+beat CPU-side work: particles, culling, post-processing, GPU-side simulation. Shader Model 5.0+ is a
+safe baseline on both. (If you find guidance in this repo saying otherwise, it is a leftover from the
+mobile-targeted upstream — treat it as a bug and report it.)
 
-- **Frame-rate target:** 60 FPS is the baseline. On PC also account for **high-refresh displays**
-  (120/144 Hz+) — decouple simulation from rendering and don't hard-assume 60. Console targets are
-  usually 30 or 60 FPS depending on a quality/performance mode; budget for the mode you commit to.
-- **Draw-call and memory budgets are higher than mobile**, but the discipline is the same: batch
-  aggressively, atlas, share materials, and use the SRP Batcher / GPU instancing. Higher headroom
-  is not an excuse to skip batching.
-- **PC hardware varies enormously.** Plan for **graphics quality / settings scaling** (resolution
-  scale, shadow/texture quality, VSync, frame-rate cap) so the game runs on both low-end and
-  high-end machines. Consoles are fixed targets — tune to the specific hardware.
-- **Resolution and aspect ratios:** support **multiple resolutions and aspect ratios**, including
-  **ultrawide (21:9)** on PC. Anchor UI for a range of aspect ratios; don't hardcode 16:9 layout.
-- **No thermal/battery/build-size obsession.** Drop mobile concerns like thermal throttling
-  (Adaptive Performance), aggressive texture compression for download size, and tiny memory
-  ceilings. Optimize for steady frame-time and load times instead.
+MSAA, HDR, higher shadow-cascade counts, and real-time shadows are all affordable. Budget them rather
+than avoiding them.
 
-## Everything Else Defers to ECU
+## Performance — desktop/console targets
 
-For C# style, the Model-View-System architecture, VContainer (DI), MessagePipe (messaging),
-UniTask (async), serialization safety (`[FormerlySerializedAs]`, `== null`), and all other
-conventions, follow ECU's rules unchanged. This addendum is intentionally narrow.
+- **PC hardware varies enormously, and min-spec is what decides who can play.** Budget for the low
+  end first, then let the high end scale up. Ship graphics **quality settings** — resolution scale,
+  shadow/texture quality, VSync, frame-rate cap — and make sure the min-spec preset actually holds
+  60 FPS.
+- **GPU vendor variance is real.** NVIDIA, AMD, and Intel differ in driver behaviour and precision. A
+  shader that is fast on one can stall on another. Test all three; your dev machine is one data point.
+- **Consoles are fixed targets** — profile on the hardware and tune to it rather than guessing from a
+  dev PC.
+- **Higher headroom is not an excuse to skip batching.** Draw-call ceilings are far above mobile's,
+  but the SRP Batcher, GPU instancing, static batching, atlasing, and shared materials are still free
+  frame time. "Fewer draw calls is always better" holds on every platform.
+- **Fill rate scales with pixels.** Profile at 4K and 3440×1440, not just 1080p. Overdraw that is
+  invisible at 1080p can cost real milliseconds at 4K.
+- **Texture compression:** BC7 for albedo, BC5 for normals on desktop. Consoles have their own
+  preferred formats.
+- **No thermal/battery/build-size obsession.** Drop Adaptive Performance, download-size compression,
+  and tiny memory ceilings. Optimise for steady frame-time and load times instead.
+- The platform-independent rules in `performance.md` apply in full: zero allocations in
+  `Update`/`FixedUpdate`/`LateUpdate`, cache `GetComponent` / `Camera.main`, `MaterialPropertyBlock`
+  over `.material`, Canvas splitting.
+
+## Display and windowing
+
+- **Support multiple resolutions and aspect ratios, including ultrawide (21:9).** Anchor UI for a
+  range of aspect ratios; never hardcode a 16:9 layout.
+- **Handle focus loss.** Alt-tab, Windows key, overlay open — pause or degrade gracefully, and do not
+  swallow input on regain.
+- **Multi-monitor:** let the player choose the display; do not assume the primary.
+- **4K and high DPI:** account for UI scaling, and consider DLSS/FSR/TAAU where the pipeline supports
+  it.
+
+## Everything Else
+
+For C# style, Model-View-System, VContainer (DI), MessagePipe (messaging), UniTask (async), and
+serialization safety (`[FormerlySerializedAs]`, `== null`), follow the spine rules unchanged. This
+addendum is intentionally narrow.

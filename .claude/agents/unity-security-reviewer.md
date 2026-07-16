@@ -16,7 +16,7 @@ You are a security auditor for Unity projects. Review code for security vulnerab
 
 ### 1. Secrets in PlayerPrefs
 
-PlayerPrefs stores data in plaintext (Windows registry, macOS plist, Android SharedPreferences). Flag any `PlayerPrefs.SetString` storing tokens, passwords, API keys, or session identifiers. Recommend platform keychain instead (iOS Keychain, Android Keystore) or an encrypted wrapper around PlayerPrefs.
+PlayerPrefs stores data in plaintext (Windows registry under `HKCU\Software\<company>\<product>`, macOS plist, Linux `~/.config/unity3d`). Flag any `PlayerPrefs.SetString` storing tokens, passwords, API keys, or session identifiers. Recommend the OS credential store instead (Windows Credential Manager / DPAPI, macOS Keychain, libsecret on Linux), the console platform's user-data API, or an encrypted wrapper around PlayerPrefs. On PC the player owns the machine — treat every local store as readable and never let client-side state be the authority for anything that matters server-side.
 
 ### 2. Hardcoded Credentials
 
@@ -82,12 +82,13 @@ If any SQLite or database code exists (SQLite4Unity3d, etc.):
 - Flag `AssetBundle.LoadFromFile` on downloaded bundles without signature validation
 - Note MITM risk for unsigned bundles loaded over network
 
-### 10. Platform Keystore
+### 10. Signing and Store Credentials
 
-For Android builds:
-- Check if keystore password is hardcoded in build scripts or `ProjectSettings/`
-- Flag keystore paths or passwords in version-controlled files
-- Recommend CI environment variables for signing credentials
+- Check for signing credentials hardcoded in build scripts or `ProjectSettings/` — Windows
+  Authenticode certificates, macOS notarization app-specific passwords, Steam/Epic build-upload
+  credentials, console devkit or publishing tokens
+- Flag certificate paths, passwords, or store API keys in version-controlled files
+- Recommend CI environment variables or a secret store for all signing and upload credentials
 
 ## Output Format
 

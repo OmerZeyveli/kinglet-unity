@@ -24,17 +24,17 @@ private void OnValidate()
 
 ```csharp
 // GOOD — always provide fallback
-#if UNITY_ANDROID
+#if UNITY_PS5
     string dataPath = Application.persistentDataPath;
-#elif UNITY_IOS
+#elif UNITY_GAMECORE
     string dataPath = Application.persistentDataPath;
 #else
     string dataPath = Application.dataPath;
 #endif
 
 // BAD — code silently excluded on other platforms
-#if UNITY_ANDROID
-    SetupMobileControls();
+#if UNITY_PS5
+    SetupConsoleSaveSystem();
 #endif
 ```
 

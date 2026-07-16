@@ -2,10 +2,10 @@
 
 ## Project Overview
 - **Unity Version:** 2022.3 LTS
-- **Render Pipeline:** URP (mobile optimized)
+- **Render Pipeline:** URP (UI-heavy, very low GPU load)
 - **Genre:** Idle / clicker / incremental
-- **Target Platform:** iOS + Android
-- **Target FPS:** 30 (battery-friendly, idle game)
+- **Target Platform:** PC (Steam) + Console (PS5 / Xbox)
+- **Target FPS:** 60 baseline; throttle the tick rate when the window is unfocused
 
 ## Architecture
 
@@ -13,56 +13,60 @@
 ```
 MyGame.Core         — events, utilities, big number math
 MyGame.Economy      — currencies, generators, upgrades, prestige
-MyGame.Gameplay     — tap handler, automation, milestones
+MyGame.Gameplay     — click handler, automation, milestones
 MyGame.Meta         — offline progress, daily rewards, achievements
 MyGame.UI           — currency display, upgrade list, prestige screen
-MyGame.Systems      — audio, save, ads, IAP, analytics, notifications
+MyGame.Systems      — audio, save, store/DLC, analytics, settings
 ```
 
 ### Key Systems
 - **Currency System** — multiple currencies (gold, gems, prestige tokens)
 - **Generator System** — auto-income sources, upgradeable
 - **Upgrade System** — exponential cost scaling (cost × 1.15^level)
-- **Tap Income** — tap to earn, upgradeable tap value
+- **Click Income** — click to earn, upgradeable click value
 - **Offline Progress** — calculate earnings while away (capped at 8hrs, 50% efficiency)
 - **Prestige System** — reset progress for permanent multipliers
 - **Daily Rewards** — consecutive day bonuses
-- **Monetization** — rewarded ads (2x offline, 2x income boost), IAP (currency packs)
+- **Monetization** — premium up-front purchase, optional expansion/cosmetic DLC
 
 ### Scene Structure
-- `S_Bootstrap` — persistent services (save, ads, IAP, notifications)
+- `S_Bootstrap` — persistent services (save, audio, store/DLC)
 - `S_Game` — single scene (main game + all UI overlays)
 
 ## Skills to Load
-- `mobile` — ASTC textures, draw call budget, thermal management, safe areas
 - `idle-clicker` — big numbers, offline progress, prestige, upgrade trees
 - `save-system` — auto-save on every purchase, offline time tracking
 - `ui-toolkit` — upgrade lists, currency displays, animated counters
-- `audio` — satisfying tap sounds, milestone fanfares
+- `audio` — satisfying click sounds, milestone fanfares
 - `dotween` — number counter animations, UI transitions
 
 ## Rules
-Follow all rules in `.claude/rules/`.
+Follow all rules in `.claude/rules/`. Platform guidance — PC/console performance budgets, input and
+display handling — comes from `.claude/rules/pc-console.md`, which is always in force; there is no
+platform skill to load.
 
 ## Key Conventions
 - **Big numbers** — use formatted display (1.23K, 4.56M, 7.89B, etc.)
-- **Auto-save** — save on every purchase, OnApplicationPause, OnApplicationQuit
+- **Auto-save** — save on every purchase, OnApplicationFocus (alt-tab), OnApplicationQuit
 - **Offline progress** — calculate on launch, show "Welcome back!" popup
-- **30fps cap** — idle games don't need 60fps, saves battery
+- **Idle-friendly frame budget** — 60fps when focused; drop to a low tick rate when the window is
+  unfocused so the game is a good background citizen on desktop
 - **Minimal Update** — update currency display every 0.1s, not every frame
 - **Exponential scaling** — both costs and rewards grow exponentially
 - **No skill required** — progress = time + strategic upgrade choices
-- **Safe area** — all UI respects Screen.safeArea
-- **Notification hooks** — remind players to collect offline earnings
+- **Aspect ratios** — all UI anchors for 16:9 through ultrawide (21:9)
+- **No push notifications** — desktop has no re-engagement push; the "Welcome back!" summary carries
+  that weight instead
 
 ## Input Map
 ```
 Player:
-  Tap to Earn — Primary Touch
-  Buy Upgrade — Tap upgrade button
-  Prestige — Tap prestige button (with confirmation)
-  Navigate — Swipe between tabs / tap tab buttons
+  Click to Earn — Left Mouse / A button
+  Buy Upgrade — Left Mouse on upgrade row / A button
+  Prestige — Left Mouse on prestige button / A button (with confirmation)
+  Navigate — Tab and Shift+Tab / Shoulder buttons between tabs
 ```
+Every binding is rebindable, and UI prompts follow the active device (see `.claude/rules/pc-console.md`).
 
 ## MCP Integration
 Unity MCP at `http://localhost:8080/mcp`. Use for UI screen building and build configuration.

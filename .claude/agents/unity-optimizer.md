@@ -32,8 +32,8 @@ manage_graphics action:"get_rendering_stats" → draw calls, batches, triangles,
 - UI rebuilds
 
 **GPU-bound** (GPU frame time > CPU frame time):
-- Too many draw calls (>100 on mobile)
-- Overdraw (transparent layers stacking — especially costly on tile-based mobile GPUs)
+- Too many draw calls (desktop has real headroom, but batching still pays)
+- Overdraw (transparent layers stacking — costly at high resolutions and on integrated GPUs)
 - Complex shaders (too many instructions, too many texture samples)
 - High fill rate (large particles, post-processing, alpha-tested geometry)
 - Too many shader variants
@@ -86,7 +86,7 @@ manage_profiler action:"get_frame_timing" → compare before/after
 | High draw calls | Enable SRP Batcher, GPU instancing, static batching |
 | Overdraw | Reduce transparent layers, optimize particle count |
 | Shader complexity | Simplify shaders, reduce variant count |
-| Large textures | Compress (ASTC mobile), reduce resolution, use mipmaps |
+| Large textures | Compress (BC7/BC5 on desktop), reduce resolution, use mipmaps |
 | Post-processing | Reduce effects, lower resolution for effects |
 
 ### Memory
@@ -99,29 +99,41 @@ manage_profiler action:"get_frame_timing" → compare before/after
 
 ## Performance Budgets
 
-| Metric | Low-End Mobile | Mid-Range Mobile | High-End Mobile |
-|--------|---------------|-----------------|-----------------|
-| Draw calls | < 50 | < 100 | < 200 |
-| Triangles | < 50k | < 100k | < 200k |
-| Frame time | 33ms (30fps) | 16.6ms (60fps) | 16.6ms (60fps) |
-| Texture memory | < 100MB | < 150MB | < 256MB |
-| Total memory | < 300MB | < 500MB | < 800MB |
-| Build size | < 100MB | < 200MB | < 500MB |
+Starting points to tune against your actual target, not laws. PC hardware varies enormously — the
+min-spec column is the one that decides whether someone can play at all, so budget for it first and
+let the high end scale up via quality settings.
+
+| Metric | Min-spec PC | Console (60fps mode) | High-end PC |
+|--------|-------------|----------------------|-------------|
+| Draw calls | < 1500 | < 3000 | < 5000 |
+| Triangles on screen | < 1M | < 3M | < 8M |
+| Frame time | 16.6ms (60fps @ 1080p low) | 16.6ms (60fps) | 8.3ms (120fps @ high refresh) |
+| VRAM | < 2GB | fixed — tune to the box | < 8GB |
+| Total memory | < 4GB | fixed — tune to the box | < 12GB |
 | GC alloc per frame | 0 bytes | 0 bytes | 0 bytes |
 
-## Mobile-Specific Optimization
+Build size has no meaningful ceiling on PC/console storefronts — optimise load times instead.
 
-- **Thermal throttling:** monitor `AdaptivePerformance` and downscale resolution dynamically
-- **Battery:** target 30fps for casual games, 60fps opt-in for action games
-- **Tile-based GPU:** minimize overdraw, avoid alpha-tested geometry, keep fragment shaders simple
-- **ASTC textures:** best quality/size ratio for both iOS and Android
-- **Particle System over VFX Graph:** VFX Graph requires compute shaders (not available on mobile)
+## PC / Console-Specific Optimization
+
+- **GPU vendor variance:** NVIDIA, AMD, and Intel differ in driver behaviour and precision. Test all
+  three; a shader that is fast on one can stall on another.
+- **Quality settings are the real optimisation:** resolution scale, shadow/texture quality, VSync,
+  frame-rate cap. Ship a min-spec preset that actually holds 60fps and let the high end opt in.
+- **High-refresh displays:** decouple simulation from rendering; never hard-assume 60Hz.
+- **Ultrawide and 4K:** fill rate scales with pixels. Profile at 3440x1440 and 4K, not just 1080p.
+- **Compute shaders and VFX Graph are available** — use them for particles, culling, and
+  post-processing where they beat CPU-side work.
+- **Texture compression:** BC7 for albedo, BC5 for normals on desktop; consoles have their own
+  preferred formats.
+- **Console targets are fixed** — profile on the actual hardware and tune to it rather than guessing
+  from a dev PC.
 
 ## What NOT To Do
 
 - Don't optimize without profiling first — measure, then fix
 - Don't optimize code that runs once (initialization, loading)
 - Don't sacrifice readability for micro-optimizations
-- Don't assume mobile performance from Editor profiling — always test on actual devices
-- Don't use VFX Graph or compute shaders — they don't work on mobile
-- Don't skip thermal throttling handling — sustained performance matters more than peak
+- Don't assume shipped performance from Editor profiling — always profile a real build
+- Don't tune only to your dev machine — min-spec is what decides who can play
+- Don't let higher desktop headroom excuse skipping batching — it is still free frame time

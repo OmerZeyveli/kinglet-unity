@@ -1,6 +1,6 @@
 ---
 name: unity-ui-builder
-description: "Builds UI screens with both code and visual setup via MCP. Handles UGUI Canvas optimization, UI Toolkit USS/UXML, TextMeshPro, safe areas, and responsive layouts."
+description: "Builds UI screens with both code and visual setup via MCP. Handles UGUI Canvas optimization, UI Toolkit USS/UXML, TextMeshPro, gamepad focus navigation, and responsive layouts from 16:9 to ultrawide."
 model: opus
 color: blue
 tools: Read, Write, Edit, Glob, Grep, mcp__unityMCP__*
@@ -66,7 +66,8 @@ batch_execute:
 ### Step 3: Configure Layout
 - Use `manage_components` to set RectTransform anchors, positions, sizes
 - Set CanvasScaler reference resolution (1920x1080 typical)
-- Configure safe area handling for notched devices
+- Anchor for the full aspect range — 16:9 through 21:9 ultrawide and 32:9 super-ultrawide
+- Set the first selected object on the EventSystem so gamepad navigation has an entry point
 
 ## UI Toolkit Workflow
 
@@ -120,24 +121,40 @@ public sealed class MainMenuController : MonoBehaviour
 }
 ```
 
-## Mobile UI Requirements
+## PC / Console UI Requirements
 
-### Safe Area
-All UI MUST respect `Screen.safeArea` for notched/rounded-corner devices:
-```csharp
-Rect safeArea = Screen.safeArea;
-// Apply to root RectTransform anchors
-```
+### Aspect Ratios and Ultrawide
+PC ships to a wide aspect range and the UI must hold at every step of it:
+- **Anchor, never hardcode positions.** Pin HUD elements to their nearest corner/edge so they track
+  the screen edge instead of drifting into the middle of a 21:9 display.
+- **Test 16:9, 16:10, 21:9 (3440x1440), and 32:9.** Ultrawide is where centred-anchor bugs surface.
+- Keep critical readouts (health, ammo, objectives) inside a **16:9 core region** on ultrawide —
+  content anchored to a 32:9 edge is outside the player's foveal view.
+- Consoles are effectively fixed at 16:9 — but **TV overscan is real**. Inset the HUD ~5% from the
+  screen edge, or offer an overscan/HUD-margin slider in settings.
 
-### Touch Targets
-- **Minimum tap target:** 44x44 points (Apple HIG) / 48x48 dp (Material Design)
-- **Spacing between targets:** at least 8pt to prevent mis-taps
-- **Bottom-of-screen actions:** keep primary actions within thumb reach
+### Gamepad Focus Navigation
+Every screen MUST be fully operable with a gamepad — no mouse-only paths:
+- Set `EventSystem.firstSelectedGameObject` (or `SetSelectedGameObject`) on screen open, and
+  restore selection when a popup closes. A screen that opens with nothing selected is a dead end.
+- Verify the `Navigation` graph on every Selectable — use Explicit navigation wherever Automatic
+  picks the wrong neighbour.
+- **Visible focus state is mandatory.** Gamepad users have no cursor; if focus is invisible, the
+  screen is unusable. Style focus distinctly from hover — do not rely on colour alone.
+- Wire cancel/back (B / Escape) on every screen, not just the primary confirm action.
 
-### Responsive Layout
-- Set CanvasScaler to **Scale With Screen Size**
-- Reference resolution: 1080x1920 (portrait) or 1920x1080 (landscape)
-- Test on multiple aspect ratios: 16:9, 19.5:9, 4:3 (iPad)
+### Mouse and Keyboard
+- **Hover states** on every interactive element — mouse users expect affordance feedback.
+- Hover and focus are **separate states**; a device switch (gamepad ↔ mouse) should update which
+  visual is showing. Hide the cursor on gamepad input, restore it on mouse movement.
+- Support keyboard traversal (Tab / arrows) and Enter to activate.
+
+### 4K and UI Scaling
+- Set CanvasScaler to **Scale With Screen Size**, reference resolution 1920x1080, **Match = 0.5**
+  (or Match Height for HUDs that must not grow horizontally on ultrawide).
+- Author UI sprites and fonts for 4K — a 1080p-authored atlas is visibly soft at 3840x2160.
+- Text below ~20px at 1080p reference is unreadable at couch distance on console. Offer a UI scale
+  slider; it is an accessibility baseline on PC/console, not a nicety.
 
 ## UGUI Performance Rules
 
@@ -153,5 +170,7 @@ Rect safeArea = Screen.safeArea;
 - Never mix UGUI and UI Toolkit in the same screen
 - Never forget to remove button listeners in OnDestroy
 - Never use `LayoutGroup` in performance-critical scroll views
-- Never skip safe area handling — test on notched devices
-- Never make tap targets smaller than 44x44pt
+- Never ship a screen that cannot be driven by gamepad alone — test with the mouse unplugged
+- Never leave focus invisible or unset — a gamepad user with no focus indicator is stuck
+- Never anchor HUD elements to the screen centre and assume 16:9 — check 21:9 and 32:9
+- Never author UI art at 1080p only — it goes soft at 4K

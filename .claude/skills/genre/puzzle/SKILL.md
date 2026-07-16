@@ -1,10 +1,10 @@
 ---
 name: puzzle
-description: "Mobile puzzle game architecture — grid/board logic, undo system, hint system, level packs, star ratings, touch drag-and-drop, tutorial overlays."
+description: "Puzzle game architecture — grid/board logic, undo system, hint system, level packs, star ratings, mouse and gamepad drag-and-drop, tutorial overlays."
 globs: ["**/Puzzle*.cs", "**/Board*.cs", "**/Grid*.cs", "**/Hint*.cs", "**/Undo*.cs"]
 ---
 
-# Mobile Puzzle Patterns
+# Puzzle Patterns
 
 ## Undo System (Command Pattern)
 
@@ -194,7 +194,7 @@ public sealed class HintSystem : MonoBehaviour
 }
 ```
 
-## Touch Drag-and-Drop
+## Drag-and-Drop (Mouse + Gamepad)
 
 ```csharp
 public sealed class DragHandler : MonoBehaviour
@@ -209,22 +209,22 @@ public sealed class DragHandler : MonoBehaviour
 
     private void Update()
     {
-        if (UnityEngine.InputSystem.Touchscreen.current == null) return;
+        if (Mouse.current == null) return;
 
-        UnityEngine.InputSystem.Controls.TouchControl touch =
-            UnityEngine.InputSystem.Touchscreen.current.primaryTouch;
+        UnityEngine.InputSystem.Controls.ButtonControl button = Mouse.current.leftButton;
+        Vector2 screenPos = Mouse.current.position.ReadValue();
 
-        if (touch.press.wasPressedThisFrame)
+        if (button.wasPressedThisFrame)
         {
-            TryStartDrag(touch.position.ReadValue());
+            TryStartDrag(screenPos);
         }
-        else if (touch.press.isPressed && _draggedPiece != null)
+        else if (button.isPressed && _draggedPiece != null)
         {
-            UpdateDrag(touch.position.ReadValue());
+            UpdateDrag(screenPos);
         }
-        else if (touch.press.wasReleasedThisFrame && _draggedPiece != null)
+        else if (button.wasReleasedThisFrame && _draggedPiece != null)
         {
-            EndDrag(touch.position.ReadValue());
+            EndDrag(screenPos);
         }
     }
 
@@ -251,11 +251,25 @@ public sealed class DragHandler : MonoBehaviour
 }
 ```
 
-## Tutorial Overlay
+### Gamepad Equivalent
+
+A puzzle board must be fully playable on a stick — a mouse-only board is a shipping blocker on
+console. Don't emulate a pointer; model it as **select → move → confirm**:
+
+- **Cursor on the grid** — D-pad / left stick steps cell-to-cell in grid space, not pixels. Snap the
+  highlight to the cell; the board is discrete, so the cursor should be too.
+- **Pick up / drop** — South button grabs the piece under the cursor, moves it with the cursor, and
+  drops it on the next press. East button cancels back to the start cell.
+- **Share the state machine** — `TryStartDrag` / `UpdateDrag` / `EndDrag` above take a screen
+  position, so route the gamepad cursor's cell centre through the same three calls rather than
+  writing a second drag path.
+- **Repeat delay** — stick-held navigation needs an initial delay (~0.4s) then a repeat rate
+  (~0.1s), or the cursor skates across the board.
 
 - **First-time only** — check PlayerPrefs flag per tutorial step
 - **Dim background** — semi-transparent overlay, spotlight on target element
-- **Animated hand** — show tap/drag gesture on the target
+- **Show the input** — animate the actual binding on the target: a drag ghost for mouse, the button
+  glyph for gamepad. Swap the prompt with the active device, never show both at once
 - **Progressive** — teach one mechanic per level, not all at once
 - **Skippable** — always allow dismissing
 
@@ -275,4 +289,4 @@ public sealed class DragHandler : MonoBehaviour
 - Puzzle games are rarely GPU-bound — focus on clean input and smooth animations
 - Pool popup effects and particles
 - Pre-calculate valid moves for hint system at level start
-- Save progress per-level to avoid data loss on app kill
+- Save progress per-level to avoid data loss on a crash or quit

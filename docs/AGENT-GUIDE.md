@@ -4,7 +4,9 @@ How to use, customize, and create agents for everything-claude-unity.
 
 ---
 
-## All 20 Agents at a Glance
+## All 28 Agents at a Glance
+
+### Engineering agents (ECU)
 
 | Agent | Model | Description |
 |-------|-------|-------------|
@@ -17,7 +19,7 @@ How to use, customize, and create agents for everything-claude-unity.
 | `unity-optimizer` | opus | Profiles performance and fixes CPU/GPU bottlenecks, GC spikes, draw calls |
 | `unity-shader-dev` | opus | Creates HLSL/ShaderLab shaders, ShaderGraph nodes, compute shaders |
 | `unity-network-dev` | opus | Implements multiplayer networking (Netcode, Mirror, Photon, Fish-Net) |
-| `unity-ui-builder` | opus | Builds UI with UGUI Canvas or UI Toolkit, handles safe areas and responsive layouts |
+| `unity-ui-builder` | opus | Builds UI with UGUI Canvas or UI Toolkit, handles gamepad focus navigation and responsive layouts from 16:9 to ultrawide |
 | `unity-reviewer` | sonnet | Reviews code for correctness, performance, serialization safety, and Unity pitfalls |
 | `unity-test-runner` | sonnet | Writes and runs EditMode/PlayMode tests, reports results |
 | `unity-build-runner` | sonnet | Configures builds, platform switching, player settings, Addressables |
@@ -28,6 +30,21 @@ How to use, customize, and create agents for everything-claude-unity.
 | `unity-security-reviewer` | sonnet | Security audit -- PlayerPrefs secrets, hardcoded keys, insecure network calls, debug builds |
 | `unity-git-master` | sonnet | Unity-aware git operations -- LFS, merge strategies, .meta hygiene, .gitattributes |
 | `unity-critic` | opus | Challenges implementation plans -- identifies risks, missed edge cases, over-engineering |
+
+### Design and production agents (cloud-nine-unity overlay)
+
+These author documentation under `docs/` -- design docs, ADRs, sprint plans. They never write C# or drive the editor.
+
+| Agent | Model | Description |
+|-------|-------|-------------|
+| `game-designer` | opus | Designs the mechanical and systems layer -- core loops, progression, combat, economy, player-facing rules |
+| `systems-designer` | sonnet | Detailed subsystem designs -- combat formulas, progression curves, crafting recipes, economy/loot tuning |
+| `level-designer` | sonnet | Spatial layouts, encounter design, pacing plans, environmental storytelling |
+| `creative-director` | opus | Vision keeper and senior creative reviewer -- resolves pillar conflicts, arbitrates scope cuts, gives verdicts |
+| `technical-director` | opus | Senior technical reviewer -- architecture decisions, technology evaluation, performance strategy, feasibility verdicts, ADRs |
+| `narrative-director` | opus | Story architecture, world-building direction, character design, dialogue strategy (optional -- narrative-heavy games) |
+| `world-builder` | sonnet | Deep world lore -- factions, cultures, history, geography, ecology (optional -- narrative-heavy games) |
+| `writer` | sonnet | Dialogue, lore entries, item descriptions, in-game text, under narrative-director direction (optional) |
 
 ---
 
@@ -67,7 +84,15 @@ What do you need?
 |     +-- LFS, .gitattributes, .meta hygiene? -> unity-git-master
 |
 +-- Challenge a plan?
-      +-- Find risks before execution? --------> unity-critic
+|     +-- Find risks before execution? --------> unity-critic
+|
++-- Design or plan the game itself (docs, not code)?
+      +-- Mechanics, loops, progression? ------> game-designer
+      +-- One subsystem in precise detail? ----> systems-designer
+      +-- Level layout and pacing? ------------> level-designer
+      +-- Vision or scope verdict? ------------> creative-director
+      +-- Architecture or feasibility verdict? -> technical-director
+      +-- Story, lore, or in-game text? -------> narrative-director, world-builder, writer
 ```
 
 ---
@@ -350,7 +375,7 @@ Use the `unity-localization` agent to handle: **$ARGUMENTS**
 
 3. **Reference existing code.** "Follow the pattern in EnemyController.cs" gives the agent a concrete example.
 
-4. **State constraints up front.** "Must support mobile (no compute shaders)" prevents wasted work.
+4. **State constraints up front.** "Must hold 60fps on min-spec (GTX 1060, 1080p)" prevents wasted work.
 
 5. **For prototypes, describe the feel.** "Tight, responsive controls like Celeste" conveys more than a feature list.
 

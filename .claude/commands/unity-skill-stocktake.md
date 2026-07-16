@@ -80,7 +80,7 @@ Non-blocking; surface as "needs manual review".
 - ...
 
 ## Stale globs (<count>)
-- `skills/platform/mobile-input` — globs `["Assets/Input/**/*.cs"]` match 0 files
+- `skills/<category>/<name>` — globs `["Assets/<Dir>/**/*.cs"]` match 0 files
 
 ## Never-referenced skills (<count>)
 - `skills/<name>` — not referenced by any agent/command and globs match 0 files

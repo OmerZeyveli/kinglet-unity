@@ -95,6 +95,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/hooks/warn-platform-defines.sh	ecu	1.5.0	.claude/hooks/warn-platform-defines.sh	814923cb311f4dfd4dfd2c0e107e72ee4bac2d79cbba791378a8d03d618a19df	verbatim	-
 .claude/hooks/warn-serialization.sh	ecu	1.5.0	.claude/hooks/warn-serialization.sh	748bc66fcb1bf8a1e53c773a24e4d1e1a96537c73fb1f1d45b6226d8ae47120d	verbatim	-
 CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
+.claude/NOTICE.md	original	-	-	-	original	-
 .claude/rules/architecture.md	ecu	1.5.0	.claude/rules/architecture.md	36aac42cb968d1b6cf09eb874bdd0649453094ed89b5c4583952dd163d432714	verbatim	-
 .claude/rules/csharp-unity.md	ecu	1.5.0	.claude/rules/csharp-unity.md	713eb2c97c39d1c791325bd749f87aed92895ee0c94464c4eb72e7dd167fa986	verbatim	-
 .claude/rules/pc-console.md	original	-	-	-	original	-
@@ -121,15 +122,12 @@ CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 .claude/skills/gameplay/procedural-generation/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/procedural-generation/SKILL.md	8672ae604cb075ad532d93031d8a181c8d11e76884a3db8b41c63cf0454b322d	verbatim	-
 .claude/skills/gameplay/save-system/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/save-system/SKILL.md	deab1c9d2aaf985a23d22909b57483eada07d198df4546787ff27e5924a11079	verbatim	-
 .claude/skills/gameplay/state-machine/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/state-machine/SKILL.md	5cbf57d364ee60156eb3edd3c849338e50ac9cb2b92f6d2b64788d1ce01ab1f3	verbatim	-
-.claude/skills/genre/endless-runner/SKILL.md	ecu	1.5.0	.claude/skills/genre/endless-runner/SKILL.md	18b168c4ea76dbd43c68c8ab991c89d1473dff035e70f3e375f0c82b70ff3029	verbatim	-
-.claude/skills/genre/hyper-casual/SKILL.md	ecu	1.5.0	.claude/skills/genre/hyper-casual/SKILL.md	cf5478083124e3c707cc10b2809d0f0f649f2bfe2688b29e0255f60f2afc31b5	verbatim	-
 .claude/skills/genre/idle-clicker/SKILL.md	ecu	1.5.0	.claude/skills/genre/idle-clicker/SKILL.md	583c2dc751d5b37cde3584728d598e96d98835844d7b45a6775e77ef3b8c5738	verbatim	-
 .claude/skills/genre/match3/SKILL.md	ecu	1.5.0	.claude/skills/genre/match3/SKILL.md	c04d5ed19b34729a0b0bb0c7569533fc1f4076da515c89831c4bf35c701dc4ee	verbatim	-
 .claude/skills/genre/platformer-2d/SKILL.md	ecu	1.5.0	.claude/skills/genre/platformer-2d/SKILL.md	9b21e1e6d5e1415dfe4f25095bdb12fedf7d8737aaea3afd9bf423b15e9cd680	verbatim	-
 .claude/skills/genre/puzzle/SKILL.md	ecu	1.5.0	.claude/skills/genre/puzzle/SKILL.md	6dedef75ca34f4c7514d14f927bfe829c1c08a3677837d887a6b0fd402f19500	verbatim	-
 .claude/skills/genre/rpg/SKILL.md	ecu	1.5.0	.claude/skills/genre/rpg/SKILL.md	a77c5e2f2db4e9d8035f64a91eebc0d8c9c04ac93dca15980c1890c035a3ac8f	verbatim	-
 .claude/skills/genre/topdown/SKILL.md	ecu	1.5.0	.claude/skills/genre/topdown/SKILL.md	cf1511b475c4de4336225930f7b1fd0402504c23bf7788b932a61402c0fba65e	verbatim	-
-.claude/skills/platform/mobile/SKILL.md	ecu	1.5.0	.claude/skills/platform/mobile/SKILL.md	565035690c8767af891a0a23c72ef4beac34c59dba35137abd30b4ed3bb5d687	verbatim	-
 .claude/skills/systems/addressables/SKILL.md	ecu	1.5.0	.claude/skills/systems/addressables/SKILL.md	23ec75e5a6d101fddb741ca58676b0ecb4d94567c69d2ad1ca11fd18fe1c76ac	verbatim	-
 .claude/skills/systems/animation/SKILL.md	ecu	1.5.0	.claude/skills/systems/animation/SKILL.md	2314a56988e1e0e2a34bde77ad12fe34b2ed454435ad37f79755e870e085044e	verbatim	-
 .claude/skills/systems/audio/SKILL.md	ecu	1.5.0	.claude/skills/systems/audio/SKILL.md	af33d218db8399b8c0c726626105f003063eadd749ec937bab5abed50abfca63	verbatim	-
@@ -151,6 +149,8 @@ CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 .claude/templates/game-design-document.md	donchitos	984023d	.claude/docs/templates/game-design-document.md	c7a3665d1a47d25c4224bb9d19dc15a0e609594d8ed8841347822fd9d1b0aaec	modified	repathed-to-docs-tree
 .claude/templates/sprint-plan.md	donchitos	984023d	.claude/docs/templates/sprint-plan.md	4e5f640fe11ba5467e457f248fbf2e4d53f45a62a75ccf123e554c701042950f	modified	repathed-to-docs-tree
 .claude/templates/systems-index.md	donchitos	984023d	.claude/docs/templates/systems-index.md	3c474f75f71d12c3175b7be58013f58f615f316ba8fa8533ebb94197c85634c1	modified	repathed-to-docs-tree
+.claude/UPSTREAM	original	-	-	-	original	-
+.claude/VERSION	original	-	-	-	original	-
 CONTRIBUTING.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 CREDITS.md	original	-	-	-	original	-
 docs/AGENT-GUIDE.md	ecu	1.5.0	docs/AGENT-GUIDE.md	138ac65721897705a730ff29f5cd2ea26e2aa9c783dc63457e52c02afe29d80b	verbatim	-
@@ -160,10 +160,8 @@ docs/HOOK-REFERENCE.md	ecu	1.5.0	docs/HOOK-REFERENCE.md	3369a90e917bd229e3e39830
 docs/MODEL-ROUTING.md	ecu	1.5.0	docs/MODEL-ROUTING.md	585fb9c38d0d88021632614e03893ef1ff3cb3c1935f9be148b3b3c986520512	verbatim	-
 docs/SKILL-CATALOG.md	ecu	1.5.0	docs/SKILL-CATALOG.md	abafe376b9063f84a8adb46a00eaf7a3e0d216b96faadf980b63c6fc0c791eb6	verbatim	-
 examples/CLAUDE.md.2d-platformer	ecu	1.5.0	examples/CLAUDE.md.2d-platformer	363930fd2c582e6155491703123fe39624ca339c74adedfc458213474195cd28	verbatim	-
-examples/CLAUDE.md.hyper-casual	ecu	1.5.0	examples/CLAUDE.md.hyper-casual	8064408e6a8a23da2f6b2c21d5ad5e53485f826af31c71e5d45f9c8312e87a33	verbatim	-
 examples/CLAUDE.md.idle-clicker	ecu	1.5.0	examples/CLAUDE.md.idle-clicker	1e8ba93e014e39172b0b6baaca5370ec9fa132467c6bec90db1459f6c0400101	verbatim	-
 examples/CLAUDE.md.match3	ecu	1.5.0	examples/CLAUDE.md.match3	76c192a905b0c4911dc757b7d04033248028b85690a926c38a57881b566f4e7c	verbatim	-
-examples/CLAUDE.md.mobile-casual	ecu	1.5.0	examples/CLAUDE.md.mobile-casual	c81680f6af715faf7c691019ac84b45f85e54a8aefac85aa93e60b38b39f3d28	verbatim	-
 examples/CLAUDE.md.rpg	ecu	1.5.0	examples/CLAUDE.md.rpg	06ee9968fd08c22f512b41c77a44e0b3ab828864d2c1e12f269c5505448395bc	verbatim	-
 .gitattributes	original	-	-	-	original	-
 .github/workflows/ci.yml	ecu	1.5.0	.github/workflows/ci.yml	3b79e9f884b55ed5fe70d1b5cdb241e2300d68da660335cf92de07bf7a5e38df	verbatim	-
@@ -201,6 +199,7 @@ tests/test-cross-validation.sh	ecu	1.5.0	tests/test-cross-validation.sh	ed11cf89
 tests/test-hooks.sh	ecu	1.5.0	tests/test-hooks.sh	ff362d3e26718ca81d6857af46c7579317ee5ba8179c6ebfb95e5f8eba6dd3a8	verbatim	-
 tests/test-install.sh	ecu	1.5.0	tests/test-install.sh	9561a3bcf8e75e2ee92b7e2ddadbe6dea6e8c3b4464c575e14339864b5eea971	verbatim	-
 tests/test-lib.sh	ecu	1.5.0	tests/test-lib.sh	8c8810123ca75250158286eae310a380d907cfb7adf30cf63fb6bc557e3cfe4d	verbatim	-
+tests/test-no-mobile.sh	original	-	-	-	original	-
 tests/test-skills.sh	ecu	1.5.0	tests/test-skills.sh	324561e8e83be33761d519e6e04bf4a7eaaac7eef453bc431db05e13228d434a	verbatim	-
 tests/test-state.sh	ecu	1.5.0	tests/test-state.sh	dc05b5a953fb23fb14ab0a009a276152f891d85b939f9c0c0aea16608ffcb321	verbatim	-
 tests/test-templates.sh	ecu	1.5.0	tests/test-templates.sh	0f38c2bc95d65cd2fe4e6baba50ede9dae4dfed80185c20b2f4d372dbe535f0f	verbatim	-

@@ -4,8 +4,8 @@
 - **Unity Version:** 2022.3 LTS
 - **Render Pipeline:** URP
 - **Genre:** Action RPG (Diablo-like / top-down)
-- **Target Platform:** iOS + Android
-- **Target FPS:** 30 (60fps on high-end)
+- **Target Platform:** PC (Steam) + Console (PS5 / Xbox)
+- **Target FPS:** 60 baseline (min-spec PC and console performance mode); uncapped on high-refresh displays
 
 ## Architecture
 
@@ -40,20 +40,21 @@ MyRPG.Editor        — quest editor, stat balancer, loot table editor
 - `S_Boss_XX` — boss arenas
 
 ## Skills to Load
-- `mobile` — ASTC textures, draw call budget, thermal management, safe areas
 - `rpg` — stat system, quests, skill trees, combat
 - `inventory-system` — items, equipment, crafting
 - `dialogue-system` — NPC conversations
 - `save-system` — full game state persistence
 - `state-machine` — game states, enemy AI, ability states
 - `procedural-generation` — dungeon generation, loot tables
-- `character-controller` — top-down movement (virtual joystick)
+- `character-controller` — top-down movement (WASD + mouse aim / gamepad twin-stick)
 - `navmesh` — enemy pathfinding
-- `ui-toolkit` — complex UI screens (safe area, touch targets)
-- `addressables` — asset loading, download-on-demand content
+- `ui-toolkit` — complex UI screens (ultrawide anchoring, gamepad focus navigation)
+- `addressables` — asset loading, DLC and post-launch content
 
 ## Rules
-Follow all rules in `.claude/rules/`.
+Follow all rules in `.claude/rules/`. Platform guidance — PC/console performance budgets, BC7/BC5
+texture compression, input and display handling — comes from `.claude/rules/pc-console.md`, which is
+always in force; there is no platform skill to load.
 
 ## Key Conventions
 - ALL game data is ScriptableObjects (items, abilities, enemies, quests, dialogue)
@@ -67,16 +68,18 @@ Follow all rules in `.claude/rules/`.
 ## Input Map
 ```
 Player:
-  Move — Virtual Joystick (left side)
-  Aim — Virtual Joystick (right side) / tap target
-  Attack — Auto-attack when in range / tap enemy
-  Ability1-4 — Skill buttons (bottom-right HUD)
-  Interact — Tap on NPC/object
-  Inventory — Inventory icon (top-right)
-  QuestLog — Quest icon (top-right)
-  Map — Map icon (top-left)
-  Dodge — Swipe or dodge button
+  Move — WASD / Left Stick
+  Aim — Mouse position / Right Stick
+  Attack — Left Mouse / Right Trigger
+  Ability1-4 — 1-4 keys / Face buttons + shoulders
+  Interact — E / A button (nearest interactable)
+  Inventory — I / Y button
+  QuestLog — J / D-pad Up
+  Map — M / D-pad Down
+  Dodge — Space / B button
 ```
+Every binding is rebindable, and the HUD swaps prompts when the player switches between keyboard/mouse
+and gamepad mid-session (see `.claude/rules/pc-console.md`).
 
 ## MCP Integration
 Unity MCP at `http://localhost:8080/mcp`. Use for dungeon scene construction, NPC placement, UI screen building.
