@@ -154,8 +154,34 @@ if [ "$DRY_RUN" -eq 1 ]; then
   printf '\n%s\n' "${BOLD}Would install:${NC}"
   printf '  %s files into %s\n' "$PAYLOAD_COUNT" "$CLAUDE_DIR"
   printf '  scripts/ and tests/ into .claude/\n'
-  printf '  CLAUDE.md (generated)\n'
-  [ -n "$BACKUP_DIR" ] && printf '  backup: %s\n' "$BACKUP_DIR"
+  # MODIFIED_FILES is always set; KEPT/MOD_COUNT are not defined until Step 5 and would be an
+  # unbound-variable death under `set -u`.
+  DRY_MOD=$(printf '%s' "$MODIFIED_FILES" | grep -c . || true)
+  [ "$DRY_MOD" -gt 0 ] && printf '  keep %s file(s) you modified\n' "$DRY_MOD"
+
+  # Report the CLAUDE.md branch we would actually take. This said "CLAUDE.md (generated)"
+  # unconditionally, which is a lie in the one case that matters: against a project that already has
+  # a CLAUDE.md, the real install writes CLAUDE.md.generated and leaves theirs alone. A dry run that
+  # misreports the only step capable of destroying work is worse than having no dry run.
+  if [ ! -f "$PROJECT_DIR/CLAUDE.md" ]; then
+    printf '  CLAUDE.md (new — generated)\n'
+  elif grep -q 'cloud-nine-unity:generated:begin' "$PROJECT_DIR/CLAUDE.md" 2>/dev/null; then
+    printf '  CLAUDE.md — refresh the generated section only; your prose untouched\n'
+  else
+    printf '  CLAUDE.md.generated — yours exists and has no markers, so it is NOT touched\n'
+  fi
+
+  printf '  .gitignore — add .claude/settings.local.json and .claude/state/*\n'
+  if [ "$WITH_MCP" -eq 1 ]; then
+    if [ ! -f "$MANIFEST" ]; then
+      printf '  --with-mcp: no Packages/manifest.json — would skip\n'
+    elif grep -q "$MCP_PKG_NAME" "$MANIFEST" 2>/dev/null; then
+      printf '  --with-mcp: %s already present — would skip\n' "$MCP_PKG_NAME"
+    else
+      printf '  --with-mcp: add %s to Packages/manifest.json\n' "$MCP_PKG_NAME"
+    fi
+  fi
+  [ -n "$BACKUP_DIR" ] && printf '  backup: %s\n' "$(basename "$BACKUP_DIR")"
   printf '\nDry run complete — nothing written.\n'
   exit 0
 fi

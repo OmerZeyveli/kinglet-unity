@@ -69,16 +69,56 @@ else
   warn "uv not found — the MCP bridge runs under it. See https://docs.astral.sh/uv/"
 fi
 
-# ── MCP bridge reachable ─────────────────────────────────────────────────────
-MCP_URL="http://localhost:8080/mcp"
-if command -v curl >/dev/null 2>&1; then
-  if curl -fsS --max-time 3 "$MCP_URL" >/dev/null 2>&1; then
-    pass "MCP bridge responding at $MCP_URL"
-  else
-    warn "No MCP bridge at $MCP_URL — open Unity and start it (Window > MCP for Unity)."
-  fi
+# ── MCP bridge reachable — and actually an MCP bridge ────────────────────────
+#
+# This used to be `curl -fsS http://localhost:8080/mcp` and passed on ANY HTTP response. On a machine
+# where 8080 happened to be an unrelated nginx, it cheerfully reported "MCP bridge responding" at a
+# web server that has never heard of Unity. That is the same defect as testing settings.json with a
+# bare `grep unityMCP`: it proves something answered, not that the right thing answered.
+#
+# So: read the endpoint from the project's own config rather than hardcoding a port, then speak
+# JSON-RPC and require an MCP-shaped reply.
+read_mcp_url() {
+  local f url=""
+  # settings.local.json wins — that is where a machine-local port override belongs.
+  for f in "$CLAUDE_DIR/settings.local.json" "$CLAUDE_DIR/settings.json"; do
+    [ -f "$f" ] || continue
+    if command -v jq >/dev/null 2>&1; then
+      url=$(jq -r '.mcpServers.unityMCP.url // empty' "$f" 2>/dev/null || true)
+    elif [ -n "$PY" ]; then
+      url=$("$PY" -c 'import json,sys
+try:
+    print(json.load(open(sys.argv[1])).get("mcpServers",{}).get("unityMCP",{}).get("url",""))
+except Exception: pass' "$f" 2>/dev/null || true)
+    fi
+    [ -n "$url" ] && { printf '%s' "$url"; return; }
+  done
+}
+
+MCP_URL=$(read_mcp_url)
+if [ -z "$MCP_URL" ]; then
+  warn "No mcpServers.unityMCP.url in settings — skipped the bridge check."
+elif ! command -v curl >/dev/null 2>&1; then
+  warn "curl not found — skipped the bridge check."
 else
-  warn "curl not found — skipped the MCP bridge check."
+  # A real MCP server answers initialize with a JSON-RPC result naming itself. Streamable HTTP wants
+  # both content types in Accept.
+  MCP_REQ='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"studio-doctor","version":"1"}}}'
+  MCP_RESP=$(curl -sS --max-time 5 -X POST "$MCP_URL" \
+      -H 'Content-Type: application/json' \
+      -H 'Accept: application/json, text/event-stream' \
+      -d "$MCP_REQ" 2>/dev/null || true)
+  if [ -z "$MCP_RESP" ]; then
+    warn "Nothing answered at $MCP_URL — open Unity and start the bridge (Window > MCP for Unity)."
+  elif printf '%s' "$MCP_RESP" | grep -q '"jsonrpc"'; then
+    SRV=$(printf '%s' "$MCP_RESP" | sed -n 's/.*"serverInfo"[^{]*{[^}]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    pass "MCP bridge answered at $MCP_URL${SRV:+ (${SRV})}"
+  else
+    # Something is listening, but it is not an MCP server. Say so — do not call it a bridge.
+    fail "$MCP_URL is serving something that is NOT an MCP server."
+    printf '     %s\n' "first bytes: $(printf '%s' "$MCP_RESP" | tr -d '\n' | cut -c1-70)"
+    printf '     %s\n' "Another service holds that port. Point unityMCP at a free one in .claude/settings.local.json."
+  fi
 fi
 
 # ── settings.json wiring (parsed, not grepped) ───────────────────────────────
