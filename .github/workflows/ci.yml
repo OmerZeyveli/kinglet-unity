@@ -18,13 +18,18 @@ jobs:
       - name: Shellcheck hook scripts
         run: shellcheck -x .claude/hooks/*.sh
 
+      - name: Shellcheck our scripts
+        run: shellcheck -x install.sh uninstall.sh scripts/*.sh tests/*.sh tests/fixtures/*.sh
+
       - name: Validate settings.json
         run: jq . .claude/settings.json > /dev/null
 
-      - name: Validate plugin manifests
-        run: |
-          jq . .claude-plugin/plugin.json > /dev/null
-          jq . .claude-plugin/marketplace.json > /dev/null
+      # The vendored workflow validated .claude-plugin/{plugin,marketplace}.json here. We ship a
+      # single installer and never vendored .claude-plugin/ — provenance-skip.tsv marks it
+      # rule=absent — so that step could only ever fail. Provenance integrity is the check that
+      # belongs in its place.
+      - name: Validate provenance manifest
+        run: bash scripts/check-provenance.sh
 
       - name: Validate agent frontmatter
         run: |
@@ -160,23 +165,41 @@ jobs:
             fi
           done
 
-      - name: Validate benchmark scenarios
+      # benchmarks/ is not vendored (provenance-skip.tsv, rule=absent), so the step that validated
+      # its scenarios was dead code guarded by an if that never fired.
+
+      - name: Install into a synthetic Unity project
         run: |
-          if [ -d "benchmarks/scenarios" ]; then
-            FAIL=0
-            for file in benchmarks/scenarios/*.json; do
-              if ! jq . "$file" > /dev/null 2>&1; then
-                echo "FAIL: $file is not valid JSON"
-                FAIL=1
-              fi
-              HAS_NAME=$(jq -r '.name // empty' "$file")
-              if [ -z "$HAS_NAME" ]; then
-                echo "FAIL: $file missing 'name' field"
-                FAIL=1
-              fi
-            done
-            exit $FAIL
-          fi
+          bash tests/fixtures/mkproject.sh /tmp/ci-project --variant urp
+          bash install.sh --project-dir /tmp/ci-project --yes
+          bash scripts/studio-doctor.sh --project-dir /tmp/ci-project
+
+      - name: Run test suite
+        run: bash tests/run-tests.sh
+
+  # macOS ships bash 3.2 and BSD grep. This repo has already shipped `declare -A` (bash 4) and
+  # `grep -oP` (GNU-only) in scripts that .gitattributes says target macOS — the Linux leg cannot
+  # see either. This job is the only thing that can.
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Report the shell we are actually testing against
+        run: bash --version | head -1
+
+      - name: Install into a synthetic Unity project
+        run: |
+          bash tests/fixtures/mkproject.sh /tmp/ci-project --variant urp
+          bash install.sh --project-dir /tmp/ci-project --yes
+
+      - name: CLAUDE.md was generated, and generated correctly
+        run: |
+          test -f /tmp/ci-project/CLAUDE.md
+          grep -q '6000.0.23f1' /tmp/ci-project/CLAUDE.md
+          grep -q 'FILL: Game Title' /tmp/ci-project/CLAUDE.md
+          # Upstream's generator leaked its own status line into the document it was writing.
+          ! grep -q 'generated successfully at' /tmp/ci-project/CLAUDE.md
 
       - name: Run test suite
         run: bash tests/run-tests.sh
