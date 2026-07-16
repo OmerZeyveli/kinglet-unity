@@ -70,6 +70,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/commands/unity-workflow.md	ecu	1.5.0	.claude/commands/unity-workflow.md	3fe77f54481d4e09c55e8feda98d669b0e56a47f3eca8b9f4bc3f00ac12ff052	modified	mobile-strip
 .claude/hooks/auto-learn.sh	ecu	1.5.0	.claude/hooks/auto-learn.sh	89f8e2d2d8bd0050a4948483529d60149d8bcefb3c6e8a87b28b8dd8b20b8064	verbatim	-
 .claude/hooks/bash-gate.sh	ecu	1.5.0	.claude/hooks/bash-gate.sh	402b11ca2bc35c47e27c06716d21fe0b7300e5ae8b106ac3cf4eab118560d081	verbatim	-
+.claude/hooks/block-legacy-input.sh	original	-	-	-	original	-
 .claude/hooks/block-meta-edit.sh	ecu	1.5.0	.claude/hooks/block-meta-edit.sh	47d80f65b4ffd88d04f59a1ae6710d3680df9a8c86ea40426a492c2759a45c6d	verbatim	-
 .claude/hooks/block-projectsettings.sh	ecu	1.5.0	.claude/hooks/block-projectsettings.sh	792e663195845faa1e61fecb4cb571a33c224a43d81e45c5e63f2455a1493eac	verbatim	-
 .claude/hooks/block-scene-edit.sh	ecu	1.5.0	.claude/hooks/block-scene-edit.sh	7eb9ae2cecb238ba786ac33af1833fd842ceb55362bf7d10b2aee56da21d71b6	verbatim	-
@@ -102,7 +103,7 @@ CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 .claude/rules/performance.md	ecu	1.5.0	.claude/rules/performance.md	757676620b64b53761f27499a6939693a27612d153d004f90b04407aa246a2ca	verbatim	-
 .claude/rules/serialization.md	ecu	1.5.0	.claude/rules/serialization.md	64d2bf49758afc495e3898225dc0d31282f66a09eecf0c1a7a9074c376ca4ae9	verbatim	-
 .claude/rules/unity-specifics.md	ecu	1.5.0	.claude/rules/unity-specifics.md	99eca581114f56b4a95b4a7ca758a34bdc16bcae470421b4f3b850b2c5aefdd6	modified	mobile-strip
-.claude/settings.json	ecu	1.5.0	.claude/settings.json	ab1c4eb6dc55f5290205e89e85999d54fb8a526eb4661c0c8626347879ebc6b1	verbatim	-
+.claude/settings.json	ecu	1.5.0	.claude/settings.json	ab1c4eb6dc55f5290205e89e85999d54fb8a526eb4661c0c8626347879ebc6b1	modified	wired in block-legacy-input.sh — rules claimed a hook blocked legacy input; none existed
 .claude/settings.local.json.template	ecu	1.5.0	.claude/settings.local.json.template	6f7ce8c899a2a1696c46160deee234ba20a9ded615bcc1da505a6b68f3333149	verbatim	-
 .claude/skills/core/assembly-definitions/SKILL.md	ecu	1.5.0	.claude/skills/core/assembly-definitions/SKILL.md	d677e254a933b4a8c95346fa26b5fd88937e9721a65571e9a10f04caf6738a9e	verbatim	-
 .claude/skills/core/commit-trailers/SKILL.md	ecu	1.5.0	.claude/skills/core/commit-trailers/SKILL.md	900218e54f1a53bcdfb23003e1cf8ff7ee78fcc834f280ec0872a5ad04e359b1	verbatim	-
@@ -196,6 +197,7 @@ templates/System.cs.template	ecu	1.5.0	templates/System.cs.template	44eabd3ede12
 templates/View.cs.template	ecu	1.5.0	templates/View.cs.template	c77939301d6476dfd52d8496bc5aad0fff1b1c2f41972616ed664fca8f692dbd	verbatim	-
 tests/fixtures/mkproject.sh	original	-	-	-	original	-
 tests/run-tests.sh	ecu	1.5.0	tests/run-tests.sh	b8c6280bf30aa4834a15255b9f4d3c0f4f3b6aa9e39d7b6c73bd49b334f510d8	modified	test-runner-fix: sourced files ended in exit, killing the runner after file 1; --source-only was unimplemented
+tests/test-block-legacy-input.sh	original	-	-	-	original	-
 tests/test-cross-validation.sh	ecu	1.5.0	tests/test-cross-validation.sh	ed11cf897a74a90ce8d3bd6a072dd3ba09e9ce412d2bfc51c7975a91faaafd33	verbatim	-
 tests/test-hooks.sh	ecu	1.5.0	tests/test-hooks.sh	ff362d3e26718ca81d6857af46c7579317ee5ba8179c6ebfb95e5f8eba6dd3a8	verbatim	-
 tests/test-install.sh	ecu	1.5.0	tests/test-install.sh	9561a3bcf8e75e2ee92b7e2ddadbe6dea6e8c3b4464c575e14339864b5eea971	modified	test-runner-fix: PASS output no longer gated on --verbose, so the tally can count it

@@ -29,6 +29,11 @@
           },
           {
             "type": "command",
+            "command": ".claude/hooks/block-legacy-input.sh",
+            "timeout": 3000
+          },
+          {
+            "type": "command",
             "command": ".claude/hooks/gateguard.sh",
             "timeout": 3000
           },
