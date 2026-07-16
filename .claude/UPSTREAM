@@ -1,0 +1,14 @@
+# cloud-nine-unity — vendored upstream pins
+# key=value, dependency-free to parse. provenance.tsv holds the per-file truth; this is the summary.
+toolkit=cloud-nine-unity
+toolkit_version=2.0.0
+ecu=1.5.0
+ecu_commit=bb28ccbd40b065b0958b02df0c03fb91c4fb7c5b
+ecu_repo=https://github.com/XeldarAlz/everything-claude-unity
+ecu_note=vendored; mobile content removed; some files modified (see provenance.tsv status=modified)
+donchitos=984023ddac0d5e27624f2baacde6105e45de375f
+donchitos_repo=https://github.com/Donchitos/Claude-Code-Game-Studios
+donchitos_note=adapted; reformatted to this toolkit's conventions
+unity_mcp=10.1.0
+unity_mcp_repo=https://github.com/CoplayDev/unity-mcp
+unity_mcp_note=not vendored; settings.json points at it on localhost:8080
