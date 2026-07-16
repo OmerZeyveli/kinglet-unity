@@ -140,7 +140,14 @@ except Exception:
     pass' "$SETTINGS" 2>/dev/null || true)
   fi
   if [ -n "$MCP_CONFIGURED" ]; then
-    pass "settings.json: mcpServers.unityMCP → $MCP_CONFIGURED"
+    # Say which file actually wins. Reporting settings.json's URL while the probe above used a
+    # different one from settings.local.json is two lines contradicting each other about the same
+    # fact — the reader has to guess which is live.
+    if [ -n "$MCP_URL" ] && [ "$MCP_URL" != "$MCP_CONFIGURED" ]; then
+      pass "settings.json: unityMCP → $MCP_CONFIGURED (overridden by settings.local.json → $MCP_URL)"
+    else
+      pass "settings.json: mcpServers.unityMCP → $MCP_CONFIGURED"
+    fi
   elif command -v jq >/dev/null 2>&1 || [ -n "$PY" ]; then
     fail "settings.json has no mcpServers.unityMCP.url — MCP tools will not work."
   else

@@ -285,15 +285,43 @@ if [ -f "$GEN" ]; then
 fi
 
 # ── Step 7: .gitignore ───────────────────────────────────────────────────────
+#
+# Ask git what it already ignores rather than grepping for our exact lines. A project that ignores
+# `/.claude/` wholesale — a perfectly sensible choice, and one real projects make — is already
+# covered, and appending our three entries to it is just noise in someone else's file.
 GITIGNORE="$PROJECT_DIR/.gitignore"
-[ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; info "Created .gitignore"; }
-ADDED=0
-add_ignore() { grep -qxF "$1" "$GITIGNORE" 2>/dev/null || { printf '%s\n' "$1" >> "$GITIGNORE"; ADDED=$((ADDED + 1)); }; }
-if [ "$ADDED" -eq 0 ]; then printf '\n# Claude Code local settings and session state\n' >> "$GITIGNORE"; fi
-add_ignore '.claude/settings.local.json'
-add_ignore '.claude/state/*'
-add_ignore '!.claude/state/.gitkeep'
-[ "$ADDED" -gt 0 ] && ok "Updated .gitignore ($ADDED entries)"
+WANT_IGNORED='.claude/settings.local.json
+.claude/state/session.json'
+
+already_ignored() {
+  git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1 || return 1
+  git -C "$PROJECT_DIR" check-ignore -q "$1" 2>/dev/null
+}
+
+NEEDED=0
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  already_ignored "$p" || NEEDED=1
+done <<< "$WANT_IGNORED"
+
+if [ "$NEEDED" -eq 0 ] && [ -f "$GITIGNORE" ]; then
+  ok ".gitignore already covers .claude/ local state — left alone."
+else
+  [ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; info "Created .gitignore"; }
+  # Only append a newline first if the file does not already end with one; otherwise our header
+  # lands on the end of their last line.
+  [ -s "$GITIGNORE" ] && [ -n "$(tail -c1 "$GITIGNORE")" ] && printf '\n' >> "$GITIGNORE"
+  ADDED=0
+  add_ignore() {
+    grep -qxF "$1" "$GITIGNORE" 2>/dev/null && return
+    [ "$ADDED" -eq 0 ] && printf '\n# Claude Code local settings and session state\n' >> "$GITIGNORE"
+    printf '%s\n' "$1" >> "$GITIGNORE"; ADDED=$((ADDED + 1))
+  }
+  add_ignore '.claude/settings.local.json'
+  add_ignore '.claude/state/*'
+  add_ignore '!.claude/state/.gitkeep'
+  [ "$ADDED" -gt 0 ] && ok "Updated .gitignore ($ADDED entries)" || ok ".gitignore already has our entries."
+fi
 
 # ── Step 8: Optional — CoplayDev MCP package ─────────────────────────────────
 if [ "$WITH_MCP" -eq 1 ]; then
@@ -307,7 +335,14 @@ if [ "$WITH_MCP" -eq 1 ]; then
     cp "$MANIFEST" "$MANIFEST.bak"
     if sed -i.tmp "s|\"dependencies\"[[:space:]]*:[[:space:]]*{|\"dependencies\": {\n    \"$MCP_PKG_NAME\": \"$MCP_PKG_URL\",|" "$MANIFEST" 2>/dev/null && grep -q "$MCP_PKG_NAME" "$MANIFEST"; then
       rm -f "$MANIFEST.tmp"
-      ok "Added $MCP_PKG_NAME to manifest.json (backup: manifest.json.bak)"
+      # If git already tracks the manifest, git IS the backup — keeping a .bak just drops untracked
+      # debris into someone's repo for no benefit.
+      if git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/manifest.json >/dev/null 2>&1; then
+        rm -f "$MANIFEST.bak"
+        ok "Added $MCP_PKG_NAME to manifest.json (revert with: git checkout Packages/manifest.json)"
+      else
+        ok "Added $MCP_PKG_NAME to manifest.json (backup: manifest.json.bak)"
+      fi
     else
       mv "$MANIFEST.bak" "$MANIFEST"; rm -f "$MANIFEST.tmp"
       warn "Could not edit manifest.json safely — add this under \"dependencies\" yourself:"
