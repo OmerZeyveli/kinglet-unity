@@ -339,7 +339,17 @@ if [ "$WITH_MCP" -eq 1 ]; then
       # debris into someone's repo for no benefit.
       if git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/manifest.json >/dev/null 2>&1; then
         rm -f "$MANIFEST.bak"
-        ok "Added $MCP_PKG_NAME to manifest.json (revert with: git checkout Packages/manifest.json)"
+        ok "Added $MCP_PKG_NAME to manifest.json"
+        # Naming only manifest.json here would be half the truth: the next time Unity opens the
+        # project it resolves the package and writes packages-lock.json too, which is also tracked.
+        # Reverting one and not the other leaves the lock referencing a package the manifest no
+        # longer asks for.
+        if git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/packages-lock.json >/dev/null 2>&1; then
+          info "To undo: git checkout Packages/manifest.json Packages/packages-lock.json"
+          info "  (Unity writes the lock file when it next resolves packages.)"
+        else
+          info "To undo: git checkout Packages/manifest.json"
+        fi
       else
         ok "Added $MCP_PKG_NAME to manifest.json (backup: manifest.json.bak)"
       fi
