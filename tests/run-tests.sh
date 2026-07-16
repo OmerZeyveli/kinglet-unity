@@ -13,6 +13,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 VERBOSE="${1:-}"
 
+# test-state.sh sources this file as `run-tests.sh --source-only` to borrow the assertion helpers.
+# That flag was never implemented — $1 was read as VERBOSE and the runner ran the whole suite again,
+# from inside the test it had just started. Infinite mutual recursion.
+#
+# It went unnoticed because of the sourcing bug below: the runner died in the first test file, so it
+# never reached test-state.sh to trigger this. Fixing that one exposed this one.
+SOURCE_ONLY=0
+if [ "$VERBOSE" = "--source-only" ]; then SOURCE_ONLY=1; VERBOSE=""; fi
+
 # --- Colors ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -34,9 +43,7 @@ assert_eq() {
     local message="${3:-assert_eq}"
     if [ "$expected" = "$actual" ]; then
         PASS=$((PASS + 1))
-        if [ "$VERBOSE" = "--verbose" ]; then
-            echo -e "  ${GREEN}PASS${NC} $message"
-        fi
+        echo -e "  ${GREEN}PASS${NC} $message"
     else
         FAIL=$((FAIL + 1))
         echo -e "  ${RED}FAIL${NC} $message"
@@ -56,9 +63,7 @@ assert_exit_code() {
 
     if [ "$expected_code" -eq "$actual_code" ]; then
         PASS=$((PASS + 1))
-        if [ "$VERBOSE" = "--verbose" ]; then
-            echo -e "  ${GREEN}PASS${NC} $message (exit $actual_code)"
-        fi
+        echo -e "  ${GREEN}PASS${NC} $message (exit $actual_code)"
     else
         FAIL=$((FAIL + 1))
         echo -e "  ${RED}FAIL${NC} $message"
@@ -73,9 +78,7 @@ assert_contains() {
     local message="${3:-assert_contains}"
     if echo "$haystack" | grep -qF "$needle"; then
         PASS=$((PASS + 1))
-        if [ "$VERBOSE" = "--verbose" ]; then
-            echo -e "  ${GREEN}PASS${NC} $message"
-        fi
+        echo -e "  ${GREEN}PASS${NC} $message"
     else
         FAIL=$((FAIL + 1))
         echo -e "  ${RED}FAIL${NC} $message"
@@ -90,9 +93,7 @@ assert_not_contains() {
     local message="${3:-assert_not_contains}"
     if ! echo "$haystack" | grep -qF "$needle"; then
         PASS=$((PASS + 1))
-        if [ "$VERBOSE" = "--verbose" ]; then
-            echo -e "  ${GREEN}PASS${NC} $message"
-        fi
+        echo -e "  ${GREEN}PASS${NC} $message"
     else
         FAIL=$((FAIL + 1))
         echo -e "  ${RED}FAIL${NC} $message"
@@ -106,9 +107,7 @@ assert_file_exists() {
     local message="${2:-file exists: $path}"
     if [ -e "$path" ]; then
         PASS=$((PASS + 1))
-        if [ "$VERBOSE" = "--verbose" ]; then
-            echo -e "  ${GREEN}PASS${NC} $message"
-        fi
+        echo -e "  ${GREEN}PASS${NC} $message"
     else
         FAIL=$((FAIL + 1))
         echo -e "  ${RED}FAIL${NC} $message"
@@ -121,9 +120,7 @@ assert_file_executable() {
     local message="${2:-file executable: $path}"
     if [ -x "$path" ]; then
         PASS=$((PASS + 1))
-        if [ "$VERBOSE" = "--verbose" ]; then
-            echo -e "  ${GREEN}PASS${NC} $message"
-        fi
+        echo -e "  ${GREEN}PASS${NC} $message"
     else
         FAIL=$((FAIL + 1))
         echo -e "  ${RED}FAIL${NC} $message"
@@ -141,10 +138,16 @@ skip_test() {
 export -f assert_eq assert_exit_code assert_contains assert_not_contains assert_file_exists assert_file_executable skip_test
 export REPO_DIR VERBOSE
 
+# Helpers are defined; that is all a --source-only caller wants. Returning here is what stops the
+# mutual recursion described above.
+if [ "$SOURCE_ONLY" -eq 1 ]; then
+    return 0 2>/dev/null || exit 0
+fi
+
 # --- Runner ---
 
 echo ""
-echo -e "${CYAN}everything-claude-unity test suite${NC}"
+echo -e "${CYAN}cloud-nine-unity test suite${NC}"
 echo "========================================"
 echo ""
 
@@ -160,7 +163,42 @@ for test_file in "${test_files[@]}"; do
     fi
     CURRENT_TEST_FILE="$(basename "$test_file")"
     echo -e "${CYAN}--- ${CURRENT_TEST_FILE} ---${NC}"
-    source "$test_file"
+
+    # Each file runs in a SUBSHELL, not sourced into this one.
+    #
+    # This used to be a bare `source "$test_file"`. Several test files end with `exit 0` — and in a
+    # sourced file, exit terminates the PARENT. So the runner died inside whichever file came first
+    # alphabetically (test-cross-validation.sh) and 7 of the 8 files never ran, while the suite
+    # printed "5 passed, 0 failed" and exited 0. It looked green because it had barely started.
+    # test-install.sh was among the files that never ran, which is how a CLAUDE.md-destroying bug
+    # shipped.
+    #
+    # Files carry their own PASS:/FAIL: output and some define their own counters, so results are
+    # aggregated from the output rather than shared variables — a subshell cannot write ours back.
+    # </dev/null: hooks read their JSON payload from stdin, so a test that runs one without
+    # redirecting would sit there forever. A test suite must never be able to block.
+    set +e
+    test_output=$( ( source "$test_file" ) 2>&1 </dev/null )
+    test_rc=$?
+    set -e
+    echo "$test_output"
+
+    # Strip ANSI first. The helpers print "${GREEN}PASS${NC}", so the character before PASS is the
+    # 'm' ending the escape sequence, not whitespace — matching on raw output silently undercounts
+    # every colourised result while still looking like it worked.
+    test_plain=$(echo "$test_output" | sed 's/\x1b\[[0-9;]*m//g')
+    file_pass=$(echo "$test_plain" | grep -cE '(^|[[:space:]])PASS(:|[[:space:]])' || true)
+    file_fail=$(echo "$test_plain" | grep -cE '(^|[[:space:]])FAIL(:|[[:space:]])' || true)
+    file_skip=$(echo "$test_plain" | grep -cE '(^|[[:space:]])SKIP(:|[[:space:]])' || true)
+    PASS=$((PASS + file_pass))
+    FAIL=$((FAIL + file_fail))
+    SKIP=$((SKIP + file_skip))
+
+    # A file that dies without reporting a failure would otherwise vanish from the tally.
+    if [ "$test_rc" -ne 0 ] && [ "$file_fail" -eq 0 ]; then
+        echo -e "  ${RED}FAIL${NC} ${CURRENT_TEST_FILE} exited ${test_rc} without reporting a failure"
+        FAIL=$((FAIL + 1))
+    fi
     echo ""
 done
 

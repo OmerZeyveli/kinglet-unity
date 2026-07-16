@@ -29,3 +29,9 @@ $RECYCLE.BIN/
 # [Tt]emp/
 # [Oo]bj/
 # [Bb]uild/
+
+# Claude Code local settings and hook/session state.
+# This repo is itself a Claude Code project, so its own hooks write here while the tests run.
+.claude/settings.local.json
+.claude/state/*
+!.claude/state/.gitkeep

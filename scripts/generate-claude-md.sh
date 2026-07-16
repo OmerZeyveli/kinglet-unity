@@ -69,7 +69,13 @@ MANIFEST="$PROJECT_DIR/Packages/manifest.json"
 UNITY_VERSION="unknown"
 VERSION_FILE="$PROJECT_DIR/ProjectSettings/ProjectVersion.txt"
 if [ -f "$VERSION_FILE" ]; then
-    UNITY_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9]*' "$VERSION_FILE" | head -1)
+    # awk on the file, not `grep ... | head -1`: ProjectVersion.txt has both m_EditorVersion and
+    # m_EditorVersionWithRevision, so the regex matches twice and head closes the pipe on grep —
+    # a SIGPIPE that pipefail turns into a fatal error, but only when the writer is still writing.
+    # It is a race that hides on small files and fires on big ones. Keying off the field name is
+    # also just more correct than matching anything version-shaped.
+    UNITY_VERSION=$(awk '/^m_EditorVersion:/ {print $2; exit}' "$VERSION_FILE")
+    [ -n "$UNITY_VERSION" ] || UNITY_VERSION="unknown"
     info "Unity version: $UNITY_VERSION"
 else
     warn "ProjectVersion.txt not found."

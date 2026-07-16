@@ -74,8 +74,10 @@ ok "Unity project detected."
 
 # ── Step 2: Scan project ─────────────────────────────────────────────────────
 UNITY_VERSION="unknown"
+# awk on the file rather than `grep | head -1` — see the note in scripts/generate-claude-md.sh.
 [ -f "$PROJECT_DIR/ProjectSettings/ProjectVersion.txt" ] && \
-  UNITY_VERSION=$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+[a-zA-Z0-9]*' "$PROJECT_DIR/ProjectSettings/ProjectVersion.txt" | head -1 || echo unknown)
+  UNITY_VERSION=$(awk '/^m_EditorVersion:/ {print $2; exit}' "$PROJECT_DIR/ProjectSettings/ProjectVersion.txt")
+[ -n "$UNITY_VERSION" ] || UNITY_VERSION="unknown"
 RENDER_PIPELINE="Built-in"
 MANIFEST="$PROJECT_DIR/Packages/manifest.json"
 if [ -f "$MANIFEST" ]; then
@@ -186,6 +188,23 @@ done <<< "$PAYLOAD_FILES"
 
 mkdir -p "$CLAUDE_DIR/state"
 chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
+
+# Ship the provenance rows for the files we just installed. NOTICE.md cites this, and a licence
+# notice you cannot check against anything is just a claim.
+if [ -f "$SCRIPT_DIR/provenance.tsv" ]; then
+  {
+    printf '# Provenance for the files installed under .claude/ — the evidence behind NOTICE.md.\n'
+    printf '# The full manifest (tests, docs, repo tooling) lives in the cloud-nine-unity repo.\n'
+    # awk reads the file directly and exits after the line it wants. `grep ... | head -1` would
+    # SIGPIPE the grep when head closes the pipe, and pipefail turns that into a 141 that set -e
+    # acts on — the installer would die here having written half a payload.
+    awk '/^# ecu=/ {print; exit}' "$SCRIPT_DIR/provenance.tsv"
+    awk '!/^#/ {print; exit}' "$SCRIPT_DIR/provenance.tsv"
+    grep -v '^#' "$SCRIPT_DIR/provenance.tsv" | tail -n +2 | grep '^\.claude/' || true
+  } > "$CLAUDE_DIR/provenance.tsv"
+  printf '.claude/provenance.tsv\t%s\t644\ttoolkit\n' "$(sha_of "$CLAUDE_DIR/provenance.tsv")" >> "$RECEIPT_TMP"
+  WRITTEN=$((WRITTEN + 1))
+fi
 
 # Validation scripts and the test suite ship alongside the payload.
 for group in scripts tests; do

@@ -74,7 +74,30 @@ while IFS= read -r f; do
 done < <(git ls-files | sort)
 [ "$ORPHANS" -eq 0 ] && pass "no orphan files ($(git ls-files | wc -l | tr -d ' ') tracked files covered)"
 
-# ── 4. Field sanity ──────────────────────────────────────────────────────────
+# ── 4. status=verbatim must actually be verbatim ─────────────────────────────
+# Offline, using the upstream_sha256 already recorded in the row. This check did not exist at first,
+# and the manifest rotted immediately: a mobile sweep edited 38 vendored files and left every one of
+# them marked `verbatim`, while this script reported "provenance OK". Deferring the comparison to
+# --online made the everyday check unable to catch the everyday mistake.
+LIED=0
+while IFS=$'\t' read -r path origin _uver _upath usha status _note; do
+  [ "$status" = verbatim ] || continue
+  [ "$origin" != original ] || continue
+  [ -f "$path" ] || continue
+  [ -n "$usha" ] && [ "$usha" != "-" ] || continue
+  actual=$(sha256sum "$path" 2>/dev/null | cut -d' ' -f1)
+  if [ "$actual" != "$usha" ]; then
+    fail "status=verbatim but the file differs from its recorded upstream: $path"
+    LIED=$((LIED + 1))
+  fi
+done < <(rows)
+if [ "$LIED" -eq 0 ]; then
+  pass "every status=verbatim file matches its recorded upstream_sha256"
+else
+  printf '     %s\n' "Set status=modified and say why in the note column."
+fi
+
+# ── 5. Field sanity ──────────────────────────────────────────────────────────
 BADFIELD=0
 while IFS=$'\t' read -r path origin _uver _upath _usha status _note; do
   case "$origin" in ecu|donchitos|original) ;; *) fail "bad origin '$origin': $path"; BADFIELD=$((BADFIELD + 1)) ;; esac

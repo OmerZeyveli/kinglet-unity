@@ -77,9 +77,7 @@ if [ -d "${MOCK_DIR}/.claude/agents" ]; then
 fi
 if [ "$AGENT_COUNT" -gt 0 ]; then
     PASS=$((PASS + 1))
-    if [ "$VERBOSE" = "--verbose" ]; then
-        echo -e "  ${GREEN}PASS${NC} agents installed (${AGENT_COUNT} found)"
-    fi
+    echo -e "  ${GREEN}PASS${NC} agents installed (${AGENT_COUNT} found)"
 else
     FAIL=$((FAIL + 1))
     echo -e "  ${RED}FAIL${NC} no agent files found after install"
@@ -92,9 +90,7 @@ if [ -d "${MOCK_DIR}/.claude/commands" ]; then
 fi
 if [ "$CMD_COUNT" -gt 0 ]; then
     PASS=$((PASS + 1))
-    if [ "$VERBOSE" = "--verbose" ]; then
-        echo -e "  ${GREEN}PASS${NC} commands installed (${CMD_COUNT} found)"
-    fi
+    echo -e "  ${GREEN}PASS${NC} commands installed (${CMD_COUNT} found)"
 else
     FAIL=$((FAIL + 1))
     echo -e "  ${RED}FAIL${NC} no command files found after install"

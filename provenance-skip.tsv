@@ -1,8 +1,8 @@
 # cloud-nine-unity — upstream content we deliberately did NOT vendor
 #
 # The audit trail for what we left behind, so a future ECU bump reports "still skipped" instead of
-# silently reinstating content we removed on purpose. scripts/ecu-diff.sh and check-provenance.sh
-# both read this.
+# silently reinstating content we removed on purpose. scripts/check-provenance.sh enforces it:
+# every rule=absent path must stay absent, and every rule=ours-wins path must be origin=original.
 #
 # rule:
 #   absent     — this path must NOT exist in the repo. check-provenance.sh fails if it reappears.
