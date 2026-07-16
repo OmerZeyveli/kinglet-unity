@@ -1,6 +1,6 @@
 ---
 name: unity-mcp-patterns
-description: "How to use unity-mcp tools effectively — batch_execute for speed, read_console for verification, resource queries for project state, tool organization patterns."
+description: "How to use unity-mcp tools effectively — activating tool groups (only core is on by default), batch_execute for speed, read_console for verification, resource queries for project state."
 alwaysApply: true
 ---
 
@@ -59,7 +59,36 @@ Don't assume:
 - The build target matches the ship target (a PC/console project can sit on the wrong platform in Build Settings)
 - Certain packages are installed
 
-## Rule 4: Tool Selection Guide
+## Rule 4: Activate the Tool Group Before You Need It
+
+**Only the `core` group is exposed by default.** Everything else is opt-in, and a tool from an
+inactive group does not appear in `tools/list` at all — a call to it fails as "unknown tool", not as
+"unavailable". If you are about to do shaders, UI, VFX, animation, profiling, tests, or reflection,
+activate the group first:
+
+```
+manage_tools(action="activate", group="vfx")     # then manage_shader / manage_vfx exist
+```
+
+Verified against MCP for Unity 10.1.0 (server 3.4.4): 29 tools before activation, 42 after.
+`mcpforunity://tool-groups` reports the live mapping.
+
+| Group | Default | Tools |
+|-------|---------|-------|
+| `core` | **on** | `batch_execute`, `manage_scene`, `manage_gameobject`, `manage_components`, `manage_physics`, `manage_camera`, `manage_material`, `manage_prefabs`, `manage_packages`, `manage_build`, `manage_graphics`, `manage_asset`, `manage_editor`, `read_console`, `create_script`, `manage_script`, `validate_script`, `delete_script`, `apply_text_edits`, `script_apply_edits`, `find_gameobjects`, `find_in_file`, `execute_menu_item`, `refresh_unity`, `get_sha` |
+| `vfx` | off | `manage_shader`, `manage_vfx`, `manage_texture` |
+| `ui` | off | `manage_ui` |
+| `animation` | off | `manage_animation` |
+| `testing` | off | `run_tests`, `get_test_job` |
+| `profiling` | off | `manage_profiler` |
+| `scripting_ext` | off | `manage_scriptable_object`, `execute_code` |
+| `docs` | off | `unity_reflect`, `unity_docs` |
+| `probuilder` | off | `manage_probuilder` |
+| `asset_gen` | off | `generate_image`, `generate_model`, `generate_audio`, `import_model` |
+
+## Rule 5: Tool Selection Guide
+
+Tools marked **(group)** need `manage_tools(action="activate", group=...)` first — see Rule 4.
 
 | Task | Tool | Key Actions |
 |------|------|-------------|
@@ -68,23 +97,25 @@ Don't assume:
 | Add/configure components | `manage_components` | add, remove, configure, get |
 | Physics setup | `manage_physics` | settings, layers, materials, joints |
 | Camera/Cinemachine | `manage_camera` | create, configure presets, extensions |
-| Materials/Shaders | `manage_material` / `manage_shader` | create, assign, configure |
-| Animation | `manage_animation` | clips, controllers, states |
-| UI elements | `manage_ui` | create, layout, style |
-| VFX | `manage_vfx` | particles, effects |
+| Materials | `manage_material` | create, assign, configure |
+| Shaders | `manage_shader` **(vfx)** | create, configure |
+| Animation | `manage_animation` **(animation)** | clips, controllers, states |
+| UI elements | `manage_ui` **(ui)** | create, layout, style |
+| VFX | `manage_vfx` **(vfx)** | particles, effects |
 | Prefabs | `manage_prefabs` | create, instantiate, modify |
-| ScriptableObjects | `manage_scriptable_object` | create, edit |
+| ScriptableObjects | `manage_scriptable_object` **(scripting_ext)** | create, edit |
 | Packages | `manage_packages` | install, remove, search |
 | Builds | `manage_build` | configure, build, switch platform |
-| Tests | `run_tests` | execute, get results |
-| Profiling | `manage_profiler` | sessions, timing, memory |
+| Tests | `run_tests` **(testing)** | execute, get results |
+| Profiling | `manage_profiler` **(profiling)** | sessions, timing, memory |
 | Graphics stats | `manage_graphics` | rendering stats, pipeline |
 | Console output | `read_console` | errors, warnings, logs |
-| API inspection | `unity_reflect` | live C# reflection |
-| Documentation | `unity_docs` | official Unity docs |
-| C# scripts | `create_script` / `validate_script` | create, validate |
+| API inspection | `unity_reflect` **(docs)** | live C# reflection |
+| Documentation | `unity_docs` **(docs)** | official Unity docs |
+| C# scripts | `create_script` / `manage_script` / `validate_script` | create, edit, validate |
+| Assets | `manage_asset` | import, move, delete (GUID-safe) |
 
-## Rule 5: Scene Templates
+## Rule 6: Scene Templates
 
 When creating new scenes, use templates for quick setup:
 
@@ -96,7 +127,7 @@ manage_scene action:"create" template:"2d_basic"
 // Creates scene with: Main Camera (orthographic)
 ```
 
-## Rule 6: Error Recovery
+## Rule 7: Error Recovery
 
 If an MCP operation fails:
 1. `read_console` — get the error message
@@ -104,7 +135,7 @@ If an MCP operation fails:
 3. Retry the operation
 4. If the error persists, fall back to writing an Editor script
 
-## Rule 7: MCP vs File Editing
+## Rule 8: MCP vs File Editing
 
 | Operation | Use MCP | Use File Edit |
 |-----------|---------|---------------|
@@ -118,7 +149,7 @@ If an MCP operation fails:
 | Edit .uxml/.uss files | No (Write tool) | Yes |
 | Edit .asmdef files | No (Write tool) | Yes |
 
-## Rule 8: Multi-Instance
+## Rule 9: Multi-Instance
 
 If the user has multiple Unity Editor instances:
 ```

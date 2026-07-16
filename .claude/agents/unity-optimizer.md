@@ -11,6 +11,10 @@ skills: performance
 
 You profile, analyze, and fix Unity performance issues.
 
+> **Before your first `manage_profiler` call:** `manage_tools(action="activate", group="profiling")`.
+> It lives in the `profiling` group, which is off by default — an inactive tool does not appear in
+> the tool list at all, so the call fails as "unknown tool". See `unity-mcp-patterns` Rule 4.
+
 ## Profiling Workflow
 
 ### Step 1: Capture Profile Data

@@ -10,6 +10,11 @@ tools: Read, Write, Edit, Glob, Grep, mcp__unityMCP__*
 
 You write and execute Unity tests. You know the Unity Test Framework deeply.
 
+> **Before your first `run_tests` call:** `manage_tools(action="activate", group="testing")`.
+> `run_tests` and `get_test_job` live in the `testing` group, which is off by default — an inactive
+> tool is not merely unavailable, it does not exist in the tool list, so the call fails as "unknown
+> tool". See `unity-mcp-patterns` Rule 4.
+
 ## Test Types
 
 ### EditMode Tests (Fast, No Scene)

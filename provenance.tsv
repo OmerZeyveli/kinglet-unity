@@ -15,19 +15,19 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/agents/unity-coder.md	ecu	1.5.0	.claude/agents/unity-coder.md	dcb5aedce694fb7941babd0ab678d102b641edf2621ef2ce5baa82df98177695	verbatim	-
 .claude/agents/unity-critic.md	ecu	1.5.0	.claude/agents/unity-critic.md	5dbfbc1547d4a44791f0b701ece488d8b3fb01c4c9ad2b726f1064aa129e937a	modified	mobile-strip
 .claude/agents/unity-fixer-lite.md	ecu	1.5.0	.claude/agents/unity-fixer-lite.md	9e3b6112f39d7e86411166ffa5f564f649d2e4c5249027662102b639ef473bc4	verbatim	-
-.claude/agents/unity-fixer.md	ecu	1.5.0	.claude/agents/unity-fixer.md	7578bff73a812bb2f4244b14246201be1f5d25aa2908b82cacb46111d6ead378	verbatim	-
+.claude/agents/unity-fixer.md	ecu	1.5.0	.claude/agents/unity-fixer.md	7578bff73a812bb2f4244b14246201be1f5d25aa2908b82cacb46111d6ead378	modified	mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4
 .claude/agents/unity-git-master.md	ecu	1.5.0	.claude/agents/unity-git-master.md	25dd3e3fdfd5402d06b920809eed8166de716e4af70dd0df9edb3e7b6077d5d2	modified	mobile-strip
 .claude/agents/unity-linter.md	ecu	1.5.0	.claude/agents/unity-linter.md	a03dba62790624871c05b2978fe6e1badf27e48b50cd30e7a1667cf624b36bce	modified	mobile-strip
 .claude/agents/unity-migrator.md	ecu	1.5.0	.claude/agents/unity-migrator.md	499c36972c73021b3b25f651f5d423662967437a714703769c0667ccde495928	verbatim	-
 .claude/agents/unity-network-dev.md	ecu	1.5.0	.claude/agents/unity-network-dev.md	d3d989a38b5019f248e24092f04d8c1c392a9240b1b33f6cbb38b50dde3f1cc4	verbatim	-
-.claude/agents/unity-optimizer.md	ecu	1.5.0	.claude/agents/unity-optimizer.md	5a0da0b10b56935c7405c7ce989eb8a900fc6e645a8472280e7df5c0a4bc27d5	modified	mobile-strip
+.claude/agents/unity-optimizer.md	ecu	1.5.0	.claude/agents/unity-optimizer.md	5a0da0b10b56935c7405c7ce989eb8a900fc6e645a8472280e7df5c0a4bc27d5	modified	mobile-strip; mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4
 .claude/agents/unity-prototyper.md	ecu	1.5.0	.claude/agents/unity-prototyper.md	0d4fd59ee9a5260ee2a592b80af793343dc5394bc1207bcd755dbabd193f8115	modified	mobile-strip
 .claude/agents/unity-reviewer.md	ecu	1.5.0	.claude/agents/unity-reviewer.md	7f83e615daa8b3bc31c43006bc99f6a282ae36ed82721964dda833c8a22669f2	modified	mobile-strip
 .claude/agents/unity-scene-builder.md	ecu	1.5.0	.claude/agents/unity-scene-builder.md	fac0c0e1c8f4fa7e158573d2764d4cf8e73326103a2c88d46aa9cf28f7583588	verbatim	-
 .claude/agents/unity-scout.md	ecu	1.5.0	.claude/agents/unity-scout.md	af8419f2b018f166fd0b51e902aa1a12d08e4d9b9120bf3e2cbebb407f21e191	verbatim	-
 .claude/agents/unity-security-reviewer.md	ecu	1.5.0	.claude/agents/unity-security-reviewer.md	76831dc6c0b287410a96f8d0dfd4d778413a5a45caa631cce39ec66943ff3304	modified	mobile-strip
 .claude/agents/unity-shader-dev.md	ecu	1.5.0	.claude/agents/unity-shader-dev.md	dfe66923f13cf9f169f406a208333ae8b9fba6f0bd65e45be06eae41df054b4e	modified	mobile-strip
-.claude/agents/unity-test-runner.md	ecu	1.5.0	.claude/agents/unity-test-runner.md	ff3c3949d6287ecbf51710574d989450aa2bb5991049406ccb435a772c619761	verbatim	-
+.claude/agents/unity-test-runner.md	ecu	1.5.0	.claude/agents/unity-test-runner.md	ff3c3949d6287ecbf51710574d989450aa2bb5991049406ccb435a772c619761	modified	mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4
 .claude/agents/unity-ui-builder.md	ecu	1.5.0	.claude/agents/unity-ui-builder.md	35f9e8ef53700e576fea56392eb9e8062b80cdeaeb22e97a1129cb245e2a835f	modified	mobile-strip
 .claude/agents/unity-verifier.md	ecu	1.5.0	.claude/agents/unity-verifier.md	818a0d752093a9b5e7289d27a5ac05e14a44f98e21c95f381141e22b25b48311	verbatim	-
 .claude/agents/world-builder.md	donchitos	984023d	.claude/agents/world-builder.md	9e3399c5478ea2491bfc8e42745948b7aec4c2045ecd008a318d4f72a8fad2ea	modified	reformatted-to-ecu-conventions
@@ -115,7 +115,7 @@ CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 .claude/skills/core/scriptable-objects/SKILL.md	ecu	1.5.0	.claude/skills/core/scriptable-objects/SKILL.md	82048f28aa681bf803948dd0c1b89085abb9e2bf26a35cdb0cd6a07290969d55	verbatim	-
 .claude/skills/core/serialization-safety/SKILL.md	ecu	1.5.0	.claude/skills/core/serialization-safety/SKILL.md	fc420ccc484f896f8a462e74fb6088c9522b22124f27ca533266246187ab7bf1	verbatim	-
 .claude/skills/core/unity-instincts/SKILL.md	ecu	1.5.0	.claude/skills/core/unity-instincts/SKILL.md	bf3c30b206c659bfd6e744c9a6a49f0b31648bff019652795ab4835c9f8525a7	verbatim	-
-.claude/skills/core/unity-mcp-patterns/SKILL.md	ecu	1.5.0	.claude/skills/core/unity-mcp-patterns/SKILL.md	d7159fe4a3084da7199ceb229bf56b4720fb0466932b35f06f0e65c3ff67d0f4	modified	mobile-strip
+.claude/skills/core/unity-mcp-patterns/SKILL.md	ecu	1.5.0	.claude/skills/core/unity-mcp-patterns/SKILL.md	d7159fe4a3084da7199ceb229bf56b4720fb0466932b35f06f0e65c3ff67d0f4	modified	mobile-strip; mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4
 .claude/skills/gameplay/character-controller/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/character-controller/SKILL.md	c6b5fb0beb977a67fe15d980fef6552a2d363d2a4da7287427098ee5f51c0afe	verbatim	-
 .claude/skills/gameplay/dialogue-system/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/dialogue-system/SKILL.md	e6aa3e268148f0d5ac57da855dc7ab6d3e4e0fead535c82fa0df7eb4cb6b61d4	verbatim	-
 .claude/skills/gameplay/inventory-system/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/inventory-system/SKILL.md	b59106ca73cc59237019f2e14100a0c10aad402de7c25e7f3fb3ed779760bdaa	verbatim	-
