@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "id": "workflow.unity-audit",
+  "kind": "workflow",
+  "name": "Unity Audit",
+  "summary": "Inspects a Unity project and reports verified findings.",
+  "capabilities": [
+    "filesystem.read",
+    "unity.read"
+  ],
+  "requires": [],
+  "support": {
+    "claude": {
+      "state": "supported",
+      "reason": null,
+      "owner": null,
+      "test": null
+    },
+    "codex": {
+      "state": "supported",
+      "reason": null,
+      "owner": null,
+      "test": null
+    }
+  },
+  "provenance": {
+    "origin": "original",
+    "upstream_version": null,
+    "upstream_path": null,
+    "upstream_sha256": null
+  },
+  "public_name": "unity-audit",
+  "stages": [
+    "investigate",
+    "verify",
+    "report"
+  ],
+  "roles": [
+    "role.unity-scout"
+  ],
+  "rules": [
+    "rule.pc-console"
+  ],
+  "knowledge": [
+    "knowledge.serialization"
+  ],
+  "inputs": [
+    "task"
+  ],
+  "artifacts": [
+    "audit-report"
+  ],
+  "evidence": [
+    "references-valid"
+  ],
+  "failure_behavior": "Report the blocker and preserve the collected evidence.",
+  "mutation": false
+}

@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "id": "rule.pc-console",
+  "kind": "rule",
+  "name": "PC and Console",
+  "summary": "Keeps canonical guidance focused on PC and console targets.",
+  "capabilities": [],
+  "requires": [],
+  "support": {
+    "claude": {
+      "state": "supported",
+      "reason": null,
+      "owner": null,
+      "test": null
+    },
+    "codex": {
+      "state": "supported",
+      "reason": null,
+      "owner": null,
+      "test": null
+    }
+  },
+  "provenance": {
+    "origin": "original",
+    "upstream_version": null,
+    "upstream_path": null,
+    "upstream_sha256": null
+  },
+  "scope": [
+    "unity"
+  ],
+  "always_loaded": true
+}

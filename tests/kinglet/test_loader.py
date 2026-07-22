@@ -58,10 +58,18 @@ class LoaderTests(unittest.TestCase):
         )
         return raised.exception
 
-    def test_loads_valid_fixture_as_one_canonical_unit(self) -> None:
+    def test_loads_valid_fixture_as_canonical_units(self) -> None:
         graph = load_graph(self.root)
 
-        self.assertEqual({"role.unity-scout"}, set(graph.units))
+        self.assertEqual(
+            {
+                "knowledge.serialization",
+                "role.unity-scout",
+                "rule.pc-console",
+                "workflow.unity-audit",
+            },
+            set(graph.units),
+        )
         unit = graph.units["role.unity-scout"]
         self.assertIsInstance(unit, CanonicalUnit)
         self.assertEqual("role", unit.kind)
@@ -299,7 +307,14 @@ class LoaderTests(unittest.TestCase):
         first = load_graph(self.root)
         second = load_graph(self.root)
 
-        expected = ("role.alpha-scout", "role.unity-scout", "role.zeta-scout")
+        expected = (
+            "knowledge.serialization",
+            "role.alpha-scout",
+            "role.unity-scout",
+            "role.zeta-scout",
+            "rule.pc-console",
+            "workflow.unity-audit",
+        )
         self.assertEqual(expected, tuple(first.units))
         self.assertEqual(tuple(first.units), tuple(second.units))
 

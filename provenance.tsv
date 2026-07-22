@@ -227,9 +227,17 @@ tests/kinglet/fixtures/invalid-unknown/src/roles/unity-scout/role.json	original	
 tests/kinglet/fixtures/valid-minimal/src/catalog/capabilities.json	original	-	-	-	original	kinglet-loader-capability-fixture
 tests/kinglet/fixtures/valid-minimal/src/catalog/routing.json	original	-	-	-	original	kinglet-loader-routing-fixture
 tests/kinglet/fixtures/valid-minimal/src/catalog/support-policy.json	original	-	-	-	original	kinglet-loader-support-policy-fixture
+tests/kinglet/fixtures/valid-minimal/src/knowledge/serialization/knowledge.json	original	-	-	-	original	kinglet-validator-knowledge-fixture
+tests/kinglet/fixtures/valid-minimal/src/knowledge/serialization/SKILL.md	original	-	-	-	original	kinglet-validator-knowledge-content-fixture
 tests/kinglet/fixtures/valid-minimal/src/roles/unity-scout/instructions.md	original	-	-	-	original	kinglet-loader-content-fixture
 tests/kinglet/fixtures/valid-minimal/src/roles/unity-scout/role.json	original	-	-	-	original	kinglet-loader-valid-descriptor-fixture
+tests/kinglet/fixtures/valid-minimal/src/rules/pc-console/instructions.md	original	-	-	-	original	kinglet-validator-rule-content-fixture
+tests/kinglet/fixtures/valid-minimal/src/rules/pc-console/rule.json	original	-	-	-	original	kinglet-validator-rule-fixture
+tests/kinglet/fixtures/valid-minimal/src/workflows/unity-audit/instructions.md	original	-	-	-	original	kinglet-validator-workflow-content-fixture
+tests/kinglet/fixtures/valid-minimal/src/workflows/unity-audit/workflow.json	original	-	-	-	original	kinglet-validator-workflow-fixture
 tests/kinglet/test_loader.py	original	-	-	-	original	kinglet-canonical-loader-tests
+tests/kinglet/test_validator.py	original	-	-	-	original	kinglet-canonical-graph-validator-tests
 tools/kinglet_build/errors.py	original	-	-	-	original	kinglet-stable-build-diagnostics
 tools/kinglet_build/loader.py	original	-	-	-	original	kinglet-strict-canonical-loader
 tools/kinglet_build/model.py	original	-	-	-	original	kinglet-canonical-graph-models
+tools/kinglet_build/validator.py	original	-	-	-	original	kinglet-canonical-graph-validator

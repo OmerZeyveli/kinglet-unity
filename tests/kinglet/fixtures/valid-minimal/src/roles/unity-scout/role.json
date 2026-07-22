@@ -8,7 +8,9 @@
     "filesystem.read",
     "unity.read"
   ],
-  "requires": [],
+  "requires": [
+    "knowledge.serialization"
+  ],
   "support": {
     "claude": {
       "state": "supported",
