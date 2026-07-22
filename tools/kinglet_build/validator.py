@@ -15,6 +15,10 @@ _CATALOG_NAMES = (
 _ID_PATTERN = re.compile(
     r"^(role|workflow|knowledge|rule|hook|template)\.[a-z0-9][a-z0-9-]*$"
 )
+_DESCRIPTOR_NAMES = {
+    kind: f"{kind}.json"
+    for kind in ("role", "workflow", "knowledge", "rule", "hook", "template")
+}
 _WORKFLOW_REFERENCES = (
     ("roles", "role"),
     ("rules", "rule"),
@@ -34,7 +38,13 @@ def _build_error(
 
 
 def _unit_source(unit: CanonicalUnit) -> Path:
-    return unit.content_path
+    id_kind = unit.id.partition(".")[0] if isinstance(unit.id, str) else ""
+    descriptor_name = _DESCRIPTOR_NAMES.get(id_kind) or _DESCRIPTOR_NAMES.get(
+        unit.kind
+    )
+    if descriptor_name is None:
+        return unit.content_path
+    return unit.content_path.parent / descriptor_name
 
 
 def _sorted_units(graph: CanonicalGraph) -> tuple[tuple[str, CanonicalUnit], ...]:
@@ -135,20 +145,26 @@ def _validate_references(
     units: tuple[tuple[str, CanonicalUnit], ...],
 ) -> None:
     for _, unit in units:
-        for reference_id in sorted(unit.requires):
-            _validate_reference(graph, unit, "requires", reference_id, None)
-        if unit.kind != "workflow":
-            continue
-        for field, expected_kind in _WORKFLOW_REFERENCES:
-            references = unit.attributes.get(field, ())
-            for reference_id in sorted(references):
-                _validate_reference(
-                    graph,
-                    unit,
-                    field,
-                    reference_id,
-                    expected_kind,
+        references = [
+            (reference_id, "requires", None) for reference_id in unit.requires
+        ]
+        if unit.kind == "workflow":
+            for field, expected_kind in _WORKFLOW_REFERENCES:
+                references.extend(
+                    (reference_id, field, expected_kind)
+                    for reference_id in unit.attributes.get(field, ())
                 )
+        for reference_id, field, expected_kind in sorted(
+            references,
+            key=lambda reference: (reference[0], reference[1]),
+        ):
+            _validate_reference(
+                graph,
+                unit,
+                field,
+                reference_id,
+                expected_kind,
+            )
 
 
 def _validate_support(
@@ -186,7 +202,20 @@ def _validate_support(
                             f"exception support requires a non-empty {field}",
                         )
                 continue
-            for field in _EXCEPTION_FIELDS:
+            exception_only_fields = _EXCEPTION_FIELDS
+            if declaration.state == "unsupported":
+                if declaration.reason is not None and (
+                    not isinstance(declaration.reason, str)
+                    or not declaration.reason.strip()
+                ):
+                    raise _build_error(
+                        "invalid-support",
+                        _unit_source(unit),
+                        f"support.{client}.reason",
+                        "unsupported support reason must be non-empty when declared",
+                    )
+                exception_only_fields = ("owner", "test")
+            for field in exception_only_fields:
                 if getattr(declaration, field) is not None:
                     raise _build_error(
                         "invalid-support",

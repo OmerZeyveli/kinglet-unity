@@ -128,6 +128,40 @@ class ValidatorTests(unittest.TestCase):
             "unit kind must match the namespace in role.unity-scout",
         )
 
+    def test_unit_field_errors_point_to_their_json_descriptors(self) -> None:
+        cases = (
+            (
+                self.replace_unit("role.unity-scout", schema_version=2),
+                "invalid-schema-version",
+                "schema_version",
+                "canonical unit schema version must be 1",
+                self.root / "src" / "roles" / "unity-scout" / "role.json",
+            ),
+            (
+                self.replace_unit("role.unity-scout", kind="workflow"),
+                "invalid-kind",
+                "kind",
+                "unit kind must match the namespace in role.unity-scout",
+                self.root / "src" / "roles" / "unity-scout" / "role.json",
+            ),
+            (
+                self.replace_attributes("workflow.unity-audit", stages=()),
+                "invalid-workflow",
+                "stages",
+                "workflow requires at least one stage item",
+                self.root
+                / "src"
+                / "workflows"
+                / "unity-audit"
+                / "workflow.json",
+            ),
+        )
+        for graph, code, field, detail, expected_source in cases:
+            with self.subTest(field=field, source=expected_source):
+                error = self.assert_build_error(graph, code, field, detail)
+
+                self.assertEqual(expected_source, error.source)
+
     def test_rejects_unknown_capabilities(self) -> None:
         graph = self.replace_unit(
             "role.unity-scout",
@@ -186,6 +220,50 @@ class ValidatorTests(unittest.TestCase):
             "reference 'hook.a-missing' does not resolve to a canonical unit",
         )
 
+    def test_sorts_reference_ids_globally_across_workflow_fields(self) -> None:
+        cases = (
+            (
+                {
+                    "requires": ("template.z-missing",),
+                    "roles": ("role.y-missing",),
+                    "rules": ("rule.x-missing",),
+                    "knowledge": ("knowledge.a-missing",),
+                },
+                "knowledge",
+                "knowledge.a-missing",
+            ),
+            (
+                {
+                    "requires": ("missing.shared",),
+                    "roles": ("missing.shared",),
+                    "rules": ("missing.shared",),
+                    "knowledge": ("missing.shared",),
+                },
+                "knowledge",
+                "missing.shared",
+            ),
+        )
+        workflow = self.graph.units["workflow.unity-audit"]
+        for changes, expected_field, expected_id in cases:
+            with self.subTest(changes=changes):
+                attributes = dict(workflow.attributes)
+                for field in ("roles", "rules", "knowledge"):
+                    attributes[field] = changes[field]
+                units = dict(self.graph.units)
+                units[workflow.id] = replace(
+                    workflow,
+                    requires=changes["requires"],
+                    attributes=attributes,
+                )
+                graph = replace(self.graph, units=units)
+
+                self.assert_build_error(
+                    graph,
+                    "unresolved-reference",
+                    expected_field,
+                    f"reference '{expected_id}' does not resolve to a canonical unit",
+                )
+
     def test_rejects_references_to_the_wrong_unit_kind(self) -> None:
         graph = self.replace_attributes(
             "workflow.unity-audit",
@@ -227,9 +305,42 @@ class ValidatorTests(unittest.TestCase):
 
     def test_supported_units_reject_exception_only_fields(self) -> None:
         unit = self.graph.units["role.unity-scout"]
+        for field in ("reason", "owner", "test"):
+            with self.subTest(field=field):
+                declaration = replace(
+                    unit.support["codex"],
+                    **{field: "This metadata is not valid for supported."},
+                )
+                support = dict(unit.support)
+                support["codex"] = declaration
+                graph = self.replace_unit("role.unity-scout", support=support)
+
+                self.assert_build_error(
+                    graph,
+                    "invalid-support",
+                    f"support.codex.{field}",
+                    f"supported support may not declare exception-only {field}",
+                )
+
+    def test_unsupported_units_allow_a_visible_reason(self) -> None:
+        unit = self.graph.units["role.unity-scout"]
         declaration = replace(
             unit.support["codex"],
-            reason="This metadata belongs only to an exception.",
+            state="unsupported",
+            reason="This client cannot provide the required behavior.",
+        )
+        support = dict(unit.support)
+        support["codex"] = declaration
+        graph = self.replace_unit("role.unity-scout", support=support)
+
+        validate_graph(graph)
+
+    def test_unsupported_units_reject_a_blank_reason(self) -> None:
+        unit = self.graph.units["role.unity-scout"]
+        declaration = replace(
+            unit.support["codex"],
+            state="unsupported",
+            reason="  ",
         )
         support = dict(unit.support)
         support["codex"] = declaration
@@ -239,8 +350,28 @@ class ValidatorTests(unittest.TestCase):
             graph,
             "invalid-support",
             "support.codex.reason",
-            "supported support may not declare exception-only reason",
+            "unsupported support reason must be non-empty when declared",
         )
+
+    def test_unsupported_units_reject_owner_and_test(self) -> None:
+        unit = self.graph.units["role.unity-scout"]
+        for field in ("owner", "test"):
+            with self.subTest(field=field):
+                declaration = replace(
+                    unit.support["codex"],
+                    state="unsupported",
+                    **{field: "exception-only-metadata"},
+                )
+                support = dict(unit.support)
+                support["codex"] = declaration
+                graph = self.replace_unit("role.unity-scout", support=support)
+
+                self.assert_build_error(
+                    graph,
+                    "invalid-support",
+                    f"support.codex.{field}",
+                    f"unsupported support may not declare exception-only {field}",
+                )
 
     def test_rejects_mutating_workflows_without_a_write_capability(self) -> None:
         graph = self.replace_attributes("workflow.unity-audit", mutation=True)
