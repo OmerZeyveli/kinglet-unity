@@ -34,6 +34,10 @@ _OUTPUT_ROOT_NAMES = {
     "claude": frozenset({"package", "compatibility"}),
     "codex": frozenset({"plugin", "project"}),
 }
+_ADAPTER_AUTHORITY_SHA256 = {
+    "claude": "a6c608aa9b7958afc91d5f4f35febb94a778fcde9cf5402bf09f9c7514a8d8de",
+    "codex": "7fdede81497571cd167155a868457bbaeb9dd853c9d90d443964a056f043f214",
+}
 
 
 def _build_error(
@@ -322,6 +326,8 @@ def validate_adapter_profiles(
     logical_capabilities: frozenset[str],
     sources: Mapping[str, Path],
     frontier_contracts: Mapping[str, Mapping[str, object]],
+    native_config_schemas: Mapping[str, Mapping[str, object]],
+    authority_fingerprints: Mapping[str, str],
 ) -> None:
     clients = frozenset(profiles)
     missing_clients = sorted(_ADAPTER_CLIENTS - clients)
@@ -371,6 +377,67 @@ def validate_adapter_profiles(
                 )
         standard = profile.agent_profiles["standard"]
         frontier = profile.agent_profiles["frontier"]
+        contract = frontier_contracts[client]
+        native_schema = native_config_schemas[client]
+        effort_schema = native_schema["reasoning_effort"]
+        capability_schema = native_schema["requires_native_capabilities"]
+        if not isinstance(effort_schema, Mapping) or not isinstance(
+            capability_schema,
+            Mapping,
+        ):
+            raise _build_error(
+                "invalid-native-config",
+                source,
+                "metadata.native_config_schema",
+                "native configuration schema must contain object policies",
+            )
+        effort_presence = effort_schema["presence"]
+        allowed_efforts = frozenset(effort_schema["allowed_values"])
+        allowed_capability_locations = frozenset(
+            capability_schema["allowed_locations"]
+        )
+        for profile_name in sorted(profile.agent_profiles):
+            for tier in sorted(profile.agent_profiles[profile_name]):
+                configuration = profile.agent_profiles[profile_name][tier]
+                effort_present = "reasoning_effort" in configuration
+                effort_field = (
+                    f"agent_profiles.{profile_name}.{tier}.reasoning_effort"
+                )
+                if effort_presence == "required" and not effort_present:
+                    raise _build_error(
+                        "invalid-native-config",
+                        source,
+                        effort_field,
+                        "client-native agent configuration requires reasoning effort",
+                    )
+                if effort_presence == "forbidden" and effort_present:
+                    raise _build_error(
+                        "invalid-native-config",
+                        source,
+                        effort_field,
+                        "client-native agent configuration forbids reasoning effort",
+                    )
+                if (
+                    effort_present
+                    and configuration["reasoning_effort"] not in allowed_efforts
+                ):
+                    raise _build_error(
+                        "invalid-native-config",
+                        source,
+                        effort_field,
+                        "reasoning effort is not allowed by the client-native schema",
+                    )
+                if "requires_native_capabilities" in configuration:
+                    location = f"{profile_name}.{tier}"
+                    if location not in allowed_capability_locations:
+                        raise _build_error(
+                            "invalid-native-config",
+                            source,
+                            "agent_profiles."
+                            f"{profile_name}.{tier}.requires_native_capabilities",
+                            "native capability requirements are not allowed here",
+                        )
+
         for tier in ("fast", "balanced"):
             if frontier[tier] != standard[tier]:
                 raise _build_error(
@@ -379,7 +446,15 @@ def validate_adapter_profiles(
                     f"agent_profiles.frontier.{tier}",
                     "frontier may not change fast or balanced configuration",
                 )
-        contract = frontier_contracts[client]
+
+        if authority_fingerprints[client] != _ADAPTER_AUTHORITY_SHA256[client]:
+            raise _build_error(
+                "invalid-frontier",
+                source,
+                "metadata.frontier_deep_contract",
+                "native frontier contract failed independent authority validation",
+            )
+
         contract_effort = contract.get("reasoning_effort")
         contract_requirements = frozenset(
             contract.get("requires_native_capabilities", ())

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 from collections.abc import Mapping
@@ -100,11 +101,22 @@ _AGENT_CONFIGURATION_FIELDS = frozenset(
     {"model", "reasoning_effort", "requires_native_capabilities"}
 )
 _METADATA_FIELDS = frozenset(
-    {"frontier_deep_contract", "evaluation_candidates"}
+    {
+        "frontier_deep_contract",
+        "native_config_schema",
+        "evaluation_candidates",
+    }
 )
 _EVALUATION_CANDIDATE_FIELDS = frozenset(
     {"role", "model", "reasoning_effort", "shipping", "adoption_gate"}
 )
+_NATIVE_CONFIG_SCHEMA_FIELDS = frozenset(
+    {"reasoning_effort", "requires_native_capabilities"}
+)
+_REASONING_EFFORT_SCHEMA_FIELDS = frozenset(
+    {"presence", "allowed_values"}
+)
+_NATIVE_CAPABILITY_SCHEMA_FIELDS = frozenset({"allowed_locations"})
 
 
 def _build_error(code: str, source: Path, field: str, detail: str) -> BuildError:
@@ -608,10 +620,126 @@ def _load_output_roots(
     return MappingProxyType(output_roots)
 
 
-def _load_adapter_metadata(
+def _load_native_config_schema(
     value: object,
     source: Path,
 ) -> Mapping[str, object]:
+    if not isinstance(value, dict):
+        raise _build_error(
+            "invalid-native-config",
+            source,
+            "metadata.native_config_schema",
+            "native configuration schema must be an object",
+        )
+    schema = cast(dict[str, object], value)
+    _reject_unknown_fields(
+        schema,
+        _NATIVE_CONFIG_SCHEMA_FIELDS,
+        source,
+        "metadata.native_config_schema",
+    )
+    if set(schema) != _NATIVE_CONFIG_SCHEMA_FIELDS:
+        missing = sorted(_NATIVE_CONFIG_SCHEMA_FIELDS - set(schema))[0]
+        raise _build_error(
+            "missing-field",
+            source,
+            f"metadata.native_config_schema.{missing}",
+            "native configuration schema field is required",
+        )
+
+    raw_effort = schema["reasoning_effort"]
+    if not isinstance(raw_effort, dict):
+        raise _build_error(
+            "invalid-native-config",
+            source,
+            "metadata.native_config_schema.reasoning_effort",
+            "reasoning effort schema must be an object",
+        )
+    effort = cast(dict[str, object], raw_effort)
+    _reject_unknown_fields(
+        effort,
+        _REASONING_EFFORT_SCHEMA_FIELDS,
+        source,
+        "metadata.native_config_schema.reasoning_effort",
+    )
+    if set(effort) != _REASONING_EFFORT_SCHEMA_FIELDS:
+        missing = sorted(_REASONING_EFFORT_SCHEMA_FIELDS - set(effort))[0]
+        raise _build_error(
+            "missing-field",
+            source,
+            f"metadata.native_config_schema.reasoning_effort.{missing}",
+            "reasoning effort schema field is required",
+        )
+    presence = effort["presence"]
+    allowed_values = effort["allowed_values"]
+    if presence not in ("required", "forbidden"):
+        raise _build_error(
+            "invalid-native-config",
+            source,
+            "metadata.native_config_schema.reasoning_effort.presence",
+            "reasoning effort presence must be required or forbidden",
+        )
+    if (
+        not isinstance(allowed_values, list)
+        or not all(isinstance(item, str) and item for item in allowed_values)
+        or len(set(allowed_values)) != len(allowed_values)
+    ):
+        raise _build_error(
+            "invalid-native-config",
+            source,
+            "metadata.native_config_schema.reasoning_effort.allowed_values",
+            "allowed reasoning efforts must be unique non-empty strings",
+        )
+    if (presence == "required") != bool(allowed_values):
+        raise _build_error(
+            "invalid-native-config",
+            source,
+            "metadata.native_config_schema.reasoning_effort.allowed_values",
+            "required effort needs allowed values and forbidden effort allows none",
+        )
+
+    raw_capabilities = schema["requires_native_capabilities"]
+    if not isinstance(raw_capabilities, dict):
+        raise _build_error(
+            "invalid-native-config",
+            source,
+            "metadata.native_config_schema.requires_native_capabilities",
+            "native capability schema must be an object",
+        )
+    capabilities = cast(dict[str, object], raw_capabilities)
+    _reject_unknown_fields(
+        capabilities,
+        _NATIVE_CAPABILITY_SCHEMA_FIELDS,
+        source,
+        "metadata.native_config_schema.requires_native_capabilities",
+    )
+    if set(capabilities) != _NATIVE_CAPABILITY_SCHEMA_FIELDS:
+        raise _build_error(
+            "missing-field",
+            source,
+            "metadata.native_config_schema.requires_native_capabilities.allowed_locations",
+            "native capability allowed locations are required",
+        )
+    allowed_locations = capabilities["allowed_locations"]
+    if (
+        not isinstance(allowed_locations, list)
+        or not allowed_locations
+        or not all(isinstance(item, str) and item for item in allowed_locations)
+        or len(set(allowed_locations)) != len(allowed_locations)
+    ):
+        raise _build_error(
+            "invalid-native-config",
+            source,
+            "metadata.native_config_schema.requires_native_capabilities.allowed_locations",
+            "native capability locations must be unique non-empty strings",
+        )
+    return cast(Mapping[str, object], _freeze(schema))
+
+
+def _load_adapter_metadata(
+    value: object,
+    source: Path,
+) -> tuple[Mapping[str, object], Mapping[str, object], str]:
     if not isinstance(value, dict):
         raise _build_error(
             "invalid-field",
@@ -633,6 +761,10 @@ def _load_adapter_metadata(
         metadata["frontier_deep_contract"],
         source,
         "metadata.frontier_deep_contract",
+    )
+    native_schema = _load_native_config_schema(
+        metadata["native_config_schema"],
+        source,
     )
     raw_candidates = metadata["evaluation_candidates"]
     if not isinstance(raw_candidates, list):
@@ -681,13 +813,24 @@ def _load_adapter_metadata(
                 f"{field}.shipping",
                 "evaluation candidates must be explicitly non-shipping",
             )
-    return contract
+    authority = {
+        field: metadata[field]
+        for field in ("frontier_deep_contract", "native_config_schema")
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(
+            authority,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    return contract, native_schema, fingerprint
 
 
 def _load_adapter_profile(
     source: Path,
     expected_client: str,
-) -> tuple[AdapterProfile, Mapping[str, object]]:
+) -> tuple[AdapterProfile, Mapping[str, object], Mapping[str, object], str]:
     data = _load_json_object(source)
     _reject_unknown_fields(data, _ADAPTER_FIELDS, source)
     missing_fields = sorted(_ADAPTER_FIELDS - set(data))
@@ -715,7 +858,10 @@ def _load_adapter_profile(
             f"adapter directory {expected_client} must declare the same client",
         )
     agent_profiles = _load_agent_profiles(data["agent_profiles"], source)
-    contract = _load_adapter_metadata(data["metadata"], source)
+    contract, native_schema, fingerprint = _load_adapter_metadata(
+        data["metadata"],
+        source,
+    )
     frontier = agent_profiles.get("frontier")
     frontier_deep = frontier.get("deep") if frontier is not None else None
     if frontier_deep != contract:
@@ -738,6 +884,8 @@ def _load_adapter_profile(
             output_roots=_load_output_roots(data["output_roots"], source),
         ),
         contract,
+        native_schema,
+        fingerprint,
     )
 
 
@@ -771,12 +919,19 @@ def load_adapter_profiles(repository_root: Path) -> Mapping[str, AdapterProfile]
 
     profiles: dict[str, AdapterProfile] = {}
     contracts: dict[str, Mapping[str, object]] = {}
+    native_schemas: dict[str, Mapping[str, object]] = {}
+    authority_fingerprints: dict[str, str] = {}
     sources: dict[str, Path] = {}
     for client in sorted(required_clients):
         source = profile_sources[client]
-        profile, contract = _load_adapter_profile(source, client)
+        profile, contract, native_schema, fingerprint = _load_adapter_profile(
+            source,
+            client,
+        )
         profiles[client] = profile
         contracts[client] = contract
+        native_schemas[client] = native_schema
+        authority_fingerprints[client] = fingerprint
         sources[client] = source
 
     validate_adapter_profiles(
@@ -784,6 +939,8 @@ def load_adapter_profiles(repository_root: Path) -> Mapping[str, AdapterProfile]
         logical_capabilities=_load_capabilities(root),
         sources=sources,
         frontier_contracts=contracts,
+        native_config_schemas=native_schemas,
+        authority_fingerprints=authority_fingerprints,
     )
     return MappingProxyType(profiles)
 

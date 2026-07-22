@@ -13,8 +13,14 @@ class RenderedFile:
     source_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if self.path.is_absolute() or ".." in self.path.parts:
-            raise ValueError("rendered file path must be relative without parent traversal")
+        if (
+            self.path.is_absolute()
+            or not self.path.parts
+            or ".." in self.path.parts
+        ):
+            raise ValueError(
+                "rendered file path must name a relative file without parent traversal"
+            )
 
 
 class Renderer(Protocol):

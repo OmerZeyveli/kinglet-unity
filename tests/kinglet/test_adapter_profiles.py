@@ -320,6 +320,98 @@ class AdapterProfileTests(unittest.TestCase):
                     self.profile_path(client),
                 )
 
+    def test_rejects_frontier_tampering_even_when_both_profile_copies_match(
+        self,
+    ) -> None:
+        cases = (
+            ("claude-model", "claude", "model", "other"),
+            ("claude-capability", "claude", "requires_native_capabilities", []),
+            ("codex-model", "codex", "model", "other"),
+            ("codex-effort", "codex", "reasoning_effort", "high"),
+            ("codex-capability", "codex", "requires_native_capabilities", []),
+        )
+        for name, client, field, value in cases:
+            with self.subTest(name=name):
+                profile = self.read_profile(client)
+                profile["agent_profiles"]["frontier"]["deep"][field] = value
+                profile["metadata"]["frontier_deep_contract"][field] = value
+                self.write_profile(client, profile)
+
+                error = self.assert_profile_error("invalid-frontier")
+
+                self.assertEqual("metadata.frontier_deep_contract", error.field)
+                shutil.copy2(
+                    REPOSITORY_ROOT / "adapters" / client / "profile.json",
+                    self.profile_path(client),
+                )
+
+    def test_rejects_client_inappropriate_reasoning_effort_presence(self) -> None:
+        claude = self.read_profile("claude")
+        claude["agent_profiles"]["standard"]["fast"][
+            "reasoning_effort"
+        ] = "medium"
+        self.write_profile("claude", claude)
+        error = self.assert_profile_error("invalid-native-config")
+        self.assertEqual(
+            "agent_profiles.standard.fast.reasoning_effort",
+            error.field,
+        )
+
+        shutil.copy2(
+            REPOSITORY_ROOT / "adapters" / "claude" / "profile.json",
+            self.profile_path("claude"),
+        )
+        codex = self.read_profile("codex")
+        del codex["agent_profiles"]["standard"]["fast"]["reasoning_effort"]
+        self.write_profile("codex", codex)
+        error = self.assert_profile_error("invalid-native-config")
+        self.assertEqual(
+            "agent_profiles.standard.fast.reasoning_effort",
+            error.field,
+        )
+
+    def test_rejects_unknown_codex_reasoning_effort(self) -> None:
+        codex = self.read_profile("codex")
+        codex["agent_profiles"]["standard"]["fast"][
+            "reasoning_effort"
+        ] = "ultra"
+        self.write_profile("codex", codex)
+
+        error = self.assert_profile_error("invalid-native-config")
+
+        self.assertEqual(
+            "agent_profiles.standard.fast.reasoning_effort",
+            error.field,
+        )
+
+    def test_rejects_client_inappropriate_native_capability_placement(self) -> None:
+        claude = self.read_profile("claude")
+        claude["agent_profiles"]["standard"]["fast"][
+            "requires_native_capabilities"
+        ] = ["model.fable.available"]
+        self.write_profile("claude", claude)
+
+        error = self.assert_profile_error("invalid-native-config")
+
+        self.assertEqual(
+            "agent_profiles.standard.fast.requires_native_capabilities",
+            error.field,
+        )
+
+    def test_rejects_invalid_native_capability_shape_stably(self) -> None:
+        codex = self.read_profile("codex")
+        codex["agent_profiles"]["standard"]["deep"][
+            "requires_native_capabilities"
+        ] = "reasoning.mode.pro"
+        self.write_profile("codex", codex)
+
+        error = self.assert_profile_error("invalid-native-capability")
+
+        self.assertEqual(
+            "agent_profiles.standard.deep.requires_native_capabilities",
+            error.field,
+        )
+
     def test_rejects_max_effort_without_native_capability(self) -> None:
         codex = self.read_profile("codex")
         codex["agent_profiles"]["standard"]["deep"]["reasoning_effort"] = "max"
@@ -448,6 +540,12 @@ class RendererContractTests(unittest.TestCase):
             PurePosixPath("/agents/unity-scout.md"),
             PurePosixPath("agents/../escape.md"),
         ):
+            with self.subTest(path=path):
+                with self.assertRaises(ValueError):
+                    RenderedFile(path=path, content=b"", source_ids=())
+
+    def test_rendered_file_rejects_paths_without_a_file_component(self) -> None:
+        for path in (PurePosixPath(), PurePosixPath(".")):
             with self.subTest(path=path):
                 with self.assertRaises(ValueError):
                     RenderedFile(path=path, content=b"", source_ids=())

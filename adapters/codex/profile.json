@@ -70,6 +70,22 @@
         "reasoning.mode.pro"
       ]
     },
+    "native_config_schema": {
+      "reasoning_effort": {
+        "presence": "required",
+        "allowed_values": [
+          "low",
+          "medium",
+          "high",
+          "max"
+        ]
+      },
+      "requires_native_capabilities": {
+        "allowed_locations": [
+          "frontier.deep"
+        ]
+      }
+    },
     "evaluation_candidates": [
       {
         "role": "unity-linter",
