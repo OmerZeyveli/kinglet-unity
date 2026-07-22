@@ -9,6 +9,7 @@ $RECYCLE.BIN/
 # ── Editor / IDE ──────────────────────────────
 .vscode/
 .idea/
+.worktrees/
 *.swp
 *.swo
 *~
