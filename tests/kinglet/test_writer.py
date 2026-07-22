@@ -1,6 +1,8 @@
+import errno
 import importlib
 import importlib.util
 import json
+import os
 from pathlib import Path, PurePosixPath
 import tempfile
 from types import SimpleNamespace
@@ -109,6 +111,46 @@ class WriterTests(unittest.TestCase):
         self.assertNotEqual(0, shell_mode & 0o111)
         self.assertEqual(0, markdown_mode & 0o111)
 
+    def test_generated_root_and_nested_directories_have_deterministic_modes(self) -> None:
+        writer = self.writer()
+        previous_umask = os.umask(0o077)
+        try:
+            writer.write_product(
+                (self.rendered("nested/deep/artifact.md", b"body\n"),),
+                self.destination,
+                check=False,
+            )
+        finally:
+            os.umask(previous_umask)
+
+        for directory in (
+            self.destination,
+            self.destination / "nested",
+            self.destination / "nested" / "deep",
+        ):
+            with self.subTest(directory=directory):
+                self.assertEqual(0o755, directory.stat().st_mode & 0o777)
+
+    def test_check_detects_and_build_repairs_generated_directory_modes(self) -> None:
+        writer = self.writer()
+        files = (self.rendered("nested/artifact.md", b"body\n"),)
+        writer.write_product(files, self.destination, check=False)
+        nested = self.destination / "nested"
+        self.destination.chmod(0o700)
+        nested.chmod(0o700)
+
+        result = writer.write_product(files, self.destination, check=True)
+
+        self.assertIn(PurePosixPath("."), result.changed)
+        self.assertIn(PurePosixPath("nested"), result.changed)
+        self.assertEqual(0o700, self.destination.stat().st_mode & 0o777)
+        self.assertEqual(0o700, nested.stat().st_mode & 0o777)
+
+        writer.write_product(files, self.destination, check=False)
+
+        self.assertEqual(0o755, self.destination.stat().st_mode & 0o777)
+        self.assertEqual(0o755, nested.stat().st_mode & 0o777)
+
     def test_check_compares_bytes_and_modes_without_writing(self) -> None:
         writer = self.writer()
         files = (
@@ -164,8 +206,15 @@ class WriterTests(unittest.TestCase):
             source_ids=(),
         )
 
-        with self.assertRaises(ValueError):
-            writer.write_product((unsafe,), self.destination, check=False)
+        with mock.patch.object(
+            writer,
+            "_canonical_destination",
+            wraps=writer._canonical_destination,
+        ) as canonical_destination:
+            with self.assertRaises(ValueError):
+                writer.write_product((unsafe,), self.destination, check=False)
+
+        canonical_destination.assert_not_called()
 
         self.assertFalse(self.destination.exists())
         self.assertFalse((self.root / "escape.md").exists())
@@ -222,6 +271,49 @@ class WriterTests(unittest.TestCase):
         self.assertEqual(b"untouched\n", marker.read_bytes())
         self.assertTrue(self.destination.is_symlink())
 
+    def test_accepts_lexical_ancestor_alias_outside_the_product_leaf(self) -> None:
+        writer = self.writer()
+        canonical_parent = self.root / "canonical-parent"
+        canonical_parent.mkdir()
+        alias = self.root / "platform-alias"
+        alias.symlink_to(canonical_parent, target_is_directory=True)
+        destination = alias / "packages" / "product"
+
+        try:
+            writer.write_product(
+                (self.rendered("artifact.md", b"body\n"),),
+                destination,
+                check=False,
+            )
+        except OSError as error:
+            self.fail(f"lexical platform alias was rejected: {error}")
+
+        self.assertEqual(
+            b"body\n",
+            (
+                canonical_parent
+                / "packages"
+                / "product"
+                / "artifact.md"
+            ).read_bytes(),
+        )
+        self.assertTrue(alias.is_symlink())
+
+    def test_rejects_symlink_inside_generated_product_without_following_it(self) -> None:
+        writer = self.writer()
+        files = (self.rendered("artifact.md", b"body\n"),)
+        writer.write_product(files, self.destination, check=False)
+        outside = self.root / "outside.md"
+        outside.write_bytes(b"outside\n")
+        artifact = self.destination / "artifact.md"
+        artifact.unlink()
+        artifact.symlink_to(outside)
+
+        with self.assertRaises(OSError):
+            writer.write_product(files, self.destination, check=True)
+
+        self.assertEqual(b"outside\n", outside.read_bytes())
+
     def test_staging_failure_leaves_existing_destination_and_no_partial_tree(self) -> None:
         writer = self.writer()
         self.destination.mkdir()
@@ -245,28 +337,37 @@ class WriterTests(unittest.TestCase):
         self.assertEqual(b"original\n", original.read_bytes())
         self.assertEqual(["product"], sorted(path.name for path in self.root.iterdir()))
 
-    def test_existing_tree_swap_has_no_ordinary_rename_visibility_gap(self) -> None:
+    def test_existing_tree_swap_observes_exchange_without_visibility_gap(self) -> None:
         writer = self.writer()
         writer.write_product(
             (self.rendered("artifact.md", b"old\n"),),
             self.destination,
             check=False,
         )
-        real_replace = writer.os.replace
+        real_exchange = writer._exchange_paths
+        exchange_calls = 0
         destination_visibility: list[bool] = []
 
-        def observe_replace(source, target) -> None:
-            real_replace(source, target)
+        def observe_exchange(left: Path, right: Path) -> None:
+            nonlocal exchange_calls
+            exchange_calls += 1
+            destination_visibility.append(self.destination.is_dir())
+            real_exchange(left, right)
             destination_visibility.append(self.destination.is_dir())
 
-        with mock.patch.object(writer.os, "replace", side_effect=observe_replace):
+        with mock.patch.object(
+            writer,
+            "_exchange_paths",
+            side_effect=observe_exchange,
+        ):
             writer.write_product(
                 (self.rendered("artifact.md", b"new\n"),),
                 self.destination,
                 check=False,
             )
 
-        self.assertNotIn(False, destination_visibility)
+        self.assertEqual(1, exchange_calls)
+        self.assertEqual([True, True], destination_visibility)
         self.assertEqual(
             b"new\n",
             (self.destination / "artifact.md").read_bytes(),
@@ -347,6 +448,183 @@ class WriterTests(unittest.TestCase):
             b"old\n",
             (recovery_trees[0] / "artifact.md").read_bytes(),
         )
+
+    def test_missing_destination_failed_rollback_retains_committed_recovery(self) -> None:
+        writer = self.writer()
+        real_replace = writer.os.replace
+        real_fsync_directory = writer._fsync_directory
+        replace_calls = 0
+
+        def fail_rollback(source: Path, target: Path) -> None:
+            nonlocal replace_calls
+            replace_calls += 1
+            if replace_calls == 1:
+                real_replace(source, target)
+                return
+            raise OSError("simulated missing-destination rollback failure")
+
+        def fail_commit_sync(path: Path) -> None:
+            if path == self.destination.parent:
+                raise OSError("simulated missing-destination commit sync failure")
+            real_fsync_directory(path)
+
+        with (
+            mock.patch.object(writer.os, "replace", side_effect=fail_rollback),
+            mock.patch.object(
+                writer,
+                "_fsync_directory",
+                side_effect=fail_commit_sync,
+            ),
+        ):
+            with self.assertRaisesRegex(
+                OSError,
+                "committed product retained for recovery",
+            ) as raised:
+                writer.write_product(
+                    (self.rendered("artifact.md", b"new\n"),),
+                    self.destination,
+                    check=False,
+                )
+
+        self.assertIn(
+            "simulated missing-destination commit sync failure",
+            str(raised.exception),
+        )
+        self.assertEqual(
+            b"new\n",
+            (self.destination / "artifact.md").read_bytes(),
+        )
+        self.assertEqual([], list(self.root.glob(".product.kinglet-stage-*")))
+
+    def test_missing_destination_successful_rollback_resyncs_parent(self) -> None:
+        writer = self.writer()
+        real_fsync_directory = writer._fsync_directory
+        parent_syncs = 0
+
+        def fail_first_parent_sync(path: Path) -> None:
+            nonlocal parent_syncs
+            if path == self.destination.parent:
+                parent_syncs += 1
+                if parent_syncs == 1:
+                    raise OSError("simulated commit sync failure")
+            real_fsync_directory(path)
+
+        with mock.patch.object(
+            writer,
+            "_fsync_directory",
+            side_effect=fail_first_parent_sync,
+        ):
+            with self.assertRaisesRegex(OSError, "simulated commit sync failure"):
+                writer.write_product(
+                    (self.rendered("artifact.md", b"new\n"),),
+                    self.destination,
+                    check=False,
+                )
+
+        self.assertEqual(2, parent_syncs)
+        self.assertFalse(self.destination.exists())
+
+    def test_new_parent_chain_entries_are_synced_before_product_commit(self) -> None:
+        writer = self.writer()
+        destination = self.root / "packages" / "nested" / "product"
+        real_mkdir = writer.os.mkdir
+        real_fsync_directory = writer._fsync_directory
+        real_replace_tree = writer._replace_tree
+        events: list[tuple[str, Path]] = []
+
+        def record_mkdir(path, mode=0o777, *, dir_fd=None) -> None:
+            real_mkdir(path, mode, dir_fd=dir_fd)
+            if dir_fd is None:
+                events.append(("mkdir", Path(path)))
+
+        def record_fsync(path: Path) -> None:
+            events.append(("fsync", path))
+            real_fsync_directory(path)
+
+        def record_commit(stage: Path, product: Path) -> None:
+            events.append(("commit", product))
+            real_replace_tree(stage, product)
+
+        with (
+            mock.patch.object(writer.os, "mkdir", side_effect=record_mkdir),
+            mock.patch.object(
+                writer,
+                "_fsync_directory",
+                side_effect=record_fsync,
+            ),
+            mock.patch.object(writer, "_replace_tree", side_effect=record_commit),
+        ):
+            writer.write_product(
+                (self.rendered("artifact.md", b"body\n"),),
+                destination,
+                check=False,
+            )
+
+        commit_index = events.index(("commit", destination))
+
+        def next_index(event: tuple[str, Path], start: int) -> int:
+            for index in range(start, len(events)):
+                if events[index] == event:
+                    return index
+            self.fail(f"missing durability event after index {start}: {event}")
+
+        packages_mkdir = next_index(
+            ("mkdir", self.root / "packages"),
+            0,
+        )
+        root_sync = next_index(("fsync", self.root), packages_mkdir + 1)
+        nested_mkdir = next_index(
+            ("mkdir", self.root / "packages" / "nested"),
+            root_sync + 1,
+        )
+        packages_sync = next_index(
+            ("fsync", self.root / "packages"),
+            nested_mkdir + 1,
+        )
+        nested_sync = next_index(
+            ("fsync", self.root / "packages" / "nested"),
+            packages_sync + 1,
+        )
+        self.assertLess(nested_sync, commit_index)
+
+    def test_raced_parent_creation_is_synced_before_product_commit(self) -> None:
+        writer = self.writer()
+        packages = self.root / "packages"
+        destination = packages / "product"
+        real_mkdir = writer.os.mkdir
+        real_fsync_directory = writer._fsync_directory
+        synced: list[Path] = []
+        raced = False
+
+        def race_mkdir(path, mode=0o777, *, dir_fd=None) -> None:
+            nonlocal raced
+            if dir_fd is None and Path(path) == packages and not raced:
+                raced = True
+                real_mkdir(path, mode)
+                raise FileExistsError(errno.EEXIST, "simulated mkdir race", path)
+            real_mkdir(path, mode, dir_fd=dir_fd)
+
+        def record_fsync(path: Path) -> None:
+            synced.append(path)
+            real_fsync_directory(path)
+
+        with (
+            mock.patch.object(writer.os, "mkdir", side_effect=race_mkdir),
+            mock.patch.object(
+                writer,
+                "_fsync_directory",
+                side_effect=record_fsync,
+            ),
+        ):
+            writer.write_product(
+                (self.rendered("artifact.md", b"body\n"),),
+                destination,
+                check=False,
+            )
+
+        self.assertTrue(raced)
+        self.assertIn(self.root, synced)
+        self.assertIn(packages, synced)
 
     def test_check_does_not_follow_destination_substituted_during_scan(self) -> None:
         writer = self.writer()

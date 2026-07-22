@@ -14,6 +14,7 @@ from .renderers import RenderedFile
 
 
 _MANIFEST_PATH = PurePosixPath(".kinglet-generated.json")
+_DIRECTORY_MODE = 0o755
 _TEXT_NAMES = frozenset(
     {
         ".gitattributes",
@@ -166,10 +167,21 @@ def _prepare_files(
     return expected
 
 
+def _expected_directories(
+    expected: dict[PurePosixPath, _ExpectedFile],
+) -> frozenset[PurePosixPath]:
+    directories = {PurePosixPath(".")}
+    for path in expected:
+        directories.update(
+            parent for parent in path.parents if parent != PurePosixPath(".")
+        )
+    return frozenset(directories)
+
+
 def _raise_symlink(path: Path) -> None:
     raise OSError(
         errno.ELOOP,
-        "generated destination must not be a symbolic link",
+        "generated product paths must not be symbolic links",
         path,
     )
 
@@ -182,6 +194,10 @@ def _assert_safe_ancestors(path: Path) -> None:
             continue
         if stat.S_ISLNK(metadata.st_mode):
             _raise_symlink(ancestor)
+
+
+def _canonical_destination(destination: Path) -> Path:
+    return destination.parent.resolve(strict=False) / destination.name
 
 
 def _destination_state(destination: Path) -> str:
@@ -231,8 +247,14 @@ def _read_file_without_following(
         os.close(descriptor)
 
 
-def _scan_tree(destination: Path) -> dict[PurePosixPath, _ActualFile]:
+def _scan_tree(
+    destination: Path,
+) -> tuple[
+    dict[PurePosixPath, _ActualFile],
+    dict[PurePosixPath, int],
+]:
     actual: dict[PurePosixPath, _ActualFile] = {}
+    directory_modes: dict[PurePosixPath, int] = {}
     directory_flags = (
         os.O_RDONLY
         | getattr(os, "O_DIRECTORY", 0)
@@ -250,11 +272,7 @@ def _scan_tree(destination: Path) -> dict[PurePosixPath, _ActualFile]:
                 follow_symlinks=False,
             )
             if stat.S_ISLNK(metadata.st_mode):
-                actual[item_relative] = _ActualFile(
-                    kind="symlink",
-                    content=None,
-                    mode=None,
-                )
+                _raise_symlink(destination.joinpath(*item_relative.parts))
             elif stat.S_ISDIR(metadata.st_mode):
                 child_fd = os.open(
                     entry.name,
@@ -270,6 +288,9 @@ def _scan_tree(destination: Path) -> dict[PurePosixPath, _ActualFile]:
                             mode=None,
                         )
                     else:
+                        directory_modes[item_relative] = stat.S_IMODE(
+                            child_metadata.st_mode
+                        )
                         visit(child_fd, item_relative)
                 finally:
                     os.close(child_fd)
@@ -293,10 +314,11 @@ def _scan_tree(destination: Path) -> dict[PurePosixPath, _ActualFile]:
                 "generated destination must be a directory",
                 destination,
             )
+        directory_modes[PurePosixPath(".")] = stat.S_IMODE(root_metadata.st_mode)
         visit(root_fd, PurePosixPath())
     finally:
         os.close(root_fd)
-    return actual
+    return actual, directory_modes
 
 
 def _compare(
@@ -309,8 +331,8 @@ def _compare(
             stale=(),
         )
 
-    actual = _scan_tree(destination)
-    changed = []
+    actual, directory_modes = _scan_tree(destination)
+    changed: set[PurePosixPath] = set()
     for path in sorted(expected, key=PurePosixPath.as_posix):
         wanted = expected[path]
         found = actual.get(path)
@@ -320,13 +342,18 @@ def _compare(
             or found.content != wanted.content
             or found.mode != wanted.mode
         ):
-            changed.append(path)
+            changed.add(path)
+    for path in _expected_directories(expected):
+        if directory_modes.get(path) != _DIRECTORY_MODE:
+            changed.add(path)
     stale = sorted(set(actual) - set(expected), key=PurePosixPath.as_posix)
-    return WriteResult(changed=tuple(changed), stale=tuple(stale))
+    return WriteResult(
+        changed=tuple(sorted(changed, key=PurePosixPath.as_posix)),
+        stale=tuple(stale),
+    )
 
 
 def _write_file(path: Path, content: bytes, mode: int) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode)
     try:
         with os.fdopen(descriptor, "wb", closefd=False) as stream:
@@ -347,6 +374,49 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def _create_directory_chain(path: Path) -> None:
+    missing: list[Path] = []
+    cursor = path
+    while True:
+        try:
+            metadata = cursor.lstat()
+        except FileNotFoundError:
+            missing.append(cursor)
+            if cursor == cursor.parent:
+                raise OSError(errno.ENOENT, "no existing directory ancestor", path)
+            cursor = cursor.parent
+            continue
+        if stat.S_ISLNK(metadata.st_mode):
+            _raise_symlink(cursor)
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise NotADirectoryError(
+                errno.ENOTDIR,
+                "generated destination parent must be a directory",
+                cursor,
+            )
+        break
+
+    for directory in reversed(missing):
+        try:
+            os.mkdir(directory, _DIRECTORY_MODE)
+        except FileExistsError:
+            metadata = directory.lstat()
+            if stat.S_ISLNK(metadata.st_mode):
+                _raise_symlink(directory)
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise NotADirectoryError(
+                    errno.ENOTDIR,
+                    "generated destination parent must be a directory",
+                    directory,
+                )
+            _fsync_directory(directory.parent)
+            _fsync_directory(directory)
+            continue
+        os.chmod(directory, _DIRECTORY_MODE, follow_symlinks=False)
+        _fsync_directory(directory.parent)
+        _fsync_directory(directory)
+
+
 def _make_stage(
     expected: dict[PurePosixPath, _ExpectedFile],
     destination: Path,
@@ -358,11 +428,21 @@ def _make_stage(
         )
     )
     try:
+        os.chmod(stage, _DIRECTORY_MODE, follow_symlinks=False)
         directories = {stage}
+        for relative in sorted(
+            _expected_directories(expected),
+            key=lambda item: (len(item.parts), item.as_posix()),
+        ):
+            if relative == PurePosixPath("."):
+                continue
+            directory = stage.joinpath(*relative.parts)
+            directory.mkdir(mode=_DIRECTORY_MODE)
+            os.chmod(directory, _DIRECTORY_MODE, follow_symlinks=False)
+            directories.add(directory)
         for relative in sorted(expected, key=PurePosixPath.as_posix):
             path = stage.joinpath(*relative.parts)
             _write_file(path, expected[relative].content, expected[relative].mode)
-            directories.update(path.parents)
         for directory in sorted(
             (item for item in directories if item == stage or stage in item.parents),
             key=lambda item: len(item.parts),
@@ -455,8 +535,21 @@ def _replace_tree(stage: Path, destination: Path) -> None:
         os.replace(stage, destination)
         try:
             _fsync_directory(destination.parent)
-        except BaseException:
-            os.replace(destination, stage)
+        except BaseException as commit_error:
+            try:
+                os.replace(destination, stage)
+            except BaseException as rollback_error:
+                raise _RollbackError(
+                    errno.EIO,
+                    "newly committed product retained for recovery at "
+                    f"{destination} after commit durability failure "
+                    f"({commit_error}) and rollback failure",
+                    destination,
+                ) from rollback_error
+            try:
+                _fsync_directory(destination.parent)
+            except OSError:
+                pass
             raise
         return
 
@@ -492,12 +585,13 @@ def write_product(
     if destination == destination.parent or not destination.name:
         raise ValueError("generated destination must name a product directory")
     expected = _prepare_files(files)
+    destination = _canonical_destination(destination)
     _assert_safe_ancestors(destination)
     result = _compare(expected, destination)
     if check or (not result.changed and not result.stale):
         return result
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    _create_directory_chain(destination.parent)
     _assert_safe_ancestors(destination)
     stage = _make_stage(expected, destination)
     preserve_stage = False
