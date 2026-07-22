@@ -1,0 +1,888 @@
+{
+  "schema_version": 1,
+  "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review.",
+  "source_commit": "c29b4cd37efa36ec3534c5b334bd3eb00ac636c2",
+  "categories": {
+    "agents": {
+      "description": "All tracked files under .claude/agents/.",
+      "expected_count": 28,
+      "files": [
+        {
+          "path": ".claude/agents/creative-director.md",
+          "sha256": "10f3e7e737f02b428b097cc25a5818a68c14ace17af8ceac21dfaf00aaac0d0d"
+        },
+        {
+          "path": ".claude/agents/game-designer.md",
+          "sha256": "bee5af89734b08adca3d72878978a510a80963ee6dc1fe4dbfc4d352e2cf6e38"
+        },
+        {
+          "path": ".claude/agents/level-designer.md",
+          "sha256": "f0155f92ec032d7f840e743133568d864aa2082f30d8fad4b4f6a1673a0b7b04"
+        },
+        {
+          "path": ".claude/agents/narrative-director.md",
+          "sha256": "a92354bbff95d365fa1cf9464e0a3a017d38cdf1c6b7ba77356018b687d0f147"
+        },
+        {
+          "path": ".claude/agents/systems-designer.md",
+          "sha256": "9ac200afeea3b34b53ebde1e130c99ca3198d655ffd46c1d28c17c4c1182e336"
+        },
+        {
+          "path": ".claude/agents/technical-director.md",
+          "sha256": "c91b57e0bcc71eca0cca4dfc66508ea94caec4a28edc9a7d346849bb32336cca"
+        },
+        {
+          "path": ".claude/agents/unity-build-runner.md",
+          "sha256": "380a62ab82e420d14215086e8ce2a570e7d9bbea3226956a880ac0598bdc7fd0"
+        },
+        {
+          "path": ".claude/agents/unity-coder-lite.md",
+          "sha256": "9edeb8ed0ed180f227f9073cec2a69a2f992e9228794ae0e5450f399f4a127d2"
+        },
+        {
+          "path": ".claude/agents/unity-coder.md",
+          "sha256": "dcb5aedce694fb7941babd0ab678d102b641edf2621ef2ce5baa82df98177695"
+        },
+        {
+          "path": ".claude/agents/unity-critic.md",
+          "sha256": "3c51588178733c96374e42c431b5dacbd139e65d15fb9c523870cecd3906e85f"
+        },
+        {
+          "path": ".claude/agents/unity-fixer-lite.md",
+          "sha256": "9e3b6112f39d7e86411166ffa5f564f649d2e4c5249027662102b639ef473bc4"
+        },
+        {
+          "path": ".claude/agents/unity-fixer.md",
+          "sha256": "9399ae7f20d351c60f0e8f6388cb61c307914dc7ba478d472c7e3042def41def"
+        },
+        {
+          "path": ".claude/agents/unity-git-master.md",
+          "sha256": "0d2515b980c9d38c4a91ded67fb3b68ad7590c113ce75c4a52b68e19fe1f924c"
+        },
+        {
+          "path": ".claude/agents/unity-linter.md",
+          "sha256": "550e21a76f0273734957d5a1cfdc04b9f24d78ffa8db2af96451cc69ad4a973a"
+        },
+        {
+          "path": ".claude/agents/unity-migrator.md",
+          "sha256": "499c36972c73021b3b25f651f5d423662967437a714703769c0667ccde495928"
+        },
+        {
+          "path": ".claude/agents/unity-network-dev.md",
+          "sha256": "d3d989a38b5019f248e24092f04d8c1c392a9240b1b33f6cbb38b50dde3f1cc4"
+        },
+        {
+          "path": ".claude/agents/unity-optimizer.md",
+          "sha256": "de678a1fc23f1f0010f1420b5b12b918f8757a2f717959eb0ec54e391ef9e058"
+        },
+        {
+          "path": ".claude/agents/unity-prototyper.md",
+          "sha256": "61ffc8763b27b3afdb6cdd8d33f25b6359fc50a45be395f6d877f4ea9437c762"
+        },
+        {
+          "path": ".claude/agents/unity-reviewer.md",
+          "sha256": "65314e79231ab538b2de565a90422e273e23106354a6c1b4007d2929b490338c"
+        },
+        {
+          "path": ".claude/agents/unity-scene-builder.md",
+          "sha256": "fac0c0e1c8f4fa7e158573d2764d4cf8e73326103a2c88d46aa9cf28f7583588"
+        },
+        {
+          "path": ".claude/agents/unity-scout.md",
+          "sha256": "af8419f2b018f166fd0b51e902aa1a12d08e4d9b9120bf3e2cbebb407f21e191"
+        },
+        {
+          "path": ".claude/agents/unity-security-reviewer.md",
+          "sha256": "f2cd99a8e11d9b49ab728a62270f096ab04383ee807a6d8e22b4ba01d34dc461"
+        },
+        {
+          "path": ".claude/agents/unity-shader-dev.md",
+          "sha256": "d66146be33492e7edcd536c2401901ecee1dd263634d92bfb442679f86c7de43"
+        },
+        {
+          "path": ".claude/agents/unity-test-runner.md",
+          "sha256": "b95f7a1034dc371b0622926a11c6a1fe7a3066dab9dbc9fa4d2343a650ff01a9"
+        },
+        {
+          "path": ".claude/agents/unity-ui-builder.md",
+          "sha256": "74baa28fd3222c7850c9040735675098bce736c73724d68dd311eb2e04eef3ae"
+        },
+        {
+          "path": ".claude/agents/unity-verifier.md",
+          "sha256": "818a0d752093a9b5e7289d27a5ac05e14a44f98e21c95f381141e22b25b48311"
+        },
+        {
+          "path": ".claude/agents/world-builder.md",
+          "sha256": "a553c530043b0dc9be63e7bebcd436d08bbfb9d815d123d8f8be026bc4817eb0"
+        },
+        {
+          "path": ".claude/agents/writer.md",
+          "sha256": "10d202fdf068f8221108050056926eabcee275d4f0cc274cd9d9abfaba9a051b"
+        }
+      ]
+    },
+    "commands": {
+      "description": "All tracked files under .claude/commands/.",
+      "expected_count": 36,
+      "files": [
+        {
+          "path": ".claude/commands/brainstorm.md",
+          "sha256": "07cf75ec627904298b337b345b96d1be3f004ae090a3631da0d74c9198febce8"
+        },
+        {
+          "path": ".claude/commands/design-review.md",
+          "sha256": "93e1ed237ff2f0d333030b3c313c1d1b4665df400ba15b30d4881c9831ee8738"
+        },
+        {
+          "path": ".claude/commands/design-system.md",
+          "sha256": "8825576a92d8e5d534699b223638e62774691e3782d758bc6bae691489e25b8d"
+        },
+        {
+          "path": ".claude/commands/estimate.md",
+          "sha256": "333b4cad0da445ef39e4ab5a45c982216ff7d570fd9abee01f36ad5899ba4e53"
+        },
+        {
+          "path": ".claude/commands/map-systems.md",
+          "sha256": "b53eb59a89cb22e97c951ba0454be45babd036b702688241e8240cc3d2905798"
+        },
+        {
+          "path": ".claude/commands/milestone-review.md",
+          "sha256": "98f881a90d1a20c9ec3a8241b8a6ad07b109879bdabd7284d5d6aef735325b16"
+        },
+        {
+          "path": ".claude/commands/retrospective.md",
+          "sha256": "cada9afdb18eb579974fd31a1545ac04a36c667c71d0adac1cf34f701dc8fd97"
+        },
+        {
+          "path": ".claude/commands/scope-check.md",
+          "sha256": "639c56b6594a6b9c0803d636bd1692f5b6f23954f7905d40630494a987229084"
+        },
+        {
+          "path": ".claude/commands/sprint-plan.md",
+          "sha256": "d8d1600c07d98c8c8d7c4a5d3d20a1f872893aa848194b27287528043214b2ae"
+        },
+        {
+          "path": ".claude/commands/unity-audit.md",
+          "sha256": "bbc58f9480952ec81089b59f9541719a01e5418cb234d1ae0c76326cddfa5f4b"
+        },
+        {
+          "path": ".claude/commands/unity-build.md",
+          "sha256": "7487a017d2b06c1de478bf61ea24ba89bf24786dc46468bb56851a945b560064"
+        },
+        {
+          "path": ".claude/commands/unity-doctor.md",
+          "sha256": "9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588"
+        },
+        {
+          "path": ".claude/commands/unity-feature.md",
+          "sha256": "b90e90bee6f79efc42a4a206d1da869d349b0ca4a10740e257626361e8a30ee2"
+        },
+        {
+          "path": ".claude/commands/unity-fix.md",
+          "sha256": "93509f96278a765492e4cfc6c5ad465c765c2382709e136c5a6f1d04509293b1"
+        },
+        {
+          "path": ".claude/commands/unity-init.md",
+          "sha256": "f12a6810e7ca56fdfb9cfff531fa9ae610da64535edf5a0e02d175b6243d8bb7"
+        },
+        {
+          "path": ".claude/commands/unity-instincts.md",
+          "sha256": "91e5bacfa25bab0c2fe1bee87bdb69a5dd6ddcc0b4fb9ed25cee64922a7bd6c4"
+        },
+        {
+          "path": ".claude/commands/unity-interview.md",
+          "sha256": "704122a65fe760a3871ca8320cb100a396babccec232e645e7916bb7616107e8"
+        },
+        {
+          "path": ".claude/commands/unity-learn.md",
+          "sha256": "7ec4b1791d321d05e58449178eedf03fb8e9295494ab5d1b4b96ff539548950e"
+        },
+        {
+          "path": ".claude/commands/unity-migrate.md",
+          "sha256": "bc66c34bc991031cf9ddbbfea07858da3739dffdd772dde3d5928d64df01cd9e"
+        },
+        {
+          "path": ".claude/commands/unity-network.md",
+          "sha256": "59b0d72edb8a453712ad45a317dd9515e7a0d4474f7df2268024b6f55e640b82"
+        },
+        {
+          "path": ".claude/commands/unity-optimize.md",
+          "sha256": "9293dc16b92a1d6404dde865e292a7c1e10effbbc31a1d92c686b8fbc01a80d9"
+        },
+        {
+          "path": ".claude/commands/unity-profile.md",
+          "sha256": "f289ce04705202403fdeea6c9cc093819eda706443433b72fb58444c831b2052"
+        },
+        {
+          "path": ".claude/commands/unity-prototype.md",
+          "sha256": "45cf4331dd68ef583cad14dbc7ff4530a0e3ae695447111b9bf02fa6afe56445"
+        },
+        {
+          "path": ".claude/commands/unity-ralph.md",
+          "sha256": "93d0618e35e6dbe47cb6fee5cb9ceb35db181f9930bfccc9290c6bc756148e82"
+        },
+        {
+          "path": ".claude/commands/unity-review.md",
+          "sha256": "0d2157690d353155c211d8f1d2b77b8144c99fe7e871a14cef0a3d5a4ebabe79"
+        },
+        {
+          "path": ".claude/commands/unity-scene.md",
+          "sha256": "a17ccc17146d7d20ba2905b425c12a832bd02922ae7caa947fe5404870552dcf"
+        },
+        {
+          "path": ".claude/commands/unity-session-resume.md",
+          "sha256": "fdb626d4c5d662ba76db920119fb09271a54f8306cc941e7b576aaae6d58e707"
+        },
+        {
+          "path": ".claude/commands/unity-session-save.md",
+          "sha256": "5272521300e9812a0296a80b4ffdb0e13be233c00c748289a793f9ec0e8190a4"
+        },
+        {
+          "path": ".claude/commands/unity-sessions.md",
+          "sha256": "698613ac90dc2fef7fec530fcef6eed6810d7a42fc417ff5a4550a00c60575d0"
+        },
+        {
+          "path": ".claude/commands/unity-shader.md",
+          "sha256": "dab5acafbcedb3bfcbf076249246895f5c9c77a8f357ebb1dbe3c59cbc37322b"
+        },
+        {
+          "path": ".claude/commands/unity-skill-stocktake.md",
+          "sha256": "8284295165da34dd89b13de67cbc29fc006207a3eafaf1b8dd96cea4a09960e0"
+        },
+        {
+          "path": ".claude/commands/unity-skillify.md",
+          "sha256": "2e68f812411f297710848abe7129352112feabdd054e0576b10a8ef49e15b7f8"
+        },
+        {
+          "path": ".claude/commands/unity-team.md",
+          "sha256": "91cf687430751c36f2e600916c6b955033c813a6f800f42edb36a47dd0add027"
+        },
+        {
+          "path": ".claude/commands/unity-test.md",
+          "sha256": "e0506c46598807898b7d35ea37e25847eac6e1b680558c3e1e698698e0c684aa"
+        },
+        {
+          "path": ".claude/commands/unity-ui.md",
+          "sha256": "c489321ee43a95a2e2795f911fa5872c366deeb48346270814e2ff83d613f395"
+        },
+        {
+          "path": ".claude/commands/unity-workflow.md",
+          "sha256": "1f3aa643c1054281f3e2f60fa3bb77801d504567b1be111101606343e7ed8170"
+        }
+      ]
+    },
+    "skills": {
+      "description": "Tracked SKILL.md files under .claude/skills/.",
+      "expected_count": 39,
+      "files": [
+        {
+          "path": ".claude/skills/core/assembly-definitions/SKILL.md",
+          "sha256": "d677e254a933b4a8c95346fa26b5fd88937e9721a65571e9a10f04caf6738a9e"
+        },
+        {
+          "path": ".claude/skills/core/commit-trailers/SKILL.md",
+          "sha256": "900218e54f1a53bcdfb23003e1cf8ff7ee78fcc834f280ec0872a5ad04e359b1"
+        },
+        {
+          "path": ".claude/skills/core/deep-interview/SKILL.md",
+          "sha256": "b3009bcb169526bb598052222996990e39cdc6ea205d3c50ae8a6daab93f44e6"
+        },
+        {
+          "path": ".claude/skills/core/event-systems/SKILL.md",
+          "sha256": "1c07a8782b07d559d1f89ec75b5e293b4925d730cb48bd8e656bf209f5bb5ecb"
+        },
+        {
+          "path": ".claude/skills/core/hud-statusline/SKILL.md",
+          "sha256": "05a87e99fdeb1f50e5fdc83ef54fe78b5b5c886bc0e6d49b21624b220c8afc85"
+        },
+        {
+          "path": ".claude/skills/core/learner/SKILL.md",
+          "sha256": "e06d3789b97d6d1f621d31554cfd6cb76cc9c21e2128bb8c16e34d0a9430b2ca"
+        },
+        {
+          "path": ".claude/skills/core/model-routing/SKILL.md",
+          "sha256": "c61790b1f83e1f065c6e047ca629bf07a78452c7aa4528935573b234849330eb"
+        },
+        {
+          "path": ".claude/skills/core/object-pooling/SKILL.md",
+          "sha256": "cb043c0ec2c5819470638bcc1d878601cbfe57514e01dbe045bb02f9686f2bb2"
+        },
+        {
+          "path": ".claude/skills/core/scriptable-objects/SKILL.md",
+          "sha256": "82048f28aa681bf803948dd0c1b89085abb9e2bf26a35cdb0cd6a07290969d55"
+        },
+        {
+          "path": ".claude/skills/core/serialization-safety/SKILL.md",
+          "sha256": "fc420ccc484f896f8a462e74fb6088c9522b22124f27ca533266246187ab7bf1"
+        },
+        {
+          "path": ".claude/skills/core/unity-instincts/SKILL.md",
+          "sha256": "bf3c30b206c659bfd6e744c9a6a49f0b31648bff019652795ab4835c9f8525a7"
+        },
+        {
+          "path": ".claude/skills/core/unity-mcp-patterns/SKILL.md",
+          "sha256": "daff325c0e78558b8efb15504bb6f23e0c19b233e82e06979c03b549b1f081a1"
+        },
+        {
+          "path": ".claude/skills/gameplay/character-controller/SKILL.md",
+          "sha256": "c6b5fb0beb977a67fe15d980fef6552a2d363d2a4da7287427098ee5f51c0afe"
+        },
+        {
+          "path": ".claude/skills/gameplay/dialogue-system/SKILL.md",
+          "sha256": "e6aa3e268148f0d5ac57da855dc7ab6d3e4e0fead535c82fa0df7eb4cb6b61d4"
+        },
+        {
+          "path": ".claude/skills/gameplay/inventory-system/SKILL.md",
+          "sha256": "b59106ca73cc59237019f2e14100a0c10aad402de7c25e7f3fb3ed779760bdaa"
+        },
+        {
+          "path": ".claude/skills/gameplay/procedural-generation/SKILL.md",
+          "sha256": "8672ae604cb075ad532d93031d8a181c8d11e76884a3db8b41c63cf0454b322d"
+        },
+        {
+          "path": ".claude/skills/gameplay/save-system/SKILL.md",
+          "sha256": "deab1c9d2aaf985a23d22909b57483eada07d198df4546787ff27e5924a11079"
+        },
+        {
+          "path": ".claude/skills/gameplay/state-machine/SKILL.md",
+          "sha256": "5cbf57d364ee60156eb3edd3c849338e50ac9cb2b92f6d2b64788d1ce01ab1f3"
+        },
+        {
+          "path": ".claude/skills/genre/idle-clicker/SKILL.md",
+          "sha256": "d7f380b46212f559153fed025d541a959ec78f82038f764238cfa80ce63a4d25"
+        },
+        {
+          "path": ".claude/skills/genre/match3/SKILL.md",
+          "sha256": "acbca4152d09b45460688919aa2a203bfa5205bff09d3699aca8e5e6850790ff"
+        },
+        {
+          "path": ".claude/skills/genre/platformer-2d/SKILL.md",
+          "sha256": "9b21e1e6d5e1415dfe4f25095bdb12fedf7d8737aaea3afd9bf423b15e9cd680"
+        },
+        {
+          "path": ".claude/skills/genre/puzzle/SKILL.md",
+          "sha256": "53e3b3d0149a1f3562ced2c6d4eb978f621ae205011858386a567e8cbfd877e4"
+        },
+        {
+          "path": ".claude/skills/genre/rpg/SKILL.md",
+          "sha256": "a77c5e2f2db4e9d8035f64a91eebc0d8c9c04ac93dca15980c1890c035a3ac8f"
+        },
+        {
+          "path": ".claude/skills/genre/topdown/SKILL.md",
+          "sha256": "c84b3066a8191c4e49671b020639cf3a4fd88e30f558f53fd6246c4d0a8777a8"
+        },
+        {
+          "path": ".claude/skills/systems/addressables/SKILL.md",
+          "sha256": "23ec75e5a6d101fddb741ca58676b0ecb4d94567c69d2ad1ca11fd18fe1c76ac"
+        },
+        {
+          "path": ".claude/skills/systems/animation/SKILL.md",
+          "sha256": "2314a56988e1e0e2a34bde77ad12fe34b2ed454435ad37f79755e870e085044e"
+        },
+        {
+          "path": ".claude/skills/systems/audio/SKILL.md",
+          "sha256": "af33d218db8399b8c0c726626105f003063eadd749ec937bab5abed50abfca63"
+        },
+        {
+          "path": ".claude/skills/systems/cinemachine/SKILL.md",
+          "sha256": "77a2390fb7056145678e669abc29e44ce6263b64f0311639397358e4bafae900"
+        },
+        {
+          "path": ".claude/skills/systems/input-system/SKILL.md",
+          "sha256": "e002d5aafa2169cb217d060c09b59279d8d67e54167c0a5881b288f984be5977"
+        },
+        {
+          "path": ".claude/skills/systems/navmesh/SKILL.md",
+          "sha256": "f06dc9b984a1d21103b4d097ea8486d3b70014a507d66d5c058c2eaf173bea43"
+        },
+        {
+          "path": ".claude/skills/systems/physics/SKILL.md",
+          "sha256": "873a6554f6733887dc1f48efb6fe49810f02b7ff58698e8493fd7e7eefe42dc5"
+        },
+        {
+          "path": ".claude/skills/systems/shader-graph/SKILL.md",
+          "sha256": "dc8d06f692cbd5ab59e26fa9043056e499bcc94f0c42479b5f440fc84b4332e9"
+        },
+        {
+          "path": ".claude/skills/systems/ui-toolkit/SKILL.md",
+          "sha256": "540cb79e01ccd11f4719029721676904e8130dd09119f95a352285a019ea9f43"
+        },
+        {
+          "path": ".claude/skills/systems/urp-pipeline/SKILL.md",
+          "sha256": "816a7a4d5311b8c0a88c8253e3681f86923c8faeee904ee966ab88885a1d2ce1"
+        },
+        {
+          "path": ".claude/skills/third-party/dotween/SKILL.md",
+          "sha256": "60225630a66ce1dd685914820af6c087730fec0b16fd77e628ddd5f1d7fb2592"
+        },
+        {
+          "path": ".claude/skills/third-party/odin-inspector/SKILL.md",
+          "sha256": "076417fa1bcc2a2e40eaf716fb5d2cfdb5927437d13fa06e459144c4eb387cbe"
+        },
+        {
+          "path": ".claude/skills/third-party/textmeshpro/SKILL.md",
+          "sha256": "1d75b3002e3e6b9f70a15acec59413661ded3977d83a3f8bf04d7aeee8b13814"
+        },
+        {
+          "path": ".claude/skills/third-party/unitask/SKILL.md",
+          "sha256": "9ce57e1865fe9c2d4cf3f12d4b3996ec5760eea16e7a45bf0118f8a28573ef82"
+        },
+        {
+          "path": ".claude/skills/third-party/vcontainer/SKILL.md",
+          "sha256": "af0249e81e0438edf547cec0c4b7282365f6fe451fd180a26d879d407c8448fe"
+        }
+      ]
+    },
+    "hooks": {
+      "description": "All tracked policy hooks under .claude/hooks/, excluding _lib.sh; every entry is executable.",
+      "expected_count": 26,
+      "files": [
+        {
+          "path": ".claude/hooks/auto-learn.sh",
+          "sha256": "89f8e2d2d8bd0050a4948483529d60149d8bcefb3c6e8a87b28b8dd8b20b8064",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/bash-gate.sh",
+          "sha256": "402b11ca2bc35c47e27c06716d21fe0b7300e5ae8b106ac3cf4eab118560d081",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/block-legacy-input.sh",
+          "sha256": "0bab1c8c8c7b7d6f92a54f7dd23ea78402676d611bb8e54fbbd0d7f1d9997880",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/block-meta-edit.sh",
+          "sha256": "47d80f65b4ffd88d04f59a1ae6710d3680df9a8c86ea40426a492c2759a45c6d",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/block-projectsettings.sh",
+          "sha256": "792e663195845faa1e61fecb4cb571a33c224a43d81e45c5e63f2455a1493eac",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/block-scene-edit.sh",
+          "sha256": "7eb9ae2cecb238ba786ac33af1833fd842ceb55362bf7d10b2aee56da21d71b6",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/build-analyze.sh",
+          "sha256": "c2b5751dff4c25ba871e2305bb446cf024d5d06f2d6116d50f8a690e2a71ee45",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/cost-tracker.sh",
+          "sha256": "09c6b79d80214e0a1686eddbd0f825be459c28c0e76ec0733331bbbd77636d90",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/gateguard.sh",
+          "sha256": "3014d20039bee7abe4ce15141679a851ab966c80df6fb5938ff6ddeeedfdd559",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/guard-editor-runtime.sh",
+          "sha256": "1e31bac6b3f7b29859fb48d756b6984da0f5bb80984238b689cc726abe9cda9e",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/guard-project-config.sh",
+          "sha256": "741d011f91987cef934bda6d922bc512e8a065f979727cab6da23cf7f76f5b6e",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/instinct-capture.sh",
+          "sha256": "9065b7a00ffd86ea538023fd7077c5ec87005d7a130eb738d330005d3e7b3bcb",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/instinct-distill.sh",
+          "sha256": "26d43d82aabb5b8695bb6c1bc607b62ac445e626c5366f8fbefe47ab70d93381",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/notify.sh",
+          "sha256": "b5aa82142acdb12e3ce08d1c80fc741afbe78a6ed1b3c9dae0ed5bc07dcded4c",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/pre-compact.sh",
+          "sha256": "b17c7e4ce26cf6b23f72530f62f3f68218d55ee7bb1963ab29dd835baa8a9a75",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/quality-gate.sh",
+          "sha256": "34518dfc74e4f53caabfc3277ca73ecba5d8011e064db5a484ce33616b772469",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/session-restore.sh",
+          "sha256": "e3fffec6abc7c1cea29e9d719bd78b643401c41b1e4195facc2a6f1fc65b4757",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/session-save.sh",
+          "sha256": "5b23330845ae08560067340d9300a037688f5012c2618b18e1c44ee6fa7c73c6",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/stop-validate.sh",
+          "sha256": "faddb38c73e6235a7f7cfe81bcbd6b76c4615c25c8ea9de5f4df4f9254fe03a7",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/suggest-verify.sh",
+          "sha256": "f4f00021b86c7a166fdd5b6e5ad8b3802bf84f0d68f8b4c9c5ab1c58b3a14c94",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/track-edits.sh",
+          "sha256": "fb3d2e9ba0116065cc73e4c5106cde68aae76c32e3ffec9b19addb1bb7c6f791",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/track-reads.sh",
+          "sha256": "47b4e734ee145bb9d36620302209879786f819de7fde933142733f69f8eef211",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/validate-commit.sh",
+          "sha256": "4a13845b844475d278e251ef5664272a3d3bb9b55e8bfe8d773afc2c5d305f06",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/warn-filename.sh",
+          "sha256": "d9373fb21d3c652dcce22fa9e32ce130834701df02156e25587330c4cccab961",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/warn-platform-defines.sh",
+          "sha256": "bfd1d38fdfa37ca55495555cec7e138ca0f3b6eef1f883b7b6204617ba2e21d5",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/warn-serialization.sh",
+          "sha256": "748bc66fcb1bf8a1e53c773a24e4d1e1a96537c73fb1f1d45b6226d8ae47120d",
+          "git_mode": "100755"
+        }
+      ]
+    },
+    "rules": {
+      "description": "All tracked files under .claude/rules/.",
+      "expected_count": 6,
+      "files": [
+        {
+          "path": ".claude/rules/architecture.md",
+          "sha256": "36aac42cb968d1b6cf09eb874bdd0649453094ed89b5c4583952dd163d432714"
+        },
+        {
+          "path": ".claude/rules/csharp-unity.md",
+          "sha256": "713eb2c97c39d1c791325bd749f87aed92895ee0c94464c4eb72e7dd167fa986"
+        },
+        {
+          "path": ".claude/rules/pc-console.md",
+          "sha256": "19c266510d5b0d9f906a2a765aef412869cddf46dcc793702a7c14668c6de78b"
+        },
+        {
+          "path": ".claude/rules/performance.md",
+          "sha256": "757676620b64b53761f27499a6939693a27612d153d004f90b04407aa246a2ca"
+        },
+        {
+          "path": ".claude/rules/serialization.md",
+          "sha256": "64d2bf49758afc495e3898225dc0d31282f66a09eecf0c1a7a9074c376ca4ae9"
+        },
+        {
+          "path": ".claude/rules/unity-specifics.md",
+          "sha256": "1c93ba08a78bd9e1163dbad92b75d6c198e8d6beb54fb24458d3d446b61aca34"
+        }
+      ]
+    },
+    "claude_templates": {
+      "description": "Tracked Markdown files under .claude/templates/.",
+      "expected_count": 5,
+      "files": [
+        {
+          "path": ".claude/templates/architecture-decision-record.md",
+          "sha256": "f431c45c91b8de23709e6c8520653b12eb28b4250cb0f853b98ab2d3509853e1"
+        },
+        {
+          "path": ".claude/templates/game-concept.md",
+          "sha256": "155481ca3249400ddf96a4bf59b8ce646c44ec57f2ecd165f069e6fdfad75b10"
+        },
+        {
+          "path": ".claude/templates/game-design-document.md",
+          "sha256": "b83503c8fe5f4cd271b3b0a2b1fea7ce760250a2a4f9d236721b73cd62fac215"
+        },
+        {
+          "path": ".claude/templates/sprint-plan.md",
+          "sha256": "b3372faa8c3ceff172ebcbd80a018b675ab67aa4e24d5b00c1b0280220414bdd"
+        },
+        {
+          "path": ".claude/templates/systems-index.md",
+          "sha256": "a521e2ff6d3ab86ffff200ed5e02aa2786df2ad9f38914f3af2141ece9d5d0eb"
+        }
+      ]
+    },
+    "code_templates": {
+      "description": "All tracked code-template files under templates/.",
+      "expected_count": 10,
+      "files": [
+        {
+          "path": "templates/AssemblyDefinition.asmdef.template",
+          "sha256": "b8826785ae4c4b36772431674c973bc2d044c6d9f62b4860c0aa760ae2f18b4f"
+        },
+        {
+          "path": "templates/EditModeTest.cs.template",
+          "sha256": "4c42c779fd5c92de956d6f7d5bf090611e7e94b1799a55726706e059ab377473"
+        },
+        {
+          "path": "templates/LifetimeScope.cs.template",
+          "sha256": "c889bd913782d3b51d2d31af5aae87db4715097d7ef448b11c1cbe22c36523ad"
+        },
+        {
+          "path": "templates/Message.cs.template",
+          "sha256": "0be5202fc6aed014525edb075491286426ded651924a891765991b6a70b86a11"
+        },
+        {
+          "path": "templates/Model.cs.template",
+          "sha256": "62d735ed8b09576d25a568f63cbff474cca743acfd4fe986762d30b7ece1d17e"
+        },
+        {
+          "path": "templates/MonoBehaviour.cs.template",
+          "sha256": "9fc3284a7645b8d2c0f7c5b8ca395ba0506636ca5c8844314219c764749c3a0e"
+        },
+        {
+          "path": "templates/PlayModeTest.cs.template",
+          "sha256": "1236fc9865c5679e0fb700f8ba8b56244f0492aaad9c73eda5f8028f1cafcc40"
+        },
+        {
+          "path": "templates/ScriptableObject.cs.template",
+          "sha256": "f005198fc1fbcb3ffa8e1bb6e59683c956f51b5b42c22a5565dcc8df9d0f530e"
+        },
+        {
+          "path": "templates/System.cs.template",
+          "sha256": "44eabd3ede128feee0df904d5f55e84fcd034d874a2dae4b9f67f188c01ca4d5"
+        },
+        {
+          "path": "templates/View.cs.template",
+          "sha256": "c77939301d6476dfd52d8496bc5aad0fff1b1c2f41972616ed664fca8f692dbd"
+        }
+      ]
+    }
+  },
+  "legacy_product_positioning": {
+    "term": "cloud-nine-unity",
+    "policy": "Plan 01 preserves the active cloud-nine-unity identity until the public rename in Plan 06. Historical paths and explicit legacy-marker test occurrences are permitted; every other current occurrence is grandfathered exactly, and new active occurrences or paths require an intentional baseline update.",
+    "historical_exact_paths": [
+      "CREDITS.md",
+      "MERGE-NOTES.md",
+      "migration/baseline-inventory.json",
+      "provenance.tsv"
+    ],
+    "historical_path_prefixes": [
+      "migration/fixtures/"
+    ],
+    "legacy_marker_test_path_prefix": "tests/",
+    "legacy_marker": "cloud-nine-unity:generated:",
+    "grandfathered_active_occurrences": [
+      {
+        "path": ".claude/NOTICE.md",
+        "text": "original to cloud-nine-unity, MIT, Copyright (c) 2026 OmerZeyveli."
+      },
+      {
+        "path": ".claude/UPSTREAM",
+        "text": "# cloud-nine-unity — vendored upstream pins"
+      },
+      {
+        "path": ".claude/UPSTREAM",
+        "text": "toolkit=cloud-nine-unity"
+      },
+      {
+        "path": ".claude/rules/pc-console.md",
+        "text": "The platform spec for this toolkit. cloud-nine-unity ships **no mobile content** — the mobile skill"
+      },
+      {
+        "path": ".claude/templates/architecture-decision-record.md",
+        "text": "<!-- cloud-nine-unity ADR template. Authored copies go to docs/adr/. -->"
+      },
+      {
+        "path": ".claude/templates/game-concept.md",
+        "text": "<!-- cloud-nine-unity game concept template (output of /brainstorm). Authored copy goes to docs/design/game-concept.md. -->"
+      },
+      {
+        "path": ".claude/templates/game-design-document.md",
+        "text": "<!-- cloud-nine-unity GDD template. Lives at .claude/templates/ after install; authored copies go to docs/design/. -->"
+      },
+      {
+        "path": ".claude/templates/sprint-plan.md",
+        "text": "<!-- cloud-nine-unity sprint plan template. Authored copies go to docs/production/sprints/. -->"
+      },
+      {
+        "path": ".claude/templates/systems-index.md",
+        "text": "<!-- cloud-nine-unity systems index (output of /map-systems). Authored copy goes to docs/design/systems-index.md. -->"
+      },
+      {
+        "path": "CLAUDE.md",
+        "text": "# cloud-nine-unity — repo guide"
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "text": "# Contributing to cloud-nine-unity"
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "text": "cloud-nine-unity is a **standalone Unity 6 toolkit for Claude Code**. It vendors"
+      },
+      {
+        "path": "MCP-SETUP.md",
+        "text": "`cloud-nine-unity` uses **one** MCP server: CoplayDev's open-source **Unity MCP** bridge."
+      },
+      {
+        "path": "README.md",
+        "text": "# cloud-nine-unity"
+      },
+      {
+        "path": "README.md",
+        "text": "between the `cloud-nine-unity:generated` markers is refreshed — your prose is left byte-for-byte."
+      },
+      {
+        "path": "README.md",
+        "text": "cd cloud-nine-unity"
+      },
+      {
+        "path": "README.md",
+        "text": "git clone https://github.com/OmerZeyveli/cloud-nine-unity.git"
+      },
+      {
+        "path": "docs/AGENT-GUIDE.md",
+        "text": "### Design and production agents (cloud-nine-unity overlay)"
+      },
+      {
+        "path": "docs/ARCHITECTURE.md",
+        "text": "5. **Design and Production Agents** (cloud-nine-unity overlay) -- author documentation under `docs/`, no code, no MCP"
+      },
+      {
+        "path": "docs/SKILL-CATALOG.md",
+        "text": "_None._ cloud-nine-unity targets PC/console only, so there is no platform-switching layer. Platform"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-07-22-kinglet-01-identity-foundation.md",
+        "text": "Test that every inventory SHA matches, every inventory path exists, and no additional file appears in a listed category without an inventory update. Also scan tracked product text and fail on new product-positioning uses of `cloud-nine-unity`; permit historical occurrences only in `MERGE-NOTES.md`, `CREDITS.md`, `provenance.tsv`, migration fixtures, and legacy-marker tests."
+      },
+      {
+        "path": "docs/superpowers/plans/2026-07-22-kinglet-05-packages-lifecycle.md",
+        "text": "<!-- cloud-nine-unity:generated:begin -->"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-07-22-kinglet-05-packages-lifecycle.md",
+        "text": "<!-- cloud-nine-unity:generated:end -->"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-07-22-kinglet-06-product-release.md",
+        "text": "cloud-nine-unity Cloud Nine Unity ECU Claude-only toolkit"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-07-22-kinglet-for-unity-design.md",
+        "text": "`cloud-nine-unity:generated:{begin,end}` markers and the new"
+      },
+      {
+        "path": "install.sh",
+        "text": "        /cloud-nine-unity:generated:begin/ { print; print \"\"; print \"## Project Facts (auto-detected)\"; print \"\"; while ((getline l < factsfile) > 0) print l; skip=1; next }"
+      },
+      {
+        "path": "install.sh",
+        "text": "        /cloud-nine-unity:generated:end/   { print \"\"; print; skip=0; next }"
+      },
+      {
+        "path": "install.sh",
+        "text": "    info \"Existing cloud-nine-unity install found (version $PREV) — upgrading to $TOOLKIT_VERSION.\""
+      },
+      {
+        "path": "install.sh",
+        "text": "    printf '# The full manifest (tests, docs, repo tooling) lives in the cloud-nine-unity repo.\\n'"
+      },
+      {
+        "path": "install.sh",
+        "text": "    warn \"cloud-nine-unity did not create it, so it will not be removed or merged blindly.\""
+      },
+      {
+        "path": "install.sh",
+        "text": "  elif grep -q 'cloud-nine-unity:generated:begin' \"$CLAUDE_MD\"; then"
+      },
+      {
+        "path": "install.sh",
+        "text": "  elif grep -q 'cloud-nine-unity:generated:begin' \"$PROJECT_DIR/CLAUDE.md\" 2>/dev/null; then"
+      },
+      {
+        "path": "install.sh",
+        "text": "  printf '# cloud-nine-unity install receipt\\n'"
+      },
+      {
+        "path": "install.sh",
+        "text": "# cloud-nine-unity — installer"
+      },
+      {
+        "path": "install.sh",
+        "text": "[ -d \"$SCRIPT_DIR/.claude\" ] || die \"Payload not found at $SCRIPT_DIR/.claude — run install.sh from the cloud-nine-unity repo root.\""
+      },
+      {
+        "path": "install.sh",
+        "text": "printf '%s\\n' \"${BOLD}cloud-nine-unity ${TOOLKIT_VERSION}${NC} — installer\""
+      },
+      {
+        "path": "provenance-skip.tsv",
+        "text": "# cloud-nine-unity — upstream content we deliberately did NOT vendor"
+      },
+      {
+        "path": "scripts/generate-claude-md.sh",
+        "text": "> Unity 6 · C# · PC / Console · built with cloud-nine-unity."
+      },
+      {
+        "path": "scripts/generate-claude-md.sh",
+        "text": "echo \"<!-- cloud-nine-unity:generated:begin — content between these markers is rewritten on re-install. Everything outside is yours. -->\""
+      },
+      {
+        "path": "scripts/generate-claude-md.sh",
+        "text": "echo \"<!-- cloud-nine-unity:generated:end -->\""
+      },
+      {
+        "path": "scripts/studio-doctor.sh",
+        "text": "  printf 'Installed: cloud-nine-unity %s (vendored ECU %s)\\n' \"$VER\" \"$ECU_VER\""
+      },
+      {
+        "path": "scripts/studio-doctor.sh",
+        "text": "  warn \"No install receipt. .claude/ exists but cloud-nine-unity did not write it here\""
+      },
+      {
+        "path": "scripts/studio-doctor.sh",
+        "text": "# cloud-nine-unity — studio-doctor"
+      },
+      {
+        "path": "scripts/studio-doctor.sh",
+        "text": "printf '%s\\n' \"${BOLD}cloud-nine-unity — studio-doctor${NC}\""
+      },
+      {
+        "path": "tests/run-tests.sh",
+        "text": "echo -e \"${CYAN}cloud-nine-unity test suite${NC}\""
+      },
+      {
+        "path": "tests/test-no-mobile.sh",
+        "text": "# test-no-mobile.sh — cloud-nine-unity is PC/console only. Prove it."
+      },
+      {
+        "path": "uninstall.sh",
+        "text": "  err \"cloud-nine-unity did not install this .claude/ — or it was installed by someone else and\""
+      },
+      {
+        "path": "uninstall.sh",
+        "text": "# cloud-nine-unity — uninstaller"
+      },
+      {
+        "path": "uninstall.sh",
+        "text": "printf '%s\\n' \"${BOLD}cloud-nine-unity — uninstaller${NC}\""
+      }
+    ]
+  }
+}

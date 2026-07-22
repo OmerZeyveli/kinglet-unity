@@ -177,6 +177,15 @@ jobs:
       - name: Run test suite
         run: bash tests/run-tests.sh
 
+      - name: Run Kinglet build suite
+        run: bash tests/test-kinglet-build.sh
+
+      - name: Validate Kinglet canonical source
+        run: python3 -m tools.kinglet_build validate
+
+      - name: Check Kinglet generated products
+        run: python3 -m tools.kinglet_build build --all --check
+
   # macOS ships bash 3.2 and BSD grep. This repo has already shipped `declare -A` (bash 4) and
   # `grep -oP` (GNU-only) in scripts that .gitattributes says target macOS — the Linux leg cannot
   # see either. This job is the only thing that can.
@@ -203,3 +212,6 @@ jobs:
 
       - name: Run test suite
         run: bash tests/run-tests.sh
+
+      - name: Run Kinglet build suite
+        run: bash tests/test-kinglet-build.sh

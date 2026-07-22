@@ -172,7 +172,7 @@ examples/CLAUDE.md.idle-clicker	ecu	1.5.0	examples/CLAUDE.md.idle-clicker	1e8ba9
 examples/CLAUDE.md.match3	ecu	1.5.0	examples/CLAUDE.md.match3	76c192a905b0c4911dc757b7d04033248028b85690a926c38a57881b566f4e7c	modified	mobile-strip
 examples/CLAUDE.md.rpg	ecu	1.5.0	examples/CLAUDE.md.rpg	06ee9968fd08c22f512b41c77a44e0b3ab828864d2c1e12f269c5505448395bc	modified	mobile-strip
 .gitattributes	original	-	-	-	original	-
-.github/workflows/ci.yml	ecu	1.5.0	.github/workflows/ci.yml	3b79e9f884b55ed5fe70d1b5cdb241e2300d68da660335cf92de07bf7a5e38df	modified	ci-adapted: dropped .claude-plugin + benchmarks steps (not vendored); added provenance, fixture install, macOS leg
+.github/workflows/ci.yml	ecu	1.5.0	.github/workflows/ci.yml	3b79e9f884b55ed5fe70d1b5cdb241e2300d68da660335cf92de07bf7a5e38df	modified	ci-adapted: dropped .claude-plugin + benchmarks steps (not vendored); added provenance, fixture install, macOS leg, cross-platform Kinglet suite, Linux validate/check gates
 .gitignore	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 install.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 LICENSE	original	-	-	-	original	root-path-collides-with-ecu-but-ours
@@ -250,3 +250,5 @@ tools/kinglet_build/writer.py	original	-	-	-	original	kinglet-atomic-determinist
 tests/kinglet/test_cli.py	original	-	-	-	original	kinglet-public-cli-contract-tests
 tools/kinglet_build/cli.py	original	-	-	-	original	kinglet-public-build-cli
 tools/kinglet_build/__main__.py	original	-	-	-	original	kinglet-build-module-entrypoint
+migration/baseline-inventory.json	original	-	-	-	original	kinglet-plan-01-human-owned-legacy-migration-baseline
+tests/kinglet/test_baseline_inventory.py	original	-	-	-	original	kinglet-legacy-drift-identity-and-ci-gate-tests
