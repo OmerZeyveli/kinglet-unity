@@ -214,3 +214,9 @@ tests/test-skills.sh	ecu	1.5.0	tests/test-skills.sh	324561e8e83be33761d519e6e04b
 tests/test-state.sh	ecu	1.5.0	tests/test-state.sh	dc05b5a953fb23fb14ab0a009a276152f891d85b939f9c0c0aea16608ffcb321	modified	remove-invalid-bash-source-environment-assignment
 tests/test-templates.sh	ecu	1.5.0	tests/test-templates.sh	0f38c2bc95d65cd2fe4e6baba50ede9dae4dfed80185c20b2f4d372dbe535f0f	verbatim	-
 uninstall.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours
+VERSION	original	-	-	-	original	kinglet-build-version
+tools/__init__.py	original	-	-	-	original	kinglet-build-package-marker
+tools/kinglet_build/__init__.py	original	-	-	-	original	kinglet-build-identity
+tests/kinglet/__init__.py	original	-	-	-	original	kinglet-test-package-marker
+tests/kinglet/test_identity.py	original	-	-	-	original	kinglet-product-identity-tests
+tests/test-kinglet-build.sh	original	-	-	-	original	kinglet-python-test-runner
