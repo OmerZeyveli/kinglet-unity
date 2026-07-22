@@ -268,6 +268,31 @@ instructions, and composes only the required roles, knowledge, rules, and MCP ca
 workflows remain materially plausible, the router asks one focused clarification instead of loading
 both full workflows.
 
+The generated end-user `CLAUDE.md` and `AGENTS.md` blocks contain one short binding instruction:
+every Unity project task must pass through the Kinglet router before a workflow is selected or a
+Unity mutation begins. This instruction is always loaded, so discovery does not depend on all 36
+workflow descriptions fitting in initial context. An explicit `/unity-*` or `$kinglet-unity:*`
+selector skips classification but still records the same structured workflow selection.
+
+### Structured workflow selection
+
+Before loading a full workflow, the router writes
+`.kinglet/state/workflow-selection.json` with:
+
+- schema version, current client, and current session ID;
+- selected canonical workflow ID;
+- selection source: `natural-language`, `claude-command`, or `codex-skill-mention`;
+- `high`, `medium`, or `low` confidence;
+- a concise reason and `needs_clarification` boolean;
+- selection time and a SHA-256 digest of the routed request, not the raw request text.
+
+A selection is valid only for the current client session, must reference a catalog workflow, and
+must have `needs_clarification: false`. Natural-language selection proceeds immediately only at high
+confidence. Medium or low confidence, multiple plausible workflows, or a matched negative boundary
+requires one focused clarification. A new routed request replaces the previous selection; workflow
+completion clears it. A valid explicit selector records high confidence and
+`needs_clarification: false` without reclassifying the request.
+
 ### Claude invocation
 
 The Claude adapter renders the common router into the generated project guidance. Natural-language
@@ -298,6 +323,11 @@ Every workflow provides positive examples, near-miss negative examples, and boun
 Routing evaluations cover direct requests, colloquial requests, ambiguous requests, and requests
 that must not trigger Kinglet. Release smoke scenarios begin with natural language; explicit Claude
 and Codex selectors are tested as deterministic fallbacks.
+
+The pinned release evaluation set requires at least 95% exact primary-workflow selection overall.
+Every safety-critical or mutating prompt must either select the expected workflow or ask for
+clarification, and no negative-control prompt may enter a mutating workflow. A wrong mutating route
+is a release blocker even when the aggregate score remains above 95%.
 
 ## Unity MCP Architecture
 
@@ -375,6 +405,14 @@ event, tool, path, command, cwd, client, session, workflow
 A single ordered dispatcher evaluates policies and returns `allow`, `warn`, or `block` plus a stable
 policy ID and explanation. Native adapters translate that decision into the client’s expected hook
 response.
+
+The first mutation policy is `require-workflow-selection`. It applies to native Unity MCP mutation
+tools and filesystem writes under `Assets/`, `Packages/`, or `ProjectSettings/`. The policy requires
+a valid current-session workflow selection and confirms that the selected workflow declares
+`filesystem.write` or `unity.write` for the attempted operation. Missing, stale, clarifying,
+read-only, or capability-incompatible selections are blocked with an instruction to invoke the
+Kinglet router. Read-only MCP calls and ordinary explanation or documentation responses do not
+require a selection.
 
 Policy ordering is explicit. Blocking safety policies run before advisory policies, and hooks do not
 race in parallel. The same normalized fixture suite is sent through both native normalizers and must
@@ -516,6 +554,10 @@ positive examples, negative boundaries, and clarification rules. Model-level smo
 the same natural-language prompt set on both clients and record the selected workflow before any
 implementation action.
 
+Hook fixtures cover missing, malformed, cross-session, clarification-pending, read-only, and
+capability-incompatible workflow selections. Both clients must block the same invalid mutation and
+allow the same valid selected workflow.
+
 The first migration baseline includes the current inventory: 28 agents, 36 commands, 39 skills, 26
 executable hooks excluding `_lib.sh`, 6 rules, and 5 Markdown templates. Counts are not permanent
 requirements; the catalog, rather than a hard-coded number, defines expected output.
@@ -532,6 +574,7 @@ Synthetic Unity fixtures cover:
 - interrupted staging;
 - rollback and client-selective uninstall;
 - MCP missing, wrong version, stopped bridge, and expired writer lease;
+- missing, stale, cross-session, and clarification-pending workflow selections;
 - Linux and macOS shell behavior.
 
 ### Live Unity release scenarios
@@ -565,6 +608,8 @@ A release is blocked when:
 - provenance fails;
 - a `supported` capability is missing from either client;
 - parity manifests differ on behavior, safety, MCP, evidence, or artifacts;
+- routing falls below the 95% overall threshold, misroutes a mutating prompt, or lets a negative
+  control enter a mutating workflow;
 - install, upgrade, rollback, or uninstall loses a user fixture;
 - the hook decision suite differs between clients;
 - a required live Unity scenario fails on either client.
@@ -581,9 +626,10 @@ The migration is divided into independently reviewable projects:
 2. **Rules, templates, and knowledge:** migrate the lowest-coupled content and produce both client
    outputs with parity.
 3. **Roles and workflows:** migrate all 28 roles and 36 workflows, add adapter tier/tool mappings,
-   and implement the hybrid `EditorSnapshot` capability model.
+   implement the shared router and structured workflow selection, and add the hybrid
+   `EditorSnapshot` capability model.
 4. **Hooks and Unity MCP orchestration:** add native normalizers, ordered policy dispatcher, pinned
-   bridge contract, verification evidence, and single-writer lease.
+   bridge contract, workflow-selection guard, verification evidence, and single-writer lease.
 5. **Packages and lifecycle:** switch installers to generated packages, add Codex marketplace/setup,
    receipt-v2 migration, pending updates, rollback, and selective uninstall.
 6. **Product and release:** rewrite user documentation for both clients, add doctor output,
@@ -607,6 +653,8 @@ The design is complete when implementation can demonstrate all of the following:
 - Both clients use the same pinned Unity MCP bridge and orchestration contract.
 - Design agents receive real project context without broad write access.
 - Only one agent or client can mutate Unity at a time.
+- No Unity mutation can begin without a valid current-session workflow selection whose declared
+  capabilities permit that operation.
 - Generated outputs rebuild byte-identically and CI rejects manual drift.
 - Dirty install, upgrade, rollback, and uninstall fixtures lose no user-authored bytes.
 - Live Unity release scenarios pass on both clients within the documented host matrix.
