@@ -37,6 +37,9 @@ Existing Claude command names such as `/unity-feature` remain stable. Canonical 
 brand-neutral, such as `workflow.unity-feature`, so a future product rename does not invalidate
 cross-references or receipts.
 
+Natural language is the primary user interface on both clients. Slash commands and skill mentions
+are optional explicit-selection shortcuts, not required knowledge for normal use.
+
 During migration, installers recognize both the old
 `cloud-nine-unity:generated:{begin,end}` markers and the new
 `kinglet-unity:generated:{begin,end}` markers. A successful managed-block update rewrites the old
@@ -54,6 +57,8 @@ provenance is preserved rather than rewritten as if Kinglet had always been the 
 5. Prevent generated-output drift and silent platform omissions in CI.
 6. Preserve user-authored files and edits across install, upgrade, rollback, and uninstall.
 7. Use one pinned CoplayDev MCP for Unity bridge and one shared orchestration contract.
+8. Route ordinary natural-language Unity requests to the correct workflow without requiring users
+   to memorize `/` commands or `$` skill names.
 
 ## Non-Goals
 
@@ -94,6 +99,7 @@ the source for a later build and are not edited by hand.
 src/
   catalog/
     capabilities.json
+    routing.json
     support-policy.json
   roles/<slug>/
     role.json
@@ -139,6 +145,9 @@ IDs are namespaced by kind:
 Descriptors reference these IDs rather than paths. Paths may be reorganized without changing the
 public identity. Duplicate IDs, unresolved references, reference cycles where cycles are forbidden,
 and two units claiming the same generated path are fatal build errors.
+
+`src/catalog/routing.json` maps stable user intents to workflow IDs, positive trigger examples, and
+negative boundaries. It is client-neutral and generated into each client’s native router surface.
 
 ### Workflow descriptor
 
@@ -206,6 +215,7 @@ The Codex adapter produces two artifacts.
 The installable plugin at `plugins/kinglet-unity/` contains:
 
 - `.codex-plugin/plugin.json`;
+- an implicitly invocable Kinglet router skill with a compact generated workflow index;
 - namespaced workflow skills under `skills/`;
 - shared hook dispatcher assets under `hooks/`;
 - notices, version, and presentation assets.
@@ -242,6 +252,52 @@ it records:
 Parity compares these manifests, not unrelated native syntax. A `supported` workflow may not differ
 on stages, safety blocks, MCP discipline, evidence, or required artifacts. Presentation-only
 differences such as `/unity-feature` versus `$kinglet-unity:unity-feature` are allowed.
+
+## Invocation and Workflow Routing
+
+Users should normally describe the result they want:
+
+```text
+Add a short invulnerability flash after the player takes damage.
+Profile this scene and explain the largest frame-time cost.
+Review the save system for serialization hazards.
+```
+
+Kinglet classifies the request, selects the primary workflow, loads the workflow’s canonical
+instructions, and composes only the required roles, knowledge, rules, and MCP capabilities. When two
+workflows remain materially plausible, the router asks one focused clarification instead of loading
+both full workflows.
+
+### Claude invocation
+
+The Claude adapter renders the common router into the generated project guidance. Natural-language
+requests therefore use the same routing catalog as Codex. Existing `/unity-*` commands remain as
+stable, explicit workflow selectors for backward compatibility and for users who prefer them.
+
+### Codex invocation
+
+The Codex plugin renders one concise, implicitly invocable Kinglet router skill plus the individual
+workflow skills. The router’s description covers Unity project work broadly enough to be discovered,
+while its generated workflow index holds the detailed intent boundaries outside initial context.
+Individual skill descriptions stay short and discriminative so Codex can also select them directly.
+
+Codex users have three supported entry paths:
+
+1. Natural language, which is the default and invokes Kinglet implicitly.
+2. `/skills`, which opens Codex’s native skill selector.
+3. `$kinglet-unity:<skill-name>`, which explicitly selects a workflow for repeatability or
+   troubleshooting.
+
+Kinglet does not create `/unity-*` aliases through Codex custom prompts. Codex custom prompts are
+deprecated, local to a user’s Codex home, explicitly invoked, and not the plugin distribution model.
+The dollar-prefixed form is a skill mention, not a separate command architecture.
+
+### Routing quality
+
+Every workflow provides positive examples, near-miss negative examples, and boundary language.
+Routing evaluations cover direct requests, colloquial requests, ambiguous requests, and requests
+that must not trigger Kinglet. Release smoke scenarios begin with natural language; explicit Claude
+and Codex selectors are tested as deterministic fallbacks.
 
 ## Unity MCP Architecture
 
@@ -455,6 +511,11 @@ Golden fixtures protect intended native output. Normalized manifests prove that 
 workflow has equivalent stages, capabilities, safety policies, MCP discipline, verification
 evidence, and artifacts on Claude and Codex.
 
+Routing fixtures validate that both generated routers expose the same intent-to-workflow mapping,
+positive examples, negative boundaries, and clarification rules. Model-level smoke evaluations use
+the same natural-language prompt set on both clients and record the selected workflow before any
+implementation action.
+
 The first migration baseline includes the current inventory: 28 agents, 36 commands, 39 skills, 26
 executable hooks excluding `_lib.sh`, 6 rules, and 5 Markdown templates. Counts are not permanent
 requirements; the catalog, rather than a hard-coded number, defines expected output.
@@ -483,6 +544,9 @@ Before release, the same seeded Unity 6 project runs representative scenarios in
 4. design workflow using `EditorSnapshot`;
 5. destructive-action block;
 6. post-write scene, console, test, and screenshot verification.
+
+Each scenario begins with a natural-language request. A second small pass verifies the equivalent
+explicit `/unity-*` Claude selector and `$kinglet-unity:*` Codex skill mention.
 
 The clients need not produce identical prose or code. Both must satisfy the same observable contract:
 required stages occurred, scope and safety boundaries held, Unity tests passed, console evidence is
@@ -546,5 +610,7 @@ The design is complete when implementation can demonstrate all of the following:
 - Generated outputs rebuild byte-identically and CI rejects manual drift.
 - Dirty install, upgrade, rollback, and uninstall fixtures lose no user-authored bytes.
 - Live Unity release scenarios pass on both clients within the documented host matrix.
+- The natural-language routing suite selects the same primary workflow on both clients, and users
+  can complete supported tasks without knowing a slash command or skill name.
 - Documentation calls the product Kinglet for Unity, uses `kinglet-unity` technical identifiers,
   preserves upstream credit, and makes unsupported surfaces explicit.
