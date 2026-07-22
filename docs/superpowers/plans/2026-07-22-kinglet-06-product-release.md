@@ -18,6 +18,9 @@
 - Compare required stages, safety, project outcome, console/tests, scene readback, screenshots, user-file preservation, and evidence. Do not require identical prose, diff, role count, or implementation style.
 - Routing must score at least 95% overall; every mutating/safety-critical case must be correct or clarify; any wrong mutating route blocks release.
 - Every supported workflow/capability must have equivalent Claude and Codex behavior. Exceptions require visible reason, owner, and named passing test.
+- The mandatory release and brownfield matrices use the `standard` agent profile. The user's main-session model remains user-selected and is recorded, never changed by Kinglet.
+- `frontier` remains explicit opt-in and ships only after live Fable and native Sol-Pro qualification. Access failure or missing Codex Pro binding must be visible; silent fallback and prompt-based Pro emulation block release.
+- A Luna `low` experiment is limited to `unity-linter`; `unity-scout` and the shipping standard profile remain Luna `medium` unless the linter trial proves identical quality/evidence and better efficiency, followed by complete profile regeneration and reruns.
 - The only supported first-release hosts are Linux and macOS. Windows must be visibly `unsupported`, never absent.
 - Product-facing text uses `Kinglet`, `Kinglet for Unity`, `kinglet-unity`, and `Multi-agent toolkit for Unity 6`. Historical attribution keeps prior names where truthful.
 - Include Unity trademark attribution and state that Kinglet is not affiliated with Unity Technologies.
@@ -56,6 +59,7 @@ tests/pilot/**                                  Harness fixtures and unit tests
 docs/releases/3.0.0-brownfield-report.md        Reviewed real-project results
 docs/releases/3.0.0-routing-report.md           Live client routing results
 docs/releases/3.0.0-unity-parity-report.md      Live Unity results
+docs/releases/3.0.0-agent-profile-report.md      Standard/frontier and Luna evaluation
 docs/releases/3.0.0-release-checklist.md        Signed release evidence index
 scripts/build-release.sh                       Reproducible archive/checksum builder
 .github/workflows/release.yml                   Tag artifact verification
@@ -100,6 +104,7 @@ README leads with outcomes and natural-language examples for both clients. It sh
 - pinned MCP registration as a visible user step;
 - Linux/macOS support and Windows unsupported status;
 - user-ownership upgrade behavior and doctor command.
+- standard/default and optional frontier profile behavior without changing the main session.
 
 Architecture and contributor docs point to `src/` as the only human-authored shared source and `packages/`/`plugins/` as generated output. Remove instructions to edit root `.claude/`.
 
@@ -140,11 +145,11 @@ native_paths named_tests exception
 
 `supported` rows must match on every behavioral field; only `native_paths` may differ. `exception` must have reason, owner, named test, and reduced behavior visible in the Markdown matrix. `unsupported` must exist for both clients when relevant and must show why.
 
-Fail a missing row, silent field omission, stale native path, unmatched canonical ID, client model name under `src/`, moving dependency ref, Windows absence, or `supported` behavior mismatch.
+Fail a missing row, silent field omission, stale native path, unmatched canonical ID, client model name under `src/`, moving dependency ref, Windows absence, or `supported` behavior mismatch. Also fail a default other than standard, a global/main-session model setting, a frontier deep-role mapping without its native capability prerequisite, or any declared fallback from frontier.
 
 - [ ] **Step 2: Render machine and human reports from the same data**
 
-The capability matrix groups by public workflow and shows Claude selector, Codex skill, natural-language examples, roles, read/write status, MCP needs, verification evidence, and support. The support matrix covers `(client × linux|macos|windows)` plus MCP v10.1.0. Markdown is rendered from sorted JSON, not hand-maintained.
+The capability matrix groups by public workflow and shows Claude selector, Codex skill, natural-language examples, roles, read/write status, MCP needs, verification evidence, agent profile, and support. A separate generated model-profile section shows the exact standard mappings, frontier deep-role mappings, access prerequisites, and explicit no-fallback behavior; native model differences are presentation/configuration data, not behavioral parity failures. The support matrix covers `(client × linux|macos|windows)` plus MCP v10.1.0 and frontier prerequisites. Markdown is rendered from sorted JSON, not hand-maintained.
 
 - [ ] **Step 3: Build and verify**
 
@@ -184,6 +189,7 @@ legacy shell suite
 hook normalization/decision/selection/lease tests
 MCP lock/snapshot/evidence tests
 install/legacy-upgrade/rollback/uninstall/doctor tests
+agent-profile defaults/overlays/capability-probe/no-fallback tests
 brand and artifact tests
 ```
 
@@ -211,7 +217,7 @@ git commit -m "test: gate Kinglet on Linux and macOS"
 
 - [ ] **Step 1: Record the environment before prompts**
 
-Record OS, Claude Code version, Codex version, native model/profile selection, Kinglet commit/version, plugin/package manifest digests, and date. Use current supported releases; if either client changed a native manifest/hook schema since implementation, stop and update the adapter plus synthetic fixtures first.
+Record OS, Claude Code version, Codex version, Kinglet agent profile, user-selected main-session model, each delegated role's requested model/effort/mode and resolved model when exposed, Kinglet commit/version, plugin/package manifest digests, and date. Run this mandatory corpus with `standard`. Use current supported releases; if either client changed a native manifest/hook/model schema since implementation, stop and update the adapter plus synthetic fixtures first.
 
 - [ ] **Step 2: Run identical isolated prompt sessions**
 
@@ -231,7 +237,7 @@ Required results:
 - zero wrong mutating routes;
 - explicit selectors record correct workflow/source/confidence.
 
-Flaky retries are not averaged away. A changed prompt, router, client, or model invalidates the prior result set.
+Flaky retries are not averaged away. A changed prompt, router, client, main-session model, agent profile, delegated model mapping, or model capability invalidates the prior result set.
 
 - [ ] **Step 4: Write and commit the reviewed report**
 
@@ -250,7 +256,11 @@ git commit -m "test: verify Kinglet live routing parity"
 - Create: `tests/evals/live-unity/scenarios.json`
 - Create: `tests/evals/live-unity/evaluate.py`
 - Create: `tests/kinglet/test_live_unity_evaluator.py`
+- Create: `tests/evals/model-profiles/cases.json`
+- Create: `tests/evals/model-profiles/evaluate.py`
+- Create: `tests/kinglet/test_model_profile_evaluator.py`
 - Create: `docs/releases/3.0.0-unity-parity-report.md`
+- Create: `docs/releases/3.0.0-agent-profile-report.md`
 - Modify: `provenance.tsv`
 
 - [ ] **Step 1: Define six resettable scenarios**
@@ -272,16 +282,32 @@ The evaluator rejects missing stages/evidence, stale snapshot, missing/expired/m
 
 - [ ] **Step 3: Execute Claude and Codex from identical resets**
 
-For each scenario, clone/reset the seed, install one client, confirm MCP v10.1.0, capture baseline, begin with natural language, then collect structured events/diff/tests/console/scene/screenshot/evidence. Run the explicit-selector smoke pass only after natural-language scenarios.
+For each scenario, clone/reset the seed, install one client with `--agent-profile standard`, confirm MCP v10.1.0, capture baseline, begin with natural language, then collect structured events/diff/tests/console/scene/screenshot/evidence. Record main-session and delegated model/profile metadata. Run the explicit-selector smoke pass only after natural-language scenarios.
 
 - [ ] **Step 4: Evaluate and report**
 
 Both clients must pass every scenario. Equivalent outcome is based on the oracle, not identical implementation. The report includes version/digests, duration/tool-call counts as non-blocking efficiency data, result table, behavioral diffs, failures, and reviewer sign-off.
 
+- [ ] **Step 5: Qualify frontier without weakening the standard gate**
+
+Create three resettable deep-role cases: architecture/design with a reviewed artifact oracle, scoped implementation with compile/test/scene oracles, and critical verification with seeded defects plus evidence oracles. Before running cases, prove Claude Fable access and Codex Sol plus native Pro binding through the same machine-readable probes used by setup; record requested/resolved model, effort, Pro binding, adapter digest, and profile-state digest. A result where Codex reports Sol/`max` but not Pro is a hard failure.
+
+Run the identical three cases on Claude frontier and Codex frontier from equal resets. Both clients must satisfy every behavioral/evidence oracle. The evaluator rejects standard fallback, missing/unknown model metadata required by the capability probe, non-deep overlay activation, main-session mutation, or different baseline. If a qualified environment is unavailable, do not label frontier supported or include its overlay in the release candidate; changing that scope requires a reviewed spec update rather than an exception hidden in the matrix.
+
+- [ ] **Step 6: Evaluate Luna low for linter only**
+
+Use a fixed corpus of clean files and seeded diagnostics with exact expected findings, locations, severity, evidence fields, false-positive ceiling of zero, and deterministic stop conditions. Run `unity-linter` with Luna `medium` and candidate Luna `low` in isolated repeated sessions; keep `unity-scout` unchanged. Low is eligible only if every run has identical required findings/evidence and no new false positive or retry, while median latency or billed reasoning usage improves. Otherwise retain medium without averaging quality failures into an efficiency score.
+
+If low qualifies, update the Codex adapter, generated packages, model-profile docs/tests, and the approved design mapping in one reviewed commit, then rerun the synthetic release gate, live routing corpus, all six standard Unity scenarios, and this comparison before accepting the change. The agent-profile report records either `retained-medium` or the complete qualifying evidence.
+
+- [ ] **Step 7: Verify and commit**
+
 ```bash
 python3 -m unittest tests.kinglet.test_live_unity_evaluator -v
+python3 -m unittest tests.kinglet.test_model_profile_evaluator -v
 python3 tests/evals/live-unity/evaluate.py tests/evals/live-unity/results/claude.json tests/evals/live-unity/results/codex.json
-git add tests/evals/live-unity tests/kinglet docs/releases/3.0.0-unity-parity-report.md provenance.tsv
+python3 tests/evals/model-profiles/evaluate.py tests/evals/model-profiles/results/claude-frontier.json tests/evals/model-profiles/results/codex-frontier.json tests/evals/model-profiles/results/luna-linter.json
+git add tests/evals/live-unity tests/evals/model-profiles tests/kinglet docs/releases/3.0.0-unity-parity-report.md docs/releases/3.0.0-agent-profile-report.md provenance.tsv
 git commit -m "test: verify Kinglet live Unity parity"
 ```
 
@@ -313,7 +339,7 @@ The harness may read a dirty source repository but clones only the explicitly su
 --source ABSOLUTE_GIT_PATH --commit FULL_40_HEX_SHA --work-root EMPTY_ABSOLUTE_PATH --kinglet-archive ABSOLUTE_TAR_PATH
 ```
 
-It creates `baseline`, `claude`, and `codex` clones using local Git clone without hardlinks, checks out the detached full commit, verifies identical tracked-tree hashes, then installs Kinglet Claude and Codex separately. It writes a harness manifest with source device/inode, commit, tree SHA, Kinglet archive SHA, Unity version, package lock digest, and clone hashes. It never runs `git clean`, `reset`, `checkout`, or Unity in the source path.
+It creates `baseline`, `claude`, and `codex` clones using local Git clone without hardlinks, checks out the detached full commit, verifies identical tracked-tree hashes, then installs Kinglet Claude and Codex separately with explicit `--agent-profile standard`. It writes a harness manifest with source device/inode, commit, tree SHA, Kinglet archive SHA, agent profile/state digest, Unity version, package lock digest, and clone hashes. It never runs `git clean`, `reset`, `checkout`, or Unity in the source path.
 
 - [ ] **Step 3: Capture the pre-agent project contract**
 
@@ -332,7 +358,7 @@ It writes JSON only beneath the work root and verifies source remains unchanged 
 
 - [ ] **Step 4: Implement safe scenario reset**
 
-`reset-clone.sh` operates only on a clone whose harness manifest path/inode/commit match. It terminates only the Unity process whose project path equals that clone, removes recorded generated Unity caches inside the clone, restores the clone from the baseline clone, reinstalls the selected Kinglet package, and revalidates tree/package/user-file hashes. Refuse unresolved paths or an active Kinglet writer lease.
+`reset-clone.sh` operates only on a clone whose harness manifest path/inode/commit match. It terminates only the Unity process whose project path equals that clone, removes recorded generated Unity caches inside the clone, restores the clone from the baseline clone, reinstalls the selected Kinglet package with standard, and revalidates tree/package/profile-state/user-file hashes. Refuse unresolved paths or an active Kinglet writer lease.
 
 - [ ] **Step 5: Test observable-outcome comparison**
 
@@ -443,7 +469,7 @@ The full archive includes installer/uninstaller, generated products, marketplace
 
 - [ ] **Step 2: Complete the signed checklist before version promotion**
 
-The checklist records commit hashes or CI run IDs for generated check, provenance, Linux/macOS release gates, routing report, seeded Unity report, brownfield report, MCP lock, package/plugin schema, install/upgrade/uninstall matrix, artifact reproducibility, trademark/license review, and reviewer names/dates. Every row must be `pass`; no waived release blocker exists.
+The checklist records commit hashes or CI run IDs for generated check, provenance, Linux/macOS release gates, routing report, seeded Unity report, agent-profile/frontier/Luna report, brownfield report, MCP lock, package/plugin schema, install/upgrade/uninstall matrix, artifact reproducibility, trademark/license review, and reviewer names/dates. Every row must be `pass`; no waived release blocker exists.
 
 - [ ] **Step 3: Promote the single version and rebuild**
 
@@ -491,7 +517,7 @@ After approval, rename the hosting repository to `kinglet-unity`, update local/C
 
 - [ ] **Step 4: Run post-publication smoke**
 
-Install Claude and Codex from the published artifacts into fresh disposable Unity projects, run doctor, connect the pinned bridge, issue one natural-language read-only request, and uninstall each client. Record publication smoke evidence in the release entry. If smoke fails, mark the release affected and publish corrective guidance; never rewrite the signed tag silently.
+Install Claude and Codex standard from the published artifacts into fresh disposable Unity projects, run doctor, connect the pinned bridge, issue one natural-language read-only request, and uninstall each client. On the previously qualified environment, also install frontier for each client, verify doctor reports Fable and native Sol Pro with no fallback, run one deep-role smoke, and uninstall. Record publication smoke evidence in the release entry. If smoke fails, mark the release affected and publish corrective guidance; never rewrite the signed tag silently.
 
 ## Plan 06 Completion Gate
 
@@ -502,6 +528,7 @@ Kinglet for Unity 3.0.0 is complete only when:
 - synthetic release gates pass on Linux and macOS;
 - live natural-language routing meets all aggregate and hard mutation thresholds;
 - all six seeded Unity scenarios pass independently on Claude and Codex;
+- standard is the fresh default, frontier passes capability and live deep-role qualification on both clients without fallback, and the Luna linter decision is evidence-backed;
 - every release-critical brownfield case passes on disposable same-commit clones and the original project is unchanged;
 - install/upgrade/rollback/uninstall preserve all user-ownership fixtures;
 - final archives rebuild byte-identically and checksums verify;

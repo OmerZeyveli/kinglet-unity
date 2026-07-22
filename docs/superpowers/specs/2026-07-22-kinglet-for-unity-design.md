@@ -183,9 +183,40 @@ Verification requirements are declared separately as evidence such as `console-c
 `unity-tests-pass`, `scene-state-readback`, `screenshot-reviewed`, and `references-valid`. This
 prevents a role’s broad tool permission from being mistaken for proof that verification happened.
 
-Canonical reasoning tiers are `fast`, `balanced`, and `deep`. Adapter profiles map tiers to native
-client configuration. Current model names live only in the adapter profile and may be updated
-without editing canonical roles.
+Canonical reasoning tiers are `fast`, `balanced`, and `deep`. They describe the work a delegated
+role performs; they do not select or replace the user's main-session model. Kinglet never writes a
+project-wide or global Claude/Codex model default.
+
+The default `standard` agent profile maps tiers to native subagent configuration:
+
+| Tier | Intended roles | Claude | Codex |
+|---|---|---|---|
+| `fast` | `unity-scout`, `unity-linter` | `haiku` | `gpt-5.6-luna`, effort `medium` |
+| `balanced` | lite, test, review, and everyday implementation roles | `sonnet` | `gpt-5.6-terra`, effort `medium` |
+| `deep` | architecture, full implementation, and critical verification roles | `opus` | `gpt-5.6-sol`, effort `high` |
+
+Claude aliases are intentional: the client resolves them to the currently supported model for the
+user's provider. Doctor reports the resolved model when the native client exposes it. Codex model
+IDs and reasoning effort are explicit. Price class and reasoning effort are separate choices, so
+Luna starts at `medium`; a release evaluation may trial `low` for `unity-linter` only and may adopt
+it only when quality and evidence are unchanged and efficiency improves.
+
+`frontier` is an optional install-time agent profile, not a fourth canonical reasoning tier and
+never a fresh-install default. It leaves `fast` and `balanced` unchanged and remaps `deep` roles:
+
+| Tier | Claude | Codex |
+|---|---|---|
+| `deep` | `fable` | `gpt-5.6-sol`, effort `max`, native Pro mode |
+
+Frontier activation is fail-closed. Claude requires visible Fable access. Codex requires both Sol
+and a native, inspectable Pro-mode binding for custom subagents; `max` effort alone is not Pro.
+Prompt wording such as “think harder” is never treated as a Pro-mode implementation. If the
+installed client cannot prove the required capability, setup refuses `frontier` with an exact
+diagnostic and does not install a degraded profile. `--client all` requires both checks before any
+write, so it cannot leave a half-frontier dual installation.
+
+Current model names, efforts, and capability probes live only in adapter profiles and generated
+profile overlays. Canonical roles remain stable when a native model generation changes.
 
 ## Adapters and Generated Products
 
@@ -197,6 +228,7 @@ other client’s generated files.
 The Claude adapter produces:
 
 - `.claude/agents/*.md` with native frontmatter, model tier mapping, and allowed tools;
+- an optional `profiles/frontier/.claude/agents/*.md` overlay for `deep` roles only;
 - `.claude/commands/*.md` with existing `/unity-*` public names;
 - `.claude/skills/**/SKILL.md`;
 - `.claude/rules/*.md`;
@@ -224,6 +256,7 @@ The project bootstrap at `packages/codex-project/` contains:
 
 - a managed root `AGENTS.md` block for binding project rules;
 - `.codex/agents/kinglet-*.toml` custom roles;
+- an optional `profiles/frontier/.codex/agents/kinglet-*.toml` overlay for `deep` roles only;
 - bootstrap and doctor scripts;
 - project-local ignore entries and receipt metadata.
 
@@ -480,11 +513,24 @@ Source and release-archive users may also bootstrap explicitly:
 ```bash
 ./install.sh --project-dir /path/to/UnityProject --client codex
 ./install.sh --project-dir /path/to/UnityProject --client all
+./install.sh --project-dir /path/to/UnityProject --client all --agent-profile frontier
 ```
+
+Fresh and legacy installs use `--agent-profile standard` when the option is omitted. An installed
+frontier project preserves that explicit choice across an upgrade only after its capabilities are
+revalidated; switching profiles requires an explicit `--agent-profile standard|frontier`. Codex
+plugin setup exposes the same option and behavior. A project has one Kinglet agent profile across
+all installed clients; adding a client with another profile or switching only one side is rejected
+with an instruction to update all installed clients together. The selected profile, clients, resolved native
+models when available, and capability-probe results are written transactionally to
+`.kinglet/state/agent-profile.json`; receipt-v2 continues to own installed files and does not gain a
+profile-specific column.
 
 The Codex bootstrap does not silently modify global `~/.codex/config.toml`. Plugin installation,
 plugin hook trust, and Unity MCP client registration remain visible user actions. The doctor reports
-each missing action with the exact recovery instruction.
+each missing action with the exact recovery instruction. Doctor also verifies that installed agent
+files match the recorded profile and reports `frontier-unavailable` rather than silently selecting
+standard models.
 
 ### Client-neutral receipt
 
@@ -541,7 +587,10 @@ invalid support exceptions, path traversal, invalid UTF-8, and malformed provena
 
 These cover duplicate IDs, unresolved references, forbidden cycles, output collisions, capability
 mapping, reasoning-tier mapping, stable ordering, line endings, deterministic rebuilds, and
-client-native manifest validity.
+client-native manifest validity. Model-profile fixtures additionally prove the exact standard
+mapping, `standard` as the only fresh default, frontier overlays for `deep` roles only, no global or
+main-session model mutation, and fail-closed Fable/Sol-Pro capability checks. A fixture where Sol
+supports `max` but not native Pro must fail frontier activation.
 
 ### Golden and parity tests
 
@@ -591,6 +640,12 @@ Before release, the same seeded Unity 6 project runs representative scenarios in
 Each scenario begins with a natural-language request. A second small pass verifies the equivalent
 explicit `/unity-*` Claude selector and `$kinglet-unity:*` Codex skill mention.
 
+The mandatory parity matrix uses the `standard` profile and records the main-session choice plus
+every delegated role's requested and resolved model/effort. Frontier is qualified in a separate
+smaller live matrix only on an environment where Claude Fable access and Codex native Sol Pro can
+both be proven. Kinglet does not publish the frontier overlay as supported until that matrix passes
+for both clients; inability to obtain either capability never causes a silent standard fallback.
+
 The clients need not produce identical prose or code. Both must satisfy the same observable contract:
 required stages occurred, scope and safety boundaries held, Unity tests passed, console evidence is
 clean, scene state was read back, required screenshots were reviewed, and the final report lists
@@ -611,6 +666,10 @@ A release is blocked when:
 - routing falls below the 95% overall threshold, misroutes a mutating prompt, or lets a negative
   control enter a mutating workflow;
 - install, upgrade, rollback, or uninstall loses a user fixture;
+- standard is not the fresh default, an install changes the user's main-session model, or a
+  requested frontier profile degrades/falls back silently;
+- a shipped frontier overlay lacks a passing capability probe and live qualification for both
+  clients;
 - the hook decision suite differs between clients;
 - a required live Unity scenario fails on either client.
 

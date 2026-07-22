@@ -20,6 +20,8 @@
 - Workflow completion clears selection. An abandoned selection may not authorize the next user request.
 - Release routing threshold is at least 95% overall. Every safety-critical or mutating prompt must select the expected workflow or clarify. Any wrong mutating route blocks release.
 - Canonical roles use `fast`, `balanced`, or `deep`; native model identifiers remain only in adapter profiles.
+- Role rendering defaults to the `standard` agent profile. `frontier` changes only `deep` native role files and is never selected by routing or by the user's main-session model.
+- Generated guidance must not set, recommend switching, or claim ownership of the Claude/Codex main-session model.
 - Every new tracked file receives one `provenance.tsv` row in its task commit.
 
 ## Dependency and File Map
@@ -36,11 +38,13 @@ src/workflows/<slug>/{workflow.json,instructions.md}    36 workflow units
 src/catalog/routing.json                                36 route contracts
 src/templates/workflow-selection/**                     Selection-state JSON schema/template
 packages/claude/.claude/agents/**                       Generated Claude agents
+packages/claude/profiles/frontier/.claude/agents/**     Generated deep-role overlay
 packages/claude/.claude/commands/**                     Generated slash commands
 packages/claude/.claude/skills/kinglet-router/**         Generated Claude router skill
 plugins/kinglet-unity/skills/kinglet-router/**           Generated Codex router skill
 plugins/kinglet-unity/skills/<workflow-slug>/**          Generated Codex workflows
 packages/codex-project/.codex/agents/kinglet-*.toml      Generated Codex agents
+packages/codex-project/profiles/frontier/.codex/agents/** Generated deep-role overlay
 packages/{claude,codex-project}/**/project-guidance     Always-loaded routing contract
 .claude/{agents,commands}                                Temporary compatibility mirror
 tests/kinglet/test_role_workflow_inventory.py            Exact inventory tests
@@ -142,7 +146,13 @@ python3 -m tools.kinglet_build.import_legacy --kind role
 python3 -m tools.kinglet_build validate
 ```
 
-Use `fast` for the legacy scout/linter/lite intent, `deep` for architecture/critical-review intent, and `balanced` for implementation/default intent. When legacy frontmatter and body disagree, preserve the safer capability set and record the normalization in `migration/role-normalizations.json` with role ID, old hash, changed field, and reason.
+Preserve the reviewed legacy tier intent exactly:
+
+- `fast`: `unity-linter`, `unity-scout`;
+- `balanced`: `level-designer`, `systems-designer`, `unity-build-runner`, `unity-coder-lite`, `unity-fixer-lite`, `unity-git-master`, `unity-migrator`, `unity-reviewer`, `unity-security-reviewer`, `unity-test-runner`, `world-builder`, `writer`;
+- `deep`: `creative-director`, `game-designer`, `narrative-director`, `technical-director`, `unity-coder`, `unity-critic`, `unity-fixer`, `unity-network-dev`, `unity-optimizer`, `unity-prototyper`, `unity-scene-builder`, `unity-shader-dev`, `unity-ui-builder`, `unity-verifier`.
+
+Lite roles are therefore `balanced`, not `fast`. When legacy frontmatter and body disagree, preserve the safer capability set and record the normalization in `migration/role-normalizations.json` with role ID, old hash, changed field, and reason.
 
 - [ ] **Step 3: Define delegation-safe instructions**
 
@@ -219,18 +229,22 @@ git commit -m "feat: migrate Kinglet workflow contracts"
 - Create: `tools/kinglet_build/renderers/codex_roles.py`
 - Create: `tests/kinglet/test_role_renderers.py`
 - Generate: `packages/claude/.claude/agents/*.md`
+- Generate: `packages/claude/profiles/frontier/.claude/agents/*.md`
 - Generate: `packages/codex-project/.codex/agents/kinglet-*.toml`
+- Generate: `packages/codex-project/profiles/frontier/.codex/agents/kinglet-*.toml`
 - Regenerate: `.claude/agents/*.md`
 - Modify: `tools/kinglet_build/renderers/__init__.py`
 - Modify: `provenance.tsv`
 
 - [ ] **Step 1: Test Claude role compatibility**
 
-Assert exact 28-path coverage, public names/descriptions, allowed-tool equivalence through the Claude profile, reasoning-tier mapping, body safety sections, and no loss of legacy operational content. `.claude/agents` becomes a complete category-owned compatibility target.
+Assert exact 28-path standard coverage, public names/descriptions, allowed-tool equivalence through the Claude profile, the 2/12/14 tier partition above, body safety sections, and no loss of legacy operational content. Standard frontmatter resolves `fast|balanced|deep` to `haiku|sonnet|opus`. The frontier overlay contains exactly the 14 `deep` agents with `model: fable`; it contains no fast/balanced file. `.claude/agents` becomes a complete category-owned compatibility target and remains standard.
 
 - [ ] **Step 2: Test valid Codex custom-agent TOML**
 
-Parse all 28 files with `tomllib`. Assert each file has a generated name, canonical source ID, description, model from the Codex profile, native sandbox policy consistent with capabilities, and instructions preserving scope/evidence/stop conditions. Read-only roles must not get a write-enabled sandbox.
+Parse all 28 standard files with `tomllib`. Assert each file has a generated name, canonical source ID, description, exact model/effort from the Codex standard profile (`Luna/medium`, `Terra/medium`, or `Sol/high`), native sandbox policy consistent with capabilities, and instructions preserving scope/evidence/stop conditions. Read-only roles must not get a write-enabled sandbox.
+
+The frontier overlay contains exactly the 14 `deep` TOML files, each with `model = "gpt-5.6-sol"` and `model_reasoning_effort = "max"`, plus a generated manifest requirement for native `reasoning.mode.pro`. The renderer emits a Pro binding only when it is a validated native field or documented inheritance mode from the Codex adapter; it never invents a TOML key or substitutes prompt prose. A synthetic adapter fixture without a valid Pro binding must still render standard but must mark frontier non-activatable for Plan 05.
 
 - [ ] **Step 3: Implement both renderers and verify twice**
 
@@ -240,7 +254,7 @@ python3 -m tools.kinglet_build build --all --check
 python3 -m unittest tests.kinglet.test_role_renderers -v
 ```
 
-Expected: both clients expose 28 roles; no canonical model name leaks; check mode is clean.
+Expected: both clients expose 28 standard roles and 14 frontier deep-role overlays; no native model name leaks into canonical role source; no generated file sets a main-session model; check mode is clean.
 
 - [ ] **Step 4: Commit**
 

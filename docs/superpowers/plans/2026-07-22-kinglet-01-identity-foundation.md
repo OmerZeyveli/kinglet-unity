@@ -352,27 +352,33 @@ git commit -m "feat: validate Kinglet canonical graph"
 
 - [ ] **Step 1: Test complete and client-native mappings**
 
-Tests must require both profiles to map all seven logical capabilities and all three reasoning tiers. Assert these initial tier mappings:
+Tests must require both client adapters to map all seven logical capabilities and all three reasoning tiers. Each adapter has `default_agent_profile: standard` plus `standard` and `frontier` profile definitions. Assert the exact standard mapping:
 
 | Tier | Claude profile | Codex profile |
 |---|---|---|
-| `fast` | `haiku` | `gpt-5.3-codex`, reasoning effort `low` |
-| `balanced` | `sonnet` | `gpt-5.3-codex`, reasoning effort `medium` |
-| `deep` | `opus` | `gpt-5.3-codex`, reasoning effort `high` |
+| `fast` | `haiku` | `gpt-5.6-luna`, reasoning effort `medium` |
+| `balanced` | `sonnet` | `gpt-5.6-terra`, reasoning effort `medium` |
+| `deep` | `opus` | `gpt-5.6-sol`, reasoning effort `high` |
 
-Model names and Codex reasoning effort live only in profiles. Canonical content tests must fail if `haiku`, `sonnet`, `opus`, or `gpt-5.3-codex` occurs under `src/`. The Codex mapping uses the current supported coding model for every tier and varies supported reasoning effort, so role quality does not silently fall back to deprecated model families.
+`frontier` is not a fourth canonical tier. It must equal `standard` for `fast` and `balanced`, map Claude `deep` to `fable`, and map Codex `deep` to `gpt-5.6-sol` with effort `max` plus required native capability `reasoning.mode.pro`. Test that `max` without the Pro capability is invalid and that no prompt-text field may claim or emulate Pro. Fable availability and Codex native Pro support are runtime prerequisites, not assumed adapter facts.
+
+Model names, Codex reasoning effort, and native capability requirements live only in profiles. Canonical content tests must fail if `haiku`, `sonnet`, `opus`, `fable`, or `gpt-5.6-` occurs under `src/`. Repository-wide active-source tests must also reject the deprecated `gpt-5.3-codex` mapping outside migration/history fixtures. Neither adapter may declare a main-session, project-wide, or global default model. Claude aliases remain aliases so the user's provider resolves the supported generation; Codex model IDs are explicit.
+
+The initial quality policy deliberately uses Luna `medium` for both fast roles. Store a non-shipping evaluation candidate for `unity-linter` at Luna `low`; do not change the standard mapping unless Plan 06 proves identical correctness/evidence with an efficiency improvement. `unity-scout` is not eligible for the initial low-effort trial.
 
 The Codex capability mapping uses logical action groups, not invented tool names: `filesystem.read`, `filesystem.write`, and `shell` map to the sandboxed command surface; `delegate` maps to agent delegation; `unity.read` and `unity.write` map to the pinned MCP surface; `web` maps to web access. The Claude profile maps the same logical set to its native allowed-tool patterns.
 
 - [ ] **Step 2: Implement `AdapterProfile` loading**
 
-Add immutable `AdapterProfile(client, reasoning_tiers, capabilities, output_roots)` and expose:
+Add immutable `AdapterProfile(client, default_agent_profile, agent_profiles, capabilities, output_roots)` and expose:
 
 ```python
 def load_adapter_profiles(repository_root: Path) -> Mapping[str, AdapterProfile]:
 ```
 
-Reject missing clients, extra clients, unknown capabilities, missing tiers, absolute output paths, `..` path components, and overlapping product output roots.
+Each `agent_profiles` entry maps the three canonical tiers to a native model configuration and optional hard capability requirements. Reject missing clients, extra clients, any default other than `standard`, unknown agent-profile names, missing/extra tiers, unknown capabilities, `frontier.fast` or `frontier.balanced` drift from standard, a Claude frontier without `fable`, a Codex frontier without Sol/`max`/native Pro, absolute output paths, `..` path components, and overlapping product output roots.
+
+The loader exposes no API that sets the active session model. Profile selection is an installer/renderer input added in Plans 03 and 05, never implicit process-global state.
 
 - [ ] **Step 3: Define the renderer boundary**
 
