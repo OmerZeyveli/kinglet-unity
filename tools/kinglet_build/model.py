@@ -1,7 +1,16 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
+
+
+@dataclass(frozen=True)
+class AdapterProfile:
+    client: str
+    default_agent_profile: str
+    agent_profiles: Mapping[str, Mapping[str, Mapping[str, object]]]
+    capabilities: Mapping[str, tuple[str, ...]]
+    output_roots: Mapping[str, PurePosixPath]
 
 
 @dataclass(frozen=True)
@@ -45,6 +54,7 @@ class CanonicalGraph:
 
 
 __all__ = [
+    "AdapterProfile",
     "CanonicalGraph",
     "CanonicalUnit",
     "Provenance",

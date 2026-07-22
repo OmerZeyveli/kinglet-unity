@@ -1,12 +1,19 @@
 import json
 import re
 from collections.abc import Mapping
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import Any, cast
 
 from .errors import BuildError
-from .model import CanonicalGraph, CanonicalUnit, Provenance, SupportDeclaration
+from .model import (
+    AdapterProfile,
+    CanonicalGraph,
+    CanonicalUnit,
+    Provenance,
+    SupportDeclaration,
+)
+from .validator import validate_adapter_profiles
 
 
 _COMMON_FIELDS = frozenset(
@@ -77,6 +84,26 @@ _SUPPORT_FIELDS = frozenset({"state", "reason", "owner", "test"})
 _SUPPORT_STATES = frozenset({"supported", "unsupported", "exception"})
 _PROVENANCE_FIELDS = frozenset(
     {"origin", "upstream_version", "upstream_path", "upstream_sha256"}
+)
+_ADAPTER_FIELDS = frozenset(
+    {
+        "schema_version",
+        "client",
+        "default_agent_profile",
+        "agent_profiles",
+        "capabilities",
+        "output_roots",
+        "metadata",
+    }
+)
+_AGENT_CONFIGURATION_FIELDS = frozenset(
+    {"model", "reasoning_effort", "requires_native_capabilities"}
+)
+_METADATA_FIELDS = frozenset(
+    {"frontier_deep_contract", "evaluation_candidates"}
+)
+_EVALUATION_CANDIDATE_FIELDS = frozenset(
+    {"role", "model", "reasoning_effort", "shipping", "adoption_gate"}
 )
 
 
@@ -425,6 +452,342 @@ def _load_routes(root: Path) -> tuple[Mapping[str, object], ...]:
     return tuple(cast(Mapping[str, object], _freeze(route)) for route in raw_routes)
 
 
+def _reject_unknown_fields(
+    data: Mapping[str, object],
+    allowed_fields: frozenset[str],
+    source: Path,
+    field_prefix: str = "",
+) -> None:
+    unknown_fields = sorted(set(data) - allowed_fields)
+    if not unknown_fields:
+        return
+    field = (
+        f"{field_prefix}.{unknown_fields[0]}"
+        if field_prefix
+        else unknown_fields[0]
+    )
+    raise _build_error(
+        "unknown-field",
+        source,
+        field,
+        "field is not allowed in an adapter profile",
+    )
+
+
+def _load_agent_configuration(
+    value: object,
+    source: Path,
+    field: str,
+) -> Mapping[str, object]:
+    if not isinstance(value, dict):
+        raise _build_error(
+            "invalid-agent-profile",
+            source,
+            field,
+            "native agent configuration must be an object",
+        )
+    configuration = cast(dict[str, object], value)
+    _reject_unknown_fields(
+        configuration,
+        _AGENT_CONFIGURATION_FIELDS,
+        source,
+        field,
+    )
+    model = configuration.get("model")
+    if not isinstance(model, str) or not model:
+        raise _build_error(
+            "invalid-agent-profile",
+            source,
+            f"{field}.model",
+            "native agent configuration requires a non-empty model",
+        )
+    effort = configuration.get("reasoning_effort")
+    if effort is not None and (not isinstance(effort, str) or not effort):
+        raise _build_error(
+            "invalid-agent-profile",
+            source,
+            f"{field}.reasoning_effort",
+            "reasoning effort must be a non-empty string",
+        )
+    requirements = configuration.get("requires_native_capabilities")
+    if requirements is not None and (
+        not isinstance(requirements, list)
+        or not all(isinstance(item, str) and item for item in requirements)
+        or len(set(requirements)) != len(requirements)
+    ):
+        raise _build_error(
+            "invalid-native-capability",
+            source,
+            f"{field}.requires_native_capabilities",
+            "native capability requirements must be unique non-empty strings",
+        )
+    return cast(Mapping[str, object], _freeze(configuration))
+
+
+def _load_agent_profiles(
+    value: object,
+    source: Path,
+) -> Mapping[str, Mapping[str, Mapping[str, object]]]:
+    if not isinstance(value, dict):
+        raise _build_error(
+            "invalid-agent-profile",
+            source,
+            "agent_profiles",
+            "agent profiles must be an object",
+        )
+    loaded: dict[str, Mapping[str, Mapping[str, object]]] = {}
+    for profile_name, raw_tiers in sorted(value.items()):
+        if not isinstance(raw_tiers, dict):
+            raise _build_error(
+                "invalid-agent-profile",
+                source,
+                f"agent_profiles.{profile_name}",
+                "agent profile must map reasoning tiers to native configuration",
+            )
+        tiers: dict[str, Mapping[str, object]] = {}
+        for tier, raw_configuration in sorted(raw_tiers.items()):
+            tiers[tier] = _load_agent_configuration(
+                raw_configuration,
+                source,
+                f"agent_profiles.{profile_name}.{tier}",
+            )
+        loaded[profile_name] = MappingProxyType(tiers)
+    return MappingProxyType(loaded)
+
+
+def _load_capability_mapping(
+    value: object,
+    source: Path,
+) -> Mapping[str, tuple[str, ...]]:
+    if not isinstance(value, dict):
+        raise _build_error(
+            "invalid-field",
+            source,
+            "capabilities",
+            "capability mapping must be an object",
+        )
+    capabilities: dict[str, tuple[str, ...]] = {}
+    for capability, raw_surfaces in sorted(value.items()):
+        if (
+            not isinstance(raw_surfaces, list)
+            or not raw_surfaces
+            or not all(isinstance(surface, str) and surface for surface in raw_surfaces)
+            or len(set(raw_surfaces)) != len(raw_surfaces)
+        ):
+            raise _build_error(
+                "invalid-field",
+                source,
+                f"capabilities.{capability}",
+                "native capability surfaces must be unique non-empty strings",
+            )
+        capabilities[capability] = tuple(raw_surfaces)
+    return MappingProxyType(capabilities)
+
+
+def _load_output_roots(
+    value: object,
+    source: Path,
+) -> Mapping[str, PurePosixPath]:
+    if not isinstance(value, dict):
+        raise _build_error(
+            "invalid-output-root",
+            source,
+            "output_roots",
+            "output roots must be an object",
+        )
+    output_roots: dict[str, PurePosixPath] = {}
+    for name, raw_path in sorted(value.items()):
+        if not isinstance(raw_path, str) or not raw_path:
+            raise _build_error(
+                "invalid-output-root",
+                source,
+                f"output_roots.{name}",
+                "output root must be a non-empty POSIX path string",
+            )
+        output_roots[name] = PurePosixPath(raw_path)
+    return MappingProxyType(output_roots)
+
+
+def _load_adapter_metadata(
+    value: object,
+    source: Path,
+) -> Mapping[str, object]:
+    if not isinstance(value, dict):
+        raise _build_error(
+            "invalid-field",
+            source,
+            "metadata",
+            "adapter metadata must be an object",
+        )
+    metadata = cast(dict[str, object], value)
+    _reject_unknown_fields(metadata, _METADATA_FIELDS, source, "metadata")
+    if set(metadata) != _METADATA_FIELDS:
+        missing = sorted(_METADATA_FIELDS - set(metadata))[0]
+        raise _build_error(
+            "missing-field",
+            source,
+            f"metadata.{missing}",
+            "required adapter metadata is missing",
+        )
+    contract = _load_agent_configuration(
+        metadata["frontier_deep_contract"],
+        source,
+        "metadata.frontier_deep_contract",
+    )
+    raw_candidates = metadata["evaluation_candidates"]
+    if not isinstance(raw_candidates, list):
+        raise _build_error(
+            "invalid-field",
+            source,
+            "metadata.evaluation_candidates",
+            "evaluation candidates must be an array",
+        )
+    for index, value in enumerate(raw_candidates):
+        field = f"metadata.evaluation_candidates.{index}"
+        if not isinstance(value, dict):
+            raise _build_error(
+                "invalid-field",
+                source,
+                field,
+                "evaluation candidate must be an object",
+            )
+        candidate = cast(dict[str, object], value)
+        _reject_unknown_fields(
+            candidate,
+            _EVALUATION_CANDIDATE_FIELDS,
+            source,
+            field,
+        )
+        if set(candidate) != _EVALUATION_CANDIDATE_FIELDS:
+            missing = sorted(_EVALUATION_CANDIDATE_FIELDS - set(candidate))[0]
+            raise _build_error(
+                "missing-field",
+                source,
+                f"{field}.{missing}",
+                "evaluation candidate field is required",
+            )
+        for name in ("role", "model", "reasoning_effort", "adoption_gate"):
+            if not isinstance(candidate[name], str) or not candidate[name]:
+                raise _build_error(
+                    "invalid-field",
+                    source,
+                    f"{field}.{name}",
+                    "evaluation candidate value must be a non-empty string",
+                )
+        if candidate["shipping"] is not False:
+            raise _build_error(
+                "invalid-field",
+                source,
+                f"{field}.shipping",
+                "evaluation candidates must be explicitly non-shipping",
+            )
+    return contract
+
+
+def _load_adapter_profile(
+    source: Path,
+    expected_client: str,
+) -> tuple[AdapterProfile, Mapping[str, object]]:
+    data = _load_json_object(source)
+    _reject_unknown_fields(data, _ADAPTER_FIELDS, source)
+    missing_fields = sorted(_ADAPTER_FIELDS - set(data))
+    if missing_fields:
+        raise _build_error(
+            "missing-field",
+            source,
+            missing_fields[0],
+            "required adapter profile field is missing",
+        )
+    schema_version = _require_integer_schema(data, source)
+    if schema_version != 1:
+        raise _build_error(
+            "invalid-schema-version",
+            source,
+            "schema_version",
+            "adapter profile schema version must be 1",
+        )
+    client = _require_string(data, source, "client")
+    if client != expected_client:
+        raise _build_error(
+            "invalid-adapter",
+            source,
+            "client",
+            f"adapter directory {expected_client} must declare the same client",
+        )
+    agent_profiles = _load_agent_profiles(data["agent_profiles"], source)
+    contract = _load_adapter_metadata(data["metadata"], source)
+    frontier = agent_profiles.get("frontier")
+    frontier_deep = frontier.get("deep") if frontier is not None else None
+    if frontier_deep != contract:
+        raise _build_error(
+            "invalid-frontier",
+            source,
+            "agent_profiles.frontier.deep",
+            "frontier deep configuration must match its native contract",
+        )
+    return (
+        AdapterProfile(
+            client=client,
+            default_agent_profile=_require_string(
+                data,
+                source,
+                "default_agent_profile",
+            ),
+            agent_profiles=agent_profiles,
+            capabilities=_load_capability_mapping(data["capabilities"], source),
+            output_roots=_load_output_roots(data["output_roots"], source),
+        ),
+        contract,
+    )
+
+
+def load_adapter_profiles(repository_root: Path) -> Mapping[str, AdapterProfile]:
+    root = Path(repository_root)
+    adapters_root = root / "adapters"
+    required_clients = frozenset(_REQUIRED_CLIENTS)
+    profile_sources = {
+        source.parent.name: source
+        for source in adapters_root.glob("*/profile.json")
+    }
+    clients = frozenset(profile_sources)
+    missing_clients = sorted(required_clients - clients)
+    if missing_clients:
+        client = missing_clients[0]
+        raise _build_error(
+            "missing-adapter",
+            adapters_root / client / "profile.json",
+            "client",
+            f"required adapter profile for {client} is missing",
+        )
+    extra_clients = sorted(clients - required_clients)
+    if extra_clients:
+        client = extra_clients[0]
+        raise _build_error(
+            "extra-adapter",
+            profile_sources[client],
+            "client",
+            f"adapter profile for unsupported client {client} is not allowed",
+        )
+
+    profiles: dict[str, AdapterProfile] = {}
+    contracts: dict[str, Mapping[str, object]] = {}
+    sources: dict[str, Path] = {}
+    for client in sorted(required_clients):
+        source = profile_sources[client]
+        profile, contract = _load_adapter_profile(source, client)
+        profiles[client] = profile
+        contracts[client] = contract
+        sources[client] = source
+
+    validate_adapter_profiles(
+        profiles,
+        logical_capabilities=_load_capabilities(root),
+        sources=sources,
+        frontier_contracts=contracts,
+    )
+    return MappingProxyType(profiles)
+
+
 def load_graph(repository_root: Path) -> CanonicalGraph:
     root = Path(repository_root)
     capabilities = _load_capabilities(root)
@@ -461,4 +824,4 @@ def load_graph(repository_root: Path) -> CanonicalGraph:
     )
 
 
-__all__ = ["load_graph"]
+__all__ = ["load_adapter_profiles", "load_graph"]

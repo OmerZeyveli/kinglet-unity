@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "client": "claude",
+  "default_agent_profile": "standard",
+  "agent_profiles": {
+    "standard": {
+      "fast": {
+        "model": "haiku"
+      },
+      "balanced": {
+        "model": "sonnet"
+      },
+      "deep": {
+        "model": "opus"
+      }
+    },
+    "frontier": {
+      "fast": {
+        "model": "haiku"
+      },
+      "balanced": {
+        "model": "sonnet"
+      },
+      "deep": {
+        "model": "fable",
+        "requires_native_capabilities": [
+          "model.fable.available"
+        ]
+      }
+    }
+  },
+  "capabilities": {
+    "delegate": [
+      "Agent"
+    ],
+    "filesystem.read": [
+      "Read",
+      "Glob",
+      "Grep"
+    ],
+    "filesystem.write": [
+      "Write",
+      "Edit"
+    ],
+    "shell": [
+      "Bash"
+    ],
+    "unity.read": [
+      "mcp__unityMCP__*"
+    ],
+    "unity.write": [
+      "mcp__unityMCP__*"
+    ],
+    "web": [
+      "WebSearch",
+      "WebFetch"
+    ]
+  },
+  "output_roots": {
+    "package": "packages/claude",
+    "compatibility": ".claude"
+  },
+  "metadata": {
+    "frontier_deep_contract": {
+      "model": "fable",
+      "requires_native_capabilities": [
+        "model.fable.available"
+      ]
+    },
+    "evaluation_candidates": []
+  }
+}

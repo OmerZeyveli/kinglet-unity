@@ -1,9 +1,10 @@
 import json
 import re
-from pathlib import Path
+from collections.abc import Mapping
+from pathlib import Path, PurePosixPath
 
 from .errors import BuildError
-from .model import CanonicalGraph, CanonicalUnit
+from .model import AdapterProfile, CanonicalGraph, CanonicalUnit
 
 
 _SCHEMA_VERSION = 1
@@ -26,6 +27,13 @@ _WORKFLOW_REFERENCES = (
 )
 _EXCEPTION_FIELDS = ("reason", "owner", "test")
 _WRITE_CAPABILITIES = frozenset({"filesystem.write", "unity.write"})
+_ADAPTER_CLIENTS = frozenset({"claude", "codex"})
+_AGENT_PROFILE_NAMES = frozenset({"standard", "frontier"})
+_REASONING_TIERS = frozenset({"fast", "balanced", "deep"})
+_OUTPUT_ROOT_NAMES = {
+    "claude": frozenset({"package", "compatibility"}),
+    "codex": frozenset({"plugin", "project"}),
+}
 
 
 def _build_error(
@@ -308,6 +316,133 @@ def _validate_generated_path_claims(
         claims[claim] = unit_id
 
 
+def validate_adapter_profiles(
+    profiles: Mapping[str, AdapterProfile],
+    *,
+    logical_capabilities: frozenset[str],
+    sources: Mapping[str, Path],
+    frontier_contracts: Mapping[str, Mapping[str, object]],
+) -> None:
+    clients = frozenset(profiles)
+    missing_clients = sorted(_ADAPTER_CLIENTS - clients)
+    extra_clients = sorted(clients - _ADAPTER_CLIENTS)
+    if missing_clients or extra_clients:
+        client = (missing_clients or extra_clients)[0]
+        raise _build_error(
+            "invalid-adapter",
+            sources.get(client, Path("adapters") / client / "profile.json"),
+            "client",
+            "adapter profiles must contain exactly the supported clients",
+        )
+
+    root_claims: list[tuple[PurePosixPath, str, str, Path]] = []
+    for client in sorted(profiles):
+        profile = profiles[client]
+        source = sources[client]
+        if profile.client != client:
+            raise _build_error(
+                "invalid-adapter",
+                source,
+                "client",
+                "adapter profile key must match its declared client",
+            )
+        if profile.default_agent_profile != "standard":
+            raise _build_error(
+                "invalid-agent-profile",
+                source,
+                "default_agent_profile",
+                "the default agent profile must be standard",
+            )
+        if frozenset(profile.agent_profiles) != _AGENT_PROFILE_NAMES:
+            raise _build_error(
+                "invalid-agent-profile",
+                source,
+                "agent_profiles",
+                "agent profiles must contain exactly standard and frontier",
+            )
+        for profile_name in sorted(profile.agent_profiles):
+            tiers = profile.agent_profiles[profile_name]
+            if frozenset(tiers) != _REASONING_TIERS:
+                raise _build_error(
+                    "invalid-agent-profile",
+                    source,
+                    f"agent_profiles.{profile_name}",
+                    "agent profile must contain exactly fast, balanced, and deep",
+                )
+        standard = profile.agent_profiles["standard"]
+        frontier = profile.agent_profiles["frontier"]
+        for tier in ("fast", "balanced"):
+            if frontier[tier] != standard[tier]:
+                raise _build_error(
+                    "invalid-frontier",
+                    source,
+                    f"agent_profiles.frontier.{tier}",
+                    "frontier may not change fast or balanced configuration",
+                )
+        contract = frontier_contracts[client]
+        contract_effort = contract.get("reasoning_effort")
+        contract_requirements = frozenset(
+            contract.get("requires_native_capabilities", ())
+        )
+        if contract_effort is not None and contract_requirements:
+            for profile_name in sorted(profile.agent_profiles):
+                for tier in sorted(profile.agent_profiles[profile_name]):
+                    configuration = profile.agent_profiles[profile_name][tier]
+                    if configuration.get("reasoning_effort") != contract_effort:
+                        continue
+                    requirements = frozenset(
+                        configuration.get("requires_native_capabilities", ())
+                    )
+                    if not contract_requirements.issubset(requirements):
+                        raise _build_error(
+                            "invalid-native-capability",
+                            source,
+                            f"agent_profiles.{profile_name}.{tier}",
+                            "frontier-level effort requires the native frontier capability",
+                        )
+
+        if frozenset(profile.capabilities) != logical_capabilities:
+            raise _build_error(
+                "unknown-capability",
+                source,
+                "capabilities",
+                "adapter capabilities must exactly match the canonical catalog",
+            )
+        expected_root_names = _OUTPUT_ROOT_NAMES[client]
+        if frozenset(profile.output_roots) != expected_root_names:
+            raise _build_error(
+                "invalid-output-root",
+                source,
+                "output_roots",
+                "adapter must declare exactly its product output roots",
+            )
+        for name in sorted(profile.output_roots):
+            path = profile.output_roots[name]
+            if path.is_absolute() or not path.parts or ".." in path.parts:
+                raise _build_error(
+                    "invalid-output-root",
+                    source,
+                    f"output_roots.{name}",
+                    "output root must be a non-empty relative path without parent traversal",
+                )
+            root_claims.append((path, client, name, source))
+
+    root_claims.sort(key=lambda claim: (claim[0].as_posix(), claim[1], claim[2]))
+    for index, (path, _client, name, source) in enumerate(root_claims):
+        for other_path, other_client, other_name, _ in root_claims[:index]:
+            if (
+                path == other_path
+                or path in other_path.parents
+                or other_path in path.parents
+            ):
+                raise _build_error(
+                    "overlapping-output-root",
+                    source,
+                    f"output_roots.{name}",
+                    f"output root overlaps {other_client}.{other_name}",
+                )
+
+
 def validate_graph(graph: CanonicalGraph) -> None:
     """Raise the first deterministic BuildError after sorting units by ID."""
     units = _sorted_units(graph)
@@ -322,4 +457,4 @@ def validate_graph(graph: CanonicalGraph) -> None:
     _validate_generated_path_claims(units)
 
 
-__all__ = ["validate_graph"]
+__all__ = ["validate_adapter_profiles", "validate_graph"]

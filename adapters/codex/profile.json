@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "client": "codex",
+  "default_agent_profile": "standard",
+  "agent_profiles": {
+    "standard": {
+      "fast": {
+        "model": "gpt-5.6-luna",
+        "reasoning_effort": "medium"
+      },
+      "balanced": {
+        "model": "gpt-5.6-terra",
+        "reasoning_effort": "medium"
+      },
+      "deep": {
+        "model": "gpt-5.6-sol",
+        "reasoning_effort": "high"
+      }
+    },
+    "frontier": {
+      "fast": {
+        "model": "gpt-5.6-luna",
+        "reasoning_effort": "medium"
+      },
+      "balanced": {
+        "model": "gpt-5.6-terra",
+        "reasoning_effort": "medium"
+      },
+      "deep": {
+        "model": "gpt-5.6-sol",
+        "reasoning_effort": "max",
+        "requires_native_capabilities": [
+          "reasoning.mode.pro"
+        ]
+      }
+    }
+  },
+  "capabilities": {
+    "delegate": [
+      "agent-delegation"
+    ],
+    "filesystem.read": [
+      "sandboxed-command"
+    ],
+    "filesystem.write": [
+      "sandboxed-command"
+    ],
+    "shell": [
+      "sandboxed-command"
+    ],
+    "unity.read": [
+      "mcp-for-unity@10.1.0"
+    ],
+    "unity.write": [
+      "mcp-for-unity@10.1.0"
+    ],
+    "web": [
+      "web-access"
+    ]
+  },
+  "output_roots": {
+    "plugin": "plugins/kinglet-unity",
+    "project": "packages/codex-project"
+  },
+  "metadata": {
+    "frontier_deep_contract": {
+      "model": "gpt-5.6-sol",
+      "reasoning_effort": "max",
+      "requires_native_capabilities": [
+        "reasoning.mode.pro"
+      ]
+    },
+    "evaluation_candidates": [
+      {
+        "role": "unity-linter",
+        "model": "gpt-5.6-luna",
+        "reasoning_effort": "low",
+        "shipping": false,
+        "adoption_gate": "plan-06-equal-correctness-evidence-and-improved-efficiency"
+      }
+    ]
+  }
+}

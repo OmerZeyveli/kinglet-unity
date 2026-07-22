@@ -238,6 +238,10 @@ tests/kinglet/fixtures/valid-minimal/src/workflows/unity-audit/workflow.json	ori
 tests/kinglet/test_loader.py	original	-	-	-	original	kinglet-canonical-loader-tests
 tests/kinglet/test_validator.py	original	-	-	-	original	kinglet-canonical-graph-validator-tests
 tools/kinglet_build/errors.py	original	-	-	-	original	kinglet-stable-build-diagnostics
-tools/kinglet_build/loader.py	original	-	-	-	original	kinglet-strict-canonical-loader
-tools/kinglet_build/model.py	original	-	-	-	original	kinglet-canonical-graph-models
-tools/kinglet_build/validator.py	original	-	-	-	original	kinglet-canonical-graph-validator
+tools/kinglet_build/loader.py	original	-	-	-	original	kinglet-strict-canonical-and-adapter-loader
+tools/kinglet_build/model.py	original	-	-	-	original	kinglet-canonical-graph-and-adapter-models
+tools/kinglet_build/validator.py	original	-	-	-	original	kinglet-canonical-graph-and-adapter-validator
+adapters/claude/profile.json	original	-	-	-	original	kinglet-claude-native-adapter-profile
+adapters/codex/profile.json	original	-	-	-	original	kinglet-codex-native-adapter-profile
+tests/kinglet/test_adapter_profiles.py	original	-	-	-	original	kinglet-adapter-profile-and-renderer-contract-tests
+tools/kinglet_build/renderers/__init__.py	original	-	-	-	original	kinglet-renderer-contract
