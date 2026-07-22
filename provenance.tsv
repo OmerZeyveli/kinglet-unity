@@ -245,3 +245,8 @@ adapters/claude/profile.json	original	-	-	-	original	kinglet-claude-native-adapt
 adapters/codex/profile.json	original	-	-	-	original	kinglet-codex-native-adapter-profile
 tests/kinglet/test_adapter_profiles.py	original	-	-	-	original	kinglet-adapter-profile-and-renderer-contract-tests
 tools/kinglet_build/renderers/__init__.py	original	-	-	-	original	kinglet-renderer-contract
+tests/kinglet/test_writer.py	original	-	-	-	original	kinglet-atomic-writer-tests
+tools/kinglet_build/writer.py	original	-	-	-	original	kinglet-atomic-deterministic-writer
+tests/kinglet/test_cli.py	original	-	-	-	original	kinglet-public-cli-contract-tests
+tools/kinglet_build/cli.py	original	-	-	-	original	kinglet-public-build-cli
+tools/kinglet_build/__main__.py	original	-	-	-	original	kinglet-build-module-entrypoint
