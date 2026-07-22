@@ -236,39 +236,57 @@ def _load_support(data: Mapping[str, object], source: Path) -> Mapping[str, Supp
                 "field is not allowed in a support declaration",
             )
         state = declaration.get("state")
-        if state not in _SUPPORT_STATES:
+        if not isinstance(state, str) or state not in _SUPPORT_STATES:
             raise _build_error(
                 "invalid-support",
                 source,
                 f"support.{client}.state",
                 "support state must be supported, unsupported, or exception",
             )
-        declarations[client] = SupportDeclaration(
-            state=cast(Any, state),
-            reason=_optional_string(
+        reason = (
+            _optional_string(
                 declaration,
                 source,
                 "reason",
                 error_field=f"support.{client}.reason",
             )
             if "reason" in declaration
-            else None,
-            owner=_optional_string(
+            else None
+        )
+        owner = (
+            _optional_string(
                 declaration,
                 source,
                 "owner",
                 error_field=f"support.{client}.owner",
             )
             if "owner" in declaration
-            else None,
-            test=_optional_string(
+            else None
+        )
+        test = (
+            _optional_string(
                 declaration,
                 source,
                 "test",
                 error_field=f"support.{client}.test",
             )
             if "test" in declaration
-            else None,
+            else None
+        )
+        if state == "exception":
+            for field, value in (("reason", reason), ("owner", owner), ("test", test)):
+                if value is None:
+                    raise _build_error(
+                        "invalid-support",
+                        source,
+                        f"support.{client}.{field}",
+                        f"exception support requires a non-null {field}",
+                    )
+        declarations[client] = SupportDeclaration(
+            state=cast(Any, state),
+            reason=reason,
+            owner=owner,
+            test=test,
         )
     return MappingProxyType(declarations)
 
