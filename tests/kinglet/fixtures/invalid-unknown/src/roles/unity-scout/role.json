@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "id": "role.unity-scout",
+  "kind": "role",
+  "name": "Unity Scout",
+  "summary": "Inspects a Unity project and reports evidence.",
+  "capabilities": [
+    "filesystem.read",
+    "unity.read"
+  ],
+  "requires": [],
+  "support": {
+    "claude": {
+      "state": "supported",
+      "reason": null,
+      "owner": null,
+      "test": null
+    },
+    "codex": {
+      "state": "supported",
+      "reason": null,
+      "owner": null,
+      "test": null
+    }
+  },
+  "provenance": {
+    "origin": "ecu",
+    "upstream_version": "1.5.0",
+    "upstream_path": ".claude/agents/unity-scout.md",
+    "upstream_sha256": "af8419f2b018f166fd0b51e902aa1a12d08e4d9b9120bf3e2cbebb407f21e191"
+  },
+  "reasoning_tier": "fast",
+  "evidence": [
+    "references-valid"
+  ],
+  "mystery_field": true
+}

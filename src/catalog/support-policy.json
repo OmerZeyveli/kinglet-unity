@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "required_clients": [
+    "claude",
+    "codex"
+  ],
+  "states": [
+    "supported",
+    "unsupported",
+    "exception"
+  ],
+  "exception_requires": [
+    "reason",
+    "owner",
+    "test"
+  ],
+  "releases": {
+    "3.0.0": {
+      "linux": "supported",
+      "macos": "supported",
+      "windows": "unsupported"
+    }
+  }
+}

@@ -220,3 +220,16 @@ tools/kinglet_build/__init__.py	original	-	-	-	original	kinglet-build-identity
 tests/kinglet/__init__.py	original	-	-	-	original	kinglet-test-package-marker
 tests/kinglet/test_identity.py	original	-	-	-	original	kinglet-product-identity-tests
 tests/test-kinglet-build.sh	original	-	-	-	original	kinglet-python-test-runner
+src/catalog/capabilities.json	original	-	-	-	original	kinglet-canonical-capability-catalog
+src/catalog/routing.json	original	-	-	-	original	kinglet-canonical-routing-catalog
+src/catalog/support-policy.json	original	-	-	-	original	kinglet-canonical-support-policy
+tests/kinglet/fixtures/invalid-unknown/src/roles/unity-scout/role.json	original	-	-	-	original	kinglet-loader-unknown-field-fixture
+tests/kinglet/fixtures/valid-minimal/src/catalog/capabilities.json	original	-	-	-	original	kinglet-loader-capability-fixture
+tests/kinglet/fixtures/valid-minimal/src/catalog/routing.json	original	-	-	-	original	kinglet-loader-routing-fixture
+tests/kinglet/fixtures/valid-minimal/src/catalog/support-policy.json	original	-	-	-	original	kinglet-loader-support-policy-fixture
+tests/kinglet/fixtures/valid-minimal/src/roles/unity-scout/instructions.md	original	-	-	-	original	kinglet-loader-content-fixture
+tests/kinglet/fixtures/valid-minimal/src/roles/unity-scout/role.json	original	-	-	-	original	kinglet-loader-valid-descriptor-fixture
+tests/kinglet/test_loader.py	original	-	-	-	original	kinglet-canonical-loader-tests
+tools/kinglet_build/errors.py	original	-	-	-	original	kinglet-stable-build-diagnostics
+tools/kinglet_build/loader.py	original	-	-	-	original	kinglet-strict-canonical-loader
+tools/kinglet_build/model.py	original	-	-	-	original	kinglet-canonical-graph-models

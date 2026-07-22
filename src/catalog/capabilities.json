@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "capabilities": [
+    "delegate",
+    "filesystem.read",
+    "filesystem.write",
+    "shell",
+    "unity.read",
+    "unity.write",
+    "web"
+  ]
+}
