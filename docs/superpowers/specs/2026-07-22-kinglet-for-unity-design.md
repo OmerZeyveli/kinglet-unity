@@ -1,6 +1,6 @@
 # Kinglet for Unity — Canonical Core and Dual-Client Design
 
-**Status:** Approved design, pending written-spec review
+**Status:** Approved design; implementation plan suite complete
 
 **Date:** 2026-07-22
 
@@ -618,6 +618,19 @@ Every release publishes a capability matrix. A platform-specific exception is vi
 matrix with its reason and test evidence. Kinglet never reports silent partial support as parity.
 
 ## Incremental Migration
+
+The approved design is implemented through these independently gated plans:
+
+1. [Identity and canonical build foundation](../plans/2026-07-22-kinglet-01-identity-foundation.md)
+2. [Rules, templates, and knowledge migration](../plans/2026-07-22-kinglet-02-content-core.md)
+3. [Roles, workflows, and natural-language router](../plans/2026-07-22-kinglet-03-roles-workflows-router.md)
+4. [Hook policies and Unity MCP orchestration](../plans/2026-07-22-kinglet-04-hooks-unity-mcp.md)
+5. [Packages and lifecycle](../plans/2026-07-22-kinglet-05-packages-lifecycle.md)
+6. [Product, brownfield validation, and 3.0.0 release](../plans/2026-07-22-kinglet-06-product-release.md)
+
+Each plan has its own completion gate. Later plans may rely only on an earlier plan whose gate has
+passed; the migration must not skip directly to package or release work.
+
 
 The migration is divided into independently reviewable projects:
 

@@ -161,6 +161,12 @@ docs/HOOK-REFERENCE.md	ecu	1.5.0	docs/HOOK-REFERENCE.md	3369a90e917bd229e3e39830
 docs/MODEL-ROUTING.md	ecu	1.5.0	docs/MODEL-ROUTING.md	585fb9c38d0d88021632614e03893ef1ff3cb3c1935f9be148b3b3c986520512	verbatim	-
 docs/SKILL-CATALOG.md	ecu	1.5.0	docs/SKILL-CATALOG.md	abafe376b9063f84a8adb46a00eaf7a3e0d216b96faadf980b63c6fc0c791eb6	modified	mobile-strip
 docs/superpowers/specs/2026-07-22-kinglet-for-unity-design.md	original	-	-	-	original	approved-dual-client-canonical-core-design
+docs/superpowers/plans/2026-07-22-kinglet-01-identity-foundation.md	original	-	-	-	original	kinglet-implementation-plan-01
+docs/superpowers/plans/2026-07-22-kinglet-02-content-core.md	original	-	-	-	original	kinglet-implementation-plan-02
+docs/superpowers/plans/2026-07-22-kinglet-03-roles-workflows-router.md	original	-	-	-	original	kinglet-implementation-plan-03
+docs/superpowers/plans/2026-07-22-kinglet-04-hooks-unity-mcp.md	original	-	-	-	original	kinglet-implementation-plan-04
+docs/superpowers/plans/2026-07-22-kinglet-05-packages-lifecycle.md	original	-	-	-	original	kinglet-implementation-plan-05
+docs/superpowers/plans/2026-07-22-kinglet-06-product-release.md	original	-	-	-	original	kinglet-implementation-plan-06
 examples/CLAUDE.md.2d-platformer	ecu	1.5.0	examples/CLAUDE.md.2d-platformer	363930fd2c582e6155491703123fe39624ca339c74adedfc458213474195cd28	modified	mobile-strip
 examples/CLAUDE.md.idle-clicker	ecu	1.5.0	examples/CLAUDE.md.idle-clicker	1e8ba93e014e39172b0b6baaca5370ec9fa132467c6bec90db1459f6c0400101	modified	mobile-strip
 examples/CLAUDE.md.match3	ecu	1.5.0	examples/CLAUDE.md.match3	76c192a905b0c4911dc757b7d04033248028b85690a926c38a57881b566f4e7c	modified	mobile-strip
