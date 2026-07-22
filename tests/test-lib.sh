@@ -91,7 +91,13 @@ assert_not_contains "$OUTPUT" "reached" "global kill switch prevents execution"
 
 # --- State Directory Tests ---
 
-assert_file_exists "/tmp/unity-claude-hooks" "state directory exists after sourcing _lib.sh"
+RESULT=$(run_test_hook "minimal" "" 'echo "STATE_DIR=$UNITY_HOOK_STATE_DIR"')
+EXIT_CODE="${RESULT%%|*}"
+OUTPUT="${RESULT#*|}"
+STATE_DIR="${OUTPUT#*STATE_DIR=}"
+assert_eq "0" "$EXIT_CODE" "state directory resolves after sourcing _lib.sh"
+assert_eq "${REPO_DIR}/.claude/state" "$STATE_DIR" "state directory prefers project-local .claude/state"
+assert_file_exists "$STATE_DIR" "resolved state directory exists after sourcing _lib.sh"
 
 # --- unity_hook_block Tests ---
 

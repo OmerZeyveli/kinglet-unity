@@ -208,9 +208,9 @@ tests/test-block-legacy-input.sh	original	-	-	-	original	-
 tests/test-cross-validation.sh	ecu	1.5.0	tests/test-cross-validation.sh	ed11cf897a74a90ce8d3bd6a072dd3ba09e9ce412d2bfc51c7975a91faaafd33	verbatim	-
 tests/test-hooks.sh	ecu	1.5.0	tests/test-hooks.sh	ff362d3e26718ca81d6857af46c7579317ee5ba8179c6ebfb95e5f8eba6dd3a8	verbatim	-
 tests/test-install.sh	ecu	1.5.0	tests/test-install.sh	9561a3bcf8e75e2ee92b7e2ddadbe6dea6e8c3b4464c575e14339864b5eea971	modified	test-runner-fix: PASS output no longer gated on --verbose, so the tally can count it
-tests/test-lib.sh	ecu	1.5.0	tests/test-lib.sh	8c8810123ca75250158286eae310a380d907cfb7adf30cf63fb6bc557e3cfe4d	verbatim	-
+tests/test-lib.sh	ecu	1.5.0	tests/test-lib.sh	8c8810123ca75250158286eae310a380d907cfb7adf30cf63fb6bc557e3cfe4d	modified	project-local-state-assertion
 tests/test-no-mobile.sh	original	-	-	-	original	-
 tests/test-skills.sh	ecu	1.5.0	tests/test-skills.sh	324561e8e83be33761d519e6e04bf4a7eaaac7eef453bc431db05e13228d434a	verbatim	-
-tests/test-state.sh	ecu	1.5.0	tests/test-state.sh	dc05b5a953fb23fb14ab0a009a276152f891d85b939f9c0c0aea16608ffcb321	verbatim	-
+tests/test-state.sh	ecu	1.5.0	tests/test-state.sh	dc05b5a953fb23fb14ab0a009a276152f891d85b939f9c0c0aea16608ffcb321	modified	remove-invalid-bash-source-environment-assignment
 tests/test-templates.sh	ecu	1.5.0	tests/test-templates.sh	0f38c2bc95d65cd2fe4e6baba50ede9dae4dfed80185c20b2f4d372dbe535f0f	verbatim	-
 uninstall.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours

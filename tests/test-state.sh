@@ -25,7 +25,7 @@ echo ""
 echo "--- Test: _lib.sh state directory variables ---"
 
 # Source _lib.sh in a subshell with a hook context
-OUTPUT=$(HOOK_PROFILE_LEVEL="minimal" BASH_SOURCE[1]="test-state.sh" bash -c '
+OUTPUT=$(HOOK_PROFILE_LEVEL="minimal" bash -c '
     source "'"$LIB_PATH"'" 2>/dev/null
     echo "STATE_DIR=$UNITY_HOOK_STATE_DIR"
     echo "SESSION=$UNITY_SESSION_FILE"
@@ -52,7 +52,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 if [ -d "$PROJECT_ROOT/.claude/state" ]; then
     # When run from within the project, it should resolve to .claude/state/
-    RESOLVED_DIR=$(cd "$PROJECT_ROOT" && HOOK_PROFILE_LEVEL="minimal" BASH_SOURCE[1]="test-state.sh" bash -c '
+    RESOLVED_DIR=$(cd "$PROJECT_ROOT" && HOOK_PROFILE_LEVEL="minimal" bash -c '
         source ".claude/hooks/_lib.sh" 2>/dev/null
         echo "$UNITY_HOOK_STATE_DIR"
     ' 2>/dev/null)
@@ -65,7 +65,7 @@ fi
 echo ""
 echo "--- Test: state dir fallback to /tmp ---"
 
-FALLBACK_DIR=$(cd /tmp && HOOK_PROFILE_LEVEL="minimal" BASH_SOURCE[1]="test-state.sh" bash -c '
+FALLBACK_DIR=$(cd /tmp && HOOK_PROFILE_LEVEL="minimal" bash -c '
     source "'"$LIB_PATH"'" 2>/dev/null
     echo "$UNITY_HOOK_STATE_DIR"
 ' 2>/dev/null)
