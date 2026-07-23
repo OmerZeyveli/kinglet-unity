@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from tools.kinglet_spike.model import (
@@ -22,6 +23,7 @@ from tools.kinglet_spike.model import (
 SCHEMA = "kinglet.spike.evidence/v1"
 STATUSES = frozenset({"pass", "fail", "unavailable", "inconclusive"})
 SUBJECT_KINDS = frozenset({"runtime", "client", "unity"})
+PROMPT_ID = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
 
 
 def _keys(value: object, path: str, required: set[str]) -> dict:
@@ -135,7 +137,10 @@ def _prompt(value: object) -> Prompt | None:
     if value is None:
         return None
     item = _keys(value, "prompt", {"id", "sha256"})
-    return Prompt(_string(item["id"], "prompt.id"), _string(item["sha256"], "prompt.sha256"))
+    prompt_id = _string(item["id"], "prompt.id")
+    if len(prompt_id) > 64 or not PROMPT_ID.fullmatch(prompt_id):
+        raise EvidenceError("E_FIELD", "prompt.id must be a lowercase opaque identifier")
+    return Prompt(prompt_id, _string(item["sha256"], "prompt.sha256"))
 
 
 def load_record(path: Path) -> EvidenceRecord:

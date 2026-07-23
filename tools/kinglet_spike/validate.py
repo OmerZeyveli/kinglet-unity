@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from tools.kinglet_spike.model import Diagnostic, EvidenceError, EvidenceRecord
-from tools.kinglet_spike.redact import SECRET_PATTERNS
+from tools.kinglet_spike.redact import ABSOLUTE_PATH_PATTERNS, SECRET_PATTERNS
 
 
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -82,6 +82,10 @@ def validate_record(record: EvidenceRecord, artifact_root: Path) -> tuple[Diagno
         for pattern in SECRET_PATTERNS:
             if pattern.search(value):
                 diagnostics.append(_diagnostic("E_SECRET", f"string[{index}]", "evidence contains a credential"))
+                break
+        for pattern in ABSOLUTE_PATH_PATTERNS:
+            if pattern.search(value):
+                diagnostics.append(_diagnostic("E_PATH", f"string[{index}]", "evidence contains an absolute path"))
                 break
 
     if record.prompt is not None and not SHA256.fullmatch(record.prompt.sha256):

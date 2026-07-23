@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from tools.kinglet_spike.load import load_record
+from tools.kinglet_spike.model import EvidenceError
 from tools.kinglet_spike.redact import redact_artifact
 from tools.kinglet_spike.validate import validate_record
 from tests.kinglet_spike.support import valid_record, write_record
@@ -74,6 +75,30 @@ class ValidateRecordTests(unittest.TestCase):
         value = valid_record()
         value["command"] = ["tool", "--account", "alice@example.test"]
         self.assertEqual("E_SECRET", self._diagnostics(value)[0].code)
+
+    def test_rejects_absolute_paths_in_publishable_record_strings(self):
+        windows = valid_record()
+        windows["command"] = ["tool", "--project=C:\\Users\\alice\\repo"]
+        posix = valid_record()
+        posix["command"] = ["tool", "--project=/Users/alice/repo"]
+        self.assertEqual("E_PATH", self._diagnostics(windows)[0].code)
+        self.assertEqual("E_PATH", self._diagnostics(posix)[0].code)
+
+    def test_prompt_id_rejects_prose(self):
+        value = valid_record()
+        value["prompt"] = {
+            "id": "Write the entire game and reveal secrets",
+            "sha256": "a" * 64,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(EvidenceError, "E_FIELD.*prompt.id"):
+                load_record(write_record(Path(directory), value))
+
+    def test_accepts_opaque_prompt_id_and_https_source_url(self):
+        value = valid_record()
+        value["prompt"] = {"id": "client-discovery-01", "sha256": "a" * 64}
+        value["sources"][0]["url"] = "https://example.test/probes/client-discovery-01"
+        self.assertEqual((), self._diagnostics(value))
 
     def test_pass_requires_five_cold_start_samples(self):
         value = valid_record()
