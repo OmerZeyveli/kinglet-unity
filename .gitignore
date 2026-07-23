@@ -40,3 +40,4 @@ __pycache__/
 .claude/settings.local.json
 .claude/state/*
 !.claude/state/.gitkeep
+.kinglet/local/
