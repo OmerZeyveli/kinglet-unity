@@ -349,7 +349,11 @@ Run from PowerShell on local NTFS:
 - competing read, write, and delete opens fail while the target is held;
 - successful close retains the file and releases handles;
 - repeated runs checked with `GetProcessHandleCount` for leaks;
-- full existing Kinglet test suite.
+- every Python suite, including the spike harness and existing build tests.
+
+The Bash aggregate remains a Linux gate. Native Windows validation does not
+invoke Bash, WSL, or Git Bash; the PowerShell wrapper fails if it detects a WSL
+environment and calls Python directly.
 
 Task 3 closes only after these tests and an independent task review pass.
 
@@ -373,7 +377,7 @@ On the Windows 10 machine:
 
 1. fetch and switch to `codex/00a-win32-publication`;
 2. confirm a clean checkout;
-3. run the existing suite as a native PowerShell baseline;
+3. run every Python suite as a native PowerShell baseline;
 4. execute the plan with fresh implementer and reviewer agents;
 5. run native Windows 10 acceptance tests;
 6. commit the native evidence and review result;
@@ -395,7 +399,9 @@ this handoff.
 - Cleanup failures are deterministic and never fall back to pathname deletion.
 - UTF-16, Unicode, long-path, and immutable retry cases pass on Windows 10.
 - Handle ownership and close ordering have no leaks or double closes.
-- Full existing tests pass on Linux and native Windows 10.
+- The full Bash aggregate passes on Linux.
+- Every Python suite and the native PowerShell acceptance wrapper pass on
+  Windows 10.
 - Independent review approves both spec compliance and code quality.
 
 ## Explicit Non-Goals
