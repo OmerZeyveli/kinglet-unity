@@ -10,6 +10,8 @@ $RECYCLE.BIN/
 .vscode/
 .idea/
 .worktrees/
+.research/
+.superpowers/
 *.swp
 *.swo
 *~
