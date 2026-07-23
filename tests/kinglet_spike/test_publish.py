@@ -167,3 +167,68 @@ class PublishTests(unittest.TestCase):
                     _copy_exclusive(source, destination, "0" * 64)
 
             self.assertFalse(destination.exists())
+
+    def test_copy_keeps_creation_in_verified_parent_after_parent_replacement(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.json"
+            source.write_bytes(b'{"ok":true}\n')
+            committed_root = root / "docs/research/platform-spike"
+            destination = committed_root / "artifacts/result.json"
+            outside = root / "outside"
+            outside.mkdir()
+            verified_parent = destination.parent
+            verified_parent.mkdir(parents=True)
+            displaced_parent = committed_root / "displaced-artifacts"
+            real_open = os.open
+            replaced = False
+
+            def replace_parent(path, flags, mode=0o777, *, dir_fd=None):
+                nonlocal replaced
+                if (
+                    not replaced
+                    and flags & os.O_CREAT
+                    and Path(path).name == destination.name
+                ):
+                    replaced = True
+                    verified_parent.rename(displaced_parent)
+                    verified_parent.symlink_to(outside, target_is_directory=True)
+                if dir_fd is None:
+                    return real_open(path, flags, mode)
+                return real_open(path, flags, mode, dir_fd=dir_fd)
+
+            with mock.patch("tools.kinglet_spike.publish.os.open", side_effect=replace_parent):
+                _copy_exclusive(
+                    source,
+                    destination,
+                    "e5f1eb4d806641698a35efe20e098efd20d7d57a9b90ee69079d5bb650920726",
+                    repo_root=root,
+                    committed_root=committed_root,
+                )
+
+            self.assertTrue(replaced)
+            self.assertEqual((), tuple(outside.iterdir()))
+            self.assertEqual(b'{"ok":true}\n', (displaced_parent / "result.json").read_bytes())
+
+    def test_record_fsync_failure_removes_only_incomplete_record(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            raw = self._raw_record(root)
+            fsync_calls = 0
+            real_fsync = os.fsync
+
+            def fail_record_fsync(descriptor):
+                nonlocal fsync_calls
+                fsync_calls += 1
+                if fsync_calls == 2:
+                    raise OSError("record fsync failed")
+                return real_fsync(descriptor)
+
+            with mock.patch("tools.kinglet_spike.publish.os.fsync", side_effect=fail_record_fsync):
+                with self.assertRaisesRegex(OSError, "record fsync failed"):
+                    publish_record(raw, root)
+
+            artifact = root / "docs/research/platform-spike/artifacts/runtime/python/20260723T120000Z-runtime-python-windows11-x64-01/result.json"
+            record = root / "docs/research/platform-spike/evidence/runtime/python/20260723T120000Z-runtime-python-windows11-x64-01.json"
+            self.assertEqual(b'{"ok":true}\n', artifact.read_bytes())
+            self.assertFalse(record.exists())

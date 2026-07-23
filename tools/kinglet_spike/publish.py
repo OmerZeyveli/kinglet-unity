@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 import errno
 import hashlib
 import json
@@ -18,6 +18,12 @@ from tools.kinglet_spike.validate import _artifact_path, validate_record
 
 _MAX_OPAQUE_SEGMENT_BYTES = 128
 _WINDOWS_DRIVE = re.compile(r"(?i)^[a-z]:")
+_DIRECTORY_FD_SUPPORTED = (
+    os.open in os.supports_dir_fd
+    and os.mkdir in os.supports_dir_fd
+    and os.unlink in os.supports_dir_fd
+    and hasattr(os, "O_NOFOLLOW")
+)
 
 
 def _opaque_segment(value: str, location: str) -> str:
@@ -86,35 +92,228 @@ def _assert_existing_parent_chain(repo_root: Path, destination: Path) -> None:
             raise EvidenceError("E_PATH", f"destination parent is not a directory: {current}")
 
 
-def _prepare_destination_parent(repo_root: Path, committed_root: Path, destination: Path) -> None:
-    """Create a parent chain while rejecting links, then re-check containment."""
-    _assert_existing_parent_chain(repo_root, destination)
-    relative = destination.parent.relative_to(repo_root)
-    current = repo_root
-    for part in relative.parts:
-        current = current / part
-        try:
-            metadata = current.lstat()
-        except FileNotFoundError:
+@dataclass
+class _CreatedTarget:
+    """A new file held beneath the directory that was verified for its creation."""
+
+    descriptor: int
+    destination: Path
+    identity: tuple[int, int]
+    parent_descriptor: int | None = None
+    name: str | None = None
+    windows_handle: bool = False
+
+
+def _directory_fd_supported() -> bool:
+    return _DIRECTORY_FD_SUPPORTED
+
+
+def _directory_open_flags() -> int:
+    return (
+        os.O_RDONLY
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_BINARY", 0)
+    )
+
+
+def _open_verified_parent(repo_root: Path, committed_root: Path, destination: Path) -> int:
+    """Return a no-follow descriptor for destination.parent, creating it safely."""
+    try:
+        relative_to_root = destination.parent.relative_to(repo_root)
+        destination.parent.relative_to(committed_root)
+    except ValueError as error:
+        raise EvidenceError("E_PATH", f"destination escapes platform-spike evidence: {destination}") from error
+
+    try:
+        current = os.open(repo_root, _directory_open_flags())
+    except OSError as error:
+        if error.errno == errno.ELOOP:
+            _raise_symlink(repo_root)
+        raise EvidenceError("E_PATH", f"repository root is unavailable: {repo_root}") from error
+
+    try:
+        for part in relative_to_root.parts:
             try:
-                current.mkdir()
+                os.mkdir(part, mode=0o755, dir_fd=current)
             except FileExistsError:
                 pass
-            _require_directory(current)
-            continue
-        if stat.S_ISLNK(metadata.st_mode):
-            _raise_symlink(current)
-        if not stat.S_ISDIR(metadata.st_mode):
-            raise EvidenceError("E_PATH", f"destination parent is not a directory: {current}")
+            except OSError as error:
+                raise EvidenceError("E_PATH", f"destination parent is unavailable: {destination.parent}") from error
+            try:
+                child = os.open(part, _directory_open_flags(), dir_fd=current)
+            except OSError as error:
+                if error.errno == errno.ELOOP:
+                    _raise_symlink(destination.parent)
+                raise EvidenceError("E_PATH", f"destination parent is unavailable: {destination.parent}") from error
+            try:
+                if not stat.S_ISDIR(os.fstat(child).st_mode):
+                    raise EvidenceError("E_PATH", f"destination parent is not a directory: {destination.parent}")
+            except BaseException:
+                os.close(child)
+                raise
+            os.close(current)
+            current = child
+        return current
+    except BaseException:
+        os.close(current)
+        raise
 
-    _assert_existing_parent_chain(repo_root, destination)
+
+def _windows_final_path(descriptor: int) -> str:
+    """Read a Windows handle's canonical path; callers use it before writing."""
+    import ctypes
+    import msvcrt
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    function = kernel32.GetFinalPathNameByHandleW
+    function.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32]
+    function.restype = ctypes.c_uint32
+    handle = ctypes.c_void_p(msvcrt.get_osfhandle(descriptor))
+    size = 260
+    while True:
+        buffer = ctypes.create_unicode_buffer(size)
+        length = function(handle, buffer, size, 0)
+        if not length:
+            raise OSError(ctypes.get_last_error(), "GetFinalPathNameByHandleW failed")
+        if length < size:
+            return buffer.value
+        size = length + 1
+
+
+def _windows_is_relative_to(path: str, root: str) -> bool:
+    import ntpath
+
+    normalized_path = ntpath.normcase(ntpath.normpath(path))
+    normalized_root = ntpath.normcase(ntpath.normpath(root))
     try:
-        resolved_root = committed_root.resolve(strict=True)
-        resolved_parent = destination.parent.resolve(strict=True)
+        return ntpath.commonpath((normalized_path, normalized_root)) == normalized_root
+    except ValueError:
+        return False
+
+
+def _windows_mark_delete(descriptor: int) -> None:
+    """Delete precisely the open file handle, never a later pathname replacement."""
+    import ctypes
+    import msvcrt
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    function = kernel32.SetFileInformationByHandle
+    function.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
+    function.restype = ctypes.c_int
+    delete = ctypes.c_int(1)
+    if not function(
+        ctypes.c_void_p(msvcrt.get_osfhandle(descriptor)),
+        4,  # FileDispositionInfo
+        ctypes.byref(delete),
+        ctypes.sizeof(delete),
+    ):
+        raise OSError(ctypes.get_last_error(), "SetFileInformationByHandle failed")
+
+
+def _open_windows_exclusive(destination: Path, committed_root: Path) -> _CreatedTarget:
+    """Create once, then prove the opened Windows handle remains under the root."""
+    # Load both APIs before creating anything, so a missing safe cleanup path fails closed.
+    try:
+        root_descriptor = os.open(committed_root, os.O_RDONLY | getattr(os, "O_BINARY", 0))
+        try:
+            root_final = _windows_final_path(root_descriptor)
+        finally:
+            os.close(root_descriptor)
+        # Probe the exact-handle deletion API before creating a target.
+        import ctypes
+
+        ctypes.WinDLL("kernel32", use_last_error=True).SetFileInformationByHandle
     except OSError as error:
-        raise EvidenceError("E_PATH", f"destination parent is unavailable: {destination.parent}") from error
-    if not resolved_parent.is_relative_to(resolved_root):
-        raise EvidenceError("E_PATH", f"destination escapes platform-spike evidence: {destination}")
+        raise EvidenceError("E_PATH", f"Windows safe publication is unavailable: {destination}") from error
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+    try:
+        descriptor = os.open(destination, flags, 0o644)
+    except FileExistsError as error:
+        raise EvidenceError("E_IMMUTABLE", f"target already published: {destination}") from error
+    except OSError as error:
+        raise EvidenceError("E_PATH", f"destination is unavailable: {destination}") from error
+    created = _CreatedTarget(
+        descriptor=descriptor,
+        destination=destination,
+        identity=_identity(os.fstat(descriptor)),
+        windows_handle=True,
+    )
+    try:
+        if not _windows_is_relative_to(_windows_final_path(descriptor), root_final):
+            _windows_mark_delete(descriptor)
+            raise EvidenceError("E_PATH", f"destination escapes platform-spike evidence: {destination}")
+        return created
+    except BaseException:
+        if created.descriptor is not None:
+            os.close(created.descriptor)
+            created.descriptor = None  # type: ignore[assignment]
+        raise
+
+
+def _open_exclusive_target(repo_root: Path, committed_root: Path, destination: Path, immutable_message: str) -> _CreatedTarget:
+    """Open a fresh target without losing the verified parent to a pathname race."""
+    if _directory_fd_supported():
+        parent_descriptor = _open_verified_parent(repo_root, committed_root, destination)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            descriptor = os.open(destination.name, flags, 0o644, dir_fd=parent_descriptor)
+        except FileExistsError as error:
+            os.close(parent_descriptor)
+            raise EvidenceError("E_IMMUTABLE", immutable_message) from error
+        except OSError as error:
+            os.close(parent_descriptor)
+            if error.errno == errno.ELOOP:
+                _raise_symlink(destination)
+            raise EvidenceError("E_PATH", f"destination is unavailable: {destination}") from error
+        return _CreatedTarget(
+            descriptor=descriptor,
+            destination=destination,
+            identity=_identity(os.fstat(descriptor)),
+            parent_descriptor=parent_descriptor,
+            name=destination.name,
+        )
+    if os.name == "nt":
+        return _open_windows_exclusive(destination, committed_root)
+    raise EvidenceError("E_PATH", "safe descriptor-relative publication is unavailable on this platform")
+
+
+def _cleanup_created(target: _CreatedTarget | None) -> None:
+    if target is None or target.descriptor is None:
+        return
+    if target.windows_handle:
+        _windows_mark_delete(target.descriptor)
+        return
+    if target.parent_descriptor is not None and target.name is not None:
+        try:
+            actual = os.stat(target.name, dir_fd=target.parent_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        if stat.S_ISREG(actual.st_mode) and _identity(actual) == target.identity:
+            os.unlink(target.name, dir_fd=target.parent_descriptor)
+        return
+        return
+
+
+def _close_created(target: _CreatedTarget | None) -> None:
+    if target is None:
+        return
+    if target.descriptor is not None:
+        os.close(target.descriptor)
+        target.descriptor = None  # type: ignore[assignment]
+    if target.parent_descriptor is not None:
+        os.close(target.parent_descriptor)
+        target.parent_descriptor = None  # type: ignore[assignment]
+
+
+def _write_all(descriptor: int, content: bytes) -> None:
+    view = memoryview(content)
+    while view:
+        written = os.write(descriptor, view)
+        if written <= 0:
+            raise OSError("short write while publishing evidence")
+        view = view[written:]
 
 
 def _existing_destination(destination: Path) -> bool:
@@ -158,17 +357,6 @@ def _open_regular_source(source: Path) -> int:
         raise
 
 
-def _unlink_if_same(path: Path, expected: tuple[int, int] | None) -> None:
-    if expected is None:
-        return
-    try:
-        actual = path.lstat()
-    except FileNotFoundError:
-        return
-    if stat.S_ISREG(actual.st_mode) and _identity(actual) == expected:
-        path.unlink()
-
-
 def _copy_exclusive(
     source: Path,
     destination: Path,
@@ -181,40 +369,38 @@ def _copy_exclusive(
     if (repo_root is None) != (committed_root is None):
         raise ValueError("repo_root and committed_root must be supplied together")
     source_descriptor = _open_regular_source(source)
-    destination_descriptor: int | None = None
-    destination_identity: tuple[int, int] | None = None
+    created: _CreatedTarget | None = None
     try:
         if repo_root is not None and committed_root is not None:
-            _prepare_destination_parent(repo_root, committed_root, destination)
-        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
-        try:
-            destination_descriptor = os.open(destination, flags, 0o644)
-        except FileExistsError as error:
-            raise EvidenceError("E_IMMUTABLE", f"artifact already published: {destination}") from error
-        except OSError as error:
-            if error.errno == errno.ELOOP:
-                _raise_symlink(destination)
-            raise EvidenceError("E_PATH", f"artifact destination is unavailable: {destination}") from error
-        destination_identity = _identity(os.fstat(destination_descriptor))
+            created = _open_exclusive_target(
+                repo_root,
+                committed_root,
+                destination,
+                f"artifact already published: {destination}",
+            )
+        else:
+            created = _open_exclusive_target(
+                destination.parent,
+                destination.parent,
+                destination,
+                f"artifact already published: {destination}",
+            )
         digest = hashlib.sha256()
-        with os.fdopen(source_descriptor, "rb") as input_stream, os.fdopen(destination_descriptor, "wb") as output_stream:
-            source_descriptor = None
-            destination_descriptor = None
-            for block in iter(lambda: input_stream.read(65536), b""):
-                digest.update(block)
-                output_stream.write(block)
-            output_stream.flush()
-            os.fsync(output_stream.fileno())
+        while True:
+            block = os.read(source_descriptor, 65536)
+            if not block:
+                break
+            digest.update(block)
+            _write_all(created.descriptor, block)
+        os.fsync(created.descriptor)
         if digest.hexdigest() != expected_sha256:
             raise EvidenceError("E_CHECKSUM", f"published artifact checksum changed: {source}")
     except BaseException:
-        _unlink_if_same(destination, destination_identity)
+        _cleanup_created(created)
         raise
     finally:
-        if source_descriptor is not None:
-            os.close(source_descriptor)
-        if destination_descriptor is not None:
-            os.close(destination_descriptor)
+        os.close(source_descriptor)
+        _close_created(created)
 
 
 def record_to_json(record: EvidenceRecord) -> str:
@@ -256,20 +442,21 @@ def _write_record_exclusive(
     repo_root: Path,
     committed_root: Path,
 ) -> None:
-    _prepare_destination_parent(repo_root, committed_root, target)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    created: _CreatedTarget | None = None
     try:
-        descriptor = os.open(target, flags, 0o644)
-    except FileExistsError as error:
-        raise EvidenceError("E_IMMUTABLE", f"run already published: {run_id}") from error
-    except OSError as error:
-        if error.errno == errno.ELOOP:
-            _raise_symlink(target)
-        raise EvidenceError("E_PATH", f"evidence destination is unavailable: {target}") from error
-    with os.fdopen(descriptor, "wb") as stream:
-        stream.write(payload)
-        stream.flush()
-        os.fsync(stream.fileno())
+        created = _open_exclusive_target(
+            repo_root,
+            committed_root,
+            target,
+            f"run already published: {run_id}",
+        )
+        _write_all(created.descriptor, payload)
+        os.fsync(created.descriptor)
+    except BaseException:
+        _cleanup_created(created)
+        raise
+    finally:
+        _close_created(created)
 
 
 def publish_record(raw_path: Path, repo_root: Path) -> Path:
@@ -306,7 +493,6 @@ def publish_record(raw_path: Path, repo_root: Path) -> Path:
         raise EvidenceError("E_IMMUTABLE", f"run already published: {record.run_id}")
 
     for source, destination, expected_sha256 in targets:
-        _prepare_destination_parent(repo_root, committed_root, destination)
         _copy_exclusive(
             source,
             destination,
