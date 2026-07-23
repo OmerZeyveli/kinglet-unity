@@ -185,6 +185,7 @@ scripts/analyze-build-size.sh	ecu	1.5.0	scripts/analyze-build-size.sh	2219c66f7a
 scripts/check-provenance.sh	original	-	-	-	original	-
 scripts/detect-missing-refs.sh	ecu	1.5.0	scripts/detect-missing-refs.sh	89408c708bf8fde7374b4a0601f6ded140af3a8469480c6f3dd0b49f7355ec71	verbatim	-
 scripts/generate-claude-md.sh	ecu	1.5.0	scripts/generate-claude-md.sh	a834e4ce5f9cfa638ee24ac9e0433117dc75480a3f617baa1c2f14bc4dfd7f9e	modified	stdout-contract-fix: upstream wrote CLAUDE.md itself while logging to stdout; see MERGE-NOTES
+scripts/recompute-adapter-authorities.py	original	-	-	-	original	kinglet-adapter-authority-maintainer-command
 scripts/studio-doctor.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 scripts/validate-architecture.sh	ecu	1.5.0	scripts/validate-architecture.sh	14dc5e48d0bf775ab3793f811e05367ddfc727c240d8d3c0fe6d11155c1a3d4d	verbatim	-
 scripts/validate-asmdefs.sh	ecu	1.5.0	scripts/validate-asmdefs.sh	57688143049a14326a81ed6c3ca645528ee725e96588b61576799c5ee4b5f725	verbatim	-
@@ -238,6 +239,7 @@ tests/kinglet/fixtures/valid-minimal/src/workflows/unity-audit/workflow.json	ori
 tests/kinglet/test_loader.py	original	-	-	-	original	kinglet-canonical-loader-tests
 tests/kinglet/test_validator.py	original	-	-	-	original	kinglet-canonical-graph-validator-tests
 tools/kinglet_build/errors.py	original	-	-	-	original	kinglet-stable-build-diagnostics
+tools/kinglet_build/baseline.py	original	-	-	-	original	kinglet-migration-source-commit-verifier
 tools/kinglet_build/loader.py	original	-	-	-	original	kinglet-strict-canonical-and-adapter-loader
 tools/kinglet_build/model.py	original	-	-	-	original	kinglet-canonical-graph-and-adapter-models
 tools/kinglet_build/validator.py	original	-	-	-	original	kinglet-canonical-graph-and-adapter-validator

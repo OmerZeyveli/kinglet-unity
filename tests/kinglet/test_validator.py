@@ -207,6 +207,18 @@ class ValidatorTests(unittest.TestCase):
                     f"reference '{missing_id}' does not resolve to a canonical unit",
                 )
 
+    def test_rejects_non_iterable_workflow_references_without_type_error(self) -> None:
+        graph = self.replace_attributes("workflow.unity-audit", roles=7)
+
+        error = self.assert_build_error(
+            graph,
+            "invalid-workflow",
+            "roles",
+            "workflow reference IDs must be a tuple of strings",
+        )
+
+        self.assertNotIsInstance(error.__cause__, TypeError)
+
     def test_sorts_reference_ids_before_reporting_an_error(self) -> None:
         graph = self.replace_unit(
             "role.unity-scout",

@@ -1,4 +1,5 @@
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -82,6 +83,19 @@ def category_paths(category: str, paths: list[str]) -> list[str]:
     else:
         raise AssertionError(f"unknown inventory category: {category}")
     return sorted(selected)
+
+
+def source_commit_errors(
+    repository_root: Path,
+    source_commit: object,
+    records: list[dict[str, str]],
+) -> list[str]:
+    specification = importlib.util.find_spec("tools.kinglet_build.baseline")
+    if specification is None:
+        raise AssertionError("tools.kinglet_build.baseline must implement anchor checks")
+    from tools.kinglet_build.baseline import source_commit_errors as check
+
+    return check(repository_root, source_commit, records)
 
 
 def full_tree_errors(
@@ -204,6 +218,7 @@ class BaselineInventoryTests(unittest.TestCase):
 
     def test_tracked_legacy_paths_and_sha256_match_exactly(self) -> None:
         tracked = tracked_paths()
+        modes = tracked_modes()
         for category, expected_count in EXPECTED_COUNTS.items():
             with self.subTest(category=category):
                 records = self.baseline["categories"][category]["files"]
@@ -218,6 +233,101 @@ class BaselineInventoryTests(unittest.TestCase):
                     self.assertTrue(path.is_file(), f"missing inventory path: {record['path']}")
                     actual_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
                     self.assertEqual(record["sha256"], actual_sha256)
+                    self.assertEqual(record["git_mode"], modes.get(record["path"]))
+
+    def test_source_commit_is_ancestor_and_matches_every_baseline_record(self) -> None:
+        records = list(self.baseline["full_claude_tree"]["files"])
+        for category in EXPECTED_COUNTS:
+            records.extend(self.baseline["categories"][category]["files"])
+
+        self.assertEqual(
+            [],
+            source_commit_errors(
+                REPOSITORY_ROOT,
+                self.baseline.get("source_commit"),
+                records,
+            ),
+        )
+
+    def git(self, root: Path, *arguments: str) -> str:
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return completed.stdout.strip()
+
+    def make_git_fixture(
+        self,
+        directory: str,
+    ) -> tuple[Path, str, str, dict[str, str]]:
+        root = Path(directory) / "repository"
+        root.mkdir()
+        self.git(root, "init", "-q")
+        self.git(root, "config", "user.name", "Kinglet Test")
+        self.git(root, "config", "user.email", "kinglet@example.invalid")
+        self.git(root, "commit", "--allow-empty", "-q", "-m", "base")
+        base = self.git(root, "rev-parse", "HEAD")
+        payload = root / "payload.txt"
+        payload.write_bytes(b"anchored payload\n")
+        self.git(root, "add", "payload.txt")
+        self.git(root, "commit", "-q", "-m", "anchor")
+        anchor = self.git(root, "rev-parse", "HEAD")
+        record = {
+            "path": "payload.txt",
+            "sha256": hashlib.sha256(payload.read_bytes()).hexdigest(),
+            "git_mode": "100644",
+        }
+        return root, base, anchor, record
+
+    def test_source_commit_checks_reject_invalid_anchor_states(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root, base, anchor, record = self.make_git_fixture(directory)
+
+            for moving_reference in ("HEAD", anchor[:12]):
+                with self.subTest(moving_reference=moving_reference):
+                    self.assertEqual(
+                        [
+                            "source_commit must be a full lowercase Git object ID: "
+                            f"{moving_reference}"
+                        ],
+                        source_commit_errors(root, moving_reference, [record]),
+                    )
+
+            nonexistent = "0" * 40
+            self.assertEqual(
+                [f"source_commit is not a Git commit: {nonexistent}"],
+                source_commit_errors(root, nonexistent, [record]),
+            )
+
+            inconsistent = dict(record)
+            inconsistent["sha256"] = "f" * 64
+            inconsistent["git_mode"] = "100755"
+            self.assertEqual(
+                [
+                    "source_commit sha256 mismatch: payload.txt",
+                    "source_commit git mode mismatch: payload.txt "
+                    "(expected 100755, got 100644)",
+                ],
+                source_commit_errors(root, anchor, [inconsistent]),
+            )
+
+            missing = dict(record, path="missing.txt")
+            self.assertEqual(
+                ["source_commit missing path: missing.txt"],
+                source_commit_errors(root, anchor, [missing]),
+            )
+
+            self.git(root, "checkout", "-q", "--detach", base)
+            (root / "current.txt").write_text("current branch\n", encoding="utf-8")
+            self.git(root, "add", "current.txt")
+            self.git(root, "commit", "-q", "-m", "current")
+            self.assertEqual(
+                [f"source_commit is not an ancestor of HEAD: {anchor}"],
+                source_commit_errors(root, anchor, [record]),
+            )
 
     def test_policy_hooks_remain_executable_in_git_and_checkout(self) -> None:
         modes = tracked_modes()

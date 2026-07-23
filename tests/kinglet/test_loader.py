@@ -17,6 +17,64 @@ from tools.kinglet_build.model import (
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
+KIND_FIXTURES = {
+    "role": {
+        "reasoning_tier": "fast",
+        "evidence": ["references-valid"],
+    },
+    "workflow": {
+        "public_name": "generated-audit",
+        "stages": ["investigate", "verify", "report"],
+        "roles": ["role.unity-scout"],
+        "rules": ["rule.pc-console"],
+        "knowledge": ["knowledge.serialization"],
+        "inputs": ["task"],
+        "artifacts": ["audit-report"],
+        "evidence": ["references-valid"],
+        "failure_behavior": "Report the blocker.",
+        "mutation": False,
+    },
+    "knowledge": {
+        "public_name": "generated-knowledge",
+        "category": "core",
+        "references": [],
+        "scripts": [],
+    },
+    "rule": {
+        "scope": "unity",
+        "always_loaded": True,
+    },
+    "hook": {
+        "events": ["PreToolUse"],
+        "priority": 100,
+        "decision": "block",
+        "needs_jq": False,
+    },
+    "template": {
+        "public_name": "generated-template",
+        "output_name": "Generated.cs",
+        "language": "csharp",
+    },
+}
+
+KIND_BODY_NAMES = {
+    "role": "instructions.md",
+    "workflow": "instructions.md",
+    "knowledge": "SKILL.md",
+    "rule": "instructions.md",
+    "hook": "policy.sh",
+    "template": "content.md",
+}
+
+KIND_DIRECTORY_NAMES = {
+    "role": "roles",
+    "workflow": "workflows",
+    "knowledge": "knowledge",
+    "rule": "rules",
+    "hook": "hooks",
+    "template": "templates",
+}
+
 
 class LoaderTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -57,6 +115,45 @@ class LoaderTests(unittest.TestCase):
             str(raised.exception),
         )
         return raised.exception
+
+    def add_descriptor(
+        self,
+        root: Path,
+        kind: str,
+        attributes: dict[str, object] | None = None,
+    ) -> Path:
+        role = self.read_descriptor(root)
+        common = {
+            field: role[field]
+            for field in (
+                "schema_version",
+                "name",
+                "summary",
+                "capabilities",
+                "requires",
+                "support",
+                "provenance",
+            )
+        }
+        common.update(
+            {
+                "id": f"{kind}.schema-fixture",
+                "kind": kind,
+            }
+        )
+        common.update(KIND_FIXTURES[kind] if attributes is None else attributes)
+        directory = root / "src" / KIND_DIRECTORY_NAMES[kind] / "schema-fixture"
+        directory.mkdir(parents=True, exist_ok=True)
+        descriptor = directory / f"{kind}.json"
+        descriptor.write_text(
+            json.dumps(common, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        (directory / KIND_BODY_NAMES[kind]).write_text(
+            f"# {kind} schema fixture\n",
+            encoding="utf-8",
+        )
+        return descriptor
 
     def test_loads_valid_fixture_as_canonical_units(self) -> None:
         graph = load_graph(self.root)
@@ -223,6 +320,103 @@ class LoaderTests(unittest.TestCase):
                 error = self.assert_build_error("invalid-id", root)
 
                 self.assertEqual("id", error.field)
+
+    def test_rejects_malformed_kind_specific_fields_stably(self) -> None:
+        cases = (
+            ("role-missing", "role", "reasoning_tier", None, "missing-field"),
+            ("role-type", "role", "evidence", "report", "invalid-field"),
+            ("role-enum", "role", "reasoning_tier", "extreme", "invalid-field"),
+            (
+                "role-duplicate",
+                "role",
+                "evidence",
+                ["report", "report"],
+                "invalid-field",
+            ),
+            ("workflow-missing", "workflow", "public_name", None, "missing-field"),
+            ("workflow-type", "workflow", "stages", "verify", "invalid-field"),
+            (
+                "workflow-enum",
+                "workflow",
+                "stages",
+                ["investigate", "publish"],
+                "invalid-field",
+            ),
+            (
+                "workflow-duplicate",
+                "workflow",
+                "roles",
+                ["role.unity-scout", "role.unity-scout"],
+                "invalid-field",
+            ),
+            ("workflow-bool", "workflow", "mutation", 1, "invalid-field"),
+            ("knowledge-missing", "knowledge", "category", None, "missing-field"),
+            ("knowledge-type", "knowledge", "references", {}, "invalid-field"),
+            (
+                "knowledge-duplicate",
+                "knowledge",
+                "scripts",
+                ["scan.py", "scan.py"],
+                "invalid-field",
+            ),
+            ("rule-missing", "rule", "scope", None, "missing-field"),
+            ("rule-type", "rule", "scope", ["unity"], "invalid-field"),
+            ("rule-bool", "rule", "always_loaded", 1, "invalid-field"),
+            ("hook-missing", "hook", "events", None, "missing-field"),
+            ("hook-type", "hook", "priority", "100", "invalid-field"),
+            ("hook-enum", "hook", "decision", "deny", "invalid-field"),
+            (
+                "hook-duplicate",
+                "hook",
+                "events",
+                ["PreToolUse", "PreToolUse"],
+                "invalid-field",
+            ),
+            ("hook-bool-as-int", "hook", "priority", True, "invalid-field"),
+            ("hook-bool", "hook", "needs_jq", 1, "invalid-field"),
+            ("template-missing", "template", "language", None, "missing-field"),
+            ("template-type", "template", "output_name", 7, "invalid-field"),
+            ("template-enum", "template", "language", "yaml", "invalid-field"),
+        )
+        for index, (name, kind, field, value, code) in enumerate(cases):
+            with self.subTest(name=name, kind=kind, field=field):
+                root = self.copy_fixture(f"kind-schema-{index}")
+                attributes = dict(KIND_FIXTURES[kind])
+                if value is None:
+                    del attributes[field]
+                else:
+                    attributes[field] = value
+                descriptor = self.add_descriptor(root, kind, attributes)
+
+                error = self.assert_build_error(code, root)
+
+                self.assertEqual(descriptor, error.source)
+                self.assertEqual(field, error.field)
+                self.assertNotIsInstance(error.__cause__, TypeError)
+
+    def test_rejects_empty_required_kind_specific_values(self) -> None:
+        cases = (
+            ("role", "reasoning_tier", ""),
+            ("role", "evidence", []),
+            ("workflow", "public_name", "  "),
+            ("workflow", "roles", []),
+            ("workflow", "inputs", []),
+            ("knowledge", "category", ""),
+            ("rule", "scope", "  "),
+            ("hook", "events", []),
+            ("template", "public_name", ""),
+        )
+        for index, (kind, field, value) in enumerate(cases):
+            with self.subTest(kind=kind, field=field):
+                root = self.copy_fixture(f"empty-kind-schema-{index}")
+                attributes = dict(KIND_FIXTURES[kind])
+                attributes[field] = value
+                descriptor = self.add_descriptor(root, kind, attributes)
+
+                error = self.assert_build_error("invalid-field", root)
+
+                self.assertEqual(descriptor, error.source)
+                self.assertEqual(field, error.field)
 
     def test_loaded_graph_and_public_models_are_immutable(self) -> None:
         graph = load_graph(self.root)

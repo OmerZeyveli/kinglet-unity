@@ -35,8 +35,22 @@ _OUTPUT_ROOT_NAMES = {
     "codex": frozenset({"plugin", "project"}),
 }
 _ADAPTER_AUTHORITY_SHA256 = {
-    "claude": "a6c608aa9b7958afc91d5f4f35febb94a778fcde9cf5402bf09f9c7514a8d8de",
-    "codex": "7fdede81497571cd167155a868457bbaeb9dd853c9d90d443964a056f043f214",
+    "claude": {
+        "frontier_deep_contract": (
+            "ff683d53d63fcf744387d902c0c34082939fc06a763e3693011bedf169f961b8"
+        ),
+        "native_config_schema": (
+            "00f0047b5f4725a8d20c279badddc07324f602544e6bc9a93e17de886ecb71a6"
+        ),
+    },
+    "codex": {
+        "frontier_deep_contract": (
+            "7beb8d3e9755e44e54948fff048ada3b99e1d6ca5238f5cb3ee1086db754f920"
+        ),
+        "native_config_schema": (
+            "29146e1bc6a5334919744179afddcb5988a2a2237dc12ec28a5f19cbdd79d80d"
+        ),
+    },
 }
 
 
@@ -162,9 +176,20 @@ def _validate_references(
         ]
         if unit.kind == "workflow":
             for field, expected_kind in _WORKFLOW_REFERENCES:
+                raw_reference_ids = unit.attributes.get(field)
+                if not isinstance(raw_reference_ids, tuple) or not all(
+                    isinstance(reference_id, str)
+                    for reference_id in raw_reference_ids
+                ):
+                    raise _build_error(
+                        "invalid-workflow",
+                        _unit_source(unit),
+                        field,
+                        "workflow reference IDs must be a tuple of strings",
+                    )
                 references.extend(
                     (reference_id, field, expected_kind)
-                    for reference_id in unit.attributes.get(field, ())
+                    for reference_id in raw_reference_ids
                 )
         for reference_id, field, expected_kind in sorted(
             references,
@@ -327,7 +352,7 @@ def validate_adapter_profiles(
     sources: Mapping[str, Path],
     frontier_contracts: Mapping[str, Mapping[str, object]],
     native_config_schemas: Mapping[str, Mapping[str, object]],
-    authority_fingerprints: Mapping[str, str],
+    authority_fingerprints: Mapping[str, Mapping[str, str]],
 ) -> None:
     clients = frozenset(profiles)
     missing_clients = sorted(_ADAPTER_CLIENTS - clients)
@@ -447,13 +472,29 @@ def validate_adapter_profiles(
                     "frontier may not change fast or balanced configuration",
                 )
 
-        if authority_fingerprints[client] != _ADAPTER_AUTHORITY_SHA256[client]:
-            raise _build_error(
+        authority_checks = (
+            (
+                "frontier_deep_contract",
                 "invalid-frontier",
-                source,
-                "metadata.frontier_deep_contract",
                 "native frontier contract failed independent authority validation",
-            )
+            ),
+            (
+                "native_config_schema",
+                "invalid-native-config",
+                "native configuration schema failed independent authority validation",
+            ),
+        )
+        for field, code, detail in authority_checks:
+            if (
+                authority_fingerprints[client][field]
+                != _ADAPTER_AUTHORITY_SHA256[client][field]
+            ):
+                raise _build_error(
+                    code,
+                    source,
+                    f"metadata.{field}",
+                    detail,
+                )
 
         contract_effort = contract.get("reasoning_effort")
         contract_requirements = frozenset(

@@ -26,8 +26,6 @@
     "upstream_path": null,
     "upstream_sha256": null
   },
-  "scope": [
-    "unity"
-  ],
+  "scope": "unity",
   "always_loaded": true
 }

@@ -750,115 +750,143 @@
       "files": [
         {
           "path": ".claude/agents/creative-director.md",
-          "sha256": "10f3e7e737f02b428b097cc25a5818a68c14ace17af8ceac21dfaf00aaac0d0d"
+          "sha256": "10f3e7e737f02b428b097cc25a5818a68c14ace17af8ceac21dfaf00aaac0d0d",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/game-designer.md",
-          "sha256": "bee5af89734b08adca3d72878978a510a80963ee6dc1fe4dbfc4d352e2cf6e38"
+          "sha256": "bee5af89734b08adca3d72878978a510a80963ee6dc1fe4dbfc4d352e2cf6e38",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/level-designer.md",
-          "sha256": "f0155f92ec032d7f840e743133568d864aa2082f30d8fad4b4f6a1673a0b7b04"
+          "sha256": "f0155f92ec032d7f840e743133568d864aa2082f30d8fad4b4f6a1673a0b7b04",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/narrative-director.md",
-          "sha256": "a92354bbff95d365fa1cf9464e0a3a017d38cdf1c6b7ba77356018b687d0f147"
+          "sha256": "a92354bbff95d365fa1cf9464e0a3a017d38cdf1c6b7ba77356018b687d0f147",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/systems-designer.md",
-          "sha256": "9ac200afeea3b34b53ebde1e130c99ca3198d655ffd46c1d28c17c4c1182e336"
+          "sha256": "9ac200afeea3b34b53ebde1e130c99ca3198d655ffd46c1d28c17c4c1182e336",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/technical-director.md",
-          "sha256": "c91b57e0bcc71eca0cca4dfc66508ea94caec4a28edc9a7d346849bb32336cca"
+          "sha256": "c91b57e0bcc71eca0cca4dfc66508ea94caec4a28edc9a7d346849bb32336cca",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-build-runner.md",
-          "sha256": "380a62ab82e420d14215086e8ce2a570e7d9bbea3226956a880ac0598bdc7fd0"
+          "sha256": "380a62ab82e420d14215086e8ce2a570e7d9bbea3226956a880ac0598bdc7fd0",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-coder-lite.md",
-          "sha256": "9edeb8ed0ed180f227f9073cec2a69a2f992e9228794ae0e5450f399f4a127d2"
+          "sha256": "9edeb8ed0ed180f227f9073cec2a69a2f992e9228794ae0e5450f399f4a127d2",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-coder.md",
-          "sha256": "dcb5aedce694fb7941babd0ab678d102b641edf2621ef2ce5baa82df98177695"
+          "sha256": "dcb5aedce694fb7941babd0ab678d102b641edf2621ef2ce5baa82df98177695",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-critic.md",
-          "sha256": "3c51588178733c96374e42c431b5dacbd139e65d15fb9c523870cecd3906e85f"
+          "sha256": "3c51588178733c96374e42c431b5dacbd139e65d15fb9c523870cecd3906e85f",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-fixer-lite.md",
-          "sha256": "9e3b6112f39d7e86411166ffa5f564f649d2e4c5249027662102b639ef473bc4"
+          "sha256": "9e3b6112f39d7e86411166ffa5f564f649d2e4c5249027662102b639ef473bc4",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-fixer.md",
-          "sha256": "9399ae7f20d351c60f0e8f6388cb61c307914dc7ba478d472c7e3042def41def"
+          "sha256": "9399ae7f20d351c60f0e8f6388cb61c307914dc7ba478d472c7e3042def41def",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-git-master.md",
-          "sha256": "0d2515b980c9d38c4a91ded67fb3b68ad7590c113ce75c4a52b68e19fe1f924c"
+          "sha256": "0d2515b980c9d38c4a91ded67fb3b68ad7590c113ce75c4a52b68e19fe1f924c",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-linter.md",
-          "sha256": "550e21a76f0273734957d5a1cfdc04b9f24d78ffa8db2af96451cc69ad4a973a"
+          "sha256": "550e21a76f0273734957d5a1cfdc04b9f24d78ffa8db2af96451cc69ad4a973a",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-migrator.md",
-          "sha256": "499c36972c73021b3b25f651f5d423662967437a714703769c0667ccde495928"
+          "sha256": "499c36972c73021b3b25f651f5d423662967437a714703769c0667ccde495928",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-network-dev.md",
-          "sha256": "d3d989a38b5019f248e24092f04d8c1c392a9240b1b33f6cbb38b50dde3f1cc4"
+          "sha256": "d3d989a38b5019f248e24092f04d8c1c392a9240b1b33f6cbb38b50dde3f1cc4",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-optimizer.md",
-          "sha256": "de678a1fc23f1f0010f1420b5b12b918f8757a2f717959eb0ec54e391ef9e058"
+          "sha256": "de678a1fc23f1f0010f1420b5b12b918f8757a2f717959eb0ec54e391ef9e058",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-prototyper.md",
-          "sha256": "61ffc8763b27b3afdb6cdd8d33f25b6359fc50a45be395f6d877f4ea9437c762"
+          "sha256": "61ffc8763b27b3afdb6cdd8d33f25b6359fc50a45be395f6d877f4ea9437c762",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-reviewer.md",
-          "sha256": "65314e79231ab538b2de565a90422e273e23106354a6c1b4007d2929b490338c"
+          "sha256": "65314e79231ab538b2de565a90422e273e23106354a6c1b4007d2929b490338c",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-scene-builder.md",
-          "sha256": "fac0c0e1c8f4fa7e158573d2764d4cf8e73326103a2c88d46aa9cf28f7583588"
+          "sha256": "fac0c0e1c8f4fa7e158573d2764d4cf8e73326103a2c88d46aa9cf28f7583588",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-scout.md",
-          "sha256": "af8419f2b018f166fd0b51e902aa1a12d08e4d9b9120bf3e2cbebb407f21e191"
+          "sha256": "af8419f2b018f166fd0b51e902aa1a12d08e4d9b9120bf3e2cbebb407f21e191",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-security-reviewer.md",
-          "sha256": "f2cd99a8e11d9b49ab728a62270f096ab04383ee807a6d8e22b4ba01d34dc461"
+          "sha256": "f2cd99a8e11d9b49ab728a62270f096ab04383ee807a6d8e22b4ba01d34dc461",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-shader-dev.md",
-          "sha256": "d66146be33492e7edcd536c2401901ecee1dd263634d92bfb442679f86c7de43"
+          "sha256": "d66146be33492e7edcd536c2401901ecee1dd263634d92bfb442679f86c7de43",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-test-runner.md",
-          "sha256": "b95f7a1034dc371b0622926a11c6a1fe7a3066dab9dbc9fa4d2343a650ff01a9"
+          "sha256": "b95f7a1034dc371b0622926a11c6a1fe7a3066dab9dbc9fa4d2343a650ff01a9",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-ui-builder.md",
-          "sha256": "74baa28fd3222c7850c9040735675098bce736c73724d68dd311eb2e04eef3ae"
+          "sha256": "74baa28fd3222c7850c9040735675098bce736c73724d68dd311eb2e04eef3ae",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-verifier.md",
-          "sha256": "818a0d752093a9b5e7289d27a5ac05e14a44f98e21c95f381141e22b25b48311"
+          "sha256": "818a0d752093a9b5e7289d27a5ac05e14a44f98e21c95f381141e22b25b48311",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/world-builder.md",
-          "sha256": "a553c530043b0dc9be63e7bebcd436d08bbfb9d815d123d8f8be026bc4817eb0"
+          "sha256": "a553c530043b0dc9be63e7bebcd436d08bbfb9d815d123d8f8be026bc4817eb0",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/agents/writer.md",
-          "sha256": "10d202fdf068f8221108050056926eabcee275d4f0cc274cd9d9abfaba9a051b"
+          "sha256": "10d202fdf068f8221108050056926eabcee275d4f0cc274cd9d9abfaba9a051b",
+          "git_mode": "100644"
         }
       ]
     },
@@ -868,147 +896,183 @@
       "files": [
         {
           "path": ".claude/commands/brainstorm.md",
-          "sha256": "07cf75ec627904298b337b345b96d1be3f004ae090a3631da0d74c9198febce8"
+          "sha256": "07cf75ec627904298b337b345b96d1be3f004ae090a3631da0d74c9198febce8",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/design-review.md",
-          "sha256": "93e1ed237ff2f0d333030b3c313c1d1b4665df400ba15b30d4881c9831ee8738"
+          "sha256": "93e1ed237ff2f0d333030b3c313c1d1b4665df400ba15b30d4881c9831ee8738",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/design-system.md",
-          "sha256": "8825576a92d8e5d534699b223638e62774691e3782d758bc6bae691489e25b8d"
+          "sha256": "8825576a92d8e5d534699b223638e62774691e3782d758bc6bae691489e25b8d",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/estimate.md",
-          "sha256": "333b4cad0da445ef39e4ab5a45c982216ff7d570fd9abee01f36ad5899ba4e53"
+          "sha256": "333b4cad0da445ef39e4ab5a45c982216ff7d570fd9abee01f36ad5899ba4e53",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/map-systems.md",
-          "sha256": "b53eb59a89cb22e97c951ba0454be45babd036b702688241e8240cc3d2905798"
+          "sha256": "b53eb59a89cb22e97c951ba0454be45babd036b702688241e8240cc3d2905798",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/milestone-review.md",
-          "sha256": "98f881a90d1a20c9ec3a8241b8a6ad07b109879bdabd7284d5d6aef735325b16"
+          "sha256": "98f881a90d1a20c9ec3a8241b8a6ad07b109879bdabd7284d5d6aef735325b16",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/retrospective.md",
-          "sha256": "cada9afdb18eb579974fd31a1545ac04a36c667c71d0adac1cf34f701dc8fd97"
+          "sha256": "cada9afdb18eb579974fd31a1545ac04a36c667c71d0adac1cf34f701dc8fd97",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/scope-check.md",
-          "sha256": "639c56b6594a6b9c0803d636bd1692f5b6f23954f7905d40630494a987229084"
+          "sha256": "639c56b6594a6b9c0803d636bd1692f5b6f23954f7905d40630494a987229084",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/sprint-plan.md",
-          "sha256": "d8d1600c07d98c8c8d7c4a5d3d20a1f872893aa848194b27287528043214b2ae"
+          "sha256": "d8d1600c07d98c8c8d7c4a5d3d20a1f872893aa848194b27287528043214b2ae",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-audit.md",
-          "sha256": "bbc58f9480952ec81089b59f9541719a01e5418cb234d1ae0c76326cddfa5f4b"
+          "sha256": "bbc58f9480952ec81089b59f9541719a01e5418cb234d1ae0c76326cddfa5f4b",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-build.md",
-          "sha256": "7487a017d2b06c1de478bf61ea24ba89bf24786dc46468bb56851a945b560064"
+          "sha256": "7487a017d2b06c1de478bf61ea24ba89bf24786dc46468bb56851a945b560064",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-doctor.md",
-          "sha256": "9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588"
+          "sha256": "9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-feature.md",
-          "sha256": "b90e90bee6f79efc42a4a206d1da869d349b0ca4a10740e257626361e8a30ee2"
+          "sha256": "b90e90bee6f79efc42a4a206d1da869d349b0ca4a10740e257626361e8a30ee2",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-fix.md",
-          "sha256": "93509f96278a765492e4cfc6c5ad465c765c2382709e136c5a6f1d04509293b1"
+          "sha256": "93509f96278a765492e4cfc6c5ad465c765c2382709e136c5a6f1d04509293b1",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-init.md",
-          "sha256": "f12a6810e7ca56fdfb9cfff531fa9ae610da64535edf5a0e02d175b6243d8bb7"
+          "sha256": "f12a6810e7ca56fdfb9cfff531fa9ae610da64535edf5a0e02d175b6243d8bb7",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-instincts.md",
-          "sha256": "91e5bacfa25bab0c2fe1bee87bdb69a5dd6ddcc0b4fb9ed25cee64922a7bd6c4"
+          "sha256": "91e5bacfa25bab0c2fe1bee87bdb69a5dd6ddcc0b4fb9ed25cee64922a7bd6c4",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-interview.md",
-          "sha256": "704122a65fe760a3871ca8320cb100a396babccec232e645e7916bb7616107e8"
+          "sha256": "704122a65fe760a3871ca8320cb100a396babccec232e645e7916bb7616107e8",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-learn.md",
-          "sha256": "7ec4b1791d321d05e58449178eedf03fb8e9295494ab5d1b4b96ff539548950e"
+          "sha256": "7ec4b1791d321d05e58449178eedf03fb8e9295494ab5d1b4b96ff539548950e",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-migrate.md",
-          "sha256": "bc66c34bc991031cf9ddbbfea07858da3739dffdd772dde3d5928d64df01cd9e"
+          "sha256": "bc66c34bc991031cf9ddbbfea07858da3739dffdd772dde3d5928d64df01cd9e",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-network.md",
-          "sha256": "59b0d72edb8a453712ad45a317dd9515e7a0d4474f7df2268024b6f55e640b82"
+          "sha256": "59b0d72edb8a453712ad45a317dd9515e7a0d4474f7df2268024b6f55e640b82",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-optimize.md",
-          "sha256": "9293dc16b92a1d6404dde865e292a7c1e10effbbc31a1d92c686b8fbc01a80d9"
+          "sha256": "9293dc16b92a1d6404dde865e292a7c1e10effbbc31a1d92c686b8fbc01a80d9",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-profile.md",
-          "sha256": "f289ce04705202403fdeea6c9cc093819eda706443433b72fb58444c831b2052"
+          "sha256": "f289ce04705202403fdeea6c9cc093819eda706443433b72fb58444c831b2052",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-prototype.md",
-          "sha256": "45cf4331dd68ef583cad14dbc7ff4530a0e3ae695447111b9bf02fa6afe56445"
+          "sha256": "45cf4331dd68ef583cad14dbc7ff4530a0e3ae695447111b9bf02fa6afe56445",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-ralph.md",
-          "sha256": "93d0618e35e6dbe47cb6fee5cb9ceb35db181f9930bfccc9290c6bc756148e82"
+          "sha256": "93d0618e35e6dbe47cb6fee5cb9ceb35db181f9930bfccc9290c6bc756148e82",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-review.md",
-          "sha256": "0d2157690d353155c211d8f1d2b77b8144c99fe7e871a14cef0a3d5a4ebabe79"
+          "sha256": "0d2157690d353155c211d8f1d2b77b8144c99fe7e871a14cef0a3d5a4ebabe79",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-scene.md",
-          "sha256": "a17ccc17146d7d20ba2905b425c12a832bd02922ae7caa947fe5404870552dcf"
+          "sha256": "a17ccc17146d7d20ba2905b425c12a832bd02922ae7caa947fe5404870552dcf",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-session-resume.md",
-          "sha256": "fdb626d4c5d662ba76db920119fb09271a54f8306cc941e7b576aaae6d58e707"
+          "sha256": "fdb626d4c5d662ba76db920119fb09271a54f8306cc941e7b576aaae6d58e707",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-session-save.md",
-          "sha256": "5272521300e9812a0296a80b4ffdb0e13be233c00c748289a793f9ec0e8190a4"
+          "sha256": "5272521300e9812a0296a80b4ffdb0e13be233c00c748289a793f9ec0e8190a4",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-sessions.md",
-          "sha256": "698613ac90dc2fef7fec530fcef6eed6810d7a42fc417ff5a4550a00c60575d0"
+          "sha256": "698613ac90dc2fef7fec530fcef6eed6810d7a42fc417ff5a4550a00c60575d0",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-shader.md",
-          "sha256": "dab5acafbcedb3bfcbf076249246895f5c9c77a8f357ebb1dbe3c59cbc37322b"
+          "sha256": "dab5acafbcedb3bfcbf076249246895f5c9c77a8f357ebb1dbe3c59cbc37322b",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-skill-stocktake.md",
-          "sha256": "8284295165da34dd89b13de67cbc29fc006207a3eafaf1b8dd96cea4a09960e0"
+          "sha256": "8284295165da34dd89b13de67cbc29fc006207a3eafaf1b8dd96cea4a09960e0",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-skillify.md",
-          "sha256": "2e68f812411f297710848abe7129352112feabdd054e0576b10a8ef49e15b7f8"
+          "sha256": "2e68f812411f297710848abe7129352112feabdd054e0576b10a8ef49e15b7f8",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-team.md",
-          "sha256": "91cf687430751c36f2e600916c6b955033c813a6f800f42edb36a47dd0add027"
+          "sha256": "91cf687430751c36f2e600916c6b955033c813a6f800f42edb36a47dd0add027",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-test.md",
-          "sha256": "e0506c46598807898b7d35ea37e25847eac6e1b680558c3e1e698698e0c684aa"
+          "sha256": "e0506c46598807898b7d35ea37e25847eac6e1b680558c3e1e698698e0c684aa",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-ui.md",
-          "sha256": "c489321ee43a95a2e2795f911fa5872c366deeb48346270814e2ff83d613f395"
+          "sha256": "c489321ee43a95a2e2795f911fa5872c366deeb48346270814e2ff83d613f395",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-workflow.md",
-          "sha256": "1f3aa643c1054281f3e2f60fa3bb77801d504567b1be111101606343e7ed8170"
+          "sha256": "1f3aa643c1054281f3e2f60fa3bb77801d504567b1be111101606343e7ed8170",
+          "git_mode": "100644"
         }
       ]
     },
@@ -1018,159 +1082,198 @@
       "files": [
         {
           "path": ".claude/skills/core/assembly-definitions/SKILL.md",
-          "sha256": "d677e254a933b4a8c95346fa26b5fd88937e9721a65571e9a10f04caf6738a9e"
+          "sha256": "d677e254a933b4a8c95346fa26b5fd88937e9721a65571e9a10f04caf6738a9e",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/commit-trailers/SKILL.md",
-          "sha256": "900218e54f1a53bcdfb23003e1cf8ff7ee78fcc834f280ec0872a5ad04e359b1"
+          "sha256": "900218e54f1a53bcdfb23003e1cf8ff7ee78fcc834f280ec0872a5ad04e359b1",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/deep-interview/SKILL.md",
-          "sha256": "b3009bcb169526bb598052222996990e39cdc6ea205d3c50ae8a6daab93f44e6"
+          "sha256": "b3009bcb169526bb598052222996990e39cdc6ea205d3c50ae8a6daab93f44e6",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/event-systems/SKILL.md",
-          "sha256": "1c07a8782b07d559d1f89ec75b5e293b4925d730cb48bd8e656bf209f5bb5ecb"
+          "sha256": "1c07a8782b07d559d1f89ec75b5e293b4925d730cb48bd8e656bf209f5bb5ecb",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/hud-statusline/SKILL.md",
-          "sha256": "05a87e99fdeb1f50e5fdc83ef54fe78b5b5c886bc0e6d49b21624b220c8afc85"
+          "sha256": "05a87e99fdeb1f50e5fdc83ef54fe78b5b5c886bc0e6d49b21624b220c8afc85",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/learner/SKILL.md",
-          "sha256": "e06d3789b97d6d1f621d31554cfd6cb76cc9c21e2128bb8c16e34d0a9430b2ca"
+          "sha256": "e06d3789b97d6d1f621d31554cfd6cb76cc9c21e2128bb8c16e34d0a9430b2ca",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/model-routing/SKILL.md",
-          "sha256": "c61790b1f83e1f065c6e047ca629bf07a78452c7aa4528935573b234849330eb"
+          "sha256": "c61790b1f83e1f065c6e047ca629bf07a78452c7aa4528935573b234849330eb",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/object-pooling/SKILL.md",
-          "sha256": "cb043c0ec2c5819470638bcc1d878601cbfe57514e01dbe045bb02f9686f2bb2"
+          "sha256": "cb043c0ec2c5819470638bcc1d878601cbfe57514e01dbe045bb02f9686f2bb2",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/scriptable-objects/SKILL.md",
-          "sha256": "82048f28aa681bf803948dd0c1b89085abb9e2bf26a35cdb0cd6a07290969d55"
+          "sha256": "82048f28aa681bf803948dd0c1b89085abb9e2bf26a35cdb0cd6a07290969d55",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/serialization-safety/SKILL.md",
-          "sha256": "fc420ccc484f896f8a462e74fb6088c9522b22124f27ca533266246187ab7bf1"
+          "sha256": "fc420ccc484f896f8a462e74fb6088c9522b22124f27ca533266246187ab7bf1",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/unity-instincts/SKILL.md",
-          "sha256": "bf3c30b206c659bfd6e744c9a6a49f0b31648bff019652795ab4835c9f8525a7"
+          "sha256": "bf3c30b206c659bfd6e744c9a6a49f0b31648bff019652795ab4835c9f8525a7",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/core/unity-mcp-patterns/SKILL.md",
-          "sha256": "daff325c0e78558b8efb15504bb6f23e0c19b233e82e06979c03b549b1f081a1"
+          "sha256": "daff325c0e78558b8efb15504bb6f23e0c19b233e82e06979c03b549b1f081a1",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/gameplay/character-controller/SKILL.md",
-          "sha256": "c6b5fb0beb977a67fe15d980fef6552a2d363d2a4da7287427098ee5f51c0afe"
+          "sha256": "c6b5fb0beb977a67fe15d980fef6552a2d363d2a4da7287427098ee5f51c0afe",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/gameplay/dialogue-system/SKILL.md",
-          "sha256": "e6aa3e268148f0d5ac57da855dc7ab6d3e4e0fead535c82fa0df7eb4cb6b61d4"
+          "sha256": "e6aa3e268148f0d5ac57da855dc7ab6d3e4e0fead535c82fa0df7eb4cb6b61d4",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/gameplay/inventory-system/SKILL.md",
-          "sha256": "b59106ca73cc59237019f2e14100a0c10aad402de7c25e7f3fb3ed779760bdaa"
+          "sha256": "b59106ca73cc59237019f2e14100a0c10aad402de7c25e7f3fb3ed779760bdaa",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/gameplay/procedural-generation/SKILL.md",
-          "sha256": "8672ae604cb075ad532d93031d8a181c8d11e76884a3db8b41c63cf0454b322d"
+          "sha256": "8672ae604cb075ad532d93031d8a181c8d11e76884a3db8b41c63cf0454b322d",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/gameplay/save-system/SKILL.md",
-          "sha256": "deab1c9d2aaf985a23d22909b57483eada07d198df4546787ff27e5924a11079"
+          "sha256": "deab1c9d2aaf985a23d22909b57483eada07d198df4546787ff27e5924a11079",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/gameplay/state-machine/SKILL.md",
-          "sha256": "5cbf57d364ee60156eb3edd3c849338e50ac9cb2b92f6d2b64788d1ce01ab1f3"
+          "sha256": "5cbf57d364ee60156eb3edd3c849338e50ac9cb2b92f6d2b64788d1ce01ab1f3",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/genre/idle-clicker/SKILL.md",
-          "sha256": "d7f380b46212f559153fed025d541a959ec78f82038f764238cfa80ce63a4d25"
+          "sha256": "d7f380b46212f559153fed025d541a959ec78f82038f764238cfa80ce63a4d25",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/genre/match3/SKILL.md",
-          "sha256": "acbca4152d09b45460688919aa2a203bfa5205bff09d3699aca8e5e6850790ff"
+          "sha256": "acbca4152d09b45460688919aa2a203bfa5205bff09d3699aca8e5e6850790ff",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/genre/platformer-2d/SKILL.md",
-          "sha256": "9b21e1e6d5e1415dfe4f25095bdb12fedf7d8737aaea3afd9bf423b15e9cd680"
+          "sha256": "9b21e1e6d5e1415dfe4f25095bdb12fedf7d8737aaea3afd9bf423b15e9cd680",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/genre/puzzle/SKILL.md",
-          "sha256": "53e3b3d0149a1f3562ced2c6d4eb978f621ae205011858386a567e8cbfd877e4"
+          "sha256": "53e3b3d0149a1f3562ced2c6d4eb978f621ae205011858386a567e8cbfd877e4",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/genre/rpg/SKILL.md",
-          "sha256": "a77c5e2f2db4e9d8035f64a91eebc0d8c9c04ac93dca15980c1890c035a3ac8f"
+          "sha256": "a77c5e2f2db4e9d8035f64a91eebc0d8c9c04ac93dca15980c1890c035a3ac8f",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/genre/topdown/SKILL.md",
-          "sha256": "c84b3066a8191c4e49671b020639cf3a4fd88e30f558f53fd6246c4d0a8777a8"
+          "sha256": "c84b3066a8191c4e49671b020639cf3a4fd88e30f558f53fd6246c4d0a8777a8",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/addressables/SKILL.md",
-          "sha256": "23ec75e5a6d101fddb741ca58676b0ecb4d94567c69d2ad1ca11fd18fe1c76ac"
+          "sha256": "23ec75e5a6d101fddb741ca58676b0ecb4d94567c69d2ad1ca11fd18fe1c76ac",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/animation/SKILL.md",
-          "sha256": "2314a56988e1e0e2a34bde77ad12fe34b2ed454435ad37f79755e870e085044e"
+          "sha256": "2314a56988e1e0e2a34bde77ad12fe34b2ed454435ad37f79755e870e085044e",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/audio/SKILL.md",
-          "sha256": "af33d218db8399b8c0c726626105f003063eadd749ec937bab5abed50abfca63"
+          "sha256": "af33d218db8399b8c0c726626105f003063eadd749ec937bab5abed50abfca63",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/cinemachine/SKILL.md",
-          "sha256": "77a2390fb7056145678e669abc29e44ce6263b64f0311639397358e4bafae900"
+          "sha256": "77a2390fb7056145678e669abc29e44ce6263b64f0311639397358e4bafae900",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/input-system/SKILL.md",
-          "sha256": "e002d5aafa2169cb217d060c09b59279d8d67e54167c0a5881b288f984be5977"
+          "sha256": "e002d5aafa2169cb217d060c09b59279d8d67e54167c0a5881b288f984be5977",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/navmesh/SKILL.md",
-          "sha256": "f06dc9b984a1d21103b4d097ea8486d3b70014a507d66d5c058c2eaf173bea43"
+          "sha256": "f06dc9b984a1d21103b4d097ea8486d3b70014a507d66d5c058c2eaf173bea43",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/physics/SKILL.md",
-          "sha256": "873a6554f6733887dc1f48efb6fe49810f02b7ff58698e8493fd7e7eefe42dc5"
+          "sha256": "873a6554f6733887dc1f48efb6fe49810f02b7ff58698e8493fd7e7eefe42dc5",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/shader-graph/SKILL.md",
-          "sha256": "dc8d06f692cbd5ab59e26fa9043056e499bcc94f0c42479b5f440fc84b4332e9"
+          "sha256": "dc8d06f692cbd5ab59e26fa9043056e499bcc94f0c42479b5f440fc84b4332e9",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/ui-toolkit/SKILL.md",
-          "sha256": "540cb79e01ccd11f4719029721676904e8130dd09119f95a352285a019ea9f43"
+          "sha256": "540cb79e01ccd11f4719029721676904e8130dd09119f95a352285a019ea9f43",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systems/urp-pipeline/SKILL.md",
-          "sha256": "816a7a4d5311b8c0a88c8253e3681f86923c8faeee904ee966ab88885a1d2ce1"
+          "sha256": "816a7a4d5311b8c0a88c8253e3681f86923c8faeee904ee966ab88885a1d2ce1",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/third-party/dotween/SKILL.md",
-          "sha256": "60225630a66ce1dd685914820af6c087730fec0b16fd77e628ddd5f1d7fb2592"
+          "sha256": "60225630a66ce1dd685914820af6c087730fec0b16fd77e628ddd5f1d7fb2592",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/third-party/odin-inspector/SKILL.md",
-          "sha256": "076417fa1bcc2a2e40eaf716fb5d2cfdb5927437d13fa06e459144c4eb387cbe"
+          "sha256": "076417fa1bcc2a2e40eaf716fb5d2cfdb5927437d13fa06e459144c4eb387cbe",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/third-party/textmeshpro/SKILL.md",
-          "sha256": "1d75b3002e3e6b9f70a15acec59413661ded3977d83a3f8bf04d7aeee8b13814"
+          "sha256": "1d75b3002e3e6b9f70a15acec59413661ded3977d83a3f8bf04d7aeee8b13814",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/third-party/unitask/SKILL.md",
-          "sha256": "9ce57e1865fe9c2d4cf3f12d4b3996ec5760eea16e7a45bf0118f8a28573ef82"
+          "sha256": "9ce57e1865fe9c2d4cf3f12d4b3996ec5760eea16e7a45bf0118f8a28573ef82",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/skills/third-party/vcontainer/SKILL.md",
-          "sha256": "af0249e81e0438edf547cec0c4b7282365f6fe451fd180a26d879d407c8448fe"
+          "sha256": "af0249e81e0438edf547cec0c4b7282365f6fe451fd180a26d879d407c8448fe",
+          "git_mode": "100644"
         }
       ]
     },
@@ -1316,27 +1419,33 @@
       "files": [
         {
           "path": ".claude/rules/architecture.md",
-          "sha256": "36aac42cb968d1b6cf09eb874bdd0649453094ed89b5c4583952dd163d432714"
+          "sha256": "36aac42cb968d1b6cf09eb874bdd0649453094ed89b5c4583952dd163d432714",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/rules/csharp-unity.md",
-          "sha256": "713eb2c97c39d1c791325bd749f87aed92895ee0c94464c4eb72e7dd167fa986"
+          "sha256": "713eb2c97c39d1c791325bd749f87aed92895ee0c94464c4eb72e7dd167fa986",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/rules/pc-console.md",
-          "sha256": "19c266510d5b0d9f906a2a765aef412869cddf46dcc793702a7c14668c6de78b"
+          "sha256": "19c266510d5b0d9f906a2a765aef412869cddf46dcc793702a7c14668c6de78b",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/rules/performance.md",
-          "sha256": "757676620b64b53761f27499a6939693a27612d153d004f90b04407aa246a2ca"
+          "sha256": "757676620b64b53761f27499a6939693a27612d153d004f90b04407aa246a2ca",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/rules/serialization.md",
-          "sha256": "64d2bf49758afc495e3898225dc0d31282f66a09eecf0c1a7a9074c376ca4ae9"
+          "sha256": "64d2bf49758afc495e3898225dc0d31282f66a09eecf0c1a7a9074c376ca4ae9",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/rules/unity-specifics.md",
-          "sha256": "1c93ba08a78bd9e1163dbad92b75d6c198e8d6beb54fb24458d3d446b61aca34"
+          "sha256": "1c93ba08a78bd9e1163dbad92b75d6c198e8d6beb54fb24458d3d446b61aca34",
+          "git_mode": "100644"
         }
       ]
     },
@@ -1346,23 +1455,28 @@
       "files": [
         {
           "path": ".claude/templates/architecture-decision-record.md",
-          "sha256": "f431c45c91b8de23709e6c8520653b12eb28b4250cb0f853b98ab2d3509853e1"
+          "sha256": "f431c45c91b8de23709e6c8520653b12eb28b4250cb0f853b98ab2d3509853e1",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/templates/game-concept.md",
-          "sha256": "155481ca3249400ddf96a4bf59b8ce646c44ec57f2ecd165f069e6fdfad75b10"
+          "sha256": "155481ca3249400ddf96a4bf59b8ce646c44ec57f2ecd165f069e6fdfad75b10",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/templates/game-design-document.md",
-          "sha256": "b83503c8fe5f4cd271b3b0a2b1fea7ce760250a2a4f9d236721b73cd62fac215"
+          "sha256": "b83503c8fe5f4cd271b3b0a2b1fea7ce760250a2a4f9d236721b73cd62fac215",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/templates/sprint-plan.md",
-          "sha256": "b3372faa8c3ceff172ebcbd80a018b675ab67aa4e24d5b00c1b0280220414bdd"
+          "sha256": "b3372faa8c3ceff172ebcbd80a018b675ab67aa4e24d5b00c1b0280220414bdd",
+          "git_mode": "100644"
         },
         {
           "path": ".claude/templates/systems-index.md",
-          "sha256": "a521e2ff6d3ab86ffff200ed5e02aa2786df2ad9f38914f3af2141ece9d5d0eb"
+          "sha256": "a521e2ff6d3ab86ffff200ed5e02aa2786df2ad9f38914f3af2141ece9d5d0eb",
+          "git_mode": "100644"
         }
       ]
     },
@@ -1372,43 +1486,53 @@
       "files": [
         {
           "path": "templates/AssemblyDefinition.asmdef.template",
-          "sha256": "b8826785ae4c4b36772431674c973bc2d044c6d9f62b4860c0aa760ae2f18b4f"
+          "sha256": "b8826785ae4c4b36772431674c973bc2d044c6d9f62b4860c0aa760ae2f18b4f",
+          "git_mode": "100644"
         },
         {
           "path": "templates/EditModeTest.cs.template",
-          "sha256": "4c42c779fd5c92de956d6f7d5bf090611e7e94b1799a55726706e059ab377473"
+          "sha256": "4c42c779fd5c92de956d6f7d5bf090611e7e94b1799a55726706e059ab377473",
+          "git_mode": "100644"
         },
         {
           "path": "templates/LifetimeScope.cs.template",
-          "sha256": "c889bd913782d3b51d2d31af5aae87db4715097d7ef448b11c1cbe22c36523ad"
+          "sha256": "c889bd913782d3b51d2d31af5aae87db4715097d7ef448b11c1cbe22c36523ad",
+          "git_mode": "100644"
         },
         {
           "path": "templates/Message.cs.template",
-          "sha256": "0be5202fc6aed014525edb075491286426ded651924a891765991b6a70b86a11"
+          "sha256": "0be5202fc6aed014525edb075491286426ded651924a891765991b6a70b86a11",
+          "git_mode": "100644"
         },
         {
           "path": "templates/Model.cs.template",
-          "sha256": "62d735ed8b09576d25a568f63cbff474cca743acfd4fe986762d30b7ece1d17e"
+          "sha256": "62d735ed8b09576d25a568f63cbff474cca743acfd4fe986762d30b7ece1d17e",
+          "git_mode": "100644"
         },
         {
           "path": "templates/MonoBehaviour.cs.template",
-          "sha256": "9fc3284a7645b8d2c0f7c5b8ca395ba0506636ca5c8844314219c764749c3a0e"
+          "sha256": "9fc3284a7645b8d2c0f7c5b8ca395ba0506636ca5c8844314219c764749c3a0e",
+          "git_mode": "100644"
         },
         {
           "path": "templates/PlayModeTest.cs.template",
-          "sha256": "1236fc9865c5679e0fb700f8ba8b56244f0492aaad9c73eda5f8028f1cafcc40"
+          "sha256": "1236fc9865c5679e0fb700f8ba8b56244f0492aaad9c73eda5f8028f1cafcc40",
+          "git_mode": "100644"
         },
         {
           "path": "templates/ScriptableObject.cs.template",
-          "sha256": "f005198fc1fbcb3ffa8e1bb6e59683c956f51b5b42c22a5565dcc8df9d0f530e"
+          "sha256": "f005198fc1fbcb3ffa8e1bb6e59683c956f51b5b42c22a5565dcc8df9d0f530e",
+          "git_mode": "100644"
         },
         {
           "path": "templates/System.cs.template",
-          "sha256": "44eabd3ede128feee0df904d5f55e84fcd034d874a2dae4b9f67f188c01ca4d5"
+          "sha256": "44eabd3ede128feee0df904d5f55e84fcd034d874a2dae4b9f67f188c01ca4d5",
+          "git_mode": "100644"
         },
         {
           "path": "templates/View.cs.template",
-          "sha256": "c77939301d6476dfd52d8496bc5aad0fff1b1c2f41972616ed664fca8f692dbd"
+          "sha256": "c77939301d6476dfd52d8496bc5aad0fff1b1c2f41972616ed664fca8f692dbd",
+          "git_mode": "100644"
         }
       ]
     }

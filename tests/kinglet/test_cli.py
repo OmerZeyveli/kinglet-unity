@@ -17,20 +17,31 @@ FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class FakeRenderer:
-    def __init__(self, client: str, calls: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        client: str,
+        calls: list[str] | None = None,
+        rendered_by_root: object | None = None,
+    ) -> None:
         self.client = client
         self.calls = calls
+        self.rendered_by_root = rendered_by_root
 
-    def render(self, graph, profile) -> tuple[RenderedFile, ...]:
+    def render(self, graph, profile):
         if self.calls is not None:
             self.calls.append(self.client)
-        return (
-            RenderedFile(
-                path=PurePosixPath("artifact.md"),
-                content=f"{self.client}\r\n".encode(),
-                source_ids=("role.unity-scout",),
-            ),
-        )
+        if self.rendered_by_root is not None:
+            return self.rendered_by_root
+        return {
+            root_name: (
+                RenderedFile(
+                    path=PurePosixPath("artifact.md"),
+                    content=f"{self.client}:{root_name}\r\n".encode(),
+                    source_ids=("role.unity-scout",),
+                ),
+            )
+            for root_name in profile.output_roots
+        }
 
 
 class CliTests(unittest.TestCase):
@@ -80,6 +91,19 @@ class CliTests(unittest.TestCase):
         self.assertIn("[invalid-schema-version]", stderr)
         self.assertTrue(stderr.startswith("validation error: "))
 
+    def test_kind_specific_schema_error_exits_two_without_type_error(self) -> None:
+        descriptor = self.root / "src" / "rules" / "pc-console" / "rule.json"
+        data = json.loads(descriptor.read_text(encoding="utf-8"))
+        data["scope"] = ["unity"]
+        descriptor.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+        exit_code, stdout, stderr = self.invoke(["validate"])
+
+        self.assertEqual(2, exit_code)
+        self.assertEqual("", stdout)
+        self.assertIn(":scope: [invalid-field]", stderr)
+        self.assertNotIn("TypeError", stderr)
+
     def test_empty_registry_builds_no_products_and_reports_zero_files(self) -> None:
         cli = self.cli()
         with mock.patch.object(cli, "renderer_registry", return_value={}):
@@ -99,7 +123,7 @@ class CliTests(unittest.TestCase):
     def test_build_all_loads_once_renders_in_client_order_and_writes_four_roots(self) -> None:
         cli = self.cli()
         calls: list[str] = []
-        destinations: list[Path] = []
+        rendered_by_destination: dict[Path, bytes] = {}
         registry = {
             "codex": FakeRenderer("codex", calls),
             "claude": FakeRenderer("claude", calls),
@@ -108,7 +132,7 @@ class CliTests(unittest.TestCase):
         def record_write(files, destination, *, check):
             self.assertFalse(check)
             self.assertEqual(1, len(files))
-            destinations.append(destination)
+            rendered_by_destination[destination] = files[0].content
             return cli.WriteResult(changed=(), stale=())
 
         with (
@@ -140,10 +164,143 @@ class CliTests(unittest.TestCase):
                 self.root / "packages" / "codex-project",
                 self.root / "plugins" / "kinglet-unity",
             },
-            set(destinations),
+            set(rendered_by_destination),
         )
+        self.assertEqual(
+            {
+                self.root / ".claude": b"claude:compatibility\r\n",
+                self.root / "packages" / "claude": b"claude:package\r\n",
+                self.root / "packages" / "codex-project": b"codex:project\r\n",
+                self.root / "plugins" / "kinglet-unity": b"codex:plugin\r\n",
+            },
+            rendered_by_destination,
+        )
+        self.assertEqual("Built 4 rendered files.\n", stdout)
+        self.assertEqual("", stderr)
+
+    def test_build_keeps_same_relative_path_isolated_between_roots(self) -> None:
+        cli = self.cli()
+        registry = {"codex": FakeRenderer("codex")}
+
+        with mock.patch.object(cli, "renderer_registry", return_value=registry):
+            exit_code, stdout, stderr = self.invoke(["build", "--codex"])
+
+        self.assertEqual(0, exit_code)
         self.assertEqual("Built 2 rendered files.\n", stdout)
         self.assertEqual("", stderr)
+        self.assertEqual(
+            b"codex:plugin\n",
+            (self.root / "plugins" / "kinglet-unity" / "artifact.md").read_bytes(),
+        )
+        self.assertEqual(
+            b"codex:project\n",
+            (self.root / "packages" / "codex-project" / "artifact.md").read_bytes(),
+        )
+
+    def test_renderer_root_keys_must_exactly_match_profile_before_writes(self) -> None:
+        cli = self.cli()
+        valid_file = RenderedFile(
+            path=PurePosixPath("artifact.md"),
+            content=b"body\n",
+            source_ids=("role.unity-scout",),
+        )
+        cases = (
+            (
+                "missing",
+                {"package": (valid_file,)},
+                "renderer for claude is missing output root: compatibility",
+            ),
+            (
+                "unknown",
+                {
+                    "compatibility": (valid_file,),
+                    "package": (valid_file,),
+                    "unknown": (valid_file,),
+                },
+                "renderer for claude returned unknown output root: unknown",
+            ),
+        )
+        for name, rendered, diagnostic in cases:
+            with self.subTest(name=name):
+                registry = {
+                    "claude": FakeRenderer(
+                        "claude",
+                        rendered_by_root=rendered,
+                    )
+                }
+                with (
+                    mock.patch.object(cli, "renderer_registry", return_value=registry),
+                    mock.patch.object(cli, "write_product") as write_product,
+                ):
+                    exit_code, stdout, stderr = self.invoke(["build", "--claude"])
+
+                self.assertEqual(2, exit_code)
+                self.assertEqual("", stdout)
+                self.assertEqual(f"build error: {diagnostic}\n", stderr)
+                write_product.assert_not_called()
+
+    def test_renderer_values_must_be_tuples_of_rendered_files_before_writes(self) -> None:
+        cli = self.cli()
+        valid_file = RenderedFile(
+            path=PurePosixPath("artifact.md"),
+            content=b"body\n",
+            source_ids=("role.unity-scout",),
+        )
+        cases = (
+            ("list", [valid_file]),
+            ("wrong-item", (object(),)),
+        )
+        for name, invalid_value in cases:
+            with self.subTest(name=name):
+                registry = {
+                    "claude": FakeRenderer(
+                        "claude",
+                        rendered_by_root={
+                            "compatibility": (valid_file,),
+                            "package": invalid_value,
+                        },
+                    )
+                }
+                with (
+                    mock.patch.object(cli, "renderer_registry", return_value=registry),
+                    mock.patch.object(cli, "write_product") as write_product,
+                ):
+                    exit_code, stdout, stderr = self.invoke(["build", "--claude"])
+
+                self.assertEqual(2, exit_code)
+                self.assertEqual("", stdout)
+                self.assertEqual(
+                    "build error: renderer for claude output root package "
+                    "must be a tuple of RenderedFile\n",
+                    stderr,
+                )
+                write_product.assert_not_called()
+
+    def test_duplicate_rendered_paths_are_rejected_within_their_root(self) -> None:
+        duplicate = RenderedFile(
+            path=PurePosixPath("artifact.md"),
+            content=b"body\n",
+            source_ids=("role.unity-scout",),
+        )
+        cli = self.cli()
+        registry = {
+            "claude": FakeRenderer(
+                "claude",
+                rendered_by_root={
+                    "compatibility": (duplicate, duplicate),
+                    "package": (),
+                },
+            )
+        }
+
+        with mock.patch.object(cli, "renderer_registry", return_value=registry):
+            exit_code, stdout, stderr = self.invoke(["build", "--claude"])
+
+        self.assertEqual(2, exit_code)
+        self.assertEqual("", stdout)
+        self.assertIn("duplicate rendered file path: artifact.md", stderr)
+        self.assertFalse((self.root / ".claude").exists())
+        self.assertFalse((self.root / "packages" / "claude").exists())
 
     def test_check_clean_exits_zero_without_modifying_products(self) -> None:
         cli = self.cli()
@@ -154,8 +311,8 @@ class CliTests(unittest.TestCase):
             before = package_artifact.stat().st_mtime_ns
             checked = self.invoke(["build", "--claude", "--check"])
 
-        self.assertEqual((0, "Built 1 rendered file.\n", ""), built)
-        self.assertEqual((0, "Checked 1 rendered file.\n", ""), checked)
+        self.assertEqual((0, "Built 2 rendered files.\n", ""), built)
+        self.assertEqual((0, "Checked 2 rendered files.\n", ""), checked)
         self.assertEqual(before, package_artifact.stat().st_mtime_ns)
 
     def test_generated_drift_in_check_exits_three(self) -> None:
@@ -170,7 +327,7 @@ class CliTests(unittest.TestCase):
             )
 
         self.assertEqual(3, exit_code)
-        self.assertEqual("Checked 1 rendered file.\n", stdout)
+        self.assertEqual("Checked 2 rendered files.\n", stdout)
         self.assertEqual(
             "generated drift: packages/claude/artifact.md (changed)\n",
             stderr,

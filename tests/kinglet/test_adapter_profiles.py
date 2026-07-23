@@ -1,8 +1,12 @@
 import json
+from collections.abc import Mapping
 from dataclasses import FrozenInstanceError
 from pathlib import Path, PurePosixPath
 import shutil
+import subprocess
+import sys
 import tempfile
+from typing import get_type_hints
 import unittest
 
 from tools.kinglet_build.errors import BuildError
@@ -345,6 +349,51 @@ class AdapterProfileTests(unittest.TestCase):
                     self.profile_path(client),
                 )
 
+    def test_rejects_direct_native_config_schema_tampering_at_its_field(
+        self,
+    ) -> None:
+        codex = self.read_profile("codex")
+        codex["metadata"]["native_config_schema"]["reasoning_effort"][
+            "allowed_values"
+        ].append("ultra")
+        self.write_profile("codex", codex)
+
+        error = self.assert_profile_error("invalid-native-config")
+
+        self.assertEqual("metadata.native_config_schema", error.field)
+        self.assertEqual(
+            "native configuration schema failed independent authority validation",
+            error.detail,
+        )
+
+    def test_maintainer_command_recomputes_both_authority_fingerprints(
+        self,
+    ) -> None:
+        command = REPOSITORY_ROOT / "scripts" / "recompute-adapter-authorities.py"
+        self.assertTrue(command.is_file(), "maintainer recomputation command is required")
+        self.assertTrue(command.stat().st_mode & 0o111, "maintainer command must be executable")
+
+        completed = subprocess.run(
+            [sys.executable, str(command)],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        fingerprints = json.loads(completed.stdout)
+        import tools.kinglet_build.validator as validator
+
+        self.assertEqual("", completed.stderr)
+        self.assertEqual(
+            {"frontier_deep_contract", "native_config_schema"},
+            set(fingerprints["claude"]),
+        )
+        self.assertEqual(
+            {"frontier_deep_contract", "native_config_schema"},
+            set(fingerprints["codex"]),
+        )
+        self.assertEqual(validator._ADAPTER_AUTHORITY_SHA256, fingerprints)
+
     def test_rejects_client_inappropriate_reasoning_effort_presence(self) -> None:
         claude = self.read_profile("claude")
         claude["agent_profiles"]["standard"]["fast"][
@@ -520,9 +569,13 @@ class RendererContractTests(unittest.TestCase):
     def test_registry_is_empty_until_content_renderers_are_added(self) -> None:
         self.assertEqual({}, renderer_registry())
         self.assertTrue(hasattr(Renderer, "render"))
-        annotations = Renderer.render.__annotations__
+        annotations = get_type_hints(Renderer.render)
         self.assertIs(annotations["graph"], CanonicalGraph)
         self.assertIs(annotations["profile"], AdapterProfile)
+        self.assertEqual(
+            Mapping[str, tuple[RenderedFile, ...]],
+            annotations["return"],
+        )
 
     def test_rendered_file_is_frozen_and_accepts_safe_relative_paths(self) -> None:
         rendered = RenderedFile(

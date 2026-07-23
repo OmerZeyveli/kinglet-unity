@@ -117,6 +117,18 @@ _REASONING_EFFORT_SCHEMA_FIELDS = frozenset(
     {"presence", "allowed_values"}
 )
 _NATIVE_CAPABILITY_SCHEMA_FIELDS = frozenset({"allowed_locations"})
+_REASONING_TIERS = ("fast", "balanced", "deep")
+_WORKFLOW_STAGES = (
+    "investigate",
+    "clarify",
+    "design",
+    "plan",
+    "implement",
+    "verify",
+    "report",
+)
+_HOOK_DECISIONS = ("allow", "warn", "block", "pass")
+_TEMPLATE_LANGUAGES = ("markdown", "csharp", "json")
 
 
 def _build_error(code: str, source: Path, field: str, detail: str) -> BuildError:
@@ -206,6 +218,245 @@ def _require_string_tuple(
             "field must be an array of strings",
         )
     return tuple(value)
+
+
+def _require_non_empty_string(
+    data: Mapping[str, object],
+    source: Path,
+    field: str,
+) -> str:
+    value = data.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise _build_error(
+            "invalid-field",
+            source,
+            field,
+            "field must be a non-empty string",
+        )
+    return value
+
+
+def _require_unique_string_tuple(
+    data: Mapping[str, object],
+    source: Path,
+    field: str,
+    *,
+    required_item: bool,
+) -> tuple[str, ...]:
+    value = data.get(field)
+    if (
+        not isinstance(value, list)
+        or not all(isinstance(item, str) and item.strip() for item in value)
+        or len(set(value)) != len(value)
+        or (required_item and not value)
+    ):
+        requirement = "a non-empty array" if required_item else "an array"
+        raise _build_error(
+            "invalid-field",
+            source,
+            field,
+            f"field must be {requirement} of unique non-empty strings",
+        )
+    return tuple(value)
+
+
+def _require_enum(
+    data: Mapping[str, object],
+    source: Path,
+    field: str,
+    allowed_values: tuple[str, ...],
+) -> str:
+    value = data.get(field)
+    if not isinstance(value, str) or not value or value not in allowed_values:
+        raise _build_error(
+            "invalid-field",
+            source,
+            field,
+            f"field must be one of: {', '.join(allowed_values)}",
+        )
+    return value
+
+
+def _require_boolean(
+    data: Mapping[str, object],
+    source: Path,
+    field: str,
+) -> bool:
+    value = data.get(field)
+    if type(value) is not bool:
+        raise _build_error(
+            "invalid-field",
+            source,
+            field,
+            "field must be a boolean",
+        )
+    return value
+
+
+def _require_integer(
+    data: Mapping[str, object],
+    source: Path,
+    field: str,
+) -> int:
+    value = data.get(field)
+    if type(value) is not int:
+        raise _build_error(
+            "invalid-field",
+            source,
+            field,
+            "field must be an integer",
+        )
+    return value
+
+
+def _load_kind_attributes(
+    data: Mapping[str, object],
+    source: Path,
+    kind: str,
+    fields: frozenset[str],
+) -> Mapping[str, object]:
+    missing_fields = sorted(fields - set(data))
+    if missing_fields:
+        raise _build_error(
+            "missing-field",
+            source,
+            missing_fields[0],
+            "required kind-specific field is missing",
+        )
+
+    attributes: dict[str, object]
+    if kind == "role":
+        attributes = {
+            "reasoning_tier": _require_enum(
+                data,
+                source,
+                "reasoning_tier",
+                _REASONING_TIERS,
+            ),
+            "evidence": _require_unique_string_tuple(
+                data,
+                source,
+                "evidence",
+                required_item=True,
+            ),
+        }
+    elif kind == "workflow":
+        attributes = {
+            "public_name": _require_non_empty_string(data, source, "public_name"),
+            "stages": _require_unique_string_tuple(
+                data,
+                source,
+                "stages",
+                required_item=True,
+            ),
+            "roles": _require_unique_string_tuple(
+                data,
+                source,
+                "roles",
+                required_item=True,
+            ),
+            "rules": _require_unique_string_tuple(
+                data,
+                source,
+                "rules",
+                required_item=False,
+            ),
+            "knowledge": _require_unique_string_tuple(
+                data,
+                source,
+                "knowledge",
+                required_item=False,
+            ),
+            "inputs": _require_unique_string_tuple(
+                data,
+                source,
+                "inputs",
+                required_item=True,
+            ),
+            "artifacts": _require_unique_string_tuple(
+                data,
+                source,
+                "artifacts",
+                required_item=True,
+            ),
+            "evidence": _require_unique_string_tuple(
+                data,
+                source,
+                "evidence",
+                required_item=True,
+            ),
+            "failure_behavior": _require_non_empty_string(
+                data,
+                source,
+                "failure_behavior",
+            ),
+            "mutation": _require_boolean(data, source, "mutation"),
+        }
+        invalid_stages = [
+            stage for stage in attributes["stages"] if stage not in _WORKFLOW_STAGES
+        ]
+        if invalid_stages:
+            raise _build_error(
+                "invalid-field",
+                source,
+                "stages",
+                f"field must contain only: {', '.join(_WORKFLOW_STAGES)}",
+            )
+    elif kind == "knowledge":
+        attributes = {
+            "public_name": _require_non_empty_string(data, source, "public_name"),
+            "category": _require_non_empty_string(data, source, "category"),
+            "references": _require_unique_string_tuple(
+                data,
+                source,
+                "references",
+                required_item=False,
+            ),
+            "scripts": _require_unique_string_tuple(
+                data,
+                source,
+                "scripts",
+                required_item=False,
+            ),
+        }
+    elif kind == "rule":
+        attributes = {
+            "scope": _require_non_empty_string(data, source, "scope"),
+            "always_loaded": _require_boolean(data, source, "always_loaded"),
+        }
+    elif kind == "hook":
+        attributes = {
+            "events": _require_unique_string_tuple(
+                data,
+                source,
+                "events",
+                required_item=True,
+            ),
+            "priority": _require_integer(data, source, "priority"),
+            "decision": _require_enum(
+                data,
+                source,
+                "decision",
+                _HOOK_DECISIONS,
+            ),
+            "needs_jq": _require_boolean(data, source, "needs_jq"),
+        }
+    elif kind == "template":
+        attributes = {
+            "public_name": _require_non_empty_string(data, source, "public_name"),
+            "output_name": _require_non_empty_string(data, source, "output_name"),
+            "language": _require_enum(
+                data,
+                source,
+                "language",
+                _TEMPLATE_LANGUAGES,
+            ),
+        }
+    else:
+        raise AssertionError(f"unsupported descriptor kind: {kind}")
+    return MappingProxyType(
+        {field: attributes[field] for field in sorted(attributes)}
+    )
 
 
 def _optional_string(
@@ -405,9 +656,12 @@ def _load_unit(
     content_path = source.parent / body_name
     _read_utf8(content_path, field="content")
 
-    attributes = {
-        field: _freeze(data[field]) for field in sorted(kind_fields) if field in data
-    }
+    attributes = _load_kind_attributes(
+        data,
+        source,
+        expected_kind,
+        kind_fields,
+    )
     return CanonicalUnit(
         schema_version=schema_version,
         id=unit_id,
@@ -419,7 +673,7 @@ def _load_unit(
         support=_load_support(data, source),
         provenance=_load_provenance(data, source),
         content_path=content_path,
-        attributes=MappingProxyType(attributes),
+        attributes=attributes,
     )
 
 
@@ -739,7 +993,11 @@ def _load_native_config_schema(
 def _load_adapter_metadata(
     value: object,
     source: Path,
-) -> tuple[Mapping[str, object], Mapping[str, object], str]:
+) -> tuple[
+    Mapping[str, object],
+    Mapping[str, object],
+    Mapping[str, str],
+]:
     if not isinstance(value, dict):
         raise _build_error(
             "invalid-field",
@@ -813,24 +1071,28 @@ def _load_adapter_metadata(
                 f"{field}.shipping",
                 "evaluation candidates must be explicitly non-shipping",
             )
-    authority = {
-        field: metadata[field]
+    fingerprints = {
+        field: hashlib.sha256(
+            json.dumps(
+                metadata[field],
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
         for field in ("frontier_deep_contract", "native_config_schema")
     }
-    fingerprint = hashlib.sha256(
-        json.dumps(
-            authority,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
-    return contract, native_schema, fingerprint
+    return contract, native_schema, MappingProxyType(fingerprints)
 
 
 def _load_adapter_profile(
     source: Path,
     expected_client: str,
-) -> tuple[AdapterProfile, Mapping[str, object], Mapping[str, object], str]:
+) -> tuple[
+    AdapterProfile,
+    Mapping[str, object],
+    Mapping[str, object],
+    Mapping[str, str],
+]:
     data = _load_json_object(source)
     _reject_unknown_fields(data, _ADAPTER_FIELDS, source)
     missing_fields = sorted(_ADAPTER_FIELDS - set(data))
@@ -920,7 +1182,7 @@ def load_adapter_profiles(repository_root: Path) -> Mapping[str, AdapterProfile]
     profiles: dict[str, AdapterProfile] = {}
     contracts: dict[str, Mapping[str, object]] = {}
     native_schemas: dict[str, Mapping[str, object]] = {}
-    authority_fingerprints: dict[str, str] = {}
+    authority_fingerprints: dict[str, Mapping[str, str]] = {}
     sources: dict[str, Path] = {}
     for client in sorted(required_clients):
         source = profile_sources[client]

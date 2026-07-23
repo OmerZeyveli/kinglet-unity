@@ -30,7 +30,7 @@ class Renderer(Protocol):
         self,
         graph: CanonicalGraph,
         profile: AdapterProfile,
-    ) -> tuple[RenderedFile, ...]: ...
+    ) -> Mapping[str, tuple[RenderedFile, ...]]: ...
 
 
 def renderer_registry() -> Mapping[str, Renderer]:

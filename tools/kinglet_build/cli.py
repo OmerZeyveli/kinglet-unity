@@ -108,7 +108,10 @@ def _build(
     check: bool,
 ) -> int:
     registry = renderer_registry()
-    rendered_by_client: dict[str, tuple[RenderedFile, ...]] = {}
+    rendered_by_client: dict[
+        str,
+        dict[str, tuple[RenderedFile, ...]],
+    ] = {}
     rendered_count = 0
 
     for client in sorted(clients):
@@ -121,17 +124,47 @@ def _build(
                 f"client {renderer.client!r}"
             )
         rendered = renderer.render(graph, profiles[client])
-        if not isinstance(rendered, tuple) or not all(
-            isinstance(item, RenderedFile) for item in rendered
-        ):
-            raise TypeError(f"renderer for {client} must return RenderedFile tuples")
-        rendered_by_client[client] = rendered
-        rendered_count += len(rendered)
+        if not isinstance(rendered, Mapping):
+            raise TypeError(
+                f"renderer for {client} must return a mapping keyed by output root"
+            )
+        expected_roots = profiles[client].output_roots
+        missing_roots = sorted(
+            root_name for root_name in expected_roots if root_name not in rendered
+        )
+        if missing_roots:
+            raise ValueError(
+                f"renderer for {client} is missing output root: {missing_roots[0]}"
+            )
+        unknown_roots = sorted(
+            (root_name for root_name in rendered if root_name not in expected_roots),
+            key=lambda root_name: (type(root_name).__name__, repr(root_name)),
+        )
+        if unknown_roots:
+            root_name = unknown_roots[0]
+            rendered_name = root_name if isinstance(root_name, str) else repr(root_name)
+            raise ValueError(
+                f"renderer for {client} returned unknown output root: {rendered_name}"
+            )
+
+        client_outputs: dict[str, tuple[RenderedFile, ...]] = {}
+        for root_name in sorted(expected_roots):
+            files = rendered[root_name]
+            if not isinstance(files, tuple) or not all(
+                isinstance(item, RenderedFile) for item in files
+            ):
+                raise TypeError(
+                    f"renderer for {client} output root {root_name} "
+                    "must be a tuple of RenderedFile"
+                )
+            client_outputs[root_name] = files
+            rendered_count += len(files)
+        rendered_by_client[client] = client_outputs
 
     drift: list[tuple[str, str]] = []
     for client in sorted(rendered_by_client):
-        rendered = rendered_by_client[client]
         for root_name in sorted(profiles[client].output_roots):
+            rendered = rendered_by_client[client][root_name]
             relative_root = profiles[client].output_roots[root_name]
             destination = repository_root.joinpath(*relative_root.parts)
             result = write_product(rendered, destination, check=check)

@@ -20,6 +20,10 @@ $RECYCLE.BIN/
 *.bak
 *.orig
 
+# ── Python caches ───────────────────────────────
+__pycache__/
+*.py[cod]
+
 # ── Secrets (savunma amaçlı; repo'da olmamalı) ─
 .env
 .env.*
