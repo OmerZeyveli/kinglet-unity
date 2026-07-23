@@ -535,8 +535,24 @@ class AdapterProfileTests(unittest.TestCase):
         deprecated = "gpt-5.3" + "-codex"
         excluded_roots = {".git", ".superpowers", "docs", "migration"}
         offenders: list[str] = []
-        for source in sorted(REPOSITORY_ROOT.rglob("*")):
-            relative = source.relative_to(REPOSITORY_ROOT)
+        active_paths = subprocess.run(
+            [
+                "git",
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "-z",
+            ],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout.split(b"\0")
+        for raw_relative in sorted(path for path in active_paths if path):
+            relative = Path(
+                raw_relative.decode("utf-8", errors="surrogateescape")
+            )
+            source = REPOSITORY_ROOT / relative
             if (
                 not source.is_file()
                 or relative.parts[0] in excluded_roots
