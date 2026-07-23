@@ -1,0 +1,15 @@
+{
+  "schema": "kinglet.spike.contract/v1",
+  "recordSchema": "kinglet.spike.evidence/v1",
+  "statuses": ["pass", "fail", "unavailable", "inconclusive"],
+  "subjectKinds": ["runtime", "client", "unity"],
+  "requiredTopLevelFields": [
+    "schema", "run_id", "subject", "probe", "environment", "started_at", "ended_at",
+    "status", "command", "artifacts", "assertions", "measurements", "sources", "prompt"
+  ],
+  "diagnosticCodes": [
+    "E_SCHEMA", "E_JSON", "E_FIELD", "E_ENUM", "E_TIME", "E_PATH", "E_SYMLINK",
+    "E_CHECKSUM", "E_SECRET", "E_PROMPT", "E_ASSERTION", "E_REPETITION",
+    "E_IMMUTABLE", "E_COVERAGE"
+  ]
+}
