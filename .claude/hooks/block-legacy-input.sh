@@ -77,5 +77,3 @@ echo "    #if ENABLE_LEGACY_INPUT_MANAGER" >&2
 echo "        if (Input.GetKeyDown(KeyCode.F9)) ..." >&2
 echo "    #endif" >&2
 unity_hook_block "Legacy Input Manager API in first-party runtime code: $FOUND"
-
-exit 0

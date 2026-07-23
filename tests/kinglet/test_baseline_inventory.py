@@ -558,6 +558,7 @@ class BaselineInventoryTests(unittest.TestCase):
         validate = "run: python3 -m tools.kinglet_build validate"
         check = "run: python3 -m tools.kinglet_build build --all --check"
 
+        self.assertEqual(2, workflow.count("fetch-depth: 0"))
         self.assertEqual(2, workflow.count(kinglet_tests))
         self.assertIn(repository_tests, ubuntu)
         self.assertIn(kinglet_tests, ubuntu)

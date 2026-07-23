@@ -169,7 +169,7 @@ _build_session_end_message() {
 
 # --- Detect events to fire ---
 EVENTS_TO_FIRE=()
-declare -A EVENT_MESSAGES
+EVENT_MESSAGES=()
 
 # Check for notify-event.json (written by other hooks: verify_fail, build_complete, cost_threshold)
 NOTIFY_EVENT_FILE="${UNITY_HOOK_STATE_DIR}/notify-event.json"
@@ -178,21 +178,22 @@ if [ -f "$NOTIFY_EVENT_FILE" ]; then
     EVENT_DETAILS=$(jq -r '.details // empty' "$NOTIFY_EVENT_FILE" 2>/dev/null || true)
 
     if [ -n "$EVENT_TYPE" ]; then
-        EVENTS_TO_FIRE+=("$EVENT_TYPE")
         case "$EVENT_TYPE" in
             verify_fail)
-                EVENT_MESSAGES["verify_fail"]="Unity Claude — Verification failed: ${EVENT_DETAILS}"
+                EVENT_MESSAGE="Unity Claude — Verification failed: ${EVENT_DETAILS}"
                 ;;
             build_complete)
-                EVENT_MESSAGES["build_complete"]="Unity Claude — Build complete: ${EVENT_DETAILS}"
+                EVENT_MESSAGE="Unity Claude — Build complete: ${EVENT_DETAILS}"
                 ;;
             cost_threshold)
-                EVENT_MESSAGES["cost_threshold"]="Unity Claude — Cost threshold reached: ${EVENT_DETAILS}"
+                EVENT_MESSAGE="Unity Claude — Cost threshold reached: ${EVENT_DETAILS}"
                 ;;
             *)
-                EVENT_MESSAGES["$EVENT_TYPE"]="Unity Claude — ${EVENT_TYPE}: ${EVENT_DETAILS}"
+                EVENT_MESSAGE="Unity Claude — ${EVENT_TYPE}: ${EVENT_DETAILS}"
                 ;;
         esac
+        EVENTS_TO_FIRE+=("$EVENT_TYPE")
+        EVENT_MESSAGES+=("$EVENT_MESSAGE")
     fi
 
     # Clean up so events don't fire twice
@@ -209,7 +210,7 @@ fi
 
 if [ "$DURATION_SECS" -ge "$MIN_DURATION" ]; then
     EVENTS_TO_FIRE+=("session_end")
-    EVENT_MESSAGES["session_end"]=$(_build_session_end_message "$DURATION_SECS")
+    EVENT_MESSAGES+=("$(_build_session_end_message "$DURATION_SECS")")
 fi
 
 # --- No events to fire? Exit early ---
@@ -251,15 +252,18 @@ for channelIndex in $(seq 0 $(( CHANNEL_COUNT - 1 ))); do
         CHANNEL_EVENTS="session_end build_complete verify_fail cost_threshold"
     fi
 
-    for event in "${EVENTS_TO_FIRE[@]}"; do
+    EVENT_INDEX=0
+    while [ "$EVENT_INDEX" -lt "${#EVENTS_TO_FIRE[@]}" ]; do
+        event="${EVENTS_TO_FIRE[$EVENT_INDEX]}"
         # Check if this channel subscribes to this event
         if echo "$CHANNEL_EVENTS" | grep -qxF "$event"; then
-            MESSAGE="${EVENT_MESSAGES[$event]:-}"
+            MESSAGE="${EVENT_MESSAGES[$EVENT_INDEX]}"
             if [ -n "$MESSAGE" ]; then
                 _notify_channel "$CHANNEL_URL" "$CHANNEL_FORMAT" "$MESSAGE"
                 SENT_COUNT=$((SENT_COUNT + 1))
             fi
         fi
+        EVENT_INDEX=$((EVENT_INDEX + 1))
     done
 done
 
