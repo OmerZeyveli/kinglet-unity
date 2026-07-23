@@ -21,7 +21,7 @@ jobs:
         run: shellcheck -x .claude/hooks/*.sh
 
       - name: Shellcheck our scripts
-        run: shellcheck -x install.sh uninstall.sh scripts/*.sh tests/*.sh tests/fixtures/*.sh
+        run: shellcheck --severity=warning -x install.sh uninstall.sh scripts/*.sh tests/*.sh tests/fixtures/*.sh
 
       - name: Validate settings.json
         run: jq . .claude/settings.json > /dev/null

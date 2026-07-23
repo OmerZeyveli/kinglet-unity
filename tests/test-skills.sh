@@ -20,9 +20,9 @@ FRONTMATTER_FAIL=0
 EXAMPLE_WARN=0
 ANTI_WARN=0
 
-for file in $(find "$PROJECT_ROOT/.claude/skills" -name "SKILL.md" 2>/dev/null); do
+while IFS= read -r file; do
     SKILL_COUNT=$((SKILL_COUNT + 1))
-    REL_PATH="${file#$PROJECT_ROOT/}"
+    REL_PATH="${file#"$PROJECT_ROOT"/}"
 
     # Check frontmatter
     YAML=$(sed -n '2,/^---$/p' "$file" | sed '$d')
@@ -46,7 +46,7 @@ for file in $(find "$PROJECT_ROOT/.claude/skills" -name "SKILL.md" 2>/dev/null);
     if [ "$ANTI_COUNT" -eq 0 ]; then
         ANTI_WARN=$((ANTI_WARN + 1))
     fi
-done
+done < <(find "$PROJECT_ROOT/.claude/skills" -name "SKILL.md" 2>/dev/null)
 
 echo "--- Test: skill frontmatter ---"
 assert_eq "$FRONTMATTER_FAIL" "0" "all skills have required frontmatter (name, description)"

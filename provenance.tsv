@@ -172,7 +172,7 @@ examples/CLAUDE.md.idle-clicker	ecu	1.5.0	examples/CLAUDE.md.idle-clicker	1e8ba9
 examples/CLAUDE.md.match3	ecu	1.5.0	examples/CLAUDE.md.match3	76c192a905b0c4911dc757b7d04033248028b85690a926c38a57881b566f4e7c	modified	mobile-strip
 examples/CLAUDE.md.rpg	ecu	1.5.0	examples/CLAUDE.md.rpg	06ee9968fd08c22f512b41c77a44e0b3ab828864d2c1e12f269c5505448395bc	modified	mobile-strip
 .gitattributes	original	-	-	-	original	-
-.github/workflows/ci.yml	ecu	1.5.0	.github/workflows/ci.yml	3b79e9f884b55ed5fe70d1b5cdb241e2300d68da660335cf92de07bf7a5e38df	modified	ci-adapted: dropped .claude-plugin + benchmarks steps (not vendored); added provenance, full-history checkout, fixture install, macOS leg, cross-platform Kinglet suite, Linux validate/check gates
+.github/workflows/ci.yml	ecu	1.5.0	.github/workflows/ci.yml	3b79e9f884b55ed5fe70d1b5cdb241e2300d68da660335cf92de07bf7a5e38df	modified	ci-adapted: dropped .claude-plugin + benchmarks steps (not vendored); added provenance, full-history checkout, fixture install, macOS leg, cross-platform Kinglet suite, warning-level script ShellCheck, Linux validate/check gates
 .gitignore	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 install.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 LICENSE	original	-	-	-	original	root-path-collides-with-ecu-but-ours
@@ -204,7 +204,7 @@ templates/ScriptableObject.cs.template	ecu	1.5.0	templates/ScriptableObject.cs.t
 templates/System.cs.template	ecu	1.5.0	templates/System.cs.template	44eabd3ede128feee0df904d5f55e84fcd034d874a2dae4b9f67f188c01ca4d5	verbatim	-
 templates/View.cs.template	ecu	1.5.0	templates/View.cs.template	c77939301d6476dfd52d8496bc5aad0fff1b1c2f41972616ed664fca8f692dbd	verbatim	-
 tests/fixtures/mkproject.sh	original	-	-	-	original	-
-tests/run-tests.sh	ecu	1.5.0	tests/run-tests.sh	b8c6280bf30aa4834a15255b9f4d3c0f4f3b6aa9e39d7b6c73bd49b334f510d8	modified	test-runner-fix: sourced files ended in exit, killing the runner after file 1; --source-only was unimplemented
+tests/run-tests.sh	ecu	1.5.0	tests/run-tests.sh	b8c6280bf30aa4834a15255b9f4d3c0f4f3b6aa9e39d7b6c73bd49b334f510d8	modified	test-runner-fix: sourced files ended in exit, killing the runner after file 1; --source-only was unimplemented; dynamic test source is intentional
 tests/test-bash32-compat.sh	original	-	-	-	original	bash32-static-regression-gate
 tests/test-block-legacy-input.sh	original	-	-	-	original	-
 tests/test-cross-validation.sh	ecu	1.5.0	tests/test-cross-validation.sh	ed11cf897a74a90ce8d3bd6a072dd3ba09e9ce412d2bfc51c7975a91faaafd33	verbatim	-
@@ -212,7 +212,7 @@ tests/test-hooks.sh	ecu	1.5.0	tests/test-hooks.sh	ff362d3e26718ca81d6857af46c757
 tests/test-install.sh	ecu	1.5.0	tests/test-install.sh	9561a3bcf8e75e2ee92b7e2ddadbe6dea6e8c3b4464c575e14339864b5eea971	modified	test-runner-fix: PASS output no longer gated on --verbose, so the tally can count it
 tests/test-lib.sh	ecu	1.5.0	tests/test-lib.sh	8c8810123ca75250158286eae310a380d907cfb7adf30cf63fb6bc557e3cfe4d	modified	project-local-state-assertion
 tests/test-no-mobile.sh	original	-	-	-	original	-
-tests/test-skills.sh	ecu	1.5.0	tests/test-skills.sh	324561e8e83be33761d519e6e04bf4a7eaaac7eef453bc431db05e13228d434a	verbatim	-
+tests/test-skills.sh	ecu	1.5.0	tests/test-skills.sh	324561e8e83be33761d519e6e04bf4a7eaaac7eef453bc431db05e13228d434a	modified	shellcheck-warning-fix: read find output without word splitting
 tests/test-state.sh	ecu	1.5.0	tests/test-state.sh	dc05b5a953fb23fb14ab0a009a276152f891d85b939f9c0c0aea16608ffcb321	modified	remove-invalid-bash-source-environment-assignment
 tests/test-templates.sh	ecu	1.5.0	tests/test-templates.sh	0f38c2bc95d65cd2fe4e6baba50ede9dae4dfed80185c20b2f4d372dbe535f0f	verbatim	-
 uninstall.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours

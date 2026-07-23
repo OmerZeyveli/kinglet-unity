@@ -178,6 +178,7 @@ for test_file in "${test_files[@]}"; do
     # </dev/null: hooks read their JSON payload from stdin, so a test that runs one without
     # redirecting would sit there forever. A test suite must never be able to block.
     set +e
+    # shellcheck source=/dev/null
     test_output=$( ( source "$test_file" ) 2>&1 </dev/null )
     test_rc=$?
     set -e
