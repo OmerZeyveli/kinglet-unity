@@ -1,5 +1,8 @@
 # Kinglet Packages, Installation, Upgrade, and Uninstall Implementation Plan
 
+> **Superseded:** Historical plan; do not execute. The approved platform redesign starts with
+> `2026-07-23-kinglet-00-plan-suite.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship valid Claude and Codex packages and a transaction-safe, ownership-preserving lifecycle for fresh install, legacy migration, upgrade, rollback, doctor, and client-selective uninstall.

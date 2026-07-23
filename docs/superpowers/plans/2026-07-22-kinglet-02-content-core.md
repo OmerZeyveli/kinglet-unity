@@ -1,5 +1,8 @@
 # Kinglet Rules, Templates, and Knowledge Migration Implementation Plan
 
+> **Superseded:** Historical plan; do not execute. The approved platform redesign starts with
+> `2026-07-23-kinglet-00-plan-suite.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move all shared rules, templates, and knowledge skills into canonical `src/` units and generate behavior-preserving Claude output plus native Codex content from that single source.

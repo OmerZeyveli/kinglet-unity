@@ -1,5 +1,8 @@
 # Kinglet Roles, Workflows, and Natural-Language Router Implementation Plan
 
+> **Superseded:** Historical plan; do not execute. The approved platform redesign starts with
+> `2026-07-23-kinglet-00-plan-suite.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Canonicalize all 28 roles and 36 workflows, render native Claude and Codex execution surfaces, and make reliable natural-language workflow selection the primary UX on both clients.

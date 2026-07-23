@@ -1,5 +1,8 @@
 # Kinglet Product, Brownfield Validation, and 3.0.0 Release Implementation Plan
 
+> **Superseded:** Historical plan; do not execute. The approved platform redesign starts with
+> `2026-07-23-kinglet-00-plan-suite.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Finish the Kinglet product rename, prove Claude/Codex behavioral parity on synthetic and live Unity projects—including the user's existing bug-bearing brownfield project—and publish reproducible Kinglet for Unity 3.0.0 artifacts.

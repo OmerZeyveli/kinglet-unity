@@ -47,6 +47,11 @@ Plan 2. After this document passes written review, a new suite of independently 
 implementation plans will replace them. The old files remain temporarily as historical records so
 that prior reasoning is not destroyed during replanning.
 
+Subproject 0 is now defined by
+`2026-07-23-kinglet-platform-spikes-design.md` and its execution index
+`../plans/2026-07-23-kinglet-00-plan-suite.md`. Later subproject plans remain locked until the
+specific evidence gates named there pass.
+
 ## Product identity and scope
 
 - Product brand: **Kinglet**

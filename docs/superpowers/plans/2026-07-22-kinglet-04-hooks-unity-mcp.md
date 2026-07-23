@@ -1,5 +1,8 @@
 # Kinglet Hook Policy and Unity MCP Orchestration Implementation Plan
 
+> **Superseded:** Historical plan; do not execute. The approved platform redesign starts with
+> `2026-07-23-kinglet-00-plan-suite.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give Claude and Codex the same ordered safety decisions and Unity MCP orchestration contract, including workflow-selection enforcement, a single-writer lease, task-scoped EditorSnapshot, and evidence-backed verification.

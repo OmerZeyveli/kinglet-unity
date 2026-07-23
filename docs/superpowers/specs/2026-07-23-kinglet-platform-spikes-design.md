@@ -1,6 +1,6 @@
 # Kinglet Platform Spikes and Capability Proof Design
 
-**Status:** Approved design; written-spec review requested
+**Status:** Approved design
 
 **Date:** 2026-07-23
 

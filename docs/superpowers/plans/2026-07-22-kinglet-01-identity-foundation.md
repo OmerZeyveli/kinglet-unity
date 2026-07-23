@@ -1,5 +1,8 @@
 # Kinglet Identity and Canonical Build Foundation Implementation Plan
 
+> **Superseded:** Historical plan; do not execute. The approved platform redesign starts with
+> `2026-07-23-kinglet-00-plan-suite.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Establish the Kinglet product identity, strict canonical data model, deterministic Python build tool, and CI guardrails without changing the installed Claude product.
