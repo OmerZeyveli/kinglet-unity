@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review.",
-  "source_commit": "e8f9cbdbdd38e103b8ed9d17c5ba6d3e85e33fd0",
+  "source_commit": "72e4218b8837e295ece20b17cd38aa26c58298fb",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 147,
@@ -358,7 +358,7 @@
       },
       {
         "path": ".claude/hooks/block-legacy-input.sh",
-        "sha256": "0bab1c8c8c7b7d6f92a54f7dd23ea78402676d611bb8e54fbbd0d7f1d9997880",
+        "sha256": "0e1913d37550d58a250079762d81326ea38a10672f88efc4e720d1ee09b0dc4b",
         "git_mode": "100755"
       },
       {
@@ -413,7 +413,7 @@
       },
       {
         "path": ".claude/hooks/notify.sh",
-        "sha256": "b5aa82142acdb12e3ce08d1c80fc741afbe78a6ed1b3c9dae0ed5bc07dcded4c",
+        "sha256": "4a2e82cb82fdb0b3595e8681593fc138e444efe5eab7508230d9bdd111ce9985",
         "git_mode": "100755"
       },
       {
@@ -1293,7 +1293,7 @@
         },
         {
           "path": ".claude/hooks/block-legacy-input.sh",
-          "sha256": "0bab1c8c8c7b7d6f92a54f7dd23ea78402676d611bb8e54fbbd0d7f1d9997880",
+          "sha256": "0e1913d37550d58a250079762d81326ea38a10672f88efc4e720d1ee09b0dc4b",
           "git_mode": "100755"
         },
         {
@@ -1348,7 +1348,7 @@
         },
         {
           "path": ".claude/hooks/notify.sh",
-          "sha256": "b5aa82142acdb12e3ce08d1c80fc741afbe78a6ed1b3c9dae0ed5bc07dcded4c",
+          "sha256": "4a2e82cb82fdb0b3595e8681593fc138e444efe5eab7508230d9bdd111ce9985",
           "git_mode": "100755"
         },
         {
