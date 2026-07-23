@@ -17,6 +17,15 @@ class EvidenceError(Exception):
         return f"{self.code}: {self.detail}"
 
 
+@dataclass(frozen=True, order=True)
+class Diagnostic:
+    """A deterministic validation finding for one evidence field or artifact."""
+
+    code: str
+    location: str
+    message: str
+
+
 @dataclass(frozen=True)
 class Subject:
     kind: str
@@ -68,6 +77,12 @@ class Source:
 
 
 @dataclass(frozen=True)
+class Prompt:
+    id: str
+    sha256: str
+
+
+@dataclass(frozen=True)
 class EvidenceRecord:
     schema: str
     run_id: str
@@ -82,4 +97,4 @@ class EvidenceRecord:
     assertions: tuple[Assertion, ...]
     measurements: tuple[Measurement, ...]
     sources: tuple[Source, ...]
-    prompt: str | None
+    prompt: Prompt | None

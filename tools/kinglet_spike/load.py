@@ -12,6 +12,7 @@ from tools.kinglet_spike.model import (
     EvidenceError,
     EvidenceRecord,
     Measurement,
+    Prompt,
     Probe,
     Source,
     Subject,
@@ -130,6 +131,13 @@ def _source(value: object, index: int) -> Source:
     return Source(_string(item["title"], f"{path}.title"), _string(item["url"], f"{path}.url"))
 
 
+def _prompt(value: object) -> Prompt | None:
+    if value is None:
+        return None
+    item = _keys(value, "prompt", {"id", "sha256"})
+    return Prompt(_string(item["id"], "prompt.id"), _string(item["sha256"], "prompt.sha256"))
+
+
 def load_record(path: Path) -> EvidenceRecord:
     """Load one UTF-8 evidence record, rejecting unknown or ill-typed fields."""
     try:
@@ -148,9 +156,6 @@ def load_record(path: Path) -> EvidenceRecord:
     schema = _string(item["schema"], "schema")
     if schema != SCHEMA:
         raise EvidenceError("E_SCHEMA", "schema must be kinglet.spike.evidence/v1")
-    prompt = item["prompt"]
-    if prompt is not None and not isinstance(prompt, str):
-        raise EvidenceError("E_FIELD", "prompt must be a string or null")
     command = tuple(
         _string(part, f"command[{index}]")
         for index, part in enumerate(_array(item["command"], "command"))
@@ -171,5 +176,5 @@ def load_record(path: Path) -> EvidenceRecord:
             _measurement(value, index) for index, value in enumerate(_array(item["measurements"], "measurements"))
         ),
         sources=tuple(_source(value, index) for index, value in enumerate(_array(item["sources"], "sources"))),
-        prompt=prompt,
+        prompt=_prompt(item["prompt"]),
     )
