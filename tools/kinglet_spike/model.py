@@ -79,6 +79,13 @@ class Diagnostic:
 
 
 @dataclass(frozen=True)
+class CoverageCell:
+    id: str
+    state: str
+    run_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class EvidenceRecord:
     schema: str
     run_id: str
