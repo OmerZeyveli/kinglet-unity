@@ -1,0 +1,451 @@
+{
+  "cells": [
+    {
+      "id": "client.antigravity.linux-ubuntu-24-04-x64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.antigravity.linux-ubuntu-24-04-x64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.antigravity.linux-ubuntu-24-04-x64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.antigravity.macos-26-arm64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.antigravity.macos-26-arm64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.antigravity.macos-26-arm64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.antigravity.windows-11-x64.capability-suite",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.claude-code.linux-ubuntu-24-04-x64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.claude-code.linux-ubuntu-24-04-x64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.claude-code.linux-ubuntu-24-04-x64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.claude-code.macos-26-arm64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.claude-code.macos-26-arm64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.claude-code.macos-26-arm64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.claude-code.windows-11-x64.capability-suite",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.codex.linux-ubuntu-24-04-x64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.codex.linux-ubuntu-24-04-x64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.codex.linux-ubuntu-24-04-x64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.codex.macos-26-arm64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.codex.macos-26-arm64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.codex.macos-26-arm64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.codex.windows-11-x64.capability-suite",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-cli.linux-ubuntu-24-04-x64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-cli.linux-ubuntu-24-04-x64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-cli.linux-ubuntu-24-04-x64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-cli.macos-26-arm64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-cli.macos-26-arm64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-cli.macos-26-arm64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-cli.windows-11-x64.capability-suite",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-vscode.macos-26-arm64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-vscode.macos-26-arm64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-vscode.macos-26-arm64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.copilot-vscode.windows-11-x64.capability-suite",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.cursor.linux-ubuntu-24-04-x64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.cursor.linux-ubuntu-24-04-x64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.cursor.linux-ubuntu-24-04-x64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.cursor.macos-26-arm64.local-executable",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.cursor.macos-26-arm64.mcp-discovery",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.cursor.macos-26-arm64.path-semantics",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "client.cursor.windows-11-x64.capability-suite",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.dotnet.linux-ubuntu-24-04-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.dotnet.macos-26-arm64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.dotnet.macos-26-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.dotnet.windows-10-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.dotnet.windows-11-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.go.linux-ubuntu-24-04-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.go.macos-26-arm64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.go.macos-26-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.go.windows-10-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.go.windows-11-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.python.linux-ubuntu-24-04-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.python.macos-26-arm64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.python.macos-26-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.python.windows-10-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.python.windows-11-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.rust.linux-ubuntu-24-04-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.rust.macos-26-arm64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.rust.macos-26-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.rust.windows-10-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "runtime.rust.windows-11-x64.host-probe",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.editor-resolution.linux-ubuntu-24-04-x64.mismatched-editor",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.editor-resolution.macos-26-arm64.mismatched-editor",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.editor-resolution.windows-11-x64.mismatched-editor",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.execution.linux-ubuntu-24-04-x64.cancellation",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.execution.linux-ubuntu-24-04-x64.orphan-cleanup",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.execution.macos-26-arm64.cancellation",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.execution.macos-26-arm64.orphan-cleanup",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.execution.windows-11-x64.cancellation",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.execution.windows-11-x64.orphan-cleanup",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.filesystem-only.linux-ubuntu-24-04-x64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.filesystem-only.macos-26-arm64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.filesystem-only.windows-11-x64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.isolated-headless.linux-ubuntu-24-04-x64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.isolated-headless.macos-26-arm64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.isolated-headless.windows-11-x64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.live-editor-mcp.linux-ubuntu-24-04-x64.bridge-not-ready",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.live-editor-mcp.linux-ubuntu-24-04-x64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.live-editor-mcp.macos-26-arm64.bridge-not-ready",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.live-editor-mcp.macos-26-arm64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.live-editor-mcp.windows-11-x64.bridge-not-ready",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.live-editor-mcp.windows-11-x64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.same-project-headless.linux-ubuntu-24-04-x64.collision-refusal",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.same-project-headless.linux-ubuntu-24-04-x64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.same-project-headless.macos-26-arm64.collision-refusal",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.same-project-headless.macos-26-arm64.route",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.same-project-headless.windows-11-x64.collision-refusal",
+      "run_ids": [],
+      "state": "missing"
+    },
+    {
+      "id": "unity.same-project-headless.windows-11-x64.route",
+      "run_ids": [],
+      "state": "missing"
+    }
+  ],
+  "generated_from_matrix": "spikes/platform/contracts/matrix-v1.json",
+  "schema": "kinglet.spike.coverage/v1"
+}

@@ -179,6 +179,11 @@ jobs:
       - name: Run test suite
         run: bash tests/run-tests.sh
 
+      - name: Verify spike contract JSON
+        run: |
+          python3 -m json.tool spikes/platform/contracts/evidence-v1.json > /dev/null
+          python3 -m json.tool spikes/platform/contracts/matrix-v1.json > /dev/null
+
       - name: Run Kinglet build suite
         run: bash tests/test-kinglet-build.sh
 
