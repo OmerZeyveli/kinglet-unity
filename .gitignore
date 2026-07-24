@@ -12,6 +12,7 @@ $RECYCLE.BIN/
 .worktrees/
 .research/
 .superpowers/
+.kinglet/local/
 *.swp
 *.swo
 *~
