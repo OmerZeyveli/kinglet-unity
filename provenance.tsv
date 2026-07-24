@@ -270,6 +270,9 @@ tools/kinglet_spike/redact.py	original	-	-	-	original	kinglet-spike-deterministi
 tools/kinglet_spike/validate.py	original	-	-	-	original	kinglet-spike-safety-and-integrity-validator
 tools/kinglet_spike/publish.py	original	-	-	-	original	kinglet-spike-immutable-evidence-publisher
 tools/kinglet_spike/coverage.py	original	-	-	-	original	kinglet-spike-required-matrix-evaluator
+tools/kinglet_spike/report.py	original	-	-	-	original	kinglet-spike-deterministic-coverage-reports
+tools/kinglet_spike/cli.py	original	-	-	-	original	kinglet-spike-maintainer-cli
+tools/kinglet_spike/__main__.py	original	-	-	-	original	kinglet-spike-module-entrypoint
 spikes/platform/contracts/evidence-v1.json	original	-	-	-	original	kinglet-spike-v1-evidence-contract
 spikes/platform/contracts/matrix-v1.json	original	-	-	-	original	kinglet-spike-v1-required-coverage-matrix
 tests/kinglet_spike/__init__.py	original	-	-	-	original	kinglet-spike-test-package-marker
@@ -278,3 +281,5 @@ tests/kinglet_spike/test_load.py	original	-	-	-	original	kinglet-spike-strict-lo
 tests/kinglet_spike/test_validate.py	original	-	-	-	original	kinglet-spike-safety-and-redaction-tests
 tests/kinglet_spike/test_publish.py	original	-	-	-	original	kinglet-spike-immutable-publication-tests
 tests/kinglet_spike/test_coverage.py	original	-	-	-	original	kinglet-spike-coverage-state-tests
+tests/kinglet_spike/test_report.py	original	-	-	-	original	kinglet-spike-deterministic-report-tests
+tests/kinglet_spike/test_cli.py	original	-	-	-	original	kinglet-spike-cli-exit-contract-tests
