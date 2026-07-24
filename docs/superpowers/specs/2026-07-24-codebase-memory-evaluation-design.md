@@ -44,9 +44,14 @@ The initial audit inspected upstream `main` at:
 
 `97ce23f9827177fff3858831156e9795c6832b18`
 
-Reproducible execution will use tag `v0.9.0` pinned by commit, not the moving branch:
+Reproducible execution will use that exact commit, not the moving branch. The older tag `v0.9.0`
+resolves to:
 
 `b637e3330c96cfe452da623db068c241aaa3ec01`
+
+That tag is retained as an audit reference but is not the experiment candidate because it predates
+the required read-only `--tool-profile=analysis` surface. The experiment may not replace that
+safety boundary with a full-profile server or client-side convention.
 
 The plan must record the source commit, compiler identity, build command, executable checksum, and
 test result. A later upstream revision is a new candidate and may not overwrite the original run.
