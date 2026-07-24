@@ -71,6 +71,13 @@ class PromptReference:
     sha256: str
 
 
+@dataclass(frozen=True, order=True)
+class Diagnostic:
+    code: str
+    location: str
+    message: str
+
+
 @dataclass(frozen=True)
 class EvidenceRecord:
     schema: str

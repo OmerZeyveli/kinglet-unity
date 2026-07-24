@@ -266,7 +266,10 @@ tests/kinglet/test_baseline_inventory.py	original	-	-	-	original	kinglet-legacy-
 tools/kinglet_spike/__init__.py	original	-	-	-	original	kinglet-spike-evidence-package-boundary
 tools/kinglet_spike/model.py	original	-	-	-	original	kinglet-spike-frozen-evidence-model
 tools/kinglet_spike/load.py	original	-	-	-	original	kinglet-spike-strict-evidence-loader
+tools/kinglet_spike/redact.py	original	-	-	-	original	kinglet-spike-deterministic-artifact-redactor
+tools/kinglet_spike/validate.py	original	-	-	-	original	kinglet-spike-safety-and-integrity-validator
 spikes/platform/contracts/evidence-v1.json	original	-	-	-	original	kinglet-spike-v1-evidence-contract
 tests/kinglet_spike/__init__.py	original	-	-	-	original	kinglet-spike-test-package-marker
 tests/kinglet_spike/support.py	original	-	-	-	original	kinglet-spike-test-fixture-builder
 tests/kinglet_spike/test_load.py	original	-	-	-	original	kinglet-spike-strict-loader-tests
+tests/kinglet_spike/test_validate.py	original	-	-	-	original	kinglet-spike-safety-and-redaction-tests
