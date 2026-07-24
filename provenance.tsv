@@ -263,3 +263,10 @@ tools/kinglet_build/cli.py	original	-	-	-	original	kinglet-public-build-cli
 tools/kinglet_build/__main__.py	original	-	-	-	original	kinglet-build-module-entrypoint
 migration/baseline-inventory.json	original	-	-	-	original	kinglet-plan-01-human-owned-legacy-migration-baseline
 tests/kinglet/test_baseline_inventory.py	original	-	-	-	original	kinglet-legacy-drift-identity-and-ci-gate-tests
+tools/kinglet_spike/__init__.py	original	-	-	-	original	kinglet-spike-evidence-package-boundary
+tools/kinglet_spike/model.py	original	-	-	-	original	kinglet-spike-frozen-evidence-model
+tools/kinglet_spike/load.py	original	-	-	-	original	kinglet-spike-strict-evidence-loader
+spikes/platform/contracts/evidence-v1.json	original	-	-	-	original	kinglet-spike-v1-evidence-contract
+tests/kinglet_spike/__init__.py	original	-	-	-	original	kinglet-spike-test-package-marker
+tests/kinglet_spike/support.py	original	-	-	-	original	kinglet-spike-test-fixture-builder
+tests/kinglet_spike/test_load.py	original	-	-	-	original	kinglet-spike-strict-loader-tests
