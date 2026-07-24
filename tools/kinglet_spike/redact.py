@@ -6,11 +6,7 @@ import os
 from pathlib import Path, PureWindowsPath
 
 from .model import EvidenceError
-from .validate import SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS
-
-ALLOWED_MEDIA_TYPES = frozenset(
-    ("application/json", "application/xml", "text/plain", "text/markdown")
-)
+from .validate import SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS, TEXT_MEDIA_TYPES
 
 
 def _is_absolute_root(value: str) -> bool:
@@ -32,12 +28,25 @@ def _replace_roots(value: object, roots: tuple[str, ...]) -> object:
     return value
 
 
-def _reject_sensitive(text: str) -> None:
+def _string_values(value: object):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            yield from _string_values(key)
+            yield from _string_values(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _string_values(item)
+
+
+def _reject_sensitive(value: object) -> None:
+    strings = tuple(_string_values(value))
     for pattern in SECRET_PATTERNS:
-        if pattern.search(text):
+        if any(pattern.search(text) for text in strings):
             raise EvidenceError("E_SECRET", "artifact contains a credential-like value")
     for pattern in SENSITIVE_PATH_PATTERNS:
-        if pattern.search(text):
+        if any(pattern.search(text) for text in strings):
             raise EvidenceError("E_PATH", "artifact contains an absolute user path")
 
 
@@ -63,7 +72,9 @@ def redact_artifact(
     media_type: str,
     forbidden_roots: tuple[str, ...],
 ) -> str:
-    if media_type not in ALLOWED_MEDIA_TYPES:
+    if source.is_symlink():
+        raise EvidenceError("E_SYMLINK", f"artifact source is a symlink: {source}")
+    if media_type not in TEXT_MEDIA_TYPES:
         raise EvidenceError("E_ENUM", f"unsupported artifact media type: {media_type}")
     for root in forbidden_roots:
         if not _is_absolute_root(root):
@@ -80,6 +91,7 @@ def redact_artifact(
         except json.JSONDecodeError as error:
             raise EvidenceError("E_JSON", f"invalid JSON artifact: {source}") from error
         redacted = _replace_roots(value, forbidden_roots)
+        _reject_sensitive(redacted)
         published = json.dumps(
             redacted,
             ensure_ascii=False,
@@ -92,8 +104,8 @@ def redact_artifact(
             published = published.replace(root, "<redacted-root>")
         if not published.endswith("\n"):
             published += "\n"
+        _reject_sensitive(published)
 
-    _reject_sensitive(published)
     payload = published.encode("utf-8")
     _exclusive_write(target, payload)
     return hashlib.sha256(payload).hexdigest()

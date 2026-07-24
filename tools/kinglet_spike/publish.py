@@ -3,15 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 from dataclasses import asdict
 from pathlib import Path
 
 from .load import load_record
 from .model import EvidenceError, EvidenceRecord
-from .validate import _artifact_path, validate_record
-
-SAFE_COMPONENT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+from .validate import SAFE_COMPONENT, _artifact_path, validate_record
 
 
 def record_to_json(record: EvidenceRecord) -> str:
@@ -97,7 +94,51 @@ def _write_exclusive(target: Path, payload: bytes, run_id: str) -> None:
         raise
 
 
+def _raw_record_path(raw_path: Path, repo_root: Path) -> Path:
+    raw_root = _trusted_repo_path(
+        repo_root,
+        Path(".kinglet/local/spikes"),
+        "local spike root",
+    )
+    candidate = raw_path.absolute()
+    try:
+        relative = candidate.relative_to(raw_root)
+    except ValueError as error:
+        raise EvidenceError(
+            "E_PATH",
+            "record must be below .kinglet/local/spikes/",
+        ) from error
+    if raw_root.is_symlink():
+        raise EvidenceError("E_SYMLINK", "local spike root is a symlink")
+    current = raw_root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise EvidenceError("E_SYMLINK", "raw record path contains a symlink")
+    resolved_root = raw_root.resolve()
+    resolved = candidate.resolve()
+    if not resolved.is_relative_to(resolved_root):
+        raise EvidenceError("E_PATH", "raw record escapes .kinglet/local/spikes/")
+    return resolved
+
+
+def _trusted_repo_path(repo_root: Path, relative: Path, label: str) -> Path:
+    root = repo_root.absolute()
+    if root.is_symlink():
+        raise EvidenceError("E_SYMLINK", f"{label} repository root is a symlink")
+    current = root
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            raise EvidenceError("E_SYMLINK", f"{label} contains a symlink")
+    resolved_root = root.resolve()
+    if not current.resolve().is_relative_to(resolved_root):
+        raise EvidenceError("E_PATH", f"{label} escapes repository root")
+    return current
+
+
 def publish_record(raw_path: Path, repo_root: Path) -> Path:
+    raw_path = _raw_record_path(raw_path, repo_root)
     record = load_record(raw_path)
     publish_root = raw_path.parent / "publish"
     diagnostics = validate_record(record, publish_root)
@@ -105,7 +146,11 @@ def publish_record(raw_path: Path, repo_root: Path) -> Path:
         first = diagnostics[0]
         raise EvidenceError(first.code, f"{first.location}: {first.message}")
 
-    committed_root = repo_root / "docs/research/platform-spike"
+    committed_root = _trusted_repo_path(
+        repo_root,
+        Path("docs/research/platform-spike"),
+        "publication root",
+    )
     targets: list[tuple[Path, Path, str]] = []
     for artifact in record.artifacts:
         source = _artifact_path(publish_root, artifact.path)

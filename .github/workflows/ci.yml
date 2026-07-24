@@ -184,6 +184,15 @@ jobs:
           python3 -m json.tool spikes/platform/contracts/evidence-v1.json > /dev/null
           python3 -m json.tool spikes/platform/contracts/matrix-v1.json > /dev/null
 
+      - name: Verify spike report regeneration
+        run: |
+          python3 -m tools.kinglet_spike report \
+            --repo-root . \
+            --matrix spikes/platform/contracts/matrix-v1.json
+          git diff --exit-code -- \
+            docs/research/platform-spike/reports/coverage.json \
+            docs/research/platform-spike/reports/coverage.md
+
       - name: Run Kinglet build suite
         run: bash tests/test-kinglet-build.sh
 

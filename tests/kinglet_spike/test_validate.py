@@ -51,12 +51,53 @@ class ValidateRecordTests(unittest.TestCase):
         diagnostics = self._diagnostics(valid_record(), artifact=False)
         self.assertEqual("E_PATH", diagnostics[0].code)
 
+    def test_rejects_artifact_outside_artifacts_namespace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            artifact = root / "publish/reports/result.json"
+            artifact.parent.mkdir(parents=True)
+            artifact.write_bytes(b'{"ok":true}\n')
+            record = load_record(
+                write_record(root, valid_record("reports/result.json"))
+            )
+            self.assertEqual(
+                "E_PATH",
+                validate_record(record, root / "publish")[0].code,
+            )
+
+    def test_rejects_binary_artifact_media_type(self):
+        value = valid_record()
+        value["artifacts"][0]["media_type"] = "image/png"
+        self.assertEqual("E_ENUM", self._diagnostics(value)[0].code)
+
+    def test_rejects_unsafe_identity(self):
+        value = valid_record()
+        value["subject"]["id"] = "../python"
+        self.assertEqual("E_FIELD", self._diagnostics(value)[0].code)
+
     def test_pass_requires_artifact_checksum_and_all_assertions(self):
         value = valid_record()
         value["artifacts"][0]["sha256"] = "0" * 64
         value["assertions"][0]["status"] = "fail"
         codes = {item.code for item in self._diagnostics(value)}
         self.assertEqual({"E_ASSERTION", "E_CHECKSUM"}, codes)
+
+    def test_pass_requires_native_environment(self):
+        value = valid_record()
+        value["environment"]["native"] = False
+        self.assertEqual("E_ASSERTION", self._diagnostics(value)[0].code)
+
+    def test_pass_requires_version_toolchain_command_and_source(self):
+        value = valid_record()
+        value["subject"]["version"] = ""
+        value["environment"]["toolchain"] = []
+        value["command"] = []
+        value["sources"] = []
+        diagnostics = self._diagnostics(value)
+        self.assertEqual(
+            {"subject.version", "environment.toolchain", "command", "sources"},
+            {item.location for item in diagnostics if item.code == "E_FIELD"},
+        )
 
     def test_rejects_raw_prompt_and_sensitive_command(self):
         value = valid_record()
@@ -68,6 +109,11 @@ class ValidateRecordTests(unittest.TestCase):
         value = valid_record()
         value["command"] = ["tool", "--token", "ghp_123456789012345678901234567890123456"]
         self.assertEqual("E_SECRET", self._diagnostics(value)[0].code)
+
+    def test_rejects_windows_user_path_in_record_strings(self):
+        value = valid_record()
+        value["command"] = ["tool", r"C:\Users\alice\project"]
+        self.assertEqual("E_PATH", self._diagnostics(value)[0].code)
 
     def test_pass_requires_five_cold_start_samples(self):
         value = valid_record()
@@ -87,3 +133,34 @@ class ValidateRecordTests(unittest.TestCase):
             self.assertEqual(64, len(digest))
             with self.assertRaisesRegex(Exception, "E_ENUM"):
                 redact_artifact(source, root / "image.png", "image/png", ())
+
+    def test_redactor_rejects_undeclared_windows_user_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "raw.json"
+            source.write_text(
+                '{"path":"C:\\\\Users\\\\alice\\\\project"}',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(Exception, "E_PATH"):
+                redact_artifact(
+                    source,
+                    root / "publish.json",
+                    "application/json",
+                    (),
+                )
+
+    def test_redactor_rejects_symlink_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_target = root / "source-target.json"
+            source_target.write_text('{"ok":true}', encoding="utf-8")
+            source = root / "raw.json"
+            source.symlink_to(source_target)
+            with self.assertRaisesRegex(Exception, "E_SYMLINK"):
+                redact_artifact(
+                    source,
+                    root / "publish.json",
+                    "application/json",
+                    (),
+                )
