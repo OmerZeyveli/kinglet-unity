@@ -319,3 +319,6 @@ spikes/platform/runtime/contract/canonical-invalid/src/rules/pc-console/instruct
 spikes/platform/runtime/contract/canonical-invalid/src/rules/pc-console/rule.json	original	-	-	-	original	host-probe-canonical-invalid-fixture-rule-json
 spikes/platform/runtime/contract/canonical-invalid/src/workflows/unity-audit/instructions.md	original	-	-	-	original	host-probe-canonical-invalid-fixture-workflow-instructions
 spikes/platform/runtime/contract/canonical-invalid/src/workflows/unity-audit/workflow.json	original	-	-	-	original	host-probe-canonical-invalid-fixture-workflow-json
+spikes/platform/runtime/rubric-v1.json	original	-	-	-	original	runtime-selection-rubric-frozen-before-candidate-results
+spikes/platform/runtime/toolchains.lock.json	original	-	-	-	original	runtime-toolchain-version-pins-with-unverified-checksums
+tests/kinglet_spike/test_runtime_rubric.py	original	-	-	-	original	runtime-rubric-scoring-and-tie-review-tests

@@ -1,0 +1,82 @@
+{
+  "_schema": "kinglet.runtime-rubric/v1",
+  "_note": "Frozen BEFORE any candidate results exist. Changes after results are accepted require an ADR explaining why the original criterion was invalid and a full rerun of all affected candidates.",
+
+  "hard_gates": [
+    {
+      "id": "no-user-runtime-required",
+      "description": "No separately installed end-user runtime or toolchain is required."
+    },
+    {
+      "id": "host-probe-all-cases-all-hosts",
+      "description": "Every Host Probe filesystem, lease, process, Unicode-path, signature, and result-contract case passes on every required native host."
+    },
+    {
+      "id": "long-running-process-management",
+      "description": "Unity-like and MCP-like long-running process trees can be started, timed out, cancelled, and cleaned reliably."
+    },
+    {
+      "id": "no-orphans-after-any-exit",
+      "description": "Success, crash, timeout, and cancellation leave no live child process or active lease."
+    },
+    {
+      "id": "reproducible-signed-artifact",
+      "description": "Each target produces a reproducible, checksummed artifact that can participate in native platform signing."
+    },
+    {
+      "id": "license-compatible-and-recorded",
+      "description": "Candidate and dependency licenses are compatible with Kinglet distribution and completely recorded."
+    },
+    {
+      "id": "no-secrets-no-absolute-paths",
+      "description": "Structured errors and committed evidence contain no forbidden secrets or absolute user paths."
+    },
+    {
+      "id": "windows-native",
+      "description": "Windows execution is native and uses neither WSL nor Git Bash."
+    },
+    {
+      "id": "no-blocking-platform-limitation",
+      "description": "The canonical manifest and structured result behaviors are implementable without a blocking platform limitation."
+    }
+  ],
+
+  "weights": {
+    "process-and-filesystem-reliability": 25,
+    "cross-platform-packaging-and-lifecycle": 20,
+    "testability-and-maintainability": 20,
+    "supply-chain-and-security": 15,
+    "existing-python-foundation-reuse-or-migration-cost": 10,
+    "startup-time-memory-and-artifact-size": 10
+  },
+
+  "scoring_bands": {
+    "0": "blocking — the capability is absent or critically broken",
+    "1": "high risk — serious gaps or unresolved platform issues",
+    "2": "material risk — notable issues that will require significant mitigation",
+    "3": "acceptable — meets the bar with minor concerns",
+    "4": "strong — clear capability with well-evidenced behavior",
+    "5": "best evidenced — exceeds the bar with thorough, reproducible evidence"
+  },
+
+  "scoring_rules": {
+    "measured_categories": ["startup-time-memory-and-artifact-size"],
+    "qualitative_categories": [
+      "process-and-filesystem-reliability",
+      "cross-platform-packaging-and-lifecycle",
+      "testability-and-maintainability",
+      "supply-chain-and-security",
+      "existing-python-foundation-reuse-or-migration-cost"
+    ],
+    "qualitative_requirements": "Each non-measured score requires an evidence record ID and a reviewer rationale string.",
+    "score_range": [0, 5],
+    "disqualification": "Any failed or open hard gate disqualifies the candidate from weighted scoring. A failed gate is committed evidence, not a low score.",
+    "tie_threshold_points": 3,
+    "tie_break_order": [
+      "fewer platform limitations",
+      "smaller supply-chain surface",
+      "lower risk preserving tested existing behavior",
+      "simpler long-term maintenance"
+    ]
+  }
+}

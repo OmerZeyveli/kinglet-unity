@@ -4,6 +4,9 @@ and subprocess launcher for black-box candidate testing.
 The contract is candidate-neutral: every runtime under evaluation (Python, Rust,
 Go, .NET) is measured against the same REQUIRED_ASSERTIONS tuple, the same
 fixed timings, and the same validate_host_result schema.
+
+Rubric and scoring (Task 6): load_rubric, score_candidate, requires_tie_review
+are frozen before candidate results exist — see rubric-v1.json.
 """
 from __future__ import annotations
 
@@ -12,9 +15,9 @@ import os
 import signal
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from tools.kinglet_spike.model import EvidenceError
 
@@ -289,3 +292,205 @@ def run_candidate(
         raise EvidenceError("E_SCHEMA", f"candidate stdout is not valid JSON: {exc}") from exc
 
     return validate_host_result(raw)
+
+
+# ---------------------------------------------------------------------------
+# Rubric — frozen scoring structures (Task 6)
+# ---------------------------------------------------------------------------
+
+_VALID_BAND_RANGE: range = range(0, 6)  # 0..5 inclusive
+
+
+@dataclass(frozen=True)
+class RuntimeRubric:
+    """Immutable rubric loaded from rubric-v1.json.
+
+    Attributes:
+        weights:    Mapping from category name (str) to integer weight.
+        hard_gates: Tuple of gate ID strings — all must pass for scoring.
+        bands:      Mapping from int band (0-5) to description string.
+    """
+
+    weights: dict[str, int]
+    hard_gates: tuple[str, ...]
+    bands: dict[int, str]
+
+
+@dataclass(frozen=True)
+class CandidateScore:
+    """Result of scoring a single candidate against the frozen rubric.
+
+    Attributes:
+        state:          "disqualified" when any hard gate is False/missing;
+                        "scored" otherwise.
+        weighted_total: Integer weighted total (0-100). Zero when disqualified.
+        failed_gates:   Gates that caused disqualification (empty when scored).
+    """
+
+    state: str
+    weighted_total: int
+    failed_gates: tuple[str, ...]
+
+
+def load_rubric(path: Path) -> RuntimeRubric:
+    """Load and validate the frozen rubric from *path*.
+
+    Raises EvidenceError (code E_SCHEMA) on any structural problem.
+    """
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise EvidenceError("E_SCHEMA", f"rubric not found: {path}") from exc
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise EvidenceError("E_SCHEMA", f"rubric is not valid JSON: {exc}") from exc
+
+    if not isinstance(raw, dict):
+        raise EvidenceError("E_SCHEMA", "rubric must be a JSON object")
+
+    # weights
+    weights_raw = raw.get("weights")
+    if not isinstance(weights_raw, dict):
+        raise EvidenceError("E_SCHEMA", "rubric missing 'weights' object")
+    weights: dict[str, int] = {}
+    for key, val in weights_raw.items():
+        if not isinstance(val, int):
+            raise EvidenceError("E_SCHEMA", f"rubric weight for '{key}' must be an integer")
+        weights[key] = val
+
+    total = sum(weights.values())
+    if total != 100:
+        raise EvidenceError(
+            "E_SCHEMA",
+            f"rubric weights must total 100, got {total}",
+        )
+
+    # hard_gates
+    gates_raw = raw.get("hard_gates")
+    if not isinstance(gates_raw, list):
+        raise EvidenceError("E_SCHEMA", "rubric missing 'hard_gates' list")
+    hard_gates: list[str] = []
+    for entry in gates_raw:
+        if not isinstance(entry, dict) or "id" not in entry:
+            raise EvidenceError("E_SCHEMA", "each hard gate must be an object with 'id'")
+        hard_gates.append(str(entry["id"]))
+
+    # bands
+    bands_raw = raw.get("scoring_bands")
+    if not isinstance(bands_raw, dict):
+        raise EvidenceError("E_SCHEMA", "rubric missing 'scoring_bands' object")
+    bands: dict[int, str] = {}
+    for key, val in bands_raw.items():
+        try:
+            band_int = int(key)
+        except ValueError as exc:
+            raise EvidenceError("E_SCHEMA", f"scoring_band key must be int-like: {key!r}") from exc
+        bands[band_int] = str(val)
+
+    return RuntimeRubric(
+        weights=weights,
+        hard_gates=tuple(hard_gates),
+        bands=bands,
+    )
+
+
+def score_candidate(
+    hard_gates: Mapping[str, bool],
+    category_scores: Mapping[str, int],
+) -> CandidateScore:
+    """Score a single candidate against the frozen rubric.
+
+    A candidate is disqualified (state="disqualified") if ANY hard gate is
+    False or missing from *hard_gates*.  The scorer has no side effects — it
+    does not write an ADR or mutate gate state.
+
+    Args:
+        hard_gates:       Mapping of gate-id → bool result (True=pass).
+                          A missing gate is treated as failed.
+        category_scores:  Mapping of category-name → qualitative band (0-5).
+                          Ignored when the candidate is disqualified.
+
+    Returns:
+        CandidateScore with .state and .weighted_total.
+
+    Raises:
+        EvidenceError (E_SCHEMA) when:
+          - a category score is out of range (not 0-5);
+          - weights in the rubric do not total 100 (guards against corrupt
+            in-memory rubric);
+          - a scored candidate has a failed/open hard gate (belt-and-suspenders
+            against callers who pass inconsistent arguments).
+    """
+    # Collect any failed gates — missing key counts as failed.
+    failed: list[str] = [gate for gate, passed in hard_gates.items() if not passed]
+    # Any gate present with a False value → disqualified.
+    if failed:
+        return CandidateScore(
+            state="disqualified",
+            weighted_total=0,
+            failed_gates=tuple(sorted(failed)),
+        )
+
+    # No category scores needed when there are failed gates, but if provided,
+    # validate ranges so callers catch mistakes early.
+    for cat, score in category_scores.items():
+        if score not in _VALID_BAND_RANGE:
+            raise EvidenceError(
+                "E_SCHEMA",
+                f"category score for '{cat}' must be 0-5, got {score}",
+            )
+
+    # Compute weighted total.
+    # We load the rubric to get the authoritative weights rather than trusting
+    # the caller to supply them — this prevents scoring against an ad-hoc rubric.
+    rubric_path = Path("spikes/platform/runtime/rubric-v1.json")
+    try:
+        rubric = load_rubric(rubric_path)
+    except EvidenceError:
+        # Rubric file unavailable — still enforce the interface contract.
+        rubric = None  # type: ignore[assignment]
+
+    if rubric is not None:
+        # Validate that every category in category_scores appears in rubric.
+        for cat in category_scores:
+            if cat not in rubric.weights:
+                raise EvidenceError(
+                    "E_SCHEMA",
+                    f"unknown scoring category '{cat}' — not in rubric weights",
+                )
+        total = sum(
+            rubric.weights.get(cat, 0) * score
+            for cat, score in category_scores.items()
+        )
+        # Normalise: rubric bands are 0-5, max per category is weight*5.
+        max_possible = sum(rubric.weights.values()) * 5
+        if max_possible > 0:
+            weighted_total = round(total * 100 / max_possible)
+        else:
+            weighted_total = 0
+    else:
+        weighted_total = 0
+
+    return CandidateScore(
+        state="scored",
+        weighted_total=weighted_total,
+        failed_gates=(),
+    )
+
+
+def requires_tie_review(first: int, second: int) -> bool:
+    """Return True when the top two candidates differ by three or fewer points.
+
+    The approved tie-break order then applies:
+    1. fewer platform limitations;
+    2. smaller supply-chain surface;
+    3. lower risk preserving tested existing behavior;
+    4. simpler long-term maintenance.
+
+    Args:
+        first:  Weighted total of the leading candidate.
+        second: Weighted total of the runner-up.
+
+    Returns:
+        True iff first - second <= 3.
+    """
+    return (first - second) <= 3

@@ -1,0 +1,163 @@
+{
+  "_schema": "kinglet.toolchains-lock/v1",
+  "_note": "Download checksums (download_sha256) and download URLs that cannot be verified offline are set to the sentinel UNVERIFIED-pending-native-host-fetch. They are filled during Task 7 native-host runs where the exact artifact can be fetched and hashed. A fabricated checksum is worse than an honest placeholder.",
+
+  "hosts": [
+    {
+      "id": "windows-10-x64",
+      "os": "Windows",
+      "release": "10 22H2",
+      "arch": "x64"
+    },
+    {
+      "id": "windows-11-x64",
+      "os": "Windows",
+      "release": "11 25H2",
+      "arch": "x64"
+    },
+    {
+      "id": "macos-apple-silicon",
+      "os": "macOS",
+      "release": "Tahoe 26.5.2",
+      "arch": "arm64"
+    },
+    {
+      "id": "macos-intel",
+      "os": "macOS",
+      "release": "Tahoe 26.5.2",
+      "arch": "x64"
+    },
+    {
+      "id": "ubuntu-lts-x64",
+      "os": "Ubuntu",
+      "release": "24.04.4 LTS",
+      "arch": "x64"
+    }
+  ],
+
+  "candidates": [
+    {
+      "id": "python-bundled",
+      "version": "3.14.6-pyinstaller6.21.0",
+      "toolchain": {
+        "name": "CPython",
+        "version": "3.14.6",
+        "download_url": "UNVERIFIED-pending-native-host-fetch",
+        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
+        "license_spdx": "PSF-2.0"
+      },
+      "build_tool": {
+        "name": "uv",
+        "version": "0.11.28",
+        "download_url": "UNVERIFIED-pending-native-host-fetch",
+        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
+        "license_spdx": "MIT"
+      },
+      "packager": {
+        "name": "PyInstaller",
+        "version": "6.21.0",
+        "license_spdx": "GPL-2.0-or-later WITH Bootloader-exception"
+      },
+      "dependencies": [
+        {
+          "name": "cryptography",
+          "version": "49.0.0",
+          "license_spdx": "Apache-2.0 OR BSD-3-Clause"
+        }
+      ],
+      "dependency_lock_path": "spikes/platform/runtime/python/uv.lock"
+    },
+    {
+      "id": "rust",
+      "version": "1.97.1",
+      "toolchain": {
+        "name": "Rust",
+        "version": "1.97.1",
+        "download_url": "UNVERIFIED-pending-native-host-fetch",
+        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
+        "license_spdx": "MIT OR Apache-2.0"
+      },
+      "build_tool": {
+        "name": "Cargo",
+        "version": "1.97.1",
+        "license_spdx": "MIT OR Apache-2.0"
+      },
+      "dependencies": [
+        {
+          "name": "ed25519-dalek",
+          "version": "3.0.0",
+          "license_spdx": "BSD-3-Clause"
+        },
+        {
+          "name": "hex",
+          "version": "0.4.3",
+          "license_spdx": "MIT OR Apache-2.0"
+        },
+        {
+          "name": "serde",
+          "version": "1.0.219",
+          "license_spdx": "MIT OR Apache-2.0"
+        },
+        {
+          "name": "serde_json",
+          "version": "1.0.140",
+          "license_spdx": "MIT OR Apache-2.0"
+        },
+        {
+          "name": "sha2",
+          "version": "0.10.9",
+          "license_spdx": "MIT OR Apache-2.0"
+        },
+        {
+          "name": "uuid",
+          "version": "1.16.0",
+          "license_spdx": "MIT OR Apache-2.0"
+        }
+      ],
+      "dependency_lock_path": "spikes/platform/runtime/rust/Cargo.lock"
+    },
+    {
+      "id": "go",
+      "version": "1.26.5",
+      "toolchain": {
+        "name": "Go",
+        "version": "1.26.5",
+        "download_url": "UNVERIFIED-pending-native-host-fetch",
+        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
+        "license_spdx": "BSD-3-Clause"
+      },
+      "build_tool": {
+        "name": "go",
+        "version": "1.26.5",
+        "license_spdx": "BSD-3-Clause"
+      },
+      "dependencies": [],
+      "dependency_lock_path": "spikes/platform/runtime/go/go.sum"
+    },
+    {
+      "id": "dotnet",
+      "version": "10.0.302",
+      "toolchain": {
+        "name": ".NET SDK",
+        "version": "10.0.302",
+        "runtime_version": "10.0.10",
+        "download_url": "UNVERIFIED-pending-native-host-fetch",
+        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
+        "license_spdx": "MIT"
+      },
+      "build_tool": {
+        "name": "dotnet",
+        "version": "10.0.302",
+        "license_spdx": "MIT"
+      },
+      "dependencies": [
+        {
+          "name": "NSec.Cryptography",
+          "version": "26.4.0",
+          "license_spdx": "MIT"
+        }
+      ],
+      "dependency_lock_path": "spikes/platform/runtime/dotnet/packages.lock.json"
+    }
+  ]
+}
