@@ -305,8 +305,11 @@ def spawn_tree_and_cancel(
     if sentinel.exists():
         sentinel.unlink()
 
+    # sys.executable is the Python interpreter when running from source and the
+    # onefile binary itself when frozen (PyInstaller) — correct to re-spawn in
+    # both modes. The script path is only passed when NOT frozen.
     cmd = [
-        sys.executable if not hasattr(sys, "_MEIPASS") else str(exe),
+        sys.executable,
         str(exe) if not hasattr(sys, "_MEIPASS") else "",
         "child",
         "--sentinel", str(sentinel),
@@ -375,7 +378,7 @@ def _run_child(sentinel_path: Path, lifetime_ms: int) -> None:
     # Spawn the grandchild
     grandchild_sentinel = sentinel_path.parent / "gc-sentinel.json"
     gc_cmd = [
-        sys.executable if not hasattr(sys, "_MEIPASS") else str(_EXE),
+        sys.executable,
         str(_EXE) if not hasattr(sys, "_MEIPASS") else "",
         "child",
         "--sentinel", str(grandchild_sentinel),
