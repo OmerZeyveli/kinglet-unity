@@ -19,14 +19,12 @@ Exposed API (imported by test_candidate.py):
 """
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
 import signal
 import subprocess
 import sys
-import tempfile
 import time
 import uuid
 from datetime import datetime, timezone
@@ -522,8 +520,9 @@ def run_contract(contract_path: Path, workspace: Path) -> dict[str, Any]:
         assertions.append(_fail("lease.acquire", str(exc)))
         errors.append(f"lease.acquire: {exc}")
 
-    # lease.renew
+    # lease.renew — wait until lease_renewal_ms before renewing (contract timing)
     try:
+        time.sleep(lease_renewal_ms / 1000.0)
         ok = lease_a.renew()
         if ok:
             assertions.append(_pass("lease.renew"))
@@ -534,8 +533,11 @@ def run_contract(contract_path: Path, workspace: Path) -> dict[str, Any]:
         assertions.append(_fail("lease.renew", str(exc)))
         errors.append(f"lease.renew: {exc}")
 
-    # lease.reject-competitor — a second Lease instance cannot acquire while lease_a is held
+    # lease.reject-competitor — wait until lease_competitor_ms before attempting
+    # (contract timing); the additional wait after renew still keeps us well within ttl.
     try:
+        extra_wait = max(0, (lease_competitor_ms - lease_renewal_ms)) / 1000.0
+        time.sleep(extra_wait)
         lease_b = Lease(lease_path, lease_ttl_ms)
         ok_b = lease_b.acquire()
         if not ok_b:
@@ -588,74 +590,22 @@ def run_contract(contract_path: Path, workspace: Path) -> dict[str, Any]:
     # Process tree
     # ------------------------------------------------------------------
 
-    # child subcommand scenario: spawn_tree_and_cancel verifies the child and
-    # grandchild start and then ALL descendants are gone after cancellation.
+    # process.child-grandchild / process.cancel / process.no-descendants —
+    # delegate entirely to spawn_tree_and_cancel (the single real implementation).
     recorded_pids: list[int] = []
-    cancel_ok = False
-
-    # cleanup.success — injected success path: no subprocess needed, just verify
-    # that our own lease + atomic paths cleaned up in the success case above.
-    # We track cleanup across all four scenarios; wrap each in try/finally.
-
-    # process.child-grandchild — spawn tree and wait for sentinel
-    _child_stderr_capture: list[bytes] = []
     try:
-        sentinel = workspace / "tree-sentinel.json"
-        if sentinel.exists():
-            sentinel.unlink()
-
-        cmd = _build_child_cmd()
-        child_proc = subprocess.Popen(
-            cmd + ["child", "--sentinel", str(sentinel), "--lifetime-ms", str(child_lifetime_ms)],
-            start_new_session=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
+        recorded_pids = spawn_tree_and_cancel(
+            _EXE,
+            workspace,
+            child_lifetime_ms,
+            cancel_deadline_ms,
         )
-        # Wait up to 5 s for sentinel with at least 2 PIDs
-        deadline = time.monotonic() + 5.0
-        pids: list[int] = []
-        while time.monotonic() < deadline:
-            if sentinel.exists():
-                try:
-                    pids = json.loads(sentinel.read_text(encoding="utf-8"))
-                    if isinstance(pids, list) and len(pids) >= 2:
-                        break
-                except (json.JSONDecodeError, OSError):
-                    pass
-            time.sleep(0.05)
 
-        if len(pids) >= 2:
+        if len(recorded_pids) >= 2:
             assertions.append(_pass("process.child-grandchild"))
-            recorded_pids = pids
         else:
-            # Collect stderr for diagnosis
-            try:
-                child_proc.kill()
-                _, stderr_data = child_proc.communicate(timeout=2)
-                _child_stderr_capture.append(stderr_data)
-            except Exception:
-                pass
-            assertions.append(_fail("process.child-grandchild", f"sentinel had only {len(pids)} pids"))
+            assertions.append(_fail("process.child-grandchild", f"sentinel had only {len(recorded_pids)} pids"))
             errors.append("process.child-grandchild: sentinel not ready in time")
-
-        # process.cancel — kill the group
-        try:
-            os.killpg(child_proc.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        try:
-            child_proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            pass
-
-        time.sleep(0.2)
-
-        # process.no-descendants — verify all recorded PIDs are dead
-        deadline2 = time.monotonic() + 5.0
-        while time.monotonic() < deadline2:
-            if all(not _is_pid_alive(p) for p in recorded_pids):
-                break
-            time.sleep(0.1)
 
         if recorded_pids and all(not _is_pid_alive(p) for p in recorded_pids):
             assertions.append(_pass("process.cancel"))
@@ -721,19 +671,25 @@ def run_contract(contract_path: Path, workspace: Path) -> dict[str, Any]:
     # resources created during the run are released.  Since all our per-assertion
     # resources above were cleaned up in their own blocks, we verify a new lease
     # can be acquired and released cleanly.
+    # FIX A: initialize cl and tmp before try so finally block never sees NameError
+    # if cl.acquire() or atomic_replace raises before they are assigned.
+    cl_path = workspace / ".cleanup" / "success.lease"
+    cl: Lease | None = None
+    tmp: Path | None = None
     try:
         try:
-            cl_path = workspace / ".cleanup" / "success.lease"
             cl = Lease(cl_path, lease_ttl_ms)
             cl.acquire()
             tmp = workspace / "cleanup-success.tmp"
             atomic_replace(tmp, b"ok")
         finally:
-            cl.release()
-            try:
-                tmp.unlink(missing_ok=True)
-            except OSError:
-                pass
+            if cl is not None:
+                cl.release()
+            if tmp is not None:
+                try:
+                    tmp.unlink(missing_ok=True)
+                except OSError:
+                    pass
         assertions.append(_pass("cleanup.success"))
     except Exception as exc:
         assertions.append(_fail("cleanup.success", str(exc)))
@@ -812,10 +768,10 @@ def run_contract(contract_path: Path, workspace: Path) -> dict[str, Any]:
     # ------------------------------------------------------------------
     # Final active-lease check
     # ------------------------------------------------------------------
-    # All leases should have been released by now.
+    # All leases should have been released by now (including cleanup.success).
     active_lease = any(
         p.exists()
-        for p in [lease_path, cl_crash_path, cl_timeout_path, cl_cancel_path]
+        for p in [lease_path, cl_path, cl_crash_path, cl_timeout_path, cl_cancel_path]
     )
 
     # ------------------------------------------------------------------
@@ -851,15 +807,6 @@ def run_contract(contract_path: Path, workspace: Path) -> dict[str, Any]:
         "descendant_pids": descendant_pids,
         "active_lease": active_lease,
     }
-
-
-def _build_child_cmd() -> list[str]:
-    """Return the command prefix to launch the child subcommand."""
-    if hasattr(sys, "_MEIPASS"):
-        # Bundled: the exe itself is the entry point
-        return [str(_EXE)]
-    else:
-        return [sys.executable, str(_EXE)]
 
 
 # ---------------------------------------------------------------------------
