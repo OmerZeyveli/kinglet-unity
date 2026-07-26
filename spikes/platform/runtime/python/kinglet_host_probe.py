@@ -832,6 +832,13 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(prog="kinglet_host_probe")
+    # Frozen protocol: `<exe> --version` prints "<id> <version>". The `version`
+    # subcommand below is kept as an alias.
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help="Print candidate version string and exit",
+    )
     sub = parser.add_subparsers(dest="command")
 
     run_p = sub.add_parser("run", help="Run the full host probe contract")
@@ -846,6 +853,10 @@ def main() -> None:
     ver_p = sub.add_parser("version", help="Print candidate version string")
 
     args = parser.parse_args()
+
+    if args.version:
+        print(f"{CANDIDATE_ID} {CANDIDATE_VERSION}")
+        sys.exit(0)
 
     if args.command == "run":
         result = run_contract(args.contract, args.workspace)
