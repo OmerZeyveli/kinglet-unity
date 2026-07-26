@@ -414,15 +414,33 @@ def score_candidate(
 
     Raises:
         EvidenceError (E_SCHEMA) when:
+          - the rubric cannot be loaded or parsed (strict — no silent fallback);
           - a category score is out of range (not 0-5);
-          - weights in the rubric do not total 100 (guards against corrupt
-            in-memory rubric);
+          - a scored candidate references an unknown category (not in rubric);
           - a scored candidate has a failed/open hard gate (belt-and-suspenders
             against callers who pass inconsistent arguments).
+
+    NOTE (deferred plan tension): qualitative scores are accepted as bare ints
+    per the frozen interface; evidence-record-id + rationale enforcement is
+    deferred to Task 8, where the richer scoring input is decided with user
+    approval.
     """
-    # Collect any failed gates — missing key counts as failed.
-    failed: list[str] = [gate for gate, passed in hard_gates.items() if not passed]
-    # Any gate present with a False value → disqualified.
+    # Load the rubric first — strict, no silent fallback.
+    # A scorer that cannot read its own frozen rubric must not return a
+    # plausible-looking zero; the error propagates to the caller.
+    rubric_path = Path("spikes/platform/runtime/rubric-v1.json")
+    rubric = load_rubric(rubric_path)
+
+    # Collect failed/open gates.
+    # "Open" means absent from hard_gates; "failed" means present and False.
+    # Both disqualify.  Compare against the rubric's authoritative gate set so
+    # a candidate that omits gates entirely is correctly rejected.
+    rubric_gate_ids: frozenset[str] = frozenset(rubric.hard_gates)
+    failed: list[str] = []
+    for gate_id in rubric_gate_ids:
+        if not hard_gates.get(gate_id, False):
+            failed.append(gate_id)
+
     if failed:
         return CandidateScore(
             state="disqualified",
@@ -430,8 +448,7 @@ def score_candidate(
             failed_gates=tuple(sorted(failed)),
         )
 
-    # No category scores needed when there are failed gates, but if provided,
-    # validate ranges so callers catch mistakes early.
+    # Validate category-score ranges so callers catch mistakes early.
     for cat, score in category_scores.items():
         if score not in _VALID_BAND_RANGE:
             raise EvidenceError(
@@ -439,34 +456,23 @@ def score_candidate(
                 f"category score for '{cat}' must be 0-5, got {score}",
             )
 
-    # Compute weighted total.
-    # We load the rubric to get the authoritative weights rather than trusting
-    # the caller to supply them — this prevents scoring against an ad-hoc rubric.
-    rubric_path = Path("spikes/platform/runtime/rubric-v1.json")
-    try:
-        rubric = load_rubric(rubric_path)
-    except EvidenceError:
-        # Rubric file unavailable — still enforce the interface contract.
-        rubric = None  # type: ignore[assignment]
+    # Validate that every category in category_scores appears in rubric.
+    for cat in category_scores:
+        if cat not in rubric.weights:
+            raise EvidenceError(
+                "E_SCHEMA",
+                f"unknown scoring category '{cat}' — not in rubric weights",
+            )
 
-    if rubric is not None:
-        # Validate that every category in category_scores appears in rubric.
-        for cat in category_scores:
-            if cat not in rubric.weights:
-                raise EvidenceError(
-                    "E_SCHEMA",
-                    f"unknown scoring category '{cat}' — not in rubric weights",
-                )
-        total = sum(
-            rubric.weights.get(cat, 0) * score
-            for cat, score in category_scores.items()
-        )
-        # Normalise: rubric bands are 0-5, max per category is weight*5.
-        max_possible = sum(rubric.weights.values()) * 5
-        if max_possible > 0:
-            weighted_total = round(total * 100 / max_possible)
-        else:
-            weighted_total = 0
+    # Compute weighted total from rubric weights (authoritative, not caller-supplied).
+    total = sum(
+        rubric.weights.get(cat, 0) * score
+        for cat, score in category_scores.items()
+    )
+    # Normalise: rubric bands are 0-5, max per category is weight*5.
+    max_possible = sum(rubric.weights.values()) * 5
+    if max_possible > 0:
+        weighted_total = round(total * 100 / max_possible)
     else:
         weighted_total = 0
 
@@ -478,7 +484,7 @@ def score_candidate(
 
 
 def requires_tie_review(first: int, second: int) -> bool:
-    """Return True when the top two candidates differ by three or fewer points.
+    """Return True when the top two candidates differ by three or fewer points (symmetric).
 
     The approved tie-break order then applies:
     1. fewer platform limitations;
@@ -491,6 +497,6 @@ def requires_tie_review(first: int, second: int) -> bool:
         second: Weighted total of the runner-up.
 
     Returns:
-        True iff first - second <= 3.
+        True iff abs(first - second) <= 3.
     """
-    return (first - second) <= 3
+    return abs(first - second) <= 3
