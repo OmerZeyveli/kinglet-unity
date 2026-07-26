@@ -293,6 +293,7 @@ docs/research/platform-spike/artifacts/.gitkeep	original	-	-	-	original	kinglet-
 docs/research/platform-spike/reports/.gitkeep	original	-	-	-	original	kinglet-spike-report-directory-marker
 docs/research/platform-spike/reports/coverage.json	original	-	-	-	original	kinglet-spike-generated-machine-coverage-baseline
 docs/research/platform-spike/reports/coverage.md	original	-	-	-	original	kinglet-spike-generated-human-coverage-baseline
+docs/research/platform-spike/reports/runtime-foundation-status.md	original	-	-	-	original	kinglet-0r-runtime-foundation-status-and-handoff
 tools/kinglet_spike/runtime_contract.py	original	-	-	-	original	host-probe-contract-frozen-assertions-and-validator
 tests/kinglet_spike/test_runtime_contract.py	original	-	-	-	original	host-probe-blackbox-conformance-runner-tests
 spikes/platform/runtime/contract/host-probe-v1.json	original	-	-	-	original	host-probe-v1-frozen-contract-timings-and-assertions
