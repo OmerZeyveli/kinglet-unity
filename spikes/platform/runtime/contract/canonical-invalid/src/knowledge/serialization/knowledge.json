@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "id": "knowledge.serialization",
+  "kind": "knowledge",
+  "name": "Serialization",
+  "summary": "Explains safe Unity serialization practices.",
+  "capabilities": [
+    "filesystem.read"
+  ],
+  "requires": [],
+  "support": {
+    "claude": {
+      "state": "supported",
+      "reason": null,
+      "owner": null,
+      "test": null
+    },
+    "codex": {
+      "state": "supported",
+      "reason": null,
+      "owner": null,
+      "test": null
+    }
+  },
+  "provenance": {
+    "origin": "original",
+    "upstream_version": null,
+    "upstream_path": null,
+    "upstream_sha256": null
+  },
+  "public_name": "serialization",
+  "category": "core",
+  "references": [],
+  "scripts": []
+}

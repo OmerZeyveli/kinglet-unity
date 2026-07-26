@@ -1,0 +1,34 @@
+{
+  "schema": "kinglet.host-probe.contract/v1",
+  "result_schema": "kinglet.host-probe.result/v1",
+  "timings_ms": {
+    "lease_ttl": 1200,
+    "lease_renewal": 400,
+    "lease_competitor_attempt": 600,
+    "child_lifetime": 30000,
+    "cancel_deadline": 5000
+  },
+  "required_assertions": [
+    "manifest.accept-valid",
+    "manifest.reject-unknown",
+    "path.unicode-space",
+    "filesystem.atomic-replace",
+    "lease.acquire",
+    "lease.renew",
+    "lease.reject-competitor",
+    "lease.expire",
+    "lease.release",
+    "process.child-grandchild",
+    "process.cancel",
+    "process.no-descendants",
+    "crypto.sha256",
+    "crypto.ed25519",
+    "cleanup.success",
+    "cleanup.crash",
+    "cleanup.timeout",
+    "cleanup.cancel"
+  ],
+  "canonical_valid": "canonical-valid/",
+  "canonical_invalid": "canonical-invalid/",
+  "crypto_vectors": "ed25519-rfc8032.json"
+}
