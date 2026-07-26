@@ -348,3 +348,4 @@ spikes/platform/runtime/dotnet/packages.lock.json	original	-	-	-	original	dotnet
 spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/Kinglet.HostProbe.Tests.csproj	original	-	-	-	original	dotnet-host-probe-xunit-test-project-file
 spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/ProbeTests.cs	original	-	-	-	original	dotnet-host-probe-xunit-tests-atomic-lease-ed25519-result-shape
 spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/packages.lock.json	original	-	-	-	original	dotnet-host-probe-test-nuget-supply-chain-lock
+docs/research/platform-spike/reports/runtime-linux-indicative.md	original	-	-	-	original	kinglet-0r-indicative-linux-perf-nonclosing
