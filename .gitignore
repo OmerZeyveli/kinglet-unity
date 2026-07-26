@@ -49,3 +49,7 @@ spikes/platform/runtime/go/dist/
 
 # Rust host probe build output (Cargo target dir)
 spikes/platform/runtime/rust/target/
+
+# .NET host probe build output (bin/ obj/ publish/)
+spikes/platform/runtime/dotnet/**/bin/
+spikes/platform/runtime/dotnet/**/obj/

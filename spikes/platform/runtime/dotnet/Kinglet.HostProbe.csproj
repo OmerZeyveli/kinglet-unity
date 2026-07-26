@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>kinglet-host-probe</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Lock file generation and locked restore -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="Exists('packages.lock.json')">true</RestoreLockedMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NSec.Cryptography" Version="26.4.0" />
+  </ItemGroup>
+
+  <!-- Exclude the test project source from this project's compilation -->
+  <ItemGroup>
+    <Compile Remove="Kinglet.HostProbe.Tests/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Kinglet.HostProbe.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>
