@@ -7,17 +7,23 @@ fixed timings, and the same validate_host_result schema.
 
 Rubric and scoring (Task 6): load_rubric, score_candidate, requires_tie_review
 are frozen before candidate results exist — see rubric-v1.json.
+
+CLI usage (see main()):
+    python3 -m tools.kinglet_spike.runtime_contract \\
+        --executable <path> --contract-dir <dir> [--workspace <dir>]
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import signal
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, List, Mapping, Optional, Sequence
 
 from tools.kinglet_spike.model import EvidenceError
 
@@ -216,6 +222,16 @@ def run_candidate(
 ) -> HostProbeResult:
     """Launch a packaged candidate and return its validated HostProbeResult.
 
+    Implements the frozen executable protocol::
+
+        <exe> run --contract <abs host-probe-v1.json> \\
+                  --workspace <abs dir> \\
+                  --result <abs result.json>
+
+    The candidate exits 0 when all assertions pass (1 on assertion failure,
+    2 on bad invocation) and ATOMICALLY writes a kinglet.host-probe.result/v1
+    JSON document to the --result path.
+
     The candidate is started in a new process group (POSIX: start_new_session=True;
     Windows: CREATE_NEW_PROCESS_GROUP). If it does not complete within
     _CANDIDATE_TIMEOUT_S seconds the whole process group is terminated, then
@@ -224,37 +240,56 @@ def run_candidate(
     Args:
         executable:   Path to the candidate binary / script.
         contract_dir: Directory containing host-probe-v1.json and the fixtures.
-        workspace:    Scratch directory the candidate may read/write.
+        workspace:    Scratch directory the candidate may read/write (created
+                      if it does not already exist).
 
     Returns:
         Validated HostProbeResult.
 
     Raises:
         EvidenceError: if the candidate times out, returns non-zero, or produces
-            an invalid result document.
+            an invalid / missing result document.
     """
-    cmd = [str(executable), str(contract_dir), str(workspace)]
+    contract_file = contract_dir / "host-probe-v1.json"
+    result_file = workspace / "host-probe-result.json"
 
-    if sys.platform == "win32" or os.name == "nt":
-        # Windows: use CREATE_NEW_PROCESS_GROUP flag (0x00000200)
-        CREATE_NEW_PROCESS_GROUP = 0x00000200
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            creationflags=CREATE_NEW_PROCESS_GROUP,
-        )
-    else:
-        # POSIX: start in a new session so pgid == proc.pid
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True,
-        )
+    # Create workspace if it does not exist (e.g. unicode/space paths from CLI).
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    cmd = [
+        str(executable),
+        "run",
+        "--contract", str(contract_file),
+        "--workspace", str(workspace),
+        "--result", str(result_file),
+    ]
 
     try:
-        stdout, _stderr = proc.communicate(timeout=_CANDIDATE_TIMEOUT_S)
+        if sys.platform == "win32" or os.name == "nt":
+            # Windows: use CREATE_NEW_PROCESS_GROUP flag (0x00000200)
+            CREATE_NEW_PROCESS_GROUP = 0x00000200
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=CREATE_NEW_PROCESS_GROUP,
+            )
+        else:
+            # POSIX: start in a new session so pgid == proc.pid
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                start_new_session=True,
+            )
+    except OSError as exc:
+        raise EvidenceError(
+            "E_CANDIDATE",
+            f"failed to launch candidate {str(executable)!r}: {exc}",
+        ) from exc
+
+    try:
+        _stdout, stderr = proc.communicate(timeout=_CANDIDATE_TIMEOUT_S)
     except subprocess.TimeoutExpired:
         # Terminate process group, wait, then kill
         if sys.platform != "win32" and os.name != "nt":
@@ -281,15 +316,25 @@ def run_candidate(
         )
 
     if proc.returncode != 0:
+        stderr_snippet = stderr[:2000].decode("utf-8", errors="replace") if stderr else ""
         raise EvidenceError(
-            "E_NONZERO",
-            f"candidate exited with code {proc.returncode}",
+            "E_CANDIDATE",
+            f"candidate exited with code {proc.returncode}; stderr: {stderr_snippet!r}",
         )
 
+    # Read the result file written atomically by the candidate.
     try:
-        raw = json.loads(stdout.decode("utf-8"))
+        raw = json.loads(result_file.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise EvidenceError(
+            "E_CANDIDATE",
+            f"candidate exited 0 but --result file is missing: {result_file}",
+        ) from exc
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-        raise EvidenceError("E_SCHEMA", f"candidate stdout is not valid JSON: {exc}") from exc
+        raise EvidenceError(
+            "E_SCHEMA",
+            f"result file is not valid JSON: {exc}",
+        ) from exc
 
     return validate_host_result(raw)
 
@@ -500,3 +545,93 @@ def requires_tie_review(first: int, second: int) -> bool:
         True iff abs(first - second) <= 3.
     """
     return abs(first - second) <= 3
+
+
+# ---------------------------------------------------------------------------
+# CLI — python3 -m tools.kinglet_spike.runtime_contract
+# ---------------------------------------------------------------------------
+
+_TOTAL_ASSERTIONS: int = len(REQUIRED_ASSERTIONS)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Entry point for the black-box candidate CLI.
+
+    Usage::
+
+        python3 -m tools.kinglet_spike.runtime_contract \\
+            --executable <path> \\
+            --contract-dir <dir> \\
+            [--workspace <dir>]
+
+    Exits 0 iff the result status is "pass" AND all assertions passed.
+    Exits 1 on assertion failure.
+    Exits 2 on EvidenceError (bad invocation, timeout, schema error, etc.).
+
+    Returns:
+        Integer exit code (0, 1, or 2).
+    """
+    parser = argparse.ArgumentParser(
+        prog="python3 -m tools.kinglet_spike.runtime_contract",
+        description="Black-box conformance harness for host-probe candidates.",
+    )
+    parser.add_argument(
+        "--executable",
+        required=True,
+        metavar="PATH",
+        help="Path to the candidate binary or script.",
+    )
+    parser.add_argument(
+        "--contract-dir",
+        required=True,
+        metavar="DIR",
+        help="Directory containing host-probe-v1.json and fixtures.",
+    )
+    parser.add_argument(
+        "--workspace",
+        metavar="DIR",
+        default=None,
+        help=(
+            "Scratch directory for the candidate run. "
+            "Defaults to a fresh temp dir with a name containing a space and non-ASCII char "
+            "(e.g. kinglet run/Kral Yalıçapkını) to exercise unicode/space path handling."
+        ),
+    )
+
+    args = parser.parse_args(argv)
+
+    executable = Path(args.executable)
+    contract_dir = Path(args.contract_dir)
+
+    if args.workspace is not None:
+        workspace = Path(args.workspace)
+        _tmp_dir = None
+    else:
+        # Use a temp dir with unicode + space in the name to exercise path handling.
+        _base = tempfile.mkdtemp()
+        _sub = Path(_base) / "kinglet run" / "Kral Yalıçapkını"
+        _sub.mkdir(parents=True, exist_ok=True)
+        workspace = _sub
+        _tmp_dir = _base  # kept alive until after run_candidate returns
+
+    try:
+        result = run_candidate(executable, contract_dir, workspace)
+    except EvidenceError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    pass_count = sum(1 for a in result.assertions if a.status == "pass")
+    print(f"{pass_count}/{_TOTAL_ASSERTIONS} assertions passed")
+
+    if result.status == "pass" and pass_count == _TOTAL_ASSERTIONS:
+        return 0
+
+    # Print failing assertion ids
+    failing = [a.id for a in result.assertions if a.status != "pass"]
+    if failing:
+        print("failing assertions:", ", ".join(failing), file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
