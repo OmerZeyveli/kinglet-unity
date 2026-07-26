@@ -287,11 +287,12 @@ def spawn_tree_and_cancel(
     workspace: Path,
     lifetime_ms: int,
     cancel_ms: int,
-) -> list[int]:
+) -> tuple[list[int], bool]:
     """Spawn a parent child process, let it spawn a grandchild, then kill the group.
 
-    Returns the list of PIDs (parent + grandchild) that were recorded in the
-    sentinel file — all must be gone by the time this function returns.
+    Returns a tuple of (recorded PIDs, killed): the parent + grandchild PIDs
+    recorded in the sentinel file (all must be gone by the time this returns),
+    and killed=True iff killpg cancelled a live process group.
 
     The parent process is this executable with 'child' subcommand, started in a
     new session (start_new_session=True) so its pgid == proc.pid.  After
@@ -335,11 +336,14 @@ def spawn_tree_and_cancel(
                 pass
         time.sleep(0.05)
 
-    # Cancel: kill the process group
+    # Cancel: kill the process group. Capture whether the kill actually
+    # cancelled a live group so process.cancel can assert it (parity with the
+    # Go/Rust/.NET candidates; independent of the liveness poll below).
     try:
         os.killpg(pgid, signal.SIGKILL)
+        killed = True
     except ProcessLookupError:
-        pass
+        killed = False
 
     # Wait for the main child to reap
     try:
@@ -357,7 +361,7 @@ def spawn_tree_and_cancel(
             break
         time.sleep(0.1)
 
-    return pids
+    return pids, killed
 
 
 def _run_child(sentinel_path: Path, lifetime_ms: int) -> None:
@@ -594,7 +598,7 @@ def run_contract(contract_path: Path, workspace: Path) -> dict[str, Any]:
     # delegate entirely to spawn_tree_and_cancel (the single real implementation).
     recorded_pids: list[int] = []
     try:
-        recorded_pids = spawn_tree_and_cancel(
+        recorded_pids, killed = spawn_tree_and_cancel(
             _EXE,
             workspace,
             child_lifetime_ms,
@@ -607,16 +611,23 @@ def run_contract(contract_path: Path, workspace: Path) -> dict[str, Any]:
             assertions.append(_fail("process.child-grandchild", f"sentinel had only {len(recorded_pids)} pids"))
             errors.append("process.child-grandchild: sentinel not ready in time")
 
-        if recorded_pids and all(not _is_pid_alive(p) for p in recorded_pids):
+        # process.cancel — pass only if killpg cancelled a live group (parity
+        # with Go/Rust/.NET; independent of the no-descendants liveness poll).
+        if recorded_pids and killed:
             assertions.append(_pass("process.cancel"))
+        elif not killed:
+            assertions.append(_fail("process.cancel", "killpg did not cancel a live process group"))
+        else:
+            assertions.append(_fail("process.cancel", "no pids recorded — see process.child-grandchild"))
+
+        # process.no-descendants — every recorded PID must be gone.
+        if recorded_pids and all(not _is_pid_alive(p) for p in recorded_pids):
             assertions.append(_pass("process.no-descendants"))
         else:
             alive = [p for p in recorded_pids if _is_pid_alive(p)]
             if not recorded_pids:
-                assertions.append(_fail("process.cancel", "no pids recorded — see process.child-grandchild"))
                 assertions.append(_fail("process.no-descendants", "no pids recorded"))
             else:
-                assertions.append(_pass("process.cancel"))
                 assertions.append(_fail("process.no-descendants", f"pids still alive: {alive}"))
                 descendant_pids = alive
                 errors.append(f"process.no-descendants: pids still alive: {alive}")

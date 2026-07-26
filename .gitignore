@@ -46,6 +46,12 @@ __pycache__/
 
 # Go host probe compiled binary (built from spikes/platform/runtime/go/)
 spikes/platform/runtime/go/dist/
+# bare `go build` emits the binary into the source dir — keep it out of git
+spikes/platform/runtime/go/kinglet-host-probe
+
+# Python host probe packaging output (PyInstaller default dist/ + build/)
+spikes/platform/runtime/python/dist/
+spikes/platform/runtime/python/build/
 
 # Rust host probe build output (Cargo target dir)
 spikes/platform/runtime/rust/target/
