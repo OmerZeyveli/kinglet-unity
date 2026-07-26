@@ -7,6 +7,7 @@ fixed timings, and the same validate_host_result schema.
 """
 from __future__ import annotations
 
+import json
 import os
 import signal
 import subprocess
@@ -229,8 +230,6 @@ def run_candidate(
         EvidenceError: if the candidate times out, returns non-zero, or produces
             an invalid result document.
     """
-    import json
-
     cmd = [str(executable), str(contract_dir), str(workspace)]
 
     if sys.platform == "win32" or os.name == "nt":
@@ -256,7 +255,10 @@ def run_candidate(
     except subprocess.TimeoutExpired:
         # Terminate process group, wait, then kill
         if sys.platform != "win32" and os.name != "nt":
-            pgid = os.getpgid(proc.pid)
+            # start_new_session=True made the child a session/group leader, so
+            # pgid == proc.pid. Use proc.pid directly to avoid a getpgid() race
+            # if the child exits and its PID is recycled during timeout handling.
+            pgid = proc.pid
             _terminate_process_group(pgid)
         else:
             proc.terminate()
