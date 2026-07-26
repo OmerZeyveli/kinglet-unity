@@ -326,3 +326,9 @@ spikes/platform/runtime/python/pyproject.toml	original	-	-	-	original	python-hos
 spikes/platform/runtime/python/kinglet_host_probe.py	original	-	-	-	original	python-host-probe-candidate-implementation
 spikes/platform/runtime/python/kinglet-host-probe.spec	original	-	-	-	original	python-host-probe-pyinstaller-onefile-build-spec
 spikes/platform/runtime/python/test_candidate.py	original	-	-	-	original	python-host-probe-candidate-unit-tests
+spikes/platform/runtime/go/go.mod	original	-	-	-	original	go-host-probe-module-declaration
+spikes/platform/runtime/go/main.go	original	-	-	-	original	go-host-probe-candidate-main-and-contract-runner
+spikes/platform/runtime/go/lease.go	original	-	-	-	original	go-host-probe-lease-implementation
+spikes/platform/runtime/go/process_unix.go	original	-	-	-	original	go-host-probe-posix-process-group-management
+spikes/platform/runtime/go/process_windows.go	original	-	-	-	original	go-host-probe-windows-process-stub
+spikes/platform/runtime/go/main_test.go	original	-	-	-	original	go-host-probe-candidate-unit-tests

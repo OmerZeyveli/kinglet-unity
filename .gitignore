@@ -43,3 +43,6 @@ __pycache__/
 .claude/settings.local.json
 .claude/state/*
 !.claude/state/.gitkeep
+
+# Go host probe compiled binary (built from spikes/platform/runtime/go/)
+spikes/platform/runtime/go/dist/
