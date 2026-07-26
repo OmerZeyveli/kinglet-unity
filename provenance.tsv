@@ -332,3 +332,8 @@ spikes/platform/runtime/go/lease.go	original	-	-	-	original	go-host-probe-lease-
 spikes/platform/runtime/go/process_unix.go	original	-	-	-	original	go-host-probe-posix-process-group-management
 spikes/platform/runtime/go/process_windows.go	original	-	-	-	original	go-host-probe-windows-process-stub
 spikes/platform/runtime/go/main_test.go	original	-	-	-	original	go-host-probe-candidate-unit-tests
+spikes/platform/runtime/rust/Cargo.toml	original	-	-	-	original	rust-host-probe-cargo-manifest-with-dependency-pins
+spikes/platform/runtime/rust/Cargo.lock	original	-	-	-	original	rust-host-probe-locked-dependency-graph
+spikes/platform/runtime/rust/src/main.rs	original	-	-	-	original	rust-host-probe-cli-contract-runner-and-child-subcommand
+spikes/platform/runtime/rust/src/lease.rs	original	-	-	-	original	rust-host-probe-file-backed-lease-implementation
+spikes/platform/runtime/rust/src/process.rs	original	-	-	-	original	rust-host-probe-process-group-and-job-object-management

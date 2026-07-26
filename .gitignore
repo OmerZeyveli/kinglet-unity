@@ -46,3 +46,6 @@ __pycache__/
 
 # Go host probe compiled binary (built from spikes/platform/runtime/go/)
 spikes/platform/runtime/go/dist/
+
+# Rust host probe build output (Cargo target dir)
+spikes/platform/runtime/rust/target/
