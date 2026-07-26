@@ -244,7 +244,7 @@ func spawnTreeAndCancel(
 	workspace string,
 	lifetimeMs int,
 	cancelDeadlineMs int,
-) ([]int, error) {
+) ([]int, bool, error) {
 	sentinelPath := filepath.Join(workspace, "tree-sentinel.json")
 	// Remove any stale sentinel.
 	os.Remove(sentinelPath)
@@ -258,7 +258,7 @@ func spawnTreeAndCancel(
 	setProcAttr(cmd)
 
 	if err := cmd.Start(); err != nil {
-		return nil, fmt.Errorf("spawn child: %w", err)
+		return nil, false, fmt.Errorf("spawn child: %w", err)
 	}
 	pgid := cmd.Process.Pid
 
@@ -277,8 +277,11 @@ func spawnTreeAndCancel(
 		time.Sleep(50 * time.Millisecond)
 	}
 
-	// Kill the process group.
-	killProcessGroup(pgid) //nolint:errcheck
+	// Kill the process group. Capture the result so process.cancel can assert
+	// the cancellation syscall actually succeeded, independent of the
+	// process.no-descendants liveness poll below.
+	killErr := killProcessGroup(pgid)
+	killed := killErr == nil
 
 	// Reap main child.
 	cmd.Wait() //nolint:errcheck
@@ -302,7 +305,7 @@ func spawnTreeAndCancel(
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return pids, nil
+	return pids, killed, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -603,7 +606,7 @@ func runContract(contractPath, workspace string) (map[string]interface{}, error)
 		exe = os.Args[0]
 	}
 
-	recordedPIDs, procErr := spawnTreeAndCancel(exe, workspace, childLifetime, cancelDeadline)
+	recordedPIDs, killed, procErr := spawnTreeAndCancel(exe, workspace, childLifetime, cancelDeadline)
 	if procErr != nil {
 		recordFail(fail("process.child-grandchild", procErr.Error()))
 		recordFail(fail("process.cancel", procErr.Error()))
@@ -616,9 +619,13 @@ func runContract(contractPath, workspace string) (map[string]interface{}, error)
 				fmt.Sprintf("sentinel had only %d pids", len(recordedPIDs))))
 		}
 
-		// process.cancel — if we reached kill, grant pass.
-		if len(recordedPIDs) > 0 {
+		// process.cancel — pass only if the kill syscall actually succeeded on a
+		// real tree. Independent of process.no-descendants (PID liveness poll):
+		// a silently-failed kill now fails process.cancel directly.
+		if len(recordedPIDs) > 0 && killed {
 			recordFail(pass("process.cancel"))
+		} else if !killed {
+			recordFail(fail("process.cancel", "killProcessGroup returned an error"))
 		} else {
 			recordFail(fail("process.cancel", "no pids recorded — see process.child-grandchild"))
 		}
