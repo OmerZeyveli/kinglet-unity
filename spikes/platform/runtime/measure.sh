@@ -57,6 +57,46 @@ rss_kb_from_output() {
   esac
 }
 
+# host_platform — uname -s, i.e. "Linux" or "Darwin". The single place the platform
+# enters the peak-RSS path, so no call site can pass a hardcoded platform to the
+# parser dispatch (a hardcoded "Linux" would feed BSD *bytes* to the GNU *kbytes*
+# parser and silently publish peak_rss_kb: 0 on macOS).
+host_platform() { uname -s; }
+
+# capture_time_output <flag> <exe> <version_arg> — the /usr/bin/time stderr text.
+# A seam: tests redefine it with canned BSD/GNU output so measure_peak_rss_kb, the
+# real dispatch, is executed rather than merely inspected.
+capture_time_output() {
+  /usr/bin/time "$1" "$2" "$3" 2>&1 1>/dev/null || true
+}
+
+# measure_peak_rss_kb <exe> <version_arg> — peak RSS in KILOBYTES on both platforms.
+# Reads the platform itself so the flag and the parser can never disagree.
+measure_peak_rss_kb() {
+  local platform flag output
+  platform=$(host_platform)
+  flag=$(time_flag_for "$platform")
+  output=$(capture_time_output "$flag" "$1" "$2")
+  rss_kb_from_output "$platform" "$output"
+}
+
+# assert_nonzero_peak_kb <value> — a real process cannot peak at 0 KB. Publishing 0
+# would be a fabricated observation (it is exactly what a bytes/kbytes parser
+# mismatch produces), so refuse instead. Mirrors measure.ps1's Assert-NonZeroPeak.
+assert_nonzero_peak_kb() {
+  case "$1" in
+    ''|*[!0-9]*)
+      echo "measure.sh: peak RSS is not a non-negative integer: '$1'; refusing to emit a fabricated measurement" >&2
+      return 3
+      ;;
+  esac
+  if [ "$1" -le 0 ]; then
+    echo "measure.sh: peak RSS measured as 0 KB; refusing to emit a fabricated measurement" >&2
+    return 3
+  fi
+  return 0
+}
+
 # time_flag_for <platform> — the /usr/bin/time flag that reports peak RSS.
 time_flag_for() {
   case "$1" in
@@ -158,11 +198,12 @@ while [ "$i" -lt "$sample_count" ]; do
 done
 
 # --- Peak RSS: /usr/bin/time -v (Linux, kbytes) or -l (Darwin, bytes) ---
-time_output=$(/usr/bin/time "$time_flag" "$exe" "$version_arg" 2>&1 1>/dev/null || true)
-peak_rss_kb=$(rss_kb_from_output "$platform" "$time_output")
+peak_rss_kb=$(measure_peak_rss_kb "$exe" "$version_arg")
 if [ -z "$peak_rss_kb" ]; then
   peak_rss_kb=0
 fi
+# Refuse a zero rather than publishing a placeholder in place of a real measurement.
+assert_nonzero_peak_kb "$peak_rss_kb" || exit 3
 
 # --- Artifact size in bytes ---
 artifact_bytes=$(wc -c < "$exe")

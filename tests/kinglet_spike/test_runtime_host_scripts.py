@@ -46,26 +46,94 @@ MEASURE_PS1 = (_RUNTIME_DIR / "measure.ps1").read_text(encoding="utf-8")
 # --------------------------------------------------------------------------
 
 
-def _run_shell_lib(script: str, body: str) -> str:
-    """Source a runner in library mode and run `body`; return stdout."""
+def _run_shell_lib_raw(
+    script: str, body: str, env: dict | None = None
+) -> subprocess.CompletedProcess:
+    """Source a runner in library mode and run `body`; return the whole result.
+
+    Used by the refusal tests, which assert on a NON-zero exit status.
+    """
     if script == "run-host.sh":
         env_flag = "KINGLET_RUNHOST_LIB=1"
     else:
         env_flag = "KINGLET_MEASURE_LIB=1"
     path = _RUNTIME_DIR / script
     program = f'{env_flag} . "{path}"\n{body}\n'
-    completed = subprocess.run(
+    child_env = dict(os.environ)
+    if env:
+        child_env.update(env)
+    return subprocess.run(
         ["bash", "-c", program],
         capture_output=True,
         text=True,
         cwd=str(_REPO_ROOT),
+        env=child_env,
         check=False,
     )
+
+
+def _run_shell_lib(script: str, body: str, env: dict | None = None) -> str:
+    """Source a runner in library mode and run `body`; return stdout."""
+    completed = _run_shell_lib_raw(script, body, env)
     if completed.returncode != 0:
         raise AssertionError(
             f"library-mode bash failed ({completed.returncode}): {completed.stderr}"
         )
     return completed.stdout
+
+
+def _make_uname_shim(directory: Path, sysname: str, release: str, machine: str) -> None:
+    """Write a `uname` shim so the runner's own platform detection can be driven.
+
+    This is what makes the END-TO-END refusal tests possible: run-host.sh is invoked
+    for real, main() calls gate_host() for real, and the platform it sees is ours.
+    A gate tested only through the predicate it calls does not notice a deleted call.
+    """
+    shim = directory / "uname"
+    shim.write_text(
+        "#!/usr/bin/env bash\n"
+        "case \"${1:-}\" in\n"
+        f"  -s) echo {sysname} ;;\n"
+        f"  -r) echo {release} ;;\n"
+        f"  -m) echo {machine} ;;\n"
+        f"  *)  echo {sysname} ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+
+
+def _make_sw_vers_shim(
+    directory: Path, product_name: str, product_version: str, build_version: str
+) -> None:
+    shim = directory / "sw_vers"
+    shim.write_text(
+        "#!/usr/bin/env bash\n"
+        "case \"${1:-}\" in\n"
+        f"  -productName)    echo '{product_name}' ;;\n"
+        f"  -productVersion) echo '{product_version}' ;;\n"
+        f"  -buildVersion)   echo '{build_version}' ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+
+
+def _run_run_host(shim_dir: Path, args: list[str], env: dict | None = None):
+    """Invoke run-host.sh for real with `shim_dir` first on PATH."""
+    child_env = dict(os.environ)
+    child_env["PATH"] = f"{shim_dir}{os.pathsep}{child_env['PATH']}"
+    child_env.pop("WSL_DISTRO_NAME", None)
+    if env:
+        child_env.update(env)
+    return subprocess.run(
+        ["bash", str(_RUNTIME_DIR / "run-host.sh")] + args,
+        capture_output=True,
+        text=True,
+        cwd=str(_REPO_ROOT),
+        env=child_env,
+        check=False,
+    )
 
 
 def _find_pwsh() -> str:
@@ -109,6 +177,31 @@ def _run_pwsh(body: str) -> str:
             f"pwsh failed ({completed.returncode}):\n{completed.stdout}\n{completed.stderr}"
         )
     return completed.stdout
+
+
+def _join_ps_continuations(text: str) -> str:
+    """Join PowerShell backtick line-continuations into single logical lines.
+
+    A regex anchored with `[^\\n]*` stops at the newline, so a command split across
+    a continuation is only half-inspected — and this repo's real code already uses
+    backtick continuations, so that is not a hypothetical shape.
+    """
+    return re.sub(r"`\r?\n\s*", " ", text)
+
+
+def _strip_ps_comments(text: str) -> str:
+    """Remove <# block #> and # line comments, so prose cannot satisfy a code check.
+
+    The BOM assertion previously passed because the only occurrence of the literal
+    in each file was a comment describing the rule — a comment standing in for the
+    code it describes.
+    """
+    without_blocks = re.sub(r"<#.*?#>", "", text, flags=re.DOTALL)
+    lines = []
+    for line in without_blocks.splitlines():
+        # Not inside a string literal: these scripts have no '#' in any string.
+        lines.append(re.sub(r"#.*$", "", line))
+    return "\n".join(lines)
 
 
 _PS1_LIB_PREAMBLE = (
@@ -514,6 +607,139 @@ class RunHostShellExecutionTests(unittest.TestCase):
         self.assertIn("OLD=no", out)
 
 
+class RunHostGateRefusalTests(unittest.TestCase):
+    """The host gate's REFUSAL path, executed end-to-end.
+
+    The brief's central anti-fabrication invariant is that a runner must refuse a
+    non-locked host rather than proceed. Asserting the refusal message exists in the
+    source does not test it: deleting the `if ! supported_platform` block, or the
+    `command -v sw_vers` check, leaves every such assertion green. These tests run
+    run-host.sh for real behind a `uname` shim, so main() -> gate_host() -> the
+    refusal is the code path under test.
+    """
+
+    def _refuses(self, sysname, release="6.0.0-generic", machine="x86_64", **kw):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shim_dir = Path(tmpdir)
+            _make_uname_shim(shim_dir, sysname, release, machine)
+            for name, value in kw.pop("shims", {}).items():
+                (shim_dir / name).write_text(value, encoding="utf-8")
+                (shim_dir / name).chmod(0o755)
+            return _run_run_host(shim_dir, ["--dry-run"], kw.get("env"))
+
+    def test_refuses_an_unsupported_platform(self):
+        for sysname in ("Windows_NT", "FreeBSD", "MINGW64_NT", "SunOS"):
+            with self.subTest(platform=sysname):
+                result = self._refuses(sysname)
+                self.assertNotEqual(
+                    result.returncode, 0,
+                    f"{sysname} must be REFUSED, not run: {result.stdout}{result.stderr}",
+                )
+                self.assertIn("unsupported platform", result.stderr)
+                # Nothing downstream may have been reached.
+                self.assertNotIn("DRY-RUN", result.stderr)
+
+    def test_points_a_windows_host_at_the_powershell_runner(self):
+        result = self._refuses("Windows_NT")
+        self.assertIn("run-host.ps1", result.stderr)
+
+    def test_refuses_wsl_via_the_environment_variable(self):
+        result = self._refuses("Linux", env={"WSL_DISTRO_NAME": "Ubuntu-24.04"})
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("refusing to run under WSL", result.stderr)
+        self.assertNotIn("DRY-RUN", result.stderr)
+
+    def test_refuses_wsl_via_the_kernel_release(self):
+        result = self._refuses("Linux", release="5.15.0-microsoft-standard-WSL2")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("refusing to run under WSL", result.stderr)
+        self.assertNotIn("DRY-RUN", result.stderr)
+
+    def test_refuses_an_unsupported_architecture(self):
+        result = self._refuses("Linux", machine="ppc64")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsupported machine architecture", result.stderr)
+        self.assertNotIn("DRY-RUN", result.stderr)
+
+    def test_darwin_is_refused_when_sw_vers_is_absent(self):
+        # gate_darwin must REFUSE a host it cannot identify. Without the
+        # `command -v sw_vers` check the runner would proceed with an empty
+        # RECORD_RELEASE and publish a record for a host it never verified.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shim_dir = Path(tmpdir)
+            _make_uname_shim(shim_dir, "Darwin", "24.0.0", "arm64")
+            # No sw_vers shim is written, and this Linux host has no sw_vers.
+            self.assertIsNone(shutil.which("sw_vers"), "unexpected sw_vers on this host")
+            result = _run_run_host(shim_dir, ["--dry-run"])
+        self.assertNotEqual(
+            result.returncode, 0,
+            f"a macOS host without sw_vers must be refused: {result.stderr}",
+        )
+        self.assertIn("sw_vers is not available", result.stderr)
+        self.assertNotIn("DRY-RUN", result.stderr)
+
+    def test_darwin_is_refused_when_sw_vers_reports_no_product_version(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shim_dir = Path(tmpdir)
+            _make_uname_shim(shim_dir, "Darwin", "24.0.0", "arm64")
+            _make_sw_vers_shim(shim_dir, "macOS", "", "25F74")
+            result = _run_run_host(shim_dir, ["--dry-run"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("returned nothing", result.stderr)
+        self.assertNotIn("DRY-RUN", result.stderr)
+
+    def test_darwin_dry_run_uses_the_detected_version_and_the_osx_rid(self):
+        # The accepting half of the same gate: a real macOS-shaped host runs the
+        # whole Darwin branch on this Linux box and the record triple, the RID and
+        # the host slug all follow the DETECTED version rather than a literal.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shim_dir = Path(tmpdir)
+            _make_uname_shim(shim_dir, "Darwin", "24.0.0", "arm64")
+            _make_sw_vers_shim(shim_dir, "macOS", "26.5.2", "25F74")
+            result = _run_run_host(shim_dir, ["--dry-run"])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("host accepted: macOS macOS 26.5.2 (build=25F74; arch=arm64", result.stderr)
+        self.assertIn(
+            "platform=Darwin machine=arm64 rid=osx-arm64 os=macos release=26.5.2 arch=arm64",
+            result.stderr,
+        )
+        self.assertIn("macos-26.5.2-arm64", result.stderr)
+        # The dotnet distributable path must follow the macOS RID, not linux-x64.
+        self.assertIn("net10.0/osx-arm64/publish/kinglet-host-probe", result.stderr)
+        self.assertNotIn("linux-x64", result.stderr)
+        # All four candidates still planned.
+        for candidate in ("python", "go", "rust", "dotnet"):
+            self.assertIn(f"DRY-RUN {candidate}:", result.stderr)
+
+    @staticmethod
+    def _tree_snapshot() -> dict:
+        """Every tracked path under the runtime dir with its size and mtime.
+
+        A filesystem snapshot rather than `git status`, so the check is meaningful
+        when the tree is not a git checkout (which is exactly the situation in a
+        mutation-testing copy — there it silently errored on every run instead of
+        checking anything).
+        """
+        snapshot = {}
+        for path in sorted((_REPO_ROOT / "spikes").rglob("*")):
+            if path.is_file():
+                stat = path.stat()
+                snapshot[str(path)] = (stat.st_size, stat.st_mtime_ns)
+        return snapshot
+
+    def test_darwin_dry_run_mutates_nothing_outside_kinglet_local(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shim_dir = Path(tmpdir)
+            _make_uname_shim(shim_dir, "Darwin", "24.0.0", "arm64")
+            _make_sw_vers_shim(shim_dir, "macOS", "26.5.2", "25F74")
+            before = self._tree_snapshot()
+            self.assertTrue(before, "snapshot must not be vacuously empty")
+            result = _run_run_host(shim_dir, ["--dry-run"])
+            after = self._tree_snapshot()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(before, after, "the Darwin dry-run modified the source tree")
+
+
 class MeasureShellExecutionTests(unittest.TestCase):
     def test_darwin_time_l_bytes_are_converted_to_kilobytes(self):
         # /usr/bin/time -l on macOS reports BYTES. 2097152 B = 2048 KB. Without the
@@ -583,6 +809,107 @@ class MeasureShellExecutionTests(unittest.TestCase):
         self.assertRegex(out, r"^\d{13}$")
 
 
+class MeasurePeakRssDispatchTests(unittest.TestCase):
+    """The bytes->KB conversion at the CALL SITE, not merely at the helper.
+
+    `rss_kb_from_time_l_output` being correct proves nothing if the production
+    dispatch hardcodes a platform: feeding BSD `-l` BYTES to the GNU `-v` kbytes
+    parser matches nothing, and peak_rss_kb is published as 0 on the exact platform
+    this task exists to add. So these drive `measure_peak_rss_kb`, which reads the
+    platform itself, with canned /usr/bin/time output.
+    """
+
+    _DARWIN_TIME_L = (
+        "        1.23 real         0.10 user         0.05 sys\\n"
+        "           4194304  maximum resident set size\\n"
+    )
+    _LINUX_TIME_V = "\\tMaximum resident set size (kbytes): 4096\\n"
+
+    def _dispatch(self, sysname: str, canned: str) -> str:
+        """Run measure_peak_rss_kb with `uname` shimmed and time output injected."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shim_dir = Path(tmpdir)
+            _make_uname_shim(shim_dir, sysname, "0.0.0", "x86_64")
+            body = (
+                f'capture_time_output() {{ printf "{canned}"; }}\n'
+                'measure_peak_rss_kb /bin/true --version\n'
+            )
+            return _run_shell_lib(
+                "measure.sh", body,
+                env={"PATH": f"{shim_dir}{os.pathsep}{os.environ['PATH']}"},
+            ).strip()
+
+    def test_darwin_bytes_are_converted_to_kilobytes_by_the_dispatch(self):
+        # 4194304 BYTES = 4096 KB. If the dispatch passed a hardcoded 'Linux' the
+        # GNU kbytes pattern would not match and this would be '0'.
+        self.assertEqual(self._dispatch("Darwin", self._DARWIN_TIME_L), "4096")
+
+    def test_linux_kbytes_are_used_as_is_by_the_dispatch(self):
+        self.assertEqual(self._dispatch("Linux", self._LINUX_TIME_V), "4096")
+
+    def test_the_dispatch_does_not_cross_the_parsers(self):
+        # The negative half: each platform's parser must reject the OTHER
+        # platform's output rather than silently producing a plausible number.
+        self.assertEqual(self._dispatch("Darwin", self._LINUX_TIME_V), "0")
+        self.assertEqual(self._dispatch("Linux", self._DARWIN_TIME_L), "0")
+
+    def test_the_time_flag_and_the_parser_cannot_disagree(self):
+        # measure_peak_rss_kb reads the platform ONCE, so the flag it passes to
+        # /usr/bin/time and the parser it selects are always the same platform.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shim_dir = Path(tmpdir)
+            _make_uname_shim(shim_dir, "Darwin", "0.0.0", "arm64")
+            out = _run_shell_lib(
+                "measure.sh",
+                'capture_time_output() { echo "FLAG=$1"; }\n'
+                'measure_peak_rss_kb /bin/true --version > /dev/null\n'
+                'capture_time_output() { printf "%s" "FLAG=$1"; }\n'
+                'echo "SEEN=$(capture_time_output "$(time_flag_for "$(host_platform)")")"\n',
+                env={"PATH": f"{shim_dir}{os.pathsep}{os.environ['PATH']}"},
+            )
+        self.assertIn("SEEN=FLAG=-l", out)
+
+
+class MeasureZeroPeakGuardTests(unittest.TestCase):
+    """measure.sh must refuse a zero peak, as measure.ps1 already does.
+
+    Without this the POSIX runner would publish `peak_rss_kb: 0` — a placeholder in
+    place of a real measurement, which the brief forbids.
+    """
+
+    def test_assert_nonzero_peak_rejects_zero_and_accepts_a_real_value(self):
+        for value, ok in (("0", False), ("1", True), ("2048", True), ("", False),
+                          ("abc", False)):
+            with self.subTest(value=value):
+                result = _run_shell_lib_raw(
+                    "measure.sh", f'assert_nonzero_peak_kb "{value}"'
+                )
+                if ok:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                else:
+                    self.assertEqual(result.returncode, 3, result.stdout)
+                    self.assertIn("refusing to emit a fabricated measurement",
+                                  result.stderr)
+
+    def test_measure_sh_exits_rather_than_emitting_a_zero_peak(self):
+        # End-to-end: with `uname` shimmed to Darwin, GNU /usr/bin/time rejects the
+        # BSD `-l` flag, so no RSS line is parsed and the peak is 0. measure.sh must
+        # exit non-zero and emit NO json rather than publish the zero.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shim_dir = Path(tmpdir)
+            _make_uname_shim(shim_dir, "Darwin", "0.0.0", "x86_64")
+            env = dict(os.environ)
+            env["PATH"] = f"{shim_dir}{os.pathsep}{env['PATH']}"
+            result = subprocess.run(
+                ["bash", str(_RUNTIME_DIR / "measure.sh"), "/bin/true", "0", "--version"],
+                capture_output=True, text=True, cwd=str(_REPO_ROOT), env=env,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 3, result.stdout)
+        self.assertNotIn("peak_rss_kb", result.stdout)
+        self.assertIn("refusing to emit a fabricated measurement", result.stderr)
+
+
 # ==========================================================================
 # Windows runner — source text
 # ==========================================================================
@@ -635,39 +962,95 @@ class RunHostPowerShellTextTests(unittest.TestCase):
         self.assertIn("kinglet-host-probe.exe", RUN_HOST_PS1)
 
     def test_never_invokes_bash_or_wsl(self):
-        for text in (RUN_HOST_PS1, MEASURE_PS1):
-            self.assertIsNone(
-                re.search(r"(?i)-FilePath\s+['\"]?(bash|wsl|cmd)\b", text)
-            )
-            self.assertIsNone(re.search(r"(?i)\b(bash|wsl|cmd)\.exe\b", text))
-            self.assertNotIn("Invoke-Expression", text)
+        # PowerShell's `&` call operator is the IDIOMATIC invocation form, so it is
+        # the first case covered — `& wsl cargo build` is the shape that a
+        # -FilePath/.exe-only check waves straight through.
+        for text, name in ((RUN_HOST_PS1, "run-host.ps1"), (MEASURE_PS1, "measure.ps1")):
+            code = _strip_ps_comments(text)
+            for pattern, why in (
+                (r"(?i)&\s*['\"]?(bash|wsl|cmd|sh|wsl\.exe)\b", "& call operator"),
+                (r"(?i)-FilePath\s+['\"]?(bash|wsl|cmd|sh)\b", "-FilePath"),
+                (r"(?i)\b(bash|wsl|cmd)\.exe\b", "explicit .exe"),
+                (r"(?i)^\s*(bash|wsl|cmd)\s+\S", "bare command invocation"),
+                (r"(?i)Start-Process\s+['\"]?(bash|wsl|cmd|sh)\b", "Start-Process"),
+            ):
+                match = re.search(pattern, code, re.MULTILINE)
+                self.assertIsNone(
+                    match,
+                    f"{name}: must not invoke bash/wsl/cmd ({why}): "
+                    f"{match.group(0) if match else ''}",
+                )
+            self.assertNotIn("Invoke-Expression", code)
 
     def test_no_bom_emitting_utf8_encoding(self):
         # [System.Text.Encoding]::UTF8 writes a BOM; a BOM on a text file has
         # already broken create-project.ps1 in this repo.
-        for text in (RUN_HOST_PS1, MEASURE_PS1):
-            self.assertNotIn("[System.Text.Encoding]::UTF8", text)
-            self.assertIn("UTF8Encoding($false)", text)
+        #
+        # The BOM-free encoding is only REQUIRED where a text file is actually
+        # written. Asserting the literal unconditionally was satisfied by the prose
+        # in each doc-block — neither script writes a text file at all — which is
+        # a comment passing for code.
+        writers = (
+            "Out-File", "Set-Content", "Add-Content", "WriteAllText",
+            "WriteAllLines", "StreamWriter", "Export-Csv",
+        )
+        for text, name in ((RUN_HOST_PS1, "run-host.ps1"), (MEASURE_PS1, "measure.ps1")):
+            code = _strip_ps_comments(text)
+            self.assertNotIn("[System.Text.Encoding]::UTF8", code)
+            used = [w for w in writers if w in code]
+            if used:
+                self.assertIn(
+                    "UTF8Encoding($false)", code,
+                    f"{name}: writes a text file ({', '.join(used)}) so it must use "
+                    "a BOM-free UTF8Encoding($false)",
+                )
 
     def test_path_cmdlets_use_literal_path(self):
         # A '[' or ']' in a Windows path is a wildcard to -Path but not -LiteralPath.
         for text, name in ((RUN_HOST_PS1, "run-host.ps1"), (MEASURE_PS1, "measure.ps1")):
+            joined = _join_ps_continuations(text)
             for cmdlet in (
                 "Test-Path", "Get-Item", "Copy-Item", "Get-FileHash",
                 "Get-ChildItem", "Remove-Item", "Resolve-Path",
-                "Get-ItemProperty", "Set-Location",
+                "Get-ItemProperty", "Set-Location", "Split-Path",
             ):
-                for match in re.finditer(re.escape(cmdlet) + r"\s+(-\w+)", text):
+                for match in re.finditer(re.escape(cmdlet) + r"\s+(-\w+)", joined):
                     self.assertEqual(
                         match.group(1), "-LiteralPath",
                         f"{name}: {cmdlet} must use -LiteralPath, saw {match.group(1)}",
                     )
 
+    def test_new_item_is_not_used_for_paths(self):
+        # New-Item has no -LiteralPath, so a '[' in a Windows path would be read as
+        # a wildcard. [System.IO.Directory]::CreateDirectory takes a literal path.
+        for text, name in ((RUN_HOST_PS1, "run-host.ps1"), (MEASURE_PS1, "measure.ps1")):
+            code = _strip_ps_comments(text)
+            self.assertNotIn(
+                "New-Item", code,
+                f"{name}: New-Item cannot take -LiteralPath; use "
+                "[System.IO.Directory]::CreateDirectory",
+            )
+
     def test_start_process_uses_an_argument_array(self):
-        for text in (RUN_HOST_PS1, MEASURE_PS1):
-            for match in re.finditer(r"Start-Process[^\n]*", text):
-                if "-ArgumentList" in match.group(0):
-                    self.assertIn("-ArgumentList @(", match.group(0))
+        # Joined across backtick continuations: the real Start-Process call in
+        # measure.ps1 already spans three physical lines, so a newline-anchored
+        # regex inspects only the first of them.
+        seen = 0
+        for text, name in ((RUN_HOST_PS1, "run-host.ps1"), (MEASURE_PS1, "measure.ps1")):
+            joined = _join_ps_continuations(_strip_ps_comments(text))
+            for match in re.finditer(r"Start-Process[^\n]*", joined):
+                seen += 1
+                self.assertIn(
+                    "-ArgumentList", match.group(0),
+                    f"{name}: Start-Process must pass arguments explicitly",
+                )
+                self.assertIn(
+                    "-ArgumentList @(", match.group(0),
+                    f"{name}: Start-Process must take an argument ARRAY, never a "
+                    f"string-evaluated command line: {match.group(0)}",
+                )
+        # The assertion must not be vacuous: measure.ps1 really does Start-Process.
+        self.assertGreaterEqual(seen, 1, "no Start-Process call found to check")
 
     def test_no_hardcoded_machine_path_or_credential(self):
         for text in (RUN_HOST_PS1, MEASURE_PS1):
@@ -875,6 +1258,33 @@ class PowerShellHelperExecutionTests(unittest.TestCase):
             '"dependency_count":12}',
         )
 
+    def test_all_four_candidates_are_driven(self):
+        # Executed rather than grepped: the candidate list is what the entry point
+        # actually iterates.
+        out = _run_pwsh(
+            _PS1_LIB_PREAMBLE + "Write-Output ('LIST=' + ($script:Candidates -join ','))"
+        )
+        self.assertIn("LIST=python,go,rust,dotnet", out)
+
+    def test_every_windows_distributable_has_the_exe_suffix(self):
+        # A bare `assertIn("kinglet-host-probe.exe", ...)` is satisfied by one
+        # occurrence anywhere; the requirement is that EVERY candidate's Windows
+        # distributable ends in .exe.
+        body = _PS1_LIB_PREAMBLE + "".join(
+            f"Write-Output ('{c}=' + (Get-CandidateDistributable -Candidate '{c}' "
+            f"-DotnetRid 'win-x64'))\n"
+            for c in ("python", "go", "rust", "dotnet")
+        )
+        out = _run_pwsh(body)
+        for candidate in ("python", "go", "rust", "dotnet"):
+            match = re.search(rf"^{candidate}=(\S+)$", out, re.MULTILINE)
+            self.assertIsNotNone(match, f"no distributable for {candidate}: {out}")
+            self.assertTrue(
+                match.group(1).endswith("kinglet-host-probe.exe"),
+                f"{candidate}: Windows distributable must end in .exe, "
+                f"saw {match.group(1)}",
+            )
+
     def test_cold_start_sampler_runs_the_executable_the_requested_number_of_times(self):
         # Executes the real sampling loop (with a small count) against a real
         # process. The 30-sample production value is asserted separately.
@@ -891,6 +1301,178 @@ class PowerShellHelperExecutionTests(unittest.TestCase):
         # Every sample must be a positive integer (the record schema requires it).
         minimum = int(re.search(r"MIN=(\d+)", out).group(1))
         self.assertGreaterEqual(minimum, 1)
+
+
+@unittest.skipIf(_PWSH_SKIP_REASON, _PWSH_SKIP_REASON)
+class WindowsHostGateRefusalTests(unittest.TestCase):
+    """The Windows gate's REFUSAL path, executed under pwsh on this Linux box.
+
+    Mirrors what `linux_host_accepted` already had. Previously the only coverage of
+    this gate was a regex inside Test-LockedWindowsCaption plus a doc-block string,
+    both of which survive DELETING the caller: the caption `throw` could be removed,
+    or Assert-NotWsl never called, and the suite stayed green. Resolve-HostEnvironment
+    now takes its facts as a parameter, so the whole gate is driven from a table.
+    """
+
+    _ACCEPTED = {
+        "Caption": "Microsoft Windows 11 Pro",
+        "Version": "10.0.26200",
+        "BuildNumber": "26200",
+        "Ubr": "1742",
+        "DisplayVersion": "25H2",
+        "Architecture": "AMD64",
+        "WslDistroName": "",
+    }
+
+    @staticmethod
+    def _fact_literal(fact: dict) -> str:
+        pairs = "; ".join(f"{k} = '{v}'" for k, v in fact.items())
+        return "[pscustomobject]@{ " + pairs + " }"
+
+    def _resolve(self, **overrides) -> subprocess.CompletedProcess:
+        fact = dict(self._ACCEPTED)
+        fact.update(overrides)
+        body = (
+            _PS1_LIB_PREAMBLE
+            + f"$fact = {self._fact_literal(fact)}\n"
+            + "try {\n"
+            + "  $resolved = Resolve-HostEnvironment -Fact $fact\n"
+            + "  Write-Output ('ACCEPTED=' + $resolved.RecordRelease + '|' + "
+              "$resolved.RecordArch + '|' + $resolved.DotnetRid + '|' + "
+              "$resolved.HostSlug)\n"
+            + "} catch {\n"
+            + "  Write-Output ('REFUSED=' + $_.Exception.Message)\n"
+            + "}\n"
+        )
+        return subprocess.run(
+            [_PWSH, "-NoProfile", "-NonInteractive", "-Command", body],
+            capture_output=True, text=True, cwd=str(_REPO_ROOT), check=False,
+        )
+
+    def _assert_refused(self, expected_fragment: str, **overrides):
+        result = self._resolve(**overrides)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "REFUSED=", result.stdout,
+            f"host must be REFUSED ({overrides}), but was accepted: {result.stdout}",
+        )
+        self.assertIn(expected_fragment, result.stdout)
+
+    def test_the_locked_host_is_accepted(self):
+        result = self._resolve()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(
+            "ACCEPTED=11-25H2|x64|win-x64|windows-11-25h2-x64", result.stdout
+        )
+
+    def test_the_other_locked_host_is_accepted(self):
+        result = self._resolve(
+            Caption="Microsoft Windows 10 Pro", DisplayVersion="22H2",
+            Version="10.0.19045", BuildNumber="19045",
+        )
+        self.assertIn("ACCEPTED=10-22H2|x64|win-x64|windows-10-22h2-x64", result.stdout)
+
+    def test_refuses_a_non_locked_caption(self):
+        for caption in (
+            "Microsoft Windows Server 2022 Standard",
+            "Microsoft Windows Server 2019 Datacenter",
+            "Microsoft Windows 8.1",
+            "Microsoft Windows 7 Ultimate",
+            "Microsoft Windows 100",
+            "Ubuntu 24.04",
+            "",
+        ):
+            with self.subTest(caption=caption):
+                self._assert_refused("host not accepted", Caption=caption)
+
+    def test_refuses_wsl(self):
+        # The WSL refusal must fire even on an otherwise perfectly locked host.
+        self._assert_refused("refusing to run under WSL", WslDistroName="Ubuntu-24.04")
+
+    def test_refuses_a_host_whose_release_cannot_be_derived(self):
+        self._assert_refused("could not derive environment.release", DisplayVersion="")
+        self._assert_refused("could not derive environment.release", DisplayVersion="   ")
+
+    def test_refuses_an_unsupported_architecture(self):
+        for arch in ("x86", "IA64", "ARM", ""):
+            with self.subTest(arch=arch):
+                self._assert_refused("unsupported architecture", Architecture=arch)
+
+    def test_the_gate_predicate_refuses_directly(self):
+        # Assert-LockedHost is the injectable pure predicate; drive it on its own so
+        # a refusal reason cannot be lost by a caller-side edit either.
+        body = _PS1_LIB_PREAMBLE + (
+            "function T($c,$d,$a,$w) {\n"
+            "  try { Assert-LockedHost -Caption $c -DisplayVersion $d -Architecture $a "
+            "-WslDistroName $w; return 'OK' } catch { return 'REFUSED' }\n"
+            "}\n"
+            "Write-Output ('A=' + (T 'Microsoft Windows 11 Pro' '25H2' 'AMD64' ''))\n"
+            "Write-Output ('B=' + (T 'Microsoft Windows Server 2022' '25H2' 'AMD64' ''))\n"
+            "Write-Output ('C=' + (T 'Microsoft Windows 11 Pro' '25H2' 'AMD64' 'Ubuntu'))\n"
+            "Write-Output ('D=' + (T 'Microsoft Windows 11 Pro' '' 'AMD64' ''))\n"
+            "Write-Output ('E=' + (T 'Microsoft Windows 11 Pro' '25H2' 'x86' ''))\n"
+        )
+        out = _run_pwsh(body)
+        self.assertIn("A=OK", out)
+        for label in ("B", "C", "D", "E"):
+            self.assertIn(f"{label}=REFUSED", out)
+
+    def test_no_record_fields_are_produced_for_a_refused_host(self):
+        # A refused host must produce NO record at all — not a partial one.
+        result = self._resolve(Caption="Microsoft Windows Server 2022 Standard")
+        self.assertNotIn("ACCEPTED=", result.stdout)
+
+
+@unittest.skipIf(_PWSH_SKIP_REASON, _PWSH_SKIP_REASON)
+class WindowsAntiFabricationGuardTests(unittest.TestCase):
+    """The two guards whose COMPARISON is the invariant, executed.
+
+    Both were previously asserted only by the presence of their message string, so
+    inverting the operator left them unfireable and the suite green.
+    """
+
+    def test_run_dir_must_be_empty(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            empty = Path(tmpdir) / "empty"
+            empty.mkdir()
+            dirty = Path(tmpdir) / "dirty"
+            dirty.mkdir()
+            (dirty / "record.json").write_text("{}", encoding="utf-8")
+            hidden = Path(tmpdir) / "hidden"
+            hidden.mkdir()
+            (hidden / ".leftover").write_text("x", encoding="utf-8")
+            missing = Path(tmpdir) / "missing"
+
+            body = _PS1_LIB_PREAMBLE + (
+                f"Write-Output ('EMPTY=' + (Test-RunDirEmpty -Path '{empty}'))\n"
+                f"Write-Output ('DIRTY=' + (Test-RunDirEmpty -Path '{dirty}'))\n"
+                f"Write-Output ('HIDDEN=' + (Test-RunDirEmpty -Path '{hidden}'))\n"
+                f"Write-Output ('MISSING=' + (Test-RunDirEmpty -Path '{missing}'))\n"
+            )
+            out = _run_pwsh(body)
+        self.assertIn("EMPTY=True", out)
+        # A run dir with content must NOT be reused: that would silently mix a new
+        # run's evidence with a previous one's.
+        self.assertIn("DIRTY=False", out)
+        # -Force: a dot-file is still content.
+        self.assertIn("HIDDEN=False", out)
+        self.assertIn("MISSING=True", out)
+
+    def test_a_zero_peak_measurement_is_refused(self):
+        body = _PS1_LIB_PREAMBLE + (
+            "function T($v) { try { Assert-NonZeroPeak -PeakRssKb $v; return 'OK' } "
+            "catch { return 'REFUSED' } }\n"
+            "Write-Output ('ZERO=' + (T 0))\n"
+            "Write-Output ('NEG=' + (T -1))\n"
+            "Write-Output ('ONE=' + (T 1))\n"
+            "Write-Output ('REAL=' + (T 2048))\n"
+        )
+        out = _run_pwsh(body)
+        # Publishing 0 would be a placeholder in place of a real measurement.
+        self.assertIn("ZERO=REFUSED", out)
+        self.assertIn("NEG=REFUSED", out)
+        self.assertIn("ONE=OK", out)
+        self.assertIn("REAL=OK", out)
 
 
 class ForeignHostOnlyTests(unittest.TestCase):

@@ -224,17 +224,25 @@ macos_host_line() {
   echo "host=macOS $1 $2 (build=$3; arch=$4)"
 }
 
+# have_sw_vers / read_sw_vers — the two seams through which gate_darwin reaches the
+# host. They exist so gate_darwin itself (not merely a predicate it calls) can be
+# EXECUTED on a non-macOS box by redefining them: a gate whose refusal path is never
+# run is a gate nothing tests.
+have_sw_vers() { command -v sw_vers > /dev/null 2>&1; }
+read_sw_vers() { sw_vers "$1"; }
+
 # gate_darwin — reads sw_vers / uname -m and sets HOST_TOOLCHAIN_LINE / RECORD_RELEASE.
 # The macOS version is recorded, NOT gated: an unlocked version yields a record that
-# matches no matrix cell instead of a fabricated pass.
+# matches no matrix cell instead of a fabricated pass. A HOST that cannot be
+# identified at all (no sw_vers, or an empty productVersion) is REFUSED.
 gate_darwin() {
-  if ! command -v sw_vers > /dev/null 2>&1; then
+  if ! have_sw_vers; then
     echo "run-host.sh: sw_vers is not available; cannot verify macOS host" >&2
     exit 1
   fi
-  MACOS_PRODUCT_NAME=$(sw_vers -productName)
-  MACOS_PRODUCT_VERSION=$(sw_vers -productVersion)
-  MACOS_BUILD_VERSION=$(sw_vers -buildVersion)
+  MACOS_PRODUCT_NAME=$(read_sw_vers -productName)
+  MACOS_PRODUCT_VERSION=$(read_sw_vers -productVersion)
+  MACOS_BUILD_VERSION=$(read_sw_vers -buildVersion)
   if [ -z "$MACOS_PRODUCT_VERSION" ]; then
     echo "run-host.sh: sw_vers -productVersion returned nothing; cannot verify macOS host" >&2
     exit 1
@@ -589,7 +597,12 @@ EOF
 # 7. Entry point
 # ---------------------------------------------------------------------------
 
-main() {
+# gate_host — the complete host gate: platform, WSL, per-OS identity, architecture
+# and RID. Every refusal path lives HERE rather than inline in main() so that it can
+# be executed directly in a subshell (and end-to-end via a PATH-shimmed `uname`)
+# instead of being asserted only as source text. A refusal exits 1 and produces no
+# record; nothing downstream is reached.
+gate_host() {
   HOST_PLATFORM=$(detect_platform)
   if ! supported_platform "$HOST_PLATFORM"; then
     echo "run-host.sh: unsupported platform: $HOST_PLATFORM (accept only Darwin or Linux)" >&2
@@ -617,6 +630,10 @@ main() {
     exit 1
   fi
   HOST_SLUG=$(host_slug_for "$HOST_PLATFORM" "$RECORD_RELEASE" "$RECORD_ARCH")
+}
+
+main() {
+  gate_host
 
   RUN_PATH=$(_strip_path "$BUILD_PATH")
   DATE_STAMP=$(date -u +%Y%m%dT%H%M%SZ)

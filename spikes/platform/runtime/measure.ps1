@@ -58,6 +58,23 @@ function Convert-BytesToKilobytes {
     return [long][math]::Ceiling($Bytes / 1024.0)
 }
 
+function Assert-NonZeroPeak {
+    <#
+      A real process cannot peak at 0 KB. Publishing 0 would be a placeholder in
+      place of a real measurement, so this THROWS instead. Extracted as a pure
+      function because the comparison itself is the invariant: inverting it in an
+      inline `if` inside Main would silently make the guard unfireable, and a test
+      that only asserts the message string exists would not notice.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [long] $PeakRssKb
+    )
+    if ($PeakRssKb -le 0) {
+        throw 'measure.ps1: peak working set measured as 0 bytes; refusing to emit a fabricated measurement'
+    }
+}
+
 function ConvertTo-SampleMilliseconds {
     <#
       A TimeSpan to a positive integer millisecond sample. A native binary can
@@ -177,11 +194,12 @@ $exePath = (Resolve-Path -LiteralPath $Exe).ProviderPath
 $coldStart = Measure-ColdStartSamples -Exe $exePath -VersionArg $VersionArg
 $peakBytes = Measure-PeakWorkingSetBytes -Exe $exePath -VersionArg $VersionArg
 $peakRssKb = Convert-BytesToKilobytes -Bytes $peakBytes
-if ($peakRssKb -le 0) {
-    # A real process cannot peak at 0 KB. Publishing 0 would be a fabricated
-    # observation, so fail loudly instead. (This is what happens when the script is
-    # run on a non-Windows host, where PeakWorkingSet64 is unavailable after exit.)
-    Write-Error 'measure.ps1: peak working set measured as 0 bytes; refusing to emit a fabricated measurement'
+# (This fires when the script is run on a non-Windows host, where PeakWorkingSet64
+# is unavailable after exit.)
+try {
+    Assert-NonZeroPeak -PeakRssKb $peakRssKb
+} catch {
+    Write-Error $_.Exception.Message
     exit 3
 }
 $artifactBytes = [long](Get-Item -LiteralPath $exePath).Length

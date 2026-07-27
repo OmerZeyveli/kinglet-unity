@@ -35,6 +35,16 @@
         . ./run-host.ps1 -LibraryOnly
         Get-DotnetRid -Architecture 'AMD64'         # -> win-x64
         Test-LockedWindowsCaption -Caption '...'    # -> $true / $false
+        Assert-LockedHost -Caption '...' -DisplayVersion '...' -Architecture '...'
+        Resolve-HostEnvironment -Fact $injectedFacts
+
+    The host gate is Assert-LockedHost, an injectable pure function, and
+    Resolve-HostEnvironment takes its facts as a parameter (defaulting to the live
+    host via Get-LiveHostFact). That is deliberate: the refusal path is the whole
+    point of the gate, so it must be EXECUTABLE from a table on a non-Windows box
+    rather than asserted as source text. Same reasoning for Test-RunDirEmpty and
+    measure.ps1's Assert-NonZeroPeak — in each the COMPARISON is the invariant, and
+    an inline comparison can be inverted without any text-level test noticing.
 
     Conventions (repo CLAUDE.md): -LiteralPath everywhere so a '[' in a Windows path
     is not read as a wildcard; argument ARRAYS to Start-Process and to native calls,
@@ -303,10 +313,50 @@ function Write-Log {
     [Console]::Error.WriteLine("[run-host] $Message")
 }
 
-function Assert-NotWsl {
-    if (-not [string]::IsNullOrWhiteSpace($env:WSL_DISTRO_NAME)) {
-        throw "run-host.ps1: refusing to run under WSL (WSL_DISTRO_NAME=$($env:WSL_DISTRO_NAME))"
+function Assert-LockedHost {
+    <#
+      THE anti-fabrication invariant: a non-locked host must be refused, not
+      proceeded through. Every refusal reason lives here as one injectable pure
+      function so the refusal paths can be driven from a table on any platform —
+      an inline `throw` inside Resolve-HostEnvironment could be deleted and every
+      text-level assertion would still pass.
+
+      Refuses: running under WSL; a caption that is not Windows 10/11; a caption or
+      DisplayVersion from which environment.release cannot be derived; an
+      architecture with no .NET RID.
+    #>
+    param(
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $Caption,
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $DisplayVersion,
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $Architecture,
+        [AllowEmptyString()] [string] $WslDistroName = ''
+    )
+    if (-not [string]::IsNullOrWhiteSpace($WslDistroName)) {
+        throw "run-host.ps1: refusing to run under WSL (WSL_DISTRO_NAME=$WslDistroName)"
     }
+    if (-not (Test-LockedWindowsCaption -Caption $Caption)) {
+        throw "run-host.ps1: host not accepted (caption='$Caption'); accept only 'Microsoft Windows 10' or 'Microsoft Windows 11'"
+    }
+    if ([string]::IsNullOrWhiteSpace((Get-WindowsRelease -Caption $Caption -DisplayVersion $DisplayVersion))) {
+        throw "run-host.ps1: could not derive environment.release (caption='$Caption'; DisplayVersion='$DisplayVersion')"
+    }
+    if ((Get-RecordArch -Architecture $Architecture) -eq 'unsupported' -or
+        (Get-DotnetRid -Architecture $Architecture) -eq 'unsupported') {
+        throw "run-host.ps1: unsupported architecture: $Architecture"
+    }
+}
+
+function Test-RunDirEmpty {
+    <#
+      True when the run dir does not exist or contains nothing. Extracted as a pure
+      function because the COMPARISON is the invariant: inverting it inline would
+      make the empty-run-dir requirement unfireable and a Windows run would silently
+      reuse a dirty run dir, while a test asserting only that the message string
+      exists would stay green.
+    #>
+    param([Parameter(Mandatory)] [string] $Path)
+    if (-not (Test-Path -LiteralPath $Path)) { return $true }
+    return (@(Get-ChildItem -LiteralPath $Path -Force).Count -eq 0)
 }
 
 function Get-WindowsDisplayVersion {
@@ -329,42 +379,56 @@ function Get-WindowsUpdateBuildRevision {
     }
 }
 
+function Get-LiveHostFact {
+    <#
+      The ONLY place that touches the live Windows host. Isolated from the gating
+      logic so Resolve-HostEnvironment (gate included) is executable from a table on
+      any platform.
+    #>
+    $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
+    return [pscustomobject]@{
+        Caption        = [string]$osInfo.Caption
+        Version        = [string]$osInfo.Version
+        BuildNumber    = [string]$osInfo.BuildNumber
+        Ubr            = (Get-WindowsUpdateBuildRevision)
+        DisplayVersion = (Get-WindowsDisplayVersion)
+        Architecture   = [string]$env:PROCESSOR_ARCHITECTURE
+        WslDistroName  = [string]$env:WSL_DISTRO_NAME
+    }
+}
+
 function Resolve-HostEnvironment {
     <#
-      Refuses the host rather than proceeding. Never fabricates a pass: a caption
-      that is not Windows 10/11, a missing DisplayVersion, or an unsupported
-      architecture all abort before anything is built.
+      Gates the host, then maps it to the evidence environment triple. Refuses
+      rather than proceeding: WSL, a caption that is not Windows 10/11, a missing
+      DisplayVersion, or an unsupported architecture all abort before anything is
+      built, and a refused host produces no record at all.
+
+      Takes its facts as a parameter (defaulting to the live host) so the refusal
+      table can be executed rather than inspected.
     #>
-    Assert-NotWsl
+    param([psobject] $Fact = (Get-LiveHostFact))
 
-    $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
-    $caption = [string]$osInfo.Caption
-    if (-not (Test-LockedWindowsCaption -Caption $caption)) {
-        throw "run-host.ps1: host not accepted (caption='$caption'); accept only 'Microsoft Windows 10' or 'Microsoft Windows 11'"
-    }
+    Assert-LockedHost -Caption $Fact.Caption -DisplayVersion $Fact.DisplayVersion `
+        -Architecture $Fact.Architecture -WslDistroName $Fact.WslDistroName
 
-    $displayVersion = Get-WindowsDisplayVersion
+    $caption = [string]$Fact.Caption
+    $displayVersion = [string]$Fact.DisplayVersion
+    $architecture = [string]$Fact.Architecture
+    $version = [string]$Fact.Version
+
     $release = Get-WindowsRelease -Caption $caption -DisplayVersion $displayVersion
-    if ([string]::IsNullOrWhiteSpace($release)) {
-        throw "run-host.ps1: could not derive environment.release (caption='$caption'; DisplayVersion='$displayVersion')"
-    }
-
-    $architecture = [string]$env:PROCESSOR_ARCHITECTURE
     $arch = Get-RecordArch -Architecture $architecture
     $rid = Get-DotnetRid -Architecture $architecture
-    if ($arch -eq 'unsupported' -or $rid -eq 'unsupported') {
-        throw "run-host.ps1: unsupported architecture: $architecture"
-    }
 
-    $ubr = Get-WindowsUpdateBuildRevision
-    $buildNumber = [string]$osInfo.BuildNumber
-    if (-not [string]::IsNullOrWhiteSpace($ubr)) {
-        $buildNumber = "$buildNumber.$ubr"
+    $buildNumber = [string]$Fact.BuildNumber
+    if (-not [string]::IsNullOrWhiteSpace($Fact.Ubr)) {
+        $buildNumber = "$buildNumber.$([string]$Fact.Ubr)"
     }
 
     return [pscustomobject]@{
         Caption        = $caption
-        Version        = [string]$osInfo.Version
+        Version        = $version
         BuildNumber    = $buildNumber
         DisplayVersion = $displayVersion
         Architecture   = $architecture
@@ -372,10 +436,10 @@ function Resolve-HostEnvironment {
         RecordRelease  = $release
         RecordArch     = $arch
         DotnetRid      = $rid
-        HostLine       = (Format-WindowsHostLine -Caption $caption -Version ([string]$osInfo.Version) `
+        HostLine       = (Format-WindowsHostLine -Caption $caption -Version $version `
                             -BuildNumber $buildNumber -DisplayVersion $displayVersion `
                             -Architecture $architecture)
-        KernelLine     = ("kernel=Windows NT {0}" -f [string]$osInfo.Version)
+        KernelLine     = ("kernel=Windows NT {0}" -f $version)
         HostSlug       = (Get-HostSlug -Release $release -Arch $arch)
     }
 }
@@ -392,7 +456,7 @@ function Get-ToolchainDirectory {
         $command = Get-Command -Name $name -CommandType Application -ErrorAction SilentlyContinue |
             Select-Object -First 1
         if ($null -eq $command) { continue }
-        $parent = Split-Path -Parent $command.Source
+        $parent = Split-Path -LiteralPath $command.Source -Parent
         if (-not [string]::IsNullOrWhiteSpace($parent)) { $dirs.Add($parent) }
     }
     return ($dirs | Sort-Object -Unique)
@@ -458,10 +522,18 @@ function Build-Candidate {
         }
         'go' {
             Write-Log 'go: go build -trimpath -ldflags="-s -w"'
-            $env:GOTOOLCHAIN = 'local'
-            Invoke-Native -FilePath 'go' -ArgumentList @(
-                'build', '-trimpath', '-ldflags=-s -w', '-o', "dist/$script:DistributableName", '.'
-            ) -WorkingDirectory (Join-Path -Path $RepoRoot -ChildPath "$script:RuntimeDir/go")
+            # Scoped to this one build and restored, matching the POSIX runner's
+            # per-command `GOTOOLCHAIN=local go build`. Setting it process-globally
+            # would leak into every later candidate and into the measure step.
+            $previousGoToolchain = $env:GOTOOLCHAIN
+            try {
+                $env:GOTOOLCHAIN = 'local'
+                Invoke-Native -FilePath 'go' -ArgumentList @(
+                    'build', '-trimpath', '-ldflags=-s -w', '-o', "dist/$script:DistributableName", '.'
+                ) -WorkingDirectory (Join-Path -Path $RepoRoot -ChildPath "$script:RuntimeDir/go")
+            } finally {
+                $env:GOTOOLCHAIN = $previousGoToolchain
+            }
         }
         'rust' {
             Write-Log 'rust: cargo build --locked --release'
@@ -534,15 +606,14 @@ function Invoke-CandidateCell {
     }
 
     # Require an empty run dir (fail if it already has content).
-    if (Test-Path -LiteralPath $runRoot) {
-        $existing = @(Get-ChildItem -LiteralPath $runRoot -Force)
-        if ($existing.Count -gt 0) {
-            throw "run-host.ps1: run dir is not empty: $runRoot"
-        }
+    if (-not (Test-RunDirEmpty -Path $runRoot)) {
+        throw "run-host.ps1: run dir is not empty: $runRoot"
     }
-    $null = New-Item -ItemType Directory -Force -Path $execDir
-    $null = New-Item -ItemType Directory -Force -Path $workspace
-    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $resultFile)
+    # [System.IO.Directory]::CreateDirectory rather than New-Item: New-Item has no
+    # -LiteralPath, so a '[' in a Windows path would be read as a wildcard.
+    $null = [System.IO.Directory]::CreateDirectory($execDir)
+    $null = [System.IO.Directory]::CreateDirectory($workspace)
+    $null = [System.IO.Directory]::CreateDirectory((Split-Path -LiteralPath $resultFile -Parent))
 
     # Copy ONLY the distributable into the clean exec dir. No toolchain, no source,
     # no build tree. The .NET publish embeds its native libraries, so there are no
