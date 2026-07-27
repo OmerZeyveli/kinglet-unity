@@ -384,7 +384,16 @@ function Get-LiveHostFact {
       The ONLY place that touches the live Windows host. Isolated from the gating
       logic so Resolve-HostEnvironment (gate included) is executable from a table on
       any platform.
+
+      A non-Windows host is refused HERE, by name, rather than left to whatever
+      Get-CimInstance happens to do off Windows. The runner must refuse a non-locked
+      host explicitly; "some error happened before anything was built" is not the
+      same claim, and a test that only asserts a non-zero exit cannot tell the two
+      apart (a typo in the repo-root Resolve-Path would satisfy it just as well).
     #>
+    if (-not $IsWindows) {
+        throw 'run-host.ps1: refusing to run on a non-Windows host; this runner gates Win32_OperatingSystem. Use the POSIX runner (run-host.sh) on Linux and macOS.'
+    }
     $osInfo = Get-CimInstance -ClassName Win32_OperatingSystem
     return [pscustomobject]@{
         Caption        = [string]$osInfo.Caption

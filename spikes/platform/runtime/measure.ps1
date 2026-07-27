@@ -137,6 +137,15 @@ function Measure-PeakWorkingSetBytes {
       the authoritative one; on other platforms it throws and the polled maximum is
       kept).
 
+      THE SEAM. This is the only Windows-only step in Invoke-Measure, and it is a
+      separate function so a test can redefine it with a canned byte count and then
+      execute Invoke-Measure for real on a non-Windows box. Without that, the
+      bytes -> kilobytes conversion at Invoke-Measure's call site is unexecutable
+      here: deleting `Convert-BytesToKilobytes` there would publish BYTES in
+      peak_rss_kb, make Windows look 1024x worse than Linux, and nothing downstream
+      would catch it. Mirrors measure.sh's capture_time_output seam, which is what
+      lets measure_peak_rss_kb's divide be driven from canned /usr/bin/time output.
+
       The child's stdout/stderr are redirected to temp files: with -NoNewWindow the
       child inherits this process's stdout, and the artifact's version banner would
       then be interleaved with the measurement JSON on stdout and corrupt it.
@@ -174,39 +183,60 @@ function Measure-PeakWorkingSetBytes {
     return $peak
 }
 
-if ($LibraryOnly) { return }
-
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-# [Console]::Error.WriteLine rather than Write-Error: $ErrorActionPreference='Stop'
-# turns Write-Error into a TERMINATING error, so the `exit <n>` beneath it never
-# runs and the process exits 1 instead of the documented 2/3. measure.sh's exit
-# codes are part of the contract the runner reads.
-if ([string]::IsNullOrWhiteSpace($Exe) -or [string]::IsNullOrWhiteSpace($VersionArg) -or $DependencyCount -lt 0) {
-    [Console]::Error.WriteLine('usage: measure.ps1 -Exe <path> -DependencyCount <int> -VersionArg <string>')
-    exit 2
-}
-if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
-    [Console]::Error.WriteLine("measure.ps1: not a file: $Exe")
-    exit 2
+function Invoke-Measure {
+    <#
+      Main, as a function, for the same reason run-host.ps1 has Invoke-RunHost: the
+      call sites are the part worth testing. With Main inline below `if
+      ($LibraryOnly) { return }` the units line
+      (`Convert-BytesToKilobytes -Bytes $peakBytes`) was unreachable from any test
+      on this platform, so dropping the conversion there was invisible even though
+      the helper itself is covered. Dot-source with -LibraryOnly, redefine
+      Measure-PeakWorkingSetBytes with a canned byte count, and this whole path runs.
+    #>
+    param(
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $Exe,
+        [Parameter(Mandatory)] [int] $DependencyCount,
+        [Parameter(Mandatory)] [AllowEmptyString()] [string] $VersionArg
+    )
+
+    # [Console]::Error.WriteLine rather than Write-Error: $ErrorActionPreference='Stop'
+    # turns Write-Error into a TERMINATING error, so the `exit <n>` beneath it never
+    # runs and the process exits 1 instead of the documented 2/3. measure.sh's exit
+    # codes are part of the contract the runner reads.
+    if ([string]::IsNullOrWhiteSpace($Exe) -or [string]::IsNullOrWhiteSpace($VersionArg) -or $DependencyCount -lt 0) {
+        [Console]::Error.WriteLine('usage: measure.ps1 -Exe <path> -DependencyCount <int> -VersionArg <string>')
+        exit 2
+    }
+    if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
+        [Console]::Error.WriteLine("measure.ps1: not a file: $Exe")
+        exit 2
+    }
+
+    $exePath = (Resolve-Path -LiteralPath $Exe).ProviderPath
+
+    $coldStart = Measure-ColdStartSamples -Exe $exePath -VersionArg $VersionArg
+    $peakBytes = Measure-PeakWorkingSetBytes -Exe $exePath -VersionArg $VersionArg
+    # BYTES -> KILOBYTES. peak_rss_kb is kilobytes on every platform; losing this
+    # call publishes bytes under a kilobyte name.
+    $peakRssKb = Convert-BytesToKilobytes -Bytes $peakBytes
+    # (This fires when the script is run on a non-Windows host, where PeakWorkingSet64
+    # is unavailable after exit.)
+    try {
+        Assert-NonZeroPeak -PeakRssKb $peakRssKb
+    } catch {
+        [Console]::Error.WriteLine($_.Exception.Message)
+        exit 3
+    }
+    $artifactBytes = [long](Get-Item -LiteralPath $exePath).Length
+
+    return (Format-MeasurementJson -ColdStartMs $coldStart -PeakRssKb $peakRssKb `
+        -ArtifactBytes $artifactBytes -DependencyCount $DependencyCount)
 }
 
-$exePath = (Resolve-Path -LiteralPath $Exe).ProviderPath
+if ($LibraryOnly) { return }
 
-$coldStart = Measure-ColdStartSamples -Exe $exePath -VersionArg $VersionArg
-$peakBytes = Measure-PeakWorkingSetBytes -Exe $exePath -VersionArg $VersionArg
-$peakRssKb = Convert-BytesToKilobytes -Bytes $peakBytes
-# (This fires when the script is run on a non-Windows host, where PeakWorkingSet64
-# is unavailable after exit.)
-try {
-    Assert-NonZeroPeak -PeakRssKb $peakRssKb
-} catch {
-    [Console]::Error.WriteLine($_.Exception.Message)
-    exit 3
-}
-$artifactBytes = [long](Get-Item -LiteralPath $exePath).Length
-
-Format-MeasurementJson -ColdStartMs $coldStart -PeakRssKb $peakRssKb `
-    -ArtifactBytes $artifactBytes -DependencyCount $DependencyCount
+Invoke-Measure -Exe $Exe -DependencyCount $DependencyCount -VersionArg $VersionArg

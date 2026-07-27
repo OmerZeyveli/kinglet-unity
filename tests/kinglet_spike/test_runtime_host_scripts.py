@@ -1550,6 +1550,14 @@ class WindowsRunnerEntryPointTests(unittest.TestCase):
             result.returncode, 0,
             f"a non-Windows host must be REFUSED, not planned: {combined}",
         )
+        # POSITIVE: it must fail AT THE GATE, for the gate's reason. `rc != 0` plus
+        # the absence of four strings is satisfied by ANY early failure — a broken
+        # Resolve-Path on the repo root, a parse error, a missing helper — none of
+        # which prove the host was refused.
+        self.assertIn(
+            "refusing to run on a non-Windows host", combined,
+            f"the run must fail at the host gate, not incidentally: {combined}",
+        )
         for forbidden in (
             "DRY-RUN",                      # no candidate cell may be reached
             "host accepted",                # the gate must not have passed
@@ -1639,7 +1647,16 @@ class WindowsRunnerEntryPointTests(unittest.TestCase):
         # the planned paths rather than `git status`, which would be dirty for
         # unrelated reasons and, under a mutation copy in /tmp, would exit 128 and
         # check nothing at all.
-        for run_id in set(re.findall(r"run_id=(\S+?)\)", plan)):
+        # The log line is `... (run_id=<id>; os=windows; ...)`, so a `\)` terminator
+        # never matches across the intervening `; os=...` and the loop body silently
+        # never ran. It is the only guard here: .kinglet/local/ is gitignored, so a
+        # dry run that really did mkdir its run dirs leaves `git status` clean too.
+        run_ids = set(re.findall(r"run_id=(\S+?);", plan))
+        self.assertEqual(
+            len(run_ids), 4,
+            f"expected one run_id per candidate to check, parsed {run_ids}: {plan}",
+        )
+        for run_id in run_ids:
             self.assertFalse(
                 (_REPO_ROOT / ".kinglet" / "local" / "spikes" / run_id).exists(),
                 f"a dry run must not create its run dir: {run_id}",
@@ -1714,6 +1731,36 @@ class WindowsRunnerEntryPointTests(unittest.TestCase):
         self.assertNotIn("run dir is not empty", clean)
         self.assertIn("RESULT=THROW", clean)
         self.assertIn("kinglet-host-probe.exe", clean)
+
+    def test_measure_ps1_main_converts_the_peak_bytes_to_kilobytes(self):
+        # measure.ps1's MAIN units path, executed. Convert-BytesToKilobytes is
+        # covered by its own table test, but that test mutates only the HELPER
+        # BODY: deleting the CALL (`$peakRssKb = $peakBytes`) publishes bytes under
+        # a kilobyte name and was invisible, which is exactly the 1024x error the
+        # record cannot detect downstream.
+        #
+        # Measure-PeakWorkingSetBytes is the only Windows-only step, so it is
+        # redefined with a canned byte count -- the seam, mirroring measure.sh's
+        # capture_time_output. Everything else (cold start, artifact size, the
+        # divide, the JSON) is the real production code.
+        probe = shutil.which("true")
+        if not probe:
+            self.skipTest("no 'true' executable on PATH")
+        body = _PS1_LIB_PREAMBLE + (
+            "function Measure-PeakWorkingSetBytes { param($Exe,$VersionArg) "
+            "return [long]2097152 }\n"
+            f"Write-Output (Invoke-Measure -Exe '{probe}' -DependencyCount 7 "
+            "-VersionArg '--version')\n"
+        )
+        result = _run_pwsh_raw(body)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        parsed = json.loads(result.stdout.strip())
+        # 2097152 bytes = 2048 KB. Not 2097152.
+        self.assertEqual(parsed["peak_rss_kb"], 2048, result.stdout)
+        self.assertEqual(parsed["dependency_count"], 7)
+        self.assertEqual(len(parsed["cold_start_ms"]), 30)
+        self.assertTrue(all(sample >= 1 for sample in parsed["cold_start_ms"]))
+        self.assertEqual(parsed["artifact_bytes"], Path(probe).stat().st_size)
 
     def test_measure_ps1_exits_rather_than_emitting_a_zero_peak(self):
         # measure.ps1's MAIN, executed. On a non-Windows host PeakWorkingSet64 is
