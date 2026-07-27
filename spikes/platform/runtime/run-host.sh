@@ -542,7 +542,8 @@ EOF
   sources_data=$(sources_of "$cand")
   toolchain_data=$(toolchain_of "$cand")
 
-  # The command array documents build + run with RELATIVE paths (no /home/...).
+  # The command array documents build + run with RELATIVE paths only — never an
+  # absolute home directory, which would leak a username into published evidence.
   # Newline-delimited; the builder splits on newlines.
   local command_data
   command_data=$(cat <<EOF

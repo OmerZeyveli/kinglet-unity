@@ -349,8 +349,10 @@ spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/Kinglet.HostProbe.Tests.c
 spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/ProbeTests.cs	original	-	-	-	original	dotnet-host-probe-xunit-tests-atomic-lease-ed25519-result-shape
 spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/packages.lock.json	original	-	-	-	original	dotnet-host-probe-test-nuget-supply-chain-lock
 docs/research/platform-spike/reports/runtime-linux-indicative.md	original	-	-	-	original	kinglet-0r-indicative-linux-perf-nonclosing
-spikes/platform/runtime/run-host.sh	original	-	-	-	original	kinglet-0r-linux-host-runner-pop-os-noble
-spikes/platform/runtime/measure.sh	original	-	-	-	original	kinglet-0r-runtime-measure-cold-start-rss
+spikes/platform/runtime/run-host.sh	original	-	-	-	original	kinglet-0r-posix-host-runner-linux-noble-and-darwin
+spikes/platform/runtime/measure.sh	original	-	-	-	original	kinglet-0r-posix-runtime-measure-cold-start-rss-linux-and-darwin
+spikes/platform/runtime/run-host.ps1	original	-	-	-	original	kinglet-0r-windows-host-runner-win10-win11
+spikes/platform/runtime/measure.ps1	original	-	-	-	original	kinglet-0r-windows-runtime-measure-cold-start-rss
 spikes/platform/runtime/build-record.py	original	-	-	-	original	kinglet-0r-linux-evidence-record-builder
 tests/kinglet_spike/test_runtime_host_scripts.py	original	-	-	-	original	kinglet-0r-host-scripts-text-assertions
 docs/research/platform-spike/evidence/runtime/python/20260727T051518Z-runtime-python-linux-noble-01.json	original	-	-	-	original	kinglet-0r-linux-python-noble-evidence-record
