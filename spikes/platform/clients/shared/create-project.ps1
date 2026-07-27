@@ -2,14 +2,18 @@
 # create-project.ps1 — Create a disposable Kinglet client-probe project (native Windows only).
 #
 # Usage:
-#   .\create-project.ps1 -Destination <path> [-Executable <path>]
+#   .\create-project.ps1 -Destination <path> [-Executable <path>] [-InstructionFilename <name>]
 #
 # Parameters:
-#   Destination   Path where the project will be created. Must not already exist.
-#   Executable    (optional) Absolute path to kinglet-client-probe.exe.
-#                 Defaults to the KINGLET_PROBE_EXECUTABLE env var if set, then
-#                 to probe-host\dist\win-x64\kinglet-client-probe.exe relative to
-#                 this script's parent repo.
+#   Destination          Path where the project will be created. Must not already exist.
+#   Executable           (optional) Absolute path to kinglet-client-probe.exe.
+#                        Defaults to KINGLET_PROBE_EXECUTABLE env var if set, then
+#                        to probe-host\dist\win-x64\kinglet-client-probe.exe relative to
+#                        this script's parent repo.
+#   InstructionFilename  (optional) Filename for the project-level instruction file.
+#                        Defaults to KINGLET_INSTRUCTION_FILENAME env var if set,
+#                        then to CLAUDE.md.  Use AGENTS.md for Codex, .cursorrules
+#                        for Cursor, etc.  Must not contain path separators.
 #
 # Refuses non-Windows hosts and a destination that already exists.
 # Never copies a user profile or credentials.
@@ -67,6 +71,13 @@ if ($InstructionFilename -eq "") {
     } else {
         $InstructionFilename = "CLAUDE.md"
     }
+}
+
+# Validate the instruction filename: must not contain path separators or dot-dot.
+# A value like ..\escape or foo\bar would write outside the project root.
+if ($InstructionFilename -match '[/\\]' -or $InstructionFilename.StartsWith('..')) {
+    [Console]::Error.WriteLine("create-project.ps1: InstructionFilename must not contain path separators or '..': $InstructionFilename")
+    exit 1
 }
 
 # ---------------------------------------------------------------------------

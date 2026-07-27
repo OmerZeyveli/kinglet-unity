@@ -774,6 +774,45 @@ class HookWrapperBehavioralTests(unittest.TestCase):
         self.assertEqual(r.returncode, 3,
                          f"malformed stdin must exit 3; got {r.returncode}\nstderr={r.stderr!r}")
 
+    def test_deny_absolute_path_via_cwd_fallback(self):
+        """cwd fallback: when CLAUDE_PROJECT_DIR absent but event carries 'cwd', absolute protected path → exit 2.
+
+        The hook has an elif branch that uses .cwd from the event JSON when
+        CLAUDE_PROJECT_DIR is not set.  Deleting that branch leaves the test RED.
+        """
+        import tempfile
+        with tempfile.TemporaryDirectory() as proj:
+            file_path = os.path.join(proj, "Assets", "Protected.txt")
+            # Embed cwd in the event but do NOT pass project_dir (CLAUDE_PROJECT_DIR absent).
+            event = (
+                '{"tool_name":"Write",'
+                '"tool_input":{"file_path":"' + file_path.replace('\\', '\\\\') + '"},'
+                '"cwd":"' + proj + '"}'
+            )
+            r = self._run_hook(event, project_dir=None)
+            self.assertEqual(r.returncode, 2,
+                             f"absolute protected path via cwd fallback must exit 2; "
+                             f"got {r.returncode}\nstderr={r.stderr!r}")
+
+    def test_allow_absolute_path_outside_project_root(self):
+        """Absolute path outside CLAUDE_PROJECT_DIR → exit 0 (not our project, allow).
+
+        Flipping the exit 0 to exit 2 on paths outside the project root would
+        make this test RED.
+        """
+        import tempfile
+        with tempfile.TemporaryDirectory() as proj:
+            # Construct an absolute path that is NOT under proj.
+            outside_path = "/tmp/some-other-project/Assets/Protected.txt"
+            event = (
+                '{"tool_name":"Write",'
+                '"tool_input":{"file_path":"' + outside_path + '"}}'
+            )
+            r = self._run_hook(event, project_dir=proj)
+            self.assertEqual(r.returncode, 0,
+                             f"absolute path outside project root must exit 0 (allow); "
+                             f"got {r.returncode}\nstderr={r.stderr!r}")
+
 
 if __name__ == "__main__":
     unittest.main()

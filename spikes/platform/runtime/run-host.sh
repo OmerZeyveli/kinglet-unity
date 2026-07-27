@@ -24,7 +24,11 @@
 set -euo pipefail
 
 # --- Resolve repo root (this script lives at spikes/platform/runtime/) ---
+# SC1007: CDPATH= here is a temporary env var override (not an assignment), which
+# suppresses cd output when CDPATH is set. The space after = is intentional.
+# shellcheck disable=SC1007
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck disable=SC1007
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
 cd "$REPO_ROOT"
 

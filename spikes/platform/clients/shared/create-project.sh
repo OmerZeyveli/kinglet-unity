@@ -2,14 +2,18 @@
 # create-project.sh — Create a disposable Kinglet client-probe project.
 #
 # Usage:
-#   create-project.sh <destination> [executable]
+#   create-project.sh <destination> [executable [instruction-filename]]
 #
 # Arguments:
-#   destination   Path where the project will be created. Must not already exist.
-#   executable    (optional) Absolute path to the kinglet-client-probe binary.
-#                 Defaults to the KINGLET_PROBE_EXECUTABLE env var if set, then
-#                 to the linux-amd64 binary in probe-host/dist/ relative to this
-#                 script (darwin-arm64 on Apple Silicon, linux-amd64 otherwise).
+#   destination           Path where the project will be created. Must not already exist.
+#   executable            (optional) Absolute path to the kinglet-client-probe binary.
+#                         Defaults to KINGLET_PROBE_EXECUTABLE env var if set, then
+#                         to the platform binary in probe-host/dist/ relative to this
+#                         script (darwin-arm64 on Apple Silicon, linux-amd64 otherwise).
+#   instruction-filename  (optional) Filename for the project-level instruction file.
+#                         Defaults to KINGLET_INSTRUCTION_FILENAME env var if set,
+#                         then to CLAUDE.md.  Use AGENTS.md for Codex, .cursorrules
+#                         for Cursor, etc.  Must not contain / or .. path components.
 #
 # Portable to macOS bash 3.2. Does not use associative arrays or GNU-only flags.
 # Does not pipe into head (SIGPIPE combined with pipefail kills scripts on large inputs).
@@ -36,7 +40,8 @@ esac
 # ---------------------------------------------------------------------------
 if [ "$#" -lt 1 ]; then
   echo "create-project.sh: missing required argument: destination" >&2
-  echo "Usage: create-project.sh <destination> [executable]" >&2
+  echo "Usage: create-project.sh <destination> [executable [instruction-filename]]" >&2
+  echo "  KINGLET_PROBE_EXECUTABLE and KINGLET_INSTRUCTION_FILENAME env vars serve as fallbacks." >&2
   exit 1
 fi
 
@@ -78,6 +83,15 @@ elif [ -n "${KINGLET_INSTRUCTION_FILENAME:-}" ]; then
 else
   instruction_filename="CLAUDE.md"
 fi
+
+# Validate the instruction filename: must not contain path separators or dot-dot.
+# A value like ../escape or foo/bar would write outside the project root.
+case "$instruction_filename" in
+  */* | ..*)
+    echo "create-project.sh: instruction-filename must not contain path separators or '..': $instruction_filename" >&2
+    exit 1
+    ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Destination existence guard

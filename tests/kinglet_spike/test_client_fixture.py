@@ -340,6 +340,30 @@ class CreateShTests(unittest.TestCase):
         # in the placed mcp.json.
         self.assertIn("__KINGLET_PROBE_EXECUTABLE__", CREATE_SH)
 
+    def test_validates_instruction_filename_against_path_traversal(self):
+        """create-project.sh must reject instruction filenames that contain path separators.
+
+        A value like '../escape' or 'sub/dir' passed as instruction-filename would
+        write outside the project root via 'cp ... $dest/$instruction_filename'.
+        The script must guard against this before writing.
+        """
+        # Check for the presence of a validation guard that rejects / or .. in the name.
+        # The guard is a 'case' statement checking */* and ..* patterns.
+        found_guard = False
+        for line in CREATE_SH.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            # The case pattern */* rejects any slash; ..* rejects dot-dot prefix.
+            if ("*/*" in stripped or "..*" in stripped) and "instruction" in CREATE_SH[
+                max(0, CREATE_SH.find(stripped) - 400):CREATE_SH.find(stripped) + 200
+            ]:
+                found_guard = True
+                break
+        self.assertTrue(found_guard,
+                        "create-project.sh must validate instruction_filename against "
+                        "path traversal (case pattern */* or ..*) before writing")
+
 
 # ---------------------------------------------------------------------------
 # create-project.ps1 tests
@@ -450,6 +474,20 @@ def _derive_probe_exe_path() -> str:
 _PROBE_EXE_PATH = _derive_probe_exe_path()
 
 
+def _clean_env():
+    """Return a copy of os.environ with Kinglet ambient variables removed.
+
+    Behavioral tests that invoke create-project.sh must not inherit
+    KINGLET_INSTRUCTION_FILENAME or KINGLET_PROBE_EXECUTABLE from the caller,
+    because those would silently override test assertions about the script's own
+    argument-handling and default-value logic.
+    """
+    env = dict(os.environ)
+    for key in ("KINGLET_INSTRUCTION_FILENAME", "KINGLET_PROBE_EXECUTABLE"):
+        env.pop(key, None)
+    return env
+
+
 @unittest.skipUnless(sys.platform != "win32", "behavioral tests require POSIX")
 class CreateShBehavioralTests(unittest.TestCase):
     _SCRIPT = str(_SHARED / "create-project.sh")
@@ -464,7 +502,7 @@ class CreateShBehavioralTests(unittest.TestCase):
         """
         result = subprocess.run(
             ["bash", self._SCRIPT],
-            capture_output=True, text=True
+            capture_output=True, text=True, env=_clean_env()
         )
         self.assertNotEqual(result.returncode, 0,
                             "script must exit non-zero when called with no arguments")
@@ -478,7 +516,7 @@ class CreateShBehavioralTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             result = subprocess.run(
                 ["bash", self._SCRIPT, tmpdir],
-                capture_output=True, text=True
+                capture_output=True, text=True, env=_clean_env()
             )
             self.assertNotEqual(result.returncode, 0,
                                 "script must refuse an already-existing destination")
@@ -496,7 +534,7 @@ class CreateShBehavioralTests(unittest.TestCase):
             dest = os.path.join(tmpdir, "probe project with spaces")
             result = subprocess.run(
                 ["bash", self._SCRIPT, dest, probe_exe],
-                capture_output=True, text=True
+                capture_output=True, text=True, env=_clean_env()
             )
             self.assertEqual(result.returncode, 0,
                              f"script failed: stderr={result.stderr!r}")
@@ -537,6 +575,15 @@ class CreateShBehavioralTests(unittest.TestCase):
             self.assertEqual(recorded_sha, actual_sha,
                              "sha256 in expected.json must match actual copied binary")
 
+            # Assert CLAUDE.md content matches the source rule file exactly.
+            # A zero-byte or otherwise incorrect file passes the filename check
+            # but would break the live probe's instructions.project case.
+            self.assertEqual(
+                Path(dest, "CLAUDE.md").read_text(encoding="utf-8"),
+                (_SHARED / "rules" / "kinglet-capability-probe.md").read_text(encoding="utf-8"),
+                "CLAUDE.md content must exactly match rules/kinglet-capability-probe.md"
+            )
+
     @unittest.skipUnless(
         os.path.isfile(_PROBE_EXE_PATH),
         "probe binary not built — skip"
@@ -548,7 +595,7 @@ class CreateShBehavioralTests(unittest.TestCase):
             dest = os.path.join(tmpdir, "a&b")
             result = subprocess.run(
                 ["bash", self._SCRIPT, dest, probe_exe],
-                capture_output=True, text=True
+                capture_output=True, text=True, env=_clean_env()
             )
             self.assertEqual(result.returncode, 0,
                              f"script failed with & in path: stderr={result.stderr!r}")
@@ -586,7 +633,7 @@ class CreateShBehavioralTests(unittest.TestCase):
             dest = os.path.join(bk_dir, "proj")
             result = subprocess.run(
                 ["bash", self._SCRIPT, dest, probe_exe],
-                capture_output=True, text=True
+                capture_output=True, text=True, env=_clean_env()
             )
             self.assertEqual(result.returncode, 0,
                              f"script failed with backslash in destination path: "
@@ -608,6 +655,39 @@ class CreateShBehavioralTests(unittest.TestCase):
                 cmd = server_cfg.get("command", "")
                 self.assertEqual(cmd, expected_cmd,
                                  "parsed command in mcp.json must equal the real absolute path")
+
+    def test_path_traversal_instruction_filename_rejected(self):
+        """Passing '../escape' as instruction-filename must exit non-zero.
+
+        Removing the guard causes this test to fail (F6 mutation check).
+        The binary path is still needed to reach the filename-validation branch
+        so we pass a placeholder; the script must reject before it reaches the
+        executable-existence check.
+        """
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = os.path.join(tmpdir, "probe-proj")
+            # Use a dummy executable path — validation must fail before it is checked.
+            result = subprocess.run(
+                ["bash", self._SCRIPT, dest, "/nonexistent-binary", "../escape"],
+                capture_output=True, text=True, env=_clean_env()
+            )
+            self.assertNotEqual(result.returncode, 0,
+                                "script must reject instruction-filename containing '..'")
+            self.assertTrue(result.stderr.strip(),
+                            "script must emit an error message when filename is invalid")
+
+    def test_slash_in_instruction_filename_rejected(self):
+        """Passing 'sub/dir' as instruction-filename must exit non-zero."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = os.path.join(tmpdir, "probe-proj")
+            result = subprocess.run(
+                ["bash", self._SCRIPT, dest, "/nonexistent-binary", "sub/dir"],
+                capture_output=True, text=True, env=_clean_env()
+            )
+            self.assertNotEqual(result.returncode, 0,
+                                "script must reject instruction-filename containing '/'")
+            self.assertTrue(result.stderr.strip(),
+                            "script must emit an error message when filename is invalid")
 
 
 if __name__ == "__main__":
