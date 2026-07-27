@@ -1,0 +1,1 @@
+✔ Successfully uninstalled plugin: kinglet-client-probe (scope: local)

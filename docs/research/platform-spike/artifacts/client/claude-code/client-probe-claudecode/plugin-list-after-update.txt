@@ -1,0 +1,7 @@
+Installed plugins:
+
+  ❯ kinglet-client-probe@kinglet-client-probe
+    Version: 0.0.2
+    Scope: local
+    Status: ✔ enabled
+

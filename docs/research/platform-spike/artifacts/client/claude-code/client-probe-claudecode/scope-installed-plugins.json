@@ -1,0 +1,15 @@
+{
+  "plugins": {
+    "kinglet-client-probe@kinglet-client-probe": [
+      {
+        "installPath": "<config-root>/plugins/cache/kinglet-client-probe/kinglet-client-probe/0.0.2",
+        "installedAt": "2026-07-27T10:31:42.258Z",
+        "lastUpdated": "2026-07-27T10:31:42.258Z",
+        "projectPath": "<project-root>",
+        "scope": "local",
+        "version": "0.0.2"
+      }
+    ]
+  },
+  "version": 2
+}

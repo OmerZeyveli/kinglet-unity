@@ -1,0 +1,188 @@
+{
+  "schema": "kinglet.client-probe.observations/v1",
+  "subject": "claude-code",
+  "client_version": "2.1.220",
+  "cases": [
+    {
+      "id": "agents.delegation",
+      "advertised": true,
+      "observed": "Not observed. No sub-agent invocation appears in any captured run: no Task/Agent tool_use and no subagent_type field in any of the four streams, and no .kinglet-probe/receipts/agent.json was written.",
+      "status": "inconclusive",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
+        "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json",
+        "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt"
+      ],
+      "notes": "The frozen prompt agent-delegation-01 was never executed: the live pass ran only mutation-block-01 and mcp-call-01 (see prompts-used.json). The only occurrences of the string 'kinglet-capability-reviewer' in the captured streams are inside the injected SKILL.md body, which tells the workflow not to write agent.json because that path belongs to the reviewer agent -- that is skill text, not a delegation. receipts-listing.txt shows the receipts directory contains only mcp-read.json. Closing this cell requires a new authorised live run of agent-delegation-01.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "approvals.mutation",
+      "advertised": true,
+      "observed": "Approval gating observed and enforced. In mcp-call-01 three tool calls were refused pending approval -- two Bash invocations of the probe binary ('This command requires approval') and one MCP tool call ('Claude requested permissions to use ... but you haven't granted it yet') -- each returned as an is_error tool_result, and the run's result envelope carried a populated permission_denials[] array naming all three. No mutation of the protected file occurred in any run.",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
+        "artifacts/client/claude-code/client-probe-claudecode/mutation-block-01-file.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/s-hook-isolation-file.txt"
+      ],
+      "notes": "Scope caveat, recorded deliberately: both live runs used --permission-mode acceptEdits, which by probe design removes the approval prompt on file edits so that the PreToolUse hook is the only remaining gate. An approval prompt on a file write was therefore never observed; the observed denials are Bash and MCP tool calls. The second half of the expected receipt (mutation_blocked_without_approval) does hold -- Assets/Protected.txt is byte-identical before and after in both runs. In the isolation run the hook-blocked Edit also appeared in permission_denials[], so the denial channel is machine-readable for mutations as well.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "executable.local",
+      "advertised": true,
+      "observed": "Discovery observed, invocation never succeeded. In mcp-call-01 the client located the binary (stat via Bash) and constructed the correct command line 'kinglet-client-probe exec --project <root> --output <root>/.kinglet-probe/receipts/workflow.json', but both attempts were refused with 'This command requires approval' and landed in permission_denials[]. In the isolation run, where Bash was pre-authorised, the client chose the MCP tool instead and never invoked the binary.",
+      "status": "inconclusive",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
+        "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt"
+      ],
+      "notes": "No captured run contains a successful client-driven execution of the probe binary. The binary was executed successfully once during this probe, but by the setup script's own smoke test in create-project.sh -- that is the harness running it, not the client discovering and invoking it, so it is not admissible for this case. The receipts directory never contained workflow.json (receipts-listing.txt). What blocked the case was the approval gate and then the model's tool choice, not a client limitation, which is why this is inconclusive rather than fail.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "hooks.pre-mutation-block",
+      "advertised": true,
+      "observed": "Hook fired and blocked the mutation. In the isolation run the client called Edit on the absolute path <root>/Assets/Protected.txt; the PreToolUse hook registered by the plugin ran, the wrapper resolved the deny and exited 2, and the tool_result came back as an error carrying the hook's deny message. Assets/Protected.txt is byte-identical before and after (sha256 0db5bf3c...17fbc), and the blocked Edit is listed in the run's permission_denials[].",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
+        "artifacts/client/claude-code/client-probe-claudecode/s-hook-isolation-file.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/s-plugin-list.txt"
+      ],
+      "notes": "Scored from the isolation run only. The confounded first run of the same prompt is NOT evidence for this case: there the model read the project CLAUDE.md and declined to call any mutation tool, so the hook never saw a tool call -- that run is recorded under instructions.project instead. The isolation run parked CLAUDE.md and pre-authorised Write/Edit so the hook was the only remaining gate. Two facts confirmed by this artifact beyond the block itself: the hook receives an ABSOLUTE file_path (the wrapper's relativisation against CLAUDE_PROJECT_DIR is load-bearing), and exit 2 is what blocks. The captured deny message is the pre-fix form -- the wrapper was emitting hookSpecificOutput/permissionDecision JSON on stderr while also exiting 2, so Claude Code surfaced it as 'PreToolUse:Edit hook error: {raw json}'. The block worked; only the reason text read as a malfunction. Fixed in b5202d4, which makes the wrapper emit plain prose on stderr. The committed wrapper therefore no longer matches this artifact's message text verbatim; the blocking behaviour it evidences is unchanged.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "install.discover",
+      "advertised": true,
+      "observed": "Cold discovery succeeded. 'claude plugin marketplace add <pkg>' registered the local marketplace, 'claude plugin install kinglet-client-probe@kinglet-client-probe --scope local' installed it, and 'claude plugin list' reported the plugin at Version 0.0.1, Scope local, Status enabled. The plugin's capabilities were then reachable from a session that was never told where they lived: the Skill tool launched kinglet-client-probe:kinglet-capability-probe by name, and ToolSearch resolved the MCP tool mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker.",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/marketplace-add.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/plugin-install.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/plugin-list.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/claude-version.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json"
+      ],
+      "notes": "Both halves of the expected receipt are covered: toolkit_version_present by the 'Version: 0.0.1' line in plugin-list.txt, capabilities_listed by the skill launch and MCP tool resolution in tool-trace.json. 'claude plugin list' -- not 'claude plugin validate' -- is the real gate: a manifest can validate at exit 0 and still report 'Status: failed to load'. The run aborts if that string appears, and it did not.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "install.remove",
+      "advertised": true,
+      "observed": "'claude plugin uninstall kinglet-client-probe --scope local' reported 'Successfully uninstalled plugin: kinglet-client-probe (scope: local)', and the following 'claude plugin list' reported 'No plugins installed.'",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/plugin-uninstall.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/plugin-list-after-uninstall.txt"
+      ],
+      "notes": "Covers removal_confirmed and no_residual_capabilities at the plugin-listing level. Residual capability absence was checked by the listing, not by re-running a prompt in a fresh session after uninstall, so the stronger no-residual-capabilities check (skill and MCP tool no longer reachable) remains unverified.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "install.update",
+      "advertised": true,
+      "observed": "Update applied and reflected. After bumping the package to 0.0.2, 'claude plugin marketplace update kinglet-client-probe' revalidated the local marketplace, and 'claude plugin update kinglet-client-probe@kinglet-client-probe --scope local' reported 'Plugin \"kinglet-client-probe\" updated from 0.0.1 to 0.0.2 for scope local'. The subsequent 'claude plugin list' reported Version: 0.0.2.",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/marketplace-update.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/plugin-update.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/plugin-list-after-update.txt"
+      ],
+      "notes": "Two ordering constraints were established by negative result, both captured in plugin-update.txt, which records both attempts in sequence. The bare plugin name fails: 'claude plugin update kinglet-client-probe --scope local' returns 'Failed to update plugin \"kinglet-client-probe\": Plugin \"kinglet-client-probe\" not found'. The fully qualified <plugin>@<marketplace> form succeeds. 'marketplace update' must run first, otherwise the marketplace still advertises the old version. The success line also notes 'Restart to apply changes'.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "instructions.project",
+      "advertised": true,
+      "observed": "Project instructions were loaded without being mentioned and were followed. Given the mutation-block-01 prompt, the client read the target file and then declined, citing the project CLAUDE.md as the reason Assets/Protected.txt must not be written. It called no mutation tool at all -- permission_denials[] for that run is empty because nothing was ever attempted -- and the file was unchanged.",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
+        "artifacts/client/claude-code/client-probe-claudecode/mutation-block-01-file.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/s-hook-isolation-file.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json"
+      ],
+      "notes": "This case has a genuine control, which is what makes it strong rather than anecdotal. Same prompt, same project, one variable changed: with CLAUDE.md present the client attempted no mutation tool and refused, citing it; with CLAUDE.md parked aside the client went straight to Edit. The instructions, not the model's general caution, produced the refusal. The client also honoured CLAUDE.md a second time in the isolation MCP run, declining to write the receipt to workflow.json because CLAUDE.md reserves that path for the capability workflow, and choosing mcp-read.json instead.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "mcp.discover-call",
+      "advertised": true,
+      "observed": "Discovered and called. The plugin's .mcp.json server registered on install; the client resolved the tool name mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker via ToolSearch, then called it with project_root set to the disposable project. The call returned a non-error result whose body is exactly {\"schema\":\"kinglet.client-probe.receipt/v1\",\"marker\":\"KINGLET_CLIENT_PROBE_PROJECT\",\"unity_version\":\"6000.3.11f1\"}, matching the on-disk marker file and ProjectSettings/ProjectVersion.txt.",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
+        "artifacts/client/claude-code/client-probe-claudecode/receipt-mcp-read.json",
+        "artifacts/client/claude-code/client-probe-claudecode/s-plugin-list.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json"
+      ],
+      "notes": "Both halves of the expected receipt are covered by the isolation run: mcp_tool_listed by the ToolSearch resolution, mcp_call_result_present by the returned body. The earlier mcp-call-01 run corroborates discovery independently -- the same tool name resolved there too -- but its call was refused pending approval, so only the isolation run evidences the call itself. The MCP server registers because plugin.json declares \"mcpServers\": \"./.mcp.json\"; unlike hooks, that declaration is required rather than auto-discovered.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "scope.project-user",
+      "advertised": true,
+      "observed": "Two scopes resolved simultaneously from two distinct stores with no collision. The marketplace was registered at user scope -- 'Successfully added marketplace: kinglet-client-probe (declared in user settings)', persisted in the user config's plugins/known_marketplaces.json. The plugin was installed at local (project) scope: installed_plugins.json records scope 'local' with an explicit projectPath, and the enablement flag was written into the project's own .claude/settings.local.json. The plugin loaded and functioned under that split.",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/scope-known-marketplaces.json",
+        "artifacts/client/claude-code/client-probe-claudecode/scope-installed-plugins.json",
+        "artifacts/client/claude-code/client-probe-claudecode/scope-project-settings-local.json",
+        "artifacts/client/claude-code/client-probe-claudecode/marketplace-add.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/plugin-install.txt"
+      ],
+      "notes": "Scope caveat, recorded deliberately: the runbook's Step F negative control -- open a session in a different directory and confirm the project-scoped plugin is NOT listed there -- was not run. What is evidenced is positive coexistence (a user-scope marketplace and a project-scope install resolving together and working), not isolation. The plugin update line independently binds local scope to the project directory: 'updated ... for scope local (<project>)'. Closing the isolation half needs a second listing from an unrelated directory, which is a cheap follow-up but was not captured.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "structured-result",
+      "advertised": true,
+      "observed": "A structured JSON receipt was written to disk by the client. In the isolation MCP run the client called Write and created .kinglet-probe/receipts/mcp-read.json containing valid JSON conforming to kinglet.client-probe.receipt/v1, with marker KINGLET_CLIENT_PROBE_PROJECT and unity_version 6000.3.11f1. The post-run listing confirms the file exists on disk with that content.",
+      "grade": "Native",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/receipt-mcp-read.json",
+        "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json"
+      ],
+      "notes": "The mcp-call-01 prompt says 'save the structured result' without naming a path, so the receipt path was the client's choice; the runbook explicitly sanctions this ('or the path Claude chooses, which must be recorded as evidence'), and the chosen path is recorded here. Both halves of the expected receipt hold: receipt_path_present and receipt_is_valid_json. Separately, and not counted toward this case, every run's stream-json result envelope was itself structured and machine-readable, carrying type, subtype, is_error, result, session_id, permission_denials, usage and total_cost_usd -- that is the CLI's output envelope, not the receipt this case asks for.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "workflow.natural-language",
+      "advertised": true,
+      "observed": "Half observed. The workflow was reached by natural language and without a filename lookup -- in both prompt runs the client spontaneously issued Skill with skill 'kinglet-client-probe:kinglet-capability-probe', the launch succeeded, and the SKILL.md body was injected into the session. But the workflow's defined receipt was never produced: .kinglet-probe/receipts/workflow.json was never created in any run, and the workflow's mandated return string KINGLET_CLIENT_PROBE_OK 6000.3.11f1 was never emitted.",
+      "status": "inconclusive",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
+        "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt",
+        "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json"
+      ],
+      "notes": "Two independent reasons this cell does not close. First, the frozen prompt workflow-natural-language-01 was never executed -- prompts-used.json records that only mutation-block-01 and mcp-call-01 ran. The skill invocations observed were spontaneous, under the mcp-call-01 prompt, which is suggestive but is not the frozen prompt. Second, the expected receipt is only half satisfied: workflow_invoked holds, receipt_matches_schema does not, because the workflow's own receipt was never written. In the first run the skill's Step 2 binary call was refused pending approval; in the isolation run the client explicitly declined to follow Step 2 and used the MCP tool instead, writing mcp-read.json rather than workflow.json. Closing this cell requires a new authorised live run of workflow-natural-language-01.",
+      "emulation_mechanism": null
+    }
+  ]
+}

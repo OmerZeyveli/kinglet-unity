@@ -1,0 +1,1 @@
+Adding marketplace…✔ Successfully added marketplace: kinglet-client-probe (declared in user settings)

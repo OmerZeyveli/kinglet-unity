@@ -1,0 +1,5 @@
+{
+  "enabledPlugins": {
+    "kinglet-client-probe@kinglet-client-probe": true
+  }
+}

@@ -1,0 +1,6 @@
+--- attempt: plugin update <name> --scope local
+Checking for updates for plugin "kinglet-client-probe" at local scope…
+✘ Failed to update plugin "kinglet-client-probe": Plugin "kinglet-client-probe" not found
+--- attempt: plugin update <name>@<marketplace> --scope local
+Checking for updates for plugin "kinglet-client-probe@kinglet-client-probe" at local scope…
+✔ Plugin "kinglet-client-probe" updated from 0.0.1 to 0.0.2 for scope local (<project-root>). Restart to apply changes.

@@ -1,0 +1,10 @@
+{
+  "kinglet-client-probe": {
+    "installLocation": "<package-root>",
+    "lastUpdated": "2026-07-27T09:59:48.891Z",
+    "source": {
+      "path": "<package-root>",
+      "source": "directory"
+    }
+  }
+}
