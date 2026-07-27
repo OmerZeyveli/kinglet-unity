@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""build-record.py — assemble a kinglet.spike.evidence/v1 record for one Linux
+"""build-record.py — assemble a kinglet.spike.evidence/v1 record for one native
 runtime bake-off cell.
 
-Invoked by run-host.sh. It reads the candidate's own host-probe result.json
+Platform-neutral: run-host.sh (Linux, macOS) and run-host.ps1 (Windows) all call
+this. The environment triple is supplied by the caller via --os/--release/--arch;
+the defaults are the Linux values (linux / ubuntu-24.04-noble / x64).
+
+It reads the candidate's own host-probe result.json
 (the raw artifact), derives the 18 assertion entries, embeds the measurements
 from measure.sh, computes the artifact's sha256, and writes a strict record.json
 under .kinglet/local/spikes/<run-id>/.
@@ -124,6 +128,12 @@ def main() -> int:
     parser.add_argument("--artifact-rel", required=True)
     parser.add_argument("--result-file", required=True)
     parser.add_argument("--measure-json", required=True)
+    # environment.{os,release,arch} must match a matrix cell exactly
+    # (tools/kinglet_spike/coverage.py::_matches). The defaults keep the original
+    # Linux behaviour for callers that do not pass them.
+    parser.add_argument("--os", dest="os_name", default="linux")
+    parser.add_argument("--release", default="ubuntu-24.04-noble")
+    parser.add_argument("--arch", default="x64")
     parser.add_argument("--host-line", required=True)
     parser.add_argument("--kernel-line", required=True)
     parser.add_argument("--toolchain-data", required=True)
@@ -162,9 +172,9 @@ def main() -> int:
         },
         "probe": {"id": "host-probe", "contract": "kinglet.host-probe/v1"},
         "environment": {
-            "os": "linux",
-            "release": "ubuntu-24.04-noble",
-            "arch": "x64",
+            "os": args.os_name,
+            "release": args.release,
+            "arch": args.arch,
             "native": True,
             "toolchain": toolchain,
         },
