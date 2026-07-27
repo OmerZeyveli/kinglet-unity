@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
 # Claude Code client-probe live pass 1 — the procedure that produced the
-# evidence in docs/research/platform-spike/.../client-probe-claudecode/.
+# evidence published under
+# docs/research/platform-spike/artifacts/client/claude-code/<run_id>/.
 #
 # OPERATOR AUTHORISATION REQUIRED. This script installs a plugin into a Claude
 # Code profile and then runs headless (`claude -p`) agent sessions that are
@@ -42,9 +43,13 @@ PROJ="$BASE/project"
 ART="$BASE/artifacts"
 
 # --- safety: never touch the operator's real config -------------------------
+# `pwd -P` (physical) is mandatory here. Plain `pwd` is bash's LOGICAL pwd: after
+# `cd` through a symlink it prints the link path, not the target, so a $CFG that
+# symlinks to the real ~/.claude would slip past this guard. This comparison is
+# the script's only interlock protecting the operator's real config.
 mkdir -p "$CFG"
-real_home_config="$(cd "$HOME" && pwd)/.claude"
-if [ "$(cd "$CFG" && pwd)" = "$real_home_config" ]; then
+real_home_config="$(cd "$HOME" && pwd -P)/.claude"
+if [ "$(cd "$CFG" && pwd -P)" = "$real_home_config" ]; then
   echo "run.sh: refusing to run against the real config root ($real_home_config)" >&2
   exit 1
 fi

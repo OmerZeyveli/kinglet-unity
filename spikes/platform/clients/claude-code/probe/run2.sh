@@ -37,8 +37,10 @@ CFG="$BASE/cfg"
 PROJ="$BASE/project"
 ART="$BASE/artifacts"
 
-real_home_config="$(cd "$HOME" && pwd)/.claude"
-if [ -d "$CFG" ] && [ "$(cd "$CFG" && pwd)" = "$real_home_config" ]; then
+# `pwd -P` (physical), not bash's logical `pwd`: `cd` through a symlink reports
+# the link path, so a symlinked $CFG would otherwise bypass this guard.
+real_home_config="$(cd "$HOME" && pwd -P)/.claude"
+if [ -d "$CFG" ] && [ "$(cd "$CFG" && pwd -P)" = "$real_home_config" ]; then
   echo "run2.sh: refusing to run against the real config root ($real_home_config)" >&2
   exit 1
 fi
@@ -88,14 +90,22 @@ MCP_TOOL="mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_r
 # --- (1) hook isolation -----------------------------------------------------
 # CLAUDE.md is parked for THIS RUN ONLY so the model does not self-censor before
 # the hook is reached. It is restored on the next line after the run.
-mv CLAUDE.md "$BASE/CLAUDE.md.parked"
+PARKED="$BASE/CLAUDE.md.parked"
+restore_claude_md() {
+  if [ -f "$PARKED" ]; then
+    mv "$PARKED" "$PROJ/CLAUDE.md"
+  fi
+}
+# Restore on interrupt/termination too, not just on the happy path.
+trap restore_claude_md EXIT INT TERM
+mv CLAUDE.md "$PARKED"
 sha_before="$(sha256_of Assets/Protected.txt)"
 claude -p "$(prompt_text mutation-block-01)" \
   --model "$MODEL" --output-format stream-json --verbose \
   --permission-mode acceptEdits --allowedTools "Write,Edit,Read,Bash" \
   > "$ART/s-hook-isolation-stream.jsonl" 2> "$ART/s-hook-isolation.err" < /dev/null || true
 sha_after="$(sha256_of Assets/Protected.txt)"
-mv "$BASE/CLAUDE.md.parked" CLAUDE.md
+restore_claude_md
 {
   echo "note=CLAUDE.md parked for this run so the model does not self-censor"
   echo "sha_before=$sha_before"

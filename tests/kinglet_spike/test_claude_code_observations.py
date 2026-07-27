@@ -12,8 +12,12 @@ The invariants worth failing over:
      executed. This is the specific fabrication risk this evidence set ran into:
      two cases were summarised as Native/pass from memory, but their prompts were
      never run and no artifact supported them.
-  4. Committed evidence carries no absolute user path, credential, or disposable
-     probe root.
+  4. Committed evidence AND the committed probe scripts that produced it carry
+     no absolute user path, credential, or disposable probe root. The scripts are
+     the highest-risk text in this tree — they are the only committed files that
+     legitimately mention the credential file at all — so they are scanned by the
+     same sanitization pass as the evidence, plus a dedicated rule: a script may
+     TEST for the credential file inside the disposable root, never copy it.
 """
 from __future__ import annotations
 
@@ -37,6 +41,8 @@ PLATFORM = REPO / "docs/research/platform-spike"
 RUN_ID = "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01"
 RECORD = PLATFORM / f"evidence/client/claude-code/{RUN_ID}.json"
 ARTIFACTS = PLATFORM / f"artifacts/client/claude-code/{RUN_ID}"
+PROBE_DIR = REPO / "spikes/platform/clients/claude-code/probe"
+EXPECTED_PROBE_SCRIPTS = ("run.sh", "run2.sh")
 
 # Frozen prompt each case is scored from, per the runbook's "Cases evidenced" lists.
 # A case may only be `pass` if its prompt actually ran.
@@ -47,6 +53,16 @@ CASE_PROMPT = {
 
 # The disposable live-run root must never appear in committed evidence.
 PROBE_ROOT = re.compile(r"/tmp/kinglet-live")
+
+# The credential file may only ever be named as "$CFG/.credentials.json" — a
+# presence check inside the disposable config root. Any other mention (a copy,
+# a read, a path under $HOME) is a leak of the operator's real credentials.
+CREDENTIALS = re.compile(r"\.credentials")
+ALLOWED_CREDENTIAL_REFERENCE = re.compile(r"\$\{?CFG\}?/\.credentials\.json")
+
+
+def _probe_scripts() -> tuple[Path, ...]:
+    return tuple(sorted(p for p in PROBE_DIR.glob("*.sh") if p.is_file()))
 
 
 def _digest(path: Path) -> str:
@@ -60,6 +76,10 @@ def _digest(path: Path) -> str:
 def _committed_text_files() -> tuple[Path, ...]:
     paths = [OBSERVATIONS, RECORD]
     paths.extend(sorted(p for p in ARTIFACTS.iterdir() if p.is_file()))
+    # The probe scripts are committed too, and they are the files that actually
+    # touch the operator's machine. Scanning only the evidence they produced left
+    # the riskiest text in the tree unguarded.
+    paths.extend(_probe_scripts())
     return tuple(paths)
 
 
@@ -177,6 +197,65 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
                 PROBE_ROOT.search(content),
                 f"{path.name} leaks the disposable probe root",
             )
+
+    def test_the_probe_scripts_are_actually_in_the_sanitization_sweep(self):
+        # Guards the guard: if the scripts are renamed or the glob stops matching,
+        # test_committed_evidence_is_sanitized would silently scan nothing new and
+        # keep passing.
+        scanned = {p.name for p in _committed_text_files()}
+        for name in EXPECTED_PROBE_SCRIPTS:
+            self.assertIn(
+                name,
+                scanned,
+                f"probe/{name} is committed but no sanitization test looks at it",
+            )
+
+    def test_probe_scripts_never_copy_the_credential_file(self):
+        # The scripts are permitted to CHECK that "$CFG/.credentials.json" exists
+        # in the disposable root — provisioning it is a manual operator step. They
+        # must never copy, read, or otherwise name the credential file anywhere
+        # else, above all not under the operator's real ~/.claude.
+        scripts = _probe_scripts()
+        self.assertTrue(scripts, f"no probe scripts found under {PROBE_DIR}")
+        for path in scripts:
+            for number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), start=1
+            ):
+                residue = ALLOWED_CREDENTIAL_REFERENCE.sub("", line)
+                self.assertIsNone(
+                    CREDENTIALS.search(residue),
+                    f"{path.name}:{number} names the credential file outside a "
+                    f'"$CFG/.credentials.json" presence check: {line.strip()!r}',
+                )
+
+    def test_probe_scripts_keep_their_disposable_root_discipline(self):
+        # KINGLET_LIVE_BASE has no default on purpose: a default would let an
+        # unattended run pick a root the operator never authorised.
+        for path in _probe_scripts():
+            text = path.read_text(encoding="utf-8")
+            self.assertIn('BASE="$KINGLET_LIVE_BASE"', text, path.name)
+            # `${KINGLET_LIVE_BASE:-}` is the set -u guard and is fine; a default
+            # VALUE (`${KINGLET_LIVE_BASE:-/tmp/...}`) is not.
+            self.assertIsNone(
+                re.search(r"\$\{KINGLET_LIVE_BASE:-[^}]", text),
+                f"{path.name} supplies a default live base",
+            )
+            self.assertIn('export CLAUDE_CONFIG_DIR="$CFG"', text, path.name)
+            # The real-config interlock must use the PHYSICAL pwd; bash's logical
+            # `pwd` returns the link path, so a symlinked $CFG would bypass it.
+            guards = [
+                line
+                for line in text.splitlines()
+                if ("$CFG" in line or "$HOME" in line) and "pwd" in line
+            ]
+            self.assertTrue(guards, f"{path.name} has no real-config interlock")
+            for line in guards:
+                self.assertIn(
+                    "pwd -P",
+                    line,
+                    f"{path.name} uses bash's logical pwd in its only safety "
+                    f"interlock, which a symlinked $CFG bypasses: {line.strip()!r}",
+                )
 
     def test_record_environment_pins_the_observed_client(self):
         self.assertEqual(self.record.subject.kind, "client")
