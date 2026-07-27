@@ -361,3 +361,8 @@ docs/research/platform-spike/artifacts/runtime/python/20260727T051518Z-runtime-p
 docs/research/platform-spike/artifacts/runtime/go/20260727T051518Z-runtime-go-linux-noble-01/result.json	original	-	-	-	original	kinglet-0r-linux-go-noble-host-probe-result
 docs/research/platform-spike/artifacts/runtime/rust/20260727T051518Z-runtime-rust-linux-noble-01/result.json	original	-	-	-	original	kinglet-0r-linux-rust-noble-host-probe-result
 docs/research/platform-spike/artifacts/runtime/dotnet/20260727T051518Z-runtime-dotnet-linux-noble-01/result.json	original	-	-	-	original	kinglet-0r-linux-dotnet-noble-host-probe-result
+spikes/platform/clients/contracts/cases-v1.json	original	-	-	-	original	client-probe-frozen-12-behavioral-case-catalog
+spikes/platform/clients/contracts/prompts-v1.json	original	-	-	-	original	client-probe-frozen-4-synthetic-prompts
+tools/kinglet_spike/client_results.py	original	-	-	-	original	client-probe-load-validate-and-to-evidence
+tests/kinglet_spike/client_support.py	original	-	-	-	original	client-probe-test-fixtures-case-ids-and-valid-observations
+tests/kinglet_spike/test_client_results.py	original	-	-	-	original	client-probe-behavioral-contract-tests

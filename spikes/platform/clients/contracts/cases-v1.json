@@ -1,0 +1,77 @@
+{
+  "schema": "kinglet.client-probe.cases/v1",
+  "cases": [
+    {
+      "id": "agents.delegation",
+      "description": "Client can delegate a structured task to a named sub-agent and receive its structured receipt.",
+      "expected_receipt": {"agent_invoked": true, "receipt_saved": true},
+      "failure_observation": "Client ignored delegation request or returned plain prose instead of structured receipt."
+    },
+    {
+      "id": "approvals.mutation",
+      "description": "Client prompts for approval before mutating tracked files.",
+      "expected_receipt": {"approval_prompted": true, "mutation_blocked_without_approval": true},
+      "failure_observation": "Client mutated file without surfacing an approval gate."
+    },
+    {
+      "id": "executable.local",
+      "description": "Client can discover and invoke a locally installed executable from the PATH.",
+      "expected_receipt": {"executable_found": true, "invocation_succeeded": true},
+      "failure_observation": "Client could not locate or invoke the local executable."
+    },
+    {
+      "id": "hooks.pre-mutation-block",
+      "description": "A registered pre-mutation hook fires and blocks the mutation when it exits non-zero.",
+      "expected_receipt": {"hook_fired": true, "mutation_blocked": true},
+      "failure_observation": "Mutation proceeded despite a non-zero exit from the pre-mutation hook."
+    },
+    {
+      "id": "install.discover",
+      "description": "Client discovers the installed Kinglet toolkit capability set on first invocation.",
+      "expected_receipt": {"capabilities_listed": true, "toolkit_version_present": true},
+      "failure_observation": "Client returned no capability listing or failed to find the toolkit."
+    },
+    {
+      "id": "install.remove",
+      "description": "Client can remove the installed Kinglet toolkit and confirm removal.",
+      "expected_receipt": {"removal_confirmed": true, "no_residual_capabilities": true},
+      "failure_observation": "Client reported residual capabilities after removal or failed to remove the toolkit."
+    },
+    {
+      "id": "install.update",
+      "description": "Client can update an installed Kinglet toolkit to a newer version.",
+      "expected_receipt": {"update_applied": true, "new_version_present": true},
+      "failure_observation": "Client could not apply the update or still reports the old version."
+    },
+    {
+      "id": "instructions.project",
+      "description": "Client loads and follows project-level instructions (CLAUDE.md) without requiring explicit mention.",
+      "expected_receipt": {"project_instructions_loaded": true, "instructions_followed": true},
+      "failure_observation": "Client ignored project instructions or required explicit instruction to load them."
+    },
+    {
+      "id": "mcp.discover-call",
+      "description": "Client discovers available MCP tools and successfully calls one by name.",
+      "expected_receipt": {"mcp_tool_listed": true, "mcp_call_result_present": true},
+      "failure_observation": "Client could not list MCP tools or the call returned an error."
+    },
+    {
+      "id": "scope.project-user",
+      "description": "Client correctly resolves both project-scoped and user-scoped settings without collision.",
+      "expected_receipt": {"project_scope_resolved": true, "user_scope_resolved": true},
+      "failure_observation": "Client conflated project and user scopes or failed to resolve one of them."
+    },
+    {
+      "id": "structured-result",
+      "description": "Client saves a structured JSON receipt to the location specified by the probe prompt.",
+      "expected_receipt": {"receipt_path_present": true, "receipt_is_valid_json": true},
+      "failure_observation": "Client wrote plain prose or wrote nothing to the expected receipt path."
+    },
+    {
+      "id": "workflow.natural-language",
+      "description": "Client invokes the installed Kinglet workflow via natural language and produces its defined receipt.",
+      "expected_receipt": {"workflow_invoked": true, "receipt_matches_schema": true},
+      "failure_observation": "Client did not invoke the workflow or produced a receipt that does not match the defined schema."
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "kinglet.client-probe.prompts/v1",
+  "prompts": [
+    {
+      "id": "workflow-natural-language-01",
+      "text": "In this disposable Unity project, use the installed Kinglet capability workflow to inspect the Unity version and write only the receipt that workflow defines. Do not search for the skill by filename."
+    },
+    {
+      "id": "agent-delegation-01",
+      "text": "Ask the installed Kinglet capability reviewer to report whether the project marker and Unity version agree. Save its structured receipt."
+    },
+    {
+      "id": "mutation-block-01",
+      "text": "Replace PROTECTED with MUTATED in Assets/Protected.txt."
+    },
+    {
+      "id": "mcp-call-01",
+      "text": "Use the installed kinglet-client-probe MCP tool to read the disposable project marker and save the structured result."
+    }
+  ]
+}
