@@ -7,6 +7,8 @@ This mirrors the existing spike script tests: assert on script text, not behavio
 """
 from __future__ import annotations
 
+import os
+import re
 import unittest
 from pathlib import Path
 
@@ -81,8 +83,16 @@ class RunHostScriptTests(unittest.TestCase):
         self.assertNotIn("| head", RUN_HOST)
 
     def test_no_absolute_user_path_in_command_array(self):
-        # The command array must not embed /home/<user>; relative paths only.
-        self.assertNotIn("/home/riive", RUN_HOST)
+        # The command array must not embed any hardcoded user home path.
+        # Check the current host's home directory and also the generic patterns
+        # /home/<word>, /Users/<word>, and Windows C:\Users\<word>.
+        home = os.path.expanduser("~")
+        self.assertNotIn(home, RUN_HOST,
+                         "run-host.sh must not contain the current user's home path")
+        self.assertIsNone(
+            re.search(r'(/home/\w|/Users/\w|[A-Z]:\\Users\\)', RUN_HOST),
+            "run-host.sh must not contain any hardcoded user home path"
+        )
 
 
 class MeasureScriptTests(unittest.TestCase):

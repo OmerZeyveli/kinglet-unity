@@ -142,7 +142,14 @@ $mcpTemplate = [System.IO.File]::ReadAllText(
     (New-Object System.Text.UTF8Encoding($false))
 )
 $absBinPath = (Resolve-Path $destExe).Path
-$mcpContent = $mcpTemplate.Replace('__KINGLET_PROBE_EXECUTABLE__', $absBinPath)
+# The substituted value is a JSON string value, so backslash and double-quote must be
+# escaped at the JSON layer before substitution.  Windows paths always contain '\',
+# which without escaping would produce invalid JSON (e.g. \U, \k are invalid escapes).
+#   1. Escape backslash: \ → \\
+#   2. Escape double-quote: " → \"
+# Using String.Replace (not -replace) avoids regex interpretation of the replacement.
+$absBinJsonEscaped = $absBinPath.Replace('\', '\\').Replace('"', '\"')
+$mcpContent = $mcpTemplate.Replace('__KINGLET_PROBE_EXECUTABLE__', $absBinJsonEscaped)
 [System.IO.File]::WriteAllText(
     (Join-Path $Destination '.kinglet-probe\mcp.json'),
     $mcpContent,

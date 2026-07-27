@@ -150,9 +150,21 @@ EOF
 # ---------------------------------------------------------------------------
 abs_bin_path="$(cd "$(dirname "$bin_path")" && pwd)/$(basename "$bin_path")"
 
-# Read the template, replace the token, write to destination.
-# Escape sed replacement metacharacters (&, |, \) in the path before substitution.
-abs_bin_escaped="$(printf '%s' "$abs_bin_path" | sed 's/[&|\\]/\\&/g')"
+# The substituted value is a JSON string value that also appears in a sed replacement.
+# Both layers require escaping, and the interaction is subtle:
+#
+#   sed replacement: \\ → one literal \ in output
+#   JSON string:     \\  encodes one literal \ character
+#
+# So to get \\ in the sed output (which JSON then decodes as \), the replacement
+# string must contain \\\\ (four backslashes):
+#   shell string \\\\ → sed sees \\\\, which the sed engine emits as \\
+#
+# Escaping order (single pass, three substitutions):
+#   1. \ → \\\\ (JSON + sed-replacement layers combined)
+#   2. " → \\"  (JSON layer; sed replacement \\" → \" in output)
+#   3. & and | → \& / \| (remaining sed metacharacters that are not backslash)
+abs_bin_escaped="$(printf '%s' "$abs_bin_path" | sed 's/\\/\\\\\\\\/g; s/"/\\\\"/g; s/[&|]/\\&/g')"
 sed "s|__KINGLET_PROBE_EXECUTABLE__|$abs_bin_escaped|g" \
   "$script_dir/mcp.json" > "$dest/.kinglet-probe/mcp.json"
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -250,14 +251,31 @@ class CreateShTests(unittest.TestCase):
         self.assertIn(".kinglet-probe/expected.json", CREATE_SH)
 
     def test_computes_sha256(self):
-        # Must invoke sha256sum or shasum, not just mention in comment.
-        has_sha256sum = "sha256sum" in CREATE_SH
-        has_shasum = "shasum -a 256" in CREATE_SH
-        self.assertTrue(has_sha256sum or has_shasum,
-                        "script must invoke sha256sum or 'shasum -a 256' to compute checksum")
+        # Must invoke sha256sum or shasum as a shell command, not just reference it
+        # in a comment.  Assert that at least one invocation line (not a comment line)
+        # contains the checksum command.
+        found = False
+        for line in CREATE_SH.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if "sha256sum" in stripped or "shasum -a 256" in stripped:
+                found = True
+                break
+        self.assertTrue(found,
+                        "a non-comment line of create-project.sh must invoke "
+                        "sha256sum or 'shasum -a 256'")
 
     def test_accepts_executable_argument_or_env(self):
-        # Must not hardcode an absolute user home path; takes executable via arg or env var.
+        # Positive: the script must accept an explicit positional argument for the
+        # executable and must fall back to the KINGLET_PROBE_EXECUTABLE env var.
+        self.assertIn("KINGLET_PROBE_EXECUTABLE", CREATE_SH,
+                      "script must reference KINGLET_PROBE_EXECUTABLE env var as fallback")
+        # The positional arg branch must exist (second positional argument handling).
+        self.assertIn('probe_exe="$1"', CREATE_SH,
+                      "script must accept the executable path as a positional argument")
+
+        # Negative: must not hardcode an absolute user home path.
         home = os.path.expanduser("~")
         self.assertNotIn(home, CREATE_SH)
         # Also check for any /home/<word>, /Users/<word>, or Windows C:\Users\<word> pattern.
@@ -352,12 +370,48 @@ class CreatePs1Tests(unittest.TestCase):
         # Encoding.UTF8 has emitBOM: true. Must use UTF8Encoding($false) instead.
         self.assertNotIn("[System.Text.Encoding]::UTF8", CREATE_PS1)
 
+    def test_json_escapes_backslash_in_mcp_path(self):
+        # The substituted exe path is a JSON string value.  Windows paths always
+        # contain '\', so without escaping the generated mcp.json is always invalid
+        # JSON (F1 regression).  Assert that the script escapes backslash before
+        # substitution.  We look for .Replace('\\', '\\\\') — the PowerShell
+        # String.Replace call that doubles each backslash character.
+        # Note: in this Python source, the four-backslash literal '\\\\' represents
+        # the two-character sequence \\ that must appear in the ps1 file as \\\\
+        # (four backslashes), which String.Replace interprets as "replace \ with \\".
+        self.assertIn(r"Replace('\', '\\')", CREATE_PS1,
+                      "create-project.ps1 must JSON-escape backslash in the exe path "
+                      "before substituting into mcp.json")
+
 
 # ---------------------------------------------------------------------------
 # create-project.sh behavioral tests (POSIX only)
 # ---------------------------------------------------------------------------
 
-_PROBE_EXE_PATH = str(_SHARED.parent / "probe-host" / "dist" / "linux-amd64" / "kinglet-client-probe")
+def _derive_probe_exe_path() -> str:
+    """Return the dist/<goos>-<goarch>/kinglet-client-probe path for this host.
+
+    Mirrors the logic in spikes/platform/clients/probe-host/build.sh, which uses
+    ``go env GOHOSTOS`` / ``go env GOHOSTARCH``.  We replicate it in Python using
+    ``platform.system()`` and ``platform.machine()`` so behavioural tests skip
+    correctly on macOS as well as Linux when the binary has not been built.
+    """
+    sys_name = platform.system().lower()   # 'linux', 'darwin', 'windows'
+    machine = platform.machine().lower()   # 'x86_64', 'aarch64', 'arm64', ...
+    # Normalise machine → GOARCH
+    if machine in ("x86_64", "amd64"):
+        goarch = "amd64"
+    elif machine in ("aarch64", "arm64"):
+        goarch = "arm64"
+    else:
+        goarch = "amd64"
+    # GOOS is platform.system().lower() for darwin and linux; go uses 'darwin' not 'macos'
+    goos = sys_name  # 'linux' or 'darwin' on POSIX
+    dist_dir = _SHARED.parent / "probe-host" / "dist" / f"{goos}-{goarch}"
+    return str(dist_dir / "kinglet-client-probe")
+
+
+_PROBE_EXE_PATH = _derive_probe_exe_path()
 
 
 @unittest.skipUnless(sys.platform != "win32", "behavioral tests require POSIX")
@@ -366,15 +420,22 @@ class CreateShBehavioralTests(unittest.TestCase):
     _PROBE_EXE = _PROBE_EXE_PATH
 
     def test_no_args_exits_nonzero_with_stderr(self):
-        """Running with no arguments must exit non-zero and emit a non-empty stderr message."""
+        """Running with no arguments must exit non-zero with the script's own usage error.
+
+        This distinguishes the explicit argument guard from a 'set -u' unbound-variable
+        crash: the script must emit its own 'missing required argument' message before
+        any shift is attempted, so the failure is intentional, not accidental.
+        """
         result = subprocess.run(
             ["bash", self._SCRIPT],
             capture_output=True, text=True
         )
         self.assertNotEqual(result.returncode, 0,
                             "script must exit non-zero when called with no arguments")
-        self.assertTrue(result.stderr.strip(),
-                        "script must emit a non-empty message on stderr when called with no arguments")
+        # Must be the script's own error, not a bash 'unbound variable' crash.
+        self.assertIn("missing required argument", result.stderr,
+                      "stderr must contain the script's own usage/error message, "
+                      "not an 'unbound variable' crash from set -u")
 
     def test_existing_destination_refused(self):
         """Running against an existing destination must exit non-zero."""
@@ -404,17 +465,28 @@ class CreateShBehavioralTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0,
                              f"script failed: stderr={result.stderr!r}")
 
-            expected_files = [
+            expected_rel = {
                 "ProjectSettings/ProjectVersion.txt",
                 "Assets/Protected.txt",
                 ".kinglet-probe/project-marker.txt",
                 ".kinglet-probe/bin/kinglet-client-probe",
                 ".kinglet-probe/expected.json",
                 ".kinglet-probe/mcp.json",
-            ]
-            for rel in expected_files:
+            }
+            for rel in expected_rel:
                 path = os.path.join(dest, rel)
                 self.assertTrue(os.path.isfile(path), f"expected file not created: {rel}")
+
+            # Assert the file set is *exclusive*: no extra files were created.
+            # This guards against scripts accidentally copying credentials or profiles.
+            actual_rel = set()
+            for dirpath, _dirnames, filenames in os.walk(dest):
+                for fname in filenames:
+                    abs_path = os.path.join(dirpath, fname)
+                    rel = os.path.relpath(abs_path, dest).replace(os.sep, "/")
+                    actual_rel.add(rel)
+            self.assertEqual(actual_rel, expected_rel,
+                             f"unexpected files in project tree: {actual_rel - expected_rel!r}")
 
             # Verify sha256 in expected.json matches the copied binary
             with open(os.path.join(dest, ".kinglet-probe", "expected.json"), encoding="utf-8") as f:
@@ -453,6 +525,52 @@ class CreateShBehavioralTests(unittest.TestCase):
                                  "token must be replaced in mcp.json command")
                 self.assertIn("&", cmd,
                               "& in path must be preserved literally in mcp.json command")
+
+    @unittest.skipUnless(
+        os.path.isfile(_PROBE_EXE_PATH),
+        "probe binary not built — skip"
+    )
+    def test_backslash_in_destination_path_produces_valid_json(self):
+        """Destination path containing a backslash must produce valid JSON in mcp.json.
+
+        On POSIX a literal backslash in a directory name is unusual but valid.
+        The substituted executable path is derived from the destination, so a
+        backslash in the destination propagates into the JSON string value.
+        Without JSON-layer escaping (\ → \\) the generated mcp.json is invalid
+        JSON (F1 regression).  The test verifies mcp.json parses and that the
+        parsed command equals the real absolute path character-for-character.
+        """
+        probe_exe = self._PROBE_EXE
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Place the project inside a directory whose name contains a backslash.
+            # The resulting abs_bin_path will be <tmpdir>/back\slash/proj/...
+            bk_dir = os.path.join(tmpdir, r"back\slash")
+            os.makedirs(bk_dir)
+            dest = os.path.join(bk_dir, "proj")
+            result = subprocess.run(
+                ["bash", self._SCRIPT, dest, probe_exe],
+                capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 0,
+                             f"script failed with backslash in destination path: "
+                             f"stderr={result.stderr!r}")
+
+            # mcp.json must be valid JSON — json.loads raises on invalid escape.
+            mcp_path = os.path.join(dest, ".kinglet-probe", "mcp.json")
+            with open(mcp_path, encoding="utf-8") as f:
+                mcp_raw = f.read()
+            try:
+                mcp_data = json.loads(mcp_raw)
+            except json.JSONDecodeError as exc:
+                self.fail(f"mcp.json is not valid JSON: {exc}\ncontent: {mcp_raw!r}")
+
+            # The parsed command value must equal the real absolute path character-for-character.
+            expected_cmd = os.path.join(dest, ".kinglet-probe", "bin", "kinglet-client-probe")
+            servers = mcp_data.get("mcpServers", {})
+            for server_cfg in servers.values():
+                cmd = server_cfg.get("command", "")
+                self.assertEqual(cmd, expected_cmd,
+                                 "parsed command in mcp.json must equal the real absolute path")
 
 
 if __name__ == "__main__":
