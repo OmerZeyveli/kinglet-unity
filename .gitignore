@@ -60,3 +60,6 @@ spikes/platform/runtime/rust/target/
 # .NET host probe build output (bin/ obj/ publish/)
 spikes/platform/runtime/dotnet/**/bin/
 spikes/platform/runtime/dotnet/**/obj/
+
+# Native client capability probe build output (build.sh/build.ps1 -> dist/)
+spikes/platform/clients/probe-host/dist/

@@ -363,6 +363,11 @@ docs/research/platform-spike/artifacts/runtime/rust/20260727T051518Z-runtime-rus
 docs/research/platform-spike/artifacts/runtime/dotnet/20260727T051518Z-runtime-dotnet-linux-noble-01/result.json	original	-	-	-	original	kinglet-0r-linux-dotnet-noble-host-probe-result
 spikes/platform/clients/contracts/cases-v1.json	original	-	-	-	original	client-probe-frozen-12-behavioral-case-catalog
 spikes/platform/clients/contracts/prompts-v1.json	original	-	-	-	original	client-probe-frozen-4-synthetic-prompts
+spikes/platform/clients/probe-host/go.mod	original	-	-	-	original	client-probe-native-host-module-declaration
+spikes/platform/clients/probe-host/main.go	original	-	-	-	original	client-probe-native-exec-hook-and-stdio-mcp-fixture
+spikes/platform/clients/probe-host/main_test.go	original	-	-	-	original	client-probe-native-host-behavioral-tests
+spikes/platform/clients/probe-host/build.sh	original	-	-	-	original	client-probe-native-host-darwin-linux-build
+spikes/platform/clients/probe-host/build.ps1	original	-	-	-	original	client-probe-native-host-windows-build
 tools/kinglet_spike/client_results.py	original	-	-	-	original	client-probe-load-validate-and-to-evidence
 tests/kinglet_spike/client_support.py	original	-	-	-	original	client-probe-test-fixtures-case-ids-and-valid-observations
 tests/kinglet_spike/test_client_results.py	original	-	-	-	original	client-probe-behavioral-contract-tests
