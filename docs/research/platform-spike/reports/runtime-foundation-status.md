@@ -107,6 +107,29 @@ Each must print `18/18 assertions passed` and exit 0. Then author the Task 7 hos
 this with 30-sample cold-start timing, peak RSS, artifact bytes, and 00A publication, run all five
 locked hosts, regenerate coverage, and only then take scoring + the ADR to the user for approval.
 
+## Update — Linux (Pop!_OS/ubuntu-noble) cells recorded (2026-07-27)
+
+The user accepted **Pop!_OS 24.04 (ubuntu-noble family)** as the Linux host for the bake-off
+(Option A, 2026-07-27). The matrix `release` for the four `runtime.*.linux-ubuntu-24-04-x64.host-probe`
+cells was broadened from `ubuntu-24.04.4-lts` to `ubuntu-24.04-noble`; the true host is recorded in
+each record's `environment.toolchain` (`host=Pop!_OS 24.04 (ID=pop; ID_LIKE=ubuntu; codename=noble)`,
+`kernel=7.0.11-76070011-generic`). The native runners `run-host.sh` / `measure.sh` were authored and
+exercised on this host: each candidate is rebuilt at its pin, its distributable is copied into a clean
+exec dir, run with the toolchain directories stripped from `PATH` (self-containment proof), verified
+**18/18** by the black-box harness, measured (30 cold-start samples + peak RSS + artifact bytes +
+dependency count), and published via the 00A harness. All **four Linux cells now show `pass`** in
+`coverage.md`.
+
+**Gate 0R remains open** pending the Windows 10/11 and macOS (Apple Silicon + Intel) cells, which need
+their own hosts; `gate 0R` still exits 1 by design. No runtime has been selected — Task 8 and the ADR
+remain blocked on user approval.
+
+**Finding recorded during the run:** a bare `-p:PublishSingleFile=true` .NET self-contained publish is
+*not* truly single-file — NSec.Cryptography's native `libsodium.so` is emitted as a loose sidecar, and
+copying only the binary breaks `crypto.ed25519` on a relocated/stripped-PATH run. The runner publishes
+.NET with `-p:IncludeNativeLibrariesForSelfExtract=true`, which embeds libsodium into the bundle so the
+single binary is genuinely relocatable. Worth carrying into the Windows/macOS .NET cells.
+
 ## Provenance of this record
 Every claim above maps to a committed commit on `main` between `9eb8ba2` (freeze contract) and the
 head that adds this file. Toolchain checksums are recorded inline; candidate lockfiles are committed

@@ -349,3 +349,15 @@ spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/Kinglet.HostProbe.Tests.c
 spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/ProbeTests.cs	original	-	-	-	original	dotnet-host-probe-xunit-tests-atomic-lease-ed25519-result-shape
 spikes/platform/runtime/dotnet/Kinglet.HostProbe.Tests/packages.lock.json	original	-	-	-	original	dotnet-host-probe-test-nuget-supply-chain-lock
 docs/research/platform-spike/reports/runtime-linux-indicative.md	original	-	-	-	original	kinglet-0r-indicative-linux-perf-nonclosing
+spikes/platform/runtime/run-host.sh	original	-	-	-	original	kinglet-0r-linux-host-runner-pop-os-noble
+spikes/platform/runtime/measure.sh	original	-	-	-	original	kinglet-0r-runtime-measure-cold-start-rss
+spikes/platform/runtime/build-record.py	original	-	-	-	original	kinglet-0r-linux-evidence-record-builder
+tests/kinglet_spike/test_runtime_host_scripts.py	original	-	-	-	original	kinglet-0r-host-scripts-text-assertions
+docs/research/platform-spike/evidence/runtime/python/20260727T051518Z-runtime-python-linux-noble-01.json	original	-	-	-	original	kinglet-0r-linux-python-noble-evidence-record
+docs/research/platform-spike/evidence/runtime/go/20260727T051518Z-runtime-go-linux-noble-01.json	original	-	-	-	original	kinglet-0r-linux-go-noble-evidence-record
+docs/research/platform-spike/evidence/runtime/rust/20260727T051518Z-runtime-rust-linux-noble-01.json	original	-	-	-	original	kinglet-0r-linux-rust-noble-evidence-record
+docs/research/platform-spike/evidence/runtime/dotnet/20260727T051518Z-runtime-dotnet-linux-noble-01.json	original	-	-	-	original	kinglet-0r-linux-dotnet-noble-evidence-record
+docs/research/platform-spike/artifacts/runtime/python/20260727T051518Z-runtime-python-linux-noble-01/result.json	original	-	-	-	original	kinglet-0r-linux-python-noble-host-probe-result
+docs/research/platform-spike/artifacts/runtime/go/20260727T051518Z-runtime-go-linux-noble-01/result.json	original	-	-	-	original	kinglet-0r-linux-go-noble-host-probe-result
+docs/research/platform-spike/artifacts/runtime/rust/20260727T051518Z-runtime-rust-linux-noble-01/result.json	original	-	-	-	original	kinglet-0r-linux-rust-noble-host-probe-result
+docs/research/platform-spike/artifacts/runtime/dotnet/20260727T051518Z-runtime-dotnet-linux-noble-01/result.json	original	-	-	-	original	kinglet-0r-linux-dotnet-noble-host-probe-result

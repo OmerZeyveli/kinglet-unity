@@ -212,8 +212,10 @@
     },
     {
       "id": "runtime.dotnet.linux-ubuntu-24-04-x64.host-probe",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260727T051518Z-runtime-dotnet-linux-noble-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "runtime.dotnet.macos-26-arm64.host-probe",
@@ -237,8 +239,10 @@
     },
     {
       "id": "runtime.go.linux-ubuntu-24-04-x64.host-probe",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260727T051518Z-runtime-go-linux-noble-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "runtime.go.macos-26-arm64.host-probe",
@@ -262,8 +266,10 @@
     },
     {
       "id": "runtime.python.linux-ubuntu-24-04-x64.host-probe",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260727T051518Z-runtime-python-linux-noble-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "runtime.python.macos-26-arm64.host-probe",
@@ -287,8 +293,10 @@
     },
     {
       "id": "runtime.rust.linux-ubuntu-24-04-x64.host-probe",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260727T051518Z-runtime-rust-linux-noble-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "runtime.rust.macos-26-arm64.host-probe",

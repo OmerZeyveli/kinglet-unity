@@ -1,0 +1,205 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/runtime/rust/20260727T051518Z-runtime-rust-linux-noble-01/result.json",
+      "required": true,
+      "sha256": "812744476870ba8c6d61d4db112722ec2931786d20e537ad763cba26b7b7deb5"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "host-probe assertion passed",
+      "id": "manifest.accept-valid",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "manifest.reject-unknown",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "path.unicode-space",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "filesystem.atomic-replace",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.acquire",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.renew",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.reject-competitor",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.expire",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.release",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.child-grandchild",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.cancel",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.no-descendants",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "crypto.sha256",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "crypto.ed25519",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.success",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.crash",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.timeout",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.cancel",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "spikes/platform/runtime/measure.sh",
+    ".kinglet/local/spikes/20260727T051518Z-runtime-rust-linux-noble-01/exec/kinglet-host-probe",
+    "run",
+    "--contract",
+    "spikes/platform/runtime/contract/host-probe-v1.json",
+    "--workspace",
+    "<clean-workspace>",
+    "--result",
+    "<result.json>"
+  ],
+  "ended_at": "2026-07-27T05:15:37Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "linux",
+    "release": "ubuntu-24.04-noble",
+    "toolchain": [
+      "rustc=1.97.1",
+      "cargo=1.97.1",
+      "host=Pop!_OS 24.04 (ID=pop; ID_LIKE=ubuntu; codename=noble)",
+      "kernel=7.0.11-76070011-generic"
+    ]
+  },
+  "measurements": [
+    {
+      "id": "cold-start",
+      "samples": [
+        3,
+        2,
+        2,
+        2,
+        2,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        1,
+        2,
+        1,
+        2,
+        2,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        1,
+        2,
+        2,
+        2
+      ],
+      "unit": "milliseconds"
+    },
+    {
+      "id": "peak-rss",
+      "samples": [
+        2572
+      ],
+      "unit": "kilobytes"
+    },
+    {
+      "id": "artifact-size",
+      "samples": [
+        971400
+      ],
+      "unit": "bytes"
+    },
+    {
+      "id": "dependency-count",
+      "samples": [
+        55
+      ],
+      "unit": "count"
+    }
+  ],
+  "probe": {
+    "contract": "kinglet.host-probe/v1",
+    "id": "host-probe"
+  },
+  "prompt": null,
+  "run_id": "20260727T051518Z-runtime-rust-linux-noble-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [
+    {
+      "title": "Rust 1.97.1",
+      "url": "https://forge.rust-lang.org/infra/other-installation-methods.html"
+    }
+  ],
+  "started_at": "2026-07-27T05:15:34Z",
+  "status": "pass",
+  "subject": {
+    "id": "rust",
+    "kind": "runtime",
+    "version": "1.97.1"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "active_lease": false,
+  "assertions": [
+    {
+      "id": "manifest.accept-valid",
+      "status": "pass"
+    },
+    {
+      "id": "manifest.reject-unknown",
+      "status": "pass"
+    },
+    {
+      "id": "path.unicode-space",
+      "status": "pass"
+    },
+    {
+      "id": "filesystem.atomic-replace",
+      "status": "pass"
+    },
+    {
+      "id": "lease.acquire",
+      "status": "pass"
+    },
+    {
+      "id": "lease.renew",
+      "status": "pass"
+    },
+    {
+      "id": "lease.reject-competitor",
+      "status": "pass"
+    },
+    {
+      "id": "lease.expire",
+      "status": "pass"
+    },
+    {
+      "id": "lease.release",
+      "status": "pass"
+    },
+    {
+      "id": "process.child-grandchild",
+      "status": "pass"
+    },
+    {
+      "id": "process.cancel",
+      "status": "pass"
+    },
+    {
+      "id": "process.no-descendants",
+      "status": "pass"
+    },
+    {
+      "id": "crypto.sha256",
+      "status": "pass"
+    },
+    {
+      "id": "crypto.ed25519",
+      "status": "pass"
+    },
+    {
+      "id": "cleanup.success",
+      "status": "pass"
+    },
+    {
+      "id": "cleanup.crash",
+      "status": "pass"
+    },
+    {
+      "id": "cleanup.timeout",
+      "status": "pass"
+    },
+    {
+      "id": "cleanup.cancel",
+      "status": "pass"
+    }
+  ],
+  "candidate": {
+    "id": "rust",
+    "version": "1.97.1"
+  },
+  "descendant_pids": [],
+  "errors": [],
+  "schema": "kinglet.host-probe.result/v1",
+  "status": "pass"
+}
