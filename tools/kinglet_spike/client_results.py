@@ -25,6 +25,14 @@ All 12 rich cases are grouped under a single probe.id of "capability-suite"
 (the same coarse probe id used for the capability-suite matrix cell on all
 platforms). The per-client probe tasks (4–5) will refine the cell grouping
 once the matrix mapping is finalised.
+
+to_evidence run_id shape
+------------------------
+`<UTC stamp>-client-probe-<subject>-<os>-<release>-<arch>-01`, matching the
+runtime records (`20260727T051518Z-runtime-python-linux-noble-01`). It must be
+environment-qualified: publish.py keys on `evidence/<kind>/<id>/<run_id>.json`
+and raises E_IMMUTABLE on collision, so a subject-only id lets exactly one host
+per client be published, ever.
 """
 from __future__ import annotations
 
@@ -76,6 +84,9 @@ _CASE_FIELDS = frozenset((
 # Tasks 4–5. See module docstring for the probe.id choice note.
 _PROBE_ID = "capability-suite"
 _PROBE_CONTRACT = "kinglet.client-probe.observations/v1"
+
+# Characters kept verbatim by _slugify; everything else becomes '-'.
+_SLUG_ALLOWED = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.-")
 
 
 # ---------------------------------------------------------------------------
@@ -326,6 +337,37 @@ def load_client_observations(path: Path) -> ClientObservationSet:
     return validate_client_observations(value, cases)
 
 
+def _slugify(value: str) -> str:
+    """Lowercase, and every character outside [a-z0-9.-] becomes '-'.
+
+    Mirrors slugify() in spikes/platform/runtime/run-host.sh so client run_ids
+    satisfy the publisher's SAFE_COMPONENT the same way runtime ones do.
+    """
+    lowered = value.lower()
+    return "".join(char if char in _SLUG_ALLOWED else "-" for char in lowered)
+
+
+def host_slug(environment: Environment) -> str:
+    """The environment component of a run_id: <os>-<release>-<arch>, slugified."""
+    return _slugify(f"{environment.os}-{environment.release}-{environment.arch}")
+
+
+def build_run_id(safe_subject: str, environment: Environment, timestamp: str) -> str:
+    """Build an environment-qualified run_id.
+
+    Shape follows the runtime records
+    (`20260727T051518Z-runtime-python-linux-noble-01`):
+    `<UTC stamp>-client-probe-<subject>-<host slug>-01`.
+
+    Deriving the id from the subject alone made every Claude Code host record
+    collide on `evidence/<kind>/<id>/<run_id>.json`, so the second host could
+    never be published (E_IMMUTABLE). The stamp plus the host slug keeps each
+    host's record distinct.
+    """
+    stamp = timestamp.replace("-", "").replace(":", "")
+    return f"{stamp}-client-probe-{safe_subject}-{host_slug(environment)}-01"
+
+
 def _prompt_digest(text: str) -> str:
     """Return the SHA-256 digest of the UTF-8 encoded prompt text."""
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -410,9 +452,8 @@ def to_evidence(
                     url=url,
                 ))
 
-    # Build a stable run_id from subject + version.
     safe_subject = observations.subject.replace("-", "")[:24]
-    run_id = f"client-probe-{safe_subject}"
+    run_id = build_run_id(safe_subject, environment, now)
 
     return EvidenceRecord(
         schema=EVIDENCE_SCHEMA,

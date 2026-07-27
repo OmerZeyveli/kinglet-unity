@@ -34,8 +34,9 @@ REPO = Path(__file__).resolve().parents[2]
 OBSERVATIONS = REPO / "spikes/platform/clients/claude-code/observations-linux.json"
 CASES = REPO / "spikes/platform/clients/contracts/cases-v1.json"
 PLATFORM = REPO / "docs/research/platform-spike"
-RECORD = PLATFORM / "evidence/client/claude-code/client-probe-claudecode.json"
-ARTIFACTS = PLATFORM / "artifacts/client/claude-code/client-probe-claudecode"
+RUN_ID = "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01"
+RECORD = PLATFORM / f"evidence/client/claude-code/{RUN_ID}.json"
+ARTIFACTS = PLATFORM / f"artifacts/client/claude-code/{RUN_ID}"
 
 # Frozen prompt each case is scored from, per the runbook's "Cases evidenced" lists.
 # A case may only be `pass` if its prompt actually ran.
@@ -186,6 +187,44 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
             f"claude={self.observations.client_version}",
             self.record.environment.toolchain,
         )
+
+    def test_record_run_id_is_environment_qualified(self):
+        # A subject-only run_id would collide with the next Claude Code host and
+        # make it unpublishable (publish.py raises E_IMMUTABLE on the key).
+        run_id = self.record.run_id
+        self.assertNotEqual(run_id, "client-probe-claudecode")
+        self.assertIn(self.record.environment.os, run_id)
+        self.assertIn(self.record.environment.arch, run_id)
+        self.assertTrue(
+            all(artifact.path.split("/")[3] == run_id for artifact in self.record.artifacts),
+            "published artifacts are not filed under the record's run_id",
+        )
+
+    def test_tool_trace_preserves_the_advertised_subagents(self):
+        # agents.delegation is inconclusive, but the client DID register and
+        # advertise the plugin's sub-agent. That is real evidence and the trace
+        # must keep it, so a re-run has a baseline to compare against.
+        trace = json.loads((ARTIFACTS / "tool-trace.json").read_text())
+        self.assertTrue(trace["runs"])
+        for run in trace["runs"]:
+            self.assertIn(
+                "kinglet-client-probe:kinglet-capability-reviewer",
+                run.get("registered_agents", []),
+                f"run {run['run']} drops the advertised sub-agent registration",
+            )
+
+    def test_agents_delegation_stays_inconclusive_without_an_invocation(self):
+        # Registration is not delegation: agent_invoked and receipt_saved are
+        # both unmet, so no grade may be attached.
+        case = self.by_id["agents.delegation"]
+        self.assertEqual(case.status, "inconclusive")
+        self.assertIsNone(case.grade)
+        listing = [
+            line.strip()
+            for line in (ARTIFACTS / "receipts-listing.txt").read_text().splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+        self.assertNotIn("agent.json", listing)
 
     def test_record_status_reflects_unclosed_cases(self):
         # Any non-pass case must keep the whole record off `pass`, so a partially

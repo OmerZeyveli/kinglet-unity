@@ -5,6 +5,51 @@ This runbook covers Steps 4–6 of the 00C task-4 brief. It is written for the
 will run the probe, record observations, and publish evidence. Do not fabricate
 observations. Do not create anything under `docs/research/platform-spike/evidence/`.
 
+## The committed live-pass scripts
+
+`probe/run.sh` and `probe/run2.sh` are the exact procedure that produced the
+published Linux evidence, sanitized for commit. They automate Steps A–G below;
+the prose remains the reference for what each step is *for*, and for the manual
+paths (Step C's interactive session, Step F's second-directory check).
+
+```bash
+export KINGLET_LIVE_BASE=/some/disposable/dir     # required — no default
+bash spikes/platform/clients/claude-code/probe/run.sh
+bash spikes/platform/clients/claude-code/probe/run2.sh
+```
+
+Both scripts require **explicit operator authorisation**: they install a plugin
+and run headless `claude -p` sessions permitted to edit files. They set
+`CLAUDE_CONFIG_DIR` to `$KINGLET_LIVE_BASE/cfg` and abort if that resolves to the
+operator's real `~/.claude`. Never point them at a real config root.
+
+Prompts are never inlined in the scripts — they are looked up by ID from
+`spikes/platform/clients/contracts/prompts-v1.json`, so what is sent is exactly
+the frozen text the evidence references by SHA-256.
+
+`run2.sh` parks the project `CLAUDE.md` **for the hook-isolation run only** and
+restores it on the next line. Its two runs are supplementary observations, not
+frozen-prompt runs.
+
+## Step 0 — Provision the disposable config root (manual)
+
+The scripts do **not** copy credentials, and nothing in this repo should. Before
+running them, log in once inside the disposable config root:
+
+```bash
+export KINGLET_LIVE_BASE=/some/disposable/dir
+mkdir -p "$KINGLET_LIVE_BASE/cfg"
+CLAUDE_CONFIG_DIR="$KINGLET_LIVE_BASE/cfg" claude   # complete the login, then exit
+```
+
+This writes `$KINGLET_LIVE_BASE/cfg/.credentials.json`. `run.sh` aborts if that
+file is absent. Delete `$KINGLET_LIVE_BASE` when the pass is finished — the
+credentials in it are real.
+
+`run.sh` then strips inherited plugin/marketplace state from
+`$KINGLET_LIVE_BASE/cfg/.claude.json` so `install.discover` is a genuinely cold
+discovery. That rewrite touches the disposable copy only.
+
 ## Prerequisites
 
 - `claude --version` reports a supported Claude Code version (documented at

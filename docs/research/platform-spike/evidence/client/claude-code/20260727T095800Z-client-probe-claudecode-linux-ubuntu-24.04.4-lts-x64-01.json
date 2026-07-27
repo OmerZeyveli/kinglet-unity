@@ -2,115 +2,115 @@
   "artifacts": [
     {
       "media_type": "application/json",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json",
       "required": true,
-      "sha256": "b5726bb94f70811f70c87569c77e1b6258438913d4eed81ac4dcad85c5e472f8"
+      "sha256": "d15bd8ef871e0ee439a393b4e759c77d15ad1d46fb5efdf0fb7e1694e6082dea"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/mutation-block-01-file.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/mutation-block-01-file.txt",
       "required": true,
       "sha256": "5ab3818d45235e8d1ab3373170af70c1cfd1e322a48beb5ef65d2c5ba2a29f64"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/s-hook-isolation-file.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/s-hook-isolation-file.txt",
       "required": true,
       "sha256": "1f8cb460ebad00e353646194008a9e0b6e25dcfac81727f719ab8c70b4b7adcd"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/s-plugin-list.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/s-plugin-list.txt",
       "required": true,
       "sha256": "9f7076e03495734ece91b910c2bde49cc442f2acb7f90032597c98abd1ee0066"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/marketplace-add.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/marketplace-add.txt",
       "required": true,
       "sha256": "dfe64b63c32fd530a96dbb28aa3cea09bc476b034ae9c829ee054c8aa9c05177"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/plugin-install.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-install.txt",
       "required": true,
       "sha256": "170304d40f26465e0c504f0907858d9cc66583e03e8b85384b36025dfe8e791e"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/plugin-list.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-list.txt",
       "required": true,
       "sha256": "0240bcc0ce5c6e2c18cee5dfdf75725905ff6928d11d8d571997ce93d977d530"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/claude-version.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/claude-version.txt",
       "required": true,
       "sha256": "74fd5c2567221e143c16e917305e16131d853eb58f8c5ca3c2fdad9037ae4956"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/plugin-uninstall.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-uninstall.txt",
       "required": true,
       "sha256": "14446191fb7dd9d5d39b925a65d9a7bf2a9733b7eaf09da7be9f1d1fdf8e52c8"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/plugin-list-after-uninstall.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-list-after-uninstall.txt",
       "required": true,
       "sha256": "c7cf20649a307734b7644d03206be69ae8e34df7e82f06402bd6397533fb0483"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/marketplace-update.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/marketplace-update.txt",
       "required": true,
       "sha256": "4e0eb91f50048417b872e3c5c2548719d72d224f474f83152404df89644e4089"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/plugin-update.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-update.txt",
       "required": true,
       "sha256": "43e8de1340df41550ae0fcbd30ed8b604a9e31788f6fc5629c649041f3ef67da"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/plugin-list-after-update.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-list-after-update.txt",
       "required": true,
       "sha256": "9f7076e03495734ece91b910c2bde49cc442f2acb7f90032597c98abd1ee0066"
     },
     {
       "media_type": "application/json",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/prompts-used.json",
       "required": true,
       "sha256": "0f048c3eee8e10472916ddf1f3a373264f959b648a31b7f55b964f037c4e6937"
     },
     {
       "media_type": "application/json",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/receipt-mcp-read.json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/receipt-mcp-read.json",
       "required": true,
       "sha256": "7519b12968d74d2a08eb607ad1dcded35170d484e25bbc6acf964b1ed7be101b"
     },
     {
       "media_type": "application/json",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/scope-known-marketplaces.json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/scope-known-marketplaces.json",
       "required": true,
       "sha256": "b1b164bfd2f93d9536f111d43d46543f51a110dfcb01250c7d9f9e9d028e8848"
     },
     {
       "media_type": "application/json",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/scope-installed-plugins.json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/scope-installed-plugins.json",
       "required": true,
       "sha256": "c2bcef00457dc0b6a867b36a4946d97d9599d6a10f2918aed82d55a4f206ae74"
     },
     {
       "media_type": "application/json",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/scope-project-settings-local.json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/scope-project-settings-local.json",
       "required": true,
       "sha256": "5ff1c78ed5b5d97b987556f1943ada75adb4bd61e2cd31a6dd767c67be03de41"
     },
     {
       "media_type": "text/plain",
-      "path": "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/receipts-listing.txt",
       "required": true,
       "sha256": "9d9aa7c933a82bacb740432d94b8f84584647296088eb7bcef85913bbd5022ed"
     }
@@ -209,7 +209,7 @@
     "id": "capability-suite"
   },
   "prompt": null,
-  "run_id": "client-probe-claudecode",
+  "run_id": "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01",
   "schema": "kinglet.spike.evidence/v1",
   "sources": [],
   "started_at": "2026-07-27T09:58:00Z",

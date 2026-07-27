@@ -96,6 +96,50 @@ def gate_is_closed(gate_id: str, repo_root: Path) -> bool:
     raise EvidenceError("E_COVERAGE", f"unknown gate: {gate_id}")
 
 
+def _gate_prefixes(gate_id: str) -> tuple[str, ...]:
+    if gate_id == "0R":
+        return ("runtime.",)
+    if gate_id == "0U":
+        return ("unity.",)
+    if gate_id == "0D":
+        return ("runtime.", "unity.")
+    if gate_id.startswith("0C:") and gate_id.count(":") == 1:
+        return (f"client.{gate_id.split(':', 1)[1]}.",)
+    return ()
+
+
+def gate_open_items(gate_id: str, repo_root: Path) -> tuple[str, ...]:
+    """Return one line per thing keeping `gate_id` open.
+
+    Mirrors gate_is_closed's decision so a failing gate can name the exact open
+    cells (or missing files, for 0A) instead of exiting 1 in silence.
+    """
+    if gate_id == "0A":
+        return tuple(
+            f"missing file  {path}"
+            for path in _gate_0a_files(repo_root)
+            if not path.is_file()
+        )
+
+    prefixes = _gate_prefixes(gate_id)
+    if not prefixes:
+        return ()
+
+    matrix = repo_root / "spikes/platform/contracts/matrix-v1.json"
+    cells = evaluate_coverage(load_published_records(repo_root), matrix)
+    open_items: list[str] = []
+    for prefix in prefixes:
+        selected = tuple(cell for cell in cells if cell.id.startswith(prefix))
+        if not selected:
+            open_items.append(f"no coverage cell matches prefix {prefix!r}")
+            continue
+        for cell in selected:
+            if cell.state != "pass":
+                runs = ", ".join(cell.run_ids) if cell.run_ids else "-"
+                open_items.append(f"{cell.state:<10} {cell.id}  runs=[{runs}]")
+    return tuple(open_items)
+
+
 def _print_diagnostics(diagnostics: tuple[Diagnostic, ...]) -> None:
     for diagnostic in diagnostics:
         print(
@@ -123,8 +167,17 @@ def main(argv: list[str] | None = None) -> int:
             print(f"reported {len(cells)} coverage cells")
             return 0
         if arguments.command == "gate":
-            return 0 if gate_is_closed(arguments.gate_id, arguments.repo_root) else 1
+            if gate_is_closed(arguments.gate_id, arguments.repo_root):
+                return 0
+            print(f"gate {arguments.gate_id}: open", file=sys.stderr)
+            for item in gate_open_items(arguments.gate_id, arguments.repo_root):
+                print(f"  {item}", file=sys.stderr)
+            return 1
         raise ValueError(f"unknown command: {arguments.command}")
     except (EvidenceError, OSError, ValueError) as error:
         print(str(error), file=sys.stderr)
         return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

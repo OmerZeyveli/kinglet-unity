@@ -6,15 +6,15 @@
     {
       "id": "agents.delegation",
       "advertised": true,
-      "observed": "Not observed. No sub-agent invocation appears in any captured run: no Task/Agent tool_use and no subagent_type field in any of the four streams, and no .kinglet-probe/receipts/agent.json was written.",
+      "observed": "Registered but never invoked. All four runs advertise the plugin's sub-agent in the system/init agents[] list ('kinglet-client-probe:kinglet-capability-reviewer'), so registration is observed. Delegation is not: no Task/Agent tool_use and no subagent_type field in any of the four streams, and no .kinglet-probe/receipts/agent.json was written.",
       "status": "inconclusive",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
-        "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json",
-        "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/prompts-used.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/receipts-listing.txt"
       ],
-      "notes": "The frozen prompt agent-delegation-01 was never executed: the live pass ran only mutation-block-01 and mcp-call-01 (see prompts-used.json). The only occurrences of the string 'kinglet-capability-reviewer' in the captured streams are inside the injected SKILL.md body, which tells the workflow not to write agent.json because that path belongs to the reviewer agent -- that is skill text, not a delegation. receipts-listing.txt shows the receipts directory contains only mcp-read.json. Closing this cell requires a new authorised live run of agent-delegation-01.",
+      "notes": "Registration is evidenced; invocation is not. Every one of the four runs' system/init event advertises the plugin's sub-agent in its agents[] list -- 'kinglet-client-probe:kinglet-capability-reviewer' alongside the client's built-ins -- so the client did discover and register it. That list is preserved verbatim per run as registered_agents in tool-trace.json. The only other occurrence of the string in any stream is inside the injected SKILL.md body, which tells the workflow not to write agent.json because that path belongs to the reviewer agent -- skill text, not a delegation. What is missing is the delegation itself: no Task/Agent tool_use, no subagent_type field, and receipts-listing.txt shows the receipts directory holds only mcp-read.json, so neither agent_invoked nor receipt_saved holds. The frozen prompt agent-delegation-01 was never executed -- the live pass ran only mutation-block-01 and mcp-call-01 (see prompts-used.json) -- so the case stays inconclusive; closing it requires a new authorised live run of agent-delegation-01.",
       "emulation_mechanism": null
     },
     {
@@ -25,9 +25,9 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
-        "artifacts/client/claude-code/client-probe-claudecode/mutation-block-01-file.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/s-hook-isolation-file.txt"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/mutation-block-01-file.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/s-hook-isolation-file.txt"
       ],
       "notes": "Scope caveat, recorded deliberately: both live runs used --permission-mode acceptEdits, which by probe design removes the approval prompt on file edits so that the PreToolUse hook is the only remaining gate. An approval prompt on a file write was therefore never observed; the observed denials are Bash and MCP tool calls. The second half of the expected receipt (mutation_blocked_without_approval) does hold -- Assets/Protected.txt is byte-identical before and after in both runs. In the isolation run the hook-blocked Edit also appeared in permission_denials[], so the denial channel is machine-readable for mutations as well.",
       "emulation_mechanism": null
@@ -39,10 +39,10 @@
       "status": "inconclusive",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
-        "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/receipts-listing.txt"
       ],
-      "notes": "No captured run contains a successful client-driven execution of the probe binary. The binary was executed successfully once during this probe, but by the setup script's own smoke test in create-project.sh -- that is the harness running it, not the client discovering and invoking it, so it is not admissible for this case. The receipts directory never contained workflow.json (receipts-listing.txt). What blocked the case was the approval gate and then the model's tool choice, not a client limitation, which is why this is inconclusive rather than fail.",
+      "notes": "No captured run contains a successful client-driven execution of the probe binary. The binary was invoked once during this probe by the setup script's own smoke test in create-project.sh -- that is the harness running it, not the client discovering and invoking it, so it is not admissible for this case, and create-project.txt records the echoed command line without a result or exit status, so even the harness invocation's outcome is not evidenced here. The receipts directory never contained workflow.json (receipts-listing.txt). What blocked the case was the approval gate and then the model's tool choice, not a client limitation, which is why this is inconclusive rather than fail.",
       "emulation_mechanism": null
     },
     {
@@ -53,9 +53,9 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
-        "artifacts/client/claude-code/client-probe-claudecode/s-hook-isolation-file.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/s-plugin-list.txt"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/s-hook-isolation-file.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/s-plugin-list.txt"
       ],
       "notes": "Scored from the isolation run only. The confounded first run of the same prompt is NOT evidence for this case: there the model read the project CLAUDE.md and declined to call any mutation tool, so the hook never saw a tool call -- that run is recorded under instructions.project instead. The isolation run parked CLAUDE.md and pre-authorised Write/Edit so the hook was the only remaining gate. Two facts confirmed by this artifact beyond the block itself: the hook receives an ABSOLUTE file_path (the wrapper's relativisation against CLAUDE_PROJECT_DIR is load-bearing), and exit 2 is what blocks. The captured deny message is the pre-fix form -- the wrapper was emitting hookSpecificOutput/permissionDecision JSON on stderr while also exiting 2, so Claude Code surfaced it as 'PreToolUse:Edit hook error: {raw json}'. The block worked; only the reason text read as a malfunction. Fixed in b5202d4, which makes the wrapper emit plain prose on stderr. The committed wrapper therefore no longer matches this artifact's message text verbatim; the blocking behaviour it evidences is unchanged.",
       "emulation_mechanism": null
@@ -68,11 +68,11 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/marketplace-add.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/plugin-install.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/plugin-list.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/claude-version.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/marketplace-add.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-install.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-list.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/claude-version.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json"
       ],
       "notes": "Both halves of the expected receipt are covered: toolkit_version_present by the 'Version: 0.0.1' line in plugin-list.txt, capabilities_listed by the skill launch and MCP tool resolution in tool-trace.json. 'claude plugin list' -- not 'claude plugin validate' -- is the real gate: a manifest can validate at exit 0 and still report 'Status: failed to load'. The run aborts if that string appears, and it did not.",
       "emulation_mechanism": null
@@ -85,8 +85,8 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/plugin-uninstall.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/plugin-list-after-uninstall.txt"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-uninstall.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-list-after-uninstall.txt"
       ],
       "notes": "Covers removal_confirmed and no_residual_capabilities at the plugin-listing level. Residual capability absence was checked by the listing, not by re-running a prompt in a fresh session after uninstall, so the stronger no-residual-capabilities check (skill and MCP tool no longer reachable) remains unverified.",
       "emulation_mechanism": null
@@ -99,9 +99,9 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/marketplace-update.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/plugin-update.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/plugin-list-after-update.txt"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/marketplace-update.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-update.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-list-after-update.txt"
       ],
       "notes": "Two ordering constraints were established by negative result, both captured in plugin-update.txt, which records both attempts in sequence. The bare plugin name fails: 'claude plugin update kinglet-client-probe --scope local' returns 'Failed to update plugin \"kinglet-client-probe\": Plugin \"kinglet-client-probe\" not found'. The fully qualified <plugin>@<marketplace> form succeeds. 'marketplace update' must run first, otherwise the marketplace still advertises the old version. The success line also notes 'Restart to apply changes'.",
       "emulation_mechanism": null
@@ -114,10 +114,10 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
-        "artifacts/client/claude-code/client-probe-claudecode/mutation-block-01-file.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/s-hook-isolation-file.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/mutation-block-01-file.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/s-hook-isolation-file.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/prompts-used.json"
       ],
       "notes": "This case has a genuine control, which is what makes it strong rather than anecdotal. Same prompt, same project, one variable changed: with CLAUDE.md present the client attempted no mutation tool and refused, citing it; with CLAUDE.md parked aside the client went straight to Edit. The instructions, not the model's general caution, produced the refusal. The client also honoured CLAUDE.md a second time in the isolation MCP run, declining to write the receipt to workflow.json because CLAUDE.md reserves that path for the capability workflow, and choosing mcp-read.json instead.",
       "emulation_mechanism": null
@@ -130,10 +130,10 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
-        "artifacts/client/claude-code/client-probe-claudecode/receipt-mcp-read.json",
-        "artifacts/client/claude-code/client-probe-claudecode/s-plugin-list.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/receipt-mcp-read.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/s-plugin-list.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/prompts-used.json"
       ],
       "notes": "Both halves of the expected receipt are covered by the isolation run: mcp_tool_listed by the ToolSearch resolution, mcp_call_result_present by the returned body. The earlier mcp-call-01 run corroborates discovery independently -- the same tool name resolved there too -- but its call was refused pending approval, so only the isolation run evidences the call itself. The MCP server registers because plugin.json declares \"mcpServers\": \"./.mcp.json\"; unlike hooks, that declaration is required rather than auto-discovered.",
       "emulation_mechanism": null
@@ -146,11 +146,11 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/scope-known-marketplaces.json",
-        "artifacts/client/claude-code/client-probe-claudecode/scope-installed-plugins.json",
-        "artifacts/client/claude-code/client-probe-claudecode/scope-project-settings-local.json",
-        "artifacts/client/claude-code/client-probe-claudecode/marketplace-add.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/plugin-install.txt"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/scope-known-marketplaces.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/scope-installed-plugins.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/scope-project-settings-local.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/marketplace-add.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/plugin-install.txt"
       ],
       "notes": "Scope caveat, recorded deliberately: the runbook's Step F negative control -- open a session in a different directory and confirm the project-scoped plugin is NOT listed there -- was not run. What is evidenced is positive coexistence (a user-scope marketplace and a project-scope install resolving together and working), not isolation. The plugin update line independently binds local scope to the project directory: 'updated ... for scope local (<project>)'. Closing the isolation half needs a second listing from an unrelated directory, which is a cheap follow-up but was not captured.",
       "emulation_mechanism": null
@@ -163,9 +163,9 @@
       "status": "pass",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/receipt-mcp-read.json",
-        "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/receipt-mcp-read.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/receipts-listing.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json"
       ],
       "notes": "The mcp-call-01 prompt says 'save the structured result' without naming a path, so the receipt path was the client's choice; the runbook explicitly sanctions this ('or the path Claude chooses, which must be recorded as evidence'), and the chosen path is recorded here. Both halves of the expected receipt hold: receipt_path_present and receipt_is_valid_json. Separately, and not counted toward this case, every run's stream-json result envelope was itself structured and machine-readable, carrying type, subtype, is_error, result, session_id, permission_denials, usage and total_cost_usd -- that is the CLI's output envelope, not the receipt this case asks for.",
       "emulation_mechanism": null
@@ -177,9 +177,9 @@
       "status": "inconclusive",
       "source_urls": [],
       "artifact_paths": [
-        "artifacts/client/claude-code/client-probe-claudecode/tool-trace.json",
-        "artifacts/client/claude-code/client-probe-claudecode/receipts-listing.txt",
-        "artifacts/client/claude-code/client-probe-claudecode/prompts-used.json"
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/receipts-listing.txt",
+        "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/prompts-used.json"
       ],
       "notes": "Two independent reasons this cell does not close. First, the frozen prompt workflow-natural-language-01 was never executed -- prompts-used.json records that only mutation-block-01 and mcp-call-01 ran. The skill invocations observed were spontaneous, under the mcp-call-01 prompt, which is suggestive but is not the frozen prompt. Second, the expected receipt is only half satisfied: workflow_invoked holds, receipt_matches_schema does not, because the workflow's own receipt was never written. In the first run the skill's Step 2 binary call was refused pending approval; in the isolation run the client explicitly declined to follow Step 2 and used the MCP tool instead, writing mcp-read.json rather than workflow.json. Closing this cell requires a new authorised live run of workflow-natural-language-01.",
       "emulation_mechanism": null

@@ -2,7 +2,7 @@
   "client": "claude-code",
   "client_version": "2.1.220",
   "model": "sonnet",
-  "note": "Structured trace derived from the live stream-json output. Prompt text is never included -- prompts are referenced by ID and SHA-256 in prompts-used.json. Model prose is reduced to a single bounded excerpt per run. Absolute machine paths are replaced with stable placeholders.",
+  "note": "Structured trace derived from the live stream-json output. Prompt text is never included -- prompts are referenced by ID and SHA-256 in prompts-used.json. Model prose is reduced to a single bounded excerpt per run. Absolute machine paths are replaced with stable placeholders. registered_agents is the verbatim agents[] list from each run's system/init event -- the sub-agents the client advertised for that session.",
   "runs": [
     {
       "allowed_tools": null,
@@ -25,6 +25,14 @@
       "permission_mode": "acceptEdits",
       "project_claude_md_present": true,
       "prompt_id": "mutation-block-01",
+      "registered_agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "kinglet-client-probe:kinglet-capability-reviewer",
+        "Plan",
+        "statusline-setup"
+      ],
       "result_envelope": {
         "envelope_fields": [
           "api_error_status",
@@ -136,6 +144,14 @@
       "permission_mode": "acceptEdits",
       "project_claude_md_present": true,
       "prompt_id": "mcp-call-01",
+      "registered_agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "kinglet-client-probe:kinglet-capability-reviewer",
+        "Plan",
+        "statusline-setup"
+      ],
       "result_envelope": {
         "envelope_fields": [
           "api_error_status",
@@ -229,6 +245,14 @@
       "permission_mode": "acceptEdits",
       "project_claude_md_present": false,
       "prompt_id": "mutation-block-01",
+      "registered_agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "kinglet-client-probe:kinglet-capability-reviewer",
+        "Plan",
+        "statusline-setup"
+      ],
       "result_envelope": {
         "envelope_fields": [
           "api_error_status",
@@ -350,6 +374,14 @@
       "permission_mode": "acceptEdits",
       "project_claude_md_present": true,
       "prompt_id": "mcp-call-01",
+      "registered_agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "kinglet-client-probe:kinglet-capability-reviewer",
+        "Plan",
+        "statusline-setup"
+      ],
       "result_envelope": {
         "envelope_fields": [
           "api_error_status",
