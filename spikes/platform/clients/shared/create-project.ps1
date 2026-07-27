@@ -22,7 +22,10 @@ Param(
     [string]$Destination,
 
     [Parameter(Mandatory = $false, Position = 1)]
-    [string]$Executable = ""
+    [string]$Executable = "",
+
+    [Parameter(Mandatory = $false, Position = 2)]
+    [string]$InstructionFilename = ""
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,6 +57,15 @@ if ($Executable -eq "") {
         $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
         $repoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $scriptDir)))
         $Executable = Join-Path $repoRoot 'spikes\platform\clients\probe-host\dist\win-x64\kinglet-client-probe.exe'
+    }
+}
+
+# Instruction filename — different clients use different names.
+if ($InstructionFilename -eq "") {
+    if ($env:KINGLET_INSTRUCTION_FILENAME -ne $null -and $env:KINGLET_INSTRUCTION_FILENAME -ne "") {
+        $InstructionFilename = $env:KINGLET_INSTRUCTION_FILENAME
+    } else {
+        $InstructionFilename = "CLAUDE.md"
     }
 }
 
@@ -107,14 +119,14 @@ $projectVersionContent = "m_EditorVersion: 6000.3.11f1`r`nm_EditorVersionWithRev
     (New-Object System.Text.UTF8Encoding($false))
 )
 
-# CLAUDE.md — project-level instructions for the instructions.project case.
-# Claude Code loads this file automatically when starting a session in this directory.
+# Instruction file — project-level instructions for the instructions.project case.
+# Claude Code loads CLAUDE.md automatically; other clients use different filenames.
 $ruleContent = [System.IO.File]::ReadAllText(
     (Join-Path $scriptDir 'rules\kinglet-capability-probe.md'),
     (New-Object System.Text.UTF8Encoding($false))
 )
 [System.IO.File]::WriteAllText(
-    (Join-Path $Destination 'CLAUDE.md'),
+    (Join-Path $Destination $InstructionFilename),
     $ruleContent,
     (New-Object System.Text.UTF8Encoding($false))
 )

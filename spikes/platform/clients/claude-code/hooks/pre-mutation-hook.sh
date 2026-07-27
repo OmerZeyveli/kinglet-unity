@@ -14,6 +14,7 @@
 #   0 — allow the mutation (decision=="allow" or harness unavailable)
 #   1 — harness error (binary missing/non-executable, or jq absent)
 #   2 — block the mutation (decision=="deny")
+#   3 — malformed stdin (JSON parse failure; non-blocking)
 #
 # Input (stdin): Claude Code PreToolUse JSON event
 #   {"tool_name": "Write"|"Edit", "tool_input": {"file_path": "..."}, ...}
@@ -50,6 +51,14 @@ fi
 TOOL_EVENT="$(cat)"
 
 # ---------------------------------------------------------------------------
+# Validate stdin is parseable JSON (guard against malformed events)
+# ---------------------------------------------------------------------------
+if ! printf '%s' "$TOOL_EVENT" | jq . > /dev/null 2>&1; then
+    echo "pre-mutation-hook: malformed JSON on stdin — allowing by default" >&2
+    exit 3
+fi
+
+# ---------------------------------------------------------------------------
 # Extract the target file path from tool_input.file_path
 # ---------------------------------------------------------------------------
 FILE_PATH="$(printf '%s' "$TOOL_EVENT" | jq -r '.tool_input.file_path // empty')"
@@ -60,29 +69,44 @@ if [ -z "$FILE_PATH" ]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Relativize the path against CLAUDE_PROJECT_DIR
+# Relativize the path against CLAUDE_PROJECT_DIR (or event cwd fallback)
 #
 # Claude Code passes absolute paths in tool_input.file_path. The native probe
 # binary compares against "Assets/Protected.txt" (relative). We must strip the
 # project root prefix before forwarding to the binary.
 #
-# If the file is outside the project root, pass the path unchanged — that
-# will produce an "allow" from the binary, which is correct: we only protect
-# files within this project.
+# Relative paths are passed through unchanged — they are already in the form
+# the probe binary expects. We only strip prefixes from absolute paths.
+#
+# If the path is absolute and outside the project root, allow without consulting
+# the binary (we only protect files within this project).
 # ---------------------------------------------------------------------------
+proj=""
 if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
-    # Ensure project dir has no trailing slash for clean prefix match
     proj="${CLAUDE_PROJECT_DIR%/}"
-    case "$FILE_PATH" in
-        "$proj"/*)
-            FILE_PATH="${FILE_PATH#"$proj"/}"
-            ;;
-        *)
-            # Outside project root — allow without consulting the binary
-            exit 0
-            ;;
-    esac
+elif CWD_FIELD="$(printf '%s' "$TOOL_EVENT" | jq -r '.cwd // empty')" && [ -n "$CWD_FIELD" ]; then
+    proj="${CWD_FIELD%/}"
 fi
+
+case "$FILE_PATH" in
+    /*)
+        # Absolute path: strip project root prefix if known.
+        if [ -n "$proj" ]; then
+            case "$FILE_PATH" in
+                "$proj"/*)
+                    FILE_PATH="${FILE_PATH#"$proj"/}"
+                    ;;
+                *)
+                    # Absolute path outside project root — allow.
+                    exit 0
+                    ;;
+            esac
+        fi
+        ;;
+    *)
+        # Relative path: pass through unchanged to the probe.
+        ;;
+esac
 
 # ---------------------------------------------------------------------------
 # Construct the probe hook event JSON and invoke the binary

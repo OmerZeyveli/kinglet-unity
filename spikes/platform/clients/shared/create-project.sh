@@ -67,6 +67,18 @@ else
   probe_exe="$repo_root/spikes/platform/clients/probe-host/dist/$goos-$goarch/kinglet-client-probe"
 fi
 
+# Optional third positional argument: instruction filename.
+# Different clients use different filenames (e.g. CLAUDE.md for Claude Code,
+# AGENTS.md for Codex, .cursorrules for Cursor).
+if [ "$#" -ge 1 ]; then
+  instruction_filename="$1"
+  shift
+elif [ -n "${KINGLET_INSTRUCTION_FILENAME:-}" ]; then
+  instruction_filename="$KINGLET_INSTRUCTION_FILENAME"
+else
+  instruction_filename="CLAUDE.md"
+fi
+
 # ---------------------------------------------------------------------------
 # Destination existence guard
 # ---------------------------------------------------------------------------
@@ -113,9 +125,9 @@ printf '%s' 'KINGLET_CLIENT_PROBE_PROJECT' > "$dest/.kinglet-probe/project-marke
 # Assets/Protected.txt — target for the hook mutation-block probe.
 printf '%s\n' 'PROTECTED' > "$dest/Assets/Protected.txt"
 
-# CLAUDE.md — project-level instructions for the instructions.project case.
-# Claude Code loads this file automatically when starting a session in this directory.
-cp "$script_dir/rules/kinglet-capability-probe.md" "$dest/CLAUDE.md"
+# Instruction file — project-level instructions for the instructions.project case.
+# Claude Code loads CLAUDE.md automatically; other clients use different filenames.
+cp "$script_dir/rules/kinglet-capability-probe.md" "$dest/$instruction_filename"
 
 # ---------------------------------------------------------------------------
 # Copy the native executable

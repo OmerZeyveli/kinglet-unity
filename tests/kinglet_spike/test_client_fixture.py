@@ -245,13 +245,31 @@ class CreateShTests(unittest.TestCase):
         self.assertIn("Assets/Protected.txt", CREATE_SH)
 
     def test_creates_claude_md(self):
-        """create-project.sh must copy the rule file as CLAUDE.md.
+        """create-project.sh must copy rules/kinglet-capability-probe.md as CLAUDE.md.
 
         CLAUDE.md in the project root is the Claude Code mechanism for
-        project-level instructions (instructions.project case).
+        project-level instructions (instructions.project case). Writing an empty
+        file or creating a different file would pass the filename check but
+        break the live probe.
         """
         self.assertIn("CLAUDE.md", CREATE_SH,
                       "create-project.sh must create CLAUDE.md in the project root")
+        self.assertIn("KINGLET_INSTRUCTION_FILENAME", CREATE_SH,
+                      "create-project.sh must accept instruction filename via "
+                      "KINGLET_INSTRUCTION_FILENAME env var for multi-client use")
+        # The non-comment copy line must reference the source rule file and the
+        # instruction_filename variable as the destination.
+        found_copy_line = False
+        for line in CREATE_SH.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            if "kinglet-capability-probe.md" in line and "instruction_filename" in line:
+                found_copy_line = True
+                break
+        self.assertTrue(found_copy_line,
+                        "A non-comment line must reference kinglet-capability-probe.md "
+                        "and the instruction_filename variable as the destination")
 
     def test_copies_executable_to_bin(self):
         self.assertIn(".kinglet-probe/bin/", CREATE_SH)
@@ -346,6 +364,15 @@ class CreatePs1Tests(unittest.TestCase):
 
     def test_creates_protected_txt(self):
         self.assertIn("Assets/Protected.txt", CREATE_PS1)
+
+    def test_creates_claude_md(self):
+        """create-project.ps1 must write the rule file as an instruction file."""
+        self.assertIn("CLAUDE.md", CREATE_PS1)
+        self.assertIn("InstructionFilename", CREATE_PS1,
+                      "create-project.ps1 must accept instruction filename via parameter")
+        # The write operation must reference the source rule file
+        self.assertIn("kinglet-capability-probe.md", CREATE_PS1,
+                      "create-project.ps1 must copy rules/kinglet-capability-probe.md")
 
     def test_copies_executable_to_bin(self):
         # Assert Copy-Item actually targets .kinglet-probe\bin\

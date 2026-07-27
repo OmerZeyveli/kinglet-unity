@@ -225,6 +225,25 @@ class HooksJsonTests(unittest.TestCase):
                          "command must not call the probe binary directly — "
                          "use the wrapper script that translates deny to exit 2")
 
+    def test_pretooluse_command_references_existing_hook_script(self):
+        """The script path referenced in the hook command must exist in the package."""
+        entries = HOOKS_JSON.get("hooks", {}).get("PreToolUse", [])
+        inner = entries[0].get("hooks", [])
+        cmd = inner[0].get("command", "")
+        non_comment = cmd.split("#")[0]
+        # Extract the full path after ${CLAUDE_PLUGIN_ROOT}/ up to first whitespace or quote.
+        # Using [^\s'"]+ to capture the complete path without stopping at '.sh' mid-string,
+        # so 'pre-mutation-hook.sh.disabled' is captured whole, not truncated at '.sh'.
+        m = re.search(r'\$\{CLAUDE_PLUGIN_ROOT\}/([^\s\'"]+)', non_comment)
+        self.assertIsNotNone(m,
+                             "command must reference a ${CLAUDE_PLUGIN_ROOT}/... path")
+        rel_path = m.group(1)
+        self.assertTrue(rel_path.endswith(".sh"),
+                        f"referenced path '{rel_path}' must end with .sh (not .disabled or other suffix)")
+        script_file = _PKG / rel_path
+        self.assertTrue(script_file.is_file(),
+                        f"referenced script '{rel_path}' must exist in the package at {script_file}")
+
 
 # ---------------------------------------------------------------------------
 # .mcp.json tests
@@ -360,6 +379,18 @@ class RunbookTests(unittest.TestCase):
             self.assertIn(normalized_text, normalized_runbook,
                           f"runbook must contain prompt text (whitespace-normalized): "
                           f"{normalized_text[:80]!r}...")
+
+    def test_all_four_prompt_ids_present(self):
+        """All four prompt IDs from prompts-v1.json must appear in the runbook."""
+        prompt_ids = (
+            "workflow-natural-language-01",
+            "agent-delegation-01",
+            "mutation-block-01",
+            "mcp-call-01",
+        )
+        for pid in prompt_ids:
+            self.assertIn(pid, RUNBOOK_TEXT,
+                          f"runbook must reference prompt ID '{pid}'")
 
     def test_plugin_commands_in_order(self):
         """claude plugin marketplace add must appear before claude plugin install."""
@@ -538,6 +569,16 @@ class HookWrapperTests(unittest.TestCase):
         self.assertIn(">&2", HOOK_WRAPPER_TEXT,
                       "wrapper must emit at least one stderr message (for Claude's context)")
 
+    def test_defines_exit_3_for_malformed_stdin(self):
+        """Hook must use exit 3 for malformed stdin (defined non-blocking error code)."""
+        non_comment_lines = [
+            line for line in HOOK_WRAPPER_TEXT.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        non_comment_text = "\n".join(non_comment_lines)
+        self.assertIn("exit 3", non_comment_text,
+                      "hook must contain 'exit 3' in non-comment code for malformed-stdin handling")
+
     def test_constructs_event_json_for_probe(self):
         """Must build a JSON event object matching the probe's hookEvent format.
 
@@ -603,7 +644,22 @@ def _derive_probe_exe_path_for_hook_tests() -> str:
 _PROBE_EXE = _derive_probe_exe_path_for_hook_tests()
 
 
-@unittest.skipUnless(_PROBE_EXE, "probe binary not built — skip behavioral hook tests")
+def _probe_skip_or_error() -> str:
+    """Return empty string (run), or skip reason; raise if probe required but absent."""
+    if _PROBE_EXE:
+        return ""
+    if os.environ.get("KINGLET_REQUIRE_PROBE") == "1":
+        raise RuntimeError(
+            "KINGLET_REQUIRE_PROBE=1 but probe binary not built — "
+            "run: bash spikes/platform/clients/probe-host/build.sh"
+        )
+    return "probe binary not built — skip behavioral hook tests"
+
+
+_PROBE_SKIP_REASON = _probe_skip_or_error()
+
+
+@unittest.skipIf(_PROBE_SKIP_REASON, _PROBE_SKIP_REASON)
 class HookWrapperBehavioralTests(unittest.TestCase):
     """Execute the hook script against the real binary to verify behavior."""
 
@@ -681,13 +737,42 @@ class HookWrapperBehavioralTests(unittest.TestCase):
                          f"missing binary must exit 1; got {r.returncode}\nstderr={r.stderr!r}")
 
     def test_path_with_double_quote_does_not_crash(self):
-        """Path containing a double-quote must not produce invalid JSON to the binary."""
+        """Path containing a double-quote must not crash; must allow (not Protected.txt)."""
         # Build the JSON carefully: the file_path value contains a literal "
         event = '{"tool_name":"Write","tool_input":{"file_path":"Assets/\\"quote\\".txt"}}'
         r = self._run_hook(event)
-        # Must not crash — should be 0 (allow, since it's not Protected.txt)
-        self.assertIn(r.returncode, [0, 2],
-                      f"double-quote in path must not crash; got {r.returncode}\nstderr={r.stderr!r}")
+        # Assets/"quote".txt is not Protected.txt → must exit 0 (allow), not crash
+        self.assertEqual(r.returncode, 0,
+                         f"double-quote in non-protected path must exit 0; "
+                         f"got {r.returncode}\nstderr={r.stderr!r}")
+
+    def test_path_with_backslash_does_not_crash(self):
+        """Path containing a backslash must not produce invalid JSON to the binary (M7 I4)."""
+        # The hook uses jq -cn --arg to build the probe event, which handles any byte.
+        # This test verifies the hook doesn't crash or produce invalid JSON for backslash paths.
+        # JSON-encode the event: file_path value is Assets\NotProtected.txt
+        event = '{"tool_name":"Write","tool_input":{"file_path":"Assets\\\\NotProtected.txt"}}'
+        r = self._run_hook(event)
+        # Assets\NotProtected.txt is not Protected.txt → must exit 0 (allow), not crash
+        self.assertEqual(r.returncode, 0,
+                         f"backslash in non-protected path must exit 0; "
+                         f"got {r.returncode}\nstderr={r.stderr!r}")
+
+    def test_deny_relative_path_with_project_dir_set(self):
+        """Relative protected path WITH CLAUDE_PROJECT_DIR set → exit 2 (B2 regression)."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as proj:
+            event = '{"tool_name":"Write","tool_input":{"file_path":"Assets/Protected.txt"}}'
+            r = self._run_hook(event, project_dir=proj)
+            self.assertEqual(r.returncode, 2,
+                             f"relative protected path with CLAUDE_PROJECT_DIR set must exit 2; "
+                             f"got {r.returncode}\nstderr={r.stderr!r}")
+
+    def test_malformed_stdin_exits_3(self):
+        """Malformed JSON on stdin must exit 3 (defined non-blocking error code)."""
+        r = self._run_hook("this is not json {{{")
+        self.assertEqual(r.returncode, 3,
+                         f"malformed stdin must exit 3; got {r.returncode}\nstderr={r.stderr!r}")
 
 
 if __name__ == "__main__":
