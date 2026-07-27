@@ -87,6 +87,14 @@ CREDENTIAL_FILE = re.compile(r"\.credentials|\bcredentials\.json\b|\bauth\.json\
 # known disposable-config name, so `$H` is not a presence check. Second:
 # `credential_copy_violations` follows the credential across assignments, so the
 # copy on line 3 is caught whatever the variable is called.
+#
+# This tuple is the SINGLE source of truth for the alphabet. The by-name
+# claude-code rule imports `ALLOWED_CREDENTIAL_REFERENCE` from here rather than
+# hard-pinning `$CFG`, because a second, narrower copy of the same rule is not a
+# second defence — it is a contradiction. While it existed, a legitimate
+# `$CODEX_HOME/.credentials.json` presence check turned the "generic rule is
+# never weaker" invariant RED with a message asserting the opposite, so every
+# entry below except `CFG` was unusable and Codex could not be written at all.
 DISPOSABLE_CONFIG_VARS = (
     "CFG",
     "CLAUDE_CONFIG_DIR",
@@ -103,10 +111,18 @@ ALLOWED_CREDENTIAL_REFERENCE = re.compile(
 
 # Copying, reading out, or shipping a credential file. Any of these on the same
 # line as a credential file name is a leak of the operator's real credentials.
+#
+# Archivers, encryptors and transports are in the list because the strict script
+# rule does not apply to `.md`/`.json`, so in a runbook this was the whole
+# bypass: name the file in one variable, then `tar cf out.tar "$CRED"`. A verb
+# list that only knows `cp` reads as "we check for copies" and checks for one
+# spelling of one of them.
 COPY_VERB = re.compile(
     r"(?<![A-Za-z0-9_-])"
     r"(cp|mv|scp|rsync|ln|dd|cat|tee|install|base64|curl|wget|xxd|od|"
-    r"Copy-Item|Move-Item|Get-Content|shutil\.copy(?:file|2)?|read_text|read_bytes)"
+    r"tar|zip|gzip|bzip2|xz|7z|gpg|openssl|nc|ssh|awk|sed|split|open|"
+    r"Copy-Item|Move-Item|Get-Content|Compress-Archive|"
+    r"shutil\.copy(?:file|2)?|read_text|read_bytes)"
     r"(?![A-Za-z0-9_-])"
 )
 
@@ -154,6 +170,13 @@ def credential_copy_violations(text: str) -> tuple[tuple[int, str, str], ...]:
     variable assigned from something that names a credential file — or from an
     already-tainted variable — is itself tainted, and a copy verb applied to a
     tainted variable is a violation wherever it appears.
+
+    This is a LINT, not an interpreter: it reads lines, it does not evaluate
+    them, so splitting the credential FILENAME literal across variables and
+    reassembling it at run time (`P2="$HOME/.claude/.creden"; P3="tials.json";
+    eval cp "$P2$P3" out`) escapes it entirely. Treat it as a guard against the
+    shapes people write by accident or by habit, never as a sandbox around
+    committed text that is assumed hostile.
 
     Returns `(line_number, line, reason)` triples so the caller can name the line.
     """

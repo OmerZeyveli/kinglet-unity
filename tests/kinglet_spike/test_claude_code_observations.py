@@ -38,6 +38,7 @@ from tests.kinglet_spike.spike_tree import (
     ALLOWED_CREDENTIAL_REFERENCE as GENERIC_ALLOWED_CREDENTIAL_REFERENCE,
 )
 from tests.kinglet_spike.spike_tree import CREDENTIAL_FILE as GENERIC_CREDENTIAL_FILE
+from tests.kinglet_spike.spike_tree import DISPOSABLE_CONFIG_VARS
 from tests.kinglet_spike.spike_tree import committed_text_files as swept_text_files
 from tests.kinglet_spike.spike_tree import credential_copy_violations
 from tools.kinglet_spike.client_results import (
@@ -67,11 +68,20 @@ CASE_PROMPT = {
 # The disposable live-run root must never appear in committed evidence.
 PROBE_ROOT = re.compile(r"/tmp/kinglet-live")
 
-# The credential file may only ever be named as "$CFG/.credentials.json" — a
-# presence check inside the disposable config root. Any other mention (a copy,
-# a read, a path under $HOME) is a leak of the operator's real credentials.
+# The credential file may only ever be named as a presence check on the
+# credential file inside the DISPOSABLE config root — "$CFG/.credentials.json"
+# for this client. Any other mention (a copy, a read, a path under $HOME) is a
+# leak of the operator's real credentials.
 CREDENTIALS = re.compile(r"\.credentials")
-ALLOWED_CREDENTIAL_REFERENCE = re.compile(r"\$\{?CFG\}?/\.credentials\.json")
+# NOT a second, $CFG-pinned copy of the allow-regex. It was one, and the two
+# rules then contradicted each other: a client whose disposable root is named by
+# any other variable in DISPOSABLE_CONFIG_VARS — CODEX_HOME, say — could not
+# write a legitimate presence check without turning
+# test_the_client_agnostic_credential_rule_is_never_weaker_than_this_one RED
+# with a message claiming the generic rule had gone soft. One alphabet, one
+# source of truth, in spike_tree.py; the invariant below still bites, because
+# the two CREDENTIAL patterns remain independent.
+ALLOWED_CREDENTIAL_REFERENCE = GENERIC_ALLOWED_CREDENTIAL_REFERENCE
 
 
 def _probe_scripts() -> tuple[Path, ...]:
@@ -248,6 +258,12 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
         #
         # — RED here for claude-code, green everywhere else. Every client but
         # claude-code was less protected by the test written to protect them all.
+        #
+        # The allow-regexes are one object now, so this can no longer fail on the
+        # allow side; it still fails if CREDENTIAL_FILE is narrowed below the
+        # `\.credentials` this file looks for, and it fails again the moment
+        # anyone re-pins the allow-regex to a single variable, because of the
+        # derived presence checks below.
         lines = [
             'F="$H/.credentials.json"',
             'F="$HOME/.claude/.credentials.json"',
@@ -259,6 +275,16 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
             "look at .credentialsFoo",
             "the scripts do not copy credentials",
         ]
+        # One legitimate presence check per disposable-config variable, in both
+        # spellings. These are the lines a client that is not claude-code has to
+        # be able to write, and while this file kept its own $CFG-pinned
+        # allow-regex every one of them failed HERE — fail-closed, but it meant
+        # the alphabet in DISPOSABLE_CONFIG_VARS was a list of names no probe
+        # could use. Derived from the tuple, so a new entry is covered the moment
+        # it is added.
+        for name in DISPOSABLE_CONFIG_VARS:
+            lines.append(f'if [ ! -f "${name}/.credentials.json" ]; then')
+            lines.append(f'if [ ! -f "${{{name}}}/.credentials.json" ]; then')
         for path in swept_text_files():
             lines.extend(path.read_text(encoding="utf-8").splitlines())
         for line in lines:
@@ -269,7 +295,7 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
                 GENERIC_CREDENTIAL_FILE.search(
                     GENERIC_ALLOWED_CREDENTIAL_REFERENCE.sub("", line)
                 ),
-                f"the $CFG-pinned rule here flags this line and the "
+                f"the by-name rule here flags this line and the "
                 f"client-agnostic rule does not, so every client except "
                 f"claude-code is less protected: {line.strip()!r}",
             )
