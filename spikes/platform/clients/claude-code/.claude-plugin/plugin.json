@@ -5,6 +5,6 @@
   "author": {
     "name": "kinglet"
   },
-  "hooks": "hooks/hooks.json",
-  "mcpServers": ".mcp.json"
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./.mcp.json"
 }

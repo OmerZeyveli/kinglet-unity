@@ -107,6 +107,18 @@ $projectVersionContent = "m_EditorVersion: 6000.3.11f1`r`nm_EditorVersionWithRev
     (New-Object System.Text.UTF8Encoding($false))
 )
 
+# CLAUDE.md — project-level instructions for the instructions.project case.
+# Claude Code loads this file automatically when starting a session in this directory.
+$ruleContent = [System.IO.File]::ReadAllText(
+    (Join-Path $scriptDir 'rules\kinglet-capability-probe.md'),
+    (New-Object System.Text.UTF8Encoding($false))
+)
+[System.IO.File]::WriteAllText(
+    (Join-Path $Destination 'CLAUDE.md'),
+    $ruleContent,
+    (New-Object System.Text.UTF8Encoding($false))
+)
+
 # ---------------------------------------------------------------------------
 # Copy the native executable
 # ---------------------------------------------------------------------------

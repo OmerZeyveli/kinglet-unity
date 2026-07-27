@@ -9,6 +9,7 @@ observations. Do not create anything under `docs/research/platform-spike/evidenc
 
 - `claude --version` reports a supported Claude Code version (documented at
   probe time).
+- `jq --version` succeeds — the pre-mutation hook requires `jq` at runtime.
 - The native probe binary has been built:
   ```bash
   bash spikes/platform/clients/probe-host/build.sh
@@ -17,6 +18,10 @@ observations. Do not create anything under `docs/research/platform-spike/evidenc
   ```bash
   bash spikes/platform/clients/shared/create-project.sh /tmp/kinglet-probe-project
   ```
+  `create-project.sh` writes a `CLAUDE.md` to the project root (copied from
+  `shared/rules/kinglet-capability-probe.md`). This is the mechanism that
+  satisfies `instructions.project` — Claude Code loads `CLAUDE.md` automatically
+  when starting a session in that directory.
 
 ## Step A — Assemble the disposable plugin package
 
@@ -42,7 +47,7 @@ mkdir -p "$PROBE_PKG/agents"
 cp spikes/platform/clients/shared/agents/kinglet-capability-reviewer.agent.md \
    "$PROBE_PKG/agents/kinglet-capability-reviewer.agent.md"
 
-# Copy shared rule (active inside the disposable project)
+# Copy shared rule into package (for reference — see note below on instructions.project)
 mkdir -p "$PROBE_PKG/rules"
 cp spikes/platform/clients/shared/rules/kinglet-capability-probe.md \
    "$PROBE_PKG/rules/kinglet-capability-probe.md"
@@ -70,8 +75,15 @@ The assembled package lives at `/tmp/kinglet-claude-probe-pkg` (or your chosen
 - `.mcp.json` — local MCP server config
 - `skills/kinglet-capability-probe/SKILL.md` — capability workflow skill
 - `agents/kinglet-capability-reviewer.agent.md` — reviewer agent
-- `rules/kinglet-capability-probe.md` — receipt schema rule
+- `rules/kinglet-capability-probe.md` — receipt schema rule (reference copy)
 - `bin/kinglet-client-probe` — native probe binary
+
+**Note on `instructions.project`:** The `rules/kinglet-capability-probe.md` file
+in the package is a reference copy. The actual mechanism for the `instructions.project`
+case is `CLAUDE.md` in the disposable project root, which `create-project.sh` writes
+automatically (copied from `shared/rules/kinglet-capability-probe.md`). Claude Code
+loads `CLAUDE.md` from the project root automatically on session start — this is the
+project-level instruction loading mechanism being tested.
 
 ## Step B — Install the plugin
 
@@ -128,6 +140,11 @@ Expected behavior:
 
 Cases evidenced: `workflow.natural-language`, `executable.local`, `structured-result`,
 `instructions.project`
+
+**Note on `instructions.project`:** This case is evidenced by `CLAUDE.md` being
+present in the disposable project root (written by `create-project.sh`). Claude Code
+loads `CLAUDE.md` automatically when starting a session, so the receipt schema and
+workflow rules are active without any explicit instruction to load them.
 
 ### Prompt agent-delegation-01
 
@@ -186,22 +203,47 @@ Cases evidenced: `mcp.discover-call`, `structured-result`
 
 ## Step E — Version update and reload
 
-Edit `plugin.json` to bump the version to `0.0.2`:
+Edit `plugin.json` and `marketplace.json` in the assembled package to bump to `0.0.2`:
 
 ```bash
-# In the assembled package directory
-sed -i 's/"version": "0.0.1"/"version": "0.0.2"/' \
-  /tmp/kinglet-claude-probe-pkg/.claude-plugin/plugin.json
+# In the assembled package directory — POSIX-portable (no GNU sed -i)
+sed 's/"version": "0.0.1"/"version": "0.0.2"/' \
+  /tmp/kinglet-claude-probe-pkg/.claude-plugin/plugin.json \
+  > /tmp/kinglet-claude-probe-pkg/.claude-plugin/plugin.json.tmp \
+  && mv /tmp/kinglet-claude-probe-pkg/.claude-plugin/plugin.json.tmp \
+        /tmp/kinglet-claude-probe-pkg/.claude-plugin/plugin.json
+
+sed 's/"version": "0.0.1"/"version": "0.0.2"/' \
+  /tmp/kinglet-claude-probe-pkg/.claude-plugin/marketplace.json \
+  > /tmp/kinglet-claude-probe-pkg/.claude-plugin/marketplace.json.tmp \
+  && mv /tmp/kinglet-claude-probe-pkg/.claude-plugin/marketplace.json.tmp \
+        /tmp/kinglet-claude-probe-pkg/.claude-plugin/marketplace.json
 ```
 
-Reload Claude Code (restart the session or run `/clear`). Verify the updated
-version is shown:
+Apply the update via Claude Code's plugin update command:
+
+```bash
+claude plugin update kinglet-client-probe --scope local
+```
+
+To reload plugins in an active session without restarting, run:
+
+```
+/reload-plugins
+```
+
+Verify the updated version is shown:
 
 ```bash
 claude plugin list
 ```
 
 Record the output showing `0.0.2`. This satisfies `install.update`.
+
+**Note:** `${CLAUDE_PLUGIN_ROOT}` is the plugin's install path, which Claude Code
+may change when the plugin is updated (the path includes the version). After an
+update, hooks and MCP server paths referencing `${CLAUDE_PLUGIN_ROOT}` resolve to
+the new version's directory, so the updated binary and scripts are used automatically.
 
 ## Step F — Scope resolution check
 

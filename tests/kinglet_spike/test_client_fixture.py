@@ -244,6 +244,15 @@ class CreateShTests(unittest.TestCase):
     def test_creates_protected_txt(self):
         self.assertIn("Assets/Protected.txt", CREATE_SH)
 
+    def test_creates_claude_md(self):
+        """create-project.sh must copy the rule file as CLAUDE.md.
+
+        CLAUDE.md in the project root is the Claude Code mechanism for
+        project-level instructions (instructions.project case).
+        """
+        self.assertIn("CLAUDE.md", CREATE_SH,
+                      "create-project.sh must create CLAUDE.md in the project root")
+
     def test_copies_executable_to_bin(self):
         self.assertIn(".kinglet-probe/bin/", CREATE_SH)
 
@@ -472,6 +481,7 @@ class CreateShBehavioralTests(unittest.TestCase):
                 ".kinglet-probe/bin/kinglet-client-probe",
                 ".kinglet-probe/expected.json",
                 ".kinglet-probe/mcp.json",
+                "CLAUDE.md",
             }
             for rel in expected_rel:
                 path = os.path.join(dest, rel)

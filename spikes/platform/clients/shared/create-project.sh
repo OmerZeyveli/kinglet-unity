@@ -113,6 +113,10 @@ printf '%s' 'KINGLET_CLIENT_PROBE_PROJECT' > "$dest/.kinglet-probe/project-marke
 # Assets/Protected.txt — target for the hook mutation-block probe.
 printf '%s\n' 'PROTECTED' > "$dest/Assets/Protected.txt"
 
+# CLAUDE.md — project-level instructions for the instructions.project case.
+# Claude Code loads this file automatically when starting a session in this directory.
+cp "$script_dir/rules/kinglet-capability-probe.md" "$dest/CLAUDE.md"
+
 # ---------------------------------------------------------------------------
 # Copy the native executable
 # ---------------------------------------------------------------------------
