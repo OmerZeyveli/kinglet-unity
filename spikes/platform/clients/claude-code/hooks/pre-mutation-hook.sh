@@ -127,8 +127,13 @@ REASON="$(printf '%s' "$PROBE_OUTPUT" | jq -r '.reason // ""')"
 # Translate deny → exit 2 (Claude Code PreToolUse block signal)
 # ---------------------------------------------------------------------------
 if [ "$DECISION" = "deny" ]; then
-    printf '{"hookSpecificOutput":{"permissionDecision":"deny"},"systemMessage":"Kinglet hook blocked write to %s: %s"}\n' \
-        "$FILE_PATH" "$REASON" >&2
+    # Exit 2 IS the block signal; Claude Code feeds stderr back to the model as
+    # the reason. Emit plain prose, not JSON: the structured
+    # hookSpecificOutput/permissionDecision form belongs to the exit-0 stdout
+    # protocol. Mixing the two was observed live to surface as
+    # "PreToolUse:Edit hook error: {...raw json...}" — the block still worked,
+    # but the reason read as a malfunction rather than a policy decision.
+    printf 'Kinglet hook blocked write to %s: %s\n' "$FILE_PATH" "$REASON" >&2
     exit 2
 fi
 
