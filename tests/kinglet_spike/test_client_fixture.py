@@ -15,7 +15,13 @@ Tests assert on the TEXT of committed files (no execution). They confirm:
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -50,7 +56,17 @@ class SkillNameTests(unittest.TestCase):
     def test_description_does_not_require_filename_lookup(self):
         # The prompt explicitly says "Do not search for the skill by filename."
         # The description must be discoverable via the trigger phrase, not just a path.
-        self.assertNotIn("SKILL.md", SKILL_MD.split("---")[0])  # not in frontmatter desc
+        # Parse frontmatter: text between first and second '---' delimiters.
+        parts = SKILL_MD.split("---")
+        # parts[0] is '', parts[1] is the frontmatter block, parts[2]+ is body
+        frontmatter = parts[1] if len(parts) > 1 else ""
+        desc_line = ""
+        for line in frontmatter.splitlines():
+            if line.strip().startswith("description:"):
+                desc_line = line
+                break
+        self.assertNotEqual(desc_line, "", "description: line must be present in frontmatter")
+        self.assertNotIn("SKILL.md", desc_line)
 
 
 class SkillStepsTests(unittest.TestCase):
@@ -62,7 +78,8 @@ class SkillStepsTests(unittest.TestCase):
 
     def test_calls_exec_subcommand(self):
         self.assertIn("kinglet-client-probe", SKILL_MD)
-        self.assertIn("exec", SKILL_MD)
+        # 'exec' as a subcommand: must appear as 'exec --project', not just as substring
+        self.assertIn("exec --project", SKILL_MD)
 
     def test_exec_receives_project_flag(self):
         self.assertIn("--project", SKILL_MD)
@@ -154,6 +171,16 @@ class HookPolicyTests(unittest.TestCase):
         # Policy must reference how the hook executable is called.
         self.assertIn("kinglet-client-probe", HOOK_JSON_TEXT)
 
+    def test_hook_policy_states_overlay_exit_code_contract(self):
+        # The policy must document that overlays are responsible for translating
+        # the JSON 'decision' field into a non-zero exit (per cases-v1.json contract).
+        self.assertIn("overlay_contract", HOOK_JSON_TEXT)
+        contract = HOOK_JSON.get("overlay_contract", {})
+        # Must mention that the binary exits 0 and overlays must handle deny translation
+        exit_text = contract.get("exit_code", "")
+        self.assertIn("exits 0", exit_text)
+        self.assertIn("non-zero", exit_text)
+
 
 # ---------------------------------------------------------------------------
 # MCP config tests
@@ -170,7 +197,12 @@ class MCPConfigTests(unittest.TestCase):
         self.assertIn("kinglet_probe_read_marker", MCP_JSON_TEXT)
 
     def test_mcp_config_references_mcp_subcommand(self):
-        self.assertIn("mcp", MCP_JSON_TEXT)
+        # The server's args must explicitly include the 'mcp' subcommand string.
+        servers = MCP_JSON.get("mcpServers", {})
+        self.assertTrue(len(servers) > 0, "mcpServers must be non-empty")
+        for server_name, server_cfg in servers.items():
+            args = server_cfg.get("args", [])
+            self.assertIn("mcp", args, f"server {server_name!r} args must contain 'mcp' subcommand")
 
 
 # ---------------------------------------------------------------------------
@@ -184,8 +216,18 @@ class CreateShTests(unittest.TestCase):
     def test_rejects_non_darwin_linux(self):
         self.assertIn("Darwin", CREATE_SH)
         self.assertIn("Linux", CREATE_SH)
-        # Must exit on unsupported host.
-        self.assertIn("exit 1", CREATE_SH)
+        # Verify exit 1 appears within the OS guard case block (not just anywhere).
+        in_case = False
+        has_exit_in_case = False
+        for line in CREATE_SH.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("case") and "host" in stripped:
+                in_case = True
+            if in_case and stripped == "esac":
+                in_case = False
+            if in_case and stripped == "exit 1":
+                has_exit_in_case = True
+        self.assertTrue(has_exit_in_case, "exit 1 must appear inside the OS-guard case block")
 
     def test_rejects_existing_destination(self):
         # Must refuse a destination that already exists.
@@ -208,12 +250,21 @@ class CreateShTests(unittest.TestCase):
         self.assertIn(".kinglet-probe/expected.json", CREATE_SH)
 
     def test_computes_sha256(self):
-        self.assertIn("sha256", CREATE_SH.lower())
+        # Must invoke sha256sum or shasum, not just mention in comment.
+        has_sha256sum = "sha256sum" in CREATE_SH
+        has_shasum = "shasum -a 256" in CREATE_SH
+        self.assertTrue(has_sha256sum or has_shasum,
+                        "script must invoke sha256sum or 'shasum -a 256' to compute checksum")
 
     def test_accepts_executable_argument_or_env(self):
-        # Must not hardcode an absolute path; takes executable via arg or env var.
-        self.assertNotIn("/home/riive", CREATE_SH)
-        self.assertNotIn("/Users/", CREATE_SH)
+        # Must not hardcode an absolute user home path; takes executable via arg or env var.
+        home = os.path.expanduser("~")
+        self.assertNotIn(home, CREATE_SH)
+        # Also check for any /home/<word>, /Users/<word>, or Windows C:\Users\<word> pattern.
+        self.assertIsNone(
+            re.search(r'(/home/\w|/Users/\w|[A-Z]:\\Users\\)', CREATE_SH),
+            "create-project.sh must not contain any hardcoded user home path"
+        )
 
     def test_no_declare_associative_array(self):
         self.assertNotIn("declare -A", CREATE_SH)
@@ -225,10 +276,19 @@ class CreateShTests(unittest.TestCase):
         self.assertNotIn("| head", CREATE_SH)
 
     def test_validates_arg_before_shift(self):
-        # shift 2 without validation fails under set -u when arg count is wrong.
-        # We require the script validates arg count before any shift.
-        # A simple proxy: the script must check $# before shifting.
-        self.assertIn("$#", CREATE_SH)
+        # Verify arg count check ($#) appears before any 'shift' in the script.
+        lines = CREATE_SH.splitlines()
+        check_line = None
+        shift_line = None
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if check_line is None and "$#" in stripped:
+                check_line = i
+            if shift_line is None and stripped.startswith("shift") and "$#" not in stripped:
+                shift_line = i
+        self.assertIsNotNone(check_line, "$# check must appear in the script")
+        self.assertIsNotNone(shift_line, "'shift' must appear in the script")
+        self.assertLess(check_line, shift_line, "$# check must appear before first 'shift'")
 
     def test_writes_mcp_json_with_token_replaced(self):
         # The project-creation script must substitute __KINGLET_PROBE_EXECUTABLE__
@@ -261,7 +321,9 @@ class CreatePs1Tests(unittest.TestCase):
         self.assertIn("Assets/Protected.txt", CREATE_PS1)
 
     def test_copies_executable_to_bin(self):
-        self.assertIn(".kinglet-probe/bin/", CREATE_PS1)
+        # Assert Copy-Item actually targets .kinglet-probe\bin\
+        self.assertIn("Copy-Item", CREATE_PS1)
+        self.assertIn(r".kinglet-probe\bin", CREATE_PS1)
 
     def test_writes_expected_json(self):
         self.assertIn(".kinglet-probe/expected.json", CREATE_PS1)
@@ -270,8 +332,13 @@ class CreatePs1Tests(unittest.TestCase):
         self.assertIn("SHA256", CREATE_PS1)
 
     def test_no_hardcoded_user_path(self):
-        self.assertNotIn("/home/riive", CREATE_PS1)
-        self.assertNotIn("C:\\Users\\", CREATE_PS1)
+        home = os.path.expanduser("~")
+        self.assertNotIn(home, CREATE_PS1)
+        # Also check for any /home/<word>, /Users/<word>, or Windows C:\Users\<word> pattern.
+        self.assertIsNone(
+            re.search(r'(/home/\w|/Users/\w|[A-Z]:\\Users\\)', CREATE_PS1),
+            "create-project.ps1 must not contain any hardcoded user home path"
+        )
 
     def test_accepts_executable_argument(self):
         # Takes executable path via parameter, not hardcoded.
@@ -279,6 +346,113 @@ class CreatePs1Tests(unittest.TestCase):
 
     def test_writes_mcp_json_with_token_replaced(self):
         self.assertIn("__KINGLET_PROBE_EXECUTABLE__", CREATE_PS1)
+
+    def test_no_bom_emitting_utf8_encoding(self):
+        # [System.Text.Encoding]::UTF8 emits BOM (EF BB BF) because .NET's
+        # Encoding.UTF8 has emitBOM: true. Must use UTF8Encoding($false) instead.
+        self.assertNotIn("[System.Text.Encoding]::UTF8", CREATE_PS1)
+
+
+# ---------------------------------------------------------------------------
+# create-project.sh behavioral tests (POSIX only)
+# ---------------------------------------------------------------------------
+
+_PROBE_EXE_PATH = str(_SHARED.parent / "probe-host" / "dist" / "linux-amd64" / "kinglet-client-probe")
+
+
+@unittest.skipUnless(sys.platform != "win32", "behavioral tests require POSIX")
+class CreateShBehavioralTests(unittest.TestCase):
+    _SCRIPT = str(_SHARED / "create-project.sh")
+    _PROBE_EXE = _PROBE_EXE_PATH
+
+    def test_no_args_exits_nonzero_with_stderr(self):
+        """Running with no arguments must exit non-zero and emit a non-empty stderr message."""
+        result = subprocess.run(
+            ["bash", self._SCRIPT],
+            capture_output=True, text=True
+        )
+        self.assertNotEqual(result.returncode, 0,
+                            "script must exit non-zero when called with no arguments")
+        self.assertTrue(result.stderr.strip(),
+                        "script must emit a non-empty message on stderr when called with no arguments")
+
+    def test_existing_destination_refused(self):
+        """Running against an existing destination must exit non-zero."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = subprocess.run(
+                ["bash", self._SCRIPT, tmpdir],
+                capture_output=True, text=True
+            )
+            self.assertNotEqual(result.returncode, 0,
+                                "script must refuse an already-existing destination")
+            self.assertTrue(result.stderr.strip(),
+                            "script must emit an error message on stderr when destination exists")
+
+    @unittest.skipUnless(
+        os.path.isfile(_PROBE_EXE_PATH),
+        "probe binary not built — skip"
+    )
+    def test_successful_run_with_space_in_path(self):
+        """Script must create exactly the declared file set; path with space must work."""
+        probe_exe = self._PROBE_EXE
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = os.path.join(tmpdir, "probe project with spaces")
+            result = subprocess.run(
+                ["bash", self._SCRIPT, dest, probe_exe],
+                capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 0,
+                             f"script failed: stderr={result.stderr!r}")
+
+            expected_files = [
+                "ProjectSettings/ProjectVersion.txt",
+                "Assets/Protected.txt",
+                ".kinglet-probe/project-marker.txt",
+                ".kinglet-probe/bin/kinglet-client-probe",
+                ".kinglet-probe/expected.json",
+                ".kinglet-probe/mcp.json",
+            ]
+            for rel in expected_files:
+                path = os.path.join(dest, rel)
+                self.assertTrue(os.path.isfile(path), f"expected file not created: {rel}")
+
+            # Verify sha256 in expected.json matches the copied binary
+            with open(os.path.join(dest, ".kinglet-probe", "expected.json"), encoding="utf-8") as f:
+                expected_data = json.load(f)
+            recorded_sha = expected_data.get("sha256", "")
+
+            bin_path = os.path.join(dest, ".kinglet-probe", "bin", "kinglet-client-probe")
+            with open(bin_path, "rb") as f:
+                actual_sha = hashlib.sha256(f.read()).hexdigest()
+
+            self.assertEqual(recorded_sha, actual_sha,
+                             "sha256 in expected.json must match actual copied binary")
+
+    @unittest.skipUnless(
+        os.path.isfile(_PROBE_EXE_PATH),
+        "probe binary not built — skip"
+    )
+    def test_ampersand_in_destination_path(self):
+        """Destination path containing '&' must not corrupt the mcp.json token substitution (M7 regression)."""
+        probe_exe = self._PROBE_EXE
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = os.path.join(tmpdir, "a&b")
+            result = subprocess.run(
+                ["bash", self._SCRIPT, dest, probe_exe],
+                capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 0,
+                             f"script failed with & in path: stderr={result.stderr!r}")
+
+            with open(os.path.join(dest, ".kinglet-probe", "mcp.json"), encoding="utf-8") as f:
+                mcp_data = json.load(f)
+            servers = mcp_data.get("mcpServers", {})
+            for server_cfg in servers.values():
+                cmd = server_cfg.get("command", "")
+                self.assertNotIn("__KINGLET_PROBE_EXECUTABLE__", cmd,
+                                 "token must be replaced in mcp.json command")
+                self.assertIn("&", cmd,
+                              "& in path must be preserved literally in mcp.json command")
 
 
 if __name__ == "__main__":

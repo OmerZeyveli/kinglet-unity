@@ -40,7 +40,7 @@ if (Get-Variable -Name 'IsWindows' -ErrorAction SilentlyContinue) {
 }
 
 if (-not $isWindowsHost) {
-    Write-Error "create-project.ps1: unsupported host; this script runs only on native Windows. Use create-project.sh on Darwin/Linux."
+    [Console]::Error.WriteLine("create-project.ps1: unsupported host; this script runs only on native Windows. Use create-project.sh on Darwin/Linux.")
     exit 1
 }
 
@@ -61,7 +61,7 @@ if ($Executable -eq "") {
 # Destination existence guard
 # ---------------------------------------------------------------------------
 if (Test-Path $Destination) {
-    Write-Error "create-project.ps1: destination already exists: $Destination. Delete it first or choose a different path."
+    [Console]::Error.WriteLine("create-project.ps1: destination already exists: $Destination. Delete it first or choose a different path.")
     exit 1
 }
 
@@ -69,7 +69,7 @@ if (Test-Path $Destination) {
 # Executable existence check
 # ---------------------------------------------------------------------------
 if (-not (Test-Path $Executable)) {
-    Write-Error "create-project.ps1: executable not found: $Executable. Build it with: .\spikes\platform\clients\probe-host\build.ps1"
+    [Console]::Error.WriteLine("create-project.ps1: executable not found: $Executable. Build it with: .\spikes\platform\clients\probe-host\build.ps1")
     exit 1
 }
 
@@ -90,21 +90,21 @@ $projectVersionContent = "m_EditorVersion: 6000.3.11f1`r`nm_EditorVersionWithRev
 [System.IO.File]::WriteAllText(
     (Join-Path $Destination 'ProjectSettings/ProjectVersion.txt'),
     $projectVersionContent,
-    [System.Text.Encoding]::UTF8
+    (New-Object System.Text.UTF8Encoding($false))
 )
 
 # .kinglet-probe/project-marker.txt — exact marker, no trailing newline
 [System.IO.File]::WriteAllText(
     (Join-Path $Destination '.kinglet-probe/project-marker.txt'),
     'KINGLET_CLIENT_PROBE_PROJECT',
-    [System.Text.Encoding]::UTF8
+    (New-Object System.Text.UTF8Encoding($false))
 )
 
 # Assets/Protected.txt
 [System.IO.File]::WriteAllText(
     (Join-Path $Destination 'Assets/Protected.txt'),
     "PROTECTED`r`n",
-    [System.Text.Encoding]::UTF8
+    (New-Object System.Text.UTF8Encoding($false))
 )
 
 # ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ $expectedJson = @"
 [System.IO.File]::WriteAllText(
     (Join-Path $Destination '.kinglet-probe\expected.json'),
     $expectedJson,
-    [System.Text.Encoding]::UTF8
+    (New-Object System.Text.UTF8Encoding($false))
 )
 
 # ---------------------------------------------------------------------------
@@ -139,14 +139,14 @@ $expectedJson = @"
 # ---------------------------------------------------------------------------
 $mcpTemplate = [System.IO.File]::ReadAllText(
     (Join-Path $scriptDir 'mcp.json'),
-    [System.Text.Encoding]::UTF8
+    (New-Object System.Text.UTF8Encoding($false))
 )
 $absBinPath = (Resolve-Path $destExe).Path
 $mcpContent = $mcpTemplate.Replace('__KINGLET_PROBE_EXECUTABLE__', $absBinPath)
 [System.IO.File]::WriteAllText(
     (Join-Path $Destination '.kinglet-probe\mcp.json'),
     $mcpContent,
-    [System.Text.Encoding]::UTF8
+    (New-Object System.Text.UTF8Encoding($false))
 )
 
 # ---------------------------------------------------------------------------

@@ -151,8 +151,9 @@ EOF
 abs_bin_path="$(cd "$(dirname "$bin_path")" && pwd)/$(basename "$bin_path")"
 
 # Read the template, replace the token, write to destination.
-# Uses sed with a literal token — no shell interpolation inside the pattern.
-sed "s|__KINGLET_PROBE_EXECUTABLE__|$abs_bin_path|g" \
+# Escape sed replacement metacharacters (&, |, \) in the path before substitution.
+abs_bin_escaped="$(printf '%s' "$abs_bin_path" | sed 's/[&|\\]/\\&/g')"
+sed "s|__KINGLET_PROBE_EXECUTABLE__|$abs_bin_escaped|g" \
   "$script_dir/mcp.json" > "$dest/.kinglet-probe/mcp.json"
 
 # ---------------------------------------------------------------------------

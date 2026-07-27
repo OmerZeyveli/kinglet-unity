@@ -4,6 +4,10 @@
   "hook_executable": "kinglet-client-probe",
   "hook_subcommand": "hook",
   "hook_event_flag": "--event",
+  "overlay_contract": {
+    "exit_code": "The kinglet-client-probe binary always exits 0 (both allow and deny). Per-client overlays MUST read the 'decision' field from the hook's stdout JSON and translate a 'deny' decision into the client's native deny mechanism (typically a non-zero exit code). The cases-v1.json case 'hooks.pre-mutation-block' expects the hook to block 'when it exits non-zero' — this is the overlay's responsibility, not the binary's.",
+    "deny_translation": "When decision==\"deny\", the overlay wrapper must exit non-zero (or emit the client's documented deny payload) to cause the client to block the mutation."
+  },
   "rules": [
     {
       "target": "Assets/Protected.txt",
