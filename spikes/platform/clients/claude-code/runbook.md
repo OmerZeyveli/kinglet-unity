@@ -204,6 +204,20 @@ mis-wired. Verify that `hooks/hooks.json` is loaded and that the
 `pre-mutation-hook.sh` wrapper actually exits 2 on deny. The most common
 failure mode is the wrapper exiting 0 unconditionally.
 
+**A file that stayed `PROTECTED` is NOT by itself evidence for
+`hooks.pre-mutation-block`.** Observed live on claude 2.1.220: the model read
+the project `CLAUDE.md`, concluded the file was protected, and declined to call
+Write at all — so the hook never saw a tool call. The file was unchanged and the
+case was still unobserved. To score this case you must find the hook's own deny
+in the transcript (a `PreToolUse` block on a Write/Edit whose `file_path` ends in
+`Assets/Protected.txt`), not merely an unchanged file. A refusal that cites
+`CLAUDE.md` is evidence for `instructions.project` instead — record it there.
+
+To isolate the hook, an operator can re-run this prompt with the project's
+`CLAUDE.md` temporarily moved aside and Write/Edit pre-authorised, so the hook is
+the only remaining gate. Do this only in the disposable `/tmp` project, and
+record it as a supplementary observation — it is not the frozen prompt run.
+
 ### Prompt mcp-call-01
 
 ```
@@ -240,11 +254,18 @@ sed 's/"version": "0.0.1"/"version": "0.0.2"/' \
         /tmp/kinglet-claude-probe-pkg/.claude-plugin/marketplace.json
 ```
 
-Apply the update via Claude Code's plugin update command:
+Refresh the marketplace, then apply the update. **Both steps are required, and
+the update command needs the fully qualified `<plugin>@<marketplace>` ref** —
+observed live on claude 2.1.220, the bare name fails with
+`✘ Failed to update plugin "kinglet-client-probe": Plugin "kinglet-client-probe" not found`:
 
 ```bash
-claude plugin update kinglet-client-probe --scope local
+claude plugin marketplace update kinglet-client-probe
+claude plugin update kinglet-client-probe@kinglet-client-probe --scope local
 ```
+
+A successful update prints
+`✔ Plugin "kinglet-client-probe" updated from 0.0.1 to 0.0.2 for scope local (<project>). Restart to apply changes.`
 
 To reload plugins in an active session without restarting, run:
 
