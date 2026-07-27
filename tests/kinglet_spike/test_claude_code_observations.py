@@ -18,6 +18,13 @@ The invariants worth failing over:
      legitimately mention the credential file at all — so they are scanned by the
      same sanitization pass as the evidence, plus a dedicated rule: a script may
      TEST for the credential file inside the disposable root, never copy it.
+
+Everything here names claude-code files explicitly, which is a per-client
+guarantee and nothing more — it is exactly why the probe scripts went unguarded
+until a mutation found them. test_committed_tree_sanitization.py sweeps every
+client tree BY SHAPE so the next client is covered without anyone remembering.
+test_the_by_name_set_is_inside_the_client_agnostic_sweep below pins the two
+together: nothing listed here may fall outside that sweep.
 """
 from __future__ import annotations
 
@@ -27,6 +34,7 @@ import re
 import unittest
 from pathlib import Path
 
+from tests.kinglet_spike.spike_tree import committed_text_files as swept_text_files
 from tools.kinglet_spike.client_results import (
     OBSERVATIONS_SCHEMA,
     load_client_observations,
@@ -208,6 +216,21 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
                 name,
                 scanned,
                 f"probe/{name} is committed but no sanitization test looks at it",
+            )
+
+    def test_the_by_name_set_is_inside_the_client_agnostic_sweep(self):
+        # The by-name list above protects claude-code only. The client-agnostic
+        # sweep in test_committed_tree_sanitization.py protects every client,
+        # including ones that do not exist yet. If a file named here is outside
+        # that sweep, the sweep is narrower than this file and the next client's
+        # equivalent file is unguarded.
+        swept = {path.resolve() for path in swept_text_files()}
+        for path in _committed_text_files():
+            self.assertIn(
+                path.resolve(),
+                swept,
+                f"{path.name} is covered by name here but not by the "
+                f"client-agnostic sweep",
             )
 
     def test_probe_scripts_never_copy_the_credential_file(self):

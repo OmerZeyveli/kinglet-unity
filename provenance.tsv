@@ -412,3 +412,5 @@ docs/research/platform-spike/artifacts/client/claude-code/20260727T095800Z-clien
 docs/research/platform-spike/artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/scope-known-marketplaces.json	original	-	-	-	original	kinglet-0c-claude-code-linux-artifact-scope-known-marketplaces-json
 docs/research/platform-spike/artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/scope-project-settings-local.json	original	-	-	-	original	kinglet-0c-claude-code-linux-artifact-scope-project-settings-local-json
 docs/research/platform-spike/artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/tool-trace.json	original	-	-	-	original	kinglet-0c-claude-code-linux-artifact-tool-trace-json
+tests/kinglet_spike/spike_tree.py	original	-	-	-	original	client-agnostic-committed-spike-tree-walker
+tests/kinglet_spike/test_committed_tree_sanitization.py	original	-	-	-	original	client-agnostic-committed-text-sanitization-sweep

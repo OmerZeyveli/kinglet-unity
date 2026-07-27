@@ -198,6 +198,20 @@ jobs:
       - name: Run test suite
         run: bash tests/run-tests.sh
 
+      # Secondary net only. The primary gate is the client-agnostic sweep in
+      # tests/kinglet_spike/test_committed_tree_sanitization.py, which a developer
+      # runs locally; this step only makes a leak loud in the PR checks as well.
+      # Plain `grep -r` (no -P, no pipe into head) so it stays portable.
+      - name: Sanitize committed spike text
+        run: |
+          if grep -rInE '(/Users/|/home/[a-z]|[A-Z]:\\Users\\|gh[pousr]_[A-Za-z0-9]{20,}|/tmp/kinglet-live)' \
+               spikes/platform/clients \
+               docs/research/platform-spike/evidence \
+               docs/research/platform-spike/artifacts; then
+            echo "committed spike text contains a machine path, token, or the disposable probe root" >&2
+            exit 1
+          fi
+
       - name: Verify spike contract JSON
         run: |
           python3 -m json.tool spikes/platform/contracts/evidence-v1.json > /dev/null
