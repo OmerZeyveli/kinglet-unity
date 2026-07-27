@@ -1,0 +1,1 @@
+Installing plugin "kinglet-client-probe@kinglet-client-probe"...✔ Successfully installed plugin: kinglet-client-probe@kinglet-client-probe (scope: local)

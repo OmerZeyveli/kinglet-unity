@@ -2,7 +2,7 @@
 
 test_client_results.py covers the validator against synthetic fixtures. This file
 covers the real artefacts on disk: the authored observations document, the published
-evidence record, and the published artifact tree.
+evidence records — one per matrix probe cell — and the published artifact tree.
 
 The invariants worth failing over:
   1. The observations document validates against the frozen 12-case catalog.
@@ -12,7 +12,10 @@ The invariants worth failing over:
      executed. This is the specific fabrication risk this evidence set ran into:
      two cases were summarised as Native/pass from memory, but their prompts were
      never run and no artifact supported them.
-  4. Committed evidence AND the committed probe scripts that produced it carry
+  4. The published records partition the 12 cases across the frozen matrix's
+     probe cells: each case is asserted in exactly one record, each record binds
+     to exactly one cell, and a cell closes only if every case it carries passed.
+  5. Committed evidence AND the committed probe scripts that produced it carry
      no absolute user path, credential, or disposable probe root. The scripts are
      the highest-risk text in this tree — they are the only committed files that
      legitimately mention the credential file at all — so they are scanned by the
@@ -45,16 +48,22 @@ from tools.kinglet_spike.client_results import (
     OBSERVATIONS_SCHEMA,
     load_client_observations,
 )
+from tools.kinglet_spike.coverage import evaluate_coverage
 from tools.kinglet_spike.load import load_record
-from tools.kinglet_spike.validate import SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS
+from tools.kinglet_spike.validate import (
+    SECRET_PATTERNS,
+    SENSITIVE_PATH_PATTERNS,
+    validate_record,
+)
 
 REPO = Path(__file__).resolve().parents[2]
 OBSERVATIONS = REPO / "spikes/platform/clients/claude-code/observations-linux.json"
 CASES = REPO / "spikes/platform/clients/contracts/cases-v1.json"
 PLATFORM = REPO / "docs/research/platform-spike"
-RUN_ID = "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01"
-RECORD = PLATFORM / f"evidence/client/claude-code/{RUN_ID}.json"
-ARTIFACTS = PLATFORM / f"artifacts/client/claude-code/{RUN_ID}"
+EVIDENCE_DIR = PLATFORM / "evidence/client/claude-code"
+ARTIFACT_ROOT = PLATFORM / "artifacts/client/claude-code"
+MATRIX = REPO / "spikes/platform/contracts/matrix-v1.json"
+CELL_PREFIX = "client.claude-code.linux-ubuntu-24-04-x64."
 PROBE_DIR = REPO / "spikes/platform/clients/claude-code/probe"
 EXPECTED_PROBE_SCRIPTS = ("run.sh", "run2.sh")
 
@@ -84,6 +93,15 @@ CREDENTIALS = re.compile(r"\.credentials")
 ALLOWED_CREDENTIAL_REFERENCE = GENERIC_ALLOWED_CREDENTIAL_REFERENCE
 
 
+def _record_paths() -> tuple[Path, ...]:
+    """Every published Claude Code record, discovered rather than named.
+
+    One record per matrix probe cell now, so a hardcoded run_id would either go
+    stale or — worse — keep passing while silently ignoring two of the three.
+    """
+    return tuple(sorted(EVIDENCE_DIR.glob("*.json")))
+
+
 def _probe_scripts() -> tuple[Path, ...]:
     return tuple(sorted(p for p in PROBE_DIR.glob("*.sh") if p.is_file()))
 
@@ -97,8 +115,10 @@ def _digest(path: Path) -> str:
 
 
 def _committed_text_files() -> tuple[Path, ...]:
-    paths = [OBSERVATIONS, RECORD]
-    paths.extend(sorted(p for p in ARTIFACTS.iterdir() if p.is_file()))
+    paths = [OBSERVATIONS]
+    paths.extend(_record_paths())
+    for directory in sorted(p for p in ARTIFACT_ROOT.iterdir() if p.is_dir()):
+        paths.extend(sorted(p for p in directory.iterdir() if p.is_file()))
     # The probe scripts are committed too, and they are the files that actually
     # touch the operator's machine. Scanning only the evidence they produced left
     # the riskiest text in the tree unguarded.
@@ -109,8 +129,28 @@ def _committed_text_files() -> tuple[Path, ...]:
 class ClaudeCodeObservationsTests(unittest.TestCase):
     def setUp(self):
         self.observations = load_client_observations(OBSERVATIONS)
-        self.record = load_record(RECORD)
+        self.records = tuple(load_record(path) for path in _record_paths())
+        self.assertTrue(self.records, f"no published record under {EVIDENCE_DIR}")
         self.by_id = {case.id: case for case in self.observations.cases}
+        self.by_probe = {record.probe.id: record for record in self.records}
+
+    def _artifact(self, name: str) -> Path:
+        """The published copy of `name`, whichever record directories carry it.
+
+        A file cited by cases in two different probe groups is published under
+        both run_ids. Those copies must stay byte-identical, or a reader of one
+        record sees different evidence from a reader of the other.
+        """
+        copies = sorted(ARTIFACT_ROOT.glob(f"*/{name}"))
+        self.assertTrue(copies, f"{name} is not published under {ARTIFACT_ROOT}")
+        digests = {_digest(path) for path in copies}
+        self.assertEqual(
+            1,
+            len(digests),
+            f"{name} is published in {len(copies)} record directories with "
+            f"differing bytes: {sorted(p.parent.name for p in copies)}",
+        )
+        return copies[0]
 
     # -- 1. schema and coverage -------------------------------------------
     def test_observations_cover_the_frozen_catalog_exactly(self):
@@ -129,7 +169,11 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
 
     # -- 2. every passing case's evidence is really on disk ----------------
     def test_passing_cases_cite_published_artifacts(self):
-        published = {artifact.path: artifact for artifact in self.record.artifacts}
+        published = {
+            artifact.path: artifact
+            for record in self.records
+            for artifact in record.artifacts
+        }
         for case in self.observations.cases:
             if case.status != "pass":
                 continue
@@ -152,8 +196,23 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
                 )
 
     def test_record_assertions_agree_with_observed_statuses(self):
-        assertions = {a.id: a.status for a in self.record.assertions}
-        self.assertEqual(set(assertions), set(self.by_id))
+        flat = [
+            assertion
+            for record in self.records
+            for assertion in record.assertions
+        ]
+        assertions = {a.id: a.status for a in flat}
+        self.assertEqual(
+            len(flat),
+            len(assertions),
+            "a case is asserted in more than one record, so one observation "
+            "would be counted toward two coverage cells",
+        )
+        self.assertEqual(
+            set(assertions),
+            set(self.by_id),
+            "the published records are not a partition of the observed cases",
+        )
         for case_id, case in self.by_id.items():
             expected = "pass" if case.status == "pass" else "fail"
             self.assertEqual(
@@ -164,7 +223,7 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
 
     # -- 3. no pass may rest on a prompt that never ran --------------------
     def test_no_case_passes_on_an_unexecuted_prompt(self):
-        used = json.loads((ARTIFACTS / "prompts-used.json").read_text())
+        used = json.loads(self._artifact("prompts-used.json").read_text())
         executed = {p["id"]: p["executed"] for p in used["prompts"]}
         for case_id, prompt_id in CASE_PROMPT.items():
             self.assertIn(prompt_id, executed, f"{prompt_id} missing from prompts-used.json")
@@ -176,7 +235,7 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
                 )
 
     def test_prompt_digests_match_the_frozen_catalog(self):
-        used = json.loads((ARTIFACTS / "prompts-used.json").read_text())
+        used = json.loads(self._artifact("prompts-used.json").read_text())
         frozen = json.loads(
             (REPO / "spikes/platform/clients/contracts/prompts-v1.json").read_text()
         )
@@ -359,32 +418,47 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
                 )
 
     def test_record_environment_pins_the_observed_client(self):
-        self.assertEqual(self.record.subject.kind, "client")
-        self.assertEqual(self.record.subject.id, "claude-code")
-        self.assertEqual(self.record.subject.version, self.observations.client_version)
-        self.assertEqual(self.record.environment.os, "linux")
-        self.assertIn(
-            f"claude={self.observations.client_version}",
-            self.record.environment.toolchain,
-        )
+        for record in self.records:
+            self.assertEqual(record.subject.kind, "client")
+            self.assertEqual(record.subject.id, "claude-code")
+            self.assertEqual(record.subject.version, self.observations.client_version)
+            self.assertEqual(record.environment.os, "linux")
+            self.assertIn(
+                f"claude={self.observations.client_version}",
+                record.environment.toolchain,
+            )
 
-    def test_record_run_id_is_environment_qualified(self):
+    def test_record_run_id_is_environment_and_probe_qualified(self):
         # A subject-only run_id would collide with the next Claude Code host and
-        # make it unpublishable (publish.py raises E_IMMUTABLE on the key).
-        run_id = self.record.run_id
-        self.assertNotEqual(run_id, "client-probe-claudecode")
-        self.assertIn(self.record.environment.os, run_id)
-        self.assertIn(self.record.environment.arch, run_id)
-        self.assertTrue(
-            all(artifact.path.split("/")[3] == run_id for artifact in self.record.artifacts),
-            "published artifacts are not filed under the record's run_id",
+        # make it unpublishable (publish.py raises E_IMMUTABLE on the key). One
+        # host now emits one record per probe cell, so the probe id has to be in
+        # there too or those records collide with each other.
+        run_ids = [record.run_id for record in self.records]
+        self.assertEqual(
+            len(run_ids),
+            len(set(run_ids)),
+            f"published records share a run_id: {sorted(run_ids)}",
         )
+        for record in self.records:
+            run_id = record.run_id
+            self.assertNotEqual(run_id, "client-probe-claudecode")
+            self.assertIn(record.environment.os, run_id)
+            self.assertIn(record.environment.arch, run_id)
+            self.assertIn(record.probe.id, run_id)
+            self.assertTrue(
+                all(
+                    artifact.path.split("/")[3] == run_id
+                    for artifact in record.artifacts
+                ),
+                f"{run_id}: published artifacts are not filed under the "
+                f"record's run_id",
+            )
 
     def test_tool_trace_preserves_the_advertised_subagents(self):
         # agents.delegation is inconclusive, but the client DID register and
         # advertise the plugin's sub-agent. That is real evidence and the trace
         # must keep it, so a re-run has a baseline to compare against.
-        trace = json.loads((ARTIFACTS / "tool-trace.json").read_text())
+        trace = json.loads(self._artifact("tool-trace.json").read_text())
         self.assertTrue(trace["runs"])
         for run in trace["runs"]:
             self.assertIn(
@@ -401,17 +475,109 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
         self.assertIsNone(case.grade)
         listing = [
             line.strip()
-            for line in (ARTIFACTS / "receipts-listing.txt").read_text().splitlines()
+            for line in self._artifact("receipts-listing.txt").read_text().splitlines()
             if line.strip() and not line.lstrip().startswith("#")
         ]
         self.assertNotIn("agent.json", listing)
 
     def test_record_status_reflects_unclosed_cases(self):
-        # Any non-pass case must keep the whole record off `pass`, so a partially
-        # observed suite can never close a coverage cell.
-        if any(case.status != "pass" for case in self.observations.cases):
-            self.assertNotEqual(self.record.status, "pass")
+        # Any non-pass case must keep its OWN record off `pass`. Coverage keys a
+        # cell's state on record.status, so this is what stops an inconclusive
+        # case from closing a cell — and, since the suite is split, it must hold
+        # per record rather than only for the suite as a whole.
+        for record in self.records:
+            observed = [self.by_id[a.id] for a in record.assertions]
+            self.assertTrue(observed, f"{record.run_id} asserts nothing")
+            if any(case.status != "pass" for case in observed):
+                unclosed = sorted(c.id for c in observed if c.status != "pass")
+                self.assertNotEqual(
+                    record.status,
+                    "pass",
+                    f"{record.probe.id} is `pass` while {unclosed} were never "
+                    f"observed to pass",
+                )
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ClaudeCodeCoverageBindingTests(unittest.TestCase):
+    """The committed records must actually reach the frozen matrix.
+
+    This is the call site, and it is the bug the split exists to fix: probe.id
+    was the constant "capability-suite", which is the suffix of the *windows
+    cell id* and not the `probe` value of any cell anywhere. coverage.py matches
+    on `record.probe.id == cell.probe`, so a correct, published, sanitized
+    evidence set closed nothing at all. Asserting probe id strings in the
+    library would not have caught it; only running the real matrix does.
+    """
+
+    def setUp(self):
+        self.records = tuple(load_record(path) for path in _record_paths())
+        self.assertTrue(self.records, f"no published record under {EVIDENCE_DIR}")
+        self.cells = {
+            cell.id: cell
+            for cell in evaluate_coverage(self.records, MATRIX)
+            if cell.id.startswith(CELL_PREFIX)
+        }
+
+    def test_every_committed_record_lands_in_a_matrix_cell(self):
+        self.assertTrue(self.cells, f"matrix defines no cells under {CELL_PREFIX}")
+        landed = {run_id for cell in self.cells.values() for run_id in cell.run_ids}
+        for record in self.records:
+            self.assertIn(
+                record.run_id,
+                landed,
+                f"{record.run_id} publishes probe.id {record.probe.id!r}, which "
+                f"matches no cell in matrix-v1.json — it closes nothing",
+            )
+
+    def test_each_linux_cell_is_reached_by_exactly_one_record(self):
+        for cell_id, cell in sorted(self.cells.items()):
+            self.assertEqual(
+                1,
+                len(cell.run_ids),
+                f"{cell_id} is backed by {len(cell.run_ids)} records "
+                f"({list(cell.run_ids)}); one probe cell takes one record",
+            )
+
+    def test_a_cell_closes_only_when_every_case_it_carries_passed(self):
+        # The honest form of "an inconclusive case must not close a cell":
+        # derived from the observations, not from a hardcoded expectation about
+        # which cells happen to be open today.
+        by_id = {case.id: case for case in load_client_observations(OBSERVATIONS).cases}
+        for record in self.records:
+            observed = [by_id[assertion.id] for assertion in record.assertions]
+            unclosed = sorted(c.id for c in observed if c.status != "pass")
+            cell = self.cells[CELL_PREFIX + record.probe.id]
+            if unclosed:
+                self.assertNotEqual(
+                    "pass",
+                    cell.state,
+                    f"{cell.id} is closed while {unclosed} were never observed "
+                    f"to pass",
+                )
+
+    def test_no_record_is_invalid_for_an_unexpected_reason(self):
+        # The path-semantics record is the first client record whose cases all
+        # pass, and evidence-v1 requires a `pass` to carry source references.
+        # The observations carry none for any case -- source_urls exists there to
+        # document an *Unavailable* grade, while a Native/pass is evidenced by
+        # artifacts. So that record validates with exactly one diagnostic and
+        # coverage reports its cell `invalid` rather than `pass`: the evidence is
+        # committed and readable, and the cell honestly stays open. Fabricating
+        # citations to close it is the thing this test exists to prevent.
+        #
+        # Any OTHER diagnostic, on any record, is real rot.
+        allowed = {("E_FIELD", "sources")}
+        for record in self.records:
+            codes = {
+                (d.code, d.location)
+                for d in validate_record(record, PLATFORM)
+            }
+            self.assertTrue(
+                codes <= allowed,
+                f"{record.run_id} is invalid for an unexpected reason: "
+                f"{sorted(codes - allowed)}",
+            )

@@ -5,7 +5,7 @@ Public API
 ClientObservationSet    Parsed observation document (dataclass).
 load_client_observations(path)      Path → ClientObservationSet
 validate_client_observations(value, cases)  dict → ClientObservationSet
-to_evidence(observations, environment)      → EvidenceRecord
+to_evidence_records(observations, environment)  → tuple[EvidenceRecord, ...]
 
 Validation rules (kinglet.client-probe.observations/v1)
 -------------------------------------------------------
@@ -19,20 +19,28 @@ Validation rules (kinglet.client-probe.observations/v1)
 * A fail may carry a grade but never closes the cell.
 * Cases sorted by ID in the resulting ClientObservationSet.
 
-to_evidence probe.id choice
----------------------------
-All 12 rich cases are grouped under a single probe.id of "capability-suite"
-(the same coarse probe id used for the capability-suite matrix cell on all
-platforms). The per-client probe tasks (4–5) will refine the cell grouping
-once the matrix mapping is finalised.
+probe.id choice
+---------------
+`matrix-v1.json` does not define one cell per client. It defines three per
+client on linux and macos (`local-executable`, `mcp-discovery`,
+`path-semantics`) and one on windows. The old code hardcoded
+probe.id="capability-suite", which is the *suffix of the windows cell id* and
+not the `probe` value of any cell on any platform — coverage matches on
+`record.probe.id == cell.probe`, so that record closed nothing anywhere.
 
-to_evidence run_id shape
-------------------------
-`<UTC stamp>-client-probe-<subject>-<os>-<release>-<arch>-01`, matching the
-runtime records (`20260727T051518Z-runtime-python-linux-noble-01`). It must be
-environment-qualified: publish.py keys on `evidence/<kind>/<id>/<run_id>.json`
-and raises E_IMMUTABLE on collision, so a subject-only id lets exactly one host
-per client be published, ever.
+PROBE_GROUPS below is the single reviewable table that partitions the 12 frozen
+cases across the three split cells; PLATFORM_PROBES says which cells a platform
+has. One record is emitted per cell, carrying only that cell's cases.
+
+run_id shape
+------------
+`<UTC stamp>-client-probe-<subject>-<os>-<release>-<arch>-<probe>-01`, matching
+the runtime records (`20260727T051518Z-runtime-python-linux-noble-01`) with a
+probe segment added. It must be qualified by BOTH environment and probe:
+publish.py keys on `evidence/<kind>/<id>/<run_id>.json` and raises E_IMMUTABLE
+on collision, so a subject-only id lets exactly one host per client be published
+ever, and a merely environment-qualified id lets exactly one of the three
+per-probe records from a single host be published.
 """
 from __future__ import annotations
 
@@ -78,12 +86,66 @@ _CASE_FIELDS = frozenset((
     "emulation_mechanism",
 ))
 
-# Probe id used when converting to EvidenceRecord.
-# Rationale: the coverage matrix groups all client capabilities under the
-# coarse "capability-suite" cell; refined per-case mapping is deferred to
-# Tasks 4–5. See module docstring for the probe.id choice note.
-_PROBE_ID = "capability-suite"
 _PROBE_CONTRACT = "kinglet.client-probe.observations/v1"
+
+# ---------------------------------------------------------------------------
+# THE case → matrix probe cell mapping
+# ---------------------------------------------------------------------------
+# One row per split probe cell. Every case id in the frozen catalog
+# (spikes/platform/clients/contracts/cases-v1.json) appears in exactly one row;
+# partition_cases() enforces both halves of that against the observations, which
+# validate_client_observations() has already pinned to the catalog exactly.
+#
+# The axis is what each case actually demonstrates, not which words it shares
+# with a cell name:
+#
+#   local-executable  the client locates and operates on something installed on
+#                     the local machine — the toolkit install lifecycle
+#                     (discover / update / remove) plus the PATH invocation the
+#                     cell is named for.
+#   mcp-discovery     the client resolves a capability BY NAME and invokes it,
+#                     and the structured result that comes back: MCP tools,
+#                     sub-agents, the natural-language workflow entry point, and
+#                     the receipt those invocations are required to produce.
+#   path-semantics    behaviour that turns on WHICH path or scope a rule
+#                     resolves against: project-root instructions, project-vs-user
+#                     settings stores, and the two guards (hook, approval) that
+#                     fire on a path inside the project.
+PROBE_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("local-executable", (
+        "executable.local",
+        "install.discover",
+        "install.remove",
+        "install.update",
+    )),
+    ("mcp-discovery", (
+        "agents.delegation",
+        "mcp.discover-call",
+        "structured-result",
+        "workflow.natural-language",
+    )),
+    ("path-semantics", (
+        "approvals.mutation",
+        "hooks.pre-mutation-block",
+        "instructions.project",
+        "scope.project-user",
+    )),
+)
+
+# Windows defines a single aggregate cell per client instead of the three-way
+# split. Its matrix `probe` value is "client-capability-suite"; the bare
+# "capability-suite" is only the suffix of the cell *id*, and using it as the
+# probe id is what made the previous record match no cell at all.
+AGGREGATE_PROBE = "client-capability-suite"
+
+_SPLIT_PROBES = tuple(probe_id for probe_id, _ in PROBE_GROUPS)
+
+# os → the probe cells matrix-v1.json defines for a client on that platform.
+PLATFORM_PROBES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("linux", _SPLIT_PROBES),
+    ("macos", _SPLIT_PROBES),
+    ("windows", (AGGREGATE_PROBE,)),
+)
 
 # Characters kept verbatim by _slugify; everything else becomes '-'.
 _SLUG_ALLOWED = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.-")
@@ -352,20 +414,115 @@ def host_slug(environment: Environment) -> str:
     return _slugify(f"{environment.os}-{environment.release}-{environment.arch}")
 
 
-def build_run_id(safe_subject: str, environment: Environment, timestamp: str) -> str:
-    """Build an environment-qualified run_id.
+def build_run_id(
+    safe_subject: str,
+    environment: Environment,
+    timestamp: str,
+    probe_id: str,
+) -> str:
+    """Build an environment- AND probe-qualified run_id.
 
     Shape follows the runtime records
     (`20260727T051518Z-runtime-python-linux-noble-01`):
-    `<UTC stamp>-client-probe-<subject>-<host slug>-01`.
+    `<UTC stamp>-client-probe-<subject>-<host slug>-<probe>-01`.
 
     Deriving the id from the subject alone made every Claude Code host record
     collide on `evidence/<kind>/<id>/<run_id>.json`, so the second host could
-    never be published (E_IMMUTABLE). The stamp plus the host slug keeps each
-    host's record distinct.
+    never be published (E_IMMUTABLE). Adding the host slug fixed that, but one
+    host now emits one record per probe cell, and those three collide with each
+    other on the same key for the same reason. `probe_id` is required, not
+    defaulted, so a caller cannot reintroduce the collision by omission.
     """
     stamp = timestamp.replace("-", "").replace(":", "")
-    return f"{stamp}-client-probe-{safe_subject}-{host_slug(environment)}-01"
+    return (
+        f"{stamp}-client-probe-{safe_subject}-{host_slug(environment)}"
+        f"-{_slugify(probe_id)}-01"
+    )
+
+
+def case_probe_map() -> dict[str, str]:
+    """Invert PROBE_GROUPS to {case id: probe id}.
+
+    Raises:
+        EvidenceError E_COVERAGE if a case id appears in more than one group.
+        A case in two groups would otherwise close two cells off one
+        observation, which is double-counting evidence.
+    """
+    mapping: dict[str, str] = {}
+    for probe_id, case_ids in PROBE_GROUPS:
+        for case_id in case_ids:
+            if case_id in mapping:
+                raise EvidenceError(
+                    "E_COVERAGE",
+                    f"case {case_id!r} is mapped to two probes: "
+                    f"{mapping[case_id]!r} and {probe_id!r}",
+                )
+            mapping[case_id] = probe_id
+    return mapping
+
+
+def probes_for_os(os_name: str) -> tuple[str, ...]:
+    """The matrix probe cells defined for a client on `os_name`.
+
+    Raises:
+        EvidenceError E_COVERAGE for an os with no client cells. Failing here
+        beats silently defaulting to one platform's cell shape on another.
+    """
+    for name, probes in PLATFORM_PROBES:
+        if name == os_name:
+            return probes
+    known = ", ".join(name for name, _ in PLATFORM_PROBES)
+    raise EvidenceError(
+        "E_COVERAGE",
+        f"no client probe cells are defined for os {os_name!r} (known: {known})",
+    )
+
+
+def partition_cases(
+    observations: ClientObservationSet,
+    os_name: str,
+) -> tuple[tuple[str, tuple[CaseObservation, ...]], ...]:
+    """Split the observed cases across the probe cells `os_name` defines.
+
+    Returns one (probe id, cases) pair per cell, in PLATFORM_PROBES order. On
+    windows the single aggregate cell carries every case.
+
+    Raises:
+        EvidenceError E_COVERAGE if an observed case is in no group, maps to a
+        probe this platform does not define, or if a group ends up empty. Every
+        case must land in exactly one cell — a case that quietly vanished from
+        the table would otherwise be dropped from the evidence without a word.
+    """
+    probes = probes_for_os(os_name)
+    if probes == (AGGREGATE_PROBE,):
+        return ((AGGREGATE_PROBE, observations.cases),)
+
+    mapping = case_probe_map()
+    buckets: dict[str, list[CaseObservation]] = {probe: [] for probe in probes}
+    for case in observations.cases:
+        probe_id = mapping.get(case.id)
+        if probe_id is None:
+            raise EvidenceError(
+                "E_COVERAGE",
+                f"case {case.id!r} is in no PROBE_GROUPS row, so its evidence "
+                f"would be silently dropped",
+            )
+        if probe_id not in buckets:
+            raise EvidenceError(
+                "E_COVERAGE",
+                f"case {case.id!r} maps to probe {probe_id!r}, which os "
+                f"{os_name!r} does not define",
+            )
+        buckets[probe_id].append(case)
+
+    empty = tuple(probe for probe in probes if not buckets[probe])
+    if empty:
+        raise EvidenceError(
+            "E_COVERAGE",
+            f"probe {empty[0]!r} carries no observed case, so it would publish "
+            f"an evidence-free record",
+        )
+    return tuple((probe, tuple(buckets[probe])) for probe in probes)
 
 
 def _prompt_digest(text: str) -> str:
@@ -386,32 +543,14 @@ def _load_prompts() -> dict[str, str]:
     return {p["id"]: _prompt_digest(p["text"]) for p in raw.get("prompts", [])}
 
 
-def to_evidence(
+def _build_record(
     observations: ClientObservationSet,
     environment: Environment,
+    probe_id: str,
+    cases: Sequence[CaseObservation],
+    now: str,
 ) -> EvidenceRecord:
-    """Convert a validated ClientObservationSet to an EvidenceRecord.
-
-    The record uses subject.kind="client" and probe.id="capability-suite"
-    (see module docstring for the probe.id rationale).
-
-    Passing cases contribute AssertionResult entries (status="pass").
-    Failing/inconclusive cases contribute AssertionResult entries (status="fail").
-
-    Artifacts are synthesised from artifact_paths on passing Native/Emulated cases.
-    The prompt field is omitted (None) since the probe set covers multiple prompts.
-
-    Args:
-        observations:   Validated ClientObservationSet.
-        environment:    Environment dataclass (os, release, arch, native, toolchain).
-
-    Returns:
-        EvidenceRecord with schema="kinglet.spike.evidence/v1".
-    """
-    import datetime
-
-    now = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
+    """Build one EvidenceRecord for one probe cell from that cell's cases."""
     # Build assertions from cases.
     assertions: list[AssertionResult] = []
     artifacts: list[Artifact] = []
@@ -421,7 +560,7 @@ def to_evidence(
 
     overall_status = "pass"
 
-    for case in observations.cases:
+    for case in cases:
         a_status = "pass" if case.status == "pass" else "fail"
         if case.status != "pass":
             overall_status = "fail"
@@ -453,7 +592,7 @@ def to_evidence(
                 ))
 
     safe_subject = observations.subject.replace("-", "")[:24]
-    run_id = build_run_id(safe_subject, environment, now)
+    run_id = build_run_id(safe_subject, environment, now, probe_id)
 
     return EvidenceRecord(
         schema=EVIDENCE_SCHEMA,
@@ -464,7 +603,7 @@ def to_evidence(
             version=observations.client_version,
         ),
         probe=Probe(
-            id=_PROBE_ID,
+            id=probe_id,
             contract=_PROBE_CONTRACT,
         ),
         environment=environment,
@@ -477,4 +616,40 @@ def to_evidence(
         measurements=(),
         sources=tuple(sources),
         prompt=None,
+    )
+
+
+def to_evidence_records(
+    observations: ClientObservationSet,
+    environment: Environment,
+) -> tuple[EvidenceRecord, ...]:
+    """Convert a validated ClientObservationSet to one record per probe cell.
+
+    Three records on linux/macos (`local-executable`, `mcp-discovery`,
+    `path-semantics`), one on windows (`client-capability-suite`). Each record
+    uses subject.kind="client" and carries only its cell's cases — every case
+    lands in exactly one record, enforced by partition_cases().
+
+    Passing cases contribute AssertionResult entries (status="pass").
+    Failing/inconclusive cases contribute AssertionResult entries (status="fail"),
+    which also drops the record's own status off "pass". Coverage keys a cell's
+    state on record.status, so a cell with any unobserved case stays open.
+
+    Artifacts are synthesised from artifact_paths on passing Native/Emulated cases.
+    The prompt field is omitted (None) since the probe set covers multiple prompts.
+
+    Args:
+        observations:   Validated ClientObservationSet.
+        environment:    Environment dataclass (os, release, arch, native, toolchain).
+
+    Returns:
+        Tuple of EvidenceRecord with schema="kinglet.spike.evidence/v1", in
+        PLATFORM_PROBES order.
+    """
+    import datetime
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return tuple(
+        _build_record(observations, environment, probe_id, cases, now)
+        for probe_id, cases in partition_cases(observations, environment.os)
     )

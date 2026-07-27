@@ -57,11 +57,21 @@ KNOWN_COVERED = (
     "spikes/platform/clients/claude-code/hooks/pre-mutation-hook.sh",
     "spikes/platform/clients/shared/create-project.sh",
     "spikes/platform/clients/shared/create-project.ps1",
+    # One record per matrix probe cell. All three are named: a sweep that
+    # reached only the first would leave two thirds of the published evidence
+    # unscanned while still looking covered.
     "docs/research/platform-spike/evidence/client/claude-code/"
-    "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01.json",
+    "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64"
+    "-local-executable-01.json",
+    "docs/research/platform-spike/evidence/client/claude-code/"
+    "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64"
+    "-mcp-discovery-01.json",
+    "docs/research/platform-spike/evidence/client/claude-code/"
+    "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64"
+    "-path-semantics-01.json",
     "docs/research/platform-spike/artifacts/client/claude-code/"
-    "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-01/"
-    "prompts-used.json",
+    "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64"
+    "-mcp-discovery-01/prompts-used.json",
 )
 
 

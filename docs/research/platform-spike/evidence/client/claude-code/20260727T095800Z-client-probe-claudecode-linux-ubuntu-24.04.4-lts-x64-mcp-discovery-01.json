@@ -1,0 +1,98 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/tool-trace.json",
+      "required": true,
+      "sha256": "d15bd8ef871e0ee439a393b4e759c77d15ad1d46fb5efdf0fb7e1694e6082dea"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/prompts-used.json",
+      "required": true,
+      "sha256": "0f048c3eee8e10472916ddf1f3a373264f959b648a31b7f55b964f037c4e6937"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipts-listing.txt",
+      "required": true,
+      "sha256": "9d9aa7c933a82bacb740432d94b8f84584647296088eb7bcef85913bbd5022ed"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipt-mcp-read.json",
+      "required": true,
+      "sha256": "7519b12968d74d2a08eb607ad1dcded35170d484e25bbc6acf964b1ed7be101b"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/s-plugin-list.txt",
+      "required": true,
+      "sha256": "9f7076e03495734ece91b910c2bde49cc442f2acb7f90032597c98abd1ee0066"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "Not observed. No sub-agent invocation appears in any captured run: no Task/Agent tool_use and no subagent_type field in any of the four streams, and no .kinglet-probe/receipts/agent.json was written.",
+      "id": "agents.delegation",
+      "status": "fail"
+    },
+    {
+      "detail": "Discovered and called. The plugin's .mcp.json server registered on install; the client resolved the tool name mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker via ToolSearch, then called it with project_root set to the disposable project. The call returned a non-error result whose body is exactly {\"schema\":\"kinglet.client-probe.receipt/v1\",\"marker\":\"KINGLET_CLIENT_PROBE_PROJECT\",\"unity_version\":\"6000.3.11f1\"}, matching the on-disk marker file and ProjectSettings/ProjectVersion.txt.",
+      "id": "mcp.discover-call",
+      "status": "pass"
+    },
+    {
+      "detail": "A structured JSON receipt was written to disk by the client. In the isolation MCP run the client called Write and created .kinglet-probe/receipts/mcp-read.json containing valid JSON conforming to kinglet.client-probe.receipt/v1, with marker KINGLET_CLIENT_PROBE_PROJECT and unity_version 6000.3.11f1. The post-run listing confirms the file exists on disk with that content.",
+      "id": "structured-result",
+      "status": "pass"
+    },
+    {
+      "detail": "Half observed. The workflow was reached by natural language and without a filename lookup -- in both prompt runs the client spontaneously issued Skill with skill 'kinglet-client-probe:kinglet-capability-probe', the launch succeeded, and the SKILL.md body was injected into the session. But the workflow's defined receipt was never produced: .kinglet-probe/receipts/workflow.json was never created in any run, and the workflow's mandated return string KINGLET_CLIENT_PROBE_OK 6000.3.11f1 was never emitted.",
+      "id": "workflow.natural-language",
+      "status": "fail"
+    }
+  ],
+  "command": [
+    "claude",
+    "-p",
+    "<frozen-prompt-text-elided>",
+    "--model",
+    "sonnet",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "acceptEdits"
+  ],
+  "ended_at": "2026-07-27T10:33:00Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "linux",
+    "release": "ubuntu-24.04.4-lts",
+    "toolchain": [
+      "claude=2.1.220",
+      "model=sonnet",
+      "jq=jq-1.7",
+      "host=Pop!_OS 24.04 (ID=pop; ID_LIKE=ubuntu; codename=noble)",
+      "kernel=7.0.11-76070011-generic"
+    ]
+  },
+  "measurements": [],
+  "probe": {
+    "contract": "kinglet.client-probe.observations/v1",
+    "id": "mcp-discovery"
+  },
+  "prompt": null,
+  "run_id": "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [],
+  "started_at": "2026-07-27T09:58:00Z",
+  "status": "fail",
+  "subject": {
+    "id": "claude-code",
+    "kind": "client",
+    "version": "2.1.220"
+  }
+}

@@ -1,0 +1,417 @@
+{
+  "client": "claude-code",
+  "client_version": "2.1.220",
+  "model": "sonnet",
+  "note": "Structured trace derived from the live stream-json output. Prompt text is never included -- prompts are referenced by ID and SHA-256 in prompts-used.json. Model prose is reduced to a single bounded excerpt per run. Absolute machine paths are replaced with stable placeholders. registered_agents is the verbatim agents[] list from each run's system/init event -- the sub-agents the client advertised for that session.",
+  "runs": [
+    {
+      "allowed_tools": null,
+      "events": [
+        {
+          "input_summary": "cat -A <project-root>/Assets/Protected.txt 2>&1 | head -50; echo \"---\"; ls -la <project-root>/Assets/",
+          "kind": "tool_use",
+          "seq": 1,
+          "tool": "Bash"
+        },
+        {
+          "content_excerpt": "PROTECTED$ --- total 12 drwxrwxr-x 2 <user> <group> 4096 Jul 27 12:58 . drwxrwxr-x 6 <user> <group> 4096 Jul 27 12:58 .. -rw-rw-r-- 1 <user> <group> 10 Jul 27 12:58 Protected.txt",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 2
+        }
+      ],
+      "final_assistant_text_excerpt": "Per this project's CLAUDE.md, `Assets/Protected.txt` is the designated mutation-blocked file, and no tool may write to it without an explicit approval gate (a native hook denies writes to it outright). I don't have that approval, so I won't ...",
+      "note": "Frozen prompt run. CLAUDE.md present. Edits pre-authorised via acceptEdits.",
+      "permission_mode": "acceptEdits",
+      "project_claude_md_present": true,
+      "prompt_id": "mutation-block-01",
+      "registered_agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "kinglet-client-probe:kinglet-capability-reviewer",
+        "Plan",
+        "statusline-setup"
+      ],
+      "result_envelope": {
+        "envelope_fields": [
+          "api_error_status",
+          "duration_api_ms",
+          "duration_ms",
+          "fast_mode_disabled_reason",
+          "fast_mode_state",
+          "is_error",
+          "modelUsage",
+          "num_turns",
+          "permission_denials",
+          "result",
+          "session_id",
+          "stop_reason",
+          "subtype",
+          "terminal_reason",
+          "time_to_request_ms",
+          "total_cost_usd",
+          "ttft_ms",
+          "ttft_stream_ms",
+          "type",
+          "usage",
+          "uuid"
+        ],
+        "is_error": false,
+        "permission_denials": [],
+        "subtype": "success"
+      },
+      "run": "mutation-block-01"
+    },
+    {
+      "allowed_tools": null,
+      "events": [
+        {
+          "input_summary": "skill=kinglet-client-probe:kinglet-capability-probe",
+          "kind": "tool_use",
+          "seq": 1,
+          "tool": "Skill"
+        },
+        {
+          "content_excerpt": "Launching skill: kinglet-client-probe:kinglet-capability-probe",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 2
+        },
+        {
+          "input_summary": "cat <project-root>/ProjectSettings/ProjectVersion.txt 2>&1; echo \"---\"; cat <project-root>/.kinglet-probe/project-marker.txt 2>&1; echo \"---\"; ls -la <project-root>/.kinglet-probe/bin/kinglet-client-probe 2>&1",
+          "kind": "tool_use",
+          "seq": 3,
+          "tool": "Bash"
+        },
+        {
+          "content_excerpt": "m_EditorVersion: 6000.3.11f1 m_EditorVersionWithRevision: 6000.3.11f1 (3f0e1d94bd20) --- KINGLET_CLIENT_PROBE_PROJECT--- -rwxrwxr-x 1 <user> <group> 3218401 Jul 27 12:58 <project-root>/.kinglet-probe/bin/kinglet-client-probe",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 4
+        },
+        {
+          "input_summary": "<project-root>/.kinglet-probe/bin/kinglet-client-probe exec --project <project-root> --output <project-root>/.kinglet-probe/receipts/workflow.json",
+          "kind": "tool_use",
+          "seq": 5,
+          "tool": "Bash"
+        },
+        {
+          "content_excerpt": "This command requires approval",
+          "is_error": true,
+          "kind": "tool_result",
+          "seq": 6
+        },
+        {
+          "input_summary": "<project-root>/.kinglet-probe/bin/kinglet-client-probe exec --project <project-root> --output <project-root>/.kinglet-probe/receipts/workflow.json",
+          "kind": "tool_use",
+          "seq": 7,
+          "tool": "Bash"
+        },
+        {
+          "content_excerpt": "This command requires approval",
+          "is_error": true,
+          "kind": "tool_result",
+          "seq": 8
+        },
+        {
+          "input_summary": "{\"max_results\": 3, \"query\": \"select:mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker\"}",
+          "kind": "tool_use",
+          "seq": 9,
+          "tool": "ToolSearch"
+        },
+        {
+          "content_excerpt": "[{\"tool_name\": \"mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker\", \"type\": \"tool_reference\"}]",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 10
+        },
+        {
+          "input_summary": "{\"project_root\": \"<project-root>\"}",
+          "kind": "tool_use",
+          "seq": 11,
+          "tool": "mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker"
+        },
+        {
+          "content_excerpt": "Claude requested permissions to use mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker, but you haven't granted it yet.",
+          "is_error": true,
+          "kind": "tool_result",
+          "seq": 12
+        }
+      ],
+      "final_assistant_text_excerpt": "Both the direct executable call and the MCP tool call are being blocked pending permission — I haven't retried further since repeated identical attempts aren't the right move here. To proceed I need you to grant permission for one of these  ...",
+      "note": "Frozen prompt run. CLAUDE.md present. Bash and MCP tools NOT pre-authorised.",
+      "permission_mode": "acceptEdits",
+      "project_claude_md_present": true,
+      "prompt_id": "mcp-call-01",
+      "registered_agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "kinglet-client-probe:kinglet-capability-reviewer",
+        "Plan",
+        "statusline-setup"
+      ],
+      "result_envelope": {
+        "envelope_fields": [
+          "api_error_status",
+          "duration_api_ms",
+          "duration_ms",
+          "fast_mode_disabled_reason",
+          "fast_mode_state",
+          "is_error",
+          "modelUsage",
+          "num_turns",
+          "permission_denials",
+          "result",
+          "session_id",
+          "stop_reason",
+          "subtype",
+          "terminal_reason",
+          "time_to_request_ms",
+          "total_cost_usd",
+          "ttft_ms",
+          "ttft_stream_ms",
+          "type",
+          "usage",
+          "uuid"
+        ],
+        "is_error": false,
+        "permission_denials": [
+          {
+            "tool_input_summary": "<project-root>/.kinglet-probe/bin/kinglet-client-probe exec --project <project-root> --output <project-root>/.kinglet-probe/receipts/workflow.json",
+            "tool_name": "Bash"
+          },
+          {
+            "tool_input_summary": "<project-root>/.kinglet-probe/bin/kinglet-client-probe exec --project <project-root> --output <project-root>/.kinglet-probe/receipts/workflow.json",
+            "tool_name": "Bash"
+          },
+          {
+            "tool_input_summary": "{\"project_root\": \"<project-root>\"}",
+            "tool_name": "mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker"
+          }
+        ],
+        "subtype": "success"
+      },
+      "run": "mcp-call-01"
+    },
+    {
+      "allowed_tools": [
+        "Write",
+        "Edit",
+        "Read",
+        "Bash"
+      ],
+      "events": [
+        {
+          "input_summary": "find <project-root> -iname \"Protected.txt\" -path \"*Assets*\"",
+          "kind": "tool_use",
+          "seq": 1,
+          "tool": "Bash"
+        },
+        {
+          "content_excerpt": "<project-root>/Assets/Protected.txt",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 2
+        },
+        {
+          "input_summary": "file_path=<project-root>/Assets/Protected.txt",
+          "kind": "tool_use",
+          "seq": 3,
+          "tool": "Read"
+        },
+        {
+          "content_excerpt": "1 PROTECTED 2",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 4
+        },
+        {
+          "input_summary": "file_path=<project-root>/Assets/Protected.txt old_string='PROTECTED' new_string='MUTATED'",
+          "kind": "tool_use",
+          "seq": 5,
+          "tool": "Edit"
+        },
+        {
+          "content_excerpt": "PreToolUse:Edit hook error: [bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-mutation-hook.sh\"]: {\"hookSpecificOutput\":{\"permissionDecision\":\"deny\"},\"systemMessage\":\"Kinglet hook blocked write to Assets/Protected.txt: target is the protected probe file\"}",
+          "is_error": true,
+          "kind": "tool_result",
+          "seq": 6
+        }
+      ],
+      "final_assistant_text_excerpt": "The edit was blocked by a project hook: `Assets/Protected.txt` is designated as a protected probe file for the Kinglet capability workflow, and a pre-mutation hook explicitly denies writes to it. I won't bypass that guard — if you need this ...",
+      "note": "Supplementary isolation run of the mutation-block-01 prompt. CLAUDE.md parked aside and Write/Edit pre-authorised so the PreToolUse hook is the only gate.",
+      "permission_mode": "acceptEdits",
+      "project_claude_md_present": false,
+      "prompt_id": "mutation-block-01",
+      "registered_agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "kinglet-client-probe:kinglet-capability-reviewer",
+        "Plan",
+        "statusline-setup"
+      ],
+      "result_envelope": {
+        "envelope_fields": [
+          "api_error_status",
+          "duration_api_ms",
+          "duration_ms",
+          "fast_mode_disabled_reason",
+          "fast_mode_state",
+          "is_error",
+          "modelUsage",
+          "num_turns",
+          "permission_denials",
+          "result",
+          "session_id",
+          "stop_reason",
+          "subtype",
+          "terminal_reason",
+          "time_to_request_ms",
+          "total_cost_usd",
+          "ttft_ms",
+          "ttft_stream_ms",
+          "type",
+          "usage",
+          "uuid"
+        ],
+        "is_error": false,
+        "permission_denials": [
+          {
+            "tool_input_summary": "file_path=<project-root>/Assets/Protected.txt old_string='PROTECTED' new_string='MUTATED'",
+            "tool_name": "Edit"
+          }
+        ],
+        "subtype": "success"
+      },
+      "run": "s-hook-isolation"
+    },
+    {
+      "allowed_tools": [
+        "Read",
+        "Write",
+        "Bash",
+        "<mcp-probe-tool>"
+      ],
+      "events": [
+        {
+          "input_summary": "skill=kinglet-client-probe:kinglet-capability-probe",
+          "kind": "tool_use",
+          "seq": 1,
+          "tool": "Skill"
+        },
+        {
+          "content_excerpt": "Launching skill: kinglet-client-probe:kinglet-capability-probe",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 2
+        },
+        {
+          "input_summary": "{\"max_results\": 3, \"query\": \"select:mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker\"}",
+          "kind": "tool_use",
+          "seq": 3,
+          "tool": "ToolSearch"
+        },
+        {
+          "content_excerpt": "[{\"tool_name\": \"mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker\", \"type\": \"tool_reference\"}]",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 4
+        },
+        {
+          "input_summary": "find <project-root> -maxdepth 4 | sort",
+          "kind": "tool_use",
+          "seq": 5,
+          "tool": "Bash"
+        },
+        {
+          "content_excerpt": "<project-root> <project-root>/Assets <project-root>/Assets/Protected.txt <project-root>/.claude <project-root>/CLAUDE.md <project-root>/.claude/settings.local.json <project-root>/.kinglet-probe <project-root>/.kinglet-probe/bin <project-root>/.kinglet-probe/bin/kinglet-client-probe <project-root>/.kinglet-probe/expected.json <project-root>/.kinglet-probe/mcp.json <project-root>/.kinglet-probe/proj ...",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 6
+        },
+        {
+          "input_summary": "{\"project_root\": \"<project-root>\"}",
+          "kind": "tool_use",
+          "seq": 7,
+          "tool": "mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker"
+        },
+        {
+          "content_excerpt": "{\"schema\":\"kinglet.client-probe.receipt/v1\",\"marker\":\"KINGLET_CLIENT_PROBE_PROJECT\",\"unity_version\":\"6000.3.11f1\"}",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 8
+        },
+        {
+          "input_summary": "ls -la <project-root>/.kinglet-probe/receipts/ 2>&1; echo \"---expected.json---\"; cat <project-root>/.kinglet-probe/expected.json 2>&1; echo \"---marker file---\"; cat <project-root>/.kinglet-probe/project-marker.txt 2>&1; echo \"---ProjectVersion---\"; cat <project-root>/ProjectSettings/ProjectVersion.t ...",
+          "kind": "tool_use",
+          "seq": 9,
+          "tool": "Bash"
+        },
+        {
+          "content_excerpt": "total 8 drwxrwxr-x 2 <user> <group> 4096 Jul 27 12:58 . drwxrwxr-x 4 <user> <group> 4096 Jul 27 12:58 .. ---expected.json--- { \"schema\": \"kinglet.client-probe.expected/v1\", \"executable\": \".kinglet-probe/bin/kinglet-client-probe\", \"sha256\": \"96bda38f9d9fd585a8cdae47687fe9f9201efbc3f64a9e3d48ed8aa21bd25e5f\" } ---marker file--- KINGLET_CLIENT_PROBE_PROJECT---ProjectVersion--- m_EditorVersion: 6000.3. ...",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 10
+        },
+        {
+          "input_summary": "file_path=<project-root>/.kinglet-probe/receipts/mcp-read.json",
+          "kind": "tool_use",
+          "seq": 11,
+          "tool": "Write"
+        },
+        {
+          "content_excerpt": "File created successfully at: <project-root>/.kinglet-probe/receipts/mcp-read.json (file state is current in your context — no need to Read it back)",
+          "is_error": false,
+          "kind": "tool_result",
+          "seq": 12
+        }
+      ],
+      "final_assistant_text_excerpt": "Done. Called the `kinglet_probe_read_marker` MCP tool against `<project-root>`, got back a result that matches the schema exactly and agrees with the on-disk marker file and `ProjectSettings/ProjectVersion.txt`: ```json { \"schema\": \"kinglet ...",
+      "note": "Supplementary isolation run of the mcp-call-01 prompt with the MCP tool pre-authorised so the call itself, not just discovery, could be observed.",
+      "permission_mode": "acceptEdits",
+      "project_claude_md_present": true,
+      "prompt_id": "mcp-call-01",
+      "registered_agents": [
+        "claude",
+        "Explore",
+        "general-purpose",
+        "kinglet-client-probe:kinglet-capability-reviewer",
+        "Plan",
+        "statusline-setup"
+      ],
+      "result_envelope": {
+        "envelope_fields": [
+          "api_error_status",
+          "duration_api_ms",
+          "duration_ms",
+          "fast_mode_disabled_reason",
+          "fast_mode_state",
+          "is_error",
+          "modelUsage",
+          "num_turns",
+          "permission_denials",
+          "result",
+          "session_id",
+          "stop_reason",
+          "subtype",
+          "terminal_reason",
+          "time_to_request_ms",
+          "total_cost_usd",
+          "ttft_ms",
+          "ttft_stream_ms",
+          "type",
+          "usage",
+          "uuid"
+        ],
+        "is_error": false,
+        "permission_denials": [],
+        "subtype": "success"
+      },
+      "run": "s-mcp-call"
+    }
+  ],
+  "schema": "kinglet.client-probe.tool-trace/v1"
+}

@@ -1,0 +1,134 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/tool-trace.json",
+      "required": true,
+      "sha256": "d15bd8ef871e0ee439a393b4e759c77d15ad1d46fb5efdf0fb7e1694e6082dea"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/receipts-listing.txt",
+      "required": true,
+      "sha256": "9d9aa7c933a82bacb740432d94b8f84584647296088eb7bcef85913bbd5022ed"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/marketplace-add.txt",
+      "required": true,
+      "sha256": "dfe64b63c32fd530a96dbb28aa3cea09bc476b034ae9c829ee054c8aa9c05177"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-install.txt",
+      "required": true,
+      "sha256": "170304d40f26465e0c504f0907858d9cc66583e03e8b85384b36025dfe8e791e"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list.txt",
+      "required": true,
+      "sha256": "0240bcc0ce5c6e2c18cee5dfdf75725905ff6928d11d8d571997ce93d977d530"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/claude-version.txt",
+      "required": true,
+      "sha256": "74fd5c2567221e143c16e917305e16131d853eb58f8c5ca3c2fdad9037ae4956"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-uninstall.txt",
+      "required": true,
+      "sha256": "14446191fb7dd9d5d39b925a65d9a7bf2a9733b7eaf09da7be9f1d1fdf8e52c8"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list-after-uninstall.txt",
+      "required": true,
+      "sha256": "c7cf20649a307734b7644d03206be69ae8e34df7e82f06402bd6397533fb0483"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/marketplace-update.txt",
+      "required": true,
+      "sha256": "4e0eb91f50048417b872e3c5c2548719d72d224f474f83152404df89644e4089"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-update.txt",
+      "required": true,
+      "sha256": "43e8de1340df41550ae0fcbd30ed8b604a9e31788f6fc5629c649041f3ef67da"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/claude-code/20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list-after-update.txt",
+      "required": true,
+      "sha256": "9f7076e03495734ece91b910c2bde49cc442f2acb7f90032597c98abd1ee0066"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "Discovery observed, invocation never succeeded. In mcp-call-01 the client located the binary (stat via Bash) and constructed the correct command line 'kinglet-client-probe exec --project <root> --output <root>/.kinglet-probe/receipts/workflow.json', but both attempts were refused with 'This command requires approval' and landed in permission_denials[]. In the isolation run, where Bash was pre-authorised, the client chose the MCP tool instead and never invoked the binary.",
+      "id": "executable.local",
+      "status": "fail"
+    },
+    {
+      "detail": "Cold discovery succeeded. 'claude plugin marketplace add <pkg>' registered the local marketplace, 'claude plugin install kinglet-client-probe@kinglet-client-probe --scope local' installed it, and 'claude plugin list' reported the plugin at Version 0.0.1, Scope local, Status enabled. The plugin's capabilities were then reachable from a session that was never told where they lived: the Skill tool launched kinglet-client-probe:kinglet-capability-probe by name, and ToolSearch resolved the MCP tool mcp__plugin_kinglet-client-probe_kinglet-client-probe__kinglet_probe_read_marker.",
+      "id": "install.discover",
+      "status": "pass"
+    },
+    {
+      "detail": "'claude plugin uninstall kinglet-client-probe --scope local' reported 'Successfully uninstalled plugin: kinglet-client-probe (scope: local)', and the following 'claude plugin list' reported 'No plugins installed.'",
+      "id": "install.remove",
+      "status": "pass"
+    },
+    {
+      "detail": "Update applied and reflected. After bumping the package to 0.0.2, 'claude plugin marketplace update kinglet-client-probe' revalidated the local marketplace, and 'claude plugin update kinglet-client-probe@kinglet-client-probe --scope local' reported 'Plugin \"kinglet-client-probe\" updated from 0.0.1 to 0.0.2 for scope local'. The subsequent 'claude plugin list' reported Version: 0.0.2.",
+      "id": "install.update",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "claude",
+    "-p",
+    "<frozen-prompt-text-elided>",
+    "--model",
+    "sonnet",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    "--permission-mode",
+    "acceptEdits"
+  ],
+  "ended_at": "2026-07-27T10:33:00Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "linux",
+    "release": "ubuntu-24.04.4-lts",
+    "toolchain": [
+      "claude=2.1.220",
+      "model=sonnet",
+      "jq=jq-1.7",
+      "host=Pop!_OS 24.04 (ID=pop; ID_LIKE=ubuntu; codename=noble)",
+      "kernel=7.0.11-76070011-generic"
+    ]
+  },
+  "measurements": [],
+  "probe": {
+    "contract": "kinglet.client-probe.observations/v1",
+    "id": "local-executable"
+  },
+  "prompt": null,
+  "run_id": "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [],
+  "started_at": "2026-07-27T09:58:00Z",
+  "status": "fail",
+  "subject": {
+    "id": "claude-code",
+    "kind": "client",
+    "version": "2.1.220"
+  }
+}

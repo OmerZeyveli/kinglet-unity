@@ -1,0 +1,5 @@
+# contents of <project-root>/.kinglet-probe/receipts after the isolation run
+# rebuilt without ownership columns; only file names are evidence here
+mcp-read.json
+# workflow.json absent: the capability workflow's own receipt was never written
+# agent.json absent: the reviewer sub-agent was never invoked
