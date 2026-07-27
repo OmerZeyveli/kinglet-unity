@@ -368,6 +368,14 @@ spikes/platform/clients/probe-host/main.go	original	-	-	-	original	client-probe-
 spikes/platform/clients/probe-host/main_test.go	original	-	-	-	original	client-probe-native-host-behavioral-tests
 spikes/platform/clients/probe-host/build.sh	original	-	-	-	original	client-probe-native-host-darwin-linux-build
 spikes/platform/clients/probe-host/build.ps1	original	-	-	-	original	client-probe-native-host-windows-build
+spikes/platform/clients/shared/agents/kinglet-capability-reviewer.agent.md	original	-	-	-	original	client-probe-shared-capability-reviewer-agent
+spikes/platform/clients/shared/hooks/hook-policy.json	original	-	-	-	original	client-probe-shared-hook-policy-deny-protected
+spikes/platform/clients/shared/mcp.json	original	-	-	-	original	client-probe-shared-mcp-server-config-with-executable-token
+spikes/platform/clients/shared/rules/kinglet-capability-probe.md	original	-	-	-	original	client-probe-shared-rule-receipt-schema-and-mutation-gate
+spikes/platform/clients/shared/skills/kinglet-capability-probe/SKILL.md	original	-	-	-	original	client-probe-shared-capability-probe-skill
+spikes/platform/clients/shared/create-project.ps1	original	-	-	-	original	client-probe-shared-disposable-project-creator-windows
+spikes/platform/clients/shared/create-project.sh	original	-	-	-	original	client-probe-shared-disposable-project-creator-darwin-linux
 tools/kinglet_spike/client_results.py	original	-	-	-	original	client-probe-load-validate-and-to-evidence
 tests/kinglet_spike/client_support.py	original	-	-	-	original	client-probe-test-fixtures-case-ids-and-valid-observations
 tests/kinglet_spike/test_client_results.py	original	-	-	-	original	client-probe-behavioral-contract-tests
+tests/kinglet_spike/test_client_fixture.py	original	-	-	-	original	client-probe-shared-fixture-structural-and-content-tests

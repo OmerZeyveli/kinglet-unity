@@ -1,0 +1,19 @@
+{
+  "schema": "kinglet.client-probe.hook-policy/v1",
+  "description": "Pre-mutation hook policy for the disposable client probe project. Denies writes to Assets/Protected.txt; allows all other targets. The decision is delegated to the native kinglet-client-probe hook subcommand.",
+  "hook_executable": "kinglet-client-probe",
+  "hook_subcommand": "hook",
+  "hook_event_flag": "--event",
+  "rules": [
+    {
+      "target": "Assets/Protected.txt",
+      "decision": "deny",
+      "reason": "target is the protected probe file"
+    },
+    {
+      "target": "*",
+      "decision": "allow",
+      "reason": "target is not protected"
+    }
+  ]
+}
