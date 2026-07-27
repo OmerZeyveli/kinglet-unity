@@ -456,7 +456,13 @@ function Get-ToolchainDirectory {
         $command = Get-Command -Name $name -CommandType Application -ErrorAction SilentlyContinue |
             Select-Object -First 1
         if ($null -eq $command) { continue }
-        $parent = Split-Path -LiteralPath $command.Source -Parent
+        # NOT `-LiteralPath ... -Parent`: -Parent lives in Split-Path's ParentSet,
+        # which takes -Path, so combining the two is an unresolvable parameter set
+        # and throws at bind time. -LiteralPath's own set already returns the
+        # parent, which is why this is the correct spelling rather than a downgrade
+        # to -Path. (Found by executing Invoke-RunHost; it fired the moment any
+        # toolchain command was actually present.)
+        $parent = Split-Path -LiteralPath $command.Source
         if (-not [string]::IsNullOrWhiteSpace($parent)) { $dirs.Add($parent) }
     }
     return ($dirs | Sort-Object -Unique)
@@ -613,7 +619,9 @@ function Invoke-CandidateCell {
     # -LiteralPath, so a '[' in a Windows path would be read as a wildcard.
     $null = [System.IO.Directory]::CreateDirectory($execDir)
     $null = [System.IO.Directory]::CreateDirectory($workspace)
-    $null = [System.IO.Directory]::CreateDirectory((Split-Path -LiteralPath $resultFile -Parent))
+    # -LiteralPath without -Parent: see Get-ToolchainDirectory — the two cannot be
+    # combined, and -LiteralPath already yields the parent.
+    $null = [System.IO.Directory]::CreateDirectory((Split-Path -LiteralPath $resultFile))
 
     # Copy ONLY the distributable into the clean exec dir. No toolchain, no source,
     # no build tree. The .NET publish embeds its native libraries, so there are no
@@ -715,12 +723,32 @@ function Invoke-CandidateCell {
 # ---------------------------------------------------------------------------
 
 function Invoke-RunHost {
-    param([switch] $DryRun)
+    <#
+      The entry point. -Fact injects the host facts so the WHOLE entry point —
+      gate call site included, not just the gate predicate — is executable from a
+      table on a non-Windows box.
+
+      The injection is deliberately absent from the production call at the bottom
+      of this file: with no -Fact the gate resolves the LIVE host, so on any
+      non-Windows box Get-LiveHostFact fails and no candidate is ever reached.
+      That is what the end-to-end refusal test asserts, and it is why replacing
+      this Resolve-HostEnvironment call with a fabricated environment cannot pass
+      unnoticed. An injectable seam whose call site is itself unchecked is the
+      defect, not the fix.
+    #>
+    param(
+        [switch] $DryRun,
+        [psobject] $Fact = $null
+    )
 
     $repoRoot = (Resolve-Path -LiteralPath (Join-Path -Path $PSScriptRoot -ChildPath '../../..')).ProviderPath
     Set-Location -LiteralPath $repoRoot
 
-    $hostEnvironment = Resolve-HostEnvironment
+    $hostEnvironment = if ($null -eq $Fact) {
+        Resolve-HostEnvironment
+    } else {
+        Resolve-HostEnvironment -Fact $Fact
+    }
     Write-Log ("host accepted: {0} (version={1}; build={2}; release={3}; arch={4}; rid={5})" -f
         $hostEnvironment.Caption, $hostEnvironment.Version, $hostEnvironment.BuildNumber,
         $hostEnvironment.RecordRelease, $hostEnvironment.RecordArch, $hostEnvironment.DotnetRid)

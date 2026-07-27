@@ -179,6 +179,55 @@ def _run_pwsh(body: str) -> str:
     return completed.stdout
 
 
+def _run_pwsh_raw(body: str, cwd: Path | None = None) -> subprocess.CompletedProcess:
+    """Run `body` under pwsh and return the whole result, failures included.
+
+    `_run_pwsh` raises on a non-zero exit, which is exactly what the REFUSAL tests
+    need to inspect, and `cwd` lets a test drive the runner from a scratch
+    directory so a non-dry-run cell writes nothing into the repository.
+    """
+    return subprocess.run(
+        [_PWSH, "-NoProfile", "-NonInteractive", "-Command", body],
+        capture_output=True,
+        text=True,
+        cwd=str(cwd or _REPO_ROOT),
+        check=False,
+    )
+
+
+def _run_pwsh_file(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
+    """Execute a .ps1 as a SCRIPT, the way the runner is actually invoked.
+
+    `-Command` with a dot-source never reaches the bottom-of-file entry point, so a
+    dot-sourcing test cannot see anything about how (or whether) that entry point
+    is wired. `-File` runs the script exactly as an operator would.
+    """
+    return subprocess.run(
+        [_PWSH, "-NoProfile", "-NonInteractive", "-File"] + args,
+        capture_output=True,
+        text=True,
+        cwd=str(cwd or _REPO_ROOT),
+        check=False,
+    )
+
+
+def _ps_fact_literal(fact: dict) -> str:
+    pairs = "; ".join(f"{k} = '{v}'" for k, v in fact.items())
+    return "[pscustomobject]@{ " + pairs + " }"
+
+
+# The locked Windows 11 host, as Get-LiveHostFact would report it.
+_ACCEPTED_WINDOWS_FACT = {
+    "Caption": "Microsoft Windows 11 Pro",
+    "Version": "10.0.26200",
+    "BuildNumber": "26200",
+    "Ubr": "1742",
+    "DisplayVersion": "25H2",
+    "Architecture": "AMD64",
+    "WslDistroName": "",
+}
+
+
 def _join_ps_continuations(text: str) -> str:
     """Join PowerShell backtick line-continuations into single logical lines.
 
@@ -934,8 +983,11 @@ class RunHostPowerShellTextTests(unittest.TestCase):
         self.assertIn(".kinglet/local/spikes", RUN_HOST_PS1)
         self.assertIn("run dir is not empty", RUN_HOST_PS1)
 
-    def test_invokes_all_four_candidates(self):
-        self.assertIn("@('python', 'go', 'rust', 'dotnet')", RUN_HOST_PS1)
+    # The candidate list used to be checked here as an array LITERAL, which says
+    # nothing about whether the entry point iterates it — building all four cells
+    # from 'python' kept that assertion green. It is now
+    # WindowsRunnerEntryPointTests.test_the_entry_point_drives_all_four_candidates,
+    # which executes Invoke-RunHost and reads the per-candidate plan back.
 
     def test_invokes_black_box_conformance_and_publish(self):
         self.assertIn("tools.kinglet_spike.runtime_contract", RUN_HOST_PS1)
@@ -1314,20 +1366,11 @@ class WindowsHostGateRefusalTests(unittest.TestCase):
     now takes its facts as a parameter, so the whole gate is driven from a table.
     """
 
-    _ACCEPTED = {
-        "Caption": "Microsoft Windows 11 Pro",
-        "Version": "10.0.26200",
-        "BuildNumber": "26200",
-        "Ubr": "1742",
-        "DisplayVersion": "25H2",
-        "Architecture": "AMD64",
-        "WslDistroName": "",
-    }
+    _ACCEPTED = _ACCEPTED_WINDOWS_FACT
 
     @staticmethod
     def _fact_literal(fact: dict) -> str:
-        pairs = "; ".join(f"{k} = '{v}'" for k, v in fact.items())
-        return "[pscustomobject]@{ " + pairs + " }"
+        return _ps_fact_literal(fact)
 
     def _resolve(self, **overrides) -> subprocess.CompletedProcess:
         fact = dict(self._ACCEPTED)
@@ -1473,6 +1516,238 @@ class WindowsAntiFabricationGuardTests(unittest.TestCase):
         self.assertIn("NEG=REFUSED", out)
         self.assertIn("ONE=OK", out)
         self.assertIn("REAL=OK", out)
+
+
+@unittest.skipIf(_PWSH_SKIP_REASON, _PWSH_SKIP_REASON)
+class WindowsRunnerEntryPointTests(unittest.TestCase):
+    """The Windows runner's ENTRY POINT, executed — not its helpers, the caller.
+
+    Every other pwsh test here dot-sources with `-LibraryOnly`, which returns
+    before `Invoke-RunHost` and before measure.ps1's Main. That left the extracted
+    guards well tested and their CALL SITES covered by nothing but
+    `assertIn("run dir is not empty", RUN_HOST_PS1)` — a message-string check that
+    survives neutering the condition it belongs to, and survives deleting the call
+    altogether. An injectable seam whose call site is unchecked is the defect, not
+    the fix.
+
+    The POSIX runner never had this hole: `run-host.sh` and `measure.sh` are driven
+    end-to-end through a `uname`/`sw_vers` PATH shim. These tests are the
+    PowerShell equivalent, and they run on this Linux box because a non-Windows
+    host is precisely what the runner must refuse.
+    """
+
+    def test_the_production_entry_point_gates_the_live_host(self):
+        # run-host.ps1 executed as a SCRIPT, with no injection: the bottom-of-file
+        # call must reach Resolve-HostEnvironment against the LIVE host, which on
+        # any non-Windows box cannot be resolved. Fabricating $hostEnvironment in
+        # Invoke-RunHost — or skipping the gate — makes this dry run SUCCEED here
+        # and print four candidate plans.
+        result = _run_pwsh_file(
+            [str(_RUNTIME_DIR / "run-host.ps1"), "-DryRun"]
+        )
+        combined = result.stdout + result.stderr
+        self.assertNotEqual(
+            result.returncode, 0,
+            f"a non-Windows host must be REFUSED, not planned: {combined}",
+        )
+        for forbidden in (
+            "DRY-RUN",                      # no candidate cell may be reached
+            "host accepted",                # the gate must not have passed
+            "dry-run complete",             # the entry point must not have finished
+            "published",
+        ):
+            self.assertNotIn(
+                forbidden, combined,
+                f"refused host still produced runner output ({forbidden!r}): {combined}",
+            )
+
+    def test_the_entry_point_refuses_an_injected_non_locked_host(self):
+        # The gate's call site, not the gate: Invoke-RunHost must propagate the
+        # refusal before the candidate loop, for every refusal reason.
+        for overrides, fragment in (
+            ({"Caption": "Microsoft Windows Server 2022 Standard"}, "host not accepted"),
+            ({"Caption": "Microsoft Windows 8.1"}, "host not accepted"),
+            ({"WslDistroName": "Ubuntu-24.04"}, "refusing to run under WSL"),
+            ({"DisplayVersion": ""}, "could not derive environment.release"),
+            ({"Architecture": "x86"}, "unsupported architecture"),
+        ):
+            with self.subTest(**overrides):
+                fact = dict(_ACCEPTED_WINDOWS_FACT)
+                fact.update(overrides)
+                body = (
+                    _PS1_LIB_PREAMBLE
+                    + f"$fact = {_ps_fact_literal(fact)}\n"
+                    + "try { Invoke-RunHost -DryRun -Fact $fact; "
+                      "Write-Output 'PLANNED' } "
+                      "catch { Write-Output ('REFUSED=' + $_.Exception.Message) }\n"
+                )
+                result = _run_pwsh_raw(body)
+                combined = result.stdout + result.stderr
+                self.assertIn("REFUSED=", result.stdout, combined)
+                self.assertIn(fragment, result.stdout)
+                self.assertNotIn("PLANNED", result.stdout)
+                # Nothing may be planned for any candidate.
+                self.assertNotIn("DRY-RUN", combined, combined)
+
+    def _dry_run_plan(self, fact: dict) -> str:
+        body = (
+            _PS1_LIB_PREAMBLE
+            + f"$fact = {_ps_fact_literal(fact)}\n"
+            + "Invoke-RunHost -DryRun -Fact $fact\n"
+        )
+        result = _run_pwsh_raw(body)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # Write-Log goes to stderr, matching run-host.sh's log discipline.
+        return result.stdout + result.stderr
+
+    def test_the_entry_point_drives_all_four_candidates(self):
+        plan = self._dry_run_plan(_ACCEPTED_WINDOWS_FACT)
+
+        # (a) The loop really iterates the four DISTINCT candidates, in order.
+        planned = re.findall(r"DRY-RUN (\w+):", plan)
+        self.assertEqual(
+            planned, ["python", "go", "rust", "dotnet"],
+            f"the entry point must drive all four candidates: {plan}",
+        )
+
+        # (b) Each cell is built from ITS OWN candidate, not four copies of one.
+        #     Passing the same candidate four times would still emit four blocks.
+        expected = {
+            "python": ("spikes/platform/runtime/python/dist/kinglet-host-probe.exe", "12", "version"),
+            "go": ("spikes/platform/runtime/go/dist/kinglet-host-probe.exe", "0", "--version"),
+            "rust": ("spikes/platform/runtime/rust/target/release/kinglet-host-probe.exe", "55", "--version"),
+            "dotnet": (
+                "spikes/platform/runtime/dotnet/bin/Release/net10.0/win-x64/publish/"
+                "kinglet-host-probe.exe",
+                "4",
+                "--version",
+            ),
+        }
+        for candidate, (dist, deps, version_arg) in expected.items():
+            with self.subTest(candidate=candidate):
+                self.assertIn(f"build: Build-Candidate {candidate} (rid=win-x64)", plan)
+                self.assertIn(f"copy distributable: {dist} ->", plan)
+                self.assertIn(f"-DependencyCount {deps} -VersionArg {version_arg}", plan)
+                # The run id, and therefore the published evidence path, is
+                # per-candidate.
+                self.assertIn(f"-runtime-{candidate}-windows-11-25h2-x64-01", plan)
+
+        self.assertIn("dry-run complete; nothing published", plan)
+        # A dry run must not publish, and must not touch the working tree.
+        self.assertNotIn("published OK", plan)
+        # ...and it must not have CREATED any of the run dirs it planned. Scoped to
+        # the planned paths rather than `git status`, which would be dirty for
+        # unrelated reasons and, under a mutation copy in /tmp, would exit 128 and
+        # check nothing at all.
+        for run_id in set(re.findall(r"run_id=(\S+?)\)", plan)):
+            self.assertFalse(
+                (_REPO_ROOT / ".kinglet" / "local" / "spikes" / run_id).exists(),
+                f"a dry run must not create its run dir: {run_id}",
+            )
+
+    def test_the_entry_point_uses_the_resolved_host_not_a_fabricated_one(self):
+        # Same code path, the OTHER locked host. Every run id must follow the fact
+        # that was resolved; a hardcoded or fabricated $hostEnvironment cannot
+        # track both.
+        fact = dict(_ACCEPTED_WINDOWS_FACT)
+        fact.update(
+            Caption="Microsoft Windows 10 Pro", DisplayVersion="22H2",
+            Version="10.0.19045", BuildNumber="19045", Ubr="6093",
+        )
+        plan = self._dry_run_plan(fact)
+        self.assertIn("host accepted: Microsoft Windows 10 Pro", plan)
+        self.assertIn("release=10-22H2", plan)
+        self.assertIn("build=19045.6093", plan)
+        slugs = set(re.findall(r"-runtime-\w+-(windows-[a-z0-9.-]+)-01", plan))
+        self.assertEqual(
+            slugs, {"windows-10-22h2-x64"},
+            f"every run id must carry the RESOLVED host slug: {plan}",
+        )
+        self.assertNotIn("25H2", plan)
+        self.assertNotIn("11-25h2", plan)
+
+    def test_the_run_dir_guard_fires_at_its_call_site(self):
+        # Invoke-CandidateCell driven for real (build stubbed, distributable faked)
+        # in a scratch cwd. Neutering the `if (-not (Test-RunDirEmpty ...))` while
+        # keeping the throw string leaves the guard unfireable — and a dirty run
+        # dir would silently mix a new run's evidence with a previous run's.
+        def cell(dirty: bool) -> str:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                scratch = Path(tmpdir)
+                body = (
+                    f". '{_RUNTIME_DIR / 'run-host.ps1'}' -LibraryOnly\n"
+                    # Stub the build: this test is about the guard, not the toolchain.
+                    "function Build-Candidate { param($Candidate,$DotnetRid,$RepoRoot) }\n"
+                    "$he = [pscustomobject]@{ DotnetRid='win-x64'; "
+                    "HostSlug='windows-11-25h2-x64'; RecordOs='windows'; "
+                    "RecordRelease='11-25H2'; RecordArch='x64'; HostLine='h'; "
+                    "KernelLine='k' }\n"
+                    "$stamp = '20260727T000000Z'\n"
+                    "$dist = Get-CandidateDistributable -Candidate 'go' -DotnetRid 'win-x64'\n"
+                    "$null = [System.IO.Directory]::CreateDirectory("
+                    "(Split-Path -LiteralPath $dist))\n"
+                    "Set-Content -LiteralPath $dist -Value 'not-a-real-binary'\n"
+                    "$runRoot = '.kinglet/local/spikes/' + (Get-RunId -Stamp $stamp "
+                    "-Candidate 'go' -HostSlug $he.HostSlug)\n"
+                )
+                if dirty:
+                    body += (
+                        "$null = [System.IO.Directory]::CreateDirectory($runRoot)\n"
+                        "Set-Content -LiteralPath ($runRoot + '/leftover.json') -Value '{}'\n"
+                    )
+                body += (
+                    "try {\n"
+                    "  Invoke-CandidateCell -Candidate 'go' -HostEnvironment $he "
+                    "-Stamp $stamp -RepoRoot (Get-Location).ProviderPath -RunPath '' "
+                    "-PythonCommand 'python3'\n"
+                    "  Write-Output 'RESULT=NO-THROW'\n"
+                    "} catch { Write-Output ('RESULT=THROW|' + $_.Exception.Message) }\n"
+                )
+                result = _run_pwsh_raw(body, cwd=scratch)
+                return result.stdout
+
+        # A run dir with leftover content must be REFUSED by name.
+        self.assertIn("run dir is not empty", cell(dirty=True))
+        # Control against a vacuous assertion: with an EMPTY run dir the guard must
+        # NOT fire — the cell proceeds past it and fails later, on the fake binary.
+        clean = cell(dirty=False)
+        self.assertNotIn("run dir is not empty", clean)
+        self.assertIn("RESULT=THROW", clean)
+        self.assertIn("kinglet-host-probe.exe", clean)
+
+    def test_measure_ps1_exits_rather_than_emitting_a_zero_peak(self):
+        # measure.ps1's MAIN, executed. On a non-Windows host PeakWorkingSet64 is
+        # unavailable, so the peak is 0 — the anti-fabrication case, for real.
+        # Mirrors test_measure_sh_exits_rather_than_emitting_a_zero_peak.
+        # `-VersionArg:--version` (colon form): under -File, a bare `--version`
+        # would be parsed as another parameter name.
+        probe = shutil.which("true")
+        if not probe:
+            self.skipTest("no 'true' executable on PATH")
+        result = _run_pwsh_file([
+            str(_RUNTIME_DIR / "measure.ps1"),
+            "-Exe", probe, "-DependencyCount", "0", "-VersionArg:--version",
+        ])
+        self.assertEqual(result.returncode, 3, result.stdout + result.stderr)
+        self.assertIn("refusing to emit a fabricated measurement", result.stderr)
+        # No JSON at all — not a record with a placeholder 0 in it.
+        self.assertNotIn("peak_rss_kb", result.stdout)
+        self.assertNotIn("cold_start_ms", result.stdout)
+
+    def test_measure_ps1_refuses_a_missing_executable(self):
+        # The other guarded exit in Main, which shares the same failure mode:
+        # Write-Error under $ErrorActionPreference='Stop' terminates before its
+        # `exit 2`, so the documented status was never actually produced.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            missing = Path(tmpdir) / "nope.exe"
+            result = _run_pwsh_file([
+                str(_RUNTIME_DIR / "measure.ps1"),
+                "-Exe", str(missing), "-DependencyCount", "0",
+                "-VersionArg:--version",
+            ])
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("not a file", result.stderr)
+        self.assertNotIn("peak_rss_kb", result.stdout)
 
 
 class ForeignHostOnlyTests(unittest.TestCase):

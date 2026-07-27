@@ -180,12 +180,16 @@ if ($LibraryOnly) { return }
 # Main
 # ---------------------------------------------------------------------------
 
+# [Console]::Error.WriteLine rather than Write-Error: $ErrorActionPreference='Stop'
+# turns Write-Error into a TERMINATING error, so the `exit <n>` beneath it never
+# runs and the process exits 1 instead of the documented 2/3. measure.sh's exit
+# codes are part of the contract the runner reads.
 if ([string]::IsNullOrWhiteSpace($Exe) -or [string]::IsNullOrWhiteSpace($VersionArg) -or $DependencyCount -lt 0) {
-    Write-Error 'usage: measure.ps1 -Exe <path> -DependencyCount <int> -VersionArg <string>'
+    [Console]::Error.WriteLine('usage: measure.ps1 -Exe <path> -DependencyCount <int> -VersionArg <string>')
     exit 2
 }
 if (-not (Test-Path -LiteralPath $Exe -PathType Leaf)) {
-    Write-Error "measure.ps1: not a file: $Exe"
+    [Console]::Error.WriteLine("measure.ps1: not a file: $Exe")
     exit 2
 }
 
@@ -199,7 +203,7 @@ $peakRssKb = Convert-BytesToKilobytes -Bytes $peakBytes
 try {
     Assert-NonZeroPeak -PeakRssKb $peakRssKb
 } catch {
-    Write-Error $_.Exception.Message
+    [Console]::Error.WriteLine($_.Exception.Message)
     exit 3
 }
 $artifactBytes = [long](Get-Item -LiteralPath $exePath).Length
