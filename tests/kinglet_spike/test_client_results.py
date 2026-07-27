@@ -18,6 +18,7 @@ PROBE_GROUPS must partition the frozen catalog, name only probes the frozen
 matrix declares, and — through the real coverage pipeline — close a cell only
 when every case in that cell was actually observed.
 """
+import inspect
 import json
 import unittest
 from pathlib import Path
@@ -25,10 +26,12 @@ from unittest.mock import patch
 
 from tools.kinglet_spike.client_results import (
     AGGREGATE_PROBE,
+    CLIENT_SOURCES,
     PLATFORM_PROBES,
     PROBE_GROUPS,
     build_run_id,
     case_probe_map,
+    client_sources,
     host_slug,
     partition_cases,
     probes_for_os,
@@ -173,6 +176,20 @@ class ClientRunIdTests(unittest.TestCase):
             f"run_id {second!r} does not carry the probe timestamp",
         )
         self.assertTrue(first.endswith("-01") and second.endswith("-01"))
+
+    def test_build_run_id_refuses_to_default_the_probe_id(self):
+        # Every other run_id test calls build_run_id with all four arguments, so
+        # giving probe_id a default is entirely GREEN — and a default is how the
+        # per-probe collision comes back: one caller omits it, three records
+        # share a key, and two die on E_IMMUTABLE at publish time. The
+        # required-ness is the contract, so assert the signature.
+        parameter = inspect.signature(build_run_id).parameters["probe_id"]
+        self.assertIs(
+            parameter.default,
+            inspect.Parameter.empty,
+            f"build_run_id.probe_id has a default ({parameter.default!r}); a "
+            f"caller can now omit it and collide one host's per-probe records",
+        )
 
     def test_run_id_is_a_safe_publication_component(self):
         # publish.py rejects a run_id that is not SAFE_COMPONENT, so slugification
@@ -395,3 +412,80 @@ class ProbeCoverageTests(unittest.TestCase):
             "matrix `probe` there is 'client-capability-suite', not the "
             "'capability-suite' suffix of the cell id",
         )
+
+
+class ClientSourceTests(unittest.TestCase):
+    """`sources` is the provenance of the CLIENT, declared once per client id.
+
+    evidence-v1 requires a `pass` record to carry source references. Deriving
+    them from case `source_urls` cannot satisfy that: in this schema a case's
+    source_urls documents an *Unavailable* grade, so the record whose cases all
+    pass is precisely the one that ends up with none — and publishes `invalid`.
+    """
+
+    ENVIRONMENT = Environment(
+        os="linux",
+        release="ubuntu-24.04",
+        arch="x64",
+        native=True,
+        toolchain=("claude=2.1.206",),
+    )
+
+    def test_every_record_carries_the_clients_declared_provenance(self):
+        observations = validate_client_observations(valid_observations(), CASES)
+        expected = client_sources("claude-code", observations.client_version)
+        self.assertTrue(expected)
+        for record in to_evidence_records(observations, self.ENVIRONMENT):
+            self.assertTrue(
+                record.sources,
+                f"{record.probe.id} publishes no sources, so a pass on this "
+                f"cell validates as invalid",
+            )
+            for source in expected:
+                self.assertIn(source, record.sources)
+
+    def test_an_all_pass_record_is_sourced_without_any_case_url(self):
+        # The exact shape that broke: strip every case source_url and the
+        # record must STILL be sourced, because the client's provenance does
+        # not come from the cases.
+        value = valid_observations()
+        for case in value["cases"]:
+            case["source_urls"] = []
+        observations = validate_client_observations(value, CASES)
+        for record in to_evidence_records(observations, self.ENVIRONMENT):
+            self.assertEqual("pass", record.status)
+            self.assertTrue(
+                record.sources,
+                f"{record.probe.id}: an all-pass record with no case URLs has "
+                f"no sources, so its cell publishes `invalid`",
+            )
+
+    def test_the_declared_title_names_the_probed_version(self):
+        # ".NET 10.0.10 runtime" is the runtime records' shape: the citation
+        # names the exact build measured. A version-less title would cite the
+        # product in general and evidence nothing about what ran.
+        sources = client_sources("claude-code", "9.9.999")
+        self.assertTrue(
+            any("9.9.999" in source.title for source in sources),
+            f"no declared source names the probed version: "
+            f"{[s.title for s in sources]}",
+        )
+
+    def test_an_undeclared_client_fails_loudly(self):
+        # Returning () would let a new client publish an unsourced all-pass
+        # record, whose cell then reads `invalid` with no stated cause.
+        with self.assertRaises(EvidenceError) as caught:
+            client_sources("no-such-client", "1.0.0")
+        self.assertEqual("E_COVERAGE", caught.exception.code)
+
+    def test_declared_sources_are_absolute_https_urls(self):
+        for client_id, entries in CLIENT_SOURCES:
+            self.assertTrue(entries, f"{client_id} declares no source")
+            for title, url in entries:
+                self.assertTrue(title.strip(), f"{client_id} has an empty title")
+                self.assertRegex(
+                    url,
+                    r"^https://[^\s]+$",
+                    f"{client_id} declares a source that is not an absolute "
+                    f"https URL: {url!r}",
+                )

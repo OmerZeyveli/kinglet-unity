@@ -32,6 +32,25 @@ PROBE_GROUPS below is the single reviewable table that partitions the 12 frozen
 cases across the three split cells; PLATFORM_PROBES says which cells a platform
 has. One record is emitted per cell, carrying only that cell's cases.
 
+record-level `sources`
+----------------------
+evidence-v1 requires a `pass` record to carry ≥1 source reference, and the
+runtime records satisfy it by citing the *provenance of the subject under test*
+— ".NET 10.0.10 runtime" → the .NET download page. Client records need the same
+thing: where the client binary came from, not what the probe observed.
+
+Case `source_urls` cannot serve that purpose. In this schema a case's
+`source_urls` documents an *Unavailable* grade ("the vendor says this does not
+exist"); a Native/pass is evidenced by artifacts and carries none. Deriving the
+record's sources from the cases therefore produced an empty `sources` on exactly
+the record whose cases all passed, and the all-pass cell published as `invalid`.
+
+CLIENT_SOURCES below fixes that at the right level: it is declared once per
+client id, alongside the subject, and says nothing about any observation. Case
+`source_urls` are still appended (a client with an Unavailable case keeps its
+citation), but they are never the only thing there. An unknown client id is an
+error, not an empty list — see client_sources().
+
 run_id shape
 ------------
 `<UTC stamp>-client-probe-<subject>-<os>-<release>-<arch>-<probe>-01`, matching
@@ -149,6 +168,31 @@ PLATFORM_PROBES: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 # Characters kept verbatim by _slugify; everything else becomes '-'.
 _SLUG_ALLOWED = frozenset("abcdefghijklmnopqrstuvwxyz0123456789.-")
+
+# ---------------------------------------------------------------------------
+# Per-client provenance of the binary under test
+# ---------------------------------------------------------------------------
+# One row per client id: (title template, url). `{version}` in the title is
+# filled from observations.client_version, so the citation names the exact build
+# that was probed — the client analogue of ".NET 10.0.10 runtime".
+#
+# These document WHERE THE SUBJECT CAME FROM. They are not evidence of anything
+# the probe saw, must never be derived from a case's observations, and must be
+# real URLs that resolve. A client with no row here cannot publish a record at
+# all (client_sources raises), because a pass with no sources is invalid under
+# evidence-v1 and quietly emitting one is how a cell ends up `invalid` with no
+# explanation.
+CLIENT_SOURCES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
+    ("claude-code", (
+        # The published release the probed build was installed from; the
+        # registry document lists 2.1.220 among its versions.
+        ("Claude Code {version} (@anthropic-ai/claude-code)",
+         "https://registry.npmjs.org/@anthropic-ai/claude-code"),
+        # The vendor documentation for the subject.
+        ("Claude Code documentation",
+         "https://code.claude.com/docs/en/overview"),
+    )),
+)
 
 
 # ---------------------------------------------------------------------------
@@ -461,6 +505,30 @@ def case_probe_map() -> dict[str, str]:
     return mapping
 
 
+def client_sources(subject: str, version: str) -> tuple[SourceReference, ...]:
+    """The declared provenance of `subject`'s binary, at `version`.
+
+    Raises:
+        EvidenceError E_COVERAGE if the client has no CLIENT_SOURCES row.
+        Returning () instead would let a new client publish an all-pass record
+        with no source references, which validate.py marks invalid and coverage
+        then reports as an open cell with no stated reason. Failing here says
+        what is actually missing.
+    """
+    for client_id, entries in CLIENT_SOURCES:
+        if client_id == subject:
+            return tuple(
+                SourceReference(title=title.format(version=version), url=url)
+                for title, url in entries
+            )
+    known = ", ".join(client_id for client_id, _ in CLIENT_SOURCES)
+    raise EvidenceError(
+        "E_COVERAGE",
+        f"no CLIENT_SOURCES row declares where client {subject!r} came from "
+        f"(known: {known}); a record with no sources cannot pass validation",
+    )
+
+
 def probes_for_os(os_name: str) -> tuple[str, ...]:
     """The matrix probe cells defined for a client on `os_name`.
 
@@ -554,9 +622,13 @@ def _build_record(
     # Build assertions from cases.
     assertions: list[AssertionResult] = []
     artifacts: list[Artifact] = []
-    sources: list[SourceReference] = []
+    # The subject's own provenance leads; case source_urls are appended below.
+    # This is what stops an all-pass record from publishing with sources=[].
+    sources: list[SourceReference] = list(
+        client_sources(observations.subject, observations.client_version)
+    )
     seen_paths: set[str] = set()
-    seen_urls: set[str] = set()
+    seen_urls: set[str] = {source.url for source in sources}
 
     overall_status = "pass"
 

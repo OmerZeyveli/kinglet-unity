@@ -35,6 +35,7 @@ import hashlib
 import json
 import re
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from tests.kinglet_spike.spike_tree import (
@@ -46,6 +47,7 @@ from tests.kinglet_spike.spike_tree import committed_text_files as swept_text_fi
 from tests.kinglet_spike.spike_tree import credential_copy_violations
 from tools.kinglet_spike.client_results import (
     OBSERVATIONS_SCHEMA,
+    client_sources,
     load_client_observations,
 )
 from tools.kinglet_spike.coverage import evaluate_coverage
@@ -166,6 +168,27 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
                     case.grade,
                     f"{case.id} is inconclusive but carries a grade",
                 )
+
+    def test_inconclusive_cases_carry_no_grade_KEY_in_the_committed_json(self):
+        # The parsed check above reads `case.grade is None`, which an explicit
+        # `"grade": null` in the document satisfies just as well as an absent
+        # key. Those are not the same claim: a written-out null is somebody
+        # having reached for a grade and left the field behind, which is exactly
+        # the state the contract says an inconclusive case may not be in.
+        # Assert against the raw bytes, where the difference is visible.
+        raw = json.loads(OBSERVATIONS.read_text(encoding="utf-8"))
+        inconclusive = [c for c in raw["cases"] if c.get("status") == "inconclusive"]
+        self.assertTrue(
+            inconclusive,
+            "no inconclusive case in the document, so this test asserts nothing",
+        )
+        for case in inconclusive:
+            self.assertNotIn(
+                "grade",
+                case,
+                f"{case['id']} is inconclusive and still writes a `grade` key "
+                f"(value {case.get('grade')!r}); the key must be absent",
+            )
 
     # -- 2. every passing case's evidence is really on disk ----------------
     def test_passing_cases_cite_published_artifacts(self):
@@ -559,25 +582,61 @@ class ClaudeCodeCoverageBindingTests(unittest.TestCase):
                     f"to pass",
                 )
 
-    def test_no_record_is_invalid_for_an_unexpected_reason(self):
-        # The path-semantics record is the first client record whose cases all
-        # pass, and evidence-v1 requires a `pass` to carry source references.
-        # The observations carry none for any case -- source_urls exists there to
-        # document an *Unavailable* grade, while a Native/pass is evidenced by
-        # artifacts. So that record validates with exactly one diagnostic and
-        # coverage reports its cell `invalid` rather than `pass`: the evidence is
-        # committed and readable, and the cell honestly stays open. Fabricating
-        # citations to close it is the thing this test exists to prevent.
+    def test_no_record_is_invalid_for_any_reason(self):
+        # This tolerated one diagnostic -- ("E_FIELD", "sources") -- while the
+        # records derived `sources` from case source_urls, which are empty for
+        # every non-Unavailable case. The all-pass path-semantics record
+        # therefore published as `invalid`.
         #
-        # Any OTHER diagnostic, on any record, is real rot.
-        allowed = {("E_FIELD", "sources")}
+        # The fix was not to relax the validator: the records now carry the
+        # client's OWN provenance at record level (CLIENT_SOURCES), the same way
+        # runtime records cite the runtime they measured. Nothing about a case
+        # changed. So the tolerance is gone, and any diagnostic at all is rot.
         for record in self.records:
+            codes = sorted(
+                (d.code, d.location) for d in validate_record(record, PLATFORM)
+            )
+            self.assertEqual(
+                [],
+                codes,
+                f"{record.run_id} is invalid: {codes}",
+            )
+
+    def test_every_record_cites_the_declared_provenance_of_the_client(self):
+        # Record-level, per-client, and identical across the three records --
+        # `sources` says where the binary under test came from, not what any
+        # probe observed. Deriving it from a case would make it evidence of the
+        # observation, which is the fabrication this whole file guards against.
+        version = load_client_observations(OBSERVATIONS).client_version
+        expected = client_sources("claude-code", version)
+        self.assertTrue(expected, "no CLIENT_SOURCES row for claude-code")
+        for record in self.records:
+            self.assertEqual(
+                list(expected),
+                list(record.sources),
+                f"{record.run_id} does not carry the declared claude-code "
+                f"provenance",
+            )
+        for source in expected:
+            self.assertRegex(source.url, r"^https://")
+
+    def test_a_client_record_without_sources_is_still_rejected(self):
+        # The load-bearing half of the fix. If validate.py ever exempts
+        # `kinglet.client-probe.observations/v1` from "a pass requires source
+        # references", every derived test in this suite stays GREEN while an
+        # unsourced all-pass client record starts closing a cell. Assert the
+        # rule directly, against a real record with its sources stripped.
+        passing = [r for r in self.records if r.status == "pass"]
+        self.assertTrue(passing, "no passing client record to check the rule on")
+        for record in passing:
             codes = {
                 (d.code, d.location)
-                for d in validate_record(record, PLATFORM)
+                for d in validate_record(replace(record, sources=()), PLATFORM)
             }
-            self.assertTrue(
-                codes <= allowed,
-                f"{record.run_id} is invalid for an unexpected reason: "
-                f"{sorted(codes - allowed)}",
+            self.assertIn(
+                ("E_FIELD", "sources"),
+                codes,
+                f"{record.run_id} passes validation with no sources at all, so "
+                f"the pass-requires-sources rule no longer applies to client "
+                f"records",
             )

@@ -68,7 +68,8 @@ Each case records `advertised`, `observed`, `grade`, `status`, `source_urls`, `a
 **Interfaces:**
 - Consumes: `kinglet.client-probe.observations/v1` JSON and the fixed case catalog.
 - Produces: `load_client_observations(path: Path) -> ClientObservationSet` and
-  `to_evidence(observations, environment) -> EvidenceRecord`.
+  `to_evidence_records(observations, environment) -> tuple[EvidenceRecord, ...]`
+  — one record per matrix probe cell, not one per client.
 
 - [ ] **Step 1: Write failing grade and completeness tests**
 

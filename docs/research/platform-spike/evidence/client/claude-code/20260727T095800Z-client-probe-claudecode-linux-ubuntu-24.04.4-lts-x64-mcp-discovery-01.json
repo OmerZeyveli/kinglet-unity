@@ -87,7 +87,16 @@
   "prompt": null,
   "run_id": "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01",
   "schema": "kinglet.spike.evidence/v1",
-  "sources": [],
+  "sources": [
+    {
+      "title": "Claude Code 2.1.220 (@anthropic-ai/claude-code)",
+      "url": "https://registry.npmjs.org/@anthropic-ai/claude-code"
+    },
+    {
+      "title": "Claude Code documentation",
+      "url": "https://code.claude.com/docs/en/overview"
+    }
+  ],
   "started_at": "2026-07-27T09:58:00Z",
   "status": "fail",
   "subject": {

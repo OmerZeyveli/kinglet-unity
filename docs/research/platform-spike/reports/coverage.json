@@ -54,7 +54,7 @@
       "run_ids": [
         "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-path-semantics-01"
       ],
-      "state": "invalid"
+      "state": "pass"
     },
     {
       "id": "client.claude-code.macos-26-arm64.local-executable",

@@ -11,7 +11,7 @@
 | `client.antigravity.windows-11-x64.capability-suite` | missing | — |
 | `client.claude-code.linux-ubuntu-24-04-x64.local-executable` | fail | `20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01` |
 | `client.claude-code.linux-ubuntu-24-04-x64.mcp-discovery` | fail | `20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01` |
-| `client.claude-code.linux-ubuntu-24-04-x64.path-semantics` | invalid | `20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-path-semantics-01` |
+| `client.claude-code.linux-ubuntu-24-04-x64.path-semantics` | pass | `20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-path-semantics-01` |
 | `client.claude-code.macos-26-arm64.local-executable` | missing | — |
 | `client.claude-code.macos-26-arm64.mcp-discovery` | missing | — |
 | `client.claude-code.macos-26-arm64.path-semantics` | missing | — |
