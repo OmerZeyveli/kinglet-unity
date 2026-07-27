@@ -3,8 +3,9 @@ Claude Code client-probe overlay.
 
 Tests assert on committed file TEXT (no execution). They confirm:
 
-  - .claude-plugin/plugin.json: name, version, relative hook path, relative
-    MCP path, and build-time instruction to copy shared skill and agent.
+  - .claude-plugin/plugin.json: name, version, relative MCP path, and the
+    ABSENCE of a 'hooks' key (hooks/hooks.json is auto-discovered; declaring
+    it makes the plugin fail to load).
   - .claude-plugin/marketplace.json: marketplace name equals plugin name,
     source pinned to "./" (fixture directory), plugin version present.
   - hooks/hooks.json: wrapper "hooks" key, PreToolUse event, Write|Edit
@@ -73,16 +74,26 @@ class PluginJsonTests(unittest.TestCase):
         desc = PLUGIN_JSON.get("description", "")
         self.assertGreater(len(desc), 0, "description must not be empty")
 
-    def test_hooks_path_is_hooks_hooks_json(self):
-        """plugin.json must reference hooks via the relative path ./hooks/hooks.json.
+    def test_manifest_does_not_declare_the_standard_hooks_file(self):
+        """plugin.json must NOT carry a 'hooks' key pointing at hooks/hooks.json.
 
-        The brief asserts this path explicitly. Using a literal or inline form
-        would break the manifest test.
+        `claude plugin validate` accepts "hooks": "./hooks/hooks.json", but the
+        plugin then fails to LOAD at runtime:
+
+            Status: ✘ failed to load
+            Error: Hook load failed: Duplicate hooks file detected:
+            ./hooks/hooks.json resolves to already-loaded file <pkg>/hooks/hooks.json.
+            The standard hooks/hooks.json is loaded automatically, so
+            manifest.hooks should only reference ADDITIONAL hook files.
+
+        The standard path is auto-discovered. Declaring it is a duplicate.
+        Observed live on claude 2.1.220; see PluginLoadTests for the gate that
+        catches a regression here (validation alone does not).
         """
-        hooks_val = PLUGIN_JSON.get("hooks", "")
-        self.assertEqual(
-            hooks_val, "./hooks/hooks.json",
-            "plugin.json 'hooks' field must equal './hooks/hooks.json'"
+        self.assertNotIn(
+            "hooks", PLUGIN_JSON,
+            "plugin.json must not declare 'hooks' — hooks/hooks.json is "
+            "auto-discovered and declaring it makes the plugin fail to load"
         )
 
     def test_mcp_path_is_dot_mcp_json(self):
@@ -619,6 +630,88 @@ class PluginValidateTests(unittest.TestCase):
             result.returncode, 0,
             f"claude plugin validate failed:\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Plugin LOAD gate (requires claude binary)
+#
+# `claude plugin validate` exiting 0 does NOT mean the plugin registers:
+# a manifest that validates cleanly can still report "failed to load" in
+# `claude plugin list`. This gate installs the assembled package into a
+# throwaway CLAUDE_CONFIG_DIR and asserts the plugin actually loads.
+# ---------------------------------------------------------------------------
+
+def _assemble_package(dest: Path) -> None:
+    """Assemble the disposable plugin package per runbook Step A."""
+    shared = _REPO_ROOT / "spikes" / "platform" / "clients" / "shared"
+    shutil.copytree(_PKG, dest, dirs_exist_ok=True)
+
+    (dest / "skills" / "kinglet-capability-probe").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(
+        shared / "skills" / "kinglet-capability-probe" / "SKILL.md",
+        dest / "skills" / "kinglet-capability-probe" / "SKILL.md",
+    )
+    (dest / "agents").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(
+        shared / "agents" / "kinglet-capability-reviewer.agent.md",
+        dest / "agents" / "kinglet-capability-reviewer.agent.md",
+    )
+    if _PROBE_EXE:
+        (dest / "bin").mkdir(parents=True, exist_ok=True)
+        target = dest / "bin" / "kinglet-client-probe"
+        shutil.copy2(_PROBE_EXE, target)
+        target.chmod(0o755)
+
+
+@unittest.skipUnless(shutil.which("claude") is not None, "claude binary absent — skip")
+class PluginLoadTests(unittest.TestCase):
+    """Gate: the assembled package must LOAD, not merely validate."""
+
+    def test_installed_plugin_loads_without_error(self):
+        """`claude plugin list` must not report the plugin as failed to load.
+
+        Runs entirely inside a throwaway CLAUDE_CONFIG_DIR and a throwaway cwd
+        so neither the user's ~/.claude nor this repo's settings are touched.
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory(prefix="kinglet-plugin-load-") as tmp:
+            root = Path(tmp)
+            pkg = root / "pkg"
+            cfg = root / "config"
+            work = root / "work"
+            cfg.mkdir()
+            work.mkdir()
+            _assemble_package(pkg)
+
+            env = dict(os.environ)
+            env["CLAUDE_CONFIG_DIR"] = str(cfg)
+
+            def run(*args):
+                return subprocess.run(
+                    ["claude", *args], capture_output=True, text=True,
+                    cwd=str(work), env=env, timeout=180,
+                )
+
+            add = run("plugin", "marketplace", "add", str(pkg))
+            self.assertEqual(
+                add.returncode, 0,
+                f"marketplace add failed:\n{add.stdout!r}\n{add.stderr!r}")
+
+            inst = run("plugin", "install",
+                       "kinglet-client-probe@kinglet-client-probe")
+            self.assertEqual(
+                inst.returncode, 0,
+                f"plugin install failed:\n{inst.stdout!r}\n{inst.stderr!r}")
+
+            listed = run("plugin", "list")
+            combined = listed.stdout + listed.stderr
+            self.assertNotIn(
+                "failed to load", combined,
+                "plugin installed but did not load:\n" + combined)
+            self.assertIn(
+                "kinglet-client-probe", combined,
+                "plugin absent from `claude plugin list`:\n" + combined)
 
 
 # ---------------------------------------------------------------------------

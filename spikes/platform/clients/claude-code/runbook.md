@@ -101,7 +101,27 @@ claude plugin list
 ```
 
 Record the output of `claude plugin list`. It must show `kinglet-client-probe`
-at version `0.0.1`. This satisfies `install.discover` (first cold discovery).
+at version `0.0.1` with `Status: ✔ enabled`. This satisfies `install.discover`
+(first cold discovery).
+
+**`claude plugin list` is the real gate — not `claude plugin validate`.**
+A manifest can validate cleanly (exit 0) and still fail to register. Observed
+live on claude 2.1.220: adding `"hooks": "./hooks/hooks.json"` to `plugin.json`
+passes validation but yields
+
+```
+Status: ✘ failed to load
+Error: Hook load failed: Duplicate hooks file detected: ./hooks/hooks.json
+resolves to already-loaded file <pkg>/hooks/hooks.json. The standard
+hooks/hooks.json is loaded automatically, so manifest.hooks should only
+reference additional hook files.
+```
+
+The committed `plugin.json` therefore declares **no** `hooks` key —
+`hooks/hooks.json` is auto-discovered. `"mcpServers": "./.mcp.json"` **is**
+declared and does register (`claude plugin details` lists `MCP servers (1)`).
+If `plugin list` reports `failed to load`, stop: no case observation gathered
+under a non-loading plugin is valid.
 
 ## Step C — Start a new session in the disposable project
 
