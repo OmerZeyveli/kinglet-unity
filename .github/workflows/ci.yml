@@ -204,6 +204,12 @@ jobs:
       # Plain `grep -r` (no -P, no pipe into head) so it stays portable.
       - name: Sanitize committed spike text
         run: |
+          set -euo pipefail
+          # `grep -I` calls any file with a stray byte binary and skips it in
+          # silence, so a leak wrapped in \xff was invisible to BOTH nets. The
+          # walk below refuses to skip a file it cannot decode and names it, and
+          # it is the same walk the sweep uses, so the two cannot drift.
+          python3 -c 'from tests.kinglet_spike.spike_tree import committed_text_files; committed_text_files()'
           if grep -rInE '(/Users/|/home/[a-z]|[A-Z]:\\Users\\|gh[pousr]_[A-Za-z0-9]{20,}|/tmp/kinglet-live)' \
                spikes/platform/clients \
                docs/research/platform-spike/evidence \

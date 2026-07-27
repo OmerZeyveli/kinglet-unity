@@ -34,7 +34,12 @@ import re
 import unittest
 from pathlib import Path
 
+from tests.kinglet_spike.spike_tree import (
+    ALLOWED_CREDENTIAL_REFERENCE as GENERIC_ALLOWED_CREDENTIAL_REFERENCE,
+)
+from tests.kinglet_spike.spike_tree import CREDENTIAL_FILE as GENERIC_CREDENTIAL_FILE
 from tests.kinglet_spike.spike_tree import committed_text_files as swept_text_files
+from tests.kinglet_spike.spike_tree import credential_copy_violations
 from tools.kinglet_spike.client_results import (
     OBSERVATIONS_SCHEMA,
     load_client_observations,
@@ -232,6 +237,53 @@ class ClaudeCodeObservationsTests(unittest.TestCase):
                 f"{path.name} is covered by name here but not by the "
                 f"client-agnostic sweep",
             )
+
+    def test_the_client_agnostic_credential_rule_is_never_weaker_than_this_one(self):
+        # Being INSIDE the generic sweep is not enough; the generic sweep's RULE
+        # has to be at least as strict. It was not: this file pins the allowed
+        # presence check to $CFG, while the generic rule accepted any variable.
+        # That gap was worth three lines in a new client's probe script —
+        #
+        #     H="$HOME/.claude"; F="$H/.credentials.json"; cp "$F" ./stolen.json
+        #
+        # — RED here for claude-code, green everywhere else. Every client but
+        # claude-code was less protected by the test written to protect them all.
+        lines = [
+            'F="$H/.credentials.json"',
+            'F="$HOME/.claude/.credentials.json"',
+            'cat "$CFG/.credentials.json"',
+            'if [ ! -f "$CFG/.credentials.json" ]; then',
+            'echo "${CFG}/.credentials.json"',
+            "cp x/.credentials.json y",
+            'p = home / ".credentials.json"',
+            "look at .credentialsFoo",
+            "the scripts do not copy credentials",
+        ]
+        for path in swept_text_files():
+            lines.extend(path.read_text(encoding="utf-8").splitlines())
+        for line in lines:
+            by_name = CREDENTIALS.search(ALLOWED_CREDENTIAL_REFERENCE.sub("", line))
+            if by_name is None:
+                continue
+            self.assertIsNotNone(
+                GENERIC_CREDENTIAL_FILE.search(
+                    GENERIC_ALLOWED_CREDENTIAL_REFERENCE.sub("", line)
+                ),
+                f"the $CFG-pinned rule here flags this line and the "
+                f"client-agnostic rule does not, so every client except "
+                f"claude-code is less protected: {line.strip()!r}",
+            )
+
+    def test_probe_scripts_never_copy_a_credential_file_indirectly(self):
+        # The by-name rule above is line-local: it never sees a credential path
+        # stashed in a variable and copied later. Run the taint-following rule
+        # over these scripts too, so the by-name set is not the weaker of the two
+        # in the other direction either.
+        for path in _probe_scripts():
+            for number, line, reason in credential_copy_violations(
+                path.read_text(encoding="utf-8")
+            ):
+                self.fail(f"{path.name}:{number} {reason}: {line.strip()!r}")
 
     def test_probe_scripts_never_copy_the_credential_file(self):
         # The scripts are permitted to CHECK that "$CFG/.credentials.json" exists
