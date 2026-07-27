@@ -379,3 +379,10 @@ tools/kinglet_spike/client_results.py	original	-	-	-	original	client-probe-load-
 tests/kinglet_spike/client_support.py	original	-	-	-	original	client-probe-test-fixtures-case-ids-and-valid-observations
 tests/kinglet_spike/test_client_results.py	original	-	-	-	original	client-probe-behavioral-contract-tests
 tests/kinglet_spike/test_client_fixture.py	original	-	-	-	original	client-probe-shared-fixture-structural-and-content-tests
+spikes/platform/clients/claude-code/.claude-plugin/plugin.json	original	-	-	-	original	client-probe-claude-code-plugin-manifest
+spikes/platform/clients/claude-code/.claude-plugin/marketplace.json	original	-	-	-	original	client-probe-claude-code-local-marketplace-entry
+spikes/platform/clients/claude-code/hooks/hooks.json	original	-	-	-	original	client-probe-claude-code-pretooluse-hook-config
+spikes/platform/clients/claude-code/hooks/pre-mutation-hook.sh	original	-	-	-	original	client-probe-claude-code-deny-translation-wrapper
+spikes/platform/clients/claude-code/.mcp.json	original	-	-	-	original	client-probe-claude-code-local-mcp-server-config
+spikes/platform/clients/claude-code/runbook.md	original	-	-	-	original	client-probe-claude-code-live-pass-runbook
+tests/kinglet_spike/test_claude_probe_package.py	original	-	-	-	original	client-probe-claude-code-manifest-and-content-tests

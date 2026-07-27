@@ -1,0 +1,18 @@
+{
+  "name": "kinglet-client-probe",
+  "description": "Local marketplace for the Kinglet client-probe disposable package. Add with: claude plugin marketplace add <absolute-path-to-this-directory>",
+  "owner": {
+    "name": "kinglet"
+  },
+  "plugins": [
+    {
+      "name": "kinglet-client-probe",
+      "version": "0.0.1",
+      "description": "Kinglet client-probe overlay for Claude Code capability measurement.",
+      "source": "./",
+      "author": {
+        "name": "kinglet"
+      }
+    }
+  ]
+}

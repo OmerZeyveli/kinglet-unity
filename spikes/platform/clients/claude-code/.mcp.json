@@ -1,0 +1,8 @@
+{
+  "kinglet-client-probe": {
+    "command": "${CLAUDE_PLUGIN_ROOT}/bin/kinglet-client-probe",
+    "args": ["mcp"],
+    "description": "Kinglet client-probe stdio MCP server. Exposes the kinglet_probe_read_marker tool, which reads the fixed project marker and Unity version from the disposable probe project. Read-only.",
+    "tools": ["kinglet_probe_read_marker"]
+  }
+}

@@ -1,0 +1,532 @@
+"""test_claude_probe_package.py — Structural and content assertions for the
+Claude Code client-probe overlay.
+
+Tests assert on committed file TEXT (no execution). They confirm:
+
+  - .claude-plugin/plugin.json: name, version, relative hook path, relative
+    MCP path, and build-time instruction to copy shared skill and agent.
+  - .claude-plugin/marketplace.json: marketplace name equals plugin name,
+    source pinned to "./" (fixture directory), plugin version present.
+  - hooks/hooks.json: wrapper "hooks" key, PreToolUse event, Write|Edit
+    matcher, command invokes kinglet-client-probe hook subcommand, uses
+    ${CLAUDE_PLUGIN_ROOT}, the wrapper script exits 2 on deny (not 0).
+  - .mcp.json: flat server entry (no "mcpServers" wrapper), command references
+    ${CLAUDE_PLUGIN_ROOT}/bin path, "mcp" subcommand present.
+  - runbook.md: four install/uninstall commands, four prompt IDs, PreToolUse
+    deny translation note, build-time copy instruction.
+  - hook wrapper shell script: strict mode, reads stdin, calls probe hook
+    subcommand, parses decision field, exits 2 on deny, exits 0 on allow,
+    no absolute user paths, no bash 4 constructs, no GNU-only flags.
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import unittest
+from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_PKG = _REPO_ROOT / "spikes" / "platform" / "clients" / "claude-code"
+
+# ---------------------------------------------------------------------------
+# Read files at import time so every test class gets the same bytes and
+# missing files surface as a clean AttributeError rather than a per-test
+# FileNotFoundError that hides which file is absent.
+# ---------------------------------------------------------------------------
+def _read(rel: str) -> str:
+    return (_PKG / rel).read_text(encoding="utf-8")
+
+
+PLUGIN_JSON_TEXT = _read(".claude-plugin/plugin.json")
+MARKETPLACE_JSON_TEXT = _read(".claude-plugin/marketplace.json")
+HOOKS_JSON_TEXT = _read("hooks/hooks.json")
+MCP_JSON_TEXT = _read(".mcp.json")
+RUNBOOK_TEXT = _read("runbook.md")
+HOOK_WRAPPER_TEXT = _read("hooks/pre-mutation-hook.sh")
+
+PLUGIN_JSON = json.loads(PLUGIN_JSON_TEXT)
+MARKETPLACE_JSON = json.loads(MARKETPLACE_JSON_TEXT)
+HOOKS_JSON = json.loads(HOOKS_JSON_TEXT)
+MCP_JSON = json.loads(MCP_JSON_TEXT)
+
+
+# ---------------------------------------------------------------------------
+# plugin.json tests
+# ---------------------------------------------------------------------------
+
+class PluginJsonTests(unittest.TestCase):
+    """Asserts on .claude-plugin/plugin.json."""
+
+    def test_name_is_kinglet_client_probe(self):
+        """The plugin name field must equal the frozen identifier."""
+        self.assertEqual(PLUGIN_JSON.get("name"), "kinglet-client-probe")
+
+    def test_version_is_0_0_1(self):
+        """The initial version must match the brief."""
+        self.assertEqual(PLUGIN_JSON.get("version"), "0.0.1")
+
+    def test_description_is_present_and_non_empty(self):
+        """A non-empty description is required."""
+        desc = PLUGIN_JSON.get("description", "")
+        self.assertGreater(len(desc), 0, "description must not be empty")
+
+    def test_hooks_path_is_hooks_hooks_json(self):
+        """plugin.json must reference hooks via the relative path hooks/hooks.json.
+
+        The brief asserts this path explicitly. Using a literal or inline form
+        would break the manifest test.
+        """
+        hooks_val = PLUGIN_JSON.get("hooks", "")
+        self.assertEqual(
+            hooks_val, "hooks/hooks.json",
+            "plugin.json 'hooks' field must equal 'hooks/hooks.json'"
+        )
+
+    def test_mcp_path_is_dot_mcp_json(self):
+        """plugin.json must reference MCP via the relative path .mcp.json."""
+        mcp_val = PLUGIN_JSON.get("mcpServers", "")
+        self.assertEqual(
+            mcp_val, ".mcp.json",
+            "plugin.json 'mcpServers' field must equal '.mcp.json'"
+        )
+
+
+# ---------------------------------------------------------------------------
+# marketplace.json tests
+# ---------------------------------------------------------------------------
+
+class MarketplaceJsonTests(unittest.TestCase):
+    """Asserts on .claude-plugin/marketplace.json."""
+
+    def test_marketplace_name_equals_plugin_name(self):
+        """The marketplace name must be 'kinglet-client-probe'.
+
+        The install command is:
+            claude plugin install kinglet-client-probe@kinglet-client-probe
+        The @<marketplace-name> part comes from the marketplace 'name' field.
+        """
+        self.assertEqual(MARKETPLACE_JSON.get("name"), "kinglet-client-probe")
+
+    def test_plugins_list_is_non_empty(self):
+        plugins = MARKETPLACE_JSON.get("plugins", [])
+        self.assertGreater(len(plugins), 0, "plugins list must not be empty")
+
+    def test_plugin_entry_name_is_kinglet_client_probe(self):
+        """The first plugin entry name must match the plugin name."""
+        plugins = MARKETPLACE_JSON.get("plugins", [])
+        self.assertGreater(len(plugins), 0)
+        self.assertEqual(plugins[0].get("name"), "kinglet-client-probe")
+
+    def test_plugin_entry_version_is_0_0_1(self):
+        """The marketplace entry version must match plugin.json."""
+        plugins = MARKETPLACE_JSON.get("plugins", [])
+        self.assertGreater(len(plugins), 0)
+        self.assertEqual(plugins[0].get("version"), "0.0.1")
+
+    def test_plugin_entry_source_is_current_dir(self):
+        """source must be './' — the disposable fixture directory.
+
+        The runbook adds the marketplace with an absolute path:
+            claude plugin marketplace add <absolute-path>
+        Claude resolves the source relative to the marketplace.json location,
+        so './' pins it to the directory containing this file.
+        """
+        plugins = MARKETPLACE_JSON.get("plugins", [])
+        self.assertGreater(len(plugins), 0)
+        self.assertEqual(plugins[0].get("source"), "./")
+
+
+# ---------------------------------------------------------------------------
+# hooks/hooks.json tests
+# ---------------------------------------------------------------------------
+
+class HooksJsonTests(unittest.TestCase):
+    """Asserts on hooks/hooks.json."""
+
+    def test_hooks_json_is_valid_json(self):
+        self.assertIsInstance(HOOKS_JSON, dict)
+
+    def test_has_top_level_hooks_key(self):
+        """Plugin hooks.json must use the 'hooks' wrapper key (plugin format)."""
+        self.assertIn("hooks", HOOKS_JSON,
+                      "hooks/hooks.json must have a top-level 'hooks' wrapper key")
+
+    def test_pretooluse_event_is_present(self):
+        hooks = HOOKS_JSON.get("hooks", {})
+        self.assertIn("PreToolUse", hooks,
+                      "hooks wrapper must contain a 'PreToolUse' event key")
+
+    def test_pretooluse_has_write_edit_matcher(self):
+        """The PreToolUse entry must target Write|Edit to intercept mutations.
+
+        The brief specifies 'matcher Write|Edit'. Any other form (e.g. 'Edit|Write'
+        or a broader glob) would mis-grade the hooks.pre-mutation-block case.
+        """
+        entries = HOOKS_JSON.get("hooks", {}).get("PreToolUse", [])
+        self.assertGreater(len(entries), 0)
+        matcher = entries[0].get("matcher", "")
+        self.assertEqual(matcher, "Write|Edit",
+                         "PreToolUse matcher must be exactly 'Write|Edit'")
+
+    def test_pretooluse_command_invokes_hook_wrapper(self):
+        """The PreToolUse hook must reference a command, not a prompt hook.
+
+        A prompt hook cannot shell the native binary and inspect its JSON output;
+        only a command hook wrapper can perform the deny-translation required by
+        the overlay_contract in shared/hooks/hook-policy.json.
+        """
+        entries = HOOKS_JSON.get("hooks", {}).get("PreToolUse", [])
+        self.assertGreater(len(entries), 0)
+        inner = entries[0].get("hooks", [])
+        self.assertGreater(len(inner), 0)
+        first_hook = inner[0]
+        self.assertEqual(first_hook.get("type"), "command",
+                         "PreToolUse hook type must be 'command' (not 'prompt')")
+
+    def test_pretooluse_command_uses_plugin_root_token(self):
+        """The command must use ${CLAUDE_PLUGIN_ROOT} for portability."""
+        entries = HOOKS_JSON.get("hooks", {}).get("PreToolUse", [])
+        inner = entries[0].get("hooks", [])
+        cmd = inner[0].get("command", "")
+        self.assertIn("${CLAUDE_PLUGIN_ROOT}", cmd,
+                      "command must use ${CLAUDE_PLUGIN_ROOT} token for portability")
+
+    def test_pretooluse_command_references_hook_wrapper_script(self):
+        """The command must reference pre-mutation-hook.sh (the deny-translate wrapper)."""
+        entries = HOOKS_JSON.get("hooks", {}).get("PreToolUse", [])
+        inner = entries[0].get("hooks", [])
+        cmd = inner[0].get("command", "")
+        self.assertIn("pre-mutation-hook.sh", cmd,
+                      "command must reference the pre-mutation-hook.sh wrapper script")
+
+    def test_pretooluse_command_does_not_call_binary_directly(self):
+        """The command must call the wrapper script, not kinglet-client-probe directly.
+
+        The binary exits 0 on deny; the wrapper is what exits 2. Calling the
+        binary directly would silently pass all mutations.
+        """
+        entries = HOOKS_JSON.get("hooks", {}).get("PreToolUse", [])
+        inner = entries[0].get("hooks", [])
+        cmd = inner[0].get("command", "")
+        # The command must invoke the .sh wrapper, not the binary
+        self.assertNotIn("kinglet-client-probe hook", cmd,
+                         "command must not call the probe binary directly — "
+                         "use the wrapper script that translates deny to exit 2")
+
+
+# ---------------------------------------------------------------------------
+# .mcp.json tests
+# ---------------------------------------------------------------------------
+
+class McpJsonTests(unittest.TestCase):
+    """Asserts on .mcp.json."""
+
+    def test_mcp_json_is_valid_json(self):
+        self.assertIsInstance(MCP_JSON, dict)
+
+    def test_mcp_json_uses_flat_format_not_mcp_servers_wrapper(self):
+        """Plugin .mcp.json must use the flat format: server-name → config.
+
+        Claude Code plugin .mcp.json uses a flat object (key is the server name),
+        NOT the 'mcpServers' wrapper used in settings.json or the shared mcp.json
+        fixture. Using the wrapper form would cause the MCP server not to register.
+        """
+        self.assertNotIn("mcpServers", MCP_JSON,
+                         ".mcp.json must use flat server-name keys, not 'mcpServers' wrapper")
+
+    def test_mcp_json_has_kinglet_client_probe_server(self):
+        """Must register a server named 'kinglet-client-probe'."""
+        self.assertIn("kinglet-client-probe", MCP_JSON,
+                      ".mcp.json must have a 'kinglet-client-probe' server entry")
+
+    def test_mcp_command_uses_plugin_root_bin(self):
+        """The MCP server command must reference ${CLAUDE_PLUGIN_ROOT}/bin/."""
+        server = MCP_JSON.get("kinglet-client-probe", {})
+        cmd = server.get("command", "")
+        self.assertIn("${CLAUDE_PLUGIN_ROOT}", cmd,
+                      "MCP command must use ${CLAUDE_PLUGIN_ROOT} for portability")
+        self.assertIn("/bin/", cmd,
+                      "MCP command must reference the /bin/ path under plugin root")
+
+    def test_mcp_args_contain_mcp_subcommand(self):
+        """The probe binary must be invoked with the 'mcp' subcommand."""
+        server = MCP_JSON.get("kinglet-client-probe", {})
+        args = server.get("args", [])
+        self.assertIn("mcp", args,
+                      "MCP server args must contain the 'mcp' subcommand")
+
+    def test_mcp_tool_name_is_listed(self):
+        """The tools restriction list must contain 'kinglet_probe_read_marker'."""
+        server = MCP_JSON.get("kinglet-client-probe", {})
+        tools = server.get("tools", [])
+        self.assertIn("kinglet_probe_read_marker", tools,
+                      "tools list must contain 'kinglet_probe_read_marker'")
+
+
+# ---------------------------------------------------------------------------
+# runbook.md tests
+# ---------------------------------------------------------------------------
+
+class RunbookTests(unittest.TestCase):
+    """Asserts on runbook.md."""
+
+    def test_install_marketplace_command_present(self):
+        """Runbook must include the 'claude plugin marketplace add' command."""
+        self.assertIn("claude plugin marketplace add", RUNBOOK_TEXT)
+
+    def test_install_command_present(self):
+        """Runbook must include the install command with scope local."""
+        self.assertIn("claude plugin install", RUNBOOK_TEXT)
+        self.assertIn("--scope local", RUNBOOK_TEXT)
+
+    def test_install_command_uses_correct_plugin_ref(self):
+        """Install command must use the name@marketplace form."""
+        self.assertIn("kinglet-client-probe@kinglet-client-probe", RUNBOOK_TEXT)
+
+    def test_plugin_list_command_present(self):
+        """Runbook must include 'claude plugin list' to verify installation."""
+        self.assertIn("claude plugin list", RUNBOOK_TEXT)
+
+    def test_uninstall_command_present(self):
+        """Runbook must include an uninstall step."""
+        self.assertIn("claude plugin uninstall", RUNBOOK_TEXT)
+
+    def test_all_four_prompt_ids_present(self):
+        """All four synthetic prompt IDs from prompts-v1.json must appear."""
+        for pid in (
+            "workflow-natural-language-01",
+            "agent-delegation-01",
+            "mutation-block-01",
+            "mcp-call-01",
+        ):
+            self.assertIn(pid, RUNBOOK_TEXT,
+                          f"runbook must reference prompt ID '{pid}'")
+
+    def test_pretooluse_deny_translation_note_present(self):
+        """Runbook must document that exit 2 is the Claude Code deny mechanism.
+
+        This is the overlay_contract requirement: the binary exits 0 on deny;
+        the wrapper exits 2; the runbook must explain this to the live-pass
+        operator so they can confirm the mutation-block case fires correctly.
+        """
+        self.assertIn("exit 2", RUNBOOK_TEXT,
+                      "runbook must document exit 2 as the Claude Code deny signal")
+
+    def test_build_step_copies_shared_skill_and_agent(self):
+        """Runbook must instruct the operator to copy the shared skill and agent.
+
+        The brief says 'Copy shared skill and agent at probe-build time' — the
+        committed overlay must not duplicate them; the runbook is the build step.
+        """
+        self.assertIn("skill", RUNBOOK_TEXT.lower())
+        self.assertIn("agent", RUNBOOK_TEXT.lower())
+        # Must reference 'copy' or 'cp' to make the instruction actionable
+        lower = RUNBOOK_TEXT.lower()
+        has_copy = "copy" in lower or " cp " in lower or "\ncp " in lower
+        self.assertTrue(has_copy,
+                        "runbook must include a copy instruction for the shared skill/agent")
+
+    def test_no_absolute_user_paths(self):
+        """Runbook must not contain hardcoded user-specific absolute paths."""
+        home = os.path.expanduser("~")
+        self.assertNotIn(home, RUNBOOK_TEXT)
+        self.assertIsNone(
+            re.search(r'(/home/\w|/Users/\w|[A-Z]:\\Users\\)', RUNBOOK_TEXT),
+            "runbook must not contain any hardcoded user home path"
+        )
+
+    def test_update_version_step_present(self):
+        """Runbook must include the update scenario (bump to 0.0.2, reload)."""
+        self.assertIn("0.0.2", RUNBOOK_TEXT,
+                      "runbook must document the version-update step (0.0.1 -> 0.0.2)")
+
+    def test_new_session_required_before_prompts(self):
+        """Runbook must instruct operator to start a new session before running prompts.
+
+        The install.discover case requires a cold session — reusing the install
+        session would mis-grade natural-language discovery.
+        """
+        lower = RUNBOOK_TEXT.lower()
+        has_new_session = "new session" in lower or "fresh session" in lower or "/clear" in lower
+        self.assertTrue(has_new_session,
+                        "runbook must instruct starting a new session before running prompts")
+
+
+# ---------------------------------------------------------------------------
+# hooks/pre-mutation-hook.sh tests
+# ---------------------------------------------------------------------------
+
+class HookWrapperTests(unittest.TestCase):
+    """Asserts on hooks/pre-mutation-hook.sh.
+
+    The wrapper is the deny-translation layer. It reads Claude Code's PreToolUse
+    JSON from stdin, extracts the file path, calls the probe binary's 'hook'
+    subcommand, parses the JSON decision, and exits 2 when decision=='deny'.
+    """
+
+    def test_uses_strict_bash_mode(self):
+        self.assertIn("set -euo pipefail", HOOK_WRAPPER_TEXT)
+
+    def test_reads_stdin_into_variable(self):
+        """Must capture stdin (the Claude Code tool-use JSON event)."""
+        # Must assign $(cat) or read from stdin to a variable (not just pipe directly).
+        # This is required because we need to use the data twice (extract path AND pass to probe).
+        lower = HOOK_WRAPPER_TEXT.lower()
+        self.assertTrue(
+            "$(cat)" in HOOK_WRAPPER_TEXT or "read" in lower,
+            "wrapper must read stdin into a variable using $(cat) or read"
+        )
+
+    def test_extracts_file_path_from_tool_input(self):
+        """Must extract file_path from .tool_input.file_path in the Claude hook JSON.
+
+        Claude Code PreToolUse sends: {"tool_name": "...", "tool_input": {"file_path": "..."}, ...}
+
+        Both 'tool_input' and 'file_path' appear in comments that document the
+        format, so this test filters comment lines to assert on actual code.
+        The jq query '.tool_input.file_path' is load-bearing; asserting its
+        exact substring prevents a comment-only match.
+        """
+        non_comment_lines = [
+            line for line in HOOK_WRAPPER_TEXT.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        non_comment_text = "\n".join(non_comment_lines)
+        # The jq query path is the load-bearing form — a comment cannot satisfy this
+        self.assertIn(".tool_input.file_path", non_comment_text,
+                      "wrapper must use jq path '.tool_input.file_path' in non-comment code "
+                      "to extract the file path from the Claude PreToolUse event")
+
+    def test_calls_probe_hook_subcommand_with_stdin_event(self):
+        """Must invoke the probe binary's 'hook' subcommand with --event -."""
+        self.assertIn("hook --event -", HOOK_WRAPPER_TEXT,
+                      "wrapper must call 'hook --event -' to pass the event via stdin")
+
+    def test_parses_decision_field_from_probe_output(self):
+        """Must read the 'decision' field from the probe binary's JSON output.
+
+        'decision' appears in a comment documenting the probe output format,
+        so we filter comments and assert on the jq query that extracts it.
+        The jq path '.decision' in non-comment code is the load-bearing form.
+        """
+        non_comment_lines = [
+            line for line in HOOK_WRAPPER_TEXT.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        non_comment_text = "\n".join(non_comment_lines)
+        self.assertIn(".decision", non_comment_text,
+                      "wrapper must extract .decision via jq in non-comment code "
+                      "(not only reference it in a format-documentation comment)")
+
+    def test_exits_2_on_deny(self):
+        """Must exit 2 when decision is 'deny' — Claude Code's native block mechanism.
+
+        Per overlay_contract: the probe binary always exits 0; the wrapper must
+        translate a deny decision into exit 2 (Claude Code's PreToolUse block signal).
+
+        This test filters out comment lines to prevent a comment mentioning 'exit 2'
+        from satisfying the assertion when the actual exit call is absent.
+        """
+        non_comment_lines = [
+            line for line in HOOK_WRAPPER_TEXT.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        non_comment_text = "\n".join(non_comment_lines)
+        self.assertIn("exit 2", non_comment_text,
+                      "wrapper must contain 'exit 2' in non-comment code "
+                      "(not only in a comment) — this is the Claude Code block signal")
+
+    def test_exits_0_on_allow(self):
+        """Must exit 0 when decision is 'allow' — letting the mutation proceed.
+
+        Filters comment lines to avoid the assertion being satisfied by a comment.
+        """
+        non_comment_lines = [
+            line for line in HOOK_WRAPPER_TEXT.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        non_comment_text = "\n".join(non_comment_lines)
+        self.assertIn("exit 0", non_comment_text,
+                      "wrapper must contain 'exit 0' in non-comment code")
+
+    def test_deny_is_conditional_not_unconditional(self):
+        """exit 2 must be conditional on the decision value, not always executed.
+
+        An unconditional 'exit 2' at end of script would block every write.
+        Verify that 'exit 2' appears inside a conditional block: a conditional
+        keyword (if, case, [ ], test) appears before 'exit 2' in non-comment code,
+        and 'exit 2' itself is in non-comment code.
+        """
+        lines = HOOK_WRAPPER_TEXT.splitlines()
+        conditional_seen = False
+        exit2_in_code_found = False
+        for line in lines:
+            stripped = line.strip()
+            # Skip comment lines — exit 2 in a comment must not satisfy the test
+            if stripped.startswith("#"):
+                continue
+            if re.search(r'\bif\b|\bcase\b|\[\s|\btest\b', stripped):
+                conditional_seen = True
+            if "exit 2" in stripped:
+                exit2_in_code_found = True
+                self.assertTrue(conditional_seen,
+                                "exit 2 must appear after a conditional construct "
+                                "(not unconditionally at script top level)")
+                break
+        self.assertTrue(exit2_in_code_found,
+                        "exit 2 must appear in non-comment code (not only in a comment)")
+
+    def test_uses_plugin_root_for_binary_path(self):
+        """Must use ${CLAUDE_PLUGIN_ROOT} to locate the probe binary."""
+        self.assertIn("CLAUDE_PLUGIN_ROOT", HOOK_WRAPPER_TEXT,
+                      "wrapper must use CLAUDE_PLUGIN_ROOT to locate the binary")
+
+    def test_no_declare_associative_array(self):
+        """No bash 4+ constructs (macOS ships bash 3.2)."""
+        self.assertNotIn("declare -A", HOOK_WRAPPER_TEXT)
+
+    def test_no_grep_oP(self):
+        """No GNU-only grep flags."""
+        self.assertNotIn("grep -oP", HOOK_WRAPPER_TEXT)
+
+    def test_no_pipe_into_head(self):
+        """No pipe into head (SIGPIPE + pipefail kills script on large inputs)."""
+        self.assertNotIn("| head", HOOK_WRAPPER_TEXT)
+
+    def test_no_absolute_user_paths(self):
+        """No hardcoded user-specific paths."""
+        home = os.path.expanduser("~")
+        self.assertNotIn(home, HOOK_WRAPPER_TEXT)
+        self.assertIsNone(
+            re.search(r'(/home/\w|/Users/\w|[A-Z]:\\Users\\)', HOOK_WRAPPER_TEXT),
+            "pre-mutation-hook.sh must not contain any hardcoded user home path"
+        )
+
+    def test_deny_path_emits_message_to_stderr(self):
+        """On deny, the wrapper should emit a message to stderr so Claude sees it."""
+        # Check that there's some stderr output near the exit 2 path
+        self.assertIn(">&2", HOOK_WRAPPER_TEXT,
+                      "wrapper must emit at least one stderr message (for Claude's context)")
+
+    def test_constructs_event_json_for_probe(self):
+        """Must build a JSON event object matching the probe's hookEvent format.
+
+        The probe's hook subcommand reads {"path": "..."} from stdin.
+        The wrapper must construct this from the file_path it extracted.
+
+        Filters comment lines to prevent a comment that documents the format
+        from satisfying the test when the actual construction code is absent.
+        """
+        non_comment_lines = [
+            line for line in HOOK_WRAPPER_TEXT.splitlines()
+            if not line.strip().startswith("#")
+        ]
+        non_comment_text = "\n".join(non_comment_lines)
+        self.assertIn('"path"', non_comment_text,
+                      'wrapper must construct JSON with a "path" key in non-comment code '
+                      '(the probe binary hook subcommand reads {"path": "..."} from stdin)')
+
+
+if __name__ == "__main__":
+    unittest.main()

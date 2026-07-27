@@ -1,0 +1,17 @@
+{
+  "description": "Pre-mutation hook for the Kinglet client-probe disposable project. Delegates allow/deny decisions to the native kinglet-client-probe binary and translates deny into exit 2 (Claude Code block signal).",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-mutation-hook.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
