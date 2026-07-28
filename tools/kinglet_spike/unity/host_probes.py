@@ -209,6 +209,39 @@ def assertion(identifier: str, ok: bool, detail: str) -> dict:
     return {"id": identifier, "status": "pass" if ok else "fail", "detail": detail}
 
 
+# The environment variable run-host.sh uses to tell the runner where to record
+# the process groups it creates. The outer trap can then sweep VBCSCompiler and
+# UnityPackageManager, which carry no -projectPath and are therefore invisible
+# to a workspace-path sweep, WITHOUT resorting to a host-wide name match.
+OWNED_PGIDS_ENV = "KINGLET_UNITY_OWNED_PGIDS"
+
+
+def record_owned_pgid(pgid: int, path: Path | None) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write(f"{pgid}\n")
+
+
+def recording_process_factory(path: Path | None):
+    """`ManagedProcess.start`, plus a note of the group it just created.
+
+    Uses the route's existing injectable `process_factory` seam rather than
+    reaching inside it, so nothing about how a route launches or contains Unity
+    changes -- the only addition is that the pgid becomes knowable to the outer
+    trap.
+    """
+    from .process import ManagedProcess
+
+    def factory(*args, **kwargs):
+        process = ManagedProcess.start(*args, **kwargs)
+        record_owned_pgid(process.pgid, path)
+        return process
+
+    return factory
+
+
 class Staging:
     """Stages sanitized artifacts and remembers their published paths."""
 
@@ -230,6 +263,26 @@ class Staging:
             "media_type": "application/json",
         })
 
+    def resolve_receipt_artifacts(self, run_id: str, receipt: dict, names: dict) -> dict:
+        """Rewrite a receipt's `artifacts` to the paths actually published.
+
+        A `UnityReceipt` names its artifacts route-relative
+        (`artifacts/unity/same-project-headless-summary.json`), which is correct
+        inside the route and DANGLING once published: the committed layout is
+        `artifacts/unity/<run-id>/<name>`, and a cell that renames a file on the
+        way in -- collision-refusal stages the route's summary as
+        `collision-refusal-summary.json` -- leaves a reference to a name that
+        exists nowhere in its directory. `names` maps the receipt's own basename
+        to the basename this cell published.
+        """
+        resolved = dict(receipt)
+        rewritten = []
+        for path in receipt.get("artifacts", ()):  # route-relative
+            base = path.rsplit("/", 1)[-1]
+            rewritten.append(f"artifacts/unity/{run_id}/{names.get(base, base)}")
+        resolved["artifacts"] = rewritten
+        return resolved
+
     def write_json(self, probe_id: str, run_id: str, name: str, payload: dict, raw_dir: Path) -> None:
         raw_dir.mkdir(parents=True, exist_ok=True)
         source = raw_dir / name
@@ -240,14 +293,31 @@ class Staging:
         return self.staged.get(probe_id, [])
 
 
-def observed(probe_id: str, command, assertions, artifacts) -> dict:
-    return {
+def utc_now() -> str:
+    return datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def observed(probe_id: str, command, assertions, artifacts,
+             started_at: str | None = None, ended_at: str | None = None) -> dict:
+    """One observed probe entry.
+
+    `started_at`/`ended_at` are the probe's REAL span. They were previously
+    dropped and every record stamped a single instant, which threw away a
+    duration the artifacts were already measuring -- a reader could see
+    `wall_seconds: 22.151` in the artifact and `started_at == ended_at` in the
+    record above it.
+    """
+    entry = {
         "id": probe_id,
         "unobserved": False,
         "command": [str(item) for item in command],
         "assertions": assertions,
         "artifact_paths": artifacts,
     }
+    if started_at is not None and ended_at is not None:
+        entry["started_at"] = started_at
+        entry["ended_at"] = ended_at
+    return entry
 
 
 def unobserved(probe_id: str, reason: str) -> dict:
@@ -263,15 +333,23 @@ def probe_filesystem(context) -> dict:
     run_id = context.run_id(probe_id)
     raw = context.raw / probe_id
     raw.mkdir(parents=True, exist_ok=True)
+    started_at = utc_now()
     before = process_rows()
     receipt = run_filesystem(context.fixture, raw)
     after = process_rows()
+    ended_at = utc_now()
     diagnostics = validate_unity_receipt(receipt)
 
     context.staging.add(probe_id, run_id, raw / "filesystem-inventory.json",
                         "filesystem-inventory.json")
-    context.staging.write_json(probe_id, run_id, "filesystem-receipt.json",
-                               receipt_to_dict(receipt), raw)
+    context.staging.write_json(
+        probe_id, run_id, "filesystem-receipt.json",
+        context.staging.resolve_receipt_artifacts(
+            run_id, receipt_to_dict(receipt),
+            {"filesystem-inventory.json": "filesystem-inventory.json"},
+        ),
+        raw,
+    )
 
     assertions = [
         assertion("receipt-valid", not diagnostics,
@@ -293,7 +371,7 @@ def probe_filesystem(context) -> dict:
     return observed(probe_id, ("python3", "-m", "tools.kinglet_spike.unity", "filesystem",
                                "--project", "spikes/platform/unity/fixture",
                                "--raw-dir", "<raw>"), assertions,
-                    context.staging.for_probe(probe_id))
+                    context.staging.for_probe(probe_id), started_at, ended_at)
 
 
 def probe_same_project(context) -> dict:
@@ -303,10 +381,13 @@ def probe_same_project(context) -> dict:
     project = context.workspace / "same-project"
     context.fresh_copy(project)
 
+    started_at = utc_now()
     with _Sampler() as sampler:
         receipt = run_same_project_headless(
-            context.editor, project, raw, timeout_seconds=FULL_TIMEOUT_SECONDS
+            context.editor, project, raw, timeout_seconds=FULL_TIMEOUT_SECONDS,
+            process_factory=context.process_factory,
         )
+    ended_at = utc_now()
     time.sleep(3)
     after = orphan_census(process_rows())
     diagnostics = validate_unity_receipt(receipt)
@@ -325,8 +406,11 @@ def probe_same_project(context) -> dict:
 
     context.staging.add(probe_id, run_id, raw / "same-project-headless-summary.json",
                         "same-project-headless-summary.json")
-    context.staging.write_json(probe_id, run_id, "same-project-headless-receipt.json",
-                               receipt_to_dict(receipt), raw)
+    context.staging.write_json(
+        probe_id, run_id, "same-project-headless-receipt.json",
+        context.staging.resolve_receipt_artifacts(run_id, receipt_to_dict(receipt), {}),
+        raw,
+    )
     context.staging.write_json(probe_id, run_id, "same-project-headless-host.json", {
         "cold_library": True,
         "orphan_peak_during_run": sampler.peak,
@@ -360,7 +444,7 @@ def probe_same_project(context) -> dict:
                   f"the Editor's own log reports {logged_version} ({logged_revision})"),
     ]
     return observed(probe_id, context.headless_command(), assertions,
-                    context.staging.for_probe(probe_id))
+                    context.staging.for_probe(probe_id), started_at, ended_at)
 
 
 def _open_gui_editor(context, project: Path):
@@ -372,6 +456,10 @@ def _open_gui_editor(context, project: Path):
         stdin=subprocess.DEVNULL,
         start_new_session=True,
     )
+    # start_new_session makes the child a session leader, so its pgid IS its
+    # pid. Recorded immediately: this Editor is the one measured to die badly
+    # here (SIGSEGV, hang, exit 255) and to orphan workers when it does.
+    record_owned_pgid(handle.pid, context.owned_pgids)
     deadline = time.time() + 300
     owner = None
     while time.time() < deadline:
@@ -479,6 +567,7 @@ def probe_isolated_and_collision(context) -> list[dict]:
     run_same_project_headless(
         context.editor, main, context.raw / "main-warm",
         timeout_seconds=FULL_TIMEOUT_SECONDS,
+        process_factory=context.process_factory,
     )
 
     handle, owner = _open_gui_editor(context, main)
@@ -505,11 +594,21 @@ def probe_isolated_and_collision(context) -> list[dict]:
         copied_top = sorted(path.name for path in isolated.iterdir())
         owner_before = detect_gui_owner(main)
 
+        iso_started_at = utc_now()
         with _Sampler() as sampler:
             receipt = run_isolated_headless(
                 context.editor, main, isolated, iso_raw,
                 manifest=manifest, timeout_seconds=FULL_TIMEOUT_SECONDS,
+                process_factory=context.process_factory,
             )
+        iso_ended_at = utc_now()
+        time.sleep(3)
+        # The post-run census the previous generation of this probe measured and
+        # did not publish. It is the strongest AssetImportWorker cleanup
+        # datapoint the suite produces -- that class peaked at 2 here and at 0
+        # on every batchmode-only route -- so leaving it in the raw tree threw
+        # away the only evidence about the one class the others cannot reach.
+        iso_census_after = orphan_census(process_rows())
         owner_after = detect_gui_owner(main)
         diagnostics = validate_unity_receipt(receipt)
         summary = json.loads((iso_raw / "isolated-headless-summary.json").read_text())
@@ -528,13 +627,19 @@ def probe_isolated_and_collision(context) -> list[dict]:
                             "isolated-headless-summary.json")
         context.staging.add(iso_id, iso_run, iso_raw / "isolated-headless-manifest.json",
                             "isolated-headless-manifest.json")
-        context.staging.write_json(iso_id, iso_run, "isolated-headless-receipt.json",
-                                   receipt_to_dict(receipt), iso_raw)
+        context.staging.write_json(
+            iso_id, iso_run, "isolated-headless-receipt.json",
+            context.staging.resolve_receipt_artifacts(
+                iso_run, receipt_to_dict(receipt), {}
+            ),
+            iso_raw,
+        )
         context.staging.write_json(iso_id, iso_run, "isolated-headless-host.json", {
             "cold_library": True,
             "copied_top_level": copied_top,
             "generated_tree_inodes": inodes,
             "orphan_peak_during_run": sampler.peak,
+            "orphan_census_after": iso_census_after,
             "leases_after": list(lease_files(context.lease_dir)),
             "main_owner_before": owner_before.source if owner_before else None,
             "main_owner_after": owner_after.source if owner_after else None,
@@ -569,11 +674,12 @@ def probe_isolated_and_collision(context) -> list[dict]:
             assertion("no-active-lease",
                       not receipt.active_lease and lease_files(context.lease_dir) == (),
                       f"active_lease={receipt.active_lease} leases={lease_files(context.lease_dir)}"),
-        ], context.staging.for_probe(iso_id)))
+        ], context.staging.for_probe(iso_id), iso_started_at, iso_ended_at))
 
         # ---- collision refusal, against the SAME live Editor ---------------
         col_run = context.run_id(col_id)
         col_raw = context.raw / col_id
+        col_started_at = utc_now()
 
         def refusing_factory(*args, **kwargs):
             raise AssertionError(
@@ -584,14 +690,24 @@ def probe_isolated_and_collision(context) -> list[dict]:
         col_receipt = run_same_project_headless(
             context.editor, main, col_raw, process_factory=refusing_factory
         )
+        col_ended_at = utc_now()
         col_diagnostics = validate_unity_receipt(col_receipt)
         col_summary = json.loads((col_raw / "same-project-headless-summary.json").read_text())
         owner_during = detect_gui_owner(main)
 
         context.staging.add(col_id, col_run, col_raw / "same-project-headless-summary.json",
                             "collision-refusal-summary.json")
-        context.staging.write_json(col_id, col_run, "collision-refusal-receipt.json",
-                                   receipt_to_dict(col_receipt), col_raw)
+        context.staging.write_json(
+            col_id, col_run, "collision-refusal-receipt.json",
+            # The route names its summary `same-project-headless-summary.json`;
+            # this cell publishes it as `collision-refusal-summary.json`, so the
+            # receipt's own reference is remapped rather than left dangling.
+            context.staging.resolve_receipt_artifacts(
+                col_run, receipt_to_dict(col_receipt),
+                {"same-project-headless-summary.json": "collision-refusal-summary.json"},
+            ),
+            col_raw,
+        )
 
         entries.append(observed(col_id, context.headless_command(), [
             assertion("receipt-valid", not col_diagnostics,
@@ -612,7 +728,7 @@ def probe_isolated_and_collision(context) -> list[dict]:
                       "the live Editor still owned the workspace after the refusal"),
             assertion("no-lease-left", lease_files(context.lease_dir) == (),
                       f"lease files = {lease_files(context.lease_dir)}"),
-        ], context.staging.for_probe(col_id)))
+        ], context.staging.for_probe(col_id), col_started_at, col_ended_at))
     finally:
         exit_code = _close_gui_editor(handle)
         swept = _sweep_project_processes(main)
@@ -637,6 +753,7 @@ def probe_mismatched_editor(context) -> dict:
             "not be observed being refused"
         ))
 
+    started_at = utc_now()
     before = {fact.path: fact.sha256 for fact in inventory_project(project)}
     tree_before = sorted(path.name for path in project.iterdir())
     try:
@@ -651,6 +768,7 @@ def probe_mismatched_editor(context) -> dict:
     accepted = verify_project_editor(project, context.editor)
     after = {fact.path: fact.sha256 for fact in inventory_project(project)}
     tree_after = sorted(path.name for path in project.iterdir())
+    ended_at = utc_now()
 
     context.staging.write_json(probe_id, run_id, "mismatched-editor.json", {
         "declared_version": context.unity_version,
@@ -676,7 +794,7 @@ def probe_mismatched_editor(context) -> dict:
                   accepted.version == context.unity_version,
                   f"the pinned {accepted.version} Editor is accepted, so this is a "
                   "version check and not a blanket refusal"),
-    ], context.staging.for_probe(probe_id))
+    ], context.staging.for_probe(probe_id), started_at, ended_at)
 
 
 def probe_cancellation_and_orphans(context) -> list[dict]:
@@ -689,6 +807,7 @@ def probe_cancellation_and_orphans(context) -> list[dict]:
     raw.mkdir(parents=True, exist_ok=True)
 
     leases_before = lease_files(context.lease_dir)
+    started_at = utc_now()
     started = time.time()
     receipt = None
     refusal = None
@@ -697,10 +816,12 @@ def probe_cancellation_and_orphans(context) -> list[dict]:
             receipt = run_same_project_headless(
                 context.editor, project, raw,
                 timeout_seconds=CANCELLATION_TIMEOUT_SECONDS,
+                process_factory=context.process_factory,
             )
         except EvidenceError as error:
             refusal = {"code": error.code, "detail": error.detail}
     elapsed = time.time() - started
+    ended_at = utc_now()
     time.sleep(3)
     after = orphan_census(process_rows())
     leases_after = lease_files(context.lease_dir)
@@ -745,23 +866,26 @@ def probe_cancellation_and_orphans(context) -> list[dict]:
                   "Temp/UnityLockfile survived the kill, which is the measured "
                   "signature of a crash or cancellation and is left visible "
                   "rather than tidied away"),
-    ], context.staging.for_probe(can_id))
+    ], context.staging.for_probe(can_id), started_at, ended_at)
 
     orphans = observed(orp_id, context.headless_command(), [
         assertion("orphan-prone-children-were-actually-spawned",
                   observed_classes.get("VBCSCompiler", 0) >= 1
                   or observed_classes.get("UnityPackageManager", 0) >= 1,
-                  f"peak population during the cold run = {observed_classes}; a "
-                  "cleanup claim over a run that spawned nothing would prove nothing"),
+                  f"peak population during THE CANCELLED cold run = {observed_classes}; "
+                  "this cell and the cancellation cell share one run and one "
+                  "artifact -- a killed run is the stronger case for cleanup, and "
+                  "a cleanup claim over a run that spawned nothing would prove nothing"),
         assertion("all-classes-swept", all(count == 0 for count in surviving.values()),
-                  f"post-run census across all four classes = {surviving}"),
+                  "post-cancellation census across all four classes = "
+                  f"{surviving}"),
         assertion("sweep-covers-the-argv0-blind-spot", True,
                   "AssetImportWorker is matched on `-name AssetImportWorker`, not on "
                   "`Editor/Unity`, because its argv0 is a bare `Unity`; its measured "
                   f"peak on this route was {observed_classes.get('AssetImportWorker')}"),
         assertion("no-lease-left", leases_after == (),
                   f"lease files after = {list(leases_after)}"),
-    ], context.staging.for_probe(orp_id))
+    ], context.staging.for_probe(orp_id), started_at, ended_at)
     return [cancellation, orphans]
 
 
@@ -778,7 +902,8 @@ def probe_bridge_not_ready(context) -> dict:
             "so 'server up, no Editor' could not be established"
         ))
 
-    process, port = start_mcp(raw)
+    started_at = utc_now()
+    process, port = start_mcp(raw, process_factory=context.process_factory)
     try:
         client = SubprocessMcpClient(host="127.0.0.1", port=port)
         listing = wait_for_server(client)
@@ -788,6 +913,7 @@ def probe_bridge_not_ready(context) -> dict:
         )
     finally:
         cleanup = process.cancel(15.0)
+    ended_at = utc_now()
 
     context.staging.write_json(probe_id, run_id, "bridge-not-ready.json", {
         "server_reachable": listing.reachable,
@@ -813,7 +939,7 @@ def probe_bridge_not_ready(context) -> dict:
                   f"instances={len(listing.instances)} reasons={list(listing.reasons)}"),
         assertion("mcp-helper-left-nothing", cleanup.survivors == (),
                   f"survivors after cancel = {list(cleanup.survivors)}"),
-    ], context.staging.for_probe(probe_id))
+    ], context.staging.for_probe(probe_id), started_at, ended_at)
 
 
 LIVE_EDITOR_MCP_REASON = (
@@ -846,6 +972,13 @@ class Context:
         self.now = now
         self.fixture = repo_root / "spikes/platform/unity/fixture"
         self.notes: list[str] = []
+        # Where run-host.sh asked us to record every process group we create,
+        # so its outer trap can sweep the two classes that carry no
+        # -projectPath without ever matching a process by name host-wide.
+        owned = os.environ.get(OWNED_PGIDS_ENV)
+        self.owned_pgids = Path(owned) if owned else raw_root_default(raw)
+        self.process_factory = recording_process_factory(self.owned_pgids)
+
         # Set by probe_same_project once a real Editor log has confirmed the
         # version/revision pair read from the install manifest. False until
         # then, so nothing can assert a confirmation that has not happened.
@@ -897,6 +1030,16 @@ class Context:
 
     def isolated_command(self) -> tuple[str, ...]:
         return self.headless_command()
+
+
+def raw_root_default(raw: Path) -> Path:
+    """Where owned pgids go when run-host.sh did not name a file.
+
+    Still a real file, still inside the gitignored raw tree: a probe run driven
+    directly (no shell wrapper) must not silently lose the record that makes a
+    later sweep exact.
+    """
+    return raw.parent / "owned-pgids.txt"
 
 
 def _lease_dir() -> Path:

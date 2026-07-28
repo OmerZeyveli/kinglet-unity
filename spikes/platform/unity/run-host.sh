@@ -113,7 +113,7 @@ if [ -f /proc/sys/kernel/osrelease ]; then
     OSRELEASE="$(cat /proc/sys/kernel/osrelease)"
     case "$OSRELEASE" in
         *icrosoft*|*WSL*)
-            echo "run-host.sh: refusing to run under WSL ('$OSRELEASE'); the Windows host must run run-host.ps1 natively" >&2
+            echo "run-host.sh: refusing to run under WSL ('$OSRELEASE'); the Windows host must run natively" >&2
             exit 2
             ;;
     esac
@@ -157,24 +157,23 @@ mkdir -p "$RAW_ROOT"
 # ---- cleanup trap ---------------------------------------------------------
 # A timeout, a failure or a Ctrl-C must still leave the host clean. The Python
 # probes contain their own launches by process group; this is the outer net for
-# anything that named the disposable workspace and outlived them.
+# whatever outlived them.
+#
+# The sweep itself lives in sweep-workspace.sh so it can be TESTED against real
+# processes rather than asserted as source text, and so its scoping rule is
+# stated in exactly one place. It kills only what names this run's workspace or
+# belongs to a process group this run created -- the probe runner records every
+# such group in OWNED_PGIDS, which is the only way to reach VBCSCompiler and
+# UnityPackageManager, neither of which carries -projectPath in its argv. It
+# never kills by a host-wide name match; see that file's header for why that
+# rule is not negotiable.
+OWNED_PGIDS="$RAW_ROOT/owned-pgids.txt"
+export KINGLET_UNITY_OWNED_PGIDS="$OWNED_PGIDS"
+
 cleanup() {
     status="$?"
     if [ -d "$RAW_ROOT/workspace" ]; then
-        WS="$RAW_ROOT/workspace"
-        # All three orphan classes: two by argv0, AssetImportWorker by its
-        # `-name` flag because its argv0 is a bare `Unity`.
-        PIDS="$(ps -eo pid,args | grep -F "$WS" | grep -v grep | awk '{print $1}' || true)"
-        SHADERS="$(ps -eo pid,args | grep -F 'UnityShaderCompiler' | grep -v grep | awk '{print $1}' || true)"
-        for pid in $PIDS $SHADERS; do
-            kill -TERM "$pid" 2>/dev/null || true
-        done
-        if [ -n "$PIDS$SHADERS" ]; then
-            sleep 5
-            for pid in $PIDS $SHADERS; do
-                kill -KILL "$pid" 2>/dev/null || true
-            done
-        fi
+        bash "$SCRIPT_DIR/sweep-workspace.sh" "$RAW_ROOT/workspace" "$OWNED_PGIDS" || true
     fi
     exit "$status"
 }

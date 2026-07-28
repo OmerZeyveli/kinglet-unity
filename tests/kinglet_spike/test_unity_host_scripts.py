@@ -171,19 +171,207 @@ class RunHostScriptSafety(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("already exists", result.stderr)
 
-    def test_the_script_installs_a_cleanup_trap(self):
-        text = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("trap cleanup EXIT INT TERM", text)
-        # All three orphan classes must be reachable by the sweep. The
-        # AssetImportWorker one is the trap: its argv0 is a bare `Unity`, so the
-        # sweep matches on the workspace path rather than on a process name.
-        self.assertIn("UnityShaderCompiler", text)
-        self.assertIn("AssetImportWorker", text)
+    def test_the_trap_actually_sweeps_when_the_run_fails(self):
+        """End to end: a FAILING run must still sweep its workspace.
+
+        This replaces an `assertIn("sweep-workspace.sh", text)` that a COMMENT
+        satisfied -- mutating only the trap's invocation line left the comment
+        naming the script, and the assertion passed over a script that swept
+        nothing. Prose cannot satisfy this one: a real process has to die.
+
+        The run is arranged to fail immediately: `--unity /bin/true` reports no
+        version, so `host_probes.run()` creates the raw workspace and then
+        refuses at `verify_project_editor` before anything launches. That is the
+        interesting case, because the trap exists precisely for runs that never
+        reach their own cleanup.
+
+        It uses the REAL repository root -- a temporary one has no
+        `tools/kinglet_spike` package, so the run would die at import and never
+        create the workspace this is asserting about. Nothing starts Unity, and
+        the raw directory is removed in the finally.
+        """
+        import shutil
+        import signal
+        import tempfile
+        import time
+
+        run_id = f"t8-trapcase-{os.getpid()}"
+        raw_root = REPO / ".kinglet/local/spikes" / run_id
+        if raw_root.exists():
+            shutil.rmtree(raw_root)
+        try:
+            root = REPO
+            workspace = raw_root / "workspace"
+
+            # Named for the workspace the run is about to create. The directory
+            # does not exist yet and does not need to: the sweep matches argv.
+            victim = subprocess.Popen(
+                ["bash", "-c", f'exec -a "Unity -projectPath {workspace}" sleep 300'],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            try:
+                time.sleep(1)
+                self.assertIsNone(victim.poll(), "the victim died before the run")
+
+                result = run_script(
+                    ["--unity", "/bin/true", "--repo-root", str(root),
+                     "--run-id", run_id]
+                )
+                self.assertNotEqual(result.returncode, 0,
+                                    "the run was supposed to fail")
+                self.assertTrue(workspace.is_dir(),
+                                "the workspace was never created, so this "
+                                "proves nothing about the trap")
+                victim.wait(timeout=30)
+                self.assertIsNotNone(
+                    victim.poll(),
+                    "the cleanup trap did not sweep the run's workspace",
+                )
+            finally:
+                try:
+                    os.killpg(os.getpgid(victim.pid), signal.SIGKILL)
+                except (ProcessLookupError, PermissionError, OSError):
+                    pass
+                try:
+                    victim.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    pass
+        finally:
+            if raw_root.exists():
+                shutil.rmtree(raw_root)
 
     def test_the_script_never_evaluates_the_editor_path(self):
         text = SCRIPT.read_text(encoding="utf-8")
         self.assertNotIn("eval ", text)
         self.assertIn('python3 -m tools.kinglet_spike.unity.host_probes "$REPO_ROOT" "$UNITY"', text)
+
+
+class SweepBehaviour(unittest.TestCase):
+    """The sweep is tested by KILLING REAL PROCESSES, not by reading the script.
+
+    The previous version of this asserted `assertIn("AssetImportWorker", text)`
+    against the whole script, which a COMMENT satisfies -- and did: mutating
+    only the two comment lines took `grep -c AssetImportWorker` to zero while
+    every executable line stood, and the assertion still passed. Nothing here
+    can be satisfied by prose.
+
+    The three processes below are the three cases that matter, and each is a
+    different kind of failure if it goes wrong:
+
+      workspace victim   -- the Editor and its AssetImportWorkers, whose argv
+                            carries -projectPath. Must die.
+      owned-pgid victim  -- VBCSCompiler and UnityPackageManager, which carry
+                            NO project path at all and are therefore invisible
+                            to a workspace sweep. Must die, and only the pgid
+                            record can reach them.
+      bystander          -- a process merely NAMED like an orphan class, in no
+                            workspace and no owned group: the operator's own
+                            Editor on another project. Must LIVE. The old
+                            host-wide `grep -F UnityShaderCompiler` killed it.
+    """
+
+    SWEEP = REPO / "spikes/platform/unity/sweep-workspace.sh"
+
+    def setUp(self):
+        import tempfile
+
+        self._temporary = tempfile.TemporaryDirectory()
+        self.workspace = Path(self._temporary.name) / "workspace"
+        self.workspace.mkdir()
+        self.pgid_file = Path(self._temporary.name) / "owned-pgids.txt"
+        self.spawned = []
+
+    def tearDown(self):
+        import signal
+
+        for handle in self.spawned:
+            try:
+                os.killpg(os.getpgid(handle.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, OSError):
+                pass
+            try:
+                handle.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass
+        self._temporary.cleanup()
+
+    def _spawn(self, command):
+        handle = subprocess.Popen(
+            ["bash", "-c", command],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,       # child is a session leader: pgid == pid
+        )
+        self.spawned.append(handle)
+        return handle
+
+    @staticmethod
+    def _alive(handle) -> bool:
+        return handle.poll() is None
+
+    def test_the_sweep_requires_a_workspace(self):
+        result = subprocess.run(
+            ["bash", str(self.SWEEP)], capture_output=True, text=True, timeout=60
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("workspace directory is required", result.stderr)
+
+    def test_it_kills_the_workspace_and_the_owned_group_and_spares_a_bystander(self):
+        victim_script = self.workspace / "victim.sh"
+        victim_script.write_text("sleep 300\n", encoding="utf-8")
+        workspace_victim = self._spawn(f"exec bash {victim_script}")
+
+        # No workspace path anywhere in its argv -- exactly like VBCSCompiler.
+        owned_victim = self._spawn("exec -a VBCSCompiler sleep 300")
+        self.pgid_file.write_text(f"{owned_victim.pid}\n", encoding="utf-8")
+
+        # Named like an orphan class, in no workspace and no owned group.
+        bystander = self._spawn("exec -a UnityShaderCompiler sleep 300")
+
+        import time
+
+        time.sleep(1)
+        self.assertTrue(self._alive(workspace_victim))
+        self.assertTrue(self._alive(owned_victim))
+        self.assertTrue(self._alive(bystander))
+        self.assertNotIn(str(self.workspace), "exec -a VBCSCompiler sleep 300")
+
+        result = subprocess.run(
+            ["bash", str(self.SWEEP), str(self.workspace), str(self.pgid_file)],
+            capture_output=True, text=True, timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        workspace_victim.wait(timeout=30)
+        owned_victim.wait(timeout=30)
+        self.assertFalse(self._alive(workspace_victim), "workspace process survived")
+        self.assertFalse(self._alive(owned_victim),
+                         "a process reachable ONLY by owned pgid survived")
+        self.assertTrue(self._alive(bystander),
+                        "the sweep killed a process it does not own")
+
+        self.assertIn("workspace", result.stdout)
+        self.assertIn("owned-pgid", result.stdout)
+        self.assertNotIn(str(bystander.pid), result.stdout)
+
+    def test_without_a_pgid_file_the_owned_class_is_out_of_reach(self):
+        # States the reason the pgid record exists at all: a workspace-only
+        # sweep provably cannot see VBCSCompiler or UnityPackageManager.
+        owned_victim = self._spawn("exec -a UnityPackageManager sleep 300")
+        import time
+
+        time.sleep(1)
+        result = subprocess.run(
+            ["bash", str(self.SWEEP), str(self.workspace)],
+            capture_output=True, text=True, timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(self._alive(owned_victim))
+        self.assertEqual(result.stdout.strip(), "")
 
 
 class ObservationValidation(unittest.TestCase):
@@ -265,6 +453,21 @@ class ObservationValidation(unittest.TestCase):
         self.assertEqual(caught.exception.code, "E_FIELD")
         self.assertIn("real host", caught.exception.detail)
 
+    def test_a_half_recorded_span_is_refused(self):
+        document = observation_document()
+        document["probes"][0]["started_at"] = "2026-07-28T13:28:00Z"
+        with self.assertRaises(EvidenceError) as caught:
+            validate_unity_observations(document)
+        self.assertEqual(caught.exception.code, "E_TIME")
+
+    def test_a_span_that_ends_before_it_starts_is_refused(self):
+        document = observation_document()
+        document["probes"][0]["started_at"] = "2026-07-28T13:29:00Z"
+        document["probes"][0]["ended_at"] = "2026-07-28T13:28:00Z"
+        with self.assertRaises(EvidenceError) as caught:
+            validate_unity_observations(document)
+        self.assertEqual(caught.exception.code, "E_TIME")
+
     def test_an_assertion_status_outside_pass_fail_is_refused(self):
         document = observation_document()
         document["probes"][0]["assertions"][0]["status"] = "inconclusive"
@@ -330,6 +533,23 @@ class RecordConversion(unittest.TestCase):
         )
         self.assertTrue(records[0].sources)
         self.assertTrue(all(source.url.startswith("https://") for source in records[0].sources))
+
+    def test_a_recorded_span_survives_into_the_record(self):
+        document = observation_document()
+        document["probes"][0]["started_at"] = "2026-07-28T13:28:00Z"
+        document["probes"][0]["ended_at"] = "2026-07-28T13:28:22Z"
+        records = to_evidence_records(
+            validate_unity_observations(document), now="2026-07-28T14:00:00Z"
+        )
+        self.assertEqual(records[0].started_at, "2026-07-28T13:28:00Z")
+        self.assertEqual(records[0].ended_at, "2026-07-28T13:28:22Z")
+
+    def test_a_probe_with_no_span_falls_back_to_one_instant(self):
+        records = to_evidence_records(
+            validate_unity_observations(observation_document()),
+            now="2026-07-28T14:00:00Z",
+        )
+        self.assertEqual(records[0].started_at, records[0].ended_at)
 
     def test_run_ids_are_qualified_by_probe_and_environment(self):
         document = observation_document()
@@ -467,6 +687,54 @@ class HostCensusHelpers(unittest.TestCase):
         self.assertTrue(environment["native"])
         self.assertTrue(environment["toolchain"])
         self.assertTrue(any("host=" in item for item in environment["toolchain"]))
+
+    def test_a_receipts_route_relative_artifact_names_resolve_to_published_paths(self):
+        # A receipt names its artifacts route-relative
+        # (`artifacts/unity/same-project-headless-summary.json`). Published, the
+        # layout is `artifacts/unity/<run-id>/<name>`, and the collision cell
+        # renames the file on the way in -- so the reference went nowhere.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            staging = host_probes.Staging(Path(temporary), ("/nowhere",), "stamp")
+            receipt = {
+                "route": "same-project-headless",
+                "artifacts": ["artifacts/unity/same-project-headless-summary.json"],
+            }
+            resolved = staging.resolve_receipt_artifacts(
+                "RUN-01", receipt,
+                {"same-project-headless-summary.json": "collision-refusal-summary.json"},
+            )
+            self.assertEqual(
+                resolved["artifacts"],
+                ["artifacts/unity/RUN-01/collision-refusal-summary.json"],
+            )
+            # The original is not mutated, and unmapped names keep their own.
+            self.assertEqual(
+                receipt["artifacts"],
+                ["artifacts/unity/same-project-headless-summary.json"],
+            )
+            self.assertEqual(
+                staging.resolve_receipt_artifacts("RUN-01", receipt, {})["artifacts"],
+                ["artifacts/unity/RUN-01/same-project-headless-summary.json"],
+            )
+
+    def test_the_recording_factory_writes_the_group_it_created(self):
+        # This record is the ONLY thing that lets the outer trap reach
+        # VBCSCompiler and UnityPackageManager without a host-wide name match.
+        import tempfile
+
+        class _Fake:
+            pgid = 4242
+
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "owned-pgids.txt"
+            host_probes.record_owned_pgid(_Fake.pgid, path)
+            host_probes.record_owned_pgid(99, path)
+            self.assertEqual(path.read_text(encoding="utf-8"), "4242\n99\n")
+
+    def test_recording_a_group_without_a_file_is_a_no_op_not_a_crash(self):
+        host_probes.record_owned_pgid(1, None)
 
     def test_the_live_editor_mcp_reason_names_the_defect_not_the_run(self):
         reason = host_probes.LIVE_EDITOR_MCP_REASON

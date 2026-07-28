@@ -32,6 +32,7 @@ from tests.kinglet_spike.spike_tree import (
     ALLOWED_CREDENTIAL_REFERENCE,
     ARTIFACTS_ROOT,
     CLIENTS_ROOT,
+    UNITY_ROOT,
     CREDENTIAL_FILE,
     DISPOSABLE_CONFIG_VARS,
     EVIDENCE_ROOT,
@@ -84,6 +85,22 @@ KNOWN_COVERED = (
     "docs/research/platform-spike/artifacts/client/claude-code/"
     "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64"
     "-mcp-discovery-01/prompts-used.json",
+    # The unity subject, named for the same reason both clients are: the two
+    # operator-run shell scripts handle Editor paths and repository roots, the
+    # fixture is committed Unity project text, and one published record and one
+    # published artifact stand for the nine and fifteen of them. A list that
+    # names only the client subject is exactly how "the sweep is generic" goes
+    # stale without anything going red.
+    "spikes/platform/unity/run-host.sh",
+    "spikes/platform/unity/sweep-workspace.sh",
+    "spikes/platform/unity/mcp.lock.json",
+    "spikes/platform/unity/fixture/ProjectSettings/ProjectVersion.txt",
+    "spikes/platform/unity/fixture/Assets/KingletSpike/Editor/KingletSpikeProbe.cs",
+    "docs/research/platform-spike/evidence/unity/execution/"
+    "20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01.json",
+    "docs/research/platform-spike/artifacts/unity/"
+    "20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01/"
+    "isolated-headless-manifest.json",
 )
 
 
@@ -103,7 +120,9 @@ class SweepIsNotVacuousTests(unittest.TestCase):
 
     def test_all_three_roots_are_swept(self):
         roots = {root for root, _paths in files_by_root()}
-        self.assertEqual(roots, {CLIENTS_ROOT, EVIDENCE_ROOT, ARTIFACTS_ROOT})
+        self.assertEqual(
+            roots, {CLIENTS_ROOT, UNITY_ROOT, EVIDENCE_ROOT, ARTIFACTS_ROOT}
+        )
 
     # There was a `>= 20` file-count floor here. It was deleted: every truncation
     # it could catch is already caught by test_known_covered_files_are_in_the_

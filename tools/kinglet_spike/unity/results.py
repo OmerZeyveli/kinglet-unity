@@ -105,7 +105,10 @@ UNITY_SOURCES: tuple[SourceReference, ...] = (
 
 _ROOT_FIELDS = frozenset(("schema", "unity_version", "unity_revision", "environment", "probes"))
 _ENV_FIELDS = frozenset(("os", "release", "arch", "native", "toolchain"))
-_PROBE_FIELDS = frozenset(("id", "command", "assertions", "artifact_paths", "unobserved", "reason"))
+_PROBE_FIELDS = frozenset((
+    "id", "command", "assertions", "artifact_paths", "unobserved", "reason",
+    "started_at", "ended_at",
+))
 _ASSERTION_FIELDS = frozenset(("id", "status", "detail"))
 _ARTIFACT_FIELDS = frozenset(("path", "sha256", "media_type"))
 
@@ -170,6 +173,10 @@ class ProbeObservation:
     artifacts: tuple[ProbeArtifact, ...]
     unobserved: bool
     reason: str
+    # The probe's real span, or ("", "") when it has none. Both or neither:
+    # a half-recorded span is a duration nobody can check.
+    started_at: str = ""
+    ended_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -245,6 +252,21 @@ def _probe(value: Any, index: int) -> ProbeObservation:
         )
     )
     command = _strings(item.get("command", []), f"{path}.command")
+    started_at = item.get("started_at")
+    ended_at = item.get("ended_at")
+    if (started_at is None) != (ended_at is None):
+        raise EvidenceError(
+            "E_TIME",
+            f"{path} must carry both started_at and ended_at or neither; a "
+            "half-recorded span is a duration no reader can check",
+        )
+    if started_at is not None:
+        started_at = _string(started_at, f"{path}.started_at")
+        ended_at = _string(ended_at, f"{path}.ended_at")
+        if ended_at < started_at:
+            raise EvidenceError("E_TIME", f"{path}.ended_at precedes started_at")
+    else:
+        started_at = ended_at = ""
 
     if unobserved:
         if not isinstance(reason, str) or not reason.strip():
@@ -260,7 +282,8 @@ def _probe(value: Any, index: int) -> ProbeObservation:
                 "E_ASSERTION",
                 f"{path} is unobserved and therefore cannot carry assertions",
             )
-        return ProbeObservation(identifier, command, (), artifacts, True, reason.strip())
+        return ProbeObservation(identifier, command, (), artifacts, True, reason.strip(),
+                                started_at, ended_at)
 
     if reason is not None:
         raise EvidenceError(
@@ -272,7 +295,8 @@ def _probe(value: Any, index: int) -> ProbeObservation:
             "E_ASSERTION",
             f"{path} was observed but asserts nothing; there is no claim to publish",
         )
-    return ProbeObservation(identifier, command, assertions, artifacts, False, "")
+    return ProbeObservation(identifier, command, assertions, artifacts, False, "",
+                            started_at, ended_at)
 
 
 def validate_unity_observations(value: Any) -> UnityObservationSet:
@@ -312,10 +336,13 @@ def load_unity_observations(path: Path) -> UnityObservationSet:
 # ---------------------------------------------------------------------------
 
 def _release_key(release: str) -> str:
-    """The cell-id spelling of a release string: dots collapse to dashes.
+    """A run_id-safe spelling of a release string: dots collapse to dashes.
 
-    `ubuntu-24.04.4-lts` keys the cell `...linux-ubuntu-24-04-x64...`. Only the
-    run_id uses this; coverage matches on `environment.release` verbatim.
+    `ubuntu-24.04.4-lts` becomes `ubuntu-24-04-4-lts`. This is NOT the matrix
+    cell id's release segment, which is the shorter `ubuntu-24-04` -- the two
+    are independent and only the run_id uses this function. Coverage matches on
+    `environment.release` verbatim, never on either spelling, so the run_id is
+    free to keep the full release string and stay unique per host.
     """
     return release.replace(".", "-")
 
@@ -357,8 +384,11 @@ def _record(
         ),
         probe=Probe(id=probe.id, contract=PROBE_CONTRACT),
         environment=observations.environment,
-        started_at=now,
-        ended_at=now,
+        # The probe's own span when it recorded one. Falling back to `now` for
+        # both is honest only for a probe that never ran (an unobserved cell);
+        # for an observed one it discards a duration the artifacts measured.
+        started_at=probe.started_at or now,
+        ended_at=probe.ended_at or now,
         status=status,
         command=probe.command,
         artifacts=tuple(

@@ -41,9 +41,16 @@ REPO = Path(__file__).resolve().parents[2]
 # The roots that must be swept. Each one is asserted non-empty independently:
 # a single combined count would let one root silently stop matching.
 CLIENTS_ROOT = REPO / "spikes/platform/clients"
+UNITY_ROOT = REPO / "spikes/platform/unity"
 EVIDENCE_ROOT = REPO / "docs/research/platform-spike/evidence"
 ARTIFACTS_ROOT = REPO / "docs/research/platform-spike/artifacts"
-SWEPT_ROOTS = (CLIENTS_ROOT, EVIDENCE_ROOT, ARTIFACTS_ROOT)
+# `spikes/platform/unity` joined late and for the same reason the others are
+# here: it ships operator-run scripts (`run-host.sh`, `sweep-workspace.sh`)
+# that handle Editor paths, repository roots and run ids, and it sat OUTSIDE
+# the sweep entirely while reading as though the whole spike tree were covered.
+# That is the "sweep narrower than it reads" shape already fixed twice for the
+# client tree; a root that is not listed is a root nobody scans.
+SWEPT_ROOTS = (CLIENTS_ROOT, UNITY_ROOT, EVIDENCE_ROOT, ARTIFACTS_ROOT)
 
 # Tool caches. These are generated, never committed, and matching them by NAME at
 # any depth is safe only because nothing tracked ever lives inside one —
