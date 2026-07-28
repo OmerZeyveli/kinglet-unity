@@ -123,3 +123,24 @@ def verify_editor(
         )
 
     return EditorIdentity(editor_path=str(editor), version=reported)
+
+
+def verify_project_editor(
+    project: Path,
+    editor: Path,
+    *,
+    run_version_flag: Callable[[Path], str] = _default_run_version_flag,
+) -> EditorIdentity:
+    """Bind required_version to what the PROJECT declares, then verify the Editor against it.
+
+    read_project_version() and verify_editor() are each correct in
+    isolation, but nothing forced a caller to actually chain them --
+    without this function, "refuse substitution" was a convention for a
+    future route runner to remember, not a guarantee this module enforces.
+    This is the one path that reads a project's own pinned version and
+    requires the handed-in Editor to match it exactly; see verify_editor()
+    for what "exactly" means (E_UNITY_VERSION on any mismatch, no
+    closest-match fallback).
+    """
+    required_version = read_project_version(project)
+    return verify_editor(editor, required_version, run_version_flag=run_version_flag)

@@ -1,12 +1,21 @@
 import json
 import os
+import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from tools.kinglet_spike.model import EvidenceError
 from tools.kinglet_spike.unity.ownership import (
     ProjectOwner,
+    _parse_posix_process_table,
+    _parse_windows_process_table,
+    _posix_process_table,
+    _tokenize_command_line,
+    _unity_lockfile_present,
+    _windows_process_table,
     assert_headless_safe,
     detect_gui_owner,
     find_owning_process,
@@ -100,6 +109,70 @@ class FindOwningProcessTests(unittest.TestCase):
             project = Path(tmp) / "proj"
             project.mkdir()
             table = [(1, "/opt/Unity/Editor/Unity -batchmode -quit")]
+            self.assertIsNone(find_owning_process(table, project))
+
+    # --- CRITICAL 1 fix: a space in the project path must not defeat the match ---
+
+    def test_space_in_project_path_still_matches(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "My Project"
+            project.mkdir()
+            table = [_unity_process(4242, str(project))]
+            owner = find_owning_process(table, project)
+            self.assertIsNotNone(owner)
+            self.assertTrue(owner.confirmed)
+
+    def test_space_in_project_path_distinguishes_a_true_sibling(self):
+        # The rejoin must stop at the next project's own -projectPath, not
+        # swallow it -- a live Editor on a DIFFERENT space-containing
+        # sibling project must still not match.
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "My Project"
+            project.mkdir()
+            other = Path(tmp) / "My Project 2"
+            other.mkdir()
+            table = [_unity_process(4242, str(other))]
+            self.assertIsNone(find_owning_process(table, project))
+
+    def test_windows_quoted_space_in_project_path_matches(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "My Project"
+            project.mkdir()
+            command = (
+                '"C:\\Program Files\\Unity\\Editor\\Unity.exe" '
+                f'-projectPath "{project}" -logFile -'
+            )
+            owner = find_owning_process([(1, command)], project, windows=True)
+            self.assertIsNotNone(owner)
+            self.assertTrue(owner.confirmed)
+
+    # --- IMPORTANT 2 fix: a discriminating test for the argv0 guard ---
+
+    def test_argv0_containing_unity_but_not_equal_is_not_a_match(self):
+        # UnityShaderCompiler and unityhub are real Unity-shipped binaries
+        # whose path contains "Unity" but are not the Editor. Mutating
+        # _is_unity_editor_argv0 to `"Unity" in token` must make this fail.
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj"
+            project.mkdir()
+            table = [
+                (10, f"/opt/Unity/Editor/Data/Tools/UnityShaderCompiler -projectPath {project}"),
+                (11, f"/usr/bin/unityhub -projectPath {project}"),
+            ]
+            self.assertIsNone(find_owning_process(table, project))
+
+    # --- IMPORTANT 3 fix: a discriminating test for path equality ---
+
+    def test_prefix_without_separator_does_not_match(self):
+        # "proj2" starts with "proj" as a bare string -- a startswith()
+        # comparison (in either direction) would incorrectly match this.
+        # Only whole-path equality may pass.
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj"
+            project.mkdir()
+            sibling = Path(tmp) / "proj2"
+            sibling.mkdir()
+            table = [_unity_process(4242, str(sibling))]
             self.assertIsNone(find_owning_process(table, project))
 
 
@@ -228,6 +301,175 @@ class DetectGuiOwnerAndAssertHeadlessSafeTests(unittest.TestCase):
             self.assertIsNone(
                 assert_headless_safe(project, process_table_provider=lambda: table)
             )
+
+    def test_owned_error_message_does_not_overclaim_gui(self):
+        # M5: the detector cannot distinguish a GUI Editor from a
+        # concurrent headless run holding the same lock/process signals --
+        # the raised message must not assert "GUI" specifically.
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj"
+            project.mkdir()
+            table = [_unity_process(1, str(project))]
+            with self.assertRaises(EvidenceError) as ctx:
+                assert_headless_safe(project, process_table_provider=lambda: table)
+            self.assertNotIn("GUI", str(ctx.exception))
+
+
+class TokenizeCommandLineTests(unittest.TestCase):
+    def test_posix_split_is_plain_whitespace_no_shell_semantics(self):
+        tokens = _tokenize_command_line(
+            "/opt/Unity/Editor/Unity -projectPath /home/u/My Project -logFile -",
+            windows=False,
+        )
+        self.assertEqual(
+            ["/opt/Unity/Editor/Unity", "-projectPath", "/home/u/My", "Project",
+             "-logFile", "-"],
+            tokens,
+        )
+
+    def test_windows_quoted_token_with_space_is_one_token(self):
+        tokens = _tokenize_command_line(
+            '"C:\\Unity\\Editor\\Unity.exe" -projectPath "C:\\proj\\My Game" -logFile -',
+            windows=True,
+        )
+        self.assertEqual(
+            ["C:\\Unity\\Editor\\Unity.exe", "-projectPath", "C:\\proj\\My Game",
+             "-logFile", "-"],
+            tokens,
+        )
+
+    def test_windows_backslashes_are_never_treated_as_escapes(self):
+        # This is the exact corruption CRITICAL 1 reported against shlex's
+        # POSIX-mode escape handling: a bare backslash-separated Windows
+        # path must survive tokenization unchanged.
+        tokens = _tokenize_command_line(
+            "C:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game", windows=True
+        )
+        self.assertEqual(
+            ["C:\\Unity\\Editor\\Unity.exe", "-projectPath", "C:\\proj\\game"],
+            tokens,
+        )
+
+
+class ParsePosixProcessTableTests(unittest.TestCase):
+    def test_parses_pid_and_command(self):
+        stdout = "  1234 /opt/Unity/Editor/Unity -batchmode\n  5678 /bin/bash\n"
+        table = _parse_posix_process_table(stdout)
+        self.assertEqual(
+            ((1234, "/opt/Unity/Editor/Unity -batchmode"), (5678, "/bin/bash")),
+            table,
+        )
+
+    def test_blank_lines_and_bad_pids_are_skipped(self):
+        stdout = "\n   \nnot-a-pid something\n42 ok\n"
+        self.assertEqual(((42, "ok"),), _parse_posix_process_table(stdout))
+
+
+class ParseWindowsProcessTableTests(unittest.TestCase):
+    def test_parses_pid_tab_commandline_lines(self):
+        stdout = (
+            "1234\tC:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game\n"
+            "5678\tC:\\Windows\\explorer.exe\n"
+        )
+        table = _parse_windows_process_table(stdout)
+        self.assertEqual(
+            (
+                (1234, "C:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game"),
+                (5678, "C:\\Windows\\explorer.exe"),
+            ),
+            table,
+        )
+
+    def test_lines_without_a_tab_are_skipped(self):
+        self.assertEqual((), _parse_windows_process_table("no tab on this line\n"))
+
+
+class UnityLockfilePresentTests(unittest.TestCase):
+    def test_missing_file_is_false(self):
+        with TemporaryDirectory() as tmp:
+            self.assertFalse(_unity_lockfile_present(Path(tmp)))
+
+    def test_existing_file_is_true(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "Temp").mkdir()
+            (project / "Temp" / "UnityLockfile").write_text("", encoding="utf-8")
+            self.assertTrue(_unity_lockfile_present(project))
+
+    def test_unreadable_temp_dir_reads_as_present_not_absent(self):
+        # Path.exists() swallows every OSError, including a permission
+        # error, and reports it identically to "file genuinely absent".
+        # An unreadable Temp/ must be treated as a signal, not silent safety.
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            with patch(
+                "tools.kinglet_spike.unity.ownership.Path.stat",
+                side_effect=PermissionError("denied"),
+            ):
+                self.assertTrue(_unity_lockfile_present(project))
+
+
+class ProcessTableProviderFailureTests(unittest.TestCase):
+    # IMPORTANT 4: a provider that cannot obtain a listing must raise
+    # E_UNITY_OWNER_UNKNOWN, never silently return an empty table that
+    # detect_gui_owner/assert_headless_safe would then read as "safe".
+
+    def test_posix_provider_raises_on_oserror(self):
+        with patch(
+            "tools.kinglet_spike.unity.ownership.subprocess.run",
+            side_effect=OSError("no ps"),
+        ):
+            with self.assertRaises(EvidenceError) as ctx:
+                _posix_process_table()
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_posix_provider_raises_on_timeout(self):
+        with patch(
+            "tools.kinglet_spike.unity.ownership.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="ps", timeout=10),
+        ):
+            with self.assertRaises(EvidenceError) as ctx:
+                _posix_process_table()
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_posix_provider_raises_on_nonzero_exit(self):
+        fake_result = SimpleNamespace(returncode=1, stdout="", stderr="permission denied")
+        with patch(
+            "tools.kinglet_spike.unity.ownership.subprocess.run",
+            return_value=fake_result,
+        ):
+            with self.assertRaises(EvidenceError) as ctx:
+                _posix_process_table()
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_windows_provider_raises_on_oserror(self):
+        with patch(
+            "tools.kinglet_spike.unity.ownership.subprocess.run",
+            side_effect=OSError("no powershell"),
+        ):
+            with self.assertRaises(EvidenceError) as ctx:
+                _windows_process_table()
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_windows_provider_raises_on_nonzero_exit(self):
+        fake_result = SimpleNamespace(returncode=1, stdout="", stderr="access denied")
+        with patch(
+            "tools.kinglet_spike.unity.ownership.subprocess.run",
+            return_value=fake_result,
+        ):
+            with self.assertRaises(EvidenceError) as ctx:
+                _windows_process_table()
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_assert_headless_safe_propagates_provider_failure_rather_than_safe(self):
+        def _boom():
+            raise EvidenceError("E_UNITY_OWNER_UNKNOWN", "cannot list processes")
+
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            with self.assertRaises(EvidenceError) as ctx:
+                assert_headless_safe(project, process_table_provider=_boom)
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
 
 
 if __name__ == "__main__":

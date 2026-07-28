@@ -7,6 +7,7 @@ from tools.kinglet_spike.unity.editor import (
     EditorIdentity,
     read_project_version,
     verify_editor,
+    verify_project_editor,
 )
 
 PROJECT_VERSION_TEXT = (
@@ -58,6 +59,21 @@ class ReadProjectVersionTests(unittest.TestCase):
     def test_malformed_version_shape_raises_e_field(self):
         with TemporaryDirectory() as tmp:
             project = _write_project_version(Path(tmp), "m_EditorVersion: not-a-version\n")
+            with self.assertRaises(EvidenceError) as ctx:
+                read_project_version(project)
+            self.assertEqual("E_FIELD", ctx.exception.code)
+
+    def test_only_with_revision_line_raises_e_field(self):
+        # M6: a loosened line-matcher (e.g. "^m_EditorVersion\\w*:") would
+        # accept "m_EditorVersionWithRevision:" as if it were the bare
+        # "m_EditorVersion:" line. Pin that this file, with ONLY the
+        # WithRevision line present, is treated as having no
+        # m_EditorVersion line at all.
+        with TemporaryDirectory() as tmp:
+            project = _write_project_version(
+                Path(tmp),
+                "m_EditorVersionWithRevision: 6000.3.18f1 (5ebeb53e4c07)\n",
+            )
             with self.assertRaises(EvidenceError) as ctx:
                 read_project_version(project)
             self.assertEqual("E_FIELD", ctx.exception.code)
@@ -128,6 +144,33 @@ class VerifyEditorTests(unittest.TestCase):
         with self.assertRaises(EvidenceError) as ctx:
             verify_editor(Path("/fake/Unity"), "6000.3.18f1", run_version_flag=_raise)
         self.assertEqual("E_FIELD", ctx.exception.code)
+
+
+class VerifyProjectEditorTests(unittest.TestCase):
+    # M7: read_project_version and verify_editor were each correct in
+    # isolation but never composed -- nothing bound required_version to
+    # what a project actually declares. These tests exercise the pair.
+
+    def test_editor_matching_projects_declared_version_passes(self):
+        with TemporaryDirectory() as tmp:
+            project = _write_project_version(Path(tmp))
+            identity = verify_project_editor(
+                project,
+                Path("/fake/Unity"),
+                run_version_flag=lambda editor: "6000.3.18f1\n",
+            )
+            self.assertEqual("6000.3.18f1", identity.version)
+
+    def test_editor_not_matching_projects_declared_version_refuses(self):
+        with TemporaryDirectory() as tmp:
+            project = _write_project_version(Path(tmp))  # declares 6000.3.18f1
+            with self.assertRaises(EvidenceError) as ctx:
+                verify_project_editor(
+                    project,
+                    Path("/fake/Unity"),
+                    run_version_flag=lambda editor: "6000.0.68f1\n",
+                )
+            self.assertEqual("E_UNITY_VERSION", ctx.exception.code)
 
 
 if __name__ == "__main__":
