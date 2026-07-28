@@ -501,3 +501,7 @@ spikes/platform/unity/fixture/Assets/KingletSpike/Tests/Editor/KingletSpikeTests
 spikes/platform/unity/fixture/Assets/KingletSpike/Tests/Editor/KingletSpikeTests.cs.meta	original	-	-	-	original	kinglet-00u-task2-fixture-tests-cs-meta
 spikes/platform/unity/mcp.lock.json	original	-	-	-	original	kinglet-00u-task2-mcp-lock
 tests/kinglet_spike/test_unity_fixture.py	original	-	-	-	original	kinglet-00u-task2-unity-fixture-tests
+tools/kinglet_spike/unity/editor.py	original	-	-	-	original	kinglet-00u-task3-editor-version-resolution
+tools/kinglet_spike/unity/ownership.py	original	-	-	-	original	kinglet-00u-task3-gui-ownership-detection
+tests/kinglet_spike/test_unity_editor.py	original	-	-	-	original	kinglet-00u-task3-editor-tests
+tests/kinglet_spike/test_unity_ownership.py	original	-	-	-	original	kinglet-00u-task3-ownership-tests
