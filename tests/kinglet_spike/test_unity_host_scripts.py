@@ -381,6 +381,55 @@ class SweepBehaviour(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("not an existing directory", result.stderr)
 
+    def test_a_path_containing_a_newline_is_refused(self):
+        """MEASURED: `/tmp/<LF>zz` was ACCEPTED by the previous guard.
+
+        `DEPTH="$(printf … | awk …)"` emitted one line per record, so a
+        two-line path produced a two-line "number", `[ "2|0" -lt 3 ]` failed
+        with "integer expression expected", and because that sits inside an
+        `if` condition `set -e` never saw it. Execution fell through and the
+        depth rule was skipped entirely -- ambiguity resolving to sweeping.
+
+        Driven through `--check`, which exits before `ps` is ever called.
+        """
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            weird = Path(temporary) / "a\nb"
+            weird.mkdir()
+            result = self._check(str(weird))
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("newline", result.stderr)
+
+    def test_a_path_containing_a_tab_or_carriage_return_is_refused(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            for name in ("a\tb", "a\rb"):
+                weird = Path(temporary) / name
+                weird.mkdir()
+                result = self._check(str(weird))
+                self.assertEqual(result.returncode, 2, name)
+                self.assertIn("newline", result.stderr)
+
+    def test_a_workspace_with_spaces_is_still_accepted(self):
+        # The newline rule must not become a refuse-everything rule. Spelling
+        # the control characters with `$(printf ...)` did exactly that --
+        # command substitution strips trailing newlines, so the pattern
+        # collapsed to `*""*` and matched every path, including this one.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            spaced = Path(temporary) / "with space" / "ws"
+            spaced.mkdir(parents=True)
+            result = self._check(str(spaced))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("ok ", result.stdout)
+
+    def test_a_trailing_slash_is_still_accepted(self):
+        result = self._check(str(self.workspace) + "/")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_a_real_run_directory_is_accepted(self):
         # Otherwise "refuses everything" would look like a working guard.
         result = self._check(str(self.workspace))
@@ -401,12 +450,14 @@ class SweepBehaviour(unittest.TestCase):
     # ---- the sweep's authority model, against real processes -------------
 
     def test_it_kills_only_what_it_owns(self):
-        """Five real processes; two must die and three must live.
+        """Six real processes; two must die and four must live.
 
         Each survivor is a defect that was actually demonstrated:
 
-          sibling         `<ws>2/proj` swept as `<ws>/proj` by an unanchored
-                          substring test -- the `/x/proj` vs `/x/proj2` case.
+          sibling         `<ws>2/proj` swept as `<ws>/proj` by a match with
+                          no RIGHT boundary -- the `/x/proj` vs `/x/proj2` case.
+          mirror          `/mnt/backup<ws>/proj` swept because the match had
+                          no LEFT boundary -- the same class, reflected.
           recycled pgid   an unrelated daemon whose pgid happened to be in the
                           owned file was killed on bare pgid equality.
           bystander       a process merely NAMED like an orphan class, killed
@@ -421,6 +472,13 @@ class SweepBehaviour(unittest.TestCase):
         sibling_argv = f"Unity -projectPath {self.workspace}2/proj"
         sibling = self._spawn(f'exec -a "{sibling_argv}" sleep 300')
 
+        # A path that merely ENDS WITH the workspace path -- the mirror of the
+        # sibling case. Reachable via a bind mount, a container or chroot
+        # mirror (/mnt/host<abs>), or a backup tree. Right-side anchoring alone
+        # selected and killed this one.
+        mirror_argv = f"Unity -projectPath /mnt/backup{self.workspace}/proj"
+        mirror = self._spawn(f'exec -a "{mirror_argv}" sleep 300')
+
         # No workspace path anywhere in its argv -- exactly like VBCSCompiler.
         owned_victim = self._spawn("exec -a VBCSCompiler sleep 300")
         # Same owned group, but nothing about it says Unity: a recycled PGID.
@@ -433,7 +491,8 @@ class SweepBehaviour(unittest.TestCase):
         bystander = self._spawn("exec -a UnityShaderCompiler sleep 300")
 
         time.sleep(1)
-        for handle in (workspace_victim, sibling, owned_victim, recycled, bystander):
+        for handle in (workspace_victim, sibling, mirror, owned_victim,
+                       recycled, bystander):
             self.assertTrue(self._alive(handle), "a process died before the sweep")
 
         result = subprocess.run(
@@ -449,7 +508,10 @@ class SweepBehaviour(unittest.TestCase):
                          "a process reachable ONLY by owned pgid survived")
         self.assertTrue(self._alive(sibling),
                         "the sweep killed a SIBLING directory's process; the "
-                        "workspace match is an unanchored substring test")
+                        "workspace match is unanchored on the right")
+        self.assertTrue(self._alive(mirror),
+                        "the sweep killed a process whose path merely ENDS "
+                        "WITH the workspace; the match has no left boundary")
         self.assertTrue(self._alive(recycled),
                         "the sweep killed an unrelated process on bare pgid "
                         "equality; a recycled PGID must resolve to sparing")
@@ -458,7 +520,7 @@ class SweepBehaviour(unittest.TestCase):
 
         self.assertIn("workspace", result.stdout)
         self.assertIn("owned-pgid", result.stdout)
-        for spared in (sibling, recycled, bystander):
+        for spared in (sibling, mirror, recycled, bystander):
             self.assertNotIn(str(spared.pid), result.stdout)
 
     def test_without_a_pgid_file_the_owned_class_is_out_of_reach(self):

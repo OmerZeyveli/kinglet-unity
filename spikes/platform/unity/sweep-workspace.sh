@@ -107,6 +107,34 @@ case "$WORKSPACE" in
     *..*) refuse "workspace must not contain '..', got: $WORKSPACE" ;;
 esac
 
+# A newline (or any control character) in the path is refused OUTRIGHT, before
+# anything tries to compute over it.
+#
+# This is the third time on this plan that a newline in a path has defeated a
+# guard -- twice in Task 3's ownership detector, and once here: `/tmp/<LF>zz`
+# was ACCEPTED, because the depth computation piped a two-line string into
+# `awk` and got two numbers back, `[ "2|0" -lt 3 ]` failed with "integer
+# expression expected", and the failure sat inside an `if` condition where
+# `set -e` cannot see it. Execution fell through and the depth rule was simply
+# skipped. Ambiguity resolved to sweeping, which is the exact inversion this
+# guard exists to prevent.
+#
+# So this is not an enumerated edge case. The rule is that a path this script
+# will compute over must be a single line, and anything else is refused rather
+# than reasoned about. The runner never produces such a path; an operator who
+# types one gets a refusal.
+# `$'\n'` and not `"$(printf '\n')"`: command substitution STRIPS trailing
+# newlines, so the printf spelling collapses to the empty string and the
+# pattern becomes `*""*`, which matches every path. That mistake refused
+# everything -- including legitimate workspaces -- and it is exactly the shape
+# a "refuses everything" guard takes, which is why there is a test asserting a
+# real run directory is still accepted. `$'...'` is bash 3.2, so macOS is fine.
+case "$WORKSPACE" in
+    *$'\n'*|*$'\r'*|*$'\t'*)
+        refuse "workspace must not contain a newline, carriage return or tab"
+        ;;
+esac
+
 if [ ! -d "$WORKSPACE" ]; then
     refuse "workspace is not an existing directory: $WORKSPACE"
 fi
@@ -121,7 +149,24 @@ if [ "$WS" = "/" ]; then
     refuse "refusing to sweep the filesystem root"
 fi
 
-DEPTH="$(printf '%s\n' "$WS" | awk -F/ '{ print NF - 1 }')"
+# Depth counted IN THE SHELL, with no subprocess and no record splitting: strip
+# every character that is not a separator and measure what is left. A pipeline
+# into `awk` emitted one line per record, so a multi-line value produced a
+# multi-line "number".
+SEPARATORS="${WS//[!\/]/}"
+DEPTH="${#SEPARATORS}"
+
+# "The value I computed is not a single integer" is itself a refusal condition.
+# Falling through on a malformed computation is how the newline case disabled
+# the rule below, and the fix for that is not to enumerate the inputs that can
+# malform it -- it is to refuse whenever the result is not something this rule
+# can be applied to.
+case "$DEPTH" in
+    ''|*[!0-9]*)
+        refuse "could not determine the workspace depth; refusing rather than sweeping on an unusable measurement"
+        ;;
+esac
+
 if [ "$DEPTH" -lt "$MIN_DEPTH" ]; then
     refuse "workspace is too shallow to be a run directory (depth $DEPTH < $MIN_DEPTH): $WS"
 fi
@@ -162,21 +207,39 @@ SELF_PGID="$(ps -o pgid= -p $$ | tr -d ' ')"
 collect() {
     printf '%s\n' "$TABLE" | awk \
         -v ws="$WS" -v owned="$OWNED" -v self="$SELF_PGID" -v self_pid="$$" '
-        # Does argv name the workspace AT A PATH BOUNDARY?
+        # Does argv name the workspace as a WHOLE PATH -- bounded on BOTH sides?
         #
-        # A plain substring test swept `<ws>2/proj` as though it were
-        # `<ws>/proj`. That is the `/x/proj` vs `/x/proj2` prefix case Task 3s
-        # ownership detector spent four rounds closing, reintroduced here in
-        # awk. A match counts only when the character after the prefix ends the
-        # path component: end of string, a separator, a space, or a quote.
-        function names_workspace(argv,    rest, p, nextch) {
+        # Right side: a plain substring test swept `<ws>2/proj` as though it
+        # were `<ws>/proj`. That is the `/x/proj` vs `/x/proj2` prefix case
+        # Task 3s ownership detector spent four rounds closing, reintroduced
+        # here in awk.
+        #
+        # Left side: anchoring only the right end left the mirror of the same
+        # bug. A process whose argv carried `/mnt/backup<ws>/proj` -- a path
+        # that merely ENDS WITH the workspace -- was selected and killed. That
+        # is not hypothetical: a bind mount, a container or chroot mirror
+        # (`/mnt/host<abs>`), or a backup tree all produce it, and none of them
+        # is this run s workspace.
+        #
+        # So a match counts only when the character BEFORE it starts the token
+        # (start of string, a space, a quote, or `=`) AND the character after
+        # it ends the path component (end of string, `/`, a space, a quote or
+        # `:`). The loop walks every occurrence, so one unbounded hit earlier
+        # in the argv cannot hide a real one later.
+        function names_workspace(argv,    rest, p, abs, pos, prevch, nextch) {
+            pos = 0
             rest = argv
             while ((p = index(rest, ws)) > 0) {
-                nextch = substr(rest, p + length(ws), 1)
-                if (nextch == "" || nextch == "/" || nextch == " " ||
-                    nextch == "\"" || nextch == "'"'"'" || nextch == ":") {
+                abs = pos + p
+                prevch = (abs == 1) ? "" : substr(argv, abs - 1, 1)
+                nextch = substr(argv, abs + length(ws), 1)
+                if ((prevch == "" || prevch == " " || prevch == "\"" ||
+                     prevch == "'"'"'" || prevch == "=") &&
+                    (nextch == "" || nextch == "/" || nextch == " " ||
+                     nextch == "\"" || nextch == "'"'"'" || nextch == ":")) {
                     return 1
                 }
+                pos = abs
                 rest = substr(rest, p + 1)
             }
             return 0

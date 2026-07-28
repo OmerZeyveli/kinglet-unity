@@ -42,12 +42,13 @@ means a host looked and could not establish the claim.
 
 These are defects in the tooling that ASSEMBLED the records, found
 after they were published. Every measured fact in them was verified
-against its artifact and stands. The assembling code is fixed; the
+against its artifact and stands, and this applies to every record
+regardless of the verdict it reached. The assembling code is fixed; the
 records are immutable and were deliberately not regenerated, so the
 next run — a Linux re-run or the first macOS run — carries the
 corrections and these notes disappear from this report.
 
-1. **Zero-length spans.** 8 records report
+1. **Zero-length spans.** 9 records report
    `started_at == ended_at` although their artifacts record real
    durations (`wall_seconds` of 14.216, 18.197 and 22.151 among
    them). The probe's span is now carried through to the record.
@@ -75,6 +76,7 @@ Affected records:
 - `20260728T132858Z-unity-probe-collision-refusal-linux-ubuntu-24-04-4-lts-x64-01`
 - `20260728T132858Z-unity-probe-filesystem-only-linux-ubuntu-24-04-4-lts-x64-01`
 - `20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01`
+- `20260728T132858Z-unity-probe-live-editor-mcp-linux-ubuntu-24-04-4-lts-x64-01`
 - `20260728T132858Z-unity-probe-mismatched-editor-linux-ubuntu-24-04-4-lts-x64-01`
 - `20260728T132858Z-unity-probe-orphan-cleanup-linux-ubuntu-24-04-4-lts-x64-01`
 - `20260728T132858Z-unity-probe-same-project-headless-linux-ubuntu-24-04-4-lts-x64-01`

@@ -149,10 +149,16 @@ def _known_artefact_lines(records) -> list[str]:
     fixed one records each probe's real span. The section therefore retires
     itself the moment no such record remains.
     """
+    # NO status filter. Filtering to `pass` reported 8 of the 9 affected
+    # records: the `live-editor-mcp` record is `inconclusive` and carries the
+    # very same zero-length span, so it was missing from both the count and the
+    # list -- and the section would have retired itself while a defective
+    # record was still published. The defect is a property of how the record
+    # was assembled, not of the verdict it reached.
     zero_span = sorted(
         record.run_id
         for record in records
-        if record.status == "pass" and record.started_at == record.ended_at
+        if record.started_at == record.ended_at
     )
     if not zero_span:
         return []
@@ -162,7 +168,8 @@ def _known_artefact_lines(records) -> list[str]:
         "",
         "These are defects in the tooling that ASSEMBLED the records, found",
         "after they were published. Every measured fact in them was verified",
-        "against its artifact and stands. The assembling code is fixed; the",
+        "against its artifact and stands, and this applies to every record",
+        "regardless of the verdict it reached. The assembling code is fixed; the",
         "records are immutable and were deliberately not regenerated, so the",
         "next run — a Linux re-run or the first macOS run — carries the",
         "corrections and these notes disappear from this report.",
