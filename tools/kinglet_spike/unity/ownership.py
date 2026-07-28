@@ -26,21 +26,38 @@ Three traps this module exists to avoid, all observed or reproduced live:
    or containing a literal double space/tab/newline is indistinguishable
    from several arguments once ps has joined them with single spaces.
    Round 1 and round 2 of this module each tried a narrower heuristic here
-   (shlex, then "stop at the first flag-shaped token") and each was
-   demonstrated to produce a false SAFE for a real launch a live Editor
-   held open. This module now (a) reads the OS's own EXACT, unambiguous
-   argv wherever the platform provides one (Linux's /proc/<pid>/cmdline is
-   NUL-delimited -- there is nothing to resolve), and (b) for the
-   remaining lossy-string case (macOS ps, an unquoted Windows line), SLICES
-   the original string at every plausible flag boundary instead of
-   tokenizing-and-rejoining, so a candidate can never lose whitespace it
-   never should have collapsed in the first place, and generates every
-   candidate a real Unity invocation could produce rather than only the
-   first. Any exact match against the caller's OWN known target project is
-   accepted as owned; a caller can never falsely conclude "not owned" by
-   this method, because the true path -- if it IS the target -- always
-   survives as one of the generated candidates (see
-   _project_path_candidates_from_raw's docstring for why).
+   (shlex, then "stop at the first flag-shaped token", then "slice at
+   every plausible flag boundary") and each was demonstrated to produce a
+   false SAFE for a real launch a live Editor held open, because a
+   two-outcome design (owned / not-owned) has no way to say "I could not
+   tell" -- every case the slicer couldn't resolve fell through to
+   not-owned by construction, whatever the slicer's cleverness. This
+   module now (a) reads the OS's own EXACT, unambiguous argv wherever the
+   platform provides one (Linux's /proc/<pid>/cmdline is NUL-delimited --
+   there is nothing to resolve, and a per-pid read failure is not treated
+   as "not Unity": see _linux_proc_process_table), and (b) for the
+   remaining lossy-string case (macOS ps, an unquoted Windows line), has a
+   THIRD outcome. find_owning_process() slices the original string at
+   every plausible flag boundary (see _project_path_candidates_from_raw)
+   and:
+     - any candidate that exactly matches the caller's known target is
+       accepted as owned, immediately;
+     - otherwise, if exactly one candidate resolves to a directory that
+       actually exists on disk, that is treated as the process's true
+       path and -- since it didn't match the target above -- this process
+       is not the owner;
+     - otherwise (zero candidates exist on disk, so the true path could
+       not be recovered at all; or more than one distinct candidate
+       exists, so which one is true can't be told) this process's
+       ownership of the target is UNRESOLVABLE, and the caller returns an
+       unconfirmed ProjectOwner (source="process-ambiguous") rather than
+       None -- exactly the outcome a bare flag-not-found case (no
+       following real flag, a bare "-", "--", a slash-style flag, or a
+       ps-truncated line spanning an embedded newline) used to fall
+       through as "safe". This module never fabricates a false match
+       against an unrelated project (a non-matching candidate is simply a
+       different string), and as of this round it also never silently
+       concludes "not owned" when it genuinely could not tell.
 
 3. Path equality must be whole-resolved-path equality, never a
    prefix/substring comparison -- `/x/proj` and `/x/proj2` (no separator
@@ -59,11 +76,28 @@ from typing import Callable, Sequence, Union
 
 from ..model import EvidenceError
 
-# A process-table entry's command is either:
-#   - an EXACT argv tuple (e.g. from /proc/<pid>/cmdline -- no ambiguity), or
+@dataclass(frozen=True)
+class _TruncatedCommand:
+    """Sentinel command value: a process-table entry known to be Unity-shaped
+    (argv0 established some other way) whose -projectPath value is NOT
+    trustworthy -- either a `ps` line-oriented capture lost the tail of
+    this argv to an embedded newline (see _parse_posix_process_table), or
+    /proc/<pid>/cmdline could not be read for a live pid and only its
+    coarser /proc/<pid>/comm was available (see _linux_proc_process_table).
+    Always resolves as ambiguous in find_owning_process -- never as "no
+    -projectPath" (which would silently drop it) and never with a guessed
+    path (which could silently mismatch).
+    """
+
+    argv0: str
+
+
+# A process-table entry's command is one of:
+#   - an EXACT argv tuple (e.g. from /proc/<pid>/cmdline -- no ambiguity),
 #   - a LOSSY, space-joined command-line string (ps, or an unquoted Windows
-#     line) that must be parsed with _project_path_candidates_from_raw.
-ProcessCommand = Union[str, "tuple[str, ...]"]
+#     line) that must be parsed with _project_path_candidates_from_raw, or
+#   - a _TruncatedCommand (Unity-shaped, but -projectPath unrecoverable).
+ProcessCommand = Union[str, "tuple[str, ...]", _TruncatedCommand]
 ProcessEntry = tuple[int, ProcessCommand]
 
 _PROJECT_PATH_FLAG_RE = re.compile(r'(?:(?<=\s)|^)-projectPath(?=\s|$)')
@@ -84,12 +118,14 @@ class ProjectOwner:
     Editor process. Authoritative -- assert_headless_safe raises
     E_UNITY_OWNED.
 
-    confirmed=False: Temp/UnityLockfile or Library/EditorInstance.json is
-    present but no live process corroborates it -- a stale lock. This is
-    NOT the same claim as "not owned": the lock proves a project WAS
-    opened, and this module cannot prove it is safe now, so
-    assert_headless_safe still refuses (E_UNITY_OWNER_UNKNOWN) until a
-    human or a future task inspects it.
+    confirmed=False: either Temp/UnityLockfile or Library/EditorInstance.json
+    is present but no live process corroborates it (source="lockfile") --
+    a stale lock, proving a project WAS opened but not that anything owns
+    it now -- or a live Unity-shaped process carries a -projectPath value
+    this module could not unambiguously resolve (source="process-ambiguous",
+    see find_owning_process). Neither is "not owned": assert_headless_safe
+    still refuses (E_UNITY_OWNER_UNKNOWN) for both, because "probably safe"
+    is not "known safe".
 
     Note on naming: "GUI" in this module's public function names describes
     the INTENT (refuse a second launch against a project a person has open)
@@ -222,13 +258,22 @@ def _project_path_candidates_from_raw(command: str, *, windows: bool) -> list[st
 
 def _candidate_paths_for_command(
     command: ProcessCommand, *, windows: bool
-) -> tuple[str | None, list[str]]:
-    """Return (argv0, [candidate -projectPath values]) for one process entry.
+) -> tuple[str | None, list[str] | None]:
+    """Return (argv0, candidates) for one process entry.
 
-    Dispatches on whether `command` is an exact argv tuple (single
-    unambiguous candidate, or none) or a lossy command-line string
-    (possibly several candidates -- see _project_path_candidates_from_raw).
+    candidates is one of:
+      - None            -- this entry is KNOWN Unity-shaped but its
+                            -projectPath is unrecoverable (_TruncatedCommand);
+                            the caller must treat this as unresolvable, never
+                            as "no -projectPath present".
+      - []               -- no -projectPath flag was found at all; this
+                            process is not a candidate owner of anything.
+      - [str, ...]        -- one (exact argv) or several (lossy command-line
+                            string, see _project_path_candidates_from_raw)
+                            plausible -projectPath values to check.
     """
+    if isinstance(command, _TruncatedCommand):
+        return (command.argv0 or None), None
     if isinstance(command, (tuple, list)):
         argv0 = command[0] if command else None
         raw_path = _extract_project_path_from_argv(command)
@@ -251,32 +296,118 @@ def find_owning_process(
     """Pure: scan a process table for a live Unity Editor owning `project`.
 
     A candidate must be a genuine Unity Editor binary (see
-    _is_unity_editor_argv0). Its -projectPath candidates (exact, from an
-    argv tuple, or several, from a lossy command-line string -- see
-    _candidate_paths_for_command) are each canonicalized and compared to
-    the canonicalized requested project; ANY exact match is authoritative.
+    _is_unity_editor_argv0). What happens next depends on how certain its
+    -projectPath value is (see _candidate_paths_for_command):
+
+    - _TruncatedCommand (candidates is None): known Unity-shaped, value
+      unrecoverable -- unconditionally ambiguous.
+    - no -projectPath at all (candidates == []): not a candidate owner,
+      skip.
+    - exact argv (from /proc): the single candidate is either the target
+      (owned) or it isn't (definitively not this process -- no ambiguity
+      is possible when the OS gave us the literal argument).
+    - a lossy command-line string: several candidates. Any EXACT match
+      against the known target wins immediately (owned). Failing that,
+      this module does NOT conclude "not owned" merely because no
+      candidate happened to match -- a candidate can be truncated by
+      construction (see _project_path_candidates_from_raw). It instead
+      asks which candidates resolve to a directory that actually exists:
+      exactly one existing candidate is treated as this process's true,
+      established path (and since it didn't match the target, this
+      process is not the owner); zero or more-than-one existing
+      candidates means the true path could not be pinned down, which is
+      UNRESOLVABLE, not "safe".
+
     Path equality is always whole-resolved-path equality, never a
-    prefix/substring comparison.
+    prefix/substring comparison. Returns a confirmed ProjectOwner
+    (source="process"/"process-exact-argv") for an outright match, an
+    unconfirmed one (source="process-ambiguous") if any process could not
+    be ruled out, or None only when every Unity-shaped process in the
+    table was positively ruled out (or there were none).
     """
     canonical_project = _canonical(project)
+    ambiguous_owner: ProjectOwner | None = None
+
     for pid, command in process_table:
         argv0, candidates = _candidate_paths_for_command(command, windows=windows)
         if argv0 is None or not _is_unity_editor_argv0(argv0, windows=windows):
             continue
-        exact_argv = isinstance(command, (tuple, list))
-        for candidate in candidates:
-            if _canonical(candidate) == canonical_project:
-                return ProjectOwner(
+
+        if candidates is None:
+            # Known Unity-shaped, -projectPath unrecoverable (truncated
+            # ps capture, or /proc/<pid>/cmdline unreadable) -- cannot be
+            # ruled out as the owner.
+            if ambiguous_owner is None:
+                ambiguous_owner = ProjectOwner(
                     pid=pid,
                     project_path=str(canonical_project),
-                    source="process-exact-argv" if exact_argv else "process",
-                    confirmed=True,
+                    source="process-ambiguous",
+                    confirmed=False,
                     detail=(
-                        f"pid {pid} -projectPath resolves to {candidate!r}"
-                        + (" (exact argv)" if exact_argv else " (from command line)")
+                        f"pid {pid} is a live Unity-shaped process whose "
+                        "-projectPath could not be read at all; refusing "
+                        "rather than guessing safe"
                     ),
                 )
-    return None
+            continue
+
+        if not candidates:
+            continue  # no -projectPath flag -- not a candidate owner
+
+        exact_argv = isinstance(command, (tuple, list))
+
+        matched = next(
+            (c for c in candidates if _canonical(c) == canonical_project), None
+        )
+        if matched is not None:
+            return ProjectOwner(
+                pid=pid,
+                project_path=str(canonical_project),
+                source="process-exact-argv" if exact_argv else "process",
+                confirmed=True,
+                detail=(
+                    f"pid {pid} -projectPath resolves to {matched!r}"
+                    + (" (exact argv)" if exact_argv else " (from command line)")
+                ),
+            )
+
+        if exact_argv:
+            # The OS gave us the literal argument; a non-match here is
+            # definitive, not ambiguous.
+            continue
+
+        # Lossy string, no direct match. Disambiguate via filesystem
+        # existence: which candidate(s), if any, are real directories?
+        existing: list[Path] = []
+        for candidate in candidates:
+            resolved = _canonical(candidate)
+            if resolved not in existing and resolved.is_dir():
+                existing.append(resolved)
+
+        if len(existing) == 1:
+            # Exactly one candidate is a real directory, and it already
+            # failed the exact-match check above -- this process's true
+            # path is established and it is not the target.
+            continue
+
+        if ambiguous_owner is None:
+            reason = (
+                "no candidate resolves to an existing directory"
+                if not existing
+                else "multiple candidates resolve to different existing directories"
+            )
+            ambiguous_owner = ProjectOwner(
+                pid=pid,
+                project_path=str(canonical_project),
+                source="process-ambiguous",
+                confirmed=False,
+                detail=(
+                    f"pid {pid} -projectPath could not be unambiguously "
+                    f"resolved ({reason}); refusing rather than guessing safe"
+                ),
+            )
+
+    return ambiguous_owner
 
 
 def _pid_is_live_unity_process(
@@ -400,6 +531,27 @@ def _read_argv_via_proc(pid: int) -> tuple[str, ...] | None:
         return tuple(part.decode("utf-8", errors="surrogateescape") for part in parts)
 
 
+def _proc_pid_is_alive(pid: int) -> bool:
+    return Path(f"/proc/{pid}").is_dir()
+
+
+def _read_comm_via_proc(pid: int) -> str | None:
+    """/proc/<pid>/comm: just the executable basename, no arguments.
+
+    A much lower bar than cmdline in practice (empty for kernel threads
+    but they carry a bracketed name here too, e.g. "[kworker/0:1]" via ps
+    -- and this file is unaffected by argv/environ-specific access
+    restrictions some hardened configurations apply). Used only as a
+    per-pid fallback when cmdline itself could not be read.
+    """
+    try:
+        return Path(f"/proc/{pid}/comm").read_text(
+            encoding="utf-8", errors="surrogateescape"
+        ).strip()
+    except OSError:
+        return None
+
+
 def _linux_proc_process_table() -> tuple[ProcessEntry, ...] | None:
     """Exact argv for every readable PID via /proc -- the authoritative Linux source.
 
@@ -407,6 +559,21 @@ def _linux_proc_process_table() -> tuple[ProcessEntry, ...] | None:
     listed, so the caller can distinguish "no processes" from "couldn't
     look" and fall back to `ps` instead of silently reporting nobody
     running anything.
+
+    A per-pid cmdline read can fail for a LIVE process (hidepid, a
+    pid-namespace boundary, a permission denial, a decode fault) without
+    the whole /proc listing failing -- round 2 dropped that pid from the
+    table silently, which could make a live Editor vanish and read as
+    SAFE. This function never does that: when cmdline is unreadable for a
+    pid that is still alive, it falls back to /proc/<pid>/comm (a much
+    lower access bar). If comm confirms the process is Unity-shaped, the
+    pid is kept as a _TruncatedCommand -- unconditionally ambiguous, since
+    we know it might be the Editor but cannot read its -projectPath. If
+    comm is also unreadable or doesn't look like Unity, the pid is
+    omitted: there would be nothing actionable to refuse on, and treating
+    every unreadable non-Unity process (there are many on any real
+    multi-user or containerized host) as ambiguous would make headless
+    launches permanently impossible rather than merely cautious.
     """
     try:
         names = os.listdir("/proc")
@@ -416,9 +583,16 @@ def _linux_proc_process_table() -> tuple[ProcessEntry, ...] | None:
     for name in names:
         if not name.isdigit():
             continue
-        argv = _read_argv_via_proc(int(name))
+        pid = int(name)
+        argv = _read_argv_via_proc(pid)
         if argv:
-            entries.append((int(name), argv))
+            entries.append((pid, argv))
+            continue
+        if not _proc_pid_is_alive(pid):
+            continue  # gone by the time we looked -- not a live owner
+        comm = _read_comm_via_proc(pid)
+        if comm and _is_unity_editor_argv0(comm, windows=False):
+            entries.append((pid, _TruncatedCommand(argv0=comm)))
     return tuple(entries)
 
 
@@ -445,21 +619,55 @@ def _ps_process_table() -> tuple[ProcessEntry, ...]:
     return _parse_posix_process_table(result.stdout)
 
 
+def _parse_posix_process_line(stripped: str) -> ProcessEntry | None:
+    """Parse one already-stripped `<pid> <command>` line, or return None."""
+    parts = stripped.split(maxsplit=1)
+    if len(parts) != 2:
+        return None
+    pid_text, command = parts
+    try:
+        pid = int(pid_text)
+    except ValueError:
+        return None
+    return (pid, command)
+
+
+def _mark_truncated(command: ProcessCommand) -> ProcessCommand:
+    """Replace a command with a _TruncatedCommand carrying its best-known argv0."""
+    if isinstance(command, _TruncatedCommand):
+        return command
+    if isinstance(command, (tuple, list)):
+        argv0 = command[0] if command else ""
+    else:
+        argv0 = _extract_argv0(command, windows=False) or ""
+    return _TruncatedCommand(argv0=argv0)
+
+
 def _parse_posix_process_table(stdout: str) -> tuple[ProcessEntry, ...]:
+    """Parse `ps -axo pid=,command=` output.
+
+    A directory name containing a literal newline makes ps itself print
+    that newline verbatim, so the tail of that one process's argv appears
+    as a SEPARATE line that will not parse as `<pid> <command>` -- a naive
+    line-oriented parser drops it, and the corresponding entry's
+    -projectPath value is then silently truncated (the previous round's
+    CRITICAL 1 finding: this fed a confidently-wrong path to the slicer
+    instead of a signal). Any line that fails to parse is therefore never
+    just discarded: if there is a preceding entry to attribute it to, that
+    entry is marked _TruncatedCommand (unconditionally ambiguous in
+    find_owning_process) rather than left looking like a clean, complete
+    command line.
+    """
     entries: list[ProcessEntry] = []
     for line in stdout.splitlines():
         stripped = line.strip()
-        if not stripped:
+        parsed = _parse_posix_process_line(stripped) if stripped else None
+        if parsed is not None:
+            entries.append(parsed)
             continue
-        parts = stripped.split(maxsplit=1)
-        if len(parts) != 2:
-            continue
-        pid_text, command = parts
-        try:
-            pid = int(pid_text)
-        except ValueError:
-            continue
-        entries.append((pid, command))
+        if entries:
+            prev_pid, prev_command = entries[-1]
+            entries[-1] = (prev_pid, _mark_truncated(prev_command))
     return tuple(entries)
 
 
@@ -596,9 +804,10 @@ def assert_headless_safe(
 
     Must run before Popen for every headless route (same-project-headless,
     isolated-headless). Raises E_UNITY_OWNED for a confirmed live owner,
-    E_UNITY_OWNER_UNKNOWN for a stale lock (or a process listing this
-    function could not obtain) that it cannot clear, and returns None only
-    when launch is safe.
+    E_UNITY_OWNER_UNKNOWN for a stale lock, a live Unity-shaped process
+    whose -projectPath could not be unambiguously resolved, or a process
+    listing this function could not obtain -- any case it cannot clear --
+    and returns None only when launch is safe.
     """
     owner = detect_gui_owner(
         project, process_table_provider=process_table_provider, windows=windows
@@ -613,6 +822,6 @@ def assert_headless_safe(
         )
     raise EvidenceError(
         "E_UNITY_OWNER_UNKNOWN",
-        f"project {owner.project_path} has a stale lock with no corroborating "
-        "live process; refusing headless launch until inspected",
+        f"project {owner.project_path} ownership could not be confirmed clear "
+        f"({owner.detail}); refusing headless launch until inspected",
     )

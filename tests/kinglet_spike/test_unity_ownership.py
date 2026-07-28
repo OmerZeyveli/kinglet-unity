@@ -10,14 +10,18 @@ from unittest.mock import patch
 from tools.kinglet_spike.model import EvidenceError
 from tools.kinglet_spike.unity.ownership import (
     ProjectOwner,
+    _TruncatedCommand,
     _extract_argv0,
     _linux_proc_process_table,
+    _mark_truncated,
     _parse_posix_process_table,
     _parse_windows_process_table,
     _posix_process_table,
+    _proc_pid_is_alive,
     _project_path_candidates_from_raw,
     _ps_process_table,
     _read_argv_via_proc,
+    _read_comm_via_proc,
     _unity_lockfile_present,
     _windows_process_table,
     assert_headless_safe,
@@ -270,6 +274,127 @@ class CriticalSpaceAmbiguityRegressionTests(unittest.TestCase):
         # -projectPath is the very last token -- the untruncated-remainder
         # candidate must still recover it.
         self._assert_owned("Kinglet - Copy", trailing="")
+
+
+class CriticalAmbiguityMustRefuseTests(unittest.TestCase):
+    """Round 3 CRITICAL 1: the re-reviewer's finding was structural, not a
+    missed case -- there was NO branch in the lossy path that could ever
+    produce E_UNITY_OWNER_UNKNOWN, so anything the slicer couldn't resolve
+    fell through to SAFE by construction. None of these may ever read as
+    SAFE (None) again; each must come back as an unconfirmed
+    (confirmed=False) ProjectOwner instead.
+    """
+
+    def _assert_ambiguous(self, dir_name: str, trailing: str, *, windows: bool = False):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / dir_name
+            project.mkdir()
+            table = [(1, _raw_unity_command(str(project), trailing))]
+            owner = find_owning_process(table, project, windows=windows)
+            self.assertIsNotNone(owner, "must not read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+    def test_next_argument_not_flag_shaped(self):
+        self._assert_ambiguous("proj", " extraarg")
+
+    def test_next_argument_bare_dash(self):
+        self._assert_ambiguous("proj", " -")
+
+    def test_next_argument_double_dashed(self):
+        self._assert_ambiguous("proj", " --quit")
+
+    def test_windows_unquoted_slash_style_flag(self):
+        with TemporaryDirectory() as tmp:
+            project_value = f"{tmp}\\proj"
+            command = f"Unity.exe -projectPath {project_value} /quit"
+            owner = find_owning_process(
+                [(1, command)], Path(project_value), windows=True
+            )
+            self.assertIsNotNone(owner, "must not read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+    def test_windows_unquoted_next_argument_not_flag_shaped(self):
+        with TemporaryDirectory() as tmp:
+            project_value = f"{tmp}\\proj"
+            command = f"Unity.exe -projectPath {project_value} extraarg"
+            owner = find_owning_process(
+                [(1, command)], Path(project_value), windows=True
+            )
+            self.assertIsNotNone(owner, "must not read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+    def test_multiple_distinct_existing_candidates_is_ambiguous(self):
+        # Two DIFFERENT real directories both appear as candidates and
+        # neither is the target -- we cannot tell which one is true, so
+        # this must refuse rather than confidently pick the "not owned"
+        # answer for a process we cannot actually rule out.
+        with TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target"
+            target.mkdir()
+            command = _raw_unity_command(f"{tmp}/decoy", " -logFile -")
+            # _project_path_candidates_from_raw(command) produces exactly
+            # two candidates for this shape: the flag-truncated
+            # ".../decoy" and the untruncated remainder
+            # ".../decoy -logFile -" (trailing " -" included). Create BOTH
+            # as real directories so neither can be ruled out by
+            # existence, and neither is the target.
+            candidates = _project_path_candidates_from_raw(command, windows=False)
+            self.assertEqual(2, len(candidates), candidates)
+            for candidate in candidates:
+                Path(candidate).mkdir()
+
+            owner = find_owning_process([(1, command)], target)
+            self.assertIsNotNone(owner, "must not read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+
+class RealPosixParserNewlineTests(unittest.TestCase):
+    """Round 3 CRITICAL 1's sixth reproduction: a newline in the reported
+    path breaks the REAL ps-output pipeline, not just a fabricated single
+    string -- the fabricated form was shown to pass while the real reader
+    (which splits stdout on '\\n' first) failed, so this drives the
+    scenario through _parse_posix_process_table itself.
+    """
+
+    def test_newline_in_reported_path_is_ambiguous_via_real_parser(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "My\nProject"
+            project.mkdir()
+            # This is what real `ps -axo pid=,command=` output looks like
+            # when an argv element contains a literal newline: ps prints
+            # it verbatim, so the captured text has an extra visual line.
+            stdout = f"  4242 {_EDITOR} -projectPath {project} -logFile -\n"
+            table = _parse_posix_process_table(stdout)
+            owner = find_owning_process(table, project)
+            self.assertIsNotNone(owner, "must not read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+    def test_unparseable_line_with_no_preceding_entry_is_dropped_not_crashed(self):
+        # Defensive: an unparseable line with nothing before it to
+        # attribute it to must not raise or fabricate an entry.
+        stdout = "garbage line with no pid\n"
+        self.assertEqual((), _parse_posix_process_table(stdout))
+
+
+class MarkTruncatedTests(unittest.TestCase):
+    def test_string_command_keeps_its_argv0(self):
+        marked = _mark_truncated(f"{_EDITOR} -projectPath /home/u/My")
+        self.assertIsInstance(marked, _TruncatedCommand)
+        self.assertEqual(_EDITOR, marked.argv0)
+
+    def test_already_truncated_is_idempotent(self):
+        original = _TruncatedCommand(argv0=_EDITOR)
+        self.assertIs(original, _mark_truncated(original))
+
+    def test_exact_argv_tuple_keeps_its_argv0(self):
+        marked = _mark_truncated((_EDITOR, "-projectPath", "/home/u/My"))
+        self.assertIsInstance(marked, _TruncatedCommand)
+        self.assertEqual(_EDITOR, marked.argv0)
 
 
 class ExactArgvProcessTableTests(unittest.TestCase):
@@ -670,6 +795,108 @@ class LinuxProcProcessTableTests(unittest.TestCase):
         # A pid that (almost certainly) doesn't exist -- /proc/<pid>/cmdline
         # missing must degrade to None, not raise.
         self.assertIsNone(_read_argv_via_proc(2**30))
+
+    def test_own_comm_is_readable(self):
+        comm = _read_comm_via_proc(os.getpid())
+        self.assertIsNotNone(comm)
+
+    def test_own_pid_reports_alive(self):
+        self.assertTrue(_proc_pid_is_alive(os.getpid()))
+
+    def test_nonexistent_pid_reports_not_alive(self):
+        self.assertFalse(_proc_pid_is_alive(2**30))
+
+
+class LinuxProcPerPidFailureTests(unittest.TestCase):
+    """NEW BREAKAGE (round 3): round 2's _linux_proc_process_table dropped
+    any pid whose cmdline read failed, silently, with no fallback and no
+    signal -- a live Editor could vanish from the table (hidepid, a
+    pid-namespace boundary, a permission denial, a decode fault) and read
+    as SAFE. It must now fall back to /proc/<pid>/comm and, if that
+    confirms the process is Unity-shaped, keep the pid as an
+    unconditionally-ambiguous _TruncatedCommand rather than dropping it.
+    """
+
+    def test_cmdline_failure_with_unity_comm_is_kept_as_ambiguous(self):
+        with patch(
+            "tools.kinglet_spike.unity.ownership.os.listdir",
+            return_value=["4242"],
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_argv_via_proc",
+            return_value=None,
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._proc_pid_is_alive",
+            return_value=True,
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_comm_via_proc",
+            return_value="Unity",
+        ):
+            table = _linux_proc_process_table()
+        self.assertEqual(1, len(table))
+        pid, command = table[0]
+        self.assertEqual(4242, pid)
+        self.assertIsInstance(command, _TruncatedCommand)
+        self.assertEqual("Unity", command.argv0)
+
+    def test_cmdline_failure_then_ambiguous_entry_refuses_headless(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj"
+            project.mkdir()
+            table = ((4242, _TruncatedCommand(argv0="Unity")),)
+            with self.assertRaises(EvidenceError) as ctx:
+                assert_headless_safe(project, process_table_provider=lambda: table)
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_cmdline_failure_with_non_unity_comm_is_dropped_not_ambiguous(self):
+        # A permission-denied kernel thread or another user's unrelated
+        # process must not force perpetual ambiguity -- only a
+        # Unity-shaped comm is kept.
+        with patch(
+            "tools.kinglet_spike.unity.ownership.os.listdir",
+            return_value=["9999"],
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_argv_via_proc",
+            return_value=None,
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._proc_pid_is_alive",
+            return_value=True,
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_comm_via_proc",
+            return_value="sshd",
+        ):
+            table = _linux_proc_process_table()
+        self.assertEqual((), table)
+
+    def test_cmdline_failure_with_dead_pid_is_dropped(self):
+        with patch(
+            "tools.kinglet_spike.unity.ownership.os.listdir",
+            return_value=["1234"],
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_argv_via_proc",
+            return_value=None,
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._proc_pid_is_alive",
+            return_value=False,
+        ):
+            table = _linux_proc_process_table()
+        self.assertEqual((), table)
+
+    def test_cmdline_failure_with_unreadable_comm_is_dropped(self):
+        with patch(
+            "tools.kinglet_spike.unity.ownership.os.listdir",
+            return_value=["4242"],
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_argv_via_proc",
+            return_value=None,
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._proc_pid_is_alive",
+            return_value=True,
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_comm_via_proc",
+            return_value=None,
+        ):
+            table = _linux_proc_process_table()
+        self.assertEqual((), table)
 
 
 if __name__ == "__main__":
