@@ -10,7 +10,7 @@ injectable pure functions" lesson from 0R's review. detect_gui_owner() and
 assert_headless_safe() are the only functions that touch the real OS, and
 they do so through an injectable provider with a real default.
 
-Two traps this module exists to avoid, both observed or reproduced live:
+Three traps this module exists to avoid, all observed or reproduced live:
 
 1. A loose substring/grep match on a process's command line finds ITSELF
    (this controller's own shell command line can contain the text
@@ -19,39 +19,60 @@ Two traps this module exists to avoid, both observed or reproduced live:
    `unityhub` are both real, non-Editor processes. This module only ever
    treats a process as a candidate Editor when its argv[0] BASENAME is
    EXACTLY "Unity" or "Unity.exe".
-2. A space in the project path defeats naive whitespace tokenization: `ps
-   -axo command=` prints raw, unescaped argv space-joined, so
-   `-projectPath /home/u/My Project -logFile -` splits into `/home/u/My`
-   and `Project` as two separate tokens, and comparing only the first
-   token against the canonical project silently returns "not owned" for a
-   project a live Editor holds open. `_extract_project_path` recombines
-   every token after `-projectPath` up to the next flag-shaped token
-   (rather than taking exactly one token) specifically to survive this.
-   shlex was also tried and rejected here: shlex's shell-escape semantics
-   do not describe this data (ps does not shell-quote its output) and
-   POSIX-mode shlex.split silently eats backslashes, which is actively
-   destructive on a Windows command line (`C:\\Unity\\Editor\\Unity.exe`
-   becomes `C:UnityEditorUnity.exe`). Tokenization here is therefore a
-   platform-aware, quote-only split (see _tokenize_command_line), never
-   shlex.
+
+2. `ps -axo command=` is a LOSSY, space-joined rendering of argv: it cannot
+   be unambiguously re-split, and no tokenize-then-rejoin scheme recovers
+   it in general, because a directory named "Kinglet - Copy", "proj -- old",
+   or containing a literal double space/tab/newline is indistinguishable
+   from several arguments once ps has joined them with single spaces.
+   Round 1 and round 2 of this module each tried a narrower heuristic here
+   (shlex, then "stop at the first flag-shaped token") and each was
+   demonstrated to produce a false SAFE for a real launch a live Editor
+   held open. This module now (a) reads the OS's own EXACT, unambiguous
+   argv wherever the platform provides one (Linux's /proc/<pid>/cmdline is
+   NUL-delimited -- there is nothing to resolve), and (b) for the
+   remaining lossy-string case (macOS ps, an unquoted Windows line), SLICES
+   the original string at every plausible flag boundary instead of
+   tokenizing-and-rejoining, so a candidate can never lose whitespace it
+   never should have collapsed in the first place, and generates every
+   candidate a real Unity invocation could produce rather than only the
+   first. Any exact match against the caller's OWN known target project is
+   accepted as owned; a caller can never falsely conclude "not owned" by
+   this method, because the true path -- if it IS the target -- always
+   survives as one of the generated candidates (see
+   _project_path_candidates_from_raw's docstring for why).
+
+3. Path equality must be whole-resolved-path equality, never a
+   prefix/substring comparison -- `/x/proj` and `/x/proj2` (no separator
+   between them) canonicalize to different paths and must never match.
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
-from typing import Callable, Sequence
+from typing import Callable, Sequence, Union
 
 from ..model import EvidenceError
 
-# (pid, full command line) -- the shape every process-table provider in this
-# module (real or injected-for-tests) produces.
-ProcessEntry = tuple[int, str]
+# A process-table entry's command is either:
+#   - an EXACT argv tuple (e.g. from /proc/<pid>/cmdline -- no ambiguity), or
+#   - a LOSSY, space-joined command-line string (ps, or an unquoted Windows
+#     line) that must be parsed with _project_path_candidates_from_raw.
+ProcessCommand = Union[str, "tuple[str, ...]"]
+ProcessEntry = tuple[int, ProcessCommand]
 
-_WINDOWS_TOKEN_RE = re.compile(r'"[^"]*"|\S+')
+_PROJECT_PATH_FLAG_RE = re.compile(r'(?:(?<=\s)|^)-projectPath(?=\s|$)')
+# A plausible start of the NEXT real flag: a dash immediately followed by a
+# letter, with nothing but whitespace (or the start of string) before it.
+# "- Copy" (dash, space, letter) does NOT match -- only an unspaced
+# "-Word" does, exactly the shape every real Unity flag has
+# (-logFile, -batchmode, -quit, -projectPath itself, ...).
+_FLAG_BOUNDARY_RE = re.compile(r'(?:(?<=\s)|^)-[A-Za-z][\w-]*')
 
 
 @dataclass(frozen=True)
@@ -90,28 +111,22 @@ class ProjectOwner:
 # Pure helpers -- no I/O, fully unit-testable.
 # ---------------------------------------------------------------------------
 
-def _tokenize_command_line(command: str, *, windows: bool) -> list[str]:
-    """Split a raw process command line into argv-shaped tokens.
+def _extract_argv0(command: str, *, windows: bool) -> str | None:
+    """Return the first whitespace-delimited token of a lossy command-line string.
 
-    windows=False (ps -axo command= on macOS/Linux): the value is raw,
-    unescaped argv space-joined by ps itself -- there is no quoting to
-    remove, so a plain whitespace split is the correct, non-lossy
-    tokenization. (shlex was tried and rejected: its shell-escape rules do
-    not apply to this data and silently eat backslashes.)
-
-    windows=True (Win32_Process.CommandLine via PowerShell): Windows
-    command lines quote arguments that contain spaces
-    (`"C:\\Program Files\\Unity\\Editor\\Unity.exe"`), so a quote-aware
-    split is required; backslashes are still never treated as escapes,
-    since Windows paths use them as literal separators.
+    windows=True additionally recognizes an explicitly quoted argv0
+    (`"C:\\Program Files\\Unity\\Editor\\Unity.exe" ...`), since WMI quotes
+    any argument containing a space and a naive whitespace split would
+    otherwise stop at "C:\\Program".
     """
-    if windows:
-        tokens = _WINDOWS_TOKEN_RE.findall(command)
-        return [
-            token[1:-1] if len(token) >= 2 and token[0] == token[-1] == '"' else token
-            for token in tokens
-        ]
-    return command.split()
+    stripped = command.lstrip()
+    if not stripped:
+        return None
+    if windows and stripped[0] == '"':
+        end = stripped.find('"', 1)
+        if end != -1:
+            return stripped[1:end]
+    return stripped.split(None, 1)[0]
 
 
 def _is_unity_editor_argv0(token: str, *, windows: bool = False) -> bool:
@@ -132,30 +147,94 @@ def _is_unity_editor_argv0(token: str, *, windows: bool = False) -> bool:
     return name in ("Unity", "Unity.exe")
 
 
-def _extract_project_path(argv: Sequence[str]) -> str | None:
-    """Return the value of `-projectPath`, rejoining a path split by spaces.
+def _extract_project_path_from_argv(argv: Sequence[str]) -> str | None:
+    """Return the EXACT value following `-projectPath` in a real argv tuple.
 
-    Finds the exact `-projectPath` token (not a substring search over the
-    raw line), then collects every following token up to -- but not
-    including -- the next flag-shaped token (one starting with "-"), or
-    the end of argv. A single-token path (the overwhelmingly common case)
-    is returned unchanged; a path containing spaces, which a naive
-    single-next-token read would truncate, is rejoined instead of silently
-    losing everything after the first space.
+    No ambiguity to resolve here at all: each element of argv is already
+    exactly one shell argument (this is what /proc/<pid>/cmdline gives us),
+    so the value immediately after the flag IS the path, spaces, tabs,
+    newlines and all -- there is nothing to rejoin or guess.
     """
     for index, token in enumerate(argv):
-        if token != "-projectPath":
-            continue
-        remainder = argv[index + 1:]
-        if not remainder or remainder[0].startswith("-"):
-            return None
-        parts = [remainder[0]]
-        for later in remainder[1:]:
-            if later.startswith("-"):
-                break
-            parts.append(later)
-        return " ".join(parts)
+        if token == "-projectPath" and index + 1 < len(argv):
+            return argv[index + 1]
     return None
+
+
+def _project_path_candidates_from_raw(command: str, *, windows: bool) -> list[str]:
+    """Every plausible -projectPath VALUE a lossy, space-joined command line
+    could encode, for a caller to test against a KNOWN target path.
+
+    Why not tokenize-and-rejoin (round 1 and round 2's approach, both
+    demonstrated unsafe): a space-joined line cannot be unambiguously
+    re-split, and str.split()-based tokenization additionally COLLAPSES
+    whitespace runs, so it can never reconstruct a path containing a
+    double space, a tab, or an embedded newline even in principle. This
+    function instead SLICES the ORIGINAL string, preserving every
+    character exactly, and returns one candidate per place a real Unity
+    flag plausibly starts (dash immediately followed by a letter, e.g.
+    -logFile/-batchmode/-quit -- see _FLAG_BOUNDARY_RE), plus the
+    untruncated remainder for when -projectPath is the last argument. A
+    directory literally named "Kinglet - Copy" (Windows' own name for a
+    duplicated folder), "proj -- old", "My -Project", or one containing
+    "-logFile" as a substring therefore all recover correctly instead of
+    being truncated at the first dash, because ONE of the generated
+    candidates always coincides with the true path whenever the real next
+    argument is a genuine Unity flag (the overwhelmingly common case) or
+    -projectPath is the last argument.
+
+    Every candidate is checked by the caller with exact canonicalized-path
+    equality against ONE already-known target -- generating extra,
+    non-matching candidates can therefore only ever produce a correct
+    match a narrower heuristic would have missed; it can never fabricate a
+    false match against an unrelated project, because an unrelated
+    project's canonical path is simply a different string. That asymmetry
+    is the point: false negatives here would be a safety hole (a false
+    SAFE), so this function is deliberately generous rather than clever.
+    """
+    match = _PROJECT_PATH_FLAG_RE.search(command)
+    if match is None:
+        return []
+    rest = command[match.end():]
+    if not rest or rest[0] not in (" ", "\t"):
+        return []
+    rest = rest[1:]
+    if not rest:
+        return []
+
+    if windows and rest[0] == '"':
+        end = rest.find('"', 1)
+        if end != -1:
+            return [rest[1:end]]
+        # Unterminated quote -- fall through to the unquoted heuristic below.
+
+    candidates: list[str] = []
+    for flag_match in _FLAG_BOUNDARY_RE.finditer(rest):
+        candidate = rest[: flag_match.start()]
+        if candidate.endswith((" ", "\t")):
+            candidate = candidate[:-1]
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+    if rest not in candidates:
+        candidates.append(rest)
+    return candidates
+
+
+def _candidate_paths_for_command(
+    command: ProcessCommand, *, windows: bool
+) -> tuple[str | None, list[str]]:
+    """Return (argv0, [candidate -projectPath values]) for one process entry.
+
+    Dispatches on whether `command` is an exact argv tuple (single
+    unambiguous candidate, or none) or a lossy command-line string
+    (possibly several candidates -- see _project_path_candidates_from_raw).
+    """
+    if isinstance(command, (tuple, list)):
+        argv0 = command[0] if command else None
+        raw_path = _extract_project_path_from_argv(command)
+        return argv0, ([raw_path] if raw_path is not None else [])
+    argv0 = _extract_argv0(command, windows=windows)
+    return argv0, _project_path_candidates_from_raw(command, windows=windows)
 
 
 def _canonical(path: str | Path) -> Path:
@@ -172,29 +251,31 @@ def find_owning_process(
     """Pure: scan a process table for a live Unity Editor owning `project`.
 
     A candidate must be a genuine Unity Editor binary (see
-    _is_unity_editor_argv0) carrying a -projectPath whose canonicalized
-    value equals the canonicalized requested project. Path equality is
-    always whole-resolved-path equality, never a prefix/substring
-    comparison -- `/x/proj` and `/x/proj2` (no separator between them)
-    canonicalize to different paths and never match, and neither does
-    `/x/proj` against `/x/proj-other`.
+    _is_unity_editor_argv0). Its -projectPath candidates (exact, from an
+    argv tuple, or several, from a lossy command-line string -- see
+    _candidate_paths_for_command) are each canonicalized and compared to
+    the canonicalized requested project; ANY exact match is authoritative.
+    Path equality is always whole-resolved-path equality, never a
+    prefix/substring comparison.
     """
     canonical_project = _canonical(project)
     for pid, command in process_table:
-        argv = _tokenize_command_line(command, windows=windows)
-        if not argv or not _is_unity_editor_argv0(argv[0], windows=windows):
+        argv0, candidates = _candidate_paths_for_command(command, windows=windows)
+        if argv0 is None or not _is_unity_editor_argv0(argv0, windows=windows):
             continue
-        raw_path = _extract_project_path(argv)
-        if raw_path is None:
-            continue
-        if _canonical(raw_path) == canonical_project:
-            return ProjectOwner(
-                pid=pid,
-                project_path=str(canonical_project),
-                source="process",
-                confirmed=True,
-                detail=f"pid {pid} has -projectPath {raw_path!r}",
-            )
+        exact_argv = isinstance(command, (tuple, list))
+        for candidate in candidates:
+            if _canonical(candidate) == canonical_project:
+                return ProjectOwner(
+                    pid=pid,
+                    project_path=str(canonical_project),
+                    source="process-exact-argv" if exact_argv else "process",
+                    confirmed=True,
+                    detail=(
+                        f"pid {pid} -projectPath resolves to {candidate!r}"
+                        + (" (exact argv)" if exact_argv else " (from command line)")
+                    ),
+                )
     return None
 
 
@@ -204,8 +285,8 @@ def _pid_is_live_unity_process(
     for entry_pid, command in process_table:
         if entry_pid != pid:
             continue
-        argv = _tokenize_command_line(command, windows=windows)
-        if argv and _is_unity_editor_argv0(argv[0], windows=windows):
+        argv0, _candidates = _candidate_paths_for_command(command, windows=windows)
+        if argv0 and _is_unity_editor_argv0(argv0, windows=windows):
             return True
     return False
 
@@ -293,7 +374,55 @@ def _unity_lockfile_present(project: Path) -> bool:
 # Real OS process-table providers -- the only I/O in this module.
 # ---------------------------------------------------------------------------
 
-def _posix_process_table() -> tuple[ProcessEntry, ...]:
+def _read_argv_via_proc(pid: int) -> tuple[str, ...] | None:
+    """Exact argv for `pid` via /proc/<pid>/cmdline (Linux only).
+
+    NUL-delimited -- each element is exactly one argv entry, so there is no
+    ambiguity to resolve at all, unlike a `ps`-rendered command-line
+    string. Returns None if unavailable (process already gone, no /proc,
+    permission denied reading another user's process) so the caller can
+    fall back to `ps`.
+    """
+    try:
+        raw = Path(f"/proc/{pid}/cmdline").read_bytes()
+    except OSError:
+        return None
+    if not raw:
+        return None
+    parts = raw.split(b"\x00")
+    if parts and parts[-1] == b"":
+        parts = parts[:-1]
+    if not parts:
+        return None
+    try:
+        return tuple(part.decode("utf-8") for part in parts)
+    except UnicodeDecodeError:
+        return tuple(part.decode("utf-8", errors="surrogateescape") for part in parts)
+
+
+def _linux_proc_process_table() -> tuple[ProcessEntry, ...] | None:
+    """Exact argv for every readable PID via /proc -- the authoritative Linux source.
+
+    Returns None (never an empty tuple) when /proc itself cannot be
+    listed, so the caller can distinguish "no processes" from "couldn't
+    look" and fall back to `ps` instead of silently reporting nobody
+    running anything.
+    """
+    try:
+        names = os.listdir("/proc")
+    except OSError:
+        return None
+    entries: list[ProcessEntry] = []
+    for name in names:
+        if not name.isdigit():
+            continue
+        argv = _read_argv_via_proc(int(name))
+        if argv:
+            entries.append((int(name), argv))
+    return tuple(entries)
+
+
+def _ps_process_table() -> tuple[ProcessEntry, ...]:
     try:
         result = subprocess.run(
             ["ps", "-axo", "pid=,command="],
@@ -334,6 +463,15 @@ def _parse_posix_process_table(stdout: str) -> tuple[ProcessEntry, ...]:
     return tuple(entries)
 
 
+def _posix_process_table() -> tuple[ProcessEntry, ...]:
+    """Linux: exact argv via /proc when available (authoritative); else `ps` (lossy fallback)."""
+    if sys.platform.startswith("linux") and Path("/proc").is_dir():
+        proc_table = _linux_proc_process_table()
+        if proc_table is not None:
+            return proc_table
+    return _ps_process_table()
+
+
 def _windows_process_table() -> tuple[ProcessEntry, ...]:
     """Win32_Process.CommandLine via PowerShell -- the plan's prescribed Windows source."""
     try:
@@ -369,7 +507,11 @@ def _parse_windows_process_table(stdout: str) -> tuple[ProcessEntry, ...]:
 
     Extracted from _windows_process_table() specifically so the parsing
     logic (as opposed to the PowerShell invocation itself) is exercised by
-    tests on every host, not merely reviewed as source text.
+    tests on every host, not merely reviewed as source text. Splits on a
+    literal tab, never generic whitespace: Win32_Process.CommandLine values
+    can legitimately contain spaces (quoted paths, arguments), and a
+    generic-whitespace split risks misreading the pid/command boundary if
+    any whitespace precedes the real tab separator.
     """
     entries: list[ProcessEntry] = []
     for line in stdout.splitlines():
@@ -408,12 +550,15 @@ def detect_gui_owner(
 ) -> ProjectOwner | None:
     """Detect whether project's physical path is currently owned by a live Unity process.
 
-    Real OS process listing is the default; process_table_provider is the
-    injectable seam tests use to drive this from a fabricated table on any
-    host, matching every other platform-dependent gate in this plan.
-    `windows` selects the command-line tokenization dialect (see
-    _tokenize_command_line) and defaults to the real host platform; tests
-    override it explicitly rather than relying on sys.platform.
+    Real OS process listing is the default -- exact argv via /proc on
+    Linux, `ps` elsewhere on POSIX, Win32_Process.CommandLine on Windows.
+    process_table_provider is the injectable seam tests use to drive this
+    from a fabricated table on any host, matching every other
+    platform-dependent gate in this plan; entries may be either an exact
+    argv tuple or a lossy command-line string (see ProcessCommand).
+    `windows` selects the lossy-string parsing dialect and defaults to the
+    real host platform; tests override it explicitly rather than relying
+    on sys.platform.
 
     Returns None only when neither a live process nor a lock artifact gives
     any reason for caution. If the real process_table_provider cannot

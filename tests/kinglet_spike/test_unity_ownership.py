@@ -10,10 +10,14 @@ from unittest.mock import patch
 from tools.kinglet_spike.model import EvidenceError
 from tools.kinglet_spike.unity.ownership import (
     ProjectOwner,
+    _extract_argv0,
+    _linux_proc_process_table,
     _parse_posix_process_table,
     _parse_windows_process_table,
     _posix_process_table,
-    _tokenize_command_line,
+    _project_path_candidates_from_raw,
+    _ps_process_table,
+    _read_argv_via_proc,
     _unity_lockfile_present,
     _windows_process_table,
     assert_headless_safe,
@@ -22,10 +26,15 @@ from tools.kinglet_spike.unity.ownership import (
     resolve_lock_owner,
 )
 
+_EDITOR = "/home/user/Unity/Hub/Editor/6000.3.18f1/Editor/Unity"
+
 
 def _unity_process(pid: int, project_path: str) -> tuple:
-    editor = "/home/user/Unity/Hub/Editor/6000.3.18f1/Editor/Unity"
-    return (pid, f"{editor} -projectPath {project_path} -logFile -")
+    return (pid, f"{_EDITOR} -projectPath {project_path} -logFile -")
+
+
+def _raw_unity_command(project_value: str, trailing: str = " -logFile -") -> str:
+    return f"{_EDITOR} -projectPath {project_value}{trailing}"
 
 
 class FindOwningProcessTests(unittest.TestCase):
@@ -111,7 +120,7 @@ class FindOwningProcessTests(unittest.TestCase):
             table = [(1, "/opt/Unity/Editor/Unity -batchmode -quit")]
             self.assertIsNone(find_owning_process(table, project))
 
-    # --- CRITICAL 1 fix: a space in the project path must not defeat the match ---
+    # --- CRITICAL 1 (round 1) fix: a single space must not defeat the match ---
 
     def test_space_in_project_path_still_matches(self):
         with TemporaryDirectory() as tmp:
@@ -123,9 +132,6 @@ class FindOwningProcessTests(unittest.TestCase):
             self.assertTrue(owner.confirmed)
 
     def test_space_in_project_path_distinguishes_a_true_sibling(self):
-        # The rejoin must stop at the next project's own -projectPath, not
-        # swallow it -- a live Editor on a DIFFERENT space-containing
-        # sibling project must still not match.
         with TemporaryDirectory() as tmp:
             project = Path(tmp) / "My Project"
             project.mkdir()
@@ -145,6 +151,40 @@ class FindOwningProcessTests(unittest.TestCase):
             owner = find_owning_process([(1, command)], project, windows=True)
             self.assertIsNotNone(owner)
             self.assertTrue(owner.confirmed)
+
+    def test_windows_unquoted_backslash_path_still_matches(self):
+        # The exposure round 2 flagged alongside CRITICAL 1: an UNQUOTED
+        # Windows command line still has to resolve correctly.
+        with TemporaryDirectory() as tmp:
+            project_value = f"{tmp}\\proj"
+            command = f"C:\\Unity\\Editor\\Unity.exe -projectPath {project_value} -logFile -"
+            owner = find_owning_process(
+                [(1, command)], Path(project_value), windows=True
+            )
+            self.assertIsNotNone(owner)
+            self.assertTrue(owner.confirmed)
+
+    def test_trailing_slash_in_reported_path_still_matches(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj"
+            project.mkdir()
+            table = [_unity_process(1, str(project) + "/")]
+            owner = find_owning_process(table, project)
+            self.assertIsNotNone(owner)
+            self.assertTrue(owner.confirmed)
+
+    def test_cwd_relative_reported_path_still_matches(self):
+        with TemporaryDirectory() as tmp:
+            (Path(tmp) / "proj").mkdir()
+            original_cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                table = [_unity_process(1, "proj")]
+                owner = find_owning_process(table, Path("proj"))
+                self.assertIsNotNone(owner)
+                self.assertTrue(owner.confirmed)
+            finally:
+                os.chdir(original_cwd)
 
     # --- IMPORTANT 2 fix: a discriminating test for the argv0 guard ---
 
@@ -174,6 +214,94 @@ class FindOwningProcessTests(unittest.TestCase):
             sibling.mkdir()
             table = [_unity_process(4242, str(sibling))]
             self.assertIsNone(find_owning_process(table, project))
+
+
+class CriticalSpaceAmbiguityRegressionTests(unittest.TestCase):
+    """Round 2 CRITICAL 1: eight concrete false-SAFE reproductions the
+    re-reviewer demonstrated against round 1's "stop at the first
+    flag-shaped token" heuristic -- a live `Unity -projectPath <dir>`
+    command line, directory exists, no lockfile yet (the real ~2s startup
+    window), each of these read SAFE under the old code. None may ever
+    read SAFE again.
+    """
+
+    def _assert_owned(self, dir_name: str, trailing: str = " -logFile -"):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / dir_name
+            project.mkdir()
+            table = [(1, _raw_unity_command(str(project), trailing))]
+            owner = find_owning_process(table, project)
+            self.assertIsNotNone(owner, f"{dir_name!r} must be detected as owned")
+            self.assertTrue(owner.confirmed)
+
+    def test_windows_style_copy_suffix(self):
+        # "Kinglet - Copy" is literally what Windows names a duplicated folder.
+        self._assert_owned("Kinglet - Copy")
+
+    def test_version_suffix(self):
+        self._assert_owned("Kinglet - v2")
+
+    def test_double_dash_word(self):
+        self._assert_owned("proj -- old")
+
+    def test_dash_letter_lookalike_flag(self):
+        # "-Project" looks exactly like a real flag token to any
+        # first-flag-stops-here heuristic.
+        self._assert_owned("My -Project")
+
+    def test_embedded_real_flag_name(self):
+        # The folder name itself contains the literal text "-logFile",
+        # which is ALSO the real trailing flag in this command.
+        self._assert_owned("My -logFile Project")
+
+    def test_double_space(self):
+        # str.split()-based tokenization collapses this to one space and
+        # can never reconstruct it -- this is why round 2 slices the
+        # original string instead of tokenizing and rejoining.
+        self._assert_owned("My  Project")
+
+    def test_tab_in_name(self):
+        self._assert_owned("My\tProject")
+
+    def test_newline_in_name(self):
+        self._assert_owned("My\nProject")
+
+    def test_last_argument_with_no_trailing_flags(self):
+        # -projectPath is the very last token -- the untruncated-remainder
+        # candidate must still recover it.
+        self._assert_owned("Kinglet - Copy", trailing="")
+
+
+class ExactArgvProcessTableTests(unittest.TestCase):
+    """Entries carrying an EXACT argv tuple (what /proc/<pid>/cmdline gives
+    us) need no ambiguity-resolving heuristic at all -- the value right
+    after -projectPath IS the path, verbatim."""
+
+    def test_exact_argv_tuple_with_space_in_path_needs_no_heuristic(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "Kinglet - Copy"
+            project.mkdir()
+            argv = (_EDITOR, "-projectPath", str(project), "-logFile", "-")
+            owner = find_owning_process([(4242, argv)], project)
+            self.assertIsNotNone(owner)
+            self.assertTrue(owner.confirmed)
+            self.assertEqual("process-exact-argv", owner.source)
+
+    def test_exact_argv_sibling_does_not_match(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj"
+            project.mkdir()
+            sibling = Path(tmp) / "proj2"
+            sibling.mkdir()
+            argv = ("/opt/Unity/Editor/Unity", "-projectPath", str(sibling))
+            self.assertIsNone(find_owning_process([(1, argv)], project))
+
+    def test_exact_argv_non_unity_argv0_is_ignored(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj"
+            project.mkdir()
+            argv = ("/usr/bin/unityhub", "-projectPath", str(project))
+            self.assertIsNone(find_owning_process([(1, argv)], project))
 
 
 class ResolveLockOwnerTests(unittest.TestCase):
@@ -315,40 +443,53 @@ class DetectGuiOwnerAndAssertHeadlessSafeTests(unittest.TestCase):
             self.assertNotIn("GUI", str(ctx.exception))
 
 
-class TokenizeCommandLineTests(unittest.TestCase):
-    def test_posix_split_is_plain_whitespace_no_shell_semantics(self):
-        tokens = _tokenize_command_line(
-            "/opt/Unity/Editor/Unity -projectPath /home/u/My Project -logFile -",
-            windows=False,
-        )
+class ExtractArgv0Tests(unittest.TestCase):
+    def test_posix_first_whitespace_token(self):
         self.assertEqual(
-            ["/opt/Unity/Editor/Unity", "-projectPath", "/home/u/My", "Project",
-             "-logFile", "-"],
-            tokens,
+            "/opt/Unity/Editor/Unity",
+            _extract_argv0("/opt/Unity/Editor/Unity -projectPath /x", windows=False),
         )
 
-    def test_windows_quoted_token_with_space_is_one_token(self):
-        tokens = _tokenize_command_line(
-            '"C:\\Unity\\Editor\\Unity.exe" -projectPath "C:\\proj\\My Game" -logFile -',
-            windows=True,
-        )
+    def test_windows_quoted_argv0_with_space(self):
         self.assertEqual(
-            ["C:\\Unity\\Editor\\Unity.exe", "-projectPath", "C:\\proj\\My Game",
-             "-logFile", "-"],
-            tokens,
+            "C:\\Program Files\\Unity\\Editor\\Unity.exe",
+            _extract_argv0(
+                '"C:\\Program Files\\Unity\\Editor\\Unity.exe" -projectPath C:\\x',
+                windows=True,
+            ),
         )
 
-    def test_windows_backslashes_are_never_treated_as_escapes(self):
-        # This is the exact corruption CRITICAL 1 reported against shlex's
-        # POSIX-mode escape handling: a bare backslash-separated Windows
-        # path must survive tokenization unchanged.
-        tokens = _tokenize_command_line(
-            "C:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game", windows=True
-        )
+    def test_windows_backslashes_never_treated_as_escapes(self):
         self.assertEqual(
-            ["C:\\Unity\\Editor\\Unity.exe", "-projectPath", "C:\\proj\\game"],
-            tokens,
+            "C:\\Unity\\Editor\\Unity.exe",
+            _extract_argv0("C:\\Unity\\Editor\\Unity.exe -projectPath C:\\x", windows=True),
         )
+
+    def test_empty_command_returns_none(self):
+        self.assertIsNone(_extract_argv0("   ", windows=False))
+
+
+class ProjectPathCandidatesFromRawTests(unittest.TestCase):
+    def test_no_projectpath_flag_yields_no_candidates(self):
+        self.assertEqual([], _project_path_candidates_from_raw("Unity -batchmode", windows=False))
+
+    def test_simple_path_is_the_only_candidate(self):
+        candidates = _project_path_candidates_from_raw(
+            "Unity -projectPath /home/u/proj -logFile -", windows=False
+        )
+        self.assertIn("/home/u/proj", candidates)
+
+    def test_double_space_is_preserved_verbatim(self):
+        candidates = _project_path_candidates_from_raw(
+            "Unity -projectPath /home/u/My  Project -logFile -", windows=False
+        )
+        self.assertIn("/home/u/My  Project", candidates)
+
+    def test_windows_quoted_value_is_the_sole_candidate(self):
+        candidates = _project_path_candidates_from_raw(
+            'Unity.exe -projectPath "C:\\proj\\My Game" -logFile -', windows=True
+        )
+        self.assertEqual(["C:\\proj\\My Game"], candidates)
 
 
 class ParsePosixProcessTableTests(unittest.TestCase):
@@ -383,6 +524,18 @@ class ParseWindowsProcessTableTests(unittest.TestCase):
     def test_lines_without_a_tab_are_skipped(self):
         self.assertEqual((), _parse_windows_process_table("no tab on this line\n"))
 
+    def test_tab_is_the_separator_not_generic_whitespace(self):
+        # Minor (round 2): mutating split("\t", 1) to split(None, 1)
+        # survived the round-1 fixture because in that data the only
+        # whitespace before the command was the tab itself, so both split
+        # styles happened to agree. A space embedded INSIDE the pid field,
+        # before the real tab, breaks that coincidence: a generic-
+        # whitespace split misreads "90 01" as pid=90 plus a spurious
+        # command fragment "01\t...". The correct behavior is to skip this
+        # malformed line entirely (bad pid), producing an empty table.
+        stdout = "90 01\tC:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game\n"
+        self.assertEqual((), _parse_windows_process_table(stdout))
+
 
 class UnityLockfilePresentTests(unittest.TestCase):
     def test_missing_file_is_false(self):
@@ -413,33 +566,36 @@ class ProcessTableProviderFailureTests(unittest.TestCase):
     # IMPORTANT 4: a provider that cannot obtain a listing must raise
     # E_UNITY_OWNER_UNKNOWN, never silently return an empty table that
     # detect_gui_owner/assert_headless_safe would then read as "safe".
+    # These target _ps_process_table directly (the function that actually
+    # calls subprocess.run) -- _posix_process_table() prefers /proc on
+    # Linux and would never reach the mocked subprocess at all.
 
-    def test_posix_provider_raises_on_oserror(self):
+    def test_ps_provider_raises_on_oserror(self):
         with patch(
             "tools.kinglet_spike.unity.ownership.subprocess.run",
             side_effect=OSError("no ps"),
         ):
             with self.assertRaises(EvidenceError) as ctx:
-                _posix_process_table()
+                _ps_process_table()
             self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
 
-    def test_posix_provider_raises_on_timeout(self):
+    def test_ps_provider_raises_on_timeout(self):
         with patch(
             "tools.kinglet_spike.unity.ownership.subprocess.run",
             side_effect=subprocess.TimeoutExpired(cmd="ps", timeout=10),
         ):
             with self.assertRaises(EvidenceError) as ctx:
-                _posix_process_table()
+                _ps_process_table()
             self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
 
-    def test_posix_provider_raises_on_nonzero_exit(self):
+    def test_ps_provider_raises_on_nonzero_exit(self):
         fake_result = SimpleNamespace(returncode=1, stdout="", stderr="permission denied")
         with patch(
             "tools.kinglet_spike.unity.ownership.subprocess.run",
             return_value=fake_result,
         ):
             with self.assertRaises(EvidenceError) as ctx:
-                _posix_process_table()
+                _ps_process_table()
             self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
 
     def test_windows_provider_raises_on_oserror(self):
@@ -470,6 +626,50 @@ class ProcessTableProviderFailureTests(unittest.TestCase):
             with self.assertRaises(EvidenceError) as ctx:
                 assert_headless_safe(project, process_table_provider=_boom)
             self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_posix_process_table_prefers_proc_when_available(self):
+        fabricated = ((999, ("Unity", "-projectPath", "/x")),)
+        with patch(
+            "tools.kinglet_spike.unity.ownership._linux_proc_process_table",
+            return_value=fabricated,
+        ):
+            self.assertEqual(fabricated, _posix_process_table())
+
+    def test_posix_process_table_falls_back_to_ps_when_proc_unavailable(self):
+        with patch(
+            "tools.kinglet_spike.unity.ownership._linux_proc_process_table",
+            return_value=None,
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._ps_process_table",
+            return_value=((1, "fallback"),),
+        ) as mock_ps:
+            result = _posix_process_table()
+            mock_ps.assert_called_once()
+            self.assertEqual(((1, "fallback"),), result)
+
+
+@unittest.skipUnless(Path("/proc").is_dir(), "requires /proc (Linux)")
+class LinuxProcProcessTableTests(unittest.TestCase):
+    """Grounds the "read exact argv where the OS gives it to you" claim in
+    an actual /proc read on this real Linux host, not just trust in the
+    fallback wiring."""
+
+    def test_own_pid_appears_with_exact_argv_tuple(self):
+        table = dict(_posix_process_table())
+        self.assertIn(os.getpid(), table)
+        command = table[os.getpid()]
+        self.assertIsInstance(command, tuple)
+        self.assertGreaterEqual(len(command), 1)
+
+    def test_read_argv_via_proc_matches_own_cmdline(self):
+        argv = _read_argv_via_proc(os.getpid())
+        self.assertIsNotNone(argv)
+        self.assertGreaterEqual(len(argv), 1)
+
+    def test_nonexistent_pid_returns_none(self):
+        # A pid that (almost certainly) doesn't exist -- /proc/<pid>/cmdline
+        # missing must degrade to None, not raise.
+        self.assertIsNone(_read_argv_via_proc(2**30))
 
 
 if __name__ == "__main__":
