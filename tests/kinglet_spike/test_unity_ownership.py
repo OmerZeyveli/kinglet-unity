@@ -1,6 +1,7 @@
 import json
 import os
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -8,10 +9,19 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from tools.kinglet_spike.model import EvidenceError
+from tools.kinglet_spike.unity import ownership
 from tools.kinglet_spike.unity.ownership import (
     ProjectOwner,
     _TruncatedCommand,
+    _build_macos_process_table,
+    _canonical_or_none,
     _extract_argv0,
+    _is_dir_or_unknown,
+    _macos_process_table,
+    _parse_comm_map,
+    _parse_pid_list,
+    _parse_procargs2,
+    _read_argv_via_sysctl,
     _linux_proc_process_table,
     _mark_truncated,
     _parse_posix_process_table,
@@ -897,6 +907,437 @@ class LinuxProcPerPidFailureTests(unittest.TestCase):
         ):
             table = _linux_proc_process_table()
         self.assertEqual((), table)
+
+
+def _procargs2(argv, *, exec_path="/Applications/Unity/Unity.app/Contents/MacOS/Unity",
+               env=("PATH=/usr/bin",), pad=8, argc=None):
+    """Build a representative KERN_PROCARGS2 buffer, byte for byte.
+
+    Layout: native-endian int argc | NUL-terminated exec path | NUL
+    alignment padding | argc NUL-terminated argv strings | environment.
+    """
+    count = len(argv) if argc is None else argc
+    raw = count.to_bytes(4, sys.byteorder, signed=True)
+    raw += exec_path.encode() + b"\x00" + b"\x00" * pad
+    for arg in argv:
+        raw += arg.encode() + b"\x00"
+    for item in env:
+        raw += item.encode() + b"\x00"
+    return raw
+
+
+class ParseProcargs2Tests(unittest.TestCase):
+    """Round 4 OPEN 1: macOS's exact-argv source, the analogue of Linux's
+    /proc/<pid>/cmdline. Parsed here from representative NUL-separated
+    bytes so the parser is exercised on this Linux host rather than merely
+    reviewed as source text -- the sysctl call itself cannot be run here.
+    """
+
+    def test_exact_argv_roundtrip(self):
+        argv = (_EDITOR, "-projectPath", "/Users/u/Kinglet", "-logFile", "-")
+        self.assertEqual(argv, _parse_procargs2(_procargs2(argv)))
+
+    def test_newline_in_project_path_survives_verbatim(self):
+        # The whole point: the kernel delimits with NUL, so the argument
+        # that defeats every ps-string reader passes through untouched.
+        argv = (_EDITOR, "-projectPath", "/Users/u/proj\n999 Editor")
+        self.assertEqual(argv, _parse_procargs2(_procargs2(argv)))
+
+    def test_spaces_and_tabs_survive_verbatim(self):
+        argv = (_EDITOR, "-projectPath", "/Users/u/Kinglet - Copy\tX", "-batchmode")
+        self.assertEqual(argv, _parse_procargs2(_procargs2(argv)))
+
+    def test_environment_after_argv_is_not_included(self):
+        argv = (_EDITOR, "-projectPath", "/Users/u/K")
+        parsed = _parse_procargs2(_procargs2(argv, env=("A=1", "B=2")))
+        self.assertEqual(argv, parsed)
+
+    def test_zero_padding_length_still_parses(self):
+        argv = (_EDITOR, "-quit")
+        self.assertEqual(argv, _parse_procargs2(_procargs2(argv, pad=0)))
+
+    def test_truncated_buffer_is_none_not_a_guess(self):
+        argv = (_EDITOR, "-projectPath", "/Users/u/K")
+        raw = _procargs2(argv)
+        self.assertIsNone(_parse_procargs2(raw[: len(raw) - 30]))
+
+    def test_argc_larger_than_available_arguments_is_none(self):
+        raw = _procargs2((_EDITOR,), env=(), argc=4)
+        self.assertIsNone(_parse_procargs2(raw))
+
+    def test_zero_or_short_buffers_are_none(self):
+        self.assertIsNone(_parse_procargs2(b""))
+        self.assertIsNone(_parse_procargs2(b"\x00\x01"))
+        self.assertIsNone(_parse_procargs2((0).to_bytes(4, sys.byteorder) + b"x\x00"))
+
+    def test_undecodable_bytes_do_not_raise(self):
+        raw = (2).to_bytes(4, sys.byteorder) + b"/x\x00" + b"/opt/Unity\x00\xff\xfe\x00"
+        parsed = _parse_procargs2(raw)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(2, len(parsed))
+
+    def test_sysctl_reader_is_none_off_darwin(self):
+        # This host is not darwin: the reader must degrade to None (the
+        # caller then falls back), never raise.
+        if sys.platform != "darwin":
+            self.assertIsNone(_read_argv_via_sysctl(os.getpid()))
+
+
+class MacosProcessTableTests(unittest.TestCase):
+    """Round 4 OPEN 1: the macOS table is assembled exactly like the Linux
+    /proc one -- exact argv per pid, and a pid whose argv is unreadable is
+    held ambiguous (never dropped) when its command name says Unity."""
+
+    def test_exact_argv_entries_are_used_verbatim(self):
+        argv = (_EDITOR, "-projectPath", "/Users/u/K")
+        table = _build_macos_process_table(
+            [7], argv_reader=lambda pid: argv, comm_reader=lambda pid: None
+        )
+        self.assertEqual(((7, argv),), table)
+
+    def test_unreadable_argv_with_unity_comm_is_kept_ambiguous(self):
+        table = _build_macos_process_table(
+            [7], argv_reader=lambda pid: None, comm_reader=lambda pid: _EDITOR
+        )
+        self.assertEqual(1, len(table))
+        self.assertIsInstance(table[0][1], _TruncatedCommand)
+
+    def test_unreadable_argv_with_non_unity_comm_is_dropped(self):
+        table = _build_macos_process_table(
+            [7],
+            argv_reader=lambda pid: None,
+            comm_reader=lambda pid: "/usr/bin/unityhub",
+        )
+        self.assertEqual((), table)
+
+    def test_unreadable_argv_and_unreadable_comm_is_dropped(self):
+        table = _build_macos_process_table(
+            [7], argv_reader=lambda pid: None, comm_reader=lambda pid: None
+        )
+        self.assertEqual((), table)
+
+    def test_newline_project_path_is_detected_as_owned_end_to_end(self):
+        # The durable fix for OPEN 1: the same directory name that reads
+        # SAFE through any ps-string pipeline is confirmed OWNED when argv
+        # comes from the kernel.
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj\n999 Editor"
+            project.mkdir()
+            (Path(tmp) / "proj").mkdir()
+            argv = _parse_procargs2(
+                _procargs2((_EDITOR, "-projectPath", str(project), "-logFile", "-"))
+            )
+            table = _build_macos_process_table(
+                [4242], argv_reader=lambda pid: argv, comm_reader=lambda pid: None
+            )
+            with self.assertRaises(EvidenceError) as ctx:
+                assert_headless_safe(project, process_table_provider=lambda: table)
+            self.assertEqual("E_UNITY_OWNED", ctx.exception.code)
+
+    def test_pid_list_parser_takes_only_integer_lines(self):
+        self.assertEqual((1, 4242), _parse_pid_list("    1\n  4242\n999 Editor\n\n"))
+
+    def test_pid_list_parser_deduplicates(self):
+        self.assertEqual((5,), _parse_pid_list("5\n5\n"))
+
+    def test_comm_map_parser(self):
+        mapping = _parse_comm_map(f"  1 /sbin/launchd\n 4242 {_EDITOR}\nbad line\n")
+        self.assertEqual({1: "/sbin/launchd", 4242: _EDITOR}, mapping)
+
+    def test_macos_table_wires_ps_enumeration_to_kernel_argv(self):
+        argv = (_EDITOR, "-projectPath", "/Users/u/K")
+        with patch(
+            "tools.kinglet_spike.unity.ownership._run_ps",
+            side_effect=["  4242\n", f"  4242 {_EDITOR}\n"],
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_argv_via_sysctl",
+            return_value=argv,
+        ):
+            self.assertEqual(((4242, argv),), _macos_process_table())
+
+    def test_macos_table_propagates_enumeration_failure_rather_than_empty(self):
+        with patch(
+            "tools.kinglet_spike.unity.ownership._run_ps",
+            side_effect=EvidenceError("E_UNITY_OWNER_UNKNOWN", "no ps"),
+        ):
+            with self.assertRaises(EvidenceError):
+                _macos_process_table()
+
+    def test_posix_dispatch_uses_macos_table_on_darwin(self):
+        fabricated = ((9, ("Unity", "-projectPath", "/x")),)
+        with patch("tools.kinglet_spike.unity.ownership.sys.platform", "darwin"), patch(
+            "tools.kinglet_spike.unity.ownership._macos_process_table",
+            return_value=fabricated,
+        ):
+            self.assertEqual(fabricated, _posix_process_table())
+
+
+class PsFallbackFailsClosedTests(unittest.TestCase):
+    """Round 4 OPEN 1, the class rather than the instance: `ps -axo
+    command=` cannot be trusted at the LINE level either. A project
+    directory named `proj\n999 Editor` makes ps emit a tail line that
+    parses cleanly as `<pid> <command>`, so nothing fails to parse, the
+    round-3 truncation detector never fires, and the Editor's own entry
+    reads as a complete command line ending at `.../proj` -- which exists,
+    so the slicer confidently rules the real owner out. Reproduced against
+    the pre-fix code as SAFE TO LAUNCH. `ps` is now last-resort only and
+    fails closed for Unity-shaped entries.
+    """
+
+    def _newline_stdout(self, project: Path) -> str:
+        # Byte-for-byte what real `ps -axo pid=,command=` prints for this
+        # argv: the newline inside the path is emitted verbatim.
+        return f"  4242 {_EDITOR} -projectPath {project} -logFile -\n"
+
+    def test_parseable_tail_via_real_parser_must_not_read_safe(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj\n999 Editor"
+            project.mkdir()
+            (Path(tmp) / "proj").mkdir()  # the truncated prefix EXISTS
+            table = _parse_posix_process_table(
+                self._newline_stdout(project), fail_closed_unity=True
+            )
+            # Sanity: the tail really does parse as its own clean entry.
+            self.assertEqual(2, len(table))
+            self.assertIn(999, [pid for pid, _ in table])
+            with self.assertRaises(EvidenceError) as ctx:
+                assert_headless_safe(project, process_table_provider=lambda: table)
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_ps_process_table_marks_unity_entries_ambiguous(self):
+        with TemporaryDirectory() as tmp:
+            project = Path(tmp) / "proj\n999 Editor"
+            project.mkdir()
+            (Path(tmp) / "proj").mkdir()
+            fake = SimpleNamespace(
+                returncode=0, stdout=self._newline_stdout(project), stderr=""
+            )
+            with patch(
+                "tools.kinglet_spike.unity.ownership.subprocess.run", return_value=fake
+            ):
+                table = _ps_process_table()
+            unity_entries = [c for _pid, c in table if isinstance(c, _TruncatedCommand)]
+            self.assertEqual(1, len(unity_entries))
+            self.assertEqual(_EDITOR, unity_entries[0].argv0)
+            with self.assertRaises(EvidenceError) as ctx:
+                assert_headless_safe(project, process_table_provider=lambda: table)
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_ps_fallback_leaves_non_unity_entries_alone(self):
+        stdout = "  1 /sbin/launchd\n  2 /usr/bin/unityhub --gpu\n"
+        table = _parse_posix_process_table(stdout, fail_closed_unity=True)
+        self.assertEqual(
+            (
+                (1, "/sbin/launchd"),
+                (2, "/usr/bin/unityhub --gpu"),
+            ),
+            table,
+        )
+
+    def test_ps_parser_default_is_unchanged(self):
+        # The pure parser keeps its old behaviour by default; only the
+        # last-resort provider opts into failing closed.
+        table = _parse_posix_process_table(f"  4242 {_EDITOR} -projectPath /x\n")
+        self.assertEqual(((4242, f"{_EDITOR} -projectPath /x"),), table)
+
+
+class UnreadableCandidateParentTests(unittest.TestCase):
+    """Round 4 OPEN 2: a candidate under an unreadable parent makes the
+    existence probe raise PermissionError on Python 3.13 and read as
+    "absent" on <=3.12. Both are wrong: a raw OSError escapes this
+    module's EvidenceError contract entirely, and "absent" is a RESOLVED
+    answer we are not entitled to. Pinned here to ONE behaviour on every
+    interpreter -- ambiguity, therefore E_UNITY_OWNER_UNKNOWN.
+    """
+
+    def _locked_tree(self, tmp: str):
+        parent = Path(tmp) / "locked"
+        parent.mkdir()
+        (parent / "proj").mkdir()
+        os.chmod(parent, 0o000)
+        return parent
+
+    @unittest.skipIf(os.geteuid() == 0, "root bypasses directory permissions")
+    def test_unreadable_candidate_parent_refuses_rather_than_raising(self):
+        with TemporaryDirectory() as tmp:
+            parent = self._locked_tree(tmp)
+            target = Path(tmp) / "other"
+            target.mkdir()
+            table = [(1, _raw_unity_command(str(parent / "proj"), " extraarg"))]
+            try:
+                with self.assertRaises(EvidenceError) as ctx:
+                    assert_headless_safe(
+                        target, process_table_provider=lambda: table
+                    )
+                self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+                owner = find_owning_process(table, target)
+                self.assertIsNotNone(owner, "unknown must never read SAFE")
+                self.assertFalse(owner.confirmed)
+                self.assertEqual("process-ambiguous", owner.source)
+            finally:
+                os.chmod(parent, 0o700)
+
+    @unittest.skipIf(os.geteuid() == 0, "root bypasses directory permissions")
+    def test_probe_helpers_report_unknown_not_absent(self):
+        with TemporaryDirectory() as tmp:
+            parent = self._locked_tree(tmp)
+            try:
+                candidate = parent / "proj"
+                resolved = _canonical_or_none(candidate)
+                if resolved is not None:
+                    self.assertIsNot(False, _is_dir_or_unknown(resolved))
+                    self.assertIsNone(_is_dir_or_unknown(resolved))
+            finally:
+                os.chmod(parent, 0o700)
+
+    def test_uncanonicalizable_candidate_is_ambiguous_not_a_non_match(self):
+        # Pinned independently of interpreter version and of which call
+        # (resolve vs is_dir) happens to raise on a given Python: a
+        # candidate we cannot canonicalize is UNKNOWN, and unknown must
+        # never quietly read as "a different path, therefore safe".
+        real = ownership._canonical
+
+        def _raising(path):
+            if "locked" in str(path):
+                raise PermissionError(13, "Permission denied")
+            return real(path)
+
+        with TemporaryDirectory() as tmp:
+            target = Path(tmp) / "Kinglet"
+            target.mkdir()
+            table = [(1, _raw_unity_command("/nowhere/locked/proj", " -logFile -"))]
+            with patch.object(ownership, "_canonical", side_effect=_raising):
+                owner = find_owning_process(table, target)
+            self.assertIsNotNone(owner, "unknown must never read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+    def test_one_existing_candidate_plus_one_unknown_is_still_ambiguous(self):
+        # The disambiguation shortcut ("exactly one candidate is a real
+        # directory, so this process's true path is established") is only
+        # valid when every OTHER candidate was actually PROBED. If one of
+        # them could not be probed at all, the shortcut is a guess.
+        real = ownership._canonical
+
+        def _raising(path):
+            if "-logFile" in str(path):
+                raise PermissionError(13, "Permission denied")
+            return real(path)
+
+        with TemporaryDirectory() as tmp:
+            open_project = Path(tmp) / "OtherGame"
+            open_project.mkdir()
+            target = Path(tmp) / "Kinglet"
+            target.mkdir()
+            table = [(1, _raw_unity_command(str(open_project), " -logFile -"))]
+            with patch.object(ownership, "_canonical", side_effect=_raising):
+                owner = find_owning_process(table, target)
+            self.assertIsNotNone(owner, "an unprobed candidate must not read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+    def test_exact_argv_candidate_that_cannot_be_canonicalized_is_ambiguous(self):
+        # An exact-argv non-match is normally definitive -- but only if the
+        # comparison actually happened. A value we could not canonicalize
+        # was never compared.
+        real = ownership._canonical
+
+        def _raising(path):
+            if "locked" in str(path):
+                raise PermissionError(13, "Permission denied")
+            return real(path)
+
+        with TemporaryDirectory() as tmp:
+            target = Path(tmp) / "Kinglet"
+            target.mkdir()
+            argv = (_EDITOR, "-projectPath", "/nowhere/locked/proj")
+            with patch.object(ownership, "_canonical", side_effect=_raising):
+                owner = find_owning_process([(1, argv)], target)
+            self.assertIsNotNone(owner, "unknown must never read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+    def test_uncanonicalizable_target_raises_evidence_error_not_oserror(self):
+        with TemporaryDirectory() as tmp:
+            with patch.object(
+                ownership, "_canonical", side_effect=PermissionError(13, "denied")
+            ):
+                with self.assertRaises(EvidenceError) as ctx:
+                    find_owning_process([], Path(tmp))
+            self.assertEqual("E_UNITY_OWNER_UNKNOWN", ctx.exception.code)
+
+    def test_unprobeable_directory_check_is_ambiguous_not_absent(self):
+        # Same shortcut as above, but with the failure arising from the
+        # is_dir() probe itself (Python 3.13's behaviour) rather than from
+        # canonicalization -- pinned so the outcome does not depend on
+        # which call the running interpreter raises in.
+        real_is_dir = Path.is_dir
+
+        def _raising(self, *args, **kwargs):
+            if "-logFile" in str(self):
+                raise PermissionError(13, "Permission denied")
+            return real_is_dir(self, *args, **kwargs)
+
+        with TemporaryDirectory() as tmp:
+            open_project = Path(tmp) / "OtherGame"
+            open_project.mkdir()
+            target = Path(tmp) / "Kinglet"
+            target.mkdir()
+            table = [(1, _raw_unity_command(str(open_project), " -logFile -"))]
+            with patch.object(Path, "is_dir", _raising):
+                owner = find_owning_process(table, target)
+            self.assertIsNotNone(owner, "an unprobeable candidate must not read SAFE")
+            self.assertFalse(owner.confirmed)
+            self.assertEqual("process-ambiguous", owner.source)
+
+    def test_unprobeable_proc_pid_counts_as_alive_not_gone(self):
+        # A pid we cannot probe must not be treated as "already exited" --
+        # that is how a live Editor vanishes from the table.
+        with patch.object(ownership, "_is_dir_or_unknown", return_value=None):
+            self.assertTrue(_proc_pid_is_alive(1234))
+
+    def test_helpers_are_total_on_ordinary_paths(self):
+        with TemporaryDirectory() as tmp:
+            self.assertEqual(Path(tmp).resolve(), _canonical_or_none(tmp))
+            self.assertTrue(_is_dir_or_unknown(Path(tmp)))
+            self.assertFalse(_is_dir_or_unknown(Path(tmp) / "nope"))
+
+
+class UsabilityMustNotOverRefuseTests(unittest.TestCase):
+    """A module that always refuses is safe but useless. These are the four
+    real macOS command-line shapes a reviewer confirmed must keep letting
+    an UNRELATED run proceed: the open project's true path is the first
+    flag-boundary slice, it exists on disk, longer slices do not, so
+    exactly one candidate resolves and the process is positively ruled out.
+    """
+
+    def _assert_unrelated_run_proceeds(self, trailing: str):
+        with TemporaryDirectory() as tmp:
+            open_project = Path(tmp) / "OtherGame"
+            open_project.mkdir()
+            target = Path(tmp) / "Kinglet"
+            target.mkdir()
+            table = [(4242, _raw_unity_command(str(open_project), trailing))]
+            self.assertIsNone(
+                find_owning_process(table, target),
+                f"trailing {trailing!r} must not block an unrelated launch",
+            )
+            assert_headless_safe(target, process_table_provider=lambda: table)
+
+    def test_project_path_is_last_argument(self):
+        self._assert_unrelated_run_proceeds("")
+
+    def test_hub_style_tail(self):
+        self._assert_unrelated_run_proceeds(
+            " -useHub -hubIPC -cloudEnvironment production "
+            "-licensingIpc LicenseClient-u -hubSessionId abc -accessToken tok123"
+        )
+
+    def test_logfile_dash_tail(self):
+        self._assert_unrelated_run_proceeds(" -logFile -")
+
+    def test_positional_tail(self):
+        self._assert_unrelated_run_proceeds(" -openfile /Users/u/OtherGame/x.unity")
 
 
 if __name__ == "__main__":

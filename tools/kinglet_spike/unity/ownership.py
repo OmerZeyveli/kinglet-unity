@@ -33,11 +33,16 @@ Three traps this module exists to avoid, all observed or reproduced live:
    tell" -- every case the slicer couldn't resolve fell through to
    not-owned by construction, whatever the slicer's cleverness. This
    module now (a) reads the OS's own EXACT, unambiguous argv wherever the
-   platform provides one (Linux's /proc/<pid>/cmdline is NUL-delimited --
-   there is nothing to resolve, and a per-pid read failure is not treated
-   as "not Unity": see _linux_proc_process_table), and (b) for the
-   remaining lossy-string case (macOS ps, an unquoted Windows line), has a
-   THIRD outcome. find_owning_process() slices the original string at
+   platform provides one -- Linux's /proc/<pid>/cmdline and macOS's sysctl
+   KERN_PROCARGS2 are both NUL-delimited, so there is nothing to resolve,
+   and a per-pid read failure is not treated as "not Unity": see
+   _linux_proc_process_table and _build_macos_process_table -- (b) uses the
+   lossy `ps` string only as a last resort, where it fails CLOSED for
+   Unity-shaped entries (see _ps_process_table: a newline in the path whose
+   TAIL parses as another `<pid> <command>` line leaves NO unparseable line
+   to detect, so a ps rendering can never establish a Unity process's path
+   beyond doubt), and (c) for the remaining lossy-string case (an unquoted
+   Windows line), has a THIRD outcome. find_owning_process() slices the original string at
    every plausible flag boundary (see _project_path_candidates_from_raw)
    and:
      - any candidate that exactly matches the caller's known target is
@@ -287,6 +292,38 @@ def _canonical(path: str | Path) -> Path:
     return Path(path).expanduser().resolve()
 
 
+def _canonical_or_none(path: str | Path) -> Path | None:
+    """_canonical() that reports "could not determine" instead of raising.
+
+    Path.resolve() is NOT total: on Python 3.13 a component under an
+    unreadable parent directory raises PermissionError, while on <=3.12 the
+    same input silently reads as "does not exist". Version-dependent safety
+    behaviour is itself a defect -- a raw OSError escaping this module
+    bypasses its EvidenceError contract entirely, and "does not exist" is a
+    RESOLVED answer this module is not entitled to. Both must instead
+    become ambiguity, so this returns None for "unknown" and the caller
+    refuses.
+    """
+    try:
+        return _canonical(path)
+    except OSError:
+        return None
+
+
+def _is_dir_or_unknown(path: Path) -> bool | None:
+    """Path.is_dir() with a third answer: None means "could not determine".
+
+    Same reason as _canonical_or_none: is_dir() raises PermissionError on
+    3.13 for a path under an unreadable parent and returns False on <=3.12.
+    An OSError here means we could not establish existence, which is
+    ambiguity, never "absent".
+    """
+    try:
+        return path.is_dir()
+    except OSError:
+        return None
+
+
 def find_owning_process(
     process_table: Sequence[ProcessEntry],
     project: Path,
@@ -325,7 +362,13 @@ def find_owning_process(
     be ruled out, or None only when every Unity-shaped process in the
     table was positively ruled out (or there were none).
     """
-    canonical_project = _canonical(project)
+    canonical_project = _canonical_or_none(project)
+    if canonical_project is None:
+        raise EvidenceError(
+            "E_UNITY_OWNER_UNKNOWN",
+            f"cannot canonicalize project path {str(project)!r} to check Unity "
+            "ownership; refusing headless launch until inspected",
+        )
     ambiguous_owner: ProjectOwner | None = None
 
     for pid, command in process_table:
@@ -356,9 +399,19 @@ def find_owning_process(
 
         exact_argv = isinstance(command, (tuple, list))
 
-        matched = next(
-            (c for c in candidates if _canonical(c) == canonical_project), None
-        )
+        # A candidate we cannot even canonicalize is not "different from the
+        # target" -- it is unknown, and unknown must not silently read as a
+        # non-match (see _canonical_or_none).
+        undetermined = False
+        matched = None
+        for candidate in candidates:
+            resolved = _canonical_or_none(candidate)
+            if resolved is None:
+                undetermined = True
+                continue
+            if resolved == canonical_project:
+                matched = candidate
+                break
         if matched is not None:
             return ProjectOwner(
                 pid=pid,
@@ -371,7 +424,7 @@ def find_owning_process(
                 ),
             )
 
-        if exact_argv:
+        if exact_argv and not undetermined:
             # The OS gave us the literal argument; a non-match here is
             # definitive, not ambiguous.
             continue
@@ -380,22 +433,34 @@ def find_owning_process(
         # existence: which candidate(s), if any, are real directories?
         existing: list[Path] = []
         for candidate in candidates:
-            resolved = _canonical(candidate)
-            if resolved not in existing and resolved.is_dir():
+            resolved = _canonical_or_none(candidate)
+            if resolved is None:
+                undetermined = True
+                continue
+            if resolved in existing:
+                continue
+            is_dir = _is_dir_or_unknown(resolved)
+            if is_dir is None:
+                undetermined = True
+            elif is_dir:
                 existing.append(resolved)
 
-        if len(existing) == 1:
+        if len(existing) == 1 and not undetermined:
             # Exactly one candidate is a real directory, and it already
             # failed the exact-match check above -- this process's true
             # path is established and it is not the target.
             continue
 
         if ambiguous_owner is None:
-            reason = (
-                "no candidate resolves to an existing directory"
-                if not existing
-                else "multiple candidates resolve to different existing directories"
-            )
+            if undetermined:
+                reason = (
+                    "a candidate path could not be probed at all "
+                    "(unreadable parent directory)"
+                )
+            elif not existing:
+                reason = "no candidate resolves to an existing directory"
+            else:
+                reason = "multiple candidates resolve to different existing directories"
             ambiguous_owner = ProjectOwner(
                 pid=pid,
                 project_path=str(canonical_project),
@@ -532,7 +597,10 @@ def _read_argv_via_proc(pid: int) -> tuple[str, ...] | None:
 
 
 def _proc_pid_is_alive(pid: int) -> bool:
-    return Path(f"/proc/{pid}").is_dir()
+    # Unknown (an OSError from the probe) counts as alive: the caller uses
+    # this only to decide whether an unreadable-cmdline pid is worth
+    # keeping as ambiguous, and "might be alive" must not become "gone".
+    return _is_dir_or_unknown(Path(f"/proc/{pid}")) is not False
 
 
 def _read_comm_via_proc(pid: int) -> str | None:
@@ -596,10 +664,142 @@ def _linux_proc_process_table() -> tuple[ProcessEntry, ...] | None:
     return tuple(entries)
 
 
-def _ps_process_table() -> tuple[ProcessEntry, ...]:
+# --- macOS: exact argv via sysctl KERN_PROCARGS2 -------------------------
+#
+# The macOS analogue of Linux's /proc/<pid>/cmdline. `ps -axo command=` is a
+# space-joined rendering of argv whose LINE STRUCTURE cannot be trusted
+# either: a project directory whose name contains a literal newline makes ps
+# print that newline verbatim, and if the text after it happens to parse as
+# `<pid> <command>` the split is completely invisible to a line-oriented
+# reader -- the real Editor entry is left looking like a clean, complete
+# command line that ends at the truncated prefix. No amount of repairing the
+# string after the fact fixes that (each such repair closed one instance and
+# left the class), so this module stops deriving macOS argv from ps at all
+# and asks the kernel for the NUL-separated argv it actually stored.
+# KERN_PROCARGS2 is readable for same-user processes, which is exactly the
+# threat model: the user's own GUI Editor.
+_CTL_KERN = 1
+_KERN_ARGMAX = 8
+_KERN_PROCARGS2 = 49
+
+
+def _parse_procargs2(raw: bytes) -> tuple[str, ...] | None:
+    """Pure: decode a KERN_PROCARGS2 buffer into an EXACT argv tuple.
+
+    Buffer layout (xnu, unchanged since 10.4): a native-endian 32-bit argc,
+    then the NUL-terminated executable path, then NUL alignment padding,
+    then exactly argc NUL-terminated argv strings, then the environment.
+    Each argv element is delimited by the kernel itself, so a path
+    containing spaces, tabs or newlines survives verbatim -- there is
+    nothing to re-split and nothing to guess.
+
+    Returns None for any buffer that does not yield exactly argc elements.
+    None means "no exact argv available", which the caller turns into
+    ambiguity, never into "not Unity".
+
+    Extracted from the ctypes call specifically so it is exercised by tests
+    on this Linux host with representative NUL-separated bytes, rather than
+    only reviewed as source text.
+    """
+    if len(raw) < 4:
+        return None
+    argc = int.from_bytes(raw[:4], sys.byteorder, signed=True)
+    if argc <= 0:
+        return None
+    rest = raw[4:]
+    exec_end = rest.find(b"\x00")
+    if exec_end == -1:
+        return None
+    rest = rest[exec_end + 1:]
+    rest = rest.lstrip(b"\x00")  # alignment padding before argv[0]
+    parts: list[bytes] = []
+    for _ in range(argc):
+        end = rest.find(b"\x00")
+        if end == -1:
+            return None  # truncated buffer -- refuse rather than guess
+        parts.append(rest[:end])
+        rest = rest[end + 1:]
+    return tuple(part.decode("utf-8", errors="surrogateescape") for part in parts)
+
+
+def _read_procargs2_bytes(pid: int) -> bytes | None:
+    """Raw KERN_PROCARGS2 buffer for pid via libc sysctl(3). Darwin only."""
+    if sys.platform != "darwin":
+        return None
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        libc.sysctl.restype = ctypes.c_int
+        libc.sysctl.argtypes = [
+            ctypes.POINTER(ctypes.c_int),
+            ctypes.c_uint,
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_size_t),
+            ctypes.c_void_p,
+            ctypes.c_size_t,
+        ]
+
+        argmax = ctypes.c_int(0)
+        argmax_size = ctypes.c_size_t(ctypes.sizeof(argmax))
+        mib2 = (ctypes.c_int * 2)(_CTL_KERN, _KERN_ARGMAX)
+        if libc.sysctl(
+            mib2, 2, ctypes.byref(argmax), ctypes.byref(argmax_size), None, 0
+        ) != 0 or argmax.value <= 0:
+            return None
+
+        buffer = ctypes.create_string_buffer(argmax.value)
+        size = ctypes.c_size_t(argmax.value)
+        mib3 = (ctypes.c_int * 3)(_CTL_KERN, _KERN_PROCARGS2, pid)
+        if libc.sysctl(mib3, 3, buffer, ctypes.byref(size), None, 0) != 0:
+            return None  # process gone, or another user's (EINVAL/EPERM)
+        return buffer.raw[: size.value]
+    except (OSError, AttributeError, ValueError, MemoryError):
+        return None
+
+
+def _read_argv_via_sysctl(pid: int) -> tuple[str, ...] | None:
+    """Exact argv for pid on macOS, or None when unavailable."""
+    raw = _read_procargs2_bytes(pid)
+    if raw is None:
+        return None
+    return _parse_procargs2(raw)
+
+
+def _build_macos_process_table(
+    pids: Sequence[int],
+    *,
+    argv_reader: Callable[[int], "tuple[str, ...] | None"],
+    comm_reader: Callable[[int], "str | None"],
+) -> tuple[ProcessEntry, ...]:
+    """Pure: assemble a macOS process table from injected per-pid readers.
+
+    Mirrors _linux_proc_process_table's contract exactly. A pid with exact
+    argv is recorded as an argv tuple. A pid whose exact argv is
+    unavailable is NOT silently dropped when its command name says it is a
+    Unity Editor -- it is kept as a _TruncatedCommand, i.e. unconditionally
+    ambiguous, because we know it might be the Editor and cannot read its
+    -projectPath. A pid whose name is not Unity-shaped is dropped, the same
+    documented bound as on Linux: there is nothing actionable to refuse on,
+    and holding every unreadable process ambiguous would make headless
+    launches permanently impossible rather than merely cautious.
+    """
+    entries: list[ProcessEntry] = []
+    for pid in pids:
+        argv = argv_reader(pid)
+        if argv:
+            entries.append((pid, argv))
+            continue
+        comm = comm_reader(pid)
+        if comm and _is_unity_editor_argv0(comm, windows=False):
+            entries.append((pid, _TruncatedCommand(argv0=comm)))
+    return tuple(entries)
+
+
+def _run_ps(args: Sequence[str]) -> str:
     try:
         result = subprocess.run(
-            ["ps", "-axo", "pid=,command="],
+            list(args),
             capture_output=True,
             text=True,
             timeout=10,
@@ -616,7 +816,72 @@ def _ps_process_table() -> tuple[ProcessEntry, ...]:
             f"process listing failed (ps exit {result.returncode}): "
             f"{result.stderr.strip()}",
         )
-    return _parse_posix_process_table(result.stdout)
+    return result.stdout
+
+
+def _parse_pid_list(stdout: str) -> tuple[int, ...]:
+    """Pure: parse `ps -axo pid=` output -- one integer per line.
+
+    A pid column is unambiguous no matter what any argument contains, which
+    is why enumeration still goes through ps while the command line does
+    not. A stray non-numeric line (the tail of some other process's
+    newline-containing argument, which this listing does not print at all)
+    is simply skipped; a phantom numeric line can only cause an extra
+    kernel argv read for a pid, whose real argv is then read exactly.
+    """
+    pids: list[int] = []
+    for line in stdout.splitlines():
+        stripped = line.strip()
+        if stripped.isdigit():
+            pid = int(stripped)
+            if pid not in pids:
+                pids.append(pid)
+    return tuple(pids)
+
+
+def _parse_comm_map(stdout: str) -> dict[int, str]:
+    """Pure: parse `ps -axo pid=,comm=` output into {pid: executable name}.
+
+    Used only to decide Unity-shaped-or-not for a pid whose exact argv
+    could not be read -- never to derive a project path.
+    """
+    mapping: dict[int, str] = {}
+    for line in stdout.splitlines():
+        parts = line.strip().split(maxsplit=1)
+        if len(parts) != 2 or not parts[0].isdigit():
+            continue
+        mapping[int(parts[0])] = parts[1].strip()
+    return mapping
+
+
+def _macos_process_table() -> tuple[ProcessEntry, ...]:
+    """macOS authoritative table: pid enumeration via ps, argv via the kernel."""
+    pids = _parse_pid_list(_run_ps(["ps", "-axo", "pid="]))
+    comm_map: dict[int, str] = {}
+    try:
+        comm_map = _parse_comm_map(_run_ps(["ps", "-axo", "pid=,comm="]))
+    except EvidenceError:
+        comm_map = {}
+    return _build_macos_process_table(
+        pids, argv_reader=_read_argv_via_sysctl, comm_reader=comm_map.get
+    )
+
+
+def _ps_process_table() -> tuple[ProcessEntry, ...]:
+    """LAST-RESORT lossy fallback: `ps -axo pid=,command=`.
+
+    Reached only when neither exact-argv source is available (/proc on
+    Linux, KERN_PROCARGS2 on macOS). Its line structure is untrustworthy in
+    a way no post-hoc repair can detect (see the KERN_PROCARGS2 comment
+    above), so it fails CLOSED: every Unity-shaped entry it produces is
+    marked ambiguous rather than being run through the candidate-slicing
+    heuristic, which can be confidently wrong on a newline-split line.
+    Non-Unity entries are untouched -- they are only ever used to
+    corroborate an EditorInstance.json pid.
+    """
+    return _parse_posix_process_table(
+        _run_ps(["ps", "-axo", "pid=,command="]), fail_closed_unity=True
+    )
 
 
 def _parse_posix_process_line(stripped: str) -> ProcessEntry | None:
@@ -643,8 +908,21 @@ def _mark_truncated(command: ProcessCommand) -> ProcessCommand:
     return _TruncatedCommand(argv0=argv0)
 
 
-def _parse_posix_process_table(stdout: str) -> tuple[ProcessEntry, ...]:
+def _parse_posix_process_table(
+    stdout: str, *, fail_closed_unity: bool = False
+) -> tuple[ProcessEntry, ...]:
     """Parse `ps -axo pid=,command=` output.
+
+    fail_closed_unity=True (what the real, last-resort _ps_process_table
+    passes) additionally marks every Unity-shaped entry ambiguous. That is
+    not belt-and-braces: an embedded newline in a project path whose TAIL
+    happens to parse as `<pid> <command>` produces no unparseable line at
+    all, so the truncation-detection below never fires and the Editor's own
+    entry reads as a clean command line ending at the truncated prefix. If
+    that prefix exists on disk, the candidate slicer resolves it
+    confidently and rules the real owner out -- a false SAFE. When exact
+    argv is unavailable, a Unity-shaped process's path is therefore not
+    established beyond doubt by construction, and this refuses instead.
 
     A directory name containing a literal newline makes ps itself print
     that newline verbatim, so the tail of that one process's argv appears
@@ -668,15 +946,36 @@ def _parse_posix_process_table(stdout: str) -> tuple[ProcessEntry, ...]:
         if entries:
             prev_pid, prev_command = entries[-1]
             entries[-1] = (prev_pid, _mark_truncated(prev_command))
+    if fail_closed_unity:
+        entries = [
+            (pid, _mark_truncated(command))
+            if _entry_is_unity_shaped(command)
+            else (pid, command)
+            for pid, command in entries
+        ]
     return tuple(entries)
 
 
+def _entry_is_unity_shaped(command: ProcessCommand) -> bool:
+    argv0, _candidates = _candidate_paths_for_command(command, windows=False)
+    return bool(argv0) and _is_unity_editor_argv0(argv0, windows=False)
+
+
 def _posix_process_table() -> tuple[ProcessEntry, ...]:
-    """Linux: exact argv via /proc when available (authoritative); else `ps` (lossy fallback)."""
-    if sys.platform.startswith("linux") and Path("/proc").is_dir():
+    """Exact argv where the OS provides it; the lossy `ps` string only as a last resort.
+
+    Linux: /proc/<pid>/cmdline (NUL-delimited). macOS: sysctl
+    KERN_PROCARGS2 (NUL-delimited). Both are the kernel's own record of
+    argv, so a project path containing spaces, tabs or newlines survives
+    verbatim. `ps -axo command=` is used only when neither is available,
+    and then fails closed for Unity-shaped entries.
+    """
+    if sys.platform.startswith("linux") and _is_dir_or_unknown(Path("/proc")):
         proc_table = _linux_proc_process_table()
         if proc_table is not None:
             return proc_table
+    if sys.platform == "darwin":
+        return _macos_process_table()
     return _ps_process_table()
 
 
@@ -759,7 +1058,8 @@ def detect_gui_owner(
     """Detect whether project's physical path is currently owned by a live Unity process.
 
     Real OS process listing is the default -- exact argv via /proc on
-    Linux, `ps` elsewhere on POSIX, Win32_Process.CommandLine on Windows.
+    Linux and sysctl KERN_PROCARGS2 on macOS, the lossy `ps` string only as
+    a last resort elsewhere, Win32_Process.CommandLine on Windows.
     process_table_provider is the injectable seam tests use to drive this
     from a fabricated table on any host, matching every other
     platform-dependent gate in this plan; entries may be either an exact
