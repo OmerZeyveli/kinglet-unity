@@ -244,12 +244,22 @@ def load_unity_receipt(path: Path) -> UnityReceipt:
 # ---------------------------------------------------------------------------
 
 def _is_safe_relative_artifact_path(value: str) -> bool:
-    """True iff value is a relative, non-escaping path (no '..', no absolute form)."""
+    """True iff value is a relative, non-escaping path (no '..', no absolute form).
+
+    PureWindowsPath("C:foo.txt").is_absolute() is False -- "C:foo.txt" is
+    drive-RELATIVE (relative to the current directory on drive C:), not
+    drive-absolute ("C:\\foo.txt" would be). is_absolute() alone therefore
+    lets a drive-qualified path through. Windows is a real target host for
+    this toolkit, so any path carrying a drive letter is rejected outright,
+    absolute or not.
+    """
     if not value or "\\" in value:
         return False
     candidate = Path(value)
     windows_candidate = PureWindowsPath(value)
     if candidate.is_absolute() or windows_candidate.is_absolute():
+        return False
+    if windows_candidate.drive:
         return False
     if ".." in candidate.parts or ".." in windows_candidate.parts:
         return False
@@ -289,6 +299,21 @@ def validate_unity_receipt(receipt: UnityReceipt) -> tuple[Diagnostic, ...]:
                 "route filesystem must report tests.status=not-run; it never launches Unity",
             ))
 
+    # Executing routes actually launch Unity, so compile is always attempted:
+    # "not-run" is only honest when the route refused to launch at all
+    # (collision_refused=true, handled separately below). Without this, the
+    # bare default receipt() fixture -- compile=not-run, tests=not-run, every
+    # count 0 -- validates clean for a route that ran nothing and never says
+    # so; receipt_to_evidence would then stamp it "pass".
+    if receipt.route in EXECUTING_ROUTES and not receipt.collision_refused:
+        if receipt.compile.status == "not-run":
+            diagnostics.append(Diagnostic(
+                "E_ASSERTION",
+                "compile.status",
+                f"route {receipt.route!r} launches Unity, so compile.status must "
+                "not be not-run unless collision_refused=true",
+            ))
+
     # Executing routes: a status claim must be backed by the counts.
     if receipt.route in EXECUTING_ROUTES:
         if receipt.tests.status == "pass" and receipt.tests.passed < 1:
@@ -304,6 +329,13 @@ def validate_unity_receipt(receipt: UnityReceipt) -> tuple[Diagnostic, ...]:
                 "tests.failed",
                 "route reports tests.status=pass but failed>0",
             ))
+        if receipt.tests.status == "pass" and receipt.tests.skipped != 0:
+            diagnostics.append(Diagnostic(
+                "E_ASSERTION",
+                "tests.skipped",
+                "route reports tests.status=pass but skipped>0; the frozen "
+                "contract requires skipped=0 for a passing run",
+            ))
         if receipt.tests.status == "fail" and receipt.tests.failed < 1:
             diagnostics.append(Diagnostic(
                 "E_ASSERTION",
@@ -311,6 +343,49 @@ def validate_unity_receipt(receipt: UnityReceipt) -> tuple[Diagnostic, ...]:
                 "route reports tests.status=fail but failed=0; a fail requires "
                 "at least one observed failing test",
             ))
+
+    # A passing compile claim must be backed by zero reported errors, and a
+    # failing one must cite at least one -- the same "claim needs a count"
+    # discipline already applied to tests above.
+    if receipt.compile.status == "pass" and receipt.compile.errors != 0:
+        diagnostics.append(Diagnostic(
+            "E_ASSERTION",
+            "compile.errors",
+            "route reports compile.status=pass but errors>0",
+        ))
+    if receipt.compile.status == "fail" and receipt.compile.errors < 1:
+        diagnostics.append(Diagnostic(
+            "E_ASSERTION",
+            "compile.errors",
+            "route reports compile.status=fail but errors=0; a fail requires "
+            "at least one observed compile error",
+        ))
+
+    # Tests cannot pass without a successful compile -- this links the two
+    # fields the plan's route contract always states together
+    # ("compile.status=pass, tests.status=pass, ..."), and it is what keeps
+    # receipt_to_evidence from emitting a record whose own assertions
+    # contradict each other (tests pass while compile is reported failed).
+    if receipt.tests.status == "pass" and receipt.compile.status != "pass":
+        diagnostics.append(Diagnostic(
+            "E_ASSERTION",
+            "tests.status",
+            "route reports tests.status=pass but compile.status is "
+            f"{receipt.compile.status!r}; tests cannot pass without a "
+            "successful compile",
+        ))
+
+    # live-editor-mcp's tests only ran through a bridge whose readiness the
+    # receipt itself must attest to. Claiming a passing test run without
+    # ready=true asserts execution nobody confirmed was ready for tools.
+    if receipt.route == "live-editor-mcp" and receipt.tests.status == "pass" and not receipt.ready:
+        diagnostics.append(Diagnostic(
+            "E_ASSERTION",
+            "ready",
+            "route live-editor-mcp reports tests.status=pass but ready=false; "
+            "a passing test claim through this route requires MCP Editor "
+            "readiness (ready_for_tools=true)",
+        ))
 
     # collision_refused is same-project-headless's own refusal probe -- it is
     # not a successful headless run.
@@ -405,15 +480,27 @@ def receipt_to_evidence(receipt: UnityReceipt, environment: Environment) -> Evid
     stamp = now.replace("-", "").replace(":", "")
     run_id = f"{stamp}-unity-probe-{receipt.route}-01"
 
+    # "not-run" is only an honest pass for filesystem, which never launches
+    # Unity. On every other route "not-run" means the route claims nothing
+    # happened, which is never a pass claim -- mapping it to "pass" here is
+    # exactly the bug that let an executing route which ran nothing convert
+    # to a passing EvidenceRecord (see CRITICAL 1 in the round-1 review).
+    compile_ok = receipt.compile.status == "pass" or (
+        receipt.route == "filesystem" and receipt.compile.status == "not-run"
+    )
+    tests_ok = receipt.tests.status == "pass" or (
+        receipt.route == "filesystem" and receipt.tests.status == "not-run"
+    )
+
     assertions = (
         AssertionResult(
             id="compile",
-            status="pass" if receipt.compile.status != "fail" else "fail",
+            status="pass" if compile_ok else "fail",
             detail=f"status={receipt.compile.status} errors={receipt.compile.errors}",
         ),
         AssertionResult(
             id="tests",
-            status="pass" if receipt.tests.status != "fail" else "fail",
+            status="pass" if tests_ok else "fail",
             detail=(
                 f"status={receipt.tests.status} passed={receipt.tests.passed} "
                 f"failed={receipt.tests.failed} skipped={receipt.tests.skipped}"

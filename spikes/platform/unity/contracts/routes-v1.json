@@ -25,9 +25,11 @@
   },
   "notes": [
     "filesystem never launches Unity; compile and tests must stay not-run.",
-    "ready=true is exclusive to live-editor-mcp; it names MCP Editor readiness (expected project instance, expected Unity version, compilation idle, ready_for_tools=true), not mere server-process startup.",
+    "The three executing routes (live-editor-mcp, same-project-headless, isolated-headless) actually launch Unity, so compile.status must not stay not-run -- the only exception is a route that refused to launch at all (collision_refused=true). A claimed pass requires compile.status=pass, tests.status=pass, passed>=1, failed=0, and skipped=0; tests can never pass without a passing compile.",
+    "ready=true is exclusive to live-editor-mcp; it names MCP Editor readiness (expected project instance, expected Unity version, compilation idle, ready_for_tools=true), not mere server-process startup. live-editor-mcp must not claim tests.status=pass while ready=false.",
     "collision_refused is same-project-headless's own refusal probe (matrix cell same-project-headless.collision-refusal); it is not a successful headless run, and compile/tests must stay not-run when it fires.",
     "active_lease and descendant_pids must be clean on every receipt regardless of outcome -- cancellation, timeout, crash, and success all leave no live lease and no descendant process, per the plan's global constraints.",
-    "unity_version records whatever Unity version actually produced the run. The plan's literal 6000.3.11f1 pin is relaxed by standing user ruling: any well-formed Unity 6000.x or 2022.x version string is accepted, but a receipt must never claim a version it did not run on."
+    "Refuse silent project upgrade: this rule stands independently of which exact Unity version is pinned (see the unity_version note below) and is unconditional across all executing routes. It is not encoded as a receipt field in Task 1 -- Task 3's editor.py is the component responsible for resolving the exact Editor and refusing to let Unity silently upgrade the pinned project on open; this note exists so that responsibility is not lost between tasks.",
+    "unity_version records whatever Unity version actually produced the run. The plan's literal 6000.3.11f1 pin is relaxed by standing user ruling: any well-formed Unity version string is accepted (shape-only check: <year>.<major>.<minor><stage><build>, e.g. 6000.3.18f1, 6000.0.68f1, 2022.3.62f3 -- the check does not restrict which year), but a receipt must never claim a version it did not run on."
   ]
 }

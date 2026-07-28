@@ -1,13 +1,23 @@
+import json
 import unittest
+from pathlib import Path
 
 from tools.kinglet_spike.model import EvidenceError
-from tools.kinglet_spike.unity.model import EXECUTING_ROUTES, ROUTES
+from tools.kinglet_spike.unity.model import (
+    EXECUTING_ROUTES,
+    PROJECT_ID,
+    RECEIPT_SCHEMA,
+    ROUTES,
+    STATUS_VALUES,
+)
 from tools.kinglet_spike.unity.receipt import (
     receipt_to_evidence,
     unity_receipt_from_dict,
     validate_unity_receipt,
 )
 from tests.kinglet_spike.unity_support import load, passing_receipt, receipt
+
+ROUTES_CONTRACT_PATH = Path("spikes/platform/unity/contracts/routes-v1.json")
 
 
 class UnityReceiptTests(unittest.TestCase):
@@ -152,6 +162,116 @@ class UnityReceiptTests(unittest.TestCase):
         value["compile"] = {"status": "pass", "errors": 0}
         record = receipt_to_evidence(load(value), environment)
         self.assertEqual("fail", record.status)
+
+    # --- fix round 1: an executing route that ran nothing must not validate
+    #     clean, and must not convert to a passing EvidenceRecord (CRITICAL 1) ---
+
+    def test_executing_route_default_not_run_receipt_is_rejected(self):
+        for route in EXECUTING_ROUTES:
+            with self.subTest(route=route):
+                codes = {item.code for item in validate_unity_receipt(load(receipt(route)))}
+                self.assertIn("E_ASSERTION", codes)
+
+    def test_executing_route_default_not_run_receipt_converts_to_fail(self):
+        from tools.kinglet_spike.model import Environment
+
+        environment = Environment(
+            os="linux", release="ubuntu-24.04.4-lts", arch="x64",
+            native=True, toolchain=("unity=6000.3.18f1",),
+        )
+        for route in EXECUTING_ROUTES:
+            with self.subTest(route=route):
+                record = receipt_to_evidence(load(receipt(route)), environment)
+                self.assertEqual("fail", record.status)
+                self.assertFalse(all(a.status == "pass" for a in record.assertions))
+
+    def test_collision_refused_exempts_not_run_from_the_executing_route_check(self):
+        # A refusal never launched Unity at all -- not-run is the honest
+        # value there, and this must not collide with the new "executing
+        # routes must not report compile.status=not-run" rule above.
+        value = receipt("same-project-headless")
+        value["collision_refused"] = True
+        self.assertEqual((), validate_unity_receipt(load(value)))
+
+    # --- fix round 1: compile.status claims must be backed by errors (IMPORTANT 1) ---
+
+    def test_compile_pass_with_errors_is_rejected(self):
+        value = passing_receipt("isolated-headless")
+        value["compile"]["errors"] = 5
+        codes = {item.code for item in validate_unity_receipt(load(value))}
+        self.assertIn("E_ASSERTION", codes)
+
+    def test_compile_fail_with_zero_errors_is_rejected(self):
+        value = receipt("isolated-headless")
+        value["compile"] = {"status": "fail", "errors": 0}
+        codes = {item.code for item in validate_unity_receipt(load(value))}
+        self.assertIn("E_ASSERTION", codes)
+
+    # --- fix round 1: tests.status=pass with skipped>0, or without a
+    #     passing compile, is rejected (IMPORTANT 2) ---
+
+    def test_tests_pass_with_nonzero_skipped_is_rejected(self):
+        value = passing_receipt("isolated-headless")
+        value["tests"]["skipped"] = 99
+        codes = {item.code for item in validate_unity_receipt(load(value))}
+        self.assertIn("E_ASSERTION", codes)
+
+    def test_tests_pass_with_compile_not_run_is_rejected(self):
+        value = receipt("isolated-headless")
+        value["tests"] = {"status": "pass", "passed": 1, "failed": 0, "skipped": 0}
+        codes = {item.code for item in validate_unity_receipt(load(value))}
+        self.assertIn("E_ASSERTION", codes)
+
+    def test_tests_pass_with_compile_fail_is_rejected(self):
+        value = receipt("isolated-headless")
+        value["compile"] = {"status": "fail", "errors": 1}
+        value["tests"] = {"status": "pass", "passed": 1, "failed": 0, "skipped": 0}
+        codes = {item.code for item in validate_unity_receipt(load(value))}
+        self.assertIn("E_ASSERTION", codes)
+
+    # --- fix round 1: live-editor-mcp cannot claim a passing test run
+    #     without ready=true (IMPORTANT 3) ---
+
+    def test_live_editor_mcp_tests_pass_without_ready_is_rejected(self):
+        value = passing_receipt("live-editor-mcp")
+        value["ready"] = False
+        codes = {item.code for item in validate_unity_receipt(load(value))}
+        self.assertIn("E_ASSERTION", codes)
+
+    # --- fix round 1: the frozen constants must match the frozen JSON contract
+    #     they are supposed to mirror (IMPORTANT 4) ---
+
+    def test_frozen_constants_match_routes_contract_json(self):
+        contract = json.loads(ROUTES_CONTRACT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(RECEIPT_SCHEMA, contract["receipt_schema"])
+        self.assertEqual(PROJECT_ID, contract["project_id"])
+        self.assertEqual(ROUTES, frozenset(contract["routes"]))
+        self.assertEqual(EXECUTING_ROUTES, frozenset(contract["executing_routes"]))
+        self.assertEqual(STATUS_VALUES, frozenset(contract["compile_statuses"]))
+        self.assertEqual(STATUS_VALUES, frozenset(contract["test_statuses"]))
+
+    def test_routes_contract_json_has_the_briefed_timings(self):
+        contract = json.loads(ROUTES_CONTRACT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(
+            {
+                "editor_startup": 300,
+                "import_compile_ready": 300,
+                "mcp_server_startup": 60,
+                "mcp_editor_ready": 300,
+                "edit_mode_tests": 180,
+                "cancellation_cleanup": 15,
+            },
+            contract["timings_seconds"],
+        )
+
+    # --- fix round 1: a Windows drive-relative artifact path must not pass
+    #     as a safe relative path (MINOR 2) ---
+
+    def test_windows_drive_relative_artifact_path_is_rejected(self):
+        value = receipt("filesystem")
+        value["artifacts"] = ["C:foo.txt"]
+        codes = {item.code for item in validate_unity_receipt(load(value))}
+        self.assertIn("E_PATH", codes)
 
 
 if __name__ == "__main__":
