@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kinglet-client-probe": {
+      "command": "./bin/kinglet-client-probe",
+      "args": ["mcp"],
+      "cwd": "."
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/pre-mutation-hook.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

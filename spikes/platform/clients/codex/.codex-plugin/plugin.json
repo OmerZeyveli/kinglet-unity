@@ -1,0 +1,11 @@
+{
+  "name": "kinglet-client-probe",
+  "version": "0.0.1",
+  "description": "Kinglet client-probe overlay for Codex. Exercises skill invocation, sub-agent delegation, PreToolUse hook blocking, and local stdio MCP — all against a disposable Unity-shaped project.",
+  "author": {
+    "name": "kinglet"
+  },
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": "./.mcp.json"
+}
