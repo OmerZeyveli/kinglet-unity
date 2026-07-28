@@ -19,6 +19,12 @@
       "sha256": "290e9e079c2facafe3e156b8113344d500563a3165ce0fcc808b408ed45ecef6"
     },
     {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/invocations.json",
+      "required": true,
+      "sha256": "9466ffd8250081b4bc797f6b1fc94a79628a9d6e14be6c3db7a1f9e37367302e"
+    },
+    {
       "media_type": "text/plain",
       "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/marketplace-add.txt",
       "required": true,
@@ -73,12 +79,6 @@
       "sha256": "b9026d298c687b317e8560c76ff373639c195a74390564d0a563c30f52c46298"
     },
     {
-      "media_type": "text/plain",
-      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/config-after-remove.txt",
-      "required": true,
-      "sha256": "21f932749c62768436969a32606278839798af45ca1a500c98c2c11df71dbe87"
-    },
-    {
       "media_type": "application/json",
       "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/capability-listing-after-remove.json",
       "required": true,
@@ -109,7 +109,7 @@
       "status": "pass"
     },
     {
-      "detail": "'codex plugin remove kinglet-client-probe@kinglet-client-probe' reported 'Removed plugin `kinglet-client-probe` from marketplace `kinglet-client-probe`', the following 'codex plugin list' showed STATUS 'not installed' with an empty VERSION, the [plugins.\"kinglet-client-probe@kinglet-client-probe\"] table disappeared from config.toml, and the version directory under the plugin cache was emptied. A NEW session then enumerated its skills and MCP tools and kinglet-client-probe:kinglet-capability-probe was absent, as was any kinglet MCP tool.",
+      "detail": "'codex plugin remove kinglet-client-probe@kinglet-client-probe' reported 'Removed plugin `kinglet-client-probe` from marketplace `kinglet-client-probe`', and the following 'codex plugin list' showed STATUS 'not installed' with an empty VERSION. A NEW session then enumerated its skills and MCP tools and kinglet-client-probe:kinglet-capability-probe was absent, as was any kinglet MCP tool.",
       "id": "install.remove",
       "status": "pass"
     },
@@ -122,10 +122,7 @@
   "command": [
     "codex",
     "exec",
-    "--json",
-    "-s",
-    "workspace-write",
-    "<frozen-prompt-text-elided>"
+    "--json"
   ],
   "ended_at": "2026-07-28T04:58:00Z",
   "environment": {

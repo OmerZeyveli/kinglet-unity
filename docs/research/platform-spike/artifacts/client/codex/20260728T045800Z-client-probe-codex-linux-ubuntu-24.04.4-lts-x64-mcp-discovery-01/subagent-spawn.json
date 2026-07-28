@@ -1,8 +1,6 @@
 {
   "schema": "kinglet.client-probe.subagent/v1",
-  "note": [
-    "Codex's multi-agent surface. collaboration.spawn_agent takes a free-text task_name chosen by the model; there is no plugin agent registry to resolve it against. plugin.json's accepted top-level fields (per codex-cli 0.145.0's own bundled validate_plugin.py) are id/name/version/description/skills/apps/mcpServers/interface/author/homepage/repository/license/keywords -- no `agents` field. The packaged agents/ directory was copied into the plugin cache but nothing bound it to the spawned sub-agent, whose agent_role is null and whose receipt follows the AGENTS.md schema rather than the reviewer agent's own kinglet.client-probe.agent/v1."
-  ],
+  "note": "Codex's multi-agent surface. collaboration.spawn_agent takes a free-text task_name chosen by the model; there is no plugin agent registry to resolve it against. plugin.json's accepted top-level fields (per codex-cli 0.145.0's own bundled validate_plugin.py) are id/name/version/description/skills/apps/mcpServers/interface/author/homepage/repository/license/keywords -- no `agents` field. The packaged agents/ directory was copied into the plugin cache but nothing bound it to the spawned sub-agent, whose agent_role is null and whose receipt follows the AGENTS.md schema rather than the reviewer agent's own kinglet.client-probe.agent/v1. The spawn message is an opaque encrypted blob and is recorded by length only.",
   "parent_calls": [
     {
       "type": "response_item",

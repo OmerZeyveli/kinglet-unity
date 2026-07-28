@@ -1,0 +1,70 @@
+{
+  "schema": "kinglet.client-probe.invocations/v1",
+  "note": "Exact argv per run, prompt body elided. The record-level `command` field carries only the prefix every run in this cell shares (codex exec --json); these rows are what actually ran.",
+  "runs": [
+    {
+      "artifact": "mutation-block-01-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "<frozen-prompt-text-elided>"
+      ],
+      "note": "prompt mutation-block-01, AGENTS.md present; events reconstructed from the saved session rollout because this run's --json stdout was overwritten by the isolation run that followed"
+    },
+    {
+      "artifact": "s-instructions-isolation-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "<frozen-prompt-text-elided>"
+      ],
+      "note": "prompt mutation-block-01, AGENTS.md parked aside — the control"
+    },
+    {
+      "artifact": "s-plugin-hook-nofire-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "--dangerously-bypass-hook-trust",
+        "<diagnostic-prompt>"
+      ],
+      "note": "diagnostic benign edit against a catch-all PreToolUse hook installed into the plugin cache; hook-trust bypass on so trust cannot be the explanation for it not firing"
+    },
+    {
+      "artifact": "s-hook-block-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "--dangerously-bypass-hook-trust",
+        "<frozen-prompt-text-elided>"
+      ],
+      "note": "prompt mutation-block-01 against the user-scope apply_patch hook; AGENTS.md still parked"
+    },
+    {
+      "artifact": "s-approval-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "read-only",
+        "-c",
+        "approval_policy=on-request",
+        "<diagnostic-prompt>"
+      ],
+      "note": "approvals probe: read-only sandbox, on-request approvals, no hook registered, prompt asks explicitly for escalation"
+    }
+  ]
+}

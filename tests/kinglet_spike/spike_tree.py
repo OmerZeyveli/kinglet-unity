@@ -257,3 +257,64 @@ def relative(path: Path) -> str:
         # to be nameable — the whole point of the undecodable-file failure is
         # that it names the file it could not read.
         return path.as_posix()
+
+
+# ---------------------------------------------------------------------------
+# Leaks that the shared validate.py patterns structurally cannot see
+# ---------------------------------------------------------------------------
+# `SECRET_PATTERNS` matches `token=...`, i.e. the SHELL spelling. Every artifact
+# this spike publishes is JSON, where the same thing is spelled with a colon:
+#
+#     {"access_token": "eyJhbGciOiJI..."}
+#
+# A pasted `auth.json` therefore sailed through the whole sweep and every test
+# stayed green. That is not hypothetical — the Codex reconstruction copied a
+# saved session rollout wholesale and shipped the operator's account tier and
+# rate-limit state, and nothing failed.
+#
+# The value guard is deliberately loose (`[^"]{8,}`): a short placeholder like
+# "" or "elided" stays legal so an artifact can SAY a token was removed, while
+# anything long enough to be a real secret does not.
+SECRET_JSON_FIELD = re.compile(
+    r'"(?:access_token|refresh_token|id_token|id_token_claims|api_key|apiKey'
+    r'|client_secret|clientSecret|secret|password|token)"\s*:\s*"[^"]{8,}"'
+)
+
+# Account state. Not a credential, but it identifies the operator's subscription
+# and usage, and it has no evidentiary value in a capability probe — the client
+# BUILD is what the record pins, not who paid for it.
+ACCOUNT_STATE_FIELD = re.compile(
+    r'"(?:plan_type|planType|account_type|accountType|subscription'
+    r'|rate_limits|rateLimits|limit_id|resets_at|has_credits|balance)"\s*:'
+)
+
+_PROMPTS = REPO / "spikes/platform/clients/contracts/prompts-v1.json"
+
+
+def frozen_prompt_bodies() -> tuple[tuple[str, str], ...]:
+    """(prompt id, prompt text) for every frozen probe prompt.
+
+    Raises rather than returning () — a vacuous prompt catalog would turn the
+    verbatim-prompt sweep into a no-op that reports green.
+    """
+    import json
+
+    catalog = json.loads(_PROMPTS.read_text(encoding="utf-8"))
+    prompts = tuple((p["id"], p["text"]) for p in catalog.get("prompts", ()))
+    if not prompts:
+        raise AssertionError(f"no frozen prompts loaded from {relative(_PROMPTS)}")
+    return prompts
+
+
+def verbatim_prompt_violations(path: Path, text: str) -> tuple[tuple[str, str], ...]:
+    """Frozen prompt bodies committed verbatim into `text`.
+
+    The plan is explicit: evidence stores a prompt's ID and SHA-256, never its
+    body. `contracts/prompts-v1.json` is the one file allowed to hold the text,
+    since it IS the catalog; the sweep's own fixtures are outside the repo.
+
+    Returns (prompt id, prompt text) pairs so the caller can name what leaked.
+    """
+    if path.resolve() == _PROMPTS.resolve():
+        return ()
+    return tuple((pid, body) for pid, body in frozen_prompt_bodies() if body in text)

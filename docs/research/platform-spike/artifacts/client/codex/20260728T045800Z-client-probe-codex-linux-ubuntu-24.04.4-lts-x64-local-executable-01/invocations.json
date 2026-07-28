@@ -1,0 +1,42 @@
+{
+  "schema": "kinglet.client-probe.invocations/v1",
+  "note": "Exact argv per run, prompt body elided. The record-level `command` field carries only the prefix every run in this cell shares (codex exec --json); these rows are what actually ran.",
+  "runs": [
+    {
+      "artifact": "workflow-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "<frozen-prompt-text-elided>"
+      ],
+      "note": "prompt workflow-natural-language-01"
+    },
+    {
+      "artifact": "capability-listing-installed.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "<diagnostic-prompt>"
+      ],
+      "note": "diagnostic skill/tool enumeration, plugin installed"
+    },
+    {
+      "artifact": "capability-listing-after-remove.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "<diagnostic-prompt>"
+      ],
+      "note": "same diagnostic in a new session after codex plugin remove"
+    }
+  ]
+}

@@ -20,6 +20,7 @@ this file walks by shape.
 """
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -27,6 +28,7 @@ from pathlib import Path
 
 from tests.kinglet_spike import spike_tree
 from tests.kinglet_spike.spike_tree import (
+    ACCOUNT_STATE_FIELD,
     ALLOWED_CREDENTIAL_REFERENCE,
     ARTIFACTS_ROOT,
     CLIENTS_ROOT,
@@ -38,11 +40,14 @@ from tests.kinglet_spike.spike_tree import (
     SKIP_DIR_NAMES,
     SKIP_RELATIVE_DIRS,
     SWEPT_ROOTS,
+    SECRET_JSON_FIELD,
     committed_text_files,
     credential_copy_violations,
     files_by_root,
+    frozen_prompt_bodies,
     is_script,
     relative,
+    verbatim_prompt_violations,
 )
 from tools.kinglet_spike.validate import SECRET_PATTERNS, SENSITIVE_PATH_PATTERNS
 
@@ -50,6 +55,13 @@ from tools.kinglet_spike.validate import SECRET_PATTERNS, SENSITIVE_PATH_PATTERN
 # narrowed glob drops one of them, the sweep is quietly scanning less than it
 # claims and this list says so. It is not a whitelist — nothing is exempt.
 KNOWN_COVERED = (
+    # Both live client subjects are named. The sweep is generic and covers a new
+    # client the moment its directory exists, but "generic" is a claim, and a
+    # list that only ever names the FIRST client is how that claim goes stale
+    # without anything going red.
+    "spikes/platform/clients/codex/observations-linux.json",
+    "spikes/platform/clients/codex/runbook.md",
+    "spikes/platform/clients/codex/hooks/pre-mutation-hook.sh",
     "spikes/platform/clients/claude-code/probe/run.sh",
     "spikes/platform/clients/claude-code/probe/run2.sh",
     "spikes/platform/clients/claude-code/observations-linux.json",
@@ -226,6 +238,107 @@ class CommittedTreeSanitizationTests(unittest.TestCase):
                 path.read_text(encoding="utf-8")
             ):
                 self.fail(f"{relative(path)}:{number} {reason}: {line.strip()!r}")
+
+    def test_no_committed_file_carries_a_json_spelled_secret(self):
+        # SECRET_PATTERNS knows `token=...`, the SHELL spelling. Every artifact
+        # this spike publishes is JSON, where the same field is spelled with a
+        # colon, so a pasted auth.json was structurally invisible to the sweep.
+        for path in committed_text_files():
+            match = SECRET_JSON_FIELD.search(path.read_text(encoding="utf-8"))
+            self.assertIsNone(
+                match,
+                f"{relative(path)} carries a JSON-spelled secret field: "
+                f"{match.group(0) if match else ''!r}",
+            )
+
+    def test_no_committed_file_carries_operator_account_state(self):
+        # Account tier and rate-limit state identify the operator's subscription
+        # and usage and evidence nothing about a client's capabilities -- the
+        # record pins the client BUILD, not who paid for it. This entered the
+        # tree once already, by copying a saved session rollout wholesale into a
+        # reconstructed trace instead of applying the elision the live --json
+        # path applies for you.
+        for path in committed_text_files():
+            match = ACCOUNT_STATE_FIELD.search(path.read_text(encoding="utf-8"))
+            self.assertIsNone(
+                match,
+                f"{relative(path)} carries operator account state: "
+                f"{match.group(0) if match else ''!r}",
+            )
+
+    def test_no_published_evidence_carries_a_verbatim_frozen_prompt(self):
+        # The plan is explicit: EVIDENCE stores a prompt's ID and its SHA-256,
+        # never the body. prompts-v1.json is the catalog and is therefore the
+        # one file allowed to hold the text; verbatim_prompt_violations exempts
+        # it by resolved path, not by name.
+        #
+        # Scoped to the published roots on purpose, and the scope is the whole
+        # judgement here. Both clients' runbook.md quote the four prompt bodies
+        # inline, because a runbook is an operator PROCEDURE -- someone has to
+        # be able to read what to type -- and those files were written and
+        # reviewed that way. The constraint is about what a captured run leaves
+        # behind: a transcript that echoes the prompt turns every published
+        # artifact into a second, uncontrolled copy of the catalog, and the
+        # elision the live `--json` path already applies is what this pins.
+        # Widening this to committed_text_files() would fail the two runbooks
+        # and say nothing true about the leak it exists to catch.
+        for root in (EVIDENCE_ROOT, ARTIFACTS_ROOT):
+            for path in spike_tree._walk(root):
+                for prompt_id, _body in verbatim_prompt_violations(
+                    path, path.read_text(encoding="utf-8")
+                ):
+                    self.fail(
+                        f"{relative(path)} commits the body of frozen prompt "
+                        f"{prompt_id!r} verbatim; store the id and its SHA-256"
+                    )
+
+    def test_the_prompt_catalog_itself_is_swept_but_not_flagged(self):
+        # The exemption has to be exactly one file, and it has to be the real
+        # one. If prompts-v1.json were exempted by filename, any artifact
+        # renamed to match would go unchecked; if it were not swept at all, the
+        # sweep would have a hole shaped like the catalog.
+        catalog = REPO / "spikes/platform/clients/contracts/prompts-v1.json"
+        self.assertIn(catalog, committed_text_files())
+        self.assertEqual(
+            (),
+            verbatim_prompt_violations(catalog, catalog.read_text(encoding="utf-8")),
+        )
+        self.assertTrue(frozen_prompt_bodies())
+
+    def test_the_new_guards_fail_against_the_leaks_that_produced_them(self):
+        # A guard with no failing case is not a guard. These three payloads are
+        # the exact shapes that reached the committed tree, or reached it and
+        # were invisible: the rollout's rate-limit block, a pasted auth.json,
+        # and a frozen prompt body copied out of a session transcript.
+        _prompt_id, prompt_body = frozen_prompt_bodies()[0]
+
+        account_state = '{"rate_limits": {"plan_type": "plus", "balance": "0"}}'
+        self.assertIsNotNone(ACCOUNT_STATE_FIELD.search(account_state))
+        # ...and the old patterns saw nothing at all, which is the whole point.
+        for pattern in SECRET_PATTERNS + SENSITIVE_PATH_PATTERNS:
+            self.assertIsNone(pattern.search(account_state))
+
+        pasted_auth = '{"access_token": "ey' + "J" * 40 + '", "id_token": "ey' + "K" * 40 + '"}'
+        self.assertIsNotNone(SECRET_JSON_FIELD.search(pasted_auth))
+        for pattern in SECRET_PATTERNS:
+            self.assertIsNone(pattern.search(pasted_auth))
+
+        with tempfile.TemporaryDirectory() as scratch:
+            leaked = Path(scratch) / "trace.json"
+            payload = '{"type": "user_message", "message": ' + json.dumps(prompt_body) + "}"
+            leaked.write_text(payload, encoding="utf-8")
+            self.assertTrue(verbatim_prompt_violations(leaked, payload))
+            # An elided trace of the same run is clean.
+            elided = '{"type": "user_message", "message": "<frozen-prompt-text-elided>"}'
+            self.assertEqual((), verbatim_prompt_violations(leaked, elided))
+
+    def test_a_short_placeholder_value_is_not_a_secret(self):
+        # An artifact must be able to SAY a field was removed. The value guard
+        # is length-based so "<elided>" stays legal while a real token does not.
+        self.assertIsNone(SECRET_JSON_FIELD.search('{"access_token": "<gone>"}'))
+        self.assertIsNotNone(
+            SECRET_JSON_FIELD.search('{"access_token": "' + "a" * 40 + '"}')
+        )
 
     def test_the_sweep_refuses_to_skip_a_file_it_cannot_decode(self):
         # `_walk` used to `continue` past UnicodeDecodeError. A committed

@@ -1,0 +1,42 @@
+{
+  "schema": "kinglet.client-probe.invocations/v1",
+  "note": "Exact argv per run, prompt body elided. The record-level `command` field carries only the prefix every run in this cell shares (codex exec --json); these rows are what actually ran.",
+  "runs": [
+    {
+      "artifact": "workflow-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "<frozen-prompt-text-elided>"
+      ],
+      "note": "prompt workflow-natural-language-01"
+    },
+    {
+      "artifact": "agent-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "<frozen-prompt-text-elided>"
+      ],
+      "note": "prompt agent-delegation-01"
+    },
+    {
+      "artifact": "mcp-tool-trace.json",
+      "argv": [
+        "codex",
+        "exec",
+        "--json",
+        "-s",
+        "workspace-write",
+        "<frozen-prompt-text-elided>"
+      ],
+      "note": "prompt mcp-call-01"
+    }
+  ]
+}

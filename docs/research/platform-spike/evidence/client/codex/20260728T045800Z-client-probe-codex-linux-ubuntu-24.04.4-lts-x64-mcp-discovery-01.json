@@ -2,9 +2,39 @@
   "artifacts": [
     {
       "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/agent-tool-trace.json",
+      "required": true,
+      "sha256": "9c23bc81cf78f73946a2a049682b91679b277ed59720a3e0a7bfd0105924333e"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/subagent-spawn.json",
+      "required": true,
+      "sha256": "11efe85e02dcb9067c941ac75a71b274081c06287785f28d8ea13ed49f5c07fd"
+    },
+    {
+      "media_type": "application/json",
       "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipt-agent.json",
       "required": true,
       "sha256": "5382bb88019cde63df9f596a84f3cc22d69f0e942d1544706a04988fd4c4d296"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/prompts-used.json",
+      "required": true,
+      "sha256": "7b8383909f974112e2dacf1dc767b89e7c0970a7e8e07544d0dd82b0d351055b"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/invocations.json",
+      "required": true,
+      "sha256": "75e93c5b0f6671359dc84bbd147fd152f7f911eef9cda187580cf50bc9a963cb"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/mcp-tool-trace.json",
+      "required": true,
+      "sha256": "63ae555627a21418c5cdd53391747d3863f0ffe85e06b713906f1d0dade4ffde"
     },
     {
       "media_type": "application/json",
@@ -20,33 +50,9 @@
     },
     {
       "media_type": "application/json",
-      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/subagent-spawn.json",
-      "required": true,
-      "sha256": "57f880e82be0e48a0c8ea50f71ef79626db6f1ca74882410a11ff22e6c9b0ea3"
-    },
-    {
-      "media_type": "application/json",
       "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/workflow-tool-trace.json",
       "required": true,
       "sha256": "3438513bfef7769ce024dadf9f013d1d27eed7559e0d851935d405b2dd9c3763"
-    },
-    {
-      "media_type": "application/json",
-      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/prompts-used.json",
-      "required": true,
-      "sha256": "7b8383909f974112e2dacf1dc767b89e7c0970a7e8e07544d0dd82b0d351055b"
-    },
-    {
-      "media_type": "application/json",
-      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/agent-tool-trace.json",
-      "required": true,
-      "sha256": "9c23bc81cf78f73946a2a049682b91679b277ed59720a3e0a7bfd0105924333e"
-    },
-    {
-      "media_type": "application/json",
-      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/mcp-tool-trace.json",
-      "required": true,
-      "sha256": "63ae555627a21418c5cdd53391747d3863f0ffe85e06b713906f1d0dade4ffde"
     }
   ],
   "assertions": [
@@ -66,7 +72,7 @@
       "status": "pass"
     },
     {
-      "detail": "Invoked by natural language and produced its defined receipt, both halves. Given the frozen workflow-natural-language-01 prompt, the client opened with 'I'm using the installed kinglet-capability-probe skill because it exactly matches this workflow request', loaded the skill body, ran the executable invocation the skill's Step 2 specifies, and returned exactly 'KINGLET_CLIENT_PROBE_OK 6000.3.11f1' -- the string Step 4 mandates, with no additional prose. .kinglet-probe/receipts/workflow.json was created with the frozen schema, marker and unity_version, and no file outside the skill's declared write was touched.",
+      "detail": "Invoked by natural language and produced its defined receipt, both halves. Given the frozen workflow-natural-language-01 prompt, the client opened with 'I'm using the installed kinglet-capability-probe skill because it exactly matches this workflow request', loaded the skill body, ran the executable invocation the skill's Step 2 specifies, and returned exactly 'KINGLET_CLIENT_PROBE_OK 6000.3.11f1' -- the string Step 4 mandates, as its own final message with nothing appended to it. (The turn also carries two intermediate agent_message items narrating the steps; Step 4 constrains the returned string, and the returned string is exact.) .kinglet-probe/receipts/workflow.json was created with the frozen schema, marker and unity_version, and no file outside the skill's declared write was touched.",
       "id": "workflow.natural-language",
       "status": "pass"
     }
@@ -74,10 +80,7 @@
   "command": [
     "codex",
     "exec",
-    "--json",
-    "-s",
-    "workspace-write",
-    "<frozen-prompt-text-elided>"
+    "--json"
   ],
   "ended_at": "2026-07-28T04:58:00Z",
   "environment": {

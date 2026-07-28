@@ -651,17 +651,29 @@ def _build_record(
             detail=case.observed or case.status,
         ))
 
-        # Collect artifacts from passing Native/Emulated cases.
-        if case.status == "pass" and case.grade in ("Native", "Emulated"):
-            for ap in case.artifact_paths:
-                if ap not in seen_paths:
-                    seen_paths.add(ap)
-                    artifacts.append(Artifact(
-                        path=ap,
-                        sha256="0" * 64,   # placeholder — harness verifies real checksum on disk
-                        media_type="application/json",
-                        required=True,
-                    ))
+        # Collect artifacts from EVERY case in the cell, whatever its status.
+        #
+        # This used to collect only from passing Native/Emulated cases, which
+        # sounds conservative and is the opposite. `artifact_paths` is what the
+        # publisher copies into the committed tree, so an inconclusive case's
+        # evidence was never published at all — the observations document went
+        # on citing it and the paths simply did not resolve. Both live clients
+        # hit it and both worked around it in their own local record builders,
+        # which is a defect being paid for twice rather than fixed.
+        #
+        # An inconclusive case is exactly the one whose evidence a reader most
+        # needs, because the judgement is contestable and the artifact is how
+        # they contest it. Publishing it changes nothing about the grade: the
+        # cell's status is keyed on the assertions, not on this list.
+        for ap in case.artifact_paths:
+            if ap not in seen_paths:
+                seen_paths.add(ap)
+                artifacts.append(Artifact(
+                    path=ap,
+                    sha256="0" * 64,   # placeholder — harness verifies real checksum on disk
+                    media_type="application/json",
+                    required=True,
+                ))
 
         # Collect source URLs.
         for url in case.source_urls:
