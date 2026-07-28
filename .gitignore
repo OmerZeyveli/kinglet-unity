@@ -63,3 +63,15 @@ spikes/platform/runtime/dotnet/**/obj/
 
 # Native client capability probe build output (build.sh/build.ps1 -> dist/)
 spikes/platform/clients/probe-host/dist/
+
+# Pinned Unity fixture (spikes/platform/unity/fixture/) is committed source only.
+# If it is ever opened in place, keep Unity's generated state out of the tree.
+spikes/platform/unity/fixture/Library/
+spikes/platform/unity/fixture/Temp/
+spikes/platform/unity/fixture/Logs/
+spikes/platform/unity/fixture/UserSettings/
+spikes/platform/unity/fixture/obj/
+spikes/platform/unity/fixture/Build/
+spikes/platform/unity/fixture/*.csproj
+spikes/platform/unity/fixture/*.sln
+spikes/platform/unity/fixture/Packages/packages-lock.json

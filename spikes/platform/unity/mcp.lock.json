@@ -1,0 +1,24 @@
+{
+  "schema": "kinglet.unity-mcp-lock/v1",
+  "package": {
+    "name": "com.coplaydev.unity-mcp",
+    "version": "9.7.1",
+    "unity_package_path": "MCPForUnity",
+    "package_url": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v9.7.1"
+  },
+  "upstream": {
+    "repository": "https://github.com/CoplayDev/unity-mcp",
+    "tag": "v9.7.1",
+    "commit": "78ee5418415953b79c358bfe6355fcc3fde7912b",
+    "license": "MIT"
+  },
+  "server": {
+    "project_version": "9.7.1"
+  },
+  "cli_resources": [
+    "instances",
+    "get_editor_state",
+    "read_console",
+    "run_tests"
+  ]
+}

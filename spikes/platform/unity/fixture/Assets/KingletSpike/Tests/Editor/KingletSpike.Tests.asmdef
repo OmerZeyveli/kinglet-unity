@@ -1,0 +1,7 @@
+{
+  "name": "KingletSpike.Tests",
+  "rootNamespace": "KingletSpike.Tests",
+  "references": ["KingletSpike.Editor"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}
