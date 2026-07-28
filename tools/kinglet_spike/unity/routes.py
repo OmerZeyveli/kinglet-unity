@@ -142,9 +142,16 @@ from typing import Callable, Sequence
 from ..model import EvidenceError
 from . import mcp as mcp_module
 from .editor import read_project_version, verify_project_editor
-from .lease import WorkspaceLease
+from .isolation import (
+    IsolationManifest,
+    assert_isolated,
+    manifest_for_copy,
+    manifest_to_dict,
+    verify_manifest,
+)
+from .lease import WorkspaceLease, lease_path_for
 from .model import PROJECT_ID, RECEIPT_SCHEMA, CompileResult, TestResult, UnityReceipt
-from .ownership import assert_headless_safe
+from .ownership import assert_headless_safe, detect_gui_owner
 from .process import ManagedProcess
 
 # The public surface. `_start_bound` and `_headless_argv` are deliberately
@@ -156,7 +163,12 @@ __all__ = (
     "FILESYSTEM_ROUTE",
     "SAME_PROJECT_HEADLESS_ROUTE",
     "LIVE_EDITOR_MCP_ROUTE",
+    "ISOLATED_HEADLESS_ROUTE",
     "run_live_editor_mcp",
+    "run_isolated_headless",
+    "main_guard_digest",
+    "MAIN_GUARDED_TREES",
+    "MAIN_GUARDED_FILES",
     "LEASE_DIR_ENV",
     "default_lease_dir",
     "run_filesystem",
@@ -176,6 +188,7 @@ __all__ = (
 FILESYSTEM_ROUTE = "filesystem"
 SAME_PROJECT_HEADLESS_ROUTE = "same-project-headless"
 LIVE_EDITOR_MCP_ROUTE = "live-editor-mcp"
+ISOLATED_HEADLESS_ROUTE = "isolated-headless"
 
 # Receipt artifact paths are relative to docs/research/platform-spike/ (see
 # receipt.py's _is_safe_relative_artifact_path). The files themselves are
@@ -189,6 +202,13 @@ HEADLESS_LOG_NAME = "same-project-headless.log"
 HEADLESS_RESULTS_NAME = "same-project-headless-results.xml"
 HEADLESS_STDOUT_NAME = "same-project-headless.stdout"
 HEADLESS_STDERR_NAME = "same-project-headless.stderr"
+
+ISOLATED_SUMMARY_NAME = "isolated-headless-summary.json"
+ISOLATED_MANIFEST_NAME = "isolated-headless-manifest.json"
+ISOLATED_LOG_NAME = "isolated-headless.log"
+ISOLATED_RESULTS_NAME = "isolated-headless-results.xml"
+ISOLATED_STDOUT_NAME = "isolated-headless.stdout"
+ISOLATED_STDERR_NAME = "isolated-headless.stderr"
 
 LIVE_MCP_SUMMARY_NAME = "live-editor-mcp-summary.json"
 LIVE_MCP_SETUP_LOG_NAME = "live-editor-mcp-setup.log"
@@ -1453,3 +1473,458 @@ def _tests_from_job(summary) -> TestResult:
         f"skipped={summary.skipped}; that is neither an observed pass nor an "
         "observed failure, and this route does not guess",
     )
+
+
+# ---------------------------------------------------------------------------
+# isolated-headless
+# ---------------------------------------------------------------------------
+#
+# The route the plan licenses in one sentence:
+#
+#   "Isolated headless may run while the main Editor is open only from a
+#    separate physical copy with separate Library, Temp, logs, lease, and
+#    outputs."
+#
+# Every clause of that sentence is a check here, and every check is made
+# BEFORE Unity is launched, because after launch the damage is already done:
+#
+#   separate physical copy -> isolation.assert_isolated, which compares
+#       (st_dev, st_ino) and not just canonical paths (a bind mount defeats
+#       path comparison, and `realpath` cannot see it).
+#   separate Library/Temp -> assert_isolated again: every generated tree
+#       present under the copy must resolve under the copy and must not be
+#       the main project's tree of that name.
+#   separate logs, outputs -> _assert_writes_outside, which requires the run
+#       directory (log, results, both captured streams) to lie outside BOTH
+#       workspaces. Outside main is the isolation claim; outside the copy is
+#       so Unity does not import its own log as an asset.
+#   separate lease -> the lease is acquired on the ISOLATED workspace only,
+#       and its file path is asserted different from the main workspace's.
+#       That is the plan's second constraint -- "a lease never spans main and
+#       isolated copies as if they were the same physical workspace" -- stated
+#       in the lease's own vocabulary rather than in a comment.
+#
+# WHAT THIS ROUTE DOES NOT DO, and why: it does not refuse because the main
+# project is open. That is the entire point of the route. It OBSERVES the main
+# project's ownership through the same detector the other routes refuse with,
+# and records what it saw (`main_owner` in the summary), because a concurrency
+# claim made without looking at whether anything was concurrent is not a
+# claim. `require_main_owner=True` turns the observation into a precondition,
+# which is how the plan's "run it while the main Editor is open" proof is
+# expressed as code rather than as a procedure someone has to remember.
+#
+# It DOES refuse if the ISOLATED path is owned or ambiguous, and it RAISES
+# rather than emitting a refusal receipt: `collision_refused` is
+# same-project-headless's own probe and routes-v1.json rejects it on any other
+# route, so there is no honest receipt for this route to emit. Same reasoning
+# as live-editor-mcp.
+#
+# THE RECEIPT-SHAPE GAP, stated rather than papered over: `asdict` of an
+# isolated-headless receipt and of a same-project-headless receipt differ in
+# the `route` label alone. The frozen Task 1 shape has no field for physical
+# workspace identity, so nothing in the receipt itself distinguishes a real
+# isolated run from a same-project run relabelled. This route narrows that as
+# far as the frozen shape allows: it always writes an isolation manifest and
+# always CITES it in `artifacts`, and that manifest carries two distinct
+# physical-path hashes plus a digest of every copied file. So the isolation
+# claim is now backed by a named artifact a reader can check against the
+# workspaces, instead of resting on a label. It is narrowed, not closed --
+# closing it needs a receipt field (a `workspace_id`, or an artifact digest),
+# which is a contract change and belongs to whoever owns routes-v1.json.
+
+# What the isolated run must not have touched in the main workspace. Not all
+# of ProjectSettings: a main Editor legitimately rewrites several .asset files
+# there while it is open (and a COLD first open creates about thirty of them),
+# so digesting the whole directory would make this guard fire on the main
+# Editor doing its job and would teach a reader to ignore it. These three are
+# the ones whose mutation means real damage -- the source, the package set,
+# and the pinned Editor version that "refuse silent project upgrade" protects.
+MAIN_GUARDED_TREES: tuple[str, ...] = ("Assets", "Packages")
+MAIN_GUARDED_FILES: tuple[str, ...] = ("ProjectSettings/ProjectVersion.txt",)
+
+
+def main_guard_digest(
+    project,
+    *,
+    trees: Sequence[str] = MAIN_GUARDED_TREES,
+    files: Sequence[str] = MAIN_GUARDED_FILES,
+) -> str:
+    """One digest over the main workspace's source, packages and pinned version.
+
+    Taken before and after the isolated run. A difference is
+    `E_UNITY_ISOLATION_BREACH` rather than a note in the summary, and
+    deliberately so: this route cannot tell whether the change came from the
+    isolated Unity or from the main Editor saving a file, and "I cannot tell"
+    resolves to refusal here as everywhere else in this plan. A main Editor
+    that saves during the window will trip it; that is the honest outcome,
+    not a false alarm to be tuned away.
+    """
+    project = Path(project)
+    digest = hashlib.sha256()
+    entries: list[tuple[str, str]] = []
+    for tree in trees:
+        root = project / tree
+        if not root.is_dir():
+            raise EvidenceError(
+                "E_UNITY_ISOLATION_BREACH",
+                f"the main workspace has no {tree} directory to guard",
+            )
+        for current, directory_names, file_names in os.walk(root):
+            directory_names.sort()
+            for name in sorted(file_names):
+                target = Path(current) / name
+                entries.append((
+                    target.relative_to(project).as_posix(), sha256_file(target)
+                ))
+    for relative in files:
+        target = project / relative
+        if not target.is_file():
+            raise EvidenceError(
+                "E_UNITY_ISOLATION_BREACH",
+                f"the main workspace has no {relative} to guard",
+            )
+        entries.append((relative, sha256_file(target)))
+    for path, checksum in sorted(entries):
+        digest.update(f"{path}\0{checksum}\n".encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _assert_writes_outside(*, label: str, target: Path, main: Path, isolated: Path) -> None:
+    """Refuse a write destination that lies inside either workspace."""
+    resolved = Path(os.path.realpath(target))
+    for boundary, name, reason in (
+        (main, "main", "an isolated run must write nothing beneath the workspace it is isolated from"),
+        (isolated, "isolated", "a run directory beneath the copy is imported by Unity as project content"),
+    ):
+        if resolved == boundary or resolved.is_relative_to(boundary):
+            raise EvidenceError(
+                "E_UNITY_ISOLATION_BREACH",
+                f"the {label} lies inside the {name} workspace; {reason}",
+            )
+
+
+def _isolated_argv(editor: Path, project: Path, results_path: Path, log_path: Path) -> list[str]:
+    """The isolated run's argv.
+
+    Identical in shape to `_headless_argv`, and that is the requirement rather
+    than a coincidence: the plan asks for "the same batchmode command and test
+    parser against the isolated path", so the two routes must differ only in
+    WHICH project they open and WHERE they write. `-quit` is absent here for
+    the same measured reason it is absent there.
+    """
+    return _headless_argv(editor, project, results_path, log_path)
+
+
+def run_isolated_headless(
+    editor,
+    main_project,
+    isolated_project,
+    raw_dir,
+    *,
+    manifest: IsolationManifest | None = None,
+    require_main_owner: bool = False,
+    process_table_provider=None,
+    windows: bool | None = None,
+    run_version_flag=None,
+    process_factory: Callable[..., ManagedProcess] = ManagedProcess.start,
+    env: dict | None = None,
+    timeout_seconds: float = HEADLESS_TIMEOUT_SECONDS,
+    cancellation_deadline: float = CANCELLATION_DEADLINE_SECONDS,
+    lease_ttl_seconds: float | None = None,
+    lease_dir=None,
+    stat_reader=os.stat,
+    clock: Callable[[], float] = time.time,
+) -> UnityReceipt:
+    """Run EditMode tests headlessly from an isolated copy, main project or not.
+
+    The one public entry point for this route. `isolated_project` is a copy
+    already made by `isolation.prepare_isolated_copy`; this function does not
+    make it, because a route that both creates the copy and vouches for it
+    would be its own witness.
+
+    If `manifest` is supplied it is VERIFIED against the bytes on disk before
+    anything launches, and a mismatch is `E_UNITY_ISOLATION_MANIFEST`. If it
+    is not supplied, one is derived from the copy as it stands. Either way a
+    manifest is written and cited in the receipt's artifacts -- see the block
+    comment above for exactly how much of the receipt-shape gap that closes
+    and how much it does not.
+
+    Every keyword is an injectable seam with a real default, so each refusal
+    and cleanup branch is executable from a test on a host with no Unity.
+    """
+    editor = Path(editor).resolve()
+    main_project = Path(main_project).resolve()
+    isolated_project = Path(isolated_project).resolve()
+    raw_dir = Path(raw_dir)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    raw_dir = raw_dir.resolve()
+    lease_dir = default_lease_dir() if lease_dir is None else Path(lease_dir)
+
+    # STEP 1 -- separateness. Nothing else may run until this holds: every
+    # later step (ownership on the copy, the lease, the launch) is meaningless
+    # if the two paths turn out to name one workspace.
+    boundary = assert_isolated(main_project, isolated_project, stat_reader=stat_reader)
+
+    main_real = Path(os.path.realpath(main_project))
+    isolated_real = Path(os.path.realpath(isolated_project))
+
+    # STEP 2 -- separate logs and outputs. The run directory holds the Editor
+    # log, the results file and both captured streams.
+    _assert_writes_outside(
+        label="run directory", target=raw_dir, main=main_real, isolated=isolated_real
+    )
+    lease_dir.mkdir(parents=True, exist_ok=True)
+    _assert_writes_outside(
+        label="lease directory", target=lease_dir, main=main_real, isolated=isolated_real
+    )
+
+    # STEP 3 -- separate lease. The boundary already proved the two path
+    # hashes differ; this asserts the consequence the plan actually names, in
+    # the lease's own terms, so a future change to how lease files are named
+    # cannot quietly make one file serve both workspaces.
+    main_lease = lease_path_for(main_project, lease_dir)
+    isolated_lease = lease_path_for(isolated_project, lease_dir)
+    if main_lease == isolated_lease:
+        raise EvidenceError(
+            "E_UNITY_NOT_ISOLATED",
+            "the main and isolated workspaces resolve to one lease file; a "
+            "lease would span both as if they were the same physical workspace",
+        )
+
+    ownership_kwargs = {}
+    if process_table_provider is not None:
+        ownership_kwargs["process_table_provider"] = process_table_provider
+    if windows is not None:
+        ownership_kwargs["windows"] = windows
+
+    # STEP 4 -- OBSERVE the main workspace. Never a refusal by itself: running
+    # while main is open is the route's purpose. `require_main_owner` makes it
+    # a precondition for the concurrency proof.
+    main_owner = detect_gui_owner(main_project, **ownership_kwargs)
+    if main_owner is None:
+        main_owner_state = "clear"
+    elif main_owner.confirmed:
+        main_owner_state = "confirmed"
+    else:
+        main_owner_state = "unresolved"
+    if require_main_owner and main_owner_state != "confirmed":
+        raise EvidenceError(
+            "E_UNITY_MAIN_NOT_OPEN",
+            "this run was asked to prove isolated headless execution while the "
+            f"main workspace is open, but its ownership reads {main_owner_state!r}; "
+            "a concurrency claim with nothing concurrent is not a claim",
+        )
+
+    # STEP 5 -- the COPY must be unowned. Raises rather than emitting a
+    # refusal receipt: collision_refused belongs to same-project-headless and
+    # routes-v1.json rejects it here, so there is no honest receipt to emit.
+    assert_headless_safe(isolated_project, **ownership_kwargs)
+
+    # STEP 6 -- the copy's own declared version decides which Editor may open
+    # it. Reading it from the COPY and not from main is the point: a copy that
+    # somehow declares a different version must not be opened by main's Editor.
+    identity = verify_project_editor(
+        isolated_project, editor,
+        **({} if run_version_flag is None else {"run_version_flag": run_version_flag}),
+    )
+
+    # STEP 7 -- the manifest is evidence, so it is checked against the bytes.
+    if manifest is None:
+        manifest = manifest_for_copy(boundary, isolated_project)
+    else:
+        if (
+            manifest.main_path_hash != boundary.main_path_hash
+            or manifest.isolated_path_hash != boundary.isolated_path_hash
+        ):
+            raise EvidenceError(
+                "E_UNITY_ISOLATION_MANIFEST",
+                "the supplied manifest records different workspace identities "
+                "than the two workspaces this run proved separate; it does not "
+                "describe this copy",
+            )
+        verify_manifest(isolated_project, manifest)
+
+    return _run_isolated_guarded(
+        editor=editor,
+        main_project=main_project,
+        isolated_project=isolated_project,
+        raw_dir=raw_dir,
+        identity=identity,
+        manifest=manifest,
+        main_owner_state=main_owner_state,
+        process_factory=process_factory,
+        env=env,
+        timeout_seconds=timeout_seconds,
+        cancellation_deadline=cancellation_deadline,
+        lease_ttl_seconds=lease_ttl_seconds,
+        lease_dir=lease_dir,
+        clock=clock,
+    )
+
+
+def _run_isolated_guarded(
+    *,
+    editor: Path,
+    main_project: Path,
+    isolated_project: Path,
+    raw_dir: Path,
+    identity,
+    manifest: IsolationManifest,
+    main_owner_state: str,
+    process_factory,
+    env,
+    timeout_seconds: float,
+    cancellation_deadline: float,
+    lease_ttl_seconds: float | None,
+    lease_dir: Path,
+    clock: Callable[[], float],
+) -> UnityReceipt:
+    """The single guarded path for isolated-headless. Private for the same
+    reason `_run_headless_guarded` is: a caller holding it could assemble the
+    launch while skipping the separateness proof entirely.
+
+    Order:
+      a. digest the main workspace's guarded content BEFORE the launch;
+      b. acquire the ISOLATED workspace's lease -- and only that one;
+      c. `_start_bound`, the module's only launch path, so "started but never
+         bound" is unreachable;
+      d. wait, then in a `finally` cancel the containment and record the
+         PROVEN survivor set (cold `Library` is the leak-prone case, and an
+         isolated copy has a cold `Library` by construction -- it was just
+         created, so this route is the one most likely to orphan a Roslyn
+         server and the last one that may report an empty survivor set
+         without having looked);
+      e. derive the outcome from the artifacts, never the exit code;
+      f. re-digest the main workspace and refuse if it moved;
+      g. release the lease in the outermost `finally`, on every path.
+    """
+    main_digest_before = main_guard_digest(main_project)
+
+    log_path = raw_dir / ISOLATED_LOG_NAME
+    results_path = raw_dir / ISOLATED_RESULTS_NAME
+    stdout_path = raw_dir / ISOLATED_STDOUT_NAME
+    stderr_path = raw_dir / ISOLATED_STDERR_NAME
+    for stale in (log_path, results_path, stdout_path, stderr_path):
+        if stale.exists():
+            stale.unlink()
+
+    lease_kwargs = {}
+    if lease_ttl_seconds is not None:
+        lease_kwargs["ttl_seconds"] = lease_ttl_seconds
+    lease = WorkspaceLease.acquire(
+        isolated_project,
+        route=ISOLATED_HEADLESS_ROUTE,
+        lease_dir=lease_dir,
+        **lease_kwargs,
+    )
+
+    argv = _isolated_argv(editor, isolated_project, results_path, log_path)
+    survivors: tuple[int, ...] = ()
+    exit_code: int | None = None
+    started = clock()
+    try:
+        process = _start_bound(
+            lease, argv,
+            cwd=isolated_project,
+            env=dict(os.environ) if env is None else dict(env),
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            process_factory=process_factory,
+            cancellation_deadline=cancellation_deadline,
+        )
+        try:
+            exit_code = process.wait(timeout_seconds)
+        finally:
+            cleanup = process.cancel(cancellation_deadline)
+            survivors = cleanup.survivors
+            if exit_code is None:
+                exit_code = cleanup.exit_code
+
+        log_text = "\n".join(
+            text for text in (
+                _read_text_or_none(log_path),
+                _read_text_or_none(stdout_path),
+                _read_text_or_none(stderr_path),
+            ) if text
+        )
+        results_text = _read_text_or_none(results_path)
+        compile_result, tests_result = _derive_outcome(
+            exit_code=exit_code, results_text=results_text, log_text=log_text
+        )
+
+        if tests_result.status == "pass" and unity_lockfile_path(isolated_project).exists():
+            raise EvidenceError(
+                "E_UNITY_STALE_LOCK",
+                "Temp/UnityLockfile is still present in the isolated copy after "
+                "the run; Unity removes it on clean exit, so a passing claim "
+                "cannot be made over what looks like a crash or a kill",
+            )
+
+        # The isolation claim, checked after the fact and not only designed
+        # for. A change here is a refusal even on an otherwise passing run.
+        main_digest_after = main_guard_digest(main_project)
+        if main_digest_after != main_digest_before:
+            raise EvidenceError(
+                "E_UNITY_ISOLATION_BREACH",
+                "the main workspace's guarded content changed while the "
+                "isolated run was in progress; this route cannot tell whether "
+                "the isolated Unity wrote it or the open Editor did, and it "
+                "does not guess",
+            )
+
+        # The isolated copy's own generated trees, recorded as the observation
+        # they are: they exist, and they are under the copy.
+        generated = tuple(
+            name for name in ("Library", "Temp", "Logs")
+            if (isolated_project / name).exists()
+        )
+
+        _write_json(raw_dir / ISOLATED_MANIFEST_NAME, manifest_to_dict(manifest))
+        _write_json(raw_dir / ISOLATED_SUMMARY_NAME, {
+            "schema": "kinglet.unity-probe.summary/v1",
+            "route": ISOLATED_HEADLESS_ROUTE,
+            "collision_refused": False,
+            "launched": True,
+            "unity_version": identity.version,
+            "exit_code": exit_code,
+            "duration_seconds": round(clock() - started, 3),
+            "main_owner": main_owner_state,
+            "main_path_hash": manifest.main_path_hash,
+            "isolated_path_hash": manifest.isolated_path_hash,
+            "isolated_tree_sha256": manifest.tree_sha256,
+            "isolated_generated_trees": list(generated),
+            "main_guard_digest": main_digest_after,
+            "compile": {
+                "status": compile_result.status,
+                "errors": compile_result.errors,
+            },
+            "tests": {
+                "status": tests_result.status,
+                "passed": tests_result.passed,
+                "failed": tests_result.failed,
+                "skipped": tests_result.skipped,
+            },
+            "survivors": len(survivors),
+        })
+
+        return UnityReceipt(
+            schema=RECEIPT_SCHEMA,
+            route=ISOLATED_HEADLESS_ROUTE,
+            project_id=PROJECT_ID,
+            unity_version=identity.version,
+            compile=compile_result,
+            tests=tests_result,
+            ready=False,
+            collision_refused=False,
+            active_lease=False,
+            descendant_pids=survivors,
+            # TWO artifacts, and the second is the whole point: it is the only
+            # place a receipt from this route can point at the two distinct
+            # physical workspace identities its name asserts.
+            artifacts=(
+                f"{ARTIFACT_PREFIX}/{ISOLATED_SUMMARY_NAME}",
+                f"{ARTIFACT_PREFIX}/{ISOLATED_MANIFEST_NAME}",
+            ),
+        )
+    finally:
+        lease.release()

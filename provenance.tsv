@@ -520,3 +520,5 @@ tests/kinglet_spike/fixtures/unity_results_failed.xml	original	-	-	-	original	ki
 tests/kinglet_spike/fixtures/unity_compile_error_log.txt	original	-	-	-	original	kinglet-00u-task5-captured-real-unity-compile-error-streams-exit1
 tools/kinglet_spike/unity/mcp.py	original	-	-	-	original	kinglet-00u-task6-mcp-server-vs-editor-readiness
 tests/kinglet_spike/test_unity_mcp.py	original	-	-	-	original	kinglet-00u-task6-mcp-readiness-and-live-route-tests
+tools/kinglet_spike/unity/isolation.py	original	-	-	-	original	kinglet-00u-task7-physical-workspace-separation-and-copy
+tests/kinglet_spike/test_unity_isolation.py	original	-	-	-	original	kinglet-00u-task7-isolated-headless-route-tests
