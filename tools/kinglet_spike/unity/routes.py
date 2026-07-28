@@ -1,7 +1,7 @@
-"""routes.py -- The `filesystem` and `same-project-headless` execution routes.
+"""routes.py -- The `filesystem`, `same-project-headless` and `live-editor-mcp` routes.
 
-Two routes, one honesty rule
-----------------------------
+Three routes, one honesty rule
+------------------------------
 `filesystem` never launches anything. It reads the project's own committed
 text, checksums it, and reports `compile=not-run` / `tests=not-run`. That is
 the whole claim: "these bytes are here and they say this". Task 1's validator
@@ -113,6 +113,19 @@ it could not clear), the route returns a receipt with
 launched, so the receipt carries no Unity pid and no lease. It is the matrix
 cell `same-project-headless.collision-refusal`, and Task 1's validator
 enforces that it can never also claim a compile or a test result.
+
+`live-editor-mcp` is the third route
+------------------------------------
+It launches a real GUI Editor and reads its outcome through the pinned MCP
+bridge instead of from a file Unity wrote. Everything that makes "the bridge
+answered" different from "the expected Editor is ready" lives in `mcp.py`,
+including the measured fact that a server with ZERO Editors connected answers
+`{"success": true, "instances": []}` and exits 0. See `run_live_editor_mcp`
+and the block comment above it for what this route does differently from the
+headless one -- most importantly that it has no collision-refusal receipt
+(the contract reserves `collision_refused` for `same-project-headless`, so an
+ownership refusal here raises) and that it mutates the developer's
+EditorPrefs and must put them back.
 """
 from __future__ import annotations
 
@@ -127,6 +140,7 @@ from pathlib import Path
 from typing import Callable, Sequence
 
 from ..model import EvidenceError
+from . import mcp as mcp_module
 from .editor import read_project_version, verify_project_editor
 from .lease import WorkspaceLease
 from .model import PROJECT_ID, RECEIPT_SCHEMA, CompileResult, TestResult, UnityReceipt
@@ -136,9 +150,13 @@ from .process import ManagedProcess
 # The public surface. `_start_bound` and `_headless_argv` are deliberately
 # absent AND underscored: either one lets a caller launch Unity without the
 # ownership and Editor-verification steps that precede it on the guarded path.
+# `_live_mcp_guarded` and the three live argv builders are absent for the same
+# reason: each one launches a real Editor.
 __all__ = (
     "FILESYSTEM_ROUTE",
     "SAME_PROJECT_HEADLESS_ROUTE",
+    "LIVE_EDITOR_MCP_ROUTE",
+    "run_live_editor_mcp",
     "LEASE_DIR_ENV",
     "default_lease_dir",
     "run_filesystem",
@@ -157,6 +175,7 @@ __all__ = (
 
 FILESYSTEM_ROUTE = "filesystem"
 SAME_PROJECT_HEADLESS_ROUTE = "same-project-headless"
+LIVE_EDITOR_MCP_ROUTE = "live-editor-mcp"
 
 # Receipt artifact paths are relative to docs/research/platform-spike/ (see
 # receipt.py's _is_safe_relative_artifact_path). The files themselves are
@@ -170,6 +189,12 @@ HEADLESS_LOG_NAME = "same-project-headless.log"
 HEADLESS_RESULTS_NAME = "same-project-headless-results.xml"
 HEADLESS_STDOUT_NAME = "same-project-headless.stdout"
 HEADLESS_STDERR_NAME = "same-project-headless.stderr"
+
+LIVE_MCP_SUMMARY_NAME = "live-editor-mcp-summary.json"
+LIVE_MCP_SETUP_LOG_NAME = "live-editor-mcp-setup.log"
+LIVE_MCP_EDITOR_LOG_NAME = "live-editor-mcp-editor.log"
+LIVE_MCP_RESTORE_LOG_NAME = "live-editor-mcp-restore.log"
+LIVE_MCP_PREFS_BACKUP_NAME = "live-editor-mcp-prefs-backup.json"
 
 # The files `filesystem` proves are present, and whose checksums it records.
 # This is the pinned fixture's shape (Task 2): the two ProjectSettings /
@@ -956,3 +981,475 @@ def _run_headless_guarded(
         )
     finally:
         lease.release()
+
+
+# ---------------------------------------------------------------------------
+# live-editor-mcp
+# ---------------------------------------------------------------------------
+#
+# The one route whose receipt may carry `ready=true`, and the only one whose
+# evidence passes through a bridge instead of a file Unity wrote. Everything
+# that makes that safe lives in mcp.py; this function is the ordering.
+#
+# Two things about this route differ from same-project-headless on purpose:
+#
+# 1. There is NO collision-refusal receipt. `collision_refused` is
+#    same-project-headless's own probe -- routes-v1.json and
+#    validate_unity_receipt both reject it on any other route -- so when
+#    ownership refuses here there is no honest receipt to emit and the route
+#    RAISES. Emitting `collision_refused=true` from this route would produce a
+#    receipt its own validator fails.
+#
+# 2. It edits the user's EditorPrefs, and EditorPrefs are per-user and
+#    per-Unity-version, NOT per-project. The four MCPForUnity keys are backed
+#    up (including their previous ABSENCE, which is why the fixture's
+#    PrefBackup carries a `*Present` flag beside each value) and restored in
+#    the finally -- so a crashed run leaves a backup file on disk and a
+#    developer's Editor with our transport settings, which is exactly why the
+#    backup is written before anything is changed and its existence is
+#    verified before the run proceeds.
+
+# Phase budgets summed from routes-v1.json: the Editor has to start, import
+# and compile, the server has to come up, the Editor has to reach the bridge
+# and go idle, and only then can tests run.
+LIVE_MCP_TIMEOUT_PHASES: tuple[str, ...] = (
+    "editor_startup",
+    "import_compile_ready",
+    "mcp_server_startup",
+    "mcp_editor_ready",
+    "edit_mode_tests",
+)
+LIVE_MCP_TIMEOUT_SECONDS: float = 1140.0
+
+CONFIGURE_METHOD = "KingletSpike.Probe.ConfigureMcpProbe"
+RESTORE_METHOD = "KingletSpike.Probe.RestoreMcpProbe"
+
+
+def _prefs_argv(editor: Path, project: Path, method: str, log_path: Path) -> list[str]:
+    """Batchmode argv for the EditorPrefs configure/restore passes.
+
+    `-quit` IS present here, and correctly so: Task 5's measured fact is that
+    `-quit` suppresses `-runTests`, and there is no `-runTests` in this argv.
+    These passes run `-executeMethod` and then must exit; without `-quit` a
+    batchmode Editor stays resident and holds the project open, which would
+    deadlock the very GUI launch this pass exists to prepare for.
+    """
+    return [
+        str(editor),
+        "-batchmode",
+        "-nographics",
+        "-quit",
+        "-projectPath", str(project),
+        "-executeMethod", method,
+        "-logFile", str(log_path),
+    ]
+
+
+def _gui_argv(editor: Path, project: Path, log_path: Path) -> list[str]:
+    """Argv for the real GUI Editor. No `-batchmode` -- that is the point.
+
+    The whole route exists to prove that a LIVE Editor, the kind a developer
+    actually has open, can be driven through MCP. A batchmode Editor would
+    make the route a slower duplicate of same-project-headless.
+    """
+    return [
+        str(editor),
+        "-projectPath", str(project),
+        "-logFile", str(log_path),
+    ]
+
+
+def _run_prefs_pass(
+    *,
+    editor: Path,
+    project: Path,
+    method: str,
+    log_path: Path,
+    raw_dir: Path,
+    backup_path: Path,
+    mcp_url: str,
+    process_factory,
+    env: dict | None,
+    timeout_seconds: float,
+    cancellation_deadline: float,
+    tag: str,
+) -> tuple[int | None, tuple[int, ...]]:
+    """Run one batchmode `-executeMethod` pass and prove it exited cleanly.
+
+    Contained like every other launch here, and its survivors are returned
+    rather than dropped: a Roslyn server orphaned by the configure pass is a
+    leak whether or not the pass itself exited 0 (Task 5's measured fact 4).
+    """
+    pass_env = dict(os.environ) if env is None else dict(env)
+    pass_env["KINGLET_MCP_URL"] = mcp_url
+    pass_env["KINGLET_MCP_PREFS_BACKUP"] = str(backup_path)
+
+    process = process_factory(
+        _prefs_argv(editor, project, method, log_path),
+        cwd=project,
+        env=pass_env,
+        stdout_path=raw_dir / f"{tag}.stdout",
+        stderr_path=raw_dir / f"{tag}.stderr",
+    )
+    exit_code: int | None = None
+    try:
+        exit_code = process.wait(timeout_seconds)
+    finally:
+        cleanup = process.cancel(cancellation_deadline)
+        survivors = cleanup.survivors
+        if exit_code is None:
+            exit_code = cleanup.exit_code
+    return exit_code, survivors
+
+
+def run_live_editor_mcp(
+    editor,
+    project,
+    raw_dir,
+    *,
+    process_table_provider=None,
+    windows: bool | None = None,
+    run_version_flag=None,
+    process_factory: Callable[..., ManagedProcess] = ManagedProcess.start,
+    client_factory=None,
+    env: dict | None = None,
+    host: str = "127.0.0.1",
+    port: int | None = None,
+    timeout_seconds: float = LIVE_MCP_TIMEOUT_SECONDS,
+    editor_ready_timeout: float = mcp_module.MCP_EDITOR_READY_SECONDS,
+    server_ready_timeout: float = mcp_module.MCP_SERVER_STARTUP_SECONDS,
+    tests_timeout: float = mcp_module.EDIT_MODE_TESTS_SECONDS,
+    cancellation_deadline: float = CANCELLATION_DEADLINE_SECONDS,
+    lease_ttl_seconds: float | None = None,
+    lease_dir=None,
+    clock: Callable[[], float] = time.time,
+) -> UnityReceipt:
+    """Drive a LIVE GUI Editor through the pinned MCP bridge.
+
+    The one public entry point for this route. Every keyword is an injectable
+    seam with a real default, so the refusal, not-ready, timeout and cleanup
+    branches are executable from a test on any host -- including hosts with no
+    Unity, no display and no MCP server.
+    """
+    editor = Path(editor).resolve()
+    project = Path(project).resolve()
+    raw_dir = Path(raw_dir)
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    raw_dir = raw_dir.resolve()
+
+    ownership_kwargs = {}
+    if process_table_provider is not None:
+        ownership_kwargs["process_table_provider"] = process_table_provider
+    if windows is not None:
+        ownership_kwargs["windows"] = windows
+
+    # Ownership first, same as the headless route and for the same reason: it
+    # is the cheapest refusal and it must precede anything that touches the
+    # Editor binary. Unlike that route it RAISES -- see the block comment
+    # above; this route has no honest refusal receipt to emit.
+    assert_headless_safe(project, **ownership_kwargs)
+
+    identity = verify_project_editor(
+        project, editor,
+        **({} if run_version_flag is None else {"run_version_flag": run_version_flag}),
+    )
+
+    return _live_mcp_guarded(
+        editor=editor,
+        project=project,
+        raw_dir=raw_dir,
+        identity=identity,
+        process_factory=process_factory,
+        client_factory=client_factory,
+        env=env,
+        host=host,
+        port=port,
+        timeout_seconds=timeout_seconds,
+        editor_ready_timeout=editor_ready_timeout,
+        server_ready_timeout=server_ready_timeout,
+        tests_timeout=tests_timeout,
+        cancellation_deadline=cancellation_deadline,
+        lease_ttl_seconds=lease_ttl_seconds,
+        lease_dir=default_lease_dir() if lease_dir is None else Path(lease_dir),
+        clock=clock,
+    )
+
+
+def _live_mcp_guarded(
+    *,
+    editor: Path,
+    project: Path,
+    raw_dir: Path,
+    identity,
+    process_factory,
+    client_factory,
+    env,
+    host: str,
+    port: int | None,
+    timeout_seconds: float,
+    editor_ready_timeout: float,
+    server_ready_timeout: float,
+    tests_timeout: float,
+    cancellation_deadline: float,
+    lease_ttl_seconds: float | None,
+    lease_dir: Path,
+    clock: Callable[[], float],
+) -> UnityReceipt:
+    """The single guarded path for live-editor-mcp.
+
+    Order, and why it is this one:
+
+    1. acquire the lease BEFORE the prefs pass. The configure pass opens the
+       project in batchmode; doing that outside the lease is a second Editor
+       on an unguarded project, which is the thing the lease exists to stop.
+    2. start the MCP server and prove it REACHABLE, before launching the
+       Editor. The Editor is configured to dial the server on load, so a
+       server that is not listening yet costs a retry cycle at best.
+    3. launch the GUI Editor with `_start_bound`, so the lease names the
+       process that actually holds the workspace -- the Editor, not the
+       server. The server holds nothing and is cancelled independently.
+    4. wait for the EXPECTED Editor. Not for "an instance": mcp.py's
+       select_instance matches the project hash and the exact version.
+    5. only then clear the console, refresh, wait again, and run tests.
+    6. finally, in this order: cancel the Editor, restore the EditorPrefs
+       (which needs the project free, hence after the cancel), cancel the
+       server, release the lease. Every step runs on every path.
+    """
+    started = clock()
+    survivors: list[int] = []
+    setup_log = raw_dir / LIVE_MCP_SETUP_LOG_NAME
+    editor_log = raw_dir / LIVE_MCP_EDITOR_LOG_NAME
+    restore_log = raw_dir / LIVE_MCP_RESTORE_LOG_NAME
+    backup_path = raw_dir / LIVE_MCP_PREFS_BACKUP_NAME
+    for stale in (setup_log, editor_log, restore_log, backup_path):
+        if stale.exists():
+            stale.unlink()
+
+    lease_kwargs = {}
+    if lease_ttl_seconds is not None:
+        lease_kwargs["ttl_seconds"] = lease_ttl_seconds
+    lease = WorkspaceLease.acquire(
+        project,
+        route=LIVE_EDITOR_MCP_ROUTE,
+        lease_dir=lease_dir,
+        **lease_kwargs,
+    )
+
+    state = {"server": None, "gui": None, "configured": False, "torn_down": False}
+    ready_state = None
+    compile_result: CompileResult | None = None
+    tests_result: TestResult | None = None
+
+    def teardown() -> None:
+        """Cancel everything and put the EditorPrefs back. Idempotent.
+
+        Runs BEFORE the receipt is built, not after, and that ordering is the
+        whole point: `descendant_pids` is a claim about what survived cleanup,
+        so a receipt assembled while the Editor was still running could only
+        ever report an empty survivor set. The first version of this function
+        built the receipt in the `try` and cancelled in the `finally`, which
+        made `descendant_pids` structurally incapable of being non-empty --
+        the leak field would have read clean on a run that leaked. A test
+        caught it; the idempotent flag is what lets the same teardown run from
+        the success path and from the outermost `finally` without cancelling
+        twice.
+        """
+        if state["torn_down"]:
+            return
+        state["torn_down"] = True
+        if state["gui"] is not None:
+            survivors.extend(state["gui"].cancel(cancellation_deadline).survivors)
+        if state["configured"]:
+            # Best effort by necessity: the run may be unwinding from an
+            # exception and this is the only chance to put the developer's
+            # EditorPrefs back. A failure here is recorded in the restore log
+            # and must not mask the original error.
+            try:
+                _, leaked = _run_prefs_pass(
+                    editor=editor, project=project, method=RESTORE_METHOD,
+                    log_path=restore_log, raw_dir=raw_dir, backup_path=backup_path,
+                    mcp_url="", process_factory=process_factory, env=env,
+                    timeout_seconds=timeout_seconds,
+                    cancellation_deadline=cancellation_deadline,
+                    tag="live-editor-mcp-restore",
+                )
+                survivors.extend(leaked)
+            except BaseException:
+                pass
+        if state["server"] is not None:
+            survivors.extend(state["server"].cancel(cancellation_deadline).survivors)
+
+    try:
+        server, resolved_port = mcp_module.start_mcp(
+            raw_dir, host=host, port=port, env=env, process_factory=process_factory
+        )
+        state["server"] = server
+        mcp_url = f"http://{host}:{resolved_port}/mcp"
+
+        client = (
+            mcp_module.SubprocessMcpClient(host=host, port=resolved_port, env=env)
+            if client_factory is None
+            else client_factory(host=host, port=resolved_port)
+        )
+
+        probe = mcp_module.wait_for_server(client, timeout=server_ready_timeout)
+        if not probe.reachable:
+            raise EvidenceError(
+                "E_UNITY_MCP_NOT_READY",
+                f"{mcp_module.CATEGORY_SERVER_START_FAILED}: the pinned MCP server "
+                f"never answered on {host}:{resolved_port} within "
+                f"{server_ready_timeout}s",
+            )
+
+        # Point the Editor at THIS server, backing up what was there first.
+        exit_code, leaked = _run_prefs_pass(
+            editor=editor, project=project, method=CONFIGURE_METHOD,
+            log_path=setup_log, raw_dir=raw_dir, backup_path=backup_path,
+            mcp_url=mcp_url, process_factory=process_factory, env=env,
+            timeout_seconds=timeout_seconds,
+            cancellation_deadline=cancellation_deadline, tag="live-editor-mcp-setup",
+        )
+        survivors.extend(leaked)
+        if exit_code != 0:
+            raise EvidenceError(
+                "E_UNITY_MCP_CONFIGURE",
+                f"the EditorPrefs configure pass exited {exit_code}; the Editor "
+                "was never pointed at the probe's MCP server",
+            )
+        if not backup_path.is_file():
+            # Without a backup we cannot put the developer's Editor back, so we
+            # refuse to change it further rather than proceed and hope.
+            raise EvidenceError(
+                "E_UNITY_MCP_CONFIGURE",
+                "the configure pass exited 0 but wrote no EditorPrefs backup; "
+                "refusing to run a route whose changes could not be reverted",
+            )
+        state["configured"] = True
+
+        gui = _start_bound(
+            lease, _gui_argv(editor, project, editor_log),
+            cwd=project,
+            env=dict(os.environ) if env is None else dict(env),
+            stdout_path=raw_dir / "live-editor-mcp-editor.stdout",
+            stderr_path=raw_dir / "live-editor-mcp-editor.stderr",
+            process_factory=process_factory,
+            cancellation_deadline=cancellation_deadline,
+        )
+        state["gui"] = gui
+
+        ready_state = mcp_module.wait_for_editor(
+            client,
+            project=project,
+            unity_version=identity.version,
+            timeout=editor_ready_timeout,
+        ).require_ready()
+        instance = ready_state.instance
+
+        # Console cleared BEFORE the refresh, so the errors we count are this
+        # compile's and not whatever was on screen when the Editor opened.
+        mcp_module.clear_console(client, instance=instance)
+        mcp_module.refresh_assets(client, instance=instance)
+        ready_state = mcp_module.wait_for_editor(
+            client,
+            project=project,
+            unity_version=identity.version,
+            timeout=editor_ready_timeout,
+        ).require_ready()
+
+        errors, _messages = mcp_module.read_console_errors(client, instance=instance)
+        if errors:
+            compile_result = CompileResult(status="fail", errors=errors)
+            tests_result = TestResult(status="not-run", passed=0, failed=0, skipped=0)
+        else:
+            summary = mcp_module.run_tests_via_mcp(
+                client, instance=instance, timeout=tests_timeout
+            )
+            compile_result = CompileResult(status="pass", errors=0)
+            tests_result = _tests_from_job(summary)
+            # A compile error can surface DURING the run (a test that triggers
+            # a reimport). Re-reading closes the window in which we would claim
+            # compile=pass over a console that had since filled with CS errors.
+            errors, _messages = mcp_module.read_console_errors(client, instance=instance)
+            if errors:
+                raise EvidenceError(
+                    "E_UNITY_RESULTS_CONFLICT",
+                    f"the Editor console reports {errors} compile error(s) after a "
+                    f"test run this route recorded as {tests_result.status!r}; one "
+                    "of those two observations is not describing this run",
+                )
+
+        # BEFORE the receipt, never after. `descendant_pids` is a claim about
+        # what survived cleanup, so cleanup has to have happened. The outer
+        # `finally` calls this again on every other path; it is idempotent.
+        teardown()
+
+        _write_json(raw_dir / LIVE_MCP_SUMMARY_NAME, {
+            "schema": "kinglet.unity-probe.summary/v1",
+            "route": LIVE_EDITOR_MCP_ROUTE,
+            "collision_refused": False,
+            "launched": True,
+            "unity_version": identity.version,
+            "mcp_commit": mcp_module.MCP_SERVER_COMMIT,
+            "mcp_host": host,
+            "instance_hash": instance.hash,
+            "ready": True,
+            "ready_polls": ready_state.polls,
+            "duration_seconds": round(clock() - started, 3),
+            "compile": {
+                "status": compile_result.status,
+                "errors": compile_result.errors,
+            },
+            "tests": {
+                "status": tests_result.status,
+                "passed": tests_result.passed,
+                "failed": tests_result.failed,
+                "skipped": tests_result.skipped,
+            },
+            "survivors": len(survivors),
+        })
+
+        return UnityReceipt(
+            schema=RECEIPT_SCHEMA,
+            route=LIVE_EDITOR_MCP_ROUTE,
+            project_id=PROJECT_ID,
+            unity_version=identity.version,
+            compile=compile_result,
+            tests=tests_result,
+            # True because wait_for_editor RETURNED ready for the expected
+            # instance at the expected version -- not because a server started.
+            ready=True,
+            collision_refused=False,
+            active_lease=False,
+            descendant_pids=tuple(survivors),
+            artifacts=(f"{ARTIFACT_PREFIX}/{LIVE_MCP_SUMMARY_NAME}",),
+        )
+    finally:
+        teardown()
+        lease.release()
+
+
+def _tests_from_job(summary) -> TestResult:
+    """Map an MCP test-job summary onto the receipt's TestResult, or refuse.
+
+    Identical discipline to `_tests_from_summary` for the headless route, and
+    deliberately so: the plan requires MCP and headless to publish the SAME
+    normalized fields, which means the same claim needs the same evidence
+    whichever bridge produced it. A run that was entirely skipped is not a
+    pass here either.
+    """
+    if summary.failed >= 1:
+        return TestResult(
+            status="fail",
+            passed=summary.passed,
+            failed=summary.failed,
+            skipped=summary.skipped,
+        )
+    if summary.status == "succeeded" and summary.passed >= 1 and summary.skipped == 0:
+        return TestResult(status="pass", passed=summary.passed, failed=0, skipped=0)
+    raise EvidenceError(
+        "E_UNITY_RESULTS_UNRESOLVED",
+        f"MCP test job finished as {summary.status!r} / {summary.result_state!r} "
+        f"with passed={summary.passed} failed={summary.failed} "
+        f"skipped={summary.skipped}; that is neither an observed pass nor an "
+        "observed failure, and this route does not guess",
+    )
