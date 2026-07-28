@@ -1042,6 +1042,29 @@ def read_console_errors(client, *, instance: McpInstance, timeout: float = 60.0)
     returning zero: "we could not read the console" and "the console is clean"
     are the same value under a permissive reading, and only one of them
     supports a `compile=pass` claim.
+
+    That promise used to be false, and the way it was false is worth keeping
+    written down. The reader recognised three container keys and otherwise
+    fell through to `entries = []` -- so a reply whose `data` was a dict with
+    unfamiliar keys, or absent, or null, was reported as `(0, ())`: a clean
+    console, for a console it had not read. `routes.py` turns that into
+    `compile=pass, errors=0`, and because the post-test re-read takes the same
+    path it also reports zero, so `E_UNITY_RESULTS_CONFLICT` never fires
+    either. A published receipt would have claimed a passing compile over
+    bytes nobody parsed.
+
+    It was one parameter from firing. `MCPForUnity/Editor/Tools/ReadConsole.cs`
+    switches to `{cursor, pageSize, nextCursor, truncated, total, items}` the
+    moment `usePaging = pageSize.HasValue || cursor.HasValue` -- our request
+    sets neither, so we take the bare-list branch today, but a cursor, a
+    default change, or an envelope tweak moves us onto `items`.
+
+    So the shape vocabulary now includes `items`, and -- more importantly --
+    ANY reply from which no entry list could be extracted is an explicit "I
+    could not tell", exactly as `_require_false` treats a non-boolean
+    readiness field. `entries` starts as None and only a recognised list
+    assigns it; None at the end raises. An empty list is a different thing
+    entirely: that is a console we DID read, and it really is clean.
     """
     call = client.call(
         ("raw", "read_console", json.dumps({"action": "get", "types": ["error"], "count": 200})),
@@ -1056,18 +1079,28 @@ def read_console_errors(client, *, instance: McpInstance, timeout: float = 60.0)
             "a compile claim cannot be made over an unread console",
         )
     data = payload.get("data")
-    entries: list = []
+    # None means "no list was extracted", which is NOT the same as an empty
+    # list. Only a recognised list ever assigns it, so every unhandled shape
+    # -- unknown dict keys, a missing `data`, a null `data`, a scalar, or a
+    # known key holding a non-list -- arrives at the raise below.
+    entries: list | None = None
     if isinstance(data, list):
         entries = data
     elif isinstance(data, dict):
-        for key in ("messages", "logs", "entries"):
+        # `items` is the pinned paging shape; the other three are the
+        # envelopes seen on the non-paging and resource paths.
+        for key in ("items", "messages", "logs", "entries"):
             if isinstance(data.get(key), list):
                 entries = data[key]
                 break
-    elif data is not None:
+    if entries is None:
         raise EvidenceError(
             "E_UNITY_MCP_CONSOLE",
-            f"the console reply carried an unrecognised data shape: {type(data).__name__}",
+            "the console reply carried no readable entry list (data was "
+            f"{type(data).__name__}"
+            + (f" with keys {sorted(data)!r}" if isinstance(data, dict) else "")
+            + "); a compile claim cannot be made over a console this reader "
+            "did not parse",
         )
 
     seen: set[str] = set()

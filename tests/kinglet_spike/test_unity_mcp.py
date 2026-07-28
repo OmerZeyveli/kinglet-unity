@@ -434,6 +434,40 @@ class AmbiguityIsNeverReadyTests(unittest.TestCase):
         self.assertEqual((mcp.REASON_STATE_UNAVAILABLE,), state.blocking_reasons)
         self.assertIn("timed out", state.detail)
 
+    def test_an_unrecognised_reply_object_is_rejected_whole_not_field_by_field(self):
+        # Pins _state_data's conservative fallback, which was unasserted:
+        # mutating `if "schema_version" in payload or "compilation" in payload`
+        # to a bare `return payload` left the whole suite green, because
+        # _evaluate then rejects the dict on every field and the verdict is
+        # still not-ready. Benign in effect, but an unasserted guard in a
+        # module whose entire claim is that its guards are asserted.
+        #
+        # The assertion that kills it is EXACTNESS: a payload that is not a
+        # snapshot must be rejected as ONE thing -- state-malformed -- not
+        # accepted and then picked apart into six field-level reasons.
+        self.assertIsNone(mcp._state_data({"success": True, "totally": "unrelated"}))
+        client = FakeClient(
+            instances=instances_payload(entry_for(self.project)),
+            state=call_from(stdout=json.dumps({"success": True, "totally": "unrelated"})),
+        )
+        state = mcp.probe_editor(
+            client, project=self.project, unity_version=EDITOR_VERSION, now_ms=NOW_MS
+        )
+        self.assertFalse(state.ready)
+        self.assertEqual((mcp.REASON_STATE_MALFORMED,), state.blocking_reasons)
+
+    def test_a_snapshot_handed_back_unwrapped_is_still_recognised(self):
+        # The other side of that guard: some transports return the snapshot
+        # without the {"success", "data"} envelope. It is accepted only
+        # because it actually looks like a snapshot, never as a fallback.
+        client = FakeClient(
+            instances=instances_payload(entry_for(self.project)),
+            state=call_from(stdout=json.dumps(snapshot())),
+        )
+        self.assertTrue(mcp.probe_editor(
+            client, project=self.project, unity_version=EDITOR_VERSION, now_ms=NOW_MS
+        ).ready)
+
     def test_state_reply_reporting_failure_is_not_ready(self):
         client = FakeClient(
             instances=instances_payload(entry_for(self.project)),
@@ -894,11 +928,93 @@ class ConsoleTests(unittest.TestCase):
         self.assertEqual("E_UNITY_MCP_CONSOLE", caught.exception.code)
 
     def test_a_bare_list_payload_is_accepted(self):
+        # The shape the pinned ReadConsole.cs returns when paging is OFF -- our
+        # request sets neither `cursor` nor `pageSize`, so this is today's path.
         client = FakeClient(script={"raw read_console": call_from(stdout=json.dumps({
             "success": True,
             "data": [{"message": "error CS0103: name not found"}],
         }))})
         self.assertEqual(1, mcp.read_console_errors(client, instance=self.instance)[0])
+
+    # -- shapes that must be READ, or REFUSED -- never silently "clean" -------
+    #
+    # Every test below failed against the first version of read_console_errors,
+    # which fell through to `entries = []` and reported (0, ()) -- i.e. "the
+    # console is clean" for a console it had not read. Downstream that becomes
+    # `compile=pass, errors=0` in a published receipt (routes.py), and the
+    # post-test re-read reports zero too, so E_UNITY_RESULTS_CONFLICT never
+    # fires either. It is the exact defect class this task exists to remove,
+    # on the one field the plan requires MCP and headless to publish alike.
+
+    def test_the_paging_shape_is_read_not_reported_clean(self):
+        # `MCPForUnity/Editor/Tools/ReadConsole.cs` returns
+        # {cursor, pageSize, nextCursor, truncated, total, items} whenever
+        # `usePaging = pageSize.HasValue || cursor.HasValue`. One added
+        # parameter -- ours or a future default -- moves us onto this shape.
+        client = FakeClient(script={"raw read_console": call_from(stdout=json.dumps({
+            "success": True,
+            "data": {
+                "cursor": 0, "pageSize": 50, "nextCursor": None,
+                "truncated": False, "total": 1,
+                "items": [{"message": "Assets/A.cs(1,1): error CS1002: ; expected"}],
+            },
+        }))})
+        count, messages = mcp.read_console_errors(client, instance=self.instance)
+        self.assertEqual(1, count)
+        self.assertEqual(1, len(messages))
+
+    def test_an_empty_page_is_a_read_console_and_reports_zero(self):
+        # The other half of the pair: `items: []` is a console we DID read and
+        # that really is clean. It must not be swept up by the refusal.
+        client = FakeClient(script={"raw read_console": call_from(stdout=json.dumps({
+            "success": True,
+            "data": {"cursor": 0, "pageSize": 50, "truncated": False,
+                     "total": 0, "items": []},
+        }))})
+        self.assertEqual(0, mcp.read_console_errors(client, instance=self.instance)[0])
+
+    def test_a_dict_with_no_recognised_entry_key_is_refused(self):
+        # Errors are RIGHT THERE and the old code reported the console clean.
+        client = FakeClient(script={"raw read_console": call_from(stdout=json.dumps({
+            "success": True,
+            "data": {"count": 2, "lines": ["Assets/A.cs(1,1): error CS1002: ; expected"]},
+        }))})
+        with self.assertRaises(EvidenceError) as caught:
+            mcp.read_console_errors(client, instance=self.instance)
+        self.assertEqual("E_UNITY_MCP_CONSOLE", caught.exception.code)
+
+    def test_a_reply_with_no_data_key_at_all_is_refused(self):
+        client = FakeClient(script={
+            "raw read_console": call_from(stdout=json.dumps({"success": True}))
+        })
+        with self.assertRaises(EvidenceError) as caught:
+            mcp.read_console_errors(client, instance=self.instance)
+        self.assertEqual("E_UNITY_MCP_CONSOLE", caught.exception.code)
+
+    def test_a_null_data_payload_is_refused(self):
+        client = FakeClient(script={
+            "raw read_console": call_from(stdout=json.dumps({"success": True, "data": None}))
+        })
+        with self.assertRaises(EvidenceError) as caught:
+            mcp.read_console_errors(client, instance=self.instance)
+        self.assertEqual("E_UNITY_MCP_CONSOLE", caught.exception.code)
+
+    def test_a_scalar_data_payload_is_refused(self):
+        client = FakeClient(script={
+            "raw read_console": call_from(stdout=json.dumps({"success": True, "data": 7}))
+        })
+        with self.assertRaises(EvidenceError) as caught:
+            mcp.read_console_errors(client, instance=self.instance)
+        self.assertEqual("E_UNITY_MCP_CONSOLE", caught.exception.code)
+
+    def test_a_recognised_key_holding_a_non_list_is_refused(self):
+        # `items` present but not a list is not a console we read either.
+        client = FakeClient(script={"raw read_console": call_from(stdout=json.dumps({
+            "success": True, "data": {"items": "error CS1002: ; expected"},
+        }))})
+        with self.assertRaises(EvidenceError):
+            mcp.read_console_errors(client, instance=self.instance)
+
 
 
 # ---------------------------------------------------------------------------
@@ -1175,6 +1291,23 @@ class LiveRouteTests(unittest.TestCase):
         self.assertEqual(
             [], [a for a, _ in self.client.calls if a[:2] == ("editor", "tests")]
         )
+
+    def test_an_unread_console_never_reaches_a_compile_pass_receipt(self):
+        # The failure scenario end to end. If read_console_errors reports
+        # (0, ()) for a shape it never parsed, this route writes
+        # compile=pass/errors=0 -- and the post-test re-read reports zero too,
+        # so E_UNITY_RESULTS_CONFLICT never fires to catch it. The receipt
+        # then publishes a passing compile over a console nobody read.
+        factory = self.client_factory()
+        self.client.script["raw read_console"] = call_from(stdout=json.dumps({
+            "success": True,
+            "data": {"count": 1, "lines": ["Assets/A.cs(1,1): error CS1002: ; expected"]},
+        }))
+        with self.assertRaises(EvidenceError) as caught:
+            self.run_route(client_factory=factory)
+        self.assertEqual("E_UNITY_MCP_CONSOLE", caught.exception.code)
+        self.assertEqual([], self.lease_files())
+        self.assertIn(routes.RESTORE_METHOD, self.fleet.methods)
 
     def test_a_skipped_only_run_is_refused_rather_than_reported(self):
         factory = self.client_factory(
