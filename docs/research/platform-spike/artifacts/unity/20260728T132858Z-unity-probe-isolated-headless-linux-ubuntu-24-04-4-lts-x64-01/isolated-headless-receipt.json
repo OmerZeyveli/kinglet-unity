@@ -1,0 +1,24 @@
+{
+  "active_lease": false,
+  "artifacts": [
+    "artifacts/unity/isolated-headless-summary.json",
+    "artifacts/unity/isolated-headless-manifest.json"
+  ],
+  "collision_refused": false,
+  "compile": {
+    "errors": 0,
+    "status": "pass"
+  },
+  "descendant_pids": [],
+  "project_id": "kinglet-unity-probe",
+  "ready": false,
+  "route": "isolated-headless",
+  "schema": "kinglet.unity-probe.receipt/v1",
+  "tests": {
+    "failed": 0,
+    "passed": 1,
+    "skipped": 0,
+    "status": "pass"
+  },
+  "unity_version": "6000.3.18f1"
+}

@@ -332,8 +332,10 @@
     },
     {
       "id": "unity.editor-resolution.linux-ubuntu-24-04-x64.mismatched-editor",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-mismatched-editor-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "unity.editor-resolution.macos-26-arm64.mismatched-editor",
@@ -347,13 +349,17 @@
     },
     {
       "id": "unity.execution.linux-ubuntu-24-04-x64.cancellation",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-cancellation-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "unity.execution.linux-ubuntu-24-04-x64.orphan-cleanup",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-orphan-cleanup-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "unity.execution.macos-26-arm64.cancellation",
@@ -377,8 +383,10 @@
     },
     {
       "id": "unity.filesystem-only.linux-ubuntu-24-04-x64.route",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-filesystem-only-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "unity.filesystem-only.macos-26-arm64.route",
@@ -392,8 +400,10 @@
     },
     {
       "id": "unity.isolated-headless.linux-ubuntu-24-04-x64.route",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "unity.isolated-headless.macos-26-arm64.route",
@@ -407,13 +417,17 @@
     },
     {
       "id": "unity.live-editor-mcp.linux-ubuntu-24-04-x64.bridge-not-ready",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-bridge-not-ready-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "unity.live-editor-mcp.linux-ubuntu-24-04-x64.route",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-live-editor-mcp-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "inconclusive"
     },
     {
       "id": "unity.live-editor-mcp.macos-26-arm64.bridge-not-ready",
@@ -437,13 +451,17 @@
     },
     {
       "id": "unity.same-project-headless.linux-ubuntu-24-04-x64.collision-refusal",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-collision-refusal-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "unity.same-project-headless.linux-ubuntu-24-04-x64.route",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T132858Z-unity-probe-same-project-headless-linux-ubuntu-24-04-4-lts-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "unity.same-project-headless.macos-26-arm64.collision-refusal",

@@ -1,0 +1,190 @@
+{
+  "files": [
+    {
+      "path": "Assets/KingletSpike/Editor/KingletSpike.Editor.asmdef",
+      "sha256": "76583c5614ae3d7e7c8b3cb06523418ffd5ccf4c454ebdb77b1b02520059a914",
+      "size": 105
+    },
+    {
+      "path": "Assets/KingletSpike/Editor/KingletSpike.Editor.asmdef.meta",
+      "sha256": "f4ee6f49fe44c61aa47a6069923ec6ee7d9c4ff5e16263dbcd43e38b3d9ba52a",
+      "size": 166
+    },
+    {
+      "path": "Assets/KingletSpike/Editor/KingletSpikeProbe.cs",
+      "sha256": "83365c1c9d21fecb9f6d7f7a90de259dd2bd492540ab0b2d38716a997ce807ce",
+      "size": 4012
+    },
+    {
+      "path": "Assets/KingletSpike/Editor/KingletSpikeProbe.cs.meta",
+      "sha256": "345decbf84c2a606252a6d5a1853e3634cc47823187e322017941eeb23f29e5d",
+      "size": 243
+    },
+    {
+      "path": "Assets/KingletSpike/Editor.meta",
+      "sha256": "0dfc5531a510b7f526f9da1f5f516198df10b860c7d945e73d04ce0fff3a2e01",
+      "size": 172
+    },
+    {
+      "path": "Assets/KingletSpike/Tests/Editor/KingletSpike.Tests.asmdef",
+      "sha256": "0436007d44c36259cd74266042bcd835f29d8bfa4a8b8fca2e1da40676525ce1",
+      "size": 200
+    },
+    {
+      "path": "Assets/KingletSpike/Tests/Editor/KingletSpike.Tests.asmdef.meta",
+      "sha256": "891f7838ecccdcd30eeac14c02cc6ecff401fca07c92e30046fa49ea0ab23eb2",
+      "size": 166
+    },
+    {
+      "path": "Assets/KingletSpike/Tests/Editor/KingletSpikeTests.cs",
+      "sha256": "b9b1a2a398739c15159c2daa1021071bbf65ec538a49c64d8db3af02da9caf68",
+      "size": 279
+    },
+    {
+      "path": "Assets/KingletSpike/Tests/Editor/KingletSpikeTests.cs.meta",
+      "sha256": "d996f00ab04a8288a9c0250e6a56820cd3418c4867bcb105a5c3130664c21893",
+      "size": 243
+    },
+    {
+      "path": "Assets/KingletSpike/Tests/Editor.meta",
+      "sha256": "19ba6c1c976c1859f81bae1e29431b1956cba834c6dad481a1e5cf0cc824335d",
+      "size": 172
+    },
+    {
+      "path": "Assets/KingletSpike/Tests.meta",
+      "sha256": "db285469a2cf65a1fd71b27288d892482a4ebbf8f7791d6e7121e28204d1ab4f",
+      "size": 172
+    },
+    {
+      "path": "Assets/KingletSpike.meta",
+      "sha256": "7a8adba3bf4a22a8153f78d1f353987369b1d421912a0ba6cbcf85089105bd06",
+      "size": 172
+    },
+    {
+      "path": "Packages/manifest.json",
+      "sha256": "2624a5a6826de974f4431ef0ccf56b0bdd781e54ee69c5c28737cf069eef6734",
+      "size": 1757
+    },
+    {
+      "path": "Packages/packages-lock.json",
+      "sha256": "b1ac6752c3441f82882a23802d7b019bcbc3698558c208ecc7a9a85b2cc417aa",
+      "size": 8660
+    },
+    {
+      "path": "ProjectSettings/AudioManager.asset",
+      "sha256": "9543c41dbfc7d3951217c4dd9481ed026eb8e529b85ecf4463969a0fea747729",
+      "size": 523
+    },
+    {
+      "path": "ProjectSettings/ClusterInputManager.asset",
+      "sha256": "40e65dd214bf254955d2c8829ca8ce2130fd3510485560ce012e9a1ddd93e623",
+      "size": 114
+    },
+    {
+      "path": "ProjectSettings/DynamicsManager.asset",
+      "sha256": "fb36e677f7de32325bede8462e7e3eaf0be86ca374216d2907886fce7cb1d488",
+      "size": 1553
+    },
+    {
+      "path": "ProjectSettings/EditorBuildSettings.asset",
+      "sha256": "41bc588f6ecc03944687d496f024917cabb061e21c148a6471b74581df14f908",
+      "size": 190
+    },
+    {
+      "path": "ProjectSettings/EditorSettings.asset",
+      "sha256": "06753c21648950aee0013b70f79a9035ac52aec6204d44cc2ac55a84034ad9ca",
+      "size": 1603
+    },
+    {
+      "path": "ProjectSettings/GraphicsSettings.asset",
+      "sha256": "40de98f4d46d02fb08e268ad3a722a00eed7289f4ef6d2e759984b1b4a85d2af",
+      "size": 2433
+    },
+    {
+      "path": "ProjectSettings/InputManager.asset",
+      "sha256": "d0f454ddb880912abcae92e3e12957a7446786ba89e24937e019ff3bbc0d4300",
+      "size": 5816
+    },
+    {
+      "path": "ProjectSettings/MemorySettings.asset",
+      "sha256": "1e8379a461b10ae09f3f696911088c16875d63e87ed5f2d95df9e1892703f9fd",
+      "size": 1192
+    },
+    {
+      "path": "ProjectSettings/MultiplayerManager.asset",
+      "sha256": "ce4075d7a7dd8ac7ffe55de2427692c63f90dae398208bd80cec0f27cbe09f4b",
+      "size": 232
+    },
+    {
+      "path": "ProjectSettings/NavMeshAreas.asset",
+      "sha256": "7ebbf8f53b8033104e1878b95ca07a28d0954092d81c220f14196a42f651e658",
+      "size": 1361
+    },
+    {
+      "path": "ProjectSettings/PackageManagerSettings.asset",
+      "sha256": "8f19147a8cca86d1b47fa1af6cd2e2d45b16747f409f55b61cde7dc2bc4c599d",
+      "size": 1132
+    },
+    {
+      "path": "ProjectSettings/Physics2DSettings.asset",
+      "sha256": "1cfc0c8fbceec604fd7cd2a06c04ff05dddee6335b75c92b0f5715ad80ba9490",
+      "size": 1862
+    },
+    {
+      "path": "ProjectSettings/PresetManager.asset",
+      "sha256": "29c125923fe6e29f90190d4fce1c82d660e7051546e2c9d02908d18c9cf2436c",
+      "size": 146
+    },
+    {
+      "path": "ProjectSettings/ProjectSettings.asset",
+      "sha256": "216f1d38d5ca7630859e15ac7e204cba484bce7beb178db521178ca83b8e2026",
+      "size": 20362
+    },
+    {
+      "path": "ProjectSettings/ProjectVersion.txt",
+      "sha256": "d03fca18d2e511a37f7a81f8709404ebb2a571d3e0e5c854038c91a943ae15da",
+      "size": 85
+    },
+    {
+      "path": "ProjectSettings/QualitySettings.asset",
+      "sha256": "f1f893b1be47ad2442f58338dd7c860dc1986bb317e2f5bb31084454ffabbf4c",
+      "size": 9802
+    },
+    {
+      "path": "ProjectSettings/TagManager.asset",
+      "sha256": "da4b5eefc927f8b91bcf9e56a186d2b852f49d9cbe91d466638d26c79d6a83ce",
+      "size": 411
+    },
+    {
+      "path": "ProjectSettings/TimeManager.asset",
+      "sha256": "3396f52fdc16d445024e01d7a2d99db6f0a37569d1d73c0302e9ffb857d90287",
+      "size": 305
+    },
+    {
+      "path": "ProjectSettings/UnityConnectSettings.asset",
+      "sha256": "11251dae0356b6f43dd2c67bb511f6b7ecda4e5de425186bba3297e6f3dc1c6f",
+      "size": 1063
+    },
+    {
+      "path": "ProjectSettings/VFXManager.asset",
+      "sha256": "2973a6af930e142f62cde00076beda8a3cc3a66d9bfcde7a58ba7d4be2251c26",
+      "size": 525
+    },
+    {
+      "path": "ProjectSettings/VersionControlSettings.asset",
+      "sha256": "e199cdfa6a8f2bf33cfd47e549198f13e3eb2a5099e908fdb4e0f14d939ccc6b",
+      "size": 172
+    }
+  ],
+  "isolated_identity": "bc47cb5bbb61ecfc4e4882663057e54312567ab19d51f840c5d7ef465514784f",
+  "isolated_path_hash": "8d1aae285222cbc6407fbaa462a79c646b861f25dd35efce317000b4fdb9b7f2",
+  "main_identity": "bf0f237d407b62c1730525afb849dd04070288d39a12fff8b0cfaaf91e8b0ffd",
+  "main_path_hash": "c6a91313b1edb12b784e6b6e88d782112ba0b9e561ad1fd8d28326cdbf8288a8",
+  "schema": "kinglet.unity-probe.isolation-manifest/v1",
+  "tree_sha256": "719524f488599e580413dac76e92b4fa58d811b397d2963854bf7551ea562cc3",
+  "trees": [
+    "Assets",
+    "Packages",
+    "ProjectSettings"
+  ]
+}

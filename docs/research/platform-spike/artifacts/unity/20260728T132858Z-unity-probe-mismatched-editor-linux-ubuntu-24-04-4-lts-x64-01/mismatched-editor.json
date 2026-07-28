@@ -1,0 +1,18 @@
+{
+  "declared_version": "6000.3.18f1",
+  "offered_version": "6000.0.68f1",
+  "pinned_editor_accepted": "6000.3.18f1",
+  "project_unmodified": true,
+  "refusal_code": "E_UNITY_VERSION",
+  "refused": true,
+  "tree_after": [
+    "Assets",
+    "Packages",
+    "ProjectSettings"
+  ],
+  "tree_before": [
+    "Assets",
+    "Packages",
+    "ProjectSettings"
+  ]
+}

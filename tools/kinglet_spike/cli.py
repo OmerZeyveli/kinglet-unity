@@ -8,7 +8,7 @@ from .coverage import evaluate_coverage
 from .load import load_record
 from .model import Diagnostic, EvidenceError
 from .publish import publish_record
-from .report import load_published_records, write_reports
+from .report import load_published_records, write_reports, write_unity_reports
 from .validate import validate_record
 
 
@@ -32,6 +32,14 @@ def _parser() -> argparse.ArgumentParser:
     report = commands.add_parser("report")
     report.add_argument("--repo-root", type=Path, default=Path("."))
     report.add_argument("--matrix", type=Path, required=True)
+
+    unity_report = commands.add_parser("unity-report")
+    unity_report.add_argument("--repo-root", type=Path, default=Path("."))
+    unity_report.add_argument(
+        "--matrix",
+        type=Path,
+        default=Path("spikes/platform/contracts/matrix-v1.json"),
+    )
 
     gate = commands.add_parser("gate")
     gate.add_argument("gate_id")
@@ -165,6 +173,12 @@ def main(argv: list[str] | None = None) -> int:
         if arguments.command == "report":
             cells = write_reports(arguments.repo_root, arguments.matrix)
             print(f"reported {len(cells)} coverage cells")
+            return 0
+        if arguments.command == "unity-report":
+            cells = write_unity_reports(arguments.repo_root, arguments.matrix)
+            unity = [cell for cell in cells if cell.id.startswith("unity.")]
+            closed = sum(1 for cell in unity if cell.state == "pass")
+            print(f"unity cells: {closed} closed, {len(unity) - closed} open")
             return 0
         if arguments.command == "gate":
             if gate_is_closed(arguments.gate_id, arguments.repo_root):

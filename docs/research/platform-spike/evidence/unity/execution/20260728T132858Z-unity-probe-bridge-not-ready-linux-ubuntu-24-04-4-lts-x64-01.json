@@ -1,0 +1,83 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-bridge-not-ready-linux-ubuntu-24-04-4-lts-x64-01/bridge-not-ready.json",
+      "required": true,
+      "sha256": "109cda18c4114dc6e0c481bead224529d491fbf1dfd0b0091d84ad815580f58d"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "the pinned MCP server answered `instances` on loopback",
+      "id": "server-reachable",
+      "status": "pass"
+    },
+    {
+      "detail": "ready=False category=mcp.editor-not-ready reasons=['no-instances']",
+      "id": "server-is-not-editor-ready",
+      "status": "pass"
+    },
+    {
+      "detail": "category=mcp.editor-not-ready; a reachable server is reported under the Editor-readiness category, never as a start failure",
+      "id": "category-is-editor-not-ready",
+      "status": "pass"
+    },
+    {
+      "detail": "instances=0 reasons=['no-instances']",
+      "id": "no-instances-registered",
+      "status": "pass"
+    },
+    {
+      "detail": "survivors after cancel = []",
+      "id": "mcp-helper-left-nothing",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "uvx",
+    "<pinned mcp-for-unity>",
+    "--http-host",
+    "127.0.0.1"
+  ],
+  "ended_at": "2026-07-28T13:28:58Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "linux",
+    "release": "ubuntu-24.04.4-lts",
+    "toolchain": [
+      "host=Pop!_OS 24.04 LTS (ID=pop; ID_LIKE=ubuntu debian; codename=noble)",
+      "kernel=7.0.11-76070011-generic"
+    ]
+  },
+  "measurements": [],
+  "probe": {
+    "contract": "kinglet.unity-probe.receipt/v1",
+    "id": "bridge-not-ready"
+  },
+  "prompt": null,
+  "run_id": "20260728T132858Z-unity-probe-bridge-not-ready-linux-ubuntu-24-04-4-lts-x64-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [
+    {
+      "title": "Unity 6.3 (6000.3) release notes",
+      "url": "https://unity.com/releases/editor/whats-new/6000.3.18"
+    },
+    {
+      "title": "MCP for Unity (CoplayDev), pinned v9.7.1",
+      "url": "https://github.com/CoplayDev/unity-mcp/tree/v9.7.1"
+    },
+    {
+      "title": "Unity Editor command line arguments",
+      "url": "https://docs.unity3d.com/6000.3/Documentation/Manual/EditorCommandLineArguments.html"
+    }
+  ],
+  "started_at": "2026-07-28T13:28:58Z",
+  "status": "pass",
+  "subject": {
+    "id": "execution",
+    "kind": "unity",
+    "version": "6000.3.18f1 (5ebeb53e4c07)"
+  }
+}

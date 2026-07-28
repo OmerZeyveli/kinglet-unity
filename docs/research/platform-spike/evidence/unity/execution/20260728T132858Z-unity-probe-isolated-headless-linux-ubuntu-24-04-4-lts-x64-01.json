@@ -1,0 +1,124 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01/isolated-headless-summary.json",
+      "required": true,
+      "sha256": "ae70e1ecd1e38fc8e96b2f17b4b8f38057d392335f4be12ba4afbb4d26edd619"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01/isolated-headless-manifest.json",
+      "required": true,
+      "sha256": "2f5f89ac5da51b4093b3f80ac9160415bf3f5d3f6d3f821ca3afa2a0025f0225"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01/isolated-headless-receipt.json",
+      "required": true,
+      "sha256": "25780bc3aadb1c534aee15b295836c1d84be127869e0ae60dba4565a80ece7da"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01/isolated-headless-host.json",
+      "required": true,
+      "sha256": "7a968401d876fc2ee4b82217e98b81dab7b92dc68a9e45a58aa39af807e8fbbd"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "receipt satisfies kinglet.unity-probe.receipt/v1",
+      "id": "receipt-valid",
+      "status": "pass"
+    },
+    {
+      "detail": "status=pass errors=0",
+      "id": "compile-pass",
+      "status": "pass"
+    },
+    {
+      "detail": "status=pass passed=1 failed=0 skipped=0",
+      "id": "tests-pass",
+      "status": "pass"
+    },
+    {
+      "detail": "a live Editor held the main workspace before and after the isolated run (before=process-exact-argv, after=process-exact-argv)",
+      "id": "main-owned-throughout",
+      "status": "pass"
+    },
+    {
+      "detail": "isolated top level at copy time = ['Assets', 'Packages', 'ProjectSettings']",
+      "id": "copy-carries-committed-trees-only",
+      "status": "pass"
+    },
+    {
+      "detail": "inode comparison = {'Library': {'main': 22048650, 'isolated': 22041050, 'distinct': True}, 'Logs': {'main': 22048642, 'isolated': 22036956, 'distinct': True}}",
+      "id": "generated-state-physically-distinct",
+      "status": "pass"
+    },
+    {
+      "detail": "descendant_pids=() survivors=0",
+      "id": "no-survivors",
+      "status": "pass"
+    },
+    {
+      "detail": "active_lease=False leases=()",
+      "id": "no-active-lease",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "<editor>",
+    "-batchmode",
+    "-nographics",
+    "-projectPath",
+    "<project>",
+    "-runTests",
+    "-testPlatform",
+    "EditMode",
+    "-testResults",
+    "<raw>/results.xml",
+    "-logFile",
+    "<raw>/editor.log"
+  ],
+  "ended_at": "2026-07-28T13:28:58Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "linux",
+    "release": "ubuntu-24.04.4-lts",
+    "toolchain": [
+      "host=Pop!_OS 24.04 LTS (ID=pop; ID_LIKE=ubuntu debian; codename=noble)",
+      "kernel=7.0.11-76070011-generic"
+    ]
+  },
+  "measurements": [],
+  "probe": {
+    "contract": "kinglet.unity-probe.receipt/v1",
+    "id": "isolated-headless"
+  },
+  "prompt": null,
+  "run_id": "20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [
+    {
+      "title": "Unity 6.3 (6000.3) release notes",
+      "url": "https://unity.com/releases/editor/whats-new/6000.3.18"
+    },
+    {
+      "title": "MCP for Unity (CoplayDev), pinned v9.7.1",
+      "url": "https://github.com/CoplayDev/unity-mcp/tree/v9.7.1"
+    },
+    {
+      "title": "Unity Editor command line arguments",
+      "url": "https://docs.unity3d.com/6000.3/Documentation/Manual/EditorCommandLineArguments.html"
+    }
+  ],
+  "started_at": "2026-07-28T13:28:58Z",
+  "status": "pass",
+  "subject": {
+    "id": "execution",
+    "kind": "unity",
+    "version": "6000.3.18f1 (5ebeb53e4c07)"
+  }
+}

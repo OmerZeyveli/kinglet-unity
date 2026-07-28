@@ -1,0 +1,77 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-mismatched-editor-linux-ubuntu-24-04-4-lts-x64-01/mismatched-editor.json",
+      "required": true,
+      "sha256": "103a78704b0423dc7a0662a4fd933998bf6c7e8fdbd68b5579e6aa887b10af6e"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "E_UNITY_VERSION: offering 6000.0.68f1 to a project pinned at 6000.3.18f1",
+      "id": "refused",
+      "status": "pass"
+    },
+    {
+      "detail": "every committed file's SHA-256 is unchanged after the refusal",
+      "id": "no-silent-upgrade",
+      "status": "pass"
+    },
+    {
+      "detail": "tree before=['Assets', 'Packages', 'ProjectSettings'] after=['Assets', 'Packages', 'ProjectSettings']",
+      "id": "no-generated-trees",
+      "status": "pass"
+    },
+    {
+      "detail": "the pinned 6000.3.18f1 Editor is accepted, so this is a version check and not a blanket refusal",
+      "id": "pinned-editor-still-accepted",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "verify_project_editor",
+    "<project>",
+    "<mismatched editor>"
+  ],
+  "ended_at": "2026-07-28T13:28:58Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "linux",
+    "release": "ubuntu-24.04.4-lts",
+    "toolchain": [
+      "host=Pop!_OS 24.04 LTS (ID=pop; ID_LIKE=ubuntu debian; codename=noble)",
+      "kernel=7.0.11-76070011-generic"
+    ]
+  },
+  "measurements": [],
+  "probe": {
+    "contract": "kinglet.unity-probe.receipt/v1",
+    "id": "mismatched-editor"
+  },
+  "prompt": null,
+  "run_id": "20260728T132858Z-unity-probe-mismatched-editor-linux-ubuntu-24-04-4-lts-x64-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [
+    {
+      "title": "Unity 6.3 (6000.3) release notes",
+      "url": "https://unity.com/releases/editor/whats-new/6000.3.18"
+    },
+    {
+      "title": "MCP for Unity (CoplayDev), pinned v9.7.1",
+      "url": "https://github.com/CoplayDev/unity-mcp/tree/v9.7.1"
+    },
+    {
+      "title": "Unity Editor command line arguments",
+      "url": "https://docs.unity3d.com/6000.3/Documentation/Manual/EditorCommandLineArguments.html"
+    }
+  ],
+  "started_at": "2026-07-28T13:28:58Z",
+  "status": "pass",
+  "subject": {
+    "id": "execution",
+    "kind": "unity",
+    "version": "6000.3.18f1 (5ebeb53e4c07)"
+  }
+}

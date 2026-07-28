@@ -1,0 +1,9 @@
+{
+  "collision_refused": true,
+  "launched": false,
+  "refusal_code": "E_UNITY_OWNED",
+  "refusal_detail": "project <redacted-root>/main is owned by a live Unity process (pid 1046496); refusing headless launch",
+  "route": "same-project-headless",
+  "schema": "kinglet.unity-probe.summary/v1",
+  "unity_version_declared": "6000.3.18f1"
+}

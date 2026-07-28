@@ -1,0 +1,19 @@
+{
+  "cold_library": true,
+  "leases_after": [],
+  "orphan_census_after": {
+    "AssetImportWorker": 0,
+    "EditorUnity": 0,
+    "UnityPackageManager": 0,
+    "UnityShaderCompiler": 0,
+    "VBCSCompiler": 0
+  },
+  "orphan_peak_during_run": {
+    "AssetImportWorker": 0,
+    "EditorUnity": 1,
+    "UnityPackageManager": 1,
+    "UnityShaderCompiler": 0,
+    "VBCSCompiler": 1
+  },
+  "unity_lockfile_after": false
+}

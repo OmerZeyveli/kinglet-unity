@@ -1,0 +1,13 @@
+{
+  "blocking_reasons": [
+    "no-instances"
+  ],
+  "category": "mcp.editor-not-ready",
+  "instance_reasons": [
+    "no-instances"
+  ],
+  "instances_seen": 0,
+  "mcp_survivors": [],
+  "ready": false,
+  "server_reachable": true
+}

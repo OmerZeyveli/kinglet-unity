@@ -1,0 +1,23 @@
+{
+  "active_lease": false,
+  "artifacts": [
+    "artifacts/unity/same-project-headless-summary.json"
+  ],
+  "collision_refused": false,
+  "compile": {
+    "errors": 0,
+    "status": "pass"
+  },
+  "descendant_pids": [],
+  "project_id": "kinglet-unity-probe",
+  "ready": false,
+  "route": "same-project-headless",
+  "schema": "kinglet.unity-probe.receipt/v1",
+  "tests": {
+    "failed": 0,
+    "passed": 1,
+    "skipped": 0,
+    "status": "pass"
+  },
+  "unity_version": "6000.3.18f1"
+}

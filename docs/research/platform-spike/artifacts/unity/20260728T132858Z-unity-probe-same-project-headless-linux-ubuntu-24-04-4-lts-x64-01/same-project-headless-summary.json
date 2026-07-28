@@ -1,0 +1,20 @@
+{
+  "collision_refused": false,
+  "compile": {
+    "errors": 0,
+    "status": "pass"
+  },
+  "duration_seconds": 18.197,
+  "exit_code": 0,
+  "launched": true,
+  "route": "same-project-headless",
+  "schema": "kinglet.unity-probe.summary/v1",
+  "survivors": 0,
+  "tests": {
+    "failed": 0,
+    "passed": 1,
+    "skipped": 0,
+    "status": "pass"
+  },
+  "unity_version": "6000.3.18f1"
+}

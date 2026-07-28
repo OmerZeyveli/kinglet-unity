@@ -1,0 +1,30 @@
+{
+  "cold_library": true,
+  "copied_top_level": [
+    "Assets",
+    "Packages",
+    "ProjectSettings"
+  ],
+  "generated_tree_inodes": {
+    "Library": {
+      "distinct": true,
+      "isolated": 22041050,
+      "main": 22048650
+    },
+    "Logs": {
+      "distinct": true,
+      "isolated": 22036956,
+      "main": 22048642
+    }
+  },
+  "leases_after": [],
+  "main_owner_after": "process-exact-argv",
+  "main_owner_before": "process-exact-argv",
+  "orphan_peak_during_run": {
+    "AssetImportWorker": 2,
+    "EditorUnity": 2,
+    "UnityPackageManager": 2,
+    "UnityShaderCompiler": 4,
+    "VBCSCompiler": 1
+  }
+}

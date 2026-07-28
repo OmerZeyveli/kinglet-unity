@@ -1,0 +1,27 @@
+{
+  "cold_library": true,
+  "leases_after": [],
+  "leases_before": [],
+  "orphan_census_after": {
+    "AssetImportWorker": 0,
+    "EditorUnity": 0,
+    "UnityPackageManager": 0,
+    "UnityShaderCompiler": 0,
+    "VBCSCompiler": 0
+  },
+  "orphan_peak_during_run": {
+    "AssetImportWorker": 0,
+    "EditorUnity": 1,
+    "UnityPackageManager": 1,
+    "UnityShaderCompiler": 0,
+    "VBCSCompiler": 1
+  },
+  "receipt": null,
+  "refusal": {
+    "code": "E_UNITY_RESULTS_MISSING",
+    "detail": "Unity exited -15 without writing a results file and without a compile error in its log; nothing establishes that any test ran (this is the measured `-quit` shape, and also what a timeout or cancellation looks like)"
+  },
+  "timeout_seconds": 14.0,
+  "unity_lockfile_after": true,
+  "wall_seconds": 14.216
+}

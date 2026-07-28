@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "path": "ProjectSettings/ProjectVersion.txt",
+      "sha256": "d03fca18d2e511a37f7a81f8709404ebb2a571d3e0e5c854038c91a943ae15da",
+      "size": 85
+    },
+    {
+      "path": "Packages/manifest.json",
+      "sha256": "90e7e9f7bf18b5a69d219c0f1c2725e584a419fb7d0b3e1007b1fb26375aafa3",
+      "size": 1659
+    },
+    {
+      "path": "Assets/KingletSpike/Editor/KingletSpike.Editor.asmdef",
+      "sha256": "76583c5614ae3d7e7c8b3cb06523418ffd5ccf4c454ebdb77b1b02520059a914",
+      "size": 105
+    },
+    {
+      "path": "Assets/KingletSpike/Editor/KingletSpikeProbe.cs",
+      "sha256": "83365c1c9d21fecb9f6d7f7a90de259dd2bd492540ab0b2d38716a997ce807ce",
+      "size": 4012
+    },
+    {
+      "path": "Assets/KingletSpike/Tests/Editor/KingletSpike.Tests.asmdef",
+      "sha256": "0436007d44c36259cd74266042bcd835f29d8bfa4a8b8fca2e1da40676525ce1",
+      "size": 200
+    },
+    {
+      "path": "Assets/KingletSpike/Tests/Editor/KingletSpikeTests.cs",
+      "sha256": "b9b1a2a398739c15159c2daa1021071bbf65ec538a49c64d8db3af02da9caf68",
+      "size": 279
+    }
+  ],
+  "project_id": "kinglet-unity-probe",
+  "route": "filesystem",
+  "schema": "kinglet.unity-probe.inventory/v1",
+  "unity_version": "6000.3.18f1"
+}

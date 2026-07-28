@@ -1,0 +1,113 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-same-project-headless-linux-ubuntu-24-04-4-lts-x64-01/same-project-headless-summary.json",
+      "required": true,
+      "sha256": "76a5d8a3328a1be7ed3778050eea86ea2cd7392a9ea2124e424b455247aee829"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-same-project-headless-linux-ubuntu-24-04-4-lts-x64-01/same-project-headless-receipt.json",
+      "required": true,
+      "sha256": "6f6dc39b6142367e753ec34cd54f429b60b5556c2a7d3bfd6f678adaf27c8b22"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/unity/20260728T132858Z-unity-probe-same-project-headless-linux-ubuntu-24-04-4-lts-x64-01/same-project-headless-host.json",
+      "required": true,
+      "sha256": "93ad5c9c318169422e7a6a8bcb9018cfd94c4bf0fbd198f323cf30e06ec39d71"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "receipt satisfies kinglet.unity-probe.receipt/v1",
+      "id": "receipt-valid",
+      "status": "pass"
+    },
+    {
+      "detail": "status=pass errors=0",
+      "id": "compile-pass",
+      "status": "pass"
+    },
+    {
+      "detail": "status=pass passed=1 failed=0 skipped=0",
+      "id": "tests-pass",
+      "status": "pass"
+    },
+    {
+      "detail": "descendant_pids=() survivors=0",
+      "id": "no-survivors",
+      "status": "pass"
+    },
+    {
+      "detail": "active_lease=False lease_files=()",
+      "id": "no-active-lease",
+      "status": "pass"
+    },
+    {
+      "detail": "Temp/UnityLockfile absent after a clean exit",
+      "id": "lockfile-removed",
+      "status": "pass"
+    },
+    {
+      "detail": "unity_version=6000.3.18f1 revision=5ebeb53e4c07; the Editor's own log reports 6000.3.18f1 (5ebeb53e4c07)",
+      "id": "version-recorded",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "<editor>",
+    "-batchmode",
+    "-nographics",
+    "-projectPath",
+    "<project>",
+    "-runTests",
+    "-testPlatform",
+    "EditMode",
+    "-testResults",
+    "<raw>/results.xml",
+    "-logFile",
+    "<raw>/editor.log"
+  ],
+  "ended_at": "2026-07-28T13:28:58Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "linux",
+    "release": "ubuntu-24.04.4-lts",
+    "toolchain": [
+      "host=Pop!_OS 24.04 LTS (ID=pop; ID_LIKE=ubuntu debian; codename=noble)",
+      "kernel=7.0.11-76070011-generic"
+    ]
+  },
+  "measurements": [],
+  "probe": {
+    "contract": "kinglet.unity-probe.receipt/v1",
+    "id": "same-project-headless"
+  },
+  "prompt": null,
+  "run_id": "20260728T132858Z-unity-probe-same-project-headless-linux-ubuntu-24-04-4-lts-x64-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [
+    {
+      "title": "Unity 6.3 (6000.3) release notes",
+      "url": "https://unity.com/releases/editor/whats-new/6000.3.18"
+    },
+    {
+      "title": "MCP for Unity (CoplayDev), pinned v9.7.1",
+      "url": "https://github.com/CoplayDev/unity-mcp/tree/v9.7.1"
+    },
+    {
+      "title": "Unity Editor command line arguments",
+      "url": "https://docs.unity3d.com/6000.3/Documentation/Manual/EditorCommandLineArguments.html"
+    }
+  ],
+  "started_at": "2026-07-28T13:28:58Z",
+  "status": "pass",
+  "subject": {
+    "id": "execution",
+    "kind": "unity",
+    "version": "6000.3.18f1 (5ebeb53e4c07)"
+  }
+}

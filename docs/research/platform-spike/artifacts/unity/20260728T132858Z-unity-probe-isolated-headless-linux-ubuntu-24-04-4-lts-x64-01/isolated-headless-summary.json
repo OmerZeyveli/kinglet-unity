@@ -1,0 +1,31 @@
+{
+  "collision_refused": false,
+  "compile": {
+    "errors": 0,
+    "status": "pass"
+  },
+  "duration_seconds": 22.151,
+  "exit_code": 0,
+  "isolated_generated_trees": [
+    "Library",
+    "Logs"
+  ],
+  "isolated_identity": "bc47cb5bbb61ecfc4e4882663057e54312567ab19d51f840c5d7ef465514784f",
+  "isolated_path_hash": "8d1aae285222cbc6407fbaa462a79c646b861f25dd35efce317000b4fdb9b7f2",
+  "isolated_tree_sha256": "719524f488599e580413dac76e92b4fa58d811b397d2963854bf7551ea562cc3",
+  "launched": true,
+  "main_guard_digest": "fc6db1a14063e77bcacbe167d5fcd48bdcbaad25bf268705fce2c17084c567bd",
+  "main_identity": "bf0f237d407b62c1730525afb849dd04070288d39a12fff8b0cfaaf91e8b0ffd",
+  "main_owner": "confirmed",
+  "main_path_hash": "c6a91313b1edb12b784e6b6e88d782112ba0b9e561ad1fd8d28326cdbf8288a8",
+  "route": "isolated-headless",
+  "schema": "kinglet.unity-probe.summary/v1",
+  "survivors": 0,
+  "tests": {
+    "failed": 0,
+    "passed": 1,
+    "skipped": 0,
+    "status": "pass"
+  },
+  "unity_version": "6000.3.18f1"
+}
