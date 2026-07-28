@@ -70,6 +70,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Sequence
@@ -87,7 +88,9 @@ __all__ = (
     "WORKSPACE_IDENTITY_DOMAIN",
     "workspace_identity",
     "assert_isolated",
+    "assert_manifest_self_consistent",
     "inventory_copy",
+    "isolation_manifest_from_dict",
     "manifest_for_copy",
     "prepare_isolated_copy",
     "verify_manifest",
@@ -214,6 +217,169 @@ def manifest_to_dict(manifest: IsolationManifest) -> dict:
         ],
         "tree_sha256": manifest.tree_sha256,
     }
+
+
+# ---------------------------------------------------------------------------
+# Reading a manifest back -- the auditor's direction
+# ---------------------------------------------------------------------------
+#
+# `manifest_to_dict` writes the artifact; these read it. A reader auditing a
+# published `isolated-headless` receipt has the JSON and nothing else -- not
+# the two directories, not the boundary object -- so everything that can still
+# be decided from the bytes must be decided here, and everything that cannot
+# must be refused rather than assumed.
+
+_MANIFEST_FIELDS = frozenset((
+    "schema",
+    "main_path_hash",
+    "isolated_path_hash",
+    "main_identity",
+    "isolated_identity",
+    "trees",
+    "files",
+    "tree_sha256",
+))
+_MANIFEST_FILE_FIELDS = frozenset(("path", "size", "sha256"))
+
+# Every hash this artifact carries is a SHA-256 hexdigest. Two UNEQUAL strings
+# are not two proven identities: without this, `main_identity="a"` and
+# `isolated_identity="b"` satisfies every inequality below.
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _manifest_refuse(detail: str) -> "EvidenceError":
+    return EvidenceError("E_UNITY_ISOLATION_MANIFEST", detail)
+
+
+def _manifest_digest_field(raw: dict, name: str) -> str:
+    value = raw.get(name)
+    if not isinstance(value, str) or not _SHA256_RE.fullmatch(value):
+        raise _manifest_refuse(
+            f"manifest {name} is not a SHA-256 hexdigest: {value!r}"
+        )
+    return value
+
+
+def isolation_manifest_from_dict(value: object) -> IsolationManifest:
+    """Strictly parse an isolation-manifest document. Raises EvidenceError.
+
+    Structural only -- the claims the document makes are judged by
+    `assert_manifest_self_consistent`, exactly as `unity_receipt_from_dict`
+    and `validate_unity_receipt` split the receipt.
+    """
+    if not isinstance(value, dict):
+        raise _manifest_refuse("an isolation manifest must be a JSON object")
+    unknown = sorted(value.keys() - _MANIFEST_FIELDS)
+    if unknown:
+        raise _manifest_refuse(f"manifest.{unknown[0]} is an unknown field")
+    missing = sorted(_MANIFEST_FIELDS - value.keys())
+    if missing:
+        raise _manifest_refuse(f"manifest is missing {missing[0]}")
+
+    schema = value["schema"]
+    if not isinstance(schema, str):
+        raise _manifest_refuse("manifest.schema must be a string")
+
+    trees = value["trees"]
+    if not isinstance(trees, list) or not all(isinstance(item, str) for item in trees):
+        raise _manifest_refuse("manifest.trees must be an array of strings")
+
+    raw_files = value["files"]
+    if not isinstance(raw_files, list):
+        raise _manifest_refuse("manifest.files must be an array")
+    files: list[CopiedFile] = []
+    for index, item in enumerate(raw_files):
+        if not isinstance(item, dict):
+            raise _manifest_refuse(f"manifest.files[{index}] must be an object")
+        extra = sorted(item.keys() - _MANIFEST_FILE_FIELDS)
+        if extra:
+            raise _manifest_refuse(
+                f"manifest.files[{index}].{extra[0]} is an unknown field"
+            )
+        path = item.get("path")
+        size = item.get("size")
+        digest = item.get("sha256")
+        if not isinstance(path, str) or not path:
+            raise _manifest_refuse(f"manifest.files[{index}].path must be a string")
+        if type(size) is not int or type(size) is bool or size < 0:
+            raise _manifest_refuse(
+                f"manifest.files[{index}].size must be a non-negative integer"
+            )
+        if not isinstance(digest, str) or not _SHA256_RE.fullmatch(digest):
+            raise _manifest_refuse(
+                f"manifest.files[{index}].sha256 is not a SHA-256 hexdigest"
+            )
+        files.append(CopiedFile(path=path, size=size, sha256=digest))
+
+    return IsolationManifest(
+        schema=schema,
+        main_path_hash=_manifest_digest_field(value, "main_path_hash"),
+        isolated_path_hash=_manifest_digest_field(value, "isolated_path_hash"),
+        main_identity=_manifest_digest_field(value, "main_identity"),
+        isolated_identity=_manifest_digest_field(value, "isolated_identity"),
+        trees=tuple(trees),
+        files=tuple(files),
+        tree_sha256=_manifest_digest_field(value, "tree_sha256"),
+    )
+
+
+def assert_manifest_self_consistent(manifest: IsolationManifest) -> None:
+    """Refuse unless the manifest's own contents describe an isolated copy.
+
+    Everything decidable WITHOUT the two directories. `verify_manifest` runs
+    this first and then re-walks the disk on top of it; an auditor holding
+    only the published artifact runs this alone.
+    """
+    if manifest.schema != ISOLATION_MANIFEST_SCHEMA:
+        raise _manifest_refuse(
+            f"manifest declares schema {manifest.schema!r}, expected "
+            f"{ISOLATION_MANIFEST_SCHEMA!r}"
+        )
+    for name, value in (
+        ("main_path_hash", manifest.main_path_hash),
+        ("isolated_path_hash", manifest.isolated_path_hash),
+        ("main_identity", manifest.main_identity),
+        ("isolated_identity", manifest.isolated_identity),
+        ("tree_sha256", manifest.tree_sha256),
+    ):
+        if not _SHA256_RE.fullmatch(value):
+            raise _manifest_refuse(
+                f"manifest {name} is not a SHA-256 hexdigest: {value!r}"
+            )
+    if manifest.main_path_hash == manifest.isolated_path_hash:
+        raise _manifest_refuse(
+            "manifest records one lease identity for both the main and the "
+            "isolated workspace; it does not describe an isolated copy"
+        )
+    # The check the path hashes CANNOT make. A bind mount gives two canonical
+    # paths -- so two different path hashes -- for one directory, and the
+    # clause above passes it. This one does not.
+    if manifest.main_identity == manifest.isolated_identity:
+        raise _manifest_refuse(
+            "manifest records the same physical directory identity for the "
+            "main and the isolated workspace; two canonical paths naming one "
+            "directory is not isolation, whatever the path hashes say"
+        )
+    # A manifest that narrows its own scope narrows the verification of it:
+    # `trees=()` used to walk nothing, match an empty `files`, digest to the
+    # empty digest, and return success over any content whatsoever.
+    if tuple(manifest.trees) != tuple(COPIED_TREES):
+        raise _manifest_refuse(
+            f"manifest declares trees {tuple(manifest.trees)!r}, but an "
+            f"isolated copy is defined by {tuple(COPIED_TREES)!r}; a manifest "
+            "that narrows its own scope narrows the verification of it"
+        )
+    if not manifest.files:
+        raise _manifest_refuse(
+            "manifest lists no files; an isolated copy of a Unity project is "
+            "never empty, and an empty inventory verifies nothing"
+        )
+    recomputed = _tree_digest(manifest.files)
+    if recomputed != manifest.tree_sha256:
+        raise _manifest_refuse(
+            f"manifest tree_sha256 is {manifest.tree_sha256!r} but its own "
+            f"file list digests to {recomputed!r}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -650,42 +816,18 @@ def verify_manifest(isolated_project, manifest: IsolationManifest) -> None:
     be taken at its word. This re-walks the trees and compares every path,
     size and digest, then the aggregate `tree_sha256`.
     """
-    if manifest.schema != ISOLATION_MANIFEST_SCHEMA:
-        raise EvidenceError(
-            "E_UNITY_ISOLATION_MANIFEST",
-            f"manifest declares schema {manifest.schema!r}, expected "
-            f"{ISOLATION_MANIFEST_SCHEMA!r}",
-        )
-    if manifest.main_path_hash == manifest.isolated_path_hash:
-        raise EvidenceError(
-            "E_UNITY_ISOLATION_MANIFEST",
-            "manifest records one lease identity for both the main and the "
-            "isolated workspace; it does not describe an isolated copy",
-        )
-    # The check the path hashes CANNOT make. A bind mount gives two canonical
-    # paths -- so two different path hashes -- for one directory, and the
-    # clause above passes it. This one does not.
-    if manifest.main_identity == manifest.isolated_identity:
-        raise EvidenceError(
-            "E_UNITY_ISOLATION_MANIFEST",
-            "manifest records the same physical directory identity for the "
-            "main and the isolated workspace; two canonical paths naming one "
-            "directory is not isolation, whatever the path hashes say",
-        )
+    # Everything decidable from the document alone -- schema, digest shapes,
+    # distinct path hashes, distinct physical identities, the frozen tree list,
+    # a non-empty inventory, and a tree_sha256 that matches that inventory --
+    # lives in ONE place, because a reader auditing the published artifact runs
+    # exactly those rules with no disk to walk. Keeping a second copy here is
+    # how the two drift.
+    #
     # The manifest's OWN `trees` used to decide what gets verified, which made
     # verification a claim the thing being verified was allowed to make about
     # itself: `trees=()` walked nothing, matched an empty `files`, digested to
-    # the empty digest, and returned success over any content whatsoever. The
-    # set of trees an isolated copy consists of is frozen in this module, so
-    # that is what is walked, and a manifest naming a different set is refused
-    # rather than honoured.
-    if tuple(manifest.trees) != tuple(COPIED_TREES):
-        raise EvidenceError(
-            "E_UNITY_ISOLATION_MANIFEST",
-            f"manifest declares trees {tuple(manifest.trees)!r}, but an "
-            f"isolated copy is defined by {tuple(COPIED_TREES)!r}; a manifest "
-            "that narrows its own scope narrows the verification of it",
-        )
+    # the empty digest, and returned success over any content whatsoever.
+    assert_manifest_self_consistent(manifest)
     # COPIED_TREES and not `manifest.trees`, even though the guard above has
     # just proved them equal. The equality is what makes this line redundant
     # TODAY; naming the frozen constant is what keeps it correct if that guard

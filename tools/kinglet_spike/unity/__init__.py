@@ -13,6 +13,7 @@ from .receipt import (
     receipt_to_evidence,
     unity_receipt_from_dict,
     validate_unity_receipt,
+    verify_cited_isolation_manifest,
 )
 
 __all__ = (
@@ -23,4 +24,5 @@ __all__ = (
     "receipt_to_evidence",
     "unity_receipt_from_dict",
     "validate_unity_receipt",
+    "verify_cited_isolation_manifest",
 )

@@ -57,8 +57,13 @@ from .mcp import (
     start_mcp,
     wait_for_server,
 )
+from .model import RECEIPT_SCHEMA
 from .ownership import detect_gui_owner
-from .receipt import validate_unity_receipt
+from .receipt import (
+    unity_receipt_from_dict,
+    validate_unity_receipt,
+    verify_cited_isolation_manifest,
+)
 from .results import (
     OBSERVATIONS_SCHEMA,
     to_evidence_records,
@@ -258,9 +263,18 @@ class Staging:
         self.stamp = stamp
         self.staged: dict[str, list[dict]] = {}
 
+    def publish_root(self, probe_id: str) -> Path:
+        """The directory this cell's published artifact paths are relative to.
+
+        It is what `verify_cited_isolation_manifest` needs: the receipt cites
+        `artifacts/unity/<run-id>/<name>`, and joining that onto this root is
+        exactly the fetch a reader of the committed record performs.
+        """
+        return self.stage_root / probe_id / "publish"
+
     def add(self, probe_id: str, run_id: str, source: Path, name: str) -> None:
         relative = f"artifacts/unity/{run_id}/{name}"
-        target = self.stage_root / probe_id / "publish" / relative
+        target = self.publish_root(probe_id) / relative
         digest = redact_artifact(
             source, target, "application/json", self.forbidden_roots
         )
@@ -281,13 +295,25 @@ class Staging:
         `collision-refusal-summary.json` -- leaves a reference to a name that
         exists nowhere in its directory. `names` maps the receipt's own basename
         to the basename this cell published.
+
+        `isolation_manifest` is rewritten by the SAME rule, because it is an
+        artifact citation too. Leaving it route-relative would publish an
+        isolated-headless receipt whose mandatory proof points at a path that
+        exists nowhere under the record -- the dangling reference this method
+        was written to prevent, reintroduced on the one field where it matters
+        most.
         """
         resolved = dict(receipt)
-        rewritten = []
-        for path in receipt.get("artifacts", ()):  # route-relative
+
+        def republish(path: str) -> str:
             base = path.rsplit("/", 1)[-1]
-            rewritten.append(f"artifacts/unity/{run_id}/{names.get(base, base)}")
-        resolved["artifacts"] = rewritten
+            return f"artifacts/unity/{run_id}/{names.get(base, base)}"
+
+        resolved["artifacts"] = [
+            republish(path) for path in receipt.get("artifacts", ())
+        ]
+        if receipt.get("isolation_manifest"):
+            resolved["isolation_manifest"] = republish(receipt["isolation_manifest"])
         return resolved
 
     def write_json(self, probe_id: str, run_id: str, name: str, payload: dict, raw_dir: Path) -> None:
@@ -361,7 +387,7 @@ def probe_filesystem(context) -> dict:
     assertions = [
         assertion("receipt-valid", not diagnostics,
                   "; ".join(f"{d.code} {d.location}: {d.message}" for d in diagnostics)
-                  or "receipt satisfies kinglet.unity-probe.receipt/v1"),
+                  or f"receipt satisfies {RECEIPT_SCHEMA}"),
         assertion("launched-nothing",
                   orphan_census(before) == orphan_census(after)
                   and orphan_census(after)["EditorUnity"] == 0,
@@ -429,7 +455,7 @@ def probe_same_project(context) -> dict:
     assertions = [
         assertion("receipt-valid", not diagnostics,
                   "; ".join(f"{d.code} {d.location}: {d.message}" for d in diagnostics)
-                  or "receipt satisfies kinglet.unity-probe.receipt/v1"),
+                  or f"receipt satisfies {RECEIPT_SCHEMA}"),
         assertion("compile-pass", receipt.compile.status == "pass",
                   f"status={receipt.compile.status} errors={receipt.compile.errors}"),
         assertion("tests-pass",
@@ -677,12 +703,21 @@ def probe_isolated_and_collision(context) -> list[dict]:
                             "isolated-headless-summary.json")
         context.staging.add(iso_id, iso_run, iso_raw / "isolated-headless-manifest.json",
                             "isolated-headless-manifest.json")
+        published_receipt = context.staging.resolve_receipt_artifacts(
+            iso_run, receipt_to_dict(receipt), {}
+        )
         context.staging.write_json(
-            iso_id, iso_run, "isolated-headless-receipt.json",
-            context.staging.resolve_receipt_artifacts(
-                iso_run, receipt_to_dict(receipt), {}
-            ),
-            iso_raw,
+            iso_id, iso_run, "isolated-headless-receipt.json", published_receipt, iso_raw,
+        )
+        # The audit a READER of the committed record performs, run here against
+        # the staged bytes: resolve the citation, fetch the file, and judge its
+        # contents. Doing it at publish time is the point -- the route already
+        # proved isolation at run time, and this is the check that the PUBLISHED
+        # document still carries that proof after redaction and path rewriting.
+        # It raises; a manifest that cannot be audited must not be published.
+        isolation_audit = verify_cited_isolation_manifest(
+            unity_receipt_from_dict(published_receipt),
+            context.staging.publish_root(iso_id),
         )
         context.staging.write_json(iso_id, iso_run, "isolated-headless-host.json", {
             "cold_library": True,
@@ -698,7 +733,7 @@ def probe_isolated_and_collision(context) -> list[dict]:
         entries.append(observed(iso_id, context.isolated_command(), [
             assertion("receipt-valid", not diagnostics,
                       "; ".join(f"{d.code} {d.location}: {d.message}" for d in diagnostics)
-                      or "receipt satisfies kinglet.unity-probe.receipt/v1"),
+                      or f"receipt satisfies {RECEIPT_SCHEMA}"),
             assertion("compile-pass", receipt.compile.status == "pass",
                       f"status={receipt.compile.status} errors={receipt.compile.errors}"),
             assertion("tests-pass",
@@ -724,6 +759,13 @@ def probe_isolated_and_collision(context) -> list[dict]:
             assertion("no-active-lease",
                       not receipt.active_lease and lease_files(context.lease_dir) == (),
                       f"active_lease={receipt.active_lease} leases={lease_files(context.lease_dir)}"),
+            assertion("isolation-manifest-cited-and-audited", True,
+                      "the published receipt cites "
+                      f"{published_receipt['isolation_manifest']}, which resolves "
+                      "beneath the record and records two distinct physical "
+                      "workspace identities "
+                      f"(main={isolation_audit.main_identity[:12]}..., "
+                      f"isolated={isolation_audit.isolated_identity[:12]}...)"),
         ], context.staging.for_probe(iso_id), iso_started_at, iso_ended_at))
 
         # ---- collision refusal, against the SAME live Editor ---------------
@@ -762,7 +804,7 @@ def probe_isolated_and_collision(context) -> list[dict]:
         entries.append(observed(col_id, context.headless_command(), [
             assertion("receipt-valid", not col_diagnostics,
                       "; ".join(f"{d.code} {d.location}: {d.message}" for d in col_diagnostics)
-                      or "receipt satisfies kinglet.unity-probe.receipt/v1"),
+                      or f"receipt satisfies {RECEIPT_SCHEMA}"),
             assertion("refused", col_receipt.collision_refused,
                       f"collision_refused={col_receipt.collision_refused} "
                       f"code={col_summary.get('refusal_code')}"),

@@ -159,7 +159,15 @@ from .isolation import (
     verify_manifest,
 )
 from .lease import WorkspaceLease, lease_path_for
-from .model import PROJECT_ID, RECEIPT_SCHEMA, CompileResult, TestResult, UnityReceipt
+from .model import (
+    ISOLATED_HEADLESS_ROUTE,
+    LEGACY_RECEIPT_SCHEMAS,
+    PROJECT_ID,
+    RECEIPT_SCHEMA,
+    CompileResult,
+    TestResult,
+    UnityReceipt,
+)
 from .ownership import assert_headless_safe, detect_gui_owner
 from .process import ManagedProcess
 
@@ -197,7 +205,8 @@ __all__ = (
 FILESYSTEM_ROUTE = "filesystem"
 SAME_PROJECT_HEADLESS_ROUTE = "same-project-headless"
 LIVE_EDITOR_MCP_ROUTE = "live-editor-mcp"
-ISOLATED_HEADLESS_ROUTE = "isolated-headless"
+# Imported, not respelled: receipt.py needs this name too (it decides which
+# route must cite an isolation manifest) and cannot import routes.py.
 
 # Receipt artifact paths are relative to docs/research/platform-spike/ (see
 # receipt.py's _is_safe_relative_artifact_path). The files themselves are
@@ -313,7 +322,7 @@ def receipt_to_dict(receipt: UnityReceipt) -> dict:
     edited by a later task; the round trip is asserted in the route tests, so
     the two cannot drift apart unnoticed.
     """
-    return {
+    value = {
         "schema": receipt.schema,
         "route": receipt.route,
         "project_id": receipt.project_id,
@@ -331,6 +340,13 @@ def receipt_to_dict(receipt: UnityReceipt) -> dict:
         "descendant_pids": list(receipt.descendant_pids),
         "artifacts": list(receipt.artifacts),
     }
+    # The field exists only in the current schema, so a legacy receipt round-
+    # trips as the v1 document it is. Emitting it there would produce a
+    # document `unity_receipt_from_dict` rejects as an unknown field, which is
+    # the correct rejection and the wrong place to discover it.
+    if receipt.schema not in LEGACY_RECEIPT_SCHEMAS:
+        value["isolation_manifest"] = receipt.isolation_manifest
+    return value
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -2023,11 +2039,16 @@ def _run_isolated_guarded(
             descendant_pids=survivors,
             # TWO artifacts, and the second is the whole point: it is the only
             # place a receipt from this route can point at the two distinct
-            # physical workspace identities its name asserts.
+            # physical workspace identities its name asserts. Under receipt/v2
+            # that citation is a FIELD as well as an artifact, so the claim and
+            # its proof are bound rather than adjacent -- a reader resolves
+            # `isolation_manifest`, and `validate_unity_receipt` refuses the
+            # receipt if it names something the artifact list does not carry.
             artifacts=(
                 f"{ARTIFACT_PREFIX}/{ISOLATED_SUMMARY_NAME}",
                 f"{ARTIFACT_PREFIX}/{ISOLATED_MANIFEST_NAME}",
             ),
+            isolation_manifest=f"{ARTIFACT_PREFIX}/{ISOLATED_MANIFEST_NAME}",
         )
     finally:
         lease.release()

@@ -10,7 +10,36 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-RECEIPT_SCHEMA: str = "kinglet.unity-probe.receipt/v1"
+# Two receipt schemas exist, and the difference between them is one mandatory
+# field.
+#
+# v1 receipts carry the `isolated-headless` label with no attached proof: an
+# `isolated-headless` receipt and a `same-project-headless` receipt were
+# byte-identical apart from the route string. The runtime check
+# (isolation.assert_isolated, which compares `(st_dev, st_ino)` and so catches
+# a bind-mounted fake copy that `realpath` cannot) was real; the PUBLISHED
+# evidence encoded none of it.
+#
+# v2 requires an `isolation_manifest` citation on that route -- a path that
+# must also appear in `artifacts`, must resolve to a file that exists, and
+# whose contents must themselves hold up (see receipt.verify_cited_isolation_
+# manifest and isolation.assert_manifest_self_consistent).
+#
+# v1 stays READABLE because eight published records were produced under it and
+# are immutable -- regenerating them means re-running Unity. It is legacy, not
+# current: a v1 document is never read as a v2 one (the new field is an
+# unknown field there), and `receipt_to_evidence` refuses to build a NEW
+# published record from one, which is what stops "emit v1" from being a way
+# around the requirement.
+RECEIPT_SCHEMA_V1: str = "kinglet.unity-probe.receipt/v1"
+RECEIPT_SCHEMA_V2: str = "kinglet.unity-probe.receipt/v2"
+
+# The schema every producer writes.
+RECEIPT_SCHEMA: str = RECEIPT_SCHEMA_V2
+
+# Readable, never written, never publishable.
+LEGACY_RECEIPT_SCHEMAS: frozenset[str] = frozenset((RECEIPT_SCHEMA_V1,))
+SUPPORTED_RECEIPT_SCHEMAS: frozenset[str] = LEGACY_RECEIPT_SCHEMAS | {RECEIPT_SCHEMA}
 
 # The one spelling of a Unity version string: <year>.<major>.<minor><stage><build>
 # -- 6000.3.18f1, 6000.0.68f1, 2022.3.62f3. Shape only; no literal version is
@@ -37,6 +66,10 @@ ROUTES: frozenset[str] = frozenset((
 ))
 
 EXECUTING_ROUTES: frozenset[str] = ROUTES - {"filesystem"}
+
+# Spelled once. receipt.py needs it to know which route must cite an isolation
+# manifest, and routes.py cannot be imported from receipt.py without a cycle.
+ISOLATED_HEADLESS_ROUTE: str = "isolated-headless"
 
 # compile.status and tests.status share the same three-value vocabulary.
 STATUS_VALUES: frozenset[str] = frozenset(("not-run", "pass", "fail"))
@@ -69,6 +102,10 @@ class UnityReceipt:
     active_lease: bool
     descendant_pids: tuple[int, ...]
     artifacts: tuple[str, ...]
+    # v2 only, and mandatory there for route="isolated-headless". Always None
+    # on a legacy v1 receipt -- the field does not exist in that schema, so a
+    # v1 document carrying it is rejected rather than upgraded.
+    isolation_manifest: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -100,4 +137,5 @@ CONTRACT_RULES: tuple[tuple[str, str], ...] = (
     ("active_lease and descendant_pids must be clean on every receipt", "receipt"),
     ("Refuse silent project upgrade", "editor"),
     ("unity_version records whatever Unity version actually produced the run", "receipt"),
+    ("isolated-headless must cite its isolation manifest", "receipt"),
 )

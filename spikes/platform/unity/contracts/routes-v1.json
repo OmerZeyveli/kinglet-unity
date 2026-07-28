@@ -1,6 +1,7 @@
 {
   "schema": "kinglet.unity-probe.contract/v1",
-  "receipt_schema": "kinglet.unity-probe.receipt/v1",
+  "receipt_schema": "kinglet.unity-probe.receipt/v2",
+  "legacy_receipt_schemas": ["kinglet.unity-probe.receipt/v1"],
   "project_id": "kinglet-unity-probe",
   "routes": [
     "filesystem",
@@ -30,6 +31,7 @@
     "collision_refused is same-project-headless's own refusal probe (matrix cell same-project-headless.collision-refusal); it is not a successful headless run, and compile/tests must stay not-run when it fires.",
     "active_lease and descendant_pids must be clean on every receipt regardless of outcome -- cancellation, timeout, crash, and success all leave no live lease and no descendant process, per the plan's global constraints.",
     "Refuse silent project upgrade: this rule stands independently of which exact Unity version is pinned (see the unity_version note below) and is unconditional across all executing routes. It is not encoded as a receipt field in Task 1 -- Task 3's editor.py is the component responsible for resolving the exact Editor and refusing to let Unity silently upgrade the pinned project on open; this note exists so that responsibility is not lost between tasks.",
-    "unity_version records whatever Unity version actually produced the run. The plan's literal 6000.3.11f1 pin is relaxed by standing user ruling: any well-formed Unity version string is accepted (shape-only check: <year>.<major>.<minor><stage><build>, e.g. 6000.3.18f1, 6000.0.68f1, 2022.3.62f3 -- the check does not restrict which year), but a receipt must never claim a version it did not run on."
+    "unity_version records whatever Unity version actually produced the run. The plan's literal 6000.3.11f1 pin is relaxed by standing user ruling: any well-formed Unity version string is accepted (shape-only check: <year>.<major>.<minor><stage><build>, e.g. 6000.3.18f1, 6000.0.68f1, 2022.3.62f3 -- the check does not restrict which year), but a receipt must never claim a version it did not run on.",
+    "isolated-headless must cite its isolation manifest: under receipt/v2 the field `isolation_manifest` is MANDATORY on that route and forbidden on every other one. It must name a path that also appears in `artifacts`, that path must resolve to a file that exists beneath the record's artifact root, and the manifest's own contents must hold up -- distinct 64-hex workspace identities (the (st_dev, st_ino) digests no path comparison can produce), distinct path hashes, the frozen tree list, a non-empty file inventory, and a tree_sha256 that matches that inventory. receipt/v1 remains READABLE as legacy because eight published records were made under it and are immutable; it is never upgraded to v2, and receipt_to_evidence refuses to build a NEW published record from a legacy receipt, so emitting v1 is not a way around this rule."
   ]
 }

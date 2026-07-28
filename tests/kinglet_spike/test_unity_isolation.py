@@ -41,10 +41,15 @@ from tools.kinglet_spike.unity.isolation import (
     verify_manifest,
 )
 from tools.kinglet_spike.unity.lease import WorkspaceLease, lease_path_for
-from tools.kinglet_spike.unity.model import PROJECT_ID, RECEIPT_SCHEMA
+from tools.kinglet_spike.unity.model import (
+    PROJECT_ID,
+    RECEIPT_SCHEMA,
+    RECEIPT_SCHEMA_V1,
+)
 from tools.kinglet_spike.unity.receipt import (
     unity_receipt_from_dict,
     validate_unity_receipt,
+    verify_cited_isolation_manifest,
 )
 
 from .test_unity_routes import (
@@ -966,6 +971,222 @@ class ContractBindingTests(unittest.TestCase):
         for name in GENERATED_TREES:
             self.assertNotIn(name, COPIED_TREES)
         self.assertIsNot(isolation.prepare_isolated_copy, None)
+
+
+PUBLISHED_ISOLATED_MANIFEST = Path(
+    "docs/research/platform-spike/artifacts/unity/"
+    "20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01/"
+    "isolated-headless-manifest.json"
+)
+
+
+class CitedManifestAuditTests(_IsolationCase):
+    """Auditing a published isolated-headless receipt from its bytes alone.
+
+    Every test here drives the REAL reader: a real `prepare_isolated_copy`
+    against real directories produces a real manifest, that manifest is written
+    to a real artifact tree, and `verify_cited_isolation_manifest` resolves and
+    parses the file off disk. Nothing hands the function a dict it was supposed
+    to have read.
+
+    A refusal here can never perform the act it forbids -- none of these tests
+    can launch anything; the whole subject is a file the receipt points at.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.manifest = self.prepare()
+        self.artifact_root = self.root / "publish"
+        self.cited = "artifacts/unity/RUN-01/isolated-headless-manifest.json"
+        self.write_manifest(isolation.manifest_to_dict(self.manifest))
+
+    def write_manifest(self, payload) -> None:
+        target = self.artifact_root / self.cited
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+    def cited_receipt(self, **overrides) -> object:
+        value = {
+            "schema": RECEIPT_SCHEMA,
+            "route": "isolated-headless",
+            "project_id": PROJECT_ID,
+            "unity_version": EDITOR_VERSION,
+            "compile": {"status": "pass", "errors": 0},
+            "tests": {"status": "pass", "passed": 1, "failed": 0, "skipped": 0},
+            "ready": False,
+            "collision_refused": False,
+            "active_lease": False,
+            "descendant_pids": [],
+            "artifacts": [self.cited],
+            "isolation_manifest": self.cited,
+        }
+        value.update(overrides)
+        return unity_receipt_from_dict(value)
+
+    def audit(self, receipt=None):
+        return verify_cited_isolation_manifest(
+            self.cited_receipt() if receipt is None else receipt, self.artifact_root
+        )
+
+    def refusal(self, receipt=None) -> EvidenceError:
+        with self.assertRaises(EvidenceError) as caught:
+            self.audit(receipt)
+        return caught.exception
+
+    # --- the happy path, so the refusals below are not vacuous ---
+
+    def test_a_real_isolated_copy_audits_clean(self):
+        audited = self.audit()
+        self.assertEqual(self.manifest, audited)
+        self.assertEqual((), validate_unity_receipt(self.cited_receipt()))
+
+    # --- the cited artifact must be reachable ---
+
+    def test_a_citation_with_no_file_behind_it_refuses(self):
+        (self.artifact_root / self.cited).unlink()
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", self.refusal().code)
+
+    def test_a_lexically_escaping_citation_refuses(self):
+        outside = self.root / "outside.json"
+        outside.write_text(
+            json.dumps(isolation.manifest_to_dict(self.manifest)), encoding="utf-8"
+        )
+        receipt = self.cited_receipt(
+            artifacts=["../outside.json"], isolation_manifest="../outside.json"
+        )
+        self.assertIn("not a safe relative path", self.refusal(receipt).detail)
+
+    def test_a_symlinked_citation_that_escapes_the_artifact_root_refuses(self):
+        # The escape a spelling check structurally cannot see. The citation has
+        # no `..` in it, resolves to a real, perfectly valid manifest, and still
+        # leaves the published tree -- so the containment check must be made on
+        # the RESOLVED path, not on the string.
+        outside = self.root / "outside.json"
+        outside.write_text(
+            json.dumps(isolation.manifest_to_dict(self.manifest)), encoding="utf-8"
+        )
+        target = self.artifact_root / self.cited
+        target.unlink()
+        target.symlink_to(outside)
+        self.assertIn("resolves outside the artifact root", self.refusal().detail)
+
+    def test_a_citation_absent_from_artifacts_refuses(self):
+        self.assertEqual(
+            "E_UNITY_ISOLATION_MANIFEST",
+            self.refusal(self.cited_receipt(artifacts=[])).code,
+        )
+
+    def test_an_unparseable_manifest_refuses(self):
+        (self.artifact_root / self.cited).write_text("{not json", encoding="utf-8")
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", self.refusal().code)
+
+    # --- the manifest's own contents must hold up ---
+
+    def test_equal_workspace_identities_refuse(self):
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["isolated_identity"] = payload["main_identity"]
+        self.write_manifest(payload)
+        self.assertIn("physical directory identity", self.refusal().detail)
+
+    def test_equal_path_hashes_refuse(self):
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["isolated_path_hash"] = payload["main_path_hash"]
+        self.write_manifest(payload)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", self.refusal().code)
+
+    def test_an_identity_that_is_not_a_digest_refuses(self):
+        # Two unequal strings are not two proven identities. Without a shape
+        # check, "a" and "b" satisfy every inequality this artifact carries.
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["main_identity"] = "a"
+        payload["isolated_identity"] = "b"
+        self.write_manifest(payload)
+        self.assertIn("not a SHA-256 hexdigest", self.refusal().detail)
+
+    def test_the_content_rules_check_digest_shape_independently_of_the_parser(self):
+        # `assert_manifest_self_consistent` is public and is what an auditor
+        # holding an already-parsed manifest runs. It must not inherit its
+        # shape guarantees from whoever happened to parse the document -- a
+        # manifest assembled in code reaches it without passing the parser.
+        forged = replace(self.manifest, main_identity="a", isolated_identity="b")
+        with self.assertRaises(EvidenceError) as caught:
+            isolation.assert_manifest_self_consistent(forged)
+        self.assertIn("not a SHA-256 hexdigest", caught.exception.detail)
+
+    def test_narrowed_trees_refuse(self):
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["trees"] = ["Assets"]
+        self.write_manifest(payload)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", self.refusal().code)
+
+    def test_empty_trees_refuse(self):
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["trees"] = []
+        payload["files"] = []
+        self.write_manifest(payload)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", self.refusal().code)
+
+    def test_an_empty_file_list_refuses(self):
+        # The digest is recomputed to MATCH the empty list, so this manifest is
+        # internally consistent and describes nothing. Leaving tree_sha256
+        # stale would have been caught by the digest rule instead, and the
+        # "an isolated copy is never empty" rule would never have run.
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["files"] = []
+        payload["tree_sha256"] = isolation._tree_digest(())
+        self.write_manifest(payload)
+        self.assertIn("lists no files", self.refusal().detail)
+
+    def test_a_tree_digest_that_does_not_match_its_own_file_list_refuses(self):
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["files"] = payload["files"][:-1]
+        self.write_manifest(payload)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", self.refusal().code)
+
+    def test_a_foreign_manifest_schema_refuses(self):
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["schema"] = "kinglet.unity-probe.isolation-manifest/v9"
+        self.write_manifest(payload)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", self.refusal().code)
+
+    def test_an_unknown_manifest_field_refuses(self):
+        payload = isolation.manifest_to_dict(self.manifest)
+        payload["isolated"] = True
+        self.write_manifest(payload)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", self.refusal().code)
+
+    # --- what cannot be audited is refused, never waved through ---
+
+    def test_a_legacy_receipt_cannot_be_audited(self):
+        # The refusal must name the SCHEMA. A v1 receipt structurally cannot
+        # carry a citation, so "cites no manifest" would fire for it either
+        # way -- and would report the wrong reason, hiding that the document
+        # predates the rule rather than merely omitting a field.
+        value = dict(routes.receipt_to_dict(self.cited_receipt()))
+        value["schema"] = RECEIPT_SCHEMA_V1
+        value.pop("isolation_manifest", None)
+        detail = self.refusal(unity_receipt_from_dict(value)).detail
+        self.assertIn(RECEIPT_SCHEMA_V1, detail)
+        self.assertIn("predates the mandatory", detail)
+
+    def test_another_route_cannot_be_audited_as_isolated(self):
+        value = dict(routes.receipt_to_dict(self.cited_receipt()))
+        value["route"] = "same-project-headless"
+        value.pop("isolation_manifest", None)
+        self.assertIn(
+            "makes no physical-separation claim",
+            self.refusal(unity_receipt_from_dict(value)).detail,
+        )
+
+    # --- the committed artifact, read as bytes ---
+
+    def test_the_published_manifest_satisfies_the_content_rules(self):
+        payload = json.loads(PUBLISHED_ISOLATED_MANIFEST.read_text(encoding="utf-8"))
+        published = isolation.isolation_manifest_from_dict(payload)
+        isolation.assert_manifest_self_consistent(published)
+        self.assertNotEqual(published.main_identity, published.isolated_identity)
 
 
 if __name__ == "__main__":

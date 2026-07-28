@@ -1026,6 +1026,51 @@ class HostCensusHelpers(unittest.TestCase):
                 ["artifacts/unity/RUN-01/same-project-headless-summary.json"],
             )
 
+    def test_the_isolation_manifest_citation_is_republished_too(self):
+        # `isolation_manifest` is an artifact citation as well as a field, and
+        # it is the MANDATORY one. Leaving it route-relative publishes an
+        # isolated-headless receipt whose proof points at a path that exists
+        # nowhere under the record -- the dangling reference this rewrite
+        # exists to prevent, on the one field where it matters most.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            staging = host_probes.Staging(Path(temporary), ("/nowhere",), "stamp")
+            receipt = {
+                "route": "isolated-headless",
+                "artifacts": [
+                    "artifacts/unity/isolated-headless-summary.json",
+                    "artifacts/unity/isolated-headless-manifest.json",
+                ],
+                "isolation_manifest": "artifacts/unity/isolated-headless-manifest.json",
+            }
+            resolved = staging.resolve_receipt_artifacts("RUN-07", receipt, {})
+            self.assertEqual(
+                "artifacts/unity/RUN-07/isolated-headless-manifest.json",
+                resolved["isolation_manifest"],
+            )
+            # And it still names something the artifact list carries, which is
+            # what validate_unity_receipt requires of it.
+            self.assertIn(resolved["isolation_manifest"], resolved["artifacts"])
+            self.assertEqual(
+                "artifacts/unity/isolated-headless-manifest.json",
+                receipt["isolation_manifest"],
+            )
+
+    def test_the_publish_root_is_where_a_citation_resolves(self):
+        # The root `verify_cited_isolation_manifest` is handed: joining a
+        # published artifact path onto it must reach the staged file.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            staging = host_probes.Staging(Path(temporary), ("/nowhere",), "stamp")
+            staging.write_json("isolated-headless", "RUN-07", "probe.json", {"a": 1},
+                               Path(temporary) / "raw")
+            published = staging.for_probe("isolated-headless")[0]["path"]
+            self.assertTrue(
+                (staging.publish_root("isolated-headless") / published).is_file()
+            )
+
     def test_the_recording_factory_writes_the_group_it_created(self):
         # This record is the ONLY thing that lets the outer trap reach
         # VBCSCompiler and UnityPackageManager without a host-wide name match.

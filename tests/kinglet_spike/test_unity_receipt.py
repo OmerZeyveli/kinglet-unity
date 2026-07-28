@@ -3,12 +3,16 @@ import unittest
 from pathlib import Path
 
 from tools.kinglet_spike.model import EvidenceError
+from tools.kinglet_spike.model import Environment
 from tools.kinglet_spike.unity.model import (
     CONTRACT_RULES,
     CONTRACT_SCHEMA,
     EXECUTING_ROUTES,
+    LEGACY_RECEIPT_SCHEMAS,
     PROJECT_ID,
     RECEIPT_SCHEMA,
+    RECEIPT_SCHEMA_V1,
+    RECEIPT_SCHEMA_V2,
     ROUTES,
     STATUS_VALUES,
 )
@@ -17,9 +21,19 @@ from tools.kinglet_spike.unity.receipt import (
     unity_receipt_from_dict,
     validate_unity_receipt,
 )
-from tests.kinglet_spike.unity_support import load, passing_receipt, receipt
+from tests.kinglet_spike.unity_support import (
+    legacy_receipt,
+    load,
+    passing_receipt,
+    receipt,
+)
 
 ROUTES_CONTRACT_PATH = Path("spikes/platform/unity/contracts/routes-v1.json")
+PUBLISHED_ISOLATED_RECEIPT = Path(
+    "docs/research/platform-spike/artifacts/unity/"
+    "20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01/"
+    "isolated-headless-receipt.json"
+)
 
 
 class UnityReceiptTests(unittest.TestCase):
@@ -64,7 +78,9 @@ class UnityReceiptTests(unittest.TestCase):
 
     def test_wrong_schema_is_rejected(self):
         value = receipt("filesystem")
-        value["schema"] = "kinglet.unity-probe.receipt/v2"
+        # v2 became the CURRENT schema; an unsupported one is a version this
+        # tree has never defined, not merely a different one.
+        value["schema"] = "kinglet.unity-probe.receipt/v3"
         with self.assertRaises(EvidenceError) as ctx:
             unity_receipt_from_dict(value)
         self.assertEqual("E_SCHEMA", ctx.exception.code)
@@ -347,6 +363,171 @@ class UnityReceiptTests(unittest.TestCase):
         value["artifacts"] = ["C:foo.txt"]
         codes = {item.code for item in validate_unity_receipt(load(value))}
         self.assertIn("E_PATH", codes)
+
+
+class IsolationManifestIsMandatoryTests(unittest.TestCase):
+    """`isolated-headless` may not claim isolation it cannot show.
+
+    Before this, a `same-project-headless` receipt and an `isolated-headless`
+    receipt were byte-identical apart from the `route` label: the runtime
+    check in `isolation.assert_isolated` was real, and the PUBLISHED evidence
+    encoded none of it. The receipt now cites the isolation manifest, and the
+    citation is required by the schema rather than by convention.
+
+    The eight already-published records were produced under v1 and are
+    immutable, so v1 stays READABLE as legacy -- it is not upgraded, and it is
+    not publishable as new evidence either.
+    """
+
+    def _isolated(self) -> dict:
+        value = passing_receipt("isolated-headless")
+        self.assertEqual(RECEIPT_SCHEMA_V2, value["schema"])
+        return value
+
+    # --- v2 requires the citation ---
+
+    def test_v2_isolated_receipt_without_a_manifest_citation_refuses(self):
+        value = self._isolated()
+        del value["isolation_manifest"]
+        diagnostics = validate_unity_receipt(load(value))
+        # The CODE as well as the location: "there is no citation" and "the
+        # citation is an unsafe path" are different failures, and a missing
+        # citation reported as a path problem is a rule stated by accident.
+        self.assertEqual(
+            [("E_ASSERTION", "isolation_manifest")],
+            [(item.code, item.location) for item in diagnostics],
+        )
+        self.assertIn("must cite the isolation manifest", diagnostics[0].message)
+
+    def test_v2_isolated_receipt_with_an_empty_citation_refuses(self):
+        value = self._isolated()
+        value["isolation_manifest"] = ""
+        diagnostics = validate_unity_receipt(load(value))
+        self.assertEqual(
+            [("E_ASSERTION", "isolation_manifest")],
+            [(item.code, item.location) for item in diagnostics],
+        )
+
+    def test_v2_isolated_receipt_with_a_null_citation_refuses(self):
+        value = self._isolated()
+        value["isolation_manifest"] = None
+        diagnostics = validate_unity_receipt(load(value))
+        self.assertEqual(
+            [("E_ASSERTION", "isolation_manifest")],
+            [(item.code, item.location) for item in diagnostics],
+        )
+
+    def test_a_citation_absent_from_artifacts_refuses(self):
+        # A field that is merely PRESENT is worth nothing: the cited path must
+        # be one of the artifacts published beside the receipt, or a reader has
+        # nothing to fetch.
+        value = self._isolated()
+        value["artifacts"] = [
+            path for path in value["artifacts"]
+            if path != value["isolation_manifest"]
+        ]
+        self.assertIn(
+            "isolation_manifest",
+            [item.location for item in validate_unity_receipt(load(value))],
+        )
+
+    def test_an_escaping_citation_refuses(self):
+        value = self._isolated()
+        value["isolation_manifest"] = "../elsewhere/manifest.json"
+        value["artifacts"] = [value["isolation_manifest"]]
+        codes = {item.code for item in validate_unity_receipt(load(value))}
+        self.assertIn("E_PATH", codes)
+
+    def test_another_route_must_not_carry_an_isolation_claim(self):
+        for route in ("filesystem", "same-project-headless", "live-editor-mcp"):
+            value = passing_receipt(route)
+            value["isolation_manifest"] = "artifacts/unity/manifest.json"
+            value["artifacts"] = [value["isolation_manifest"]]
+            with self.subTest(route=route):
+                self.assertIn(
+                    "isolation_manifest",
+                    [item.location for item in validate_unity_receipt(load(value))],
+                )
+
+    def test_a_legitimate_isolated_receipt_still_validates(self):
+        self.assertEqual((), validate_unity_receipt(load(self._isolated())))
+
+    # --- v1 is legacy: readable, never upgraded, never republished ---
+
+    def test_v1_receipt_may_not_carry_the_new_field(self):
+        value = legacy_receipt("isolated-headless")
+        value["isolation_manifest"] = "artifacts/unity/manifest.json"
+        with self.assertRaises(EvidenceError) as caught:
+            unity_receipt_from_dict(value)
+        self.assertEqual("E_FIELD", caught.exception.code)
+
+    def test_v1_receipt_is_not_silently_upgraded(self):
+        parsed = load(legacy_receipt("isolated-headless"))
+        self.assertEqual(RECEIPT_SCHEMA_V1, parsed.schema)
+        self.assertIsNone(parsed.isolation_manifest)
+
+    def test_an_existing_v1_isolated_receipt_still_validates(self):
+        value = legacy_receipt("isolated-headless")
+        value["compile"] = {"status": "pass", "errors": 0}
+        value["tests"] = {"status": "pass", "passed": 1, "failed": 0, "skipped": 0}
+        value["artifacts"] = [
+            "artifacts/unity/isolated-headless-summary.json",
+            "artifacts/unity/isolated-headless-manifest.json",
+        ]
+        self.assertEqual((), validate_unity_receipt(load(value)))
+
+    def test_the_published_isolated_receipt_still_parses_and_validates(self):
+        # The real committed artifact, through the real reader. This is the
+        # "accept the existing records" half of the transition, measured
+        # against the bytes rather than against a fixture shaped like them.
+        published = json.loads(PUBLISHED_ISOLATED_RECEIPT.read_text(encoding="utf-8"))
+        parsed = unity_receipt_from_dict(published)
+        self.assertEqual(RECEIPT_SCHEMA_V1, parsed.schema)
+        self.assertEqual((), validate_unity_receipt(parsed))
+
+    def test_a_legacy_receipt_cannot_back_a_new_published_record(self):
+        # Readable is not publishable. Nothing in the committed tree was made
+        # this way, so this closes the downgrade route -- emitting v1 to dodge
+        # the manifest requirement -- without touching what is already on disk.
+        environment = Environment(
+            os="linux", release="ubuntu-24.04", arch="x64",
+            native=True, toolchain="test",
+        )
+        value = legacy_receipt("isolated-headless")
+        value["compile"] = {"status": "pass", "errors": 0}
+        value["tests"] = {"status": "pass", "passed": 1, "failed": 0, "skipped": 0}
+        record = receipt_to_evidence(load(value), environment)
+        self.assertEqual("fail", record.status)
+        contract = [item for item in record.assertions if item.id == "contract"][0]
+        self.assertEqual("fail", contract.status)
+        self.assertIn(RECEIPT_SCHEMA_V1, contract.detail)
+
+    # --- the schema constants and the frozen contract move together ---
+
+    def test_the_current_schema_is_v2_and_v1_is_the_only_legacy_one(self):
+        self.assertEqual(RECEIPT_SCHEMA_V2, RECEIPT_SCHEMA)
+        self.assertEqual(frozenset((RECEIPT_SCHEMA_V1,)), LEGACY_RECEIPT_SCHEMAS)
+        self.assertNotIn(RECEIPT_SCHEMA, LEGACY_RECEIPT_SCHEMAS)
+
+    def test_the_contract_states_both_the_current_and_the_legacy_schema(self):
+        contract = json.loads(ROUTES_CONTRACT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(RECEIPT_SCHEMA, contract["receipt_schema"])
+        self.assertEqual(
+            LEGACY_RECEIPT_SCHEMAS, frozenset(contract["legacy_receipt_schemas"])
+        )
+
+    def test_no_producer_module_can_spell_the_legacy_schema(self):
+        # The downgrade hole restated as a producer property: a route that
+        # wanted to dodge the manifest requirement would emit v1. The modules
+        # that BUILD receipts may not name that string at all; only the two
+        # modules that must still READ it may.
+        from tools.kinglet_spike.unity import host_probes, mcp
+        from tools.kinglet_spike.unity import routes as routes_module
+
+        for module in (routes_module, host_probes, mcp):
+            with self.subTest(module=module.__name__):
+                source = Path(module.__file__).read_text(encoding="utf-8")
+                self.assertNotIn(RECEIPT_SCHEMA_V1, source)
 
 
 if __name__ == "__main__":

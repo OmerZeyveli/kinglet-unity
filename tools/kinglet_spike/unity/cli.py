@@ -9,7 +9,7 @@
 
 Contract of the exit codes, which is the whole point of having a CLI here:
 
-    0  a receipt was produced AND it satisfies kinglet.unity-probe.receipt/v1
+    0  a receipt was produced AND it satisfies the current receipt contract
     1  a receipt was produced but VIOLATES the contract (its diagnostics are
        printed to stderr; the receipt is still printed to stdout, because a
        dishonest receipt is evidence and must not be swallowed)
