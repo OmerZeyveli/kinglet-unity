@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import os
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from tools.kinglet_spike.model import EvidenceError
@@ -341,6 +342,56 @@ class VerifyManifestTests(_IsolationCase):
             verify_manifest(self.isolated, manifest)
         self.assertEqual("E_UNITY_ISOLATION_MANIFEST", caught.exception.code)
 
+    def test_the_manifest_records_the_inode_identity_the_decision_rests_on(self):
+        # ROUND-1 REVIEW: the manifest published only the two path hashes, and
+        # a path hash cannot express the one check `realpath` cannot make. A
+        # bind mount yields two DIFFERENT canonical paths -- hence two
+        # different path hashes -- for ONE directory, so a manifest carrying
+        # only path hashes validates cleanly for exactly the forgery
+        # `assert_isolated` step 4 refuses. These two fields close that
+        # asymmetry, and they must be the digests of the pairs that were
+        # actually compared.
+        manifest = self.prepare()
+        main_stat = os.stat(self.main)
+        iso_stat = os.stat(self.isolated)
+        self.assertEqual(
+            isolation.workspace_identity(main_stat.st_dev, main_stat.st_ino),
+            manifest.main_identity,
+        )
+        self.assertEqual(
+            isolation.workspace_identity(iso_stat.st_dev, iso_stat.st_ino),
+            manifest.isolated_identity,
+        )
+        self.assertNotEqual(manifest.main_identity, manifest.isolated_identity)
+
+    def test_the_identity_digest_is_recomputable_by_a_reader(self):
+        # Unsalted and domain-separated on purpose: a reader holding the
+        # artifact and the two directories must be able to check it. A random
+        # salt would make the field unverifiable, which defeats its purpose.
+        first = isolation.workspace_identity(66, 12345)
+        self.assertEqual(first, isolation.workspace_identity(66, 12345))
+        self.assertNotEqual(first, isolation.workspace_identity(66, 12346))
+        self.assertNotEqual(first, isolation.workspace_identity(67, 12345))
+        # Domain-separated: it is not a bare digest of the two numbers.
+        import hashlib
+
+        self.assertNotEqual(
+            hashlib.sha256(b"66\x0012345").hexdigest(), first
+        )
+
+    def test_a_bind_mount_forgery_is_refused_by_the_manifest_alone(self):
+        # THE case round-1 review named. Two distinct canonical paths, two
+        # distinct path hashes, one physical directory. Only the identity
+        # fields can see it, so this asserts the refusal comes from THEM: the
+        # path hashes in this manifest are genuinely different.
+        manifest = self.prepare()
+        forged = replace(manifest, isolated_identity=manifest.main_identity)
+        self.assertNotEqual(forged.main_path_hash, forged.isolated_path_hash)
+        with self.assertRaises(EvidenceError) as caught:
+            verify_manifest(self.isolated, forged)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", caught.exception.code)
+        self.assertIn("same physical directory identity", caught.exception.detail)
+
     def test_a_manifest_naming_one_workspace_twice_is_refused(self):
         from dataclasses import replace
 
@@ -521,6 +572,34 @@ class IsolatedHeadlessRouteTests(_IsolationCase):
         self.assertIn(
             "Assets/SAVED_MARKER.txt", [item["path"] for item in payload["files"]]
         )
+        # The PUBLISHED artifact must carry the inode identities, not only the
+        # lease keys -- a reader checking the file is the whole point of it.
+        main_stat = os.stat(self.main)
+        iso_stat = os.stat(self.isolated)
+        self.assertEqual(
+            isolation.workspace_identity(main_stat.st_dev, main_stat.st_ino),
+            payload["main_identity"],
+        )
+        self.assertEqual(
+            isolation.workspace_identity(iso_stat.st_dev, iso_stat.st_ino),
+            payload["isolated_identity"],
+        )
+        self.assertNotEqual(payload["main_identity"], payload["isolated_identity"])
+
+    def test_the_summary_publishes_the_inode_identities_too(self):
+        self.run_route(FakeUnity())
+        summary = json.loads((self.raw / routes.ISOLATED_SUMMARY_NAME).read_text())
+        self.assertEqual(self.manifest.main_identity, summary["main_identity"])
+        self.assertEqual(self.manifest.isolated_identity, summary["isolated_identity"])
+        self.assertNotEqual(summary["main_identity"], summary["isolated_identity"])
+
+    def test_a_manifest_whose_identities_do_not_match_the_boundary_is_refused(self):
+        # Path hashes matching is not enough: a workspace swapped between the
+        # copy and the run keeps its path and changes its inode.
+        forged = replace(self.manifest, isolated_identity="e" * 64)
+        with self.assertRaises(EvidenceError) as caught:
+            self.run_route(exploding_factory, manifest=forged)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", caught.exception.code)
 
     def test_the_manifest_artifact_carries_no_machine_path(self):
         # It is published beside a receipt, so it must carry identities, not

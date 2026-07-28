@@ -1735,6 +1735,13 @@ def run_isolated_headless(
         if (
             manifest.main_path_hash != boundary.main_path_hash
             or manifest.isolated_path_hash != boundary.isolated_path_hash
+            # The physical-directory identities too, not only the lease keys:
+            # a manifest whose path hashes match while its inode identities do
+            # not is describing a different pair of directories that happen to
+            # sit at the same two paths -- a workspace replaced between the
+            # copy and the run.
+            or manifest.main_identity != boundary.main_identity
+            or manifest.isolated_identity != boundary.isolated_identity
         ):
             raise EvidenceError(
                 "E_UNITY_ISOLATION_MANIFEST",
@@ -1891,6 +1898,8 @@ def _run_isolated_guarded(
             "main_owner": main_owner_state,
             "main_path_hash": manifest.main_path_hash,
             "isolated_path_hash": manifest.isolated_path_hash,
+            "main_identity": manifest.main_identity,
+            "isolated_identity": manifest.isolated_identity,
             "isolated_tree_sha256": manifest.tree_sha256,
             "isolated_generated_trees": list(generated),
             "main_guard_digest": main_digest_after,

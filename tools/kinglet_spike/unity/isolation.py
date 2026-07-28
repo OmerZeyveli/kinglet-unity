@@ -84,6 +84,8 @@ __all__ = (
     "CopiedFile",
     "IsolationBoundary",
     "IsolationManifest",
+    "WORKSPACE_IDENTITY_DOMAIN",
+    "workspace_identity",
     "assert_isolated",
     "inventory_copy",
     "manifest_for_copy",
@@ -93,6 +95,10 @@ __all__ = (
 )
 
 ISOLATION_MANIFEST_SCHEMA: str = "kinglet.unity-probe.isolation-manifest/v1"
+
+# Domain separation for the workspace identity digest, so a `(st_dev, st_ino)`
+# digest can never be confused with any other SHA-256 in this plan.
+WORKSPACE_IDENTITY_DOMAIN: str = "kinglet.unity-probe.workspace-identity/v1"
 
 # The ONLY trees an isolated copy is made from. See the module docstring for
 # why this is a whitelist and why that whitelist is the unsaved-state
@@ -115,6 +121,24 @@ class CopiedFile:
     sha256: str
 
 
+def workspace_identity(dev: int, ino: int) -> str:
+    """A publishable digest of one directory's `(st_dev, st_ino)`.
+
+    Domain-separated and UNSALTED on purpose: a reader holding this artifact
+    and the two directories must be able to recompute it and check it. A random
+    salt would make the field unverifiable, which is the opposite of the point.
+
+    It is a digest rather than the raw pair because the raw pair is host state
+    that varies per machine and per remount, and a receipt-adjacent artifact
+    that changes every time a disk is remounted invites people to stop reading
+    it. The digest is stable for as long as the directory is, which is the
+    window in which the claim means anything.
+    """
+    return hashlib.sha256(
+        f"{WORKSPACE_IDENTITY_DOMAIN}\0{dev}\0{ino}".encode("utf-8")
+    ).hexdigest()
+
+
 @dataclass(frozen=True)
 class IsolationBoundary:
     """A PROVEN separation between two physical workspaces.
@@ -125,10 +149,20 @@ class IsolationBoundary:
     two path hashes are the same values `lease.lease_path_for` keys on, so
     `main_path_hash != isolated_path_hash` IS the plan's "a lease never spans
     main and isolated copies" stated in the lease's own vocabulary.
+
+    `main_identity` and `isolated_identity` digest the `(st_dev, st_ino)` pair
+    that step 4 actually compared. They are carried out of this function
+    BECAUSE the path hashes cannot stand in for them: a bind mount presents one
+    directory under two canonical paths, so it produces two DIFFERENT path
+    hashes and one IDENTICAL identity. Without these two fields the artifact a
+    reader is told to check would validate the exact forgery `assert_isolated`
+    exists to refuse.
     """
 
     main_path_hash: str
     isolated_path_hash: str
+    main_identity: str
+    isolated_identity: str
 
 
 @dataclass(frozen=True)
@@ -145,11 +179,22 @@ class IsolationManifest:
     next to a receipt, and the sanitization sweep rejects absolute machine
     paths -- the hashes carry the identity the lease already uses without
     carrying anybody's home directory.
+
+    THE PATH HASHES ARE NOT SUFFICIENT, which is why `main_identity` and
+    `isolated_identity` are here as well. Round-1 review found the asymmetry:
+    the artifact a reader is told to check must carry the fact the decision
+    rests on, and for a bind mount the path hashes DIFFER while the directory
+    is one and the same. A manifest carrying only path hashes therefore
+    validates cleanly for exactly the forgery `assert_isolated` step 4 exists
+    to refuse. The identity digests come from that comparison, so the artifact
+    now encodes the refusal instead of merely being consistent with it.
     """
 
     schema: str
     main_path_hash: str
     isolated_path_hash: str
+    main_identity: str
+    isolated_identity: str
     trees: tuple[str, ...]
     files: tuple[CopiedFile, ...]
     tree_sha256: str
@@ -160,6 +205,8 @@ def manifest_to_dict(manifest: IsolationManifest) -> dict:
         "schema": manifest.schema,
         "main_path_hash": manifest.main_path_hash,
         "isolated_path_hash": manifest.isolated_path_hash,
+        "main_identity": manifest.main_identity,
+        "isolated_identity": manifest.isolated_identity,
         "trees": list(manifest.trees),
         "files": [
             {"path": item.path, "size": item.size, "sha256": item.sha256}
@@ -303,7 +350,12 @@ def assert_isolated(
         )
 
     return IsolationBoundary(
-        main_path_hash=main_hash, isolated_path_hash=isolated_hash
+        main_path_hash=main_hash,
+        isolated_path_hash=isolated_hash,
+        # Carried out of the comparison that was actually made, not recomputed
+        # later from a path -- a second stat could see a different directory.
+        main_identity=workspace_identity(*main_identity),
+        isolated_identity=workspace_identity(*isolated_identity),
     )
 
 
@@ -463,6 +515,8 @@ def manifest_for_copy(
         schema=ISOLATION_MANIFEST_SCHEMA,
         main_path_hash=boundary.main_path_hash,
         isolated_path_hash=boundary.isolated_path_hash,
+        main_identity=boundary.main_identity,
+        isolated_identity=boundary.isolated_identity,
         trees=tuple(trees),
         files=inventory,
         tree_sha256=_tree_digest(inventory),
@@ -605,8 +659,18 @@ def verify_manifest(isolated_project, manifest: IsolationManifest) -> None:
     if manifest.main_path_hash == manifest.isolated_path_hash:
         raise EvidenceError(
             "E_UNITY_ISOLATION_MANIFEST",
-            "manifest records one workspace identity for both the main and the "
+            "manifest records one lease identity for both the main and the "
             "isolated workspace; it does not describe an isolated copy",
+        )
+    # The check the path hashes CANNOT make. A bind mount gives two canonical
+    # paths -- so two different path hashes -- for one directory, and the
+    # clause above passes it. This one does not.
+    if manifest.main_identity == manifest.isolated_identity:
+        raise EvidenceError(
+            "E_UNITY_ISOLATION_MANIFEST",
+            "manifest records the same physical directory identity for the "
+            "main and the isolated workspace; two canonical paths naming one "
+            "directory is not isolation, whatever the path hashes say",
         )
     observed = inventory_copy(isolated_project, manifest.trees)
     expected = tuple(sorted(manifest.files, key=lambda item: item.path))
