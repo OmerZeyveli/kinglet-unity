@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import unittest
 from pathlib import Path
 
@@ -1195,6 +1196,115 @@ class LiveRouteTests(unittest.TestCase):
         self.assertEqual([], self.lease_files())
         # Configure pass, MCP server, GUI Editor, restore pass.
         self.assertEqual(len(self.fleet.launches), len(self.fleet.cancelled))
+
+    # --- FINAL whole-branch review, IMPORTANT 1: `_run_prefs_pass` launched a
+    #     batchmode Editor on the REAL project through `process_factory`
+    #     directly, bypassing `_start_bound`. It is the route's FIRST Unity
+    #     launch, so the lease named the controller for the entire configure
+    #     pass -- the exact double-open window `_start_bound` closes.
+
+    def test_the_configure_pass_binds_the_lease_before_the_next_launch(self):
+        # The bind is observed from a LATER launch: by the time the GUI Editor
+        # starts, the lease on disk must already name a launched process
+        # group, not this controller. Against the previous code the lease
+        # still carried the controller's own pid here.
+        observed = {}
+        controller_pid = os.getpid()
+        original = self.fleet.factory
+
+        def factory(argv, **kwargs):
+            argv = list(argv)
+            if "-executeMethod" not in argv and "--http-port" not in argv:
+                files = list(self.lease_dir().glob("*.lease.json"))
+                observed["at_gui_launch"] = (
+                    json.loads(files[0].read_text(encoding="utf-8")) if files else None
+                )
+            return original(argv, **kwargs)
+
+        self.run_route(process_factory=factory)
+        record = observed["at_gui_launch"]
+        self.assertIsNotNone(record, "the lease must exist when the GUI starts")
+        self.assertEqual(
+            4242,
+            record["pgid"],
+            "the configure pass must have bound the lease to its own group",
+        )
+        self.assertNotEqual(
+            controller_pid,
+            record["pid"],
+            "the lease still names the controller: the configure pass launched "
+            "Unity without binding, which is the double-open window",
+        )
+
+    def test_every_editor_launch_on_the_project_binds_the_lease(self):
+        # Counted at the REAL `WorkspaceLease.bind_holder`, so nothing about
+        # `_start_bound` is taken on trust. This route opens three Editors on
+        # the physical project -- configure, GUI, restore -- and all three must
+        # bind. Previously only the GUI did: 1, not 3.
+        from tools.kinglet_spike.unity.lease import WorkspaceLease
+
+        binds: list[tuple[int, int]] = []
+        original = WorkspaceLease.bind_holder
+
+        def spy(lease_self, *, pid, pgid):
+            binds.append((pid, pgid))
+            return original(lease_self, pid=pid, pgid=pgid)
+
+        WorkspaceLease.bind_holder = spy
+        try:
+            self.run_route()
+        finally:
+            WorkspaceLease.bind_holder = original
+
+        editor_launches = [
+            argv for argv in self.fleet.launches if "--http-port" not in argv
+        ]
+        self.assertEqual(3, len(editor_launches))
+        self.assertEqual(len(editor_launches), len(binds))
+
+    # --- FINAL whole-branch review, IMPORTANT 2 and 3: teardown set
+    #     `torn_down = True` before doing any work and left `gui.cancel()` /
+    #     `server.cancel()` unguarded, so ONE raise skipped the prefs restore,
+    #     the server cancel and the lease release; and on the success path
+    #     `except BaseException: pass` let `descendant_pids: []` publish as
+    #     proof of cleanliness after cleanup had actually failed.
+
+    def _fleet_whose_gui_cancel_raises(self):
+        fleet = self.fleet
+        original = fleet.factory
+
+        def factory(argv, **kwargs):
+            handle = original(list(argv), **kwargs)
+            if "-executeMethod" not in handle.argv and "--http-port" not in handle.argv:
+                def exploding_cancel(deadline_seconds):
+                    fleet.cancelled.append(handle.argv)
+                    raise RuntimeError("could not prove the group was gone")
+                handle.cancel = exploding_cancel
+            return handle
+
+        return factory
+
+    def test_a_raising_gui_cancel_still_restores_prefs_and_cancels_the_server(self):
+        with self.assertRaises(EvidenceError):
+            self.run_route(process_factory=self._fleet_whose_gui_cancel_raises())
+        self.assertIn(
+            routes.RESTORE_METHOD,
+            self.fleet.methods,
+            "a raising GUI cancel must not skip the developer's EditorPrefs restore",
+        )
+        server_cancels = [a for a in self.fleet.cancelled if "--http-port" in a]
+        self.assertEqual(1, len(server_cancels), "the MCP server must still be cancelled")
+
+    def test_a_raising_gui_cancel_still_releases_the_lease(self):
+        with self.assertRaises(EvidenceError):
+            self.run_route(process_factory=self._fleet_whose_gui_cancel_raises())
+        self.assertEqual([], self.lease_files(), "the lease must not leak")
+
+    def test_a_failed_cleanup_never_publishes_an_empty_survivor_set(self):
+        with self.assertRaises(EvidenceError) as caught:
+            self.run_route(process_factory=self._fleet_whose_gui_cancel_raises())
+        self.assertEqual("E_UNITY_CLEANUP_UNKNOWN", caught.exception.code)
+        self.assertIn("could not prove the group was gone", caught.exception.detail)
 
     def test_a_summary_artifact_is_written_and_named_in_the_receipt(self):
         receipt = self.run_route()

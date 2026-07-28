@@ -27,12 +27,13 @@ from pathlib import Path
 from typing import Callable
 
 from ..model import EvidenceError
+from .model import UNITY_VERSION_RE
 
-# Same shape as receipt.py's _UNITY_VERSION_RE: <year>.<major>.<minor><stage><build>,
-# e.g. 6000.3.18f1, 6000.0.68f1, 2022.3.62f3. Duplicated locally (rather than
-# imported) because it is a small, stable literal and this module must not
-# depend on receipt.py's frozen Task 1 surface for an unrelated concern.
-_UNITY_VERSION_RE = re.compile(r"^\d{4}\.\d+\.\d+(a|b|c|f|p|rc|x)\d+$")
+# IMPORTED, not respelled. This module and receipt.py judge the same version
+# string from opposite ends (may this Editor run / may this receipt publish),
+# and the two literals had no test asserting they agreed. `model` is the frozen
+# shape module both already depend on, so this adds no new coupling.
+_UNITY_VERSION_RE = UNITY_VERSION_RE
 
 _EDITOR_VERSION_LINE_RE = re.compile(r"^m_EditorVersion:\s*(\S+)\s*$")
 

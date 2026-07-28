@@ -171,6 +171,102 @@ class RunHostScriptSafety(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("already exists", result.stderr)
 
+    # --- FINAL whole-branch review, IMPORTANT 6 (second half): RUN_ID was
+    #     unvalidated, and it is concatenated into RAW_ROOT, which becomes the
+    #     SWEEP'S WORKSPACE ARGUMENT.
+
+    def test_a_traversing_run_id_is_refused_before_it_reaches_the_sweep(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "spikes/platform/unity/fixture").mkdir(parents=True)
+            for bad in ("../../..", "a/b", ".", "..", ".hidden", "a b", "a$(id)"):
+                result = run_script(
+                    ["--unity", "/bin/true", "--repo-root", str(root),
+                     "--run-id", bad]
+                )
+                self.assertEqual(result.returncode, 2, bad)
+                self.assertIn("--run-id", result.stderr, bad)
+            # And the guard must not have become a refuse-everything rule.
+            self.assertFalse(
+                (root / ".kinglet").exists(),
+                "a refused run must create no raw root at all",
+            )
+
+    def test_an_ordinary_run_id_is_still_accepted(self):
+        # Otherwise "refuses everything" would look like a working guard. This
+        # gets PAST the run-id check and dies at the next one.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "spikes/platform/unity/fixture").mkdir(parents=True)
+            existing = root / ".kinglet/local/spikes/2026-07-28T00_00_00Z-host"
+            existing.mkdir(parents=True)
+            result = run_script(
+                ["--unity", "/bin/true", "--repo-root", str(root),
+                 "--run-id", "2026-07-28T00_00_00Z-host"]
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("already exists", result.stderr)
+
+    def _run_with_stub_sweep(self, sweep_body):
+        """Drive the REAL cleanup trap with a sweep that cannot kill anything.
+
+        `run-host.sh` resolves its sweep from its own directory, so a copy of
+        the script beside a stub `sweep-workspace.sh` exercises the trap end
+        to end while the stub does nothing but exit. That is deliberate: the
+        subject here is what the trap does with the sweep's EXIT STATUS, and a
+        test of that must not be able to signal a process.
+
+        The real repository root is used because a temporary one has no
+        `tools/kinglet_spike`, so the run would die at import and never create
+        the workspace the trap keys on.
+        """
+        import shutil
+        import tempfile
+
+        run_id = f"t8-sweepstatus-{os.getpid()}-{abs(hash(sweep_body)) % 10000}"
+        raw_root = REPO / ".kinglet/local/spikes" / run_id
+        if raw_root.exists():
+            shutil.rmtree(raw_root)
+        temporary = tempfile.mkdtemp()
+        try:
+            stub_dir = Path(temporary)
+            shutil.copy2(SCRIPT, stub_dir / "run-host.sh")
+            (stub_dir / "sweep-workspace.sh").write_text(
+                sweep_body, encoding="utf-8"
+            )
+            return subprocess.run(
+                ["bash", str(stub_dir / "run-host.sh"),
+                 "--unity", "/bin/true", "--repo-root", str(REPO),
+                 "--run-id", run_id],
+                capture_output=True, text=True, timeout=300,
+                cwd=str(REPO),
+            )
+        finally:
+            shutil.rmtree(temporary, ignore_errors=True)
+            if raw_root.exists():
+                shutil.rmtree(raw_root)
+
+    def test_the_cleanup_trap_does_not_discard_the_sweeps_refusal(self):
+        # The refusal used to be thrown away by `|| true`: the sweep exited 2
+        # -- an unusable workspace, or a process table it could not read --
+        # and the operator saw nothing at all while the host may still have
+        # been running Unity from this run.
+        result = self._run_with_stub_sweep(
+            '#!/usr/bin/env bash\necho "stub: refusing" >&2\nexit 2\n'
+        )
+        self.assertIn("THE SWEEP REFUSED", result.stderr)
+        self.assertNotEqual(0, result.returncode)
+
+    def test_a_sweep_that_succeeds_reports_no_refusal(self):
+        # The pair that makes the assertion above mean something: a guard that
+        # always shouted would satisfy it.
+        result = self._run_with_stub_sweep("#!/usr/bin/env bash\nexit 0\n")
+        self.assertNotIn("THE SWEEP REFUSED", result.stderr)
+
     def test_the_trap_actually_sweeps_when_the_run_fails(self):
         """End to end: a FAILING run must still sweep its workspace.
 
@@ -522,6 +618,52 @@ class SweepBehaviour(unittest.TestCase):
         self.assertIn("owned-pgid", result.stdout)
         for spared in (sibling, mirror, recycled, bystander):
             self.assertNotIn(str(spared.pid), result.stdout)
+
+    def test_a_backslash_in_the_workspace_does_not_silently_disarm_the_sweep(self):
+        """FINAL whole-branch review, IMPORTANT 6.
+
+        `awk -v ws="$WS"` runs ESCAPE PROCESSING over the value. VERIFIED on
+        this host: `-v ws='/tmp/a\\t1/ws'` yields length 11, not 12. A
+        backslash is a legal filename character and the argument guard does
+        not refuse it, so the selector was comparing against a DIFFERENT
+        string than the one that was validated: it matched nothing, the sweep
+        found no targets, and it exited 0 -- reporting a clean host over a
+        live Editor.
+
+        This is the whole defect, so it is asserted by KILLING: a victim
+        naming a backslash workspace must die. Against the `-v` spelling it
+        survives and the sweep still exits 0, which is the silent failure.
+
+        Nothing in THIS process's own command line names the workspace, so the
+        test runner cannot select itself -- that has happened on this plan.
+        """
+        import time
+
+        backslash_ws = Path(self._temporary.name) / "ws\\x"
+        backslash_ws.mkdir()
+
+        victim_argv = f"Unity -projectPath {backslash_ws}/proj"
+        victim = self._spawn(f'exec -a "{victim_argv}" sleep 300')
+        # The same anchoring rules must still hold for a backslash path.
+        sibling_argv = f"Unity -projectPath {backslash_ws}2/proj"
+        sibling = self._spawn(f'exec -a "{sibling_argv}" sleep 300')
+
+        time.sleep(1)
+        self.assertTrue(self._alive(victim))
+        self.assertTrue(self._alive(sibling))
+
+        result = subprocess.run(
+            ["bash", str(self.SWEEP), str(backslash_ws)],
+            capture_output=True, text=True, timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        victim.wait(timeout=30)
+        self.assertFalse(
+            self._alive(victim),
+            "the sweep reported success without selecting a process in its own "
+            "workspace; the workspace string was mangled before the comparison",
+        )
+        self.assertTrue(self._alive(sibling), "anchoring must still hold")
 
     def test_without_a_pgid_file_the_owned_class_is_out_of_reach(self):
         # States the reason the pgid record exists at all: a workspace-only
@@ -905,6 +1047,113 @@ class HostCensusHelpers(unittest.TestCase):
         reason = host_probes.LIVE_EDITOR_MCP_REASON
         self.assertIn("EditorPrefs", reason)
         self.assertIn("not worked around", reason)
+
+
+class SweepDelegatesToTheOneAuthorityModel(unittest.TestCase):
+    """FINAL whole-branch review, CRITICAL 1.
+
+    `_sweep_project_processes` was the PRE-FIX sweep, preserved intact in the
+    production probe runner:
+
+        if str(project) in parts[3] or "UnityShaderCompiler" in parts[3]
+
+    -- unanchored on both ends, plus a host-wide name match that `sweep-
+    workspace.sh` states may never authorise a kill, ending in SIGKILL.
+
+    These tests do not run a sweep. They drive the delegation through an
+    injected runner and drive the script's own guard through `--check`, which
+    validates and exits without listing or signalling anything. A refusal test
+    that could signal a process is not a test.
+    """
+
+    class _Runner:
+        def __init__(self, returncode=0, stdout="", stderr=""):
+            self.returncode = returncode
+            self.stdout = stdout
+            self.stderr = stderr
+            self.calls = []
+
+        def __call__(self, argv, **kwargs):
+            self.calls.append((list(argv), kwargs))
+            return subprocess.CompletedProcess(
+                argv, self.returncode, self.stdout, self.stderr
+            )
+
+    def test_the_sweep_script_it_calls_actually_exists(self):
+        self.assertTrue(
+            host_probes.SWEEP_SCRIPT.is_file(),
+            f"the shared authority model must be at {host_probes.SWEEP_SCRIPT}",
+        )
+
+    def test_it_calls_sweep_workspace_with_the_workspace_and_the_owned_pgids(self):
+        runner = self._Runner(stdout="swept 4242 4242 owned-pgid\n")
+        swept = host_probes._sweep_project_processes(
+            Path("/ws/run/workspace/main"),
+            Path("/ws/run/owned-pgids.txt"),
+            runner=runner,
+        )
+        self.assertEqual(1, len(runner.calls))
+        argv, _kwargs = runner.calls[0]
+        self.assertEqual(
+            [
+                "bash",
+                str(host_probes.SWEEP_SCRIPT),
+                "/ws/run/workspace/main",
+                "/ws/run/owned-pgids.txt",
+            ],
+            argv,
+        )
+        self.assertEqual(("swept 4242 4242 owned-pgid",), swept)
+
+    def test_a_refusal_is_raised_not_reported_as_a_clean_host(self):
+        runner = self._Runner(returncode=2, stderr="workspace is too shallow")
+        with self.assertRaises(host_probes.SweepRefused) as caught:
+            host_probes._sweep_project_processes(
+                Path("/x"), None, runner=runner
+            )
+        self.assertIn("too shallow", str(caught.exception))
+
+    def test_the_module_defines_no_second_selection_rule(self):
+        # Checked against the COMPILED function, not the file text, so a
+        # comment cannot satisfy it. The sweep must not read the process table
+        # itself and must not signal: its only names are the delegation.
+        names = set(host_probes._sweep_project_processes.__code__.co_names)
+        self.assertIn("SWEEP_SCRIPT", names)
+        for forbidden in ("process_rows", "kill", "killpg", "SIGKILL", "SIGTERM"):
+            self.assertNotIn(
+                forbidden,
+                names,
+                f"the sweep must not reference {forbidden}; selection and "
+                "signalling belong to sweep-workspace.sh alone",
+            )
+
+    def test_the_scripts_own_guard_refuses_a_workspace_that_is_a_prefix_sibling(self):
+        # The defect this replaces: workspace `<ws>/main` selected
+        # `<ws>/main-backup`. Driven through the real script, `--check` only,
+        # so nothing can be signalled: the sibling must not be equal to the
+        # workspace after the script canonicalises it.
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "a" / "b" / "c"
+            main = root / "main"
+            sibling = root / "main-backup"
+            main.mkdir(parents=True)
+            sibling.mkdir(parents=True)
+            result = subprocess.run(
+                ["bash", str(host_probes.SWEEP_SCRIPT), "--check", str(main)],
+                capture_output=True, text=True, check=False,
+            )
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertEqual(f"ok {os.path.realpath(main)}", result.stdout.strip())
+            self.assertNotIn("main-backup", result.stdout)
+
+    def test_the_scripts_own_guard_refuses_the_filesystem_root(self):
+        result = subprocess.run(
+            ["bash", str(host_probes.SWEEP_SCRIPT), "--check", "/"],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(2, result.returncode)
 
 
 if __name__ == "__main__":

@@ -672,7 +672,27 @@ def verify_manifest(isolated_project, manifest: IsolationManifest) -> None:
             "main and the isolated workspace; two canonical paths naming one "
             "directory is not isolation, whatever the path hashes say",
         )
-    observed = inventory_copy(isolated_project, manifest.trees)
+    # The manifest's OWN `trees` used to decide what gets verified, which made
+    # verification a claim the thing being verified was allowed to make about
+    # itself: `trees=()` walked nothing, matched an empty `files`, digested to
+    # the empty digest, and returned success over any content whatsoever. The
+    # set of trees an isolated copy consists of is frozen in this module, so
+    # that is what is walked, and a manifest naming a different set is refused
+    # rather than honoured.
+    if tuple(manifest.trees) != tuple(COPIED_TREES):
+        raise EvidenceError(
+            "E_UNITY_ISOLATION_MANIFEST",
+            f"manifest declares trees {tuple(manifest.trees)!r}, but an "
+            f"isolated copy is defined by {tuple(COPIED_TREES)!r}; a manifest "
+            "that narrows its own scope narrows the verification of it",
+        )
+    # COPIED_TREES and not `manifest.trees`, even though the guard above has
+    # just proved them equal. The equality is what makes this line redundant
+    # TODAY; naming the frozen constant is what keeps it correct if that guard
+    # is ever relaxed. (Mutating this line back to `manifest.trees` therefore
+    # survives the suite, which is expected and is why the refusal above is
+    # the tested guard.)
+    observed = inventory_copy(isolated_project, COPIED_TREES)
     expected = tuple(sorted(manifest.files, key=lambda item: item.path))
     if observed != expected:
         observed_paths = {item.path for item in observed}

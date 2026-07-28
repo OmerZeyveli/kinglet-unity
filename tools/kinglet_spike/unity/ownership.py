@@ -67,6 +67,24 @@ Three traps this module exists to avoid, all observed or reproduced live:
 3. Path equality must be whole-resolved-path equality, never a
    prefix/substring comparison -- `/x/proj` and `/x/proj2` (no separator
    between them) canonicalize to different paths and must never match.
+
+WHAT HAS AND HAS NOT BEEN RUN ON A REAL HOST
+--------------------------------------------
+Stated here, in the module, rather than only in a planning note: a caveat
+that lives somewhere a reader of this file will not look is a caveat that
+does not exist.
+
+- Linux /proc: exercised live on the development host.
+- macOS `sysctl` KERN_PROCARGS2 (_read_procargs2_bytes): the ctypes call
+  itself has NEVER been executed on macOS. Its buffer DECODER
+  (_parse_procargs2) and its table ASSEMBLY (_build_macos_process_table)
+  are pure and fully unit-tested from any host, but the mib layout, the
+  KERN_ARGMAX sizing and the sysctl(3) return conventions are reasoned
+  from the xnu sources, not measured. A macOS pass must confirm that
+  _read_argv_via_sysctl returns non-None for the caller's own process
+  before any conclusion drawn on macOS is trusted.
+- Windows Win32_Process via PowerShell: the invocation has never been
+  executed either; _parse_windows_process_table is pure and tested.
 """
 from __future__ import annotations
 
@@ -105,13 +123,36 @@ class _TruncatedCommand:
 ProcessCommand = Union[str, "tuple[str, ...]", _TruncatedCommand]
 ProcessEntry = tuple[int, ProcessCommand]
 
-_PROJECT_PATH_FLAG_RE = re.compile(r'(?:(?<=\s)|^)-projectPath(?=\s|$)')
+# ONE argument-separator alphabet, shared by the flag REGEXES and the value
+# EXTRACTOR below.
+#
+# They used to disagree: the regexes accepted any `\s` while the extractor
+# accepted only space and tab. `-projectPath\n/path` therefore MATCHED the
+# flag regex and was then rejected by `rest[0] not in (" ", "\t")`, and the
+# function returned `[]` -- which its caller reads as "no -projectPath here",
+# i.e. a POSITIVE ruling-out, for a command line that plainly carries one.
+# Same shape as the credential-rule defect fixed in 6257de1: two guards, two
+# alphabets, and their disagreement resolving toward SAFE.
+#
+# The alphabet is spelled once, as an explicit character class rather than
+# `\s`, because `\s` on a str pattern also matches Unicode separators that
+# `str.__contains__` over a literal would not -- which is how two spellings of
+# "whitespace" drift apart in the first place. test_unity_ownership.py asserts
+# character-by-character that the regex and the extractor agree.
+_SEPARATOR_CHARS: str = " \t\n\r\v\f"
+_SEPARATOR_CLASS: str = "[ \\t\\n\\r\\v\\f]"
+
+_PROJECT_PATH_FLAG_RE = re.compile(
+    r'(?:(?<=' + _SEPARATOR_CLASS + r')|^)-projectPath(?=' + _SEPARATOR_CLASS + r'|$)'
+)
 # A plausible start of the NEXT real flag: a dash immediately followed by a
-# letter, with nothing but whitespace (or the start of string) before it.
+# letter, with nothing but a separator (or the start of string) before it.
 # "- Copy" (dash, space, letter) does NOT match -- only an unspaced
 # "-Word" does, exactly the shape every real Unity flag has
 # (-logFile, -batchmode, -quit, -projectPath itself, ...).
-_FLAG_BOUNDARY_RE = re.compile(r'(?:(?<=\s)|^)-[A-Za-z][\w-]*')
+_FLAG_BOUNDARY_RE = re.compile(
+    r'(?:(?<=' + _SEPARATOR_CLASS + r')|^)-[A-Za-z][\w-]*'
+)
 
 
 @dataclass(frozen=True)
@@ -237,7 +278,9 @@ def _project_path_candidates_from_raw(command: str, *, windows: bool) -> list[st
     if match is None:
         return []
     rest = command[match.end():]
-    if not rest or rest[0] not in (" ", "\t"):
+    # Same alphabet the flag regex's lookahead just used. Anything narrower
+    # here turns a matched flag into `[]`, which reads as "ruled out".
+    if not rest or rest[0] not in _SEPARATOR_CHARS:
         return []
     rest = rest[1:]
     if not rest:
@@ -252,7 +295,7 @@ def _project_path_candidates_from_raw(command: str, *, windows: bool) -> list[st
     candidates: list[str] = []
     for flag_match in _FLAG_BOUNDARY_RE.finditer(rest):
         candidate = rest[: flag_match.start()]
-        if candidate.endswith((" ", "\t")):
+        if candidate.endswith(tuple(_SEPARATOR_CHARS)):
             candidate = candidate[:-1]
         if candidate and candidate not in candidates:
             candidates.append(candidate)
@@ -754,7 +797,14 @@ def _read_procargs2_bytes(pid: int) -> bytes | None:
         if libc.sysctl(mib3, 3, buffer, ctypes.byref(size), None, 0) != 0:
             return None  # process gone, or another user's (EINVAL/EPERM)
         return buffer.raw[: size.value]
-    except (OSError, AttributeError, ValueError, MemoryError):
+    except (OSError, AttributeError, ValueError, MemoryError, ctypes.ArgumentError):
+        # ctypes.ArgumentError derives from Exception, NOT from any of the
+        # others: a pid that does not fit c_int (a value from a hostile or
+        # simply unexpected `ps`) raises it out of the (c_int * 3) build and
+        # escaped this handler entirely, breaking the module's "every route
+        # yields E_UNITY_OWNER_UNKNOWN, never a bare traceback" guarantee on
+        # macOS. Returning None here is the same answer as every other
+        # unreadable-argv case: no exact argv, so the caller decides ambiguity.
         return None
 
 
@@ -857,11 +907,16 @@ def _parse_comm_map(stdout: str) -> dict[int, str]:
 def _macos_process_table() -> tuple[ProcessEntry, ...]:
     """macOS authoritative table: pid enumeration via ps, argv via the kernel."""
     pids = _parse_pid_list(_run_ps(["ps", "-axo", "pid="]))
-    comm_map: dict[int, str] = {}
-    try:
-        comm_map = _parse_comm_map(_run_ps(["ps", "-axo", "pid=,comm="]))
-    except EvidenceError:
-        comm_map = {}
+    # NOT wrapped in `except EvidenceError: comm_map = {}`. That is what it
+    # used to be, and an empty map disables the ambiguity fallback for EVERY
+    # pid at once: a pid whose exact argv could not be read then has no comm
+    # to say "Unity-shaped", so it is dropped, and a live Editor whose argv
+    # was unreadable vanishes from the table and reads as SAFE. That converts
+    # "I could not look" into "there was nothing to see" -- the inversion this
+    # module exists to prevent. `_run_ps` already raises
+    # E_UNITY_OWNER_UNKNOWN, which IS the "I could not tell" outcome, so the
+    # error is allowed through instead of being downgraded to a fact.
+    comm_map = _parse_comm_map(_run_ps(["ps", "-axo", "pid=,comm="]))
     return _build_macos_process_table(
         pids, argv_reader=_read_argv_via_sysctl, comm_reader=comm_map.get
     )
@@ -897,14 +952,23 @@ def _parse_posix_process_line(stripped: str) -> ProcessEntry | None:
     return (pid, command)
 
 
-def _mark_truncated(command: ProcessCommand) -> ProcessCommand:
-    """Replace a command with a _TruncatedCommand carrying its best-known argv0."""
+def _mark_truncated(command: ProcessCommand, *, windows: bool = False) -> ProcessCommand:
+    """Replace a command with a _TruncatedCommand carrying its best-known argv0.
+
+    `windows` is not decorative. The argv0 stored here is what
+    _candidate_paths_for_command hands back, and the caller runs it through
+    _is_unity_editor_argv0 -- which splits on the WRONG separator if the
+    platform is guessed. A Windows command line marked with windows=False
+    yields an argv0 of `C:\\Program Files\\...\\Unity.exe` whose POSIX
+    basename is the whole string, so a truncated ELEVATED Editor would read
+    as not-Unity and be ignored: the same false SAFE, one layer down.
+    """
     if isinstance(command, _TruncatedCommand):
         return command
     if isinstance(command, (tuple, list)):
         argv0 = command[0] if command else ""
     else:
-        argv0 = _extract_argv0(command, windows=False) or ""
+        argv0 = _extract_argv0(command, windows=windows) or ""
     return _TruncatedCommand(argv0=argv0)
 
 
@@ -987,8 +1051,15 @@ def _windows_process_table() -> tuple[ProcessEntry, ...]:
                 "powershell",
                 "-NoProfile",
                 "-Command",
+                # `Name` is fetched as well as `CommandLine`, and that is not
+                # cosmetic: CommandLine is $null for any process the caller
+                # cannot inspect -- INCLUDING an elevated Editor -- and Name
+                # is the only field left that can say "Unity-shaped". Without
+                # it the fallback data for _TruncatedCommand does not exist,
+                # so the pid could only be dropped, and a live elevated Editor
+                # read as SAFE.
                 "Get-CimInstance Win32_Process | "
-                "ForEach-Object { \"$($_.ProcessId)`t$($_.CommandLine)\" }",
+                "ForEach-Object { \"$($_.ProcessId)`t$($_.Name)`t$($_.CommandLine)\" }",
             ],
             capture_output=True,
             text=True,
@@ -1010,7 +1081,7 @@ def _windows_process_table() -> tuple[ProcessEntry, ...]:
 
 
 def _parse_windows_process_table(stdout: str) -> tuple[ProcessEntry, ...]:
-    """Pure: parse `<pid><TAB><CommandLine>` lines -- unit-tested from Linux.
+    """Pure: parse `<pid><TAB><Name><TAB><CommandLine>` lines -- unit-tested from Linux.
 
     Extracted from _windows_process_table() specifically so the parsing
     logic (as opposed to the PowerShell invocation itself) is exercised by
@@ -1019,19 +1090,53 @@ def _parse_windows_process_table(stdout: str) -> tuple[ProcessEntry, ...]:
     can legitimately contain spaces (quoted paths, arguments), and a
     generic-whitespace split risks misreading the pid/command boundary if
     any whitespace precedes the real tab separator.
+
+    TWO WAYS THIS USED TO RESOLVE TOWARD SAFE, both closed here:
+
+    1. `if "\\t" not in line: continue`. PowerShell prints a CommandLine
+       verbatim, so a project directory whose name contains a NEWLINE makes
+       one process emit two lines: the head keeps the pid and a TRUNCATED
+       command, and the tail -- carrying no tab -- was silently dropped. The
+       Editor's entry was then left looking like a clean, complete command
+       line ending at the truncated prefix, which is EXACTLY the shape
+       _parse_posix_process_table documents as "the previous round's
+       CRITICAL 1 finding" and closes on the POSIX side. It is closed the
+       same way here: an unparseable line is never just discarded, it marks
+       the preceding entry _TruncatedCommand (unconditionally ambiguous).
+
+    2. `if command:` -- dropping the pid outright when CommandLine is empty.
+       Win32_Process.CommandLine is $null for a process the caller cannot
+       inspect, and an ELEVATED Editor is precisely such a process. Dropping
+       it means no owner is found, `assert_headless_safe` clears, and
+       headless Unity launches on a project a live Editor owns. Linux
+       (_linux_proc_process_table) and macOS (_build_macos_process_table)
+       both KEEP such a pid as a _TruncatedCommand when its coarser name
+       says Unity; Windows now does the same, using Win32_Process.Name. A
+       pid with no command AND a non-Unity name is dropped, the same
+       documented bound as the other two platforms.
     """
     entries: list[ProcessEntry] = []
     for line in stdout.splitlines():
-        if "\t" not in line:
+        parts = line.split("\t", 2)
+        pid: int | None = None
+        if len(parts) == 3:
+            try:
+                pid = int(parts[0].strip())
+            except ValueError:
+                pid = None
+        if pid is None:
+            # Unparseable: either a tail left behind by an embedded newline,
+            # or a non-numeric pid column. Never discarded -- see (1) above.
+            if entries:
+                prev_pid, prev_command = entries[-1]
+                entries[-1] = (prev_pid, _mark_truncated(prev_command, windows=True))
             continue
-        pid_text, command = line.split("\t", 1)
-        command = command.strip()
-        try:
-            pid = int(pid_text.strip())
-        except ValueError:
-            continue
+        name = parts[1].strip()
+        command = parts[2].strip()
         if command:
             entries.append((pid, command))
+        elif name and _is_unity_editor_argv0(name, windows=True):
+            entries.append((pid, _TruncatedCommand(argv0=name)))
     return tuple(entries)
 
 

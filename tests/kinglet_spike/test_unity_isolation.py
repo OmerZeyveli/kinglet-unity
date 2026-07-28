@@ -401,6 +401,39 @@ class VerifyManifestTests(_IsolationCase):
             verify_manifest(self.isolated, forged)
         self.assertEqual("E_UNITY_ISOLATION_MANIFEST", caught.exception.code)
 
+    # --- FINAL whole-branch review, IMPORTANT 9: verify_manifest walked the
+    #     CALLER-SUPPLIED manifest.trees, so a manifest could narrow the
+    #     verification of itself. `trees=()` verified nothing and succeeded.
+
+    def test_a_manifest_that_names_no_trees_does_not_verify_by_walking_nothing(self):
+        from dataclasses import replace
+
+        manifest = self.prepare()
+        forged = replace(manifest, trees=(), files=(), tree_sha256=isolation._tree_digest(()))
+        with self.assertRaises(EvidenceError) as caught:
+            verify_manifest(self.isolated, forged)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", caught.exception.code)
+
+    def test_a_manifest_that_drops_one_tree_cannot_hide_that_trees_content(self):
+        # Sharper than trees=(): Assets is verified, Packages is simply not
+        # looked at, so a tampered Packages tree passed. The refusal must come
+        # from the tree SET, before any digest comparison can be arranged to
+        # agree.
+        from dataclasses import replace
+
+        manifest = self.prepare()
+        kept = tuple(item for item in manifest.files if not item.path.startswith("Packages/"))
+        forged = replace(
+            manifest,
+            trees=("Assets", "ProjectSettings"),
+            files=kept,
+            tree_sha256=isolation._tree_digest(kept),
+        )
+        with self.assertRaises(EvidenceError) as caught:
+            verify_manifest(self.isolated, forged)
+        self.assertEqual("E_UNITY_ISOLATION_MANIFEST", caught.exception.code)
+        self.assertIn("narrows its own scope", caught.exception.detail)
+
     def test_a_manifest_with_a_forged_tree_digest_is_refused(self):
         from dataclasses import replace
 

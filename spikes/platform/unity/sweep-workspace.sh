@@ -204,9 +204,32 @@ fi
 
 SELF_PGID="$(ps -o pgid= -p $$ | tr -d ' ')"
 
+# The workspace reaches awk through the ENVIRONMENT, never through `-v`.
+#
+# `awk -v` runs ESCAPE PROCESSING over the value it is given. VERIFIED on this
+# host: `awk -v ws='/tmp/a\t1/ws' 'BEGIN{print length(ws)}'` prints 11, not 12
+# -- the two characters `\` and `t` were folded into one tab. A BACKSLASH is a
+# legal filename character on every POSIX filesystem and the argument guard
+# above does not (and should not have to) refuse it, so a workspace containing
+# one silently became a DIFFERENT string inside the selector: it matched
+# nothing, the sweep found no targets, and it exited 0 -- reporting a clean
+# host over a live Editor. That is the same shape as every other defect on
+# this plan: a transformation applied to a value between the guard that
+# validated it and the code that uses it.
+#
+# ENVIRON does no escape processing. Same host, same value via the
+# environment: length 12. Verified for backslashes too (`/tmp/a\b\\c/ws` is 14
+# characters through ENVIRON and 12 through `-v`).
+#
+# `owned` and `self` stay on `-v`: both are digits and newlines produced by
+# this script, with no backslash reachable.
+KINGLET_SWEEP_WS="$WS"
+export KINGLET_SWEEP_WS
+
 collect() {
     printf '%s\n' "$TABLE" | awk \
-        -v ws="$WS" -v owned="$OWNED" -v self="$SELF_PGID" -v self_pid="$$" '
+        -v owned="$OWNED" -v self="$SELF_PGID" -v self_pid="$$" '
+        BEGIN { ws = ENVIRON["KINGLET_SWEEP_WS"] }
         # Does argv name the workspace as a WHOLE PATH -- bounded on BOTH sides?
         #
         # Right side: a plain substring test swept `<ws>2/proj` as though it

@@ -145,6 +145,32 @@ if [ -z "$RUN_ID" ]; then
     RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-unity-host"
 fi
 
+# RUN_ID is concatenated into RAW_ROOT, which becomes the SWEEP'S WORKSPACE
+# ARGUMENT. It was accepted unvalidated, so `--run-id ../../..` walked the raw
+# root out of `.kinglet/local/` entirely, and `--run-id ''`-shaped values (a
+# lone `.`, a trailing `/..`) collapsed it further -- handing the sweep a
+# directory nobody intended it to have. sweep-workspace.sh's own guard refuses
+# the worst of those, but a value that reaches a guard already meaning
+# something else is the defect; it is refused HERE, where it is still the
+# operator's literal input.
+#
+# A single conservative alphabet: letters, digits, dot, dash, underscore. It
+# admits every id this script generates and every id an operator would type,
+# and it excludes `/`, `..` as a whole component, and every shell and control
+# character at once.
+case "$RUN_ID" in
+    *[!A-Za-z0-9._-]*)
+        echo "run-host.sh: --run-id may contain only letters, digits, '.', '-' and '_', got: $RUN_ID" >&2
+        exit 2
+        ;;
+esac
+case "$RUN_ID" in
+    ""|.|..|.*)
+        echo "run-host.sh: --run-id must not be empty and must not begin with '.', got: $RUN_ID" >&2
+        exit 2
+        ;;
+esac
+
 RAW_ROOT="$REPO_ROOT/.kinglet/local/spikes/$RUN_ID"
 if [ -e "$RAW_ROOT" ]; then
     # A fresh raw run ID every time. Reusing one would let a previous run's log,
@@ -173,7 +199,21 @@ export KINGLET_UNITY_OWNED_PGIDS="$OWNED_PGIDS"
 cleanup() {
     status="$?"
     if [ -d "$RAW_ROOT/workspace" ]; then
-        bash "$SCRIPT_DIR/sweep-workspace.sh" "$RAW_ROOT/workspace" "$OWNED_PGIDS" || true
+        # NOT `|| true`. The sweep exits 2 when it REFUSES -- an unusable
+        # workspace, or a process table it could not read -- and `|| true`
+        # discarded that refusal entirely: the operator saw a clean exit while
+        # a live Editor and its orphans were still on the host. "I could not
+        # sweep" is not "nothing was left behind", and the difference has to
+        # reach the exit status or nobody will ever act on it.
+        #
+        # A refusal during cleanup does not overwrite a real failure status
+        # from the run itself; it only turns a success into a failure.
+        if ! bash "$SCRIPT_DIR/sweep-workspace.sh" "$RAW_ROOT/workspace" "$OWNED_PGIDS"; then
+            echo "run-host.sh: THE SWEEP REFUSED; this host may still be running Unity processes from this run" >&2
+            if [ "$status" -eq 0 ]; then
+                status=1
+            fi
+        fi
     fi
     exit "$status"
 }

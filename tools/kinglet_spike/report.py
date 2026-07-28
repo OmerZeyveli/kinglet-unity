@@ -124,12 +124,52 @@ def render_unity_markdown(
     for cell in unity_cells:
         runs = ", ".join(f"`{run}`" for run in cell.run_ids) if cell.run_ids else "—"
         lines.append(f"| `{cell.id}` | {cell.state} | {runs} |")
+    lines += _shared_artifact_lines(unity_records)
     if reasons:
         lines += ["", "## Why the open cells are open", ""]
         for key in sorted(reasons):
             lines.append(f"- **`{key}`** — {reasons[key]}")
     lines += _known_artefact_lines(unity_records)
     return "\n".join(lines) + "\n"
+
+
+def _shared_artifact_lines(records) -> list[str]:
+    """Say, in the matrix section, where two closed cells rest on ONE artifact.
+
+    A reader skimming the table counts rows and reads each `pass` as an
+    independent observation. `cancellation` and `orphan-cleanup` are closed by
+    the SAME BYTE-IDENTICAL FILE -- one cancelled run, digested twice -- so
+    that reader over-counts the evidence by a cell. The table cannot show it
+    and the run ids differ, which makes it worse, not better.
+
+    Derived from the records' own artifact digests, so it appears exactly when
+    it is true and disappears when a later run gives each cell its own
+    artifact.
+    """
+    by_digest: dict[str, list[str]] = {}
+    for record in records:
+        for artifact in record.artifacts:
+            by_digest.setdefault(artifact.sha256, []).append(record.probe.id)
+    shared = sorted(
+        (sorted(set(probes)) for probes in by_digest.values() if len(set(probes)) > 1),
+        key=lambda item: item[0],
+    )
+    if not shared:
+        return []
+    lines = ["", "### Cells that share one artifact", ""]
+    lines.append(
+        "Each row above is a cell, not an independent observation. These cells"
+    )
+    lines.append("are closed by the SAME byte-identical artifact:")
+    lines.append("")
+    for probes in shared:
+        joined = " and ".join(f"`{probe}`" for probe in probes)
+        lines.append(f"- {joined}")
+    lines.append("")
+    lines.append(
+        "Count the evidence by artifact, not by cell, when reading the table."
+    )
+    return lines
 
 
 def _known_artefact_lines(records) -> list[str]:
@@ -162,22 +202,59 @@ def _known_artefact_lines(records) -> list[str]:
     )
     if not zero_span:
         return []
+    # DERIVED, because the two sentences this replaces were both wrong, and
+    # both wrong in the direction of claiming more evidence than exists.
+    #
+    #   "Every measured fact ... was verified against its artifact ... this
+    #   applies to every record regardless of the verdict" -- but the
+    #   `live-editor-mcp` record has `artifacts: []`, so there was no artifact
+    #   to verify it against. A blanket claim that quietly excludes its own
+    #   counterexample is the shape this plan keeps finding.
+    #
+    #   "their artifacts record real durations (`wall_seconds` of 14.216,
+    #   18.197 and 22.151)" -- only 4 of the 9 affected records carry an
+    #   artifact with a duration at all; two of those three values are
+    #   `duration_seconds`, not `wall_seconds`; and 14.216 appears twice only
+    #   because `cancellation` and `orphan-cleanup` share ONE byte-identical
+    #   artifact. Three numbers read as three measurements. They are two.
+    artifactless = sorted(
+        record.run_id for record in records if not record.artifacts
+    )
     lines = [
         "",
         "## Known artefacts of the committed records",
         "",
         "These are defects in the tooling that ASSEMBLED the records, found",
-        "after they were published. Every measured fact in them was verified",
-        "against its artifact and stands, and this applies to every record",
-        "regardless of the verdict it reached. The assembling code is fixed; the",
+        "after they were published. The assembling code is fixed; the",
         "records are immutable and were deliberately not regenerated, so the",
         "next run — a Linux re-run or the first macOS run — carries the",
         "corrections and these notes disappear from this report.",
         "",
+    ]
+    if artifactless:
+        lines += [
+            "Every measured fact in a record that HAS an artifact was verified",
+            "against that artifact and stands. That is not every record: the",
+            "following carry no artifact at all, so there was nothing to verify",
+            "them against, and nothing in them should be read as measured.",
+            "",
+        ]
+        lines += [f"- `{run_id}`" for run_id in artifactless]
+        lines.append("")
+    else:
+        lines += [
+            "Every measured fact in them was verified against its artifact and",
+            "stands, for every record regardless of the verdict it reached.",
+            "",
+        ]
+    lines += [
         f"1. **Zero-length spans.** {len(zero_span)} records report",
-        "   `started_at == ended_at` although their artifacts record real",
-        "   durations (`wall_seconds` of 14.216, 18.197 and 22.151 among",
-        "   them). The probe's span is now carried through to the record.",
+        "   `started_at == ended_at`. Some — not all — of their artifacts",
+        "   record a real duration, under two different field names",
+        "   (`wall_seconds` on the cancelled run, `duration_seconds` on the",
+        "   headless summaries), and two cells share one artifact and so one",
+        "   value. The probe's span is now carried through to the record, which",
+        "   is the only place a per-record duration belongs.",
         "2. **One dangling artifact reference.** Inside",
         "   `collision-refusal-receipt.json`, the `artifacts` field names",
         "   `artifacts/unity/same-project-headless-summary.json` — the route's",

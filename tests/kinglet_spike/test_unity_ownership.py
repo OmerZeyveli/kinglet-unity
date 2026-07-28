@@ -17,6 +17,7 @@ from tools.kinglet_spike.unity.ownership import (
     _canonical_or_none,
     _extract_argv0,
     _is_dir_or_unknown,
+    _is_unity_editor_argv0,
     _macos_process_table,
     _parse_comm_map,
     _parse_pid_list,
@@ -620,6 +621,46 @@ class ProjectPathCandidatesFromRawTests(unittest.TestCase):
         )
         self.assertIn("/home/u/My  Project", candidates)
 
+    # --- FINAL whole-branch review, IMPORTANT 8: the flag regex and the value
+    #     extractor were two guards with two different whitespace alphabets,
+    #     and their disagreement returned [] -- which reads as "no -projectPath
+    #     here", a POSITIVE ruling-out. Same shape as 6257de1's credential rule.
+
+    def test_every_separator_the_flag_regex_accepts_the_extractor_also_accepts(self):
+        # Drives the alphabet character by character rather than asserting on
+        # one lucky example, so narrowing EITHER guard fails this test.
+        for char in ownership._SEPARATOR_CHARS:
+            with self.subTest(char=repr(char)):
+                command = f"Unity -projectPath{char}/home/u/proj"
+                self.assertIsNotNone(
+                    ownership._PROJECT_PATH_FLAG_RE.search(command),
+                    "the flag regex must match this separator",
+                )
+                self.assertIn(
+                    "/home/u/proj",
+                    _project_path_candidates_from_raw(command, windows=False),
+                    "a separator the regex accepts must not yield an empty "
+                    "candidate list, which the caller reads as 'ruled out'",
+                )
+
+    def test_newline_separated_projectpath_is_not_silently_ruled_out(self):
+        # The concrete instance: a `ps`-rendered line whose separator is a
+        # newline. Previously matched the regex, then failed
+        # `rest[0] not in (" ", "\t")`, and returned [].
+        candidates = _project_path_candidates_from_raw(
+            "Unity -projectPath\n/home/u/proj -logFile -", windows=False
+        )
+        self.assertIn("/home/u/proj", candidates)
+
+    def test_a_separator_preceding_the_flag_is_the_same_alphabet(self):
+        for char in ownership._SEPARATOR_CHARS:
+            with self.subTest(char=repr(char)):
+                command = f"Unity{char}-projectPath /home/u/proj"
+                self.assertIn(
+                    "/home/u/proj",
+                    _project_path_candidates_from_raw(command, windows=False),
+                )
+
     def test_windows_quoted_value_is_the_sole_candidate(self):
         candidates = _project_path_candidates_from_raw(
             'Unity.exe -projectPath "C:\\proj\\My Game" -logFile -', windows=True
@@ -642,10 +683,10 @@ class ParsePosixProcessTableTests(unittest.TestCase):
 
 
 class ParseWindowsProcessTableTests(unittest.TestCase):
-    def test_parses_pid_tab_commandline_lines(self):
+    def test_parses_pid_tab_name_tab_commandline_lines(self):
         stdout = (
-            "1234\tC:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game\n"
-            "5678\tC:\\Windows\\explorer.exe\n"
+            "1234\tUnity.exe\tC:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game\n"
+            "5678\texplorer.exe\tC:\\Windows\\explorer.exe\n"
         )
         table = _parse_windows_process_table(stdout)
         self.assertEqual(
@@ -656,20 +697,81 @@ class ParseWindowsProcessTableTests(unittest.TestCase):
             table,
         )
 
-    def test_lines_without_a_tab_are_skipped(self):
-        self.assertEqual((), _parse_windows_process_table("no tab on this line\n"))
-
     def test_tab_is_the_separator_not_generic_whitespace(self):
-        # Minor (round 2): mutating split("\t", 1) to split(None, 1)
+        # Minor (round 2): mutating split("\t", 2) to split(None, 2)
         # survived the round-1 fixture because in that data the only
         # whitespace before the command was the tab itself, so both split
         # styles happened to agree. A space embedded INSIDE the pid field,
         # before the real tab, breaks that coincidence: a generic-
         # whitespace split misreads "90 01" as pid=90 plus a spurious
-        # command fragment "01\t...". The correct behavior is to skip this
-        # malformed line entirely (bad pid), producing an empty table.
-        stdout = "90 01\tC:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game\n"
+        # command fragment "01\t...". The correct behavior is to treat this
+        # line as unparseable (bad pid), producing an empty table.
+        stdout = (
+            "90 01\tUnity.exe\t"
+            "C:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\game\n"
+        )
         self.assertEqual((), _parse_windows_process_table(stdout))
+
+    # --- FINAL whole-branch review, CRITICAL 2: the Windows parser had no
+    #     "I could not tell" branch. Both of these FAIL against the previous
+    #     parser, which dropped the tail line and dropped the $null command.
+
+    def test_newline_in_a_path_marks_the_split_entry_ambiguous_not_clean(self):
+        # A project directory whose name contains a newline makes PowerShell
+        # print ONE process as TWO lines. The old parser dropped the tail
+        # (`if "\t" not in line: continue`) and left the Editor's entry
+        # looking like a clean, complete command line ending at the truncated
+        # prefix -- which then failed to match the real project and read as
+        # NOT the owner. Identical shape to the POSIX side's fix.
+        stdout = (
+            "1234\tUnity.exe\t"
+            "C:\\Unity\\Editor\\Unity.exe -projectPath C:\\proj\\ga\n"
+            "me\n"
+            "5678\texplorer.exe\tC:\\Windows\\explorer.exe\n"
+        )
+        table = _parse_windows_process_table(stdout)
+        self.assertEqual(2, len(table))
+        pid, command = table[0]
+        self.assertEqual(1234, pid)
+        self.assertIsInstance(command, _TruncatedCommand)
+        # argv0 must be parsed with WINDOWS separators, or the entry reads as
+        # not-Unity one layer down and is ignored again.
+        self.assertTrue(_is_unity_editor_argv0(command.argv0, windows=True))
+        self.assertEqual((5678, "C:\\Windows\\explorer.exe"), table[1])
+
+    def test_null_commandline_for_a_unity_process_is_kept_as_ambiguous(self):
+        # Win32_Process.CommandLine is $null -- rendered as an empty field --
+        # for a process the caller cannot inspect, INCLUDING an elevated
+        # Editor. The old parser dropped the pid, so no owner was found and
+        # assert_headless_safe cleared over a live Editor.
+        stdout = "1234\tUnity.exe\t\n5678\tservices.exe\t\n"
+        table = _parse_windows_process_table(stdout)
+        self.assertEqual(1, len(table), "the non-Unity $null pid stays dropped")
+        pid, command = table[0]
+        self.assertEqual(1234, pid)
+        self.assertIsInstance(command, _TruncatedCommand)
+        self.assertEqual("Unity.exe", command.argv0)
+
+    def test_a_null_commandline_editor_is_reported_as_an_unconfirmed_owner(self):
+        # Driven through the real public entry point, not just the parser:
+        # the whole point is that assert_headless_safe must NOT clear.
+        stdout = "1234\tUnity.exe\t\n"
+
+        def provider():
+            return _parse_windows_process_table(stdout)
+
+        owner = detect_gui_owner(
+            Path("C:/proj/game"), process_table_provider=provider, windows=True
+        )
+        self.assertIsNotNone(owner, "an unreadable Editor must not read as SAFE")
+        self.assertFalse(owner.confirmed)
+        with self.assertRaises(EvidenceError) as caught:
+            assert_headless_safe(
+                Path("C:/proj/game"),
+                process_table_provider=provider,
+                windows=True,
+            )
+        self.assertEqual("E_UNITY_OWNER_UNKNOWN", caught.exception.code)
 
 
 class UnityLockfilePresentTests(unittest.TestCase):
@@ -1062,6 +1164,42 @@ class MacosProcessTableTests(unittest.TestCase):
         ):
             with self.assertRaises(EvidenceError):
                 _macos_process_table()
+
+    # --- FINAL whole-branch review, IMPORTANT 7: `except EvidenceError:
+    #     comm_map = {}` disabled the ambiguity fallback for EVERY pid at
+    #     once, turning "I could not look" into "nothing to see".
+
+    def test_comm_listing_failure_does_not_silently_empty_the_fallback(self):
+        # ps enumerates one pid; the argv read fails (an elevated / other-user
+        # Editor); the comm listing then fails too. With the swallow in place
+        # this returned an EMPTY table -- a live Editor vanished and the host
+        # read as SAFE. The honest answer is E_UNITY_OWNER_UNKNOWN.
+        with patch(
+            "tools.kinglet_spike.unity.ownership._run_ps",
+            side_effect=["  4242\n", EvidenceError("E_UNITY_OWNER_UNKNOWN", "no ps")],
+        ), patch(
+            "tools.kinglet_spike.unity.ownership._read_argv_via_sysctl",
+            return_value=None,
+        ):
+            with self.assertRaises(EvidenceError) as caught:
+                _macos_process_table()
+        self.assertEqual("E_UNITY_OWNER_UNKNOWN", caught.exception.code)
+
+    def test_sysctl_reader_survives_a_ctypes_argument_error(self):
+        # ctypes.ArgumentError derives from Exception, not from OSError /
+        # ValueError / AttributeError / MemoryError, so a pid that does not
+        # fit c_int escaped the handler entirely and broke the module's
+        # "every route yields E_UNITY_OWNER_UNKNOWN" guarantee on macOS.
+        import ctypes as _ctypes
+
+        class _Libc:
+            def __getattr__(self, name):
+                raise _ctypes.ArgumentError("argument 3: int too long to convert")
+
+        with patch("tools.kinglet_spike.unity.ownership.sys.platform", "darwin"), patch(
+            "ctypes.CDLL", side_effect=_ctypes.ArgumentError("boom")
+        ):
+            self.assertIsNone(ownership._read_procargs2_bytes(2**63))
 
     def test_posix_dispatch_uses_macos_table_on_darwin(self):
         fabricated = ((9, ("Unity", "-projectPath", "/x")),)

@@ -67,12 +67,21 @@ Unity in its own session on purpose, so a controller crash in that window
 leaves a live Unity under a lease that becomes reclaimable at TTL -- a
 double-open, the exact thing the lease exists to prevent.
 
-So there is exactly one guarded path (`_run_headless_guarded`), it is private,
-and `_start_bound()` is the ONLY way this module launches: it starts and binds
-in one call and cancels the process if the bind fails, so "started but never
-bound" is not a state a caller can reach by forgetting a line. See
-`_start_bound`'s docstring for the residual window that cannot be closed from
-inside this process.
+So every route runs through a private guarded path -- `_run_headless_guarded`,
+`_live_mcp_guarded`, `_run_isolated_guarded`, one per executing route, none of
+them exported -- and `_start_bound()` is the ONLY way any of them launches: it
+starts and binds in one call and cancels the process if the bind fails, so
+"started but never bound" is not a state a caller can reach by forgetting a
+line. See `_start_bound`'s docstring for the residual window that cannot be
+closed from inside this process.
+
+(This paragraph read "there is exactly one guarded path" until the final
+whole-branch review. Task 7 added `_run_isolated_guarded` -- correctly, and it
+enforces the same ordering -- but the sentence was left behind, and a docstring
+that undercounts the launch paths is how the next reader concludes there is
+nothing else to check. `_run_prefs_pass` was the real instance of that: it
+launched a batchmode Editor on the physical project through `process_factory`
+directly, and both this paragraph and the count above said it could not.)
 
 `_start_bound` and `_headless_argv` are private, and `__all__` names the public
 surface, because a caller holding either could launch Unity while skipping
@@ -1081,6 +1090,7 @@ def _gui_argv(editor: Path, project: Path, log_path: Path) -> list[str]:
 
 def _run_prefs_pass(
     *,
+    lease: WorkspaceLease,
     editor: Path,
     project: Path,
     method: str,
@@ -1099,17 +1109,30 @@ def _run_prefs_pass(
     Contained like every other launch here, and its survivors are returned
     rather than dropped: a Roslyn server orphaned by the configure pass is a
     leak whether or not the pass itself exited 0 (Task 5's measured fact 4).
+
+    LAUNCHES THROUGH `_start_bound`, and the `lease` argument is why. This
+    function used to call `process_factory` directly, which made it the ONE
+    launch in this module that skipped the bind -- and it is the route's FIRST
+    Unity launch, so for the whole configure pass the lease named the
+    controller rather than the contained group. That is precisely the
+    double-open window `_start_bound` exists to close, and it also made the
+    module docstring's "`_start_bound()` is the ONLY way this module launches"
+    false. The bind is not optional for a batchmode pass: it opens a real
+    Editor on the real project for as long as the configure takes.
     """
     pass_env = dict(os.environ) if env is None else dict(env)
     pass_env["KINGLET_MCP_URL"] = mcp_url
     pass_env["KINGLET_MCP_PREFS_BACKUP"] = str(backup_path)
 
-    process = process_factory(
+    process = _start_bound(
+        lease,
         _prefs_argv(editor, project, method, log_path),
         cwd=project,
         env=pass_env,
         stdout_path=raw_dir / f"{tag}.stdout",
         stderr_path=raw_dir / f"{tag}.stderr",
+        process_factory=process_factory,
+        cancellation_deadline=cancellation_deadline,
     )
     exit_code: int | None = None
     try:
@@ -1255,7 +1278,13 @@ def _live_mcp_guarded(
         **lease_kwargs,
     )
 
-    state = {"server": None, "gui": None, "configured": False, "torn_down": False}
+    state = {
+        "server": None,
+        "gui": None,
+        "configured": False,
+        "torn_down": False,
+        "teardown_failures": (),
+    }
     ready_state = None
     compile_result: CompileResult | None = None
     tests_result: TestResult | None = None
@@ -1277,15 +1306,38 @@ def _live_mcp_guarded(
         if state["torn_down"]:
             return
         state["torn_down"] = True
+        # EVERY step runs, whatever any earlier one did. This used to be three
+        # bare statements: `gui.cancel()` and `server.cancel()` were unguarded
+        # and genuinely raise (process.py re-raises a cancel whose outcome it
+        # could not prove), so ONE raise skipped the EditorPrefs restore, the
+        # server cancel, and -- because the outermost handler was
+        # `finally: teardown(); lease.release()` -- the lease release too. A
+        # live server, mutated developer EditorPrefs and a live lease all
+        # leaked from a single failure.
+        failures: list[str] = []
+
+        def attempt(what: str, action) -> None:
+            try:
+                action()
+            except BaseException as error:  # noqa: BLE001 -- recorded, not swallowed
+                failures.append(f"{what}: {error!r}")
+
         if state["gui"] is not None:
-            survivors.extend(state["gui"].cancel(cancellation_deadline).survivors)
+            attempt(
+                "cancelling the GUI Editor",
+                lambda: survivors.extend(
+                    state["gui"].cancel(cancellation_deadline).survivors
+                ),
+            )
         if state["configured"]:
             # Best effort by necessity: the run may be unwinding from an
             # exception and this is the only chance to put the developer's
-            # EditorPrefs back. A failure here is recorded in the restore log
-            # and must not mask the original error.
-            try:
+            # EditorPrefs back. A failure here must not mask the original
+            # error -- but it is RECORDED, because a run that could not put
+            # the developer's Editor back has not cleaned up.
+            def restore() -> None:
                 _, leaked = _run_prefs_pass(
+                    lease=lease,
                     editor=editor, project=project, method=RESTORE_METHOD,
                     log_path=restore_log, raw_dir=raw_dir, backup_path=backup_path,
                     mcp_url="", process_factory=process_factory, env=env,
@@ -1294,10 +1346,33 @@ def _live_mcp_guarded(
                     tag="live-editor-mcp-restore",
                 )
                 survivors.extend(leaked)
-            except BaseException:
-                pass
+
+            attempt("restoring the developer's EditorPrefs", restore)
         if state["server"] is not None:
-            survivors.extend(state["server"].cancel(cancellation_deadline).survivors)
+            attempt(
+                "cancelling the MCP server",
+                lambda: survivors.extend(
+                    state["server"].cancel(cancellation_deadline).survivors
+                ),
+            )
+        state["teardown_failures"] = tuple(failures)
+
+    def require_clean_teardown() -> None:
+        """A receipt may not claim cleanliness cleanup could not establish.
+
+        `descendant_pids: []` is a POSITIVE claim -- "nothing survived". When
+        a cancel raised, the survivor set was never computed, so publishing an
+        empty one turns "I could not tell" into "it was clean". That is the
+        inversion this plan exists to prevent, and it used to be exactly what
+        `except BaseException: pass` produced on the SUCCESS path.
+        """
+        failures = state.get("teardown_failures") or ()
+        if failures:
+            raise EvidenceError(
+                "E_UNITY_CLEANUP_UNKNOWN",
+                "cleanup did not complete, so this run cannot report what "
+                "survived it: " + "; ".join(failures),
+            )
 
     try:
         server, resolved_port = mcp_module.start_mcp(
@@ -1323,6 +1398,7 @@ def _live_mcp_guarded(
 
         # Point the Editor at THIS server, backing up what was there first.
         exit_code, leaked = _run_prefs_pass(
+            lease=lease,
             editor=editor, project=project, method=CONFIGURE_METHOD,
             log_path=setup_log, raw_dir=raw_dir, backup_path=backup_path,
             mcp_url=mcp_url, process_factory=process_factory, env=env,
@@ -1402,6 +1478,10 @@ def _live_mcp_guarded(
         # what survived cleanup, so cleanup has to have happened. The outer
         # `finally` calls this again on every other path; it is idempotent.
         teardown()
+        # ...and cleanup has to have SUCCEEDED, or there is no survivor set to
+        # publish. Without this the success path published `descendant_pids:
+        # []` as proof of cleanliness on a run whose cleanup raised.
+        require_clean_teardown()
 
         _write_json(raw_dir / LIVE_MCP_SUMMARY_NAME, {
             "schema": "kinglet.unity-probe.summary/v1",
@@ -1444,8 +1524,22 @@ def _live_mcp_guarded(
             artifacts=(f"{ARTIFACT_PREFIX}/{LIVE_MCP_SUMMARY_NAME}",),
         )
     finally:
-        teardown()
-        lease.release()
+        # `lease.release()` is in its own `finally` so a raising teardown
+        # cannot skip it. It used to sit after `teardown()` as a plain second
+        # statement, which meant one unguarded `cancel()` raise leaked the
+        # lease as well as everything teardown had not yet reached.
+        #
+        # STATED PLAINLY so nobody mistakes this for a tested branch: teardown
+        # is now TOTAL -- every step inside it runs through `attempt`, which
+        # catches BaseException and records it -- so there is currently no
+        # input that makes it raise, and no test can kill a mutant that
+        # flattens these two statements. That is the stronger fix, not a
+        # weaker one, and this construction is here for the next edit that
+        # adds a statement to teardown outside `attempt`.
+        try:
+            teardown()
+        finally:
+            lease.release()
 
 
 def _tests_from_job(summary) -> TestResult:

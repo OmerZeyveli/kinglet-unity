@@ -79,6 +79,7 @@ from .model import (
     RECEIPT_SCHEMA,
     ROUTES,
     STATUS_VALUES,
+    UNITY_VERSION_RE,
     CompileResult,
     TestResult,
     UnityReceipt,
@@ -86,10 +87,9 @@ from .model import (
 
 EVIDENCE_SCHEMA = "kinglet.spike.evidence/v1"
 
-# Unity version strings look like 6000.3.18f1, 6000.0.68f1, 2022.3.62f3:
-# <year>.<major>.<minor><stage><build>. Shape-only -- see module docstring on
-# why no exact literal is pinned here.
-_UNITY_VERSION_RE = re.compile(r"^\d{4}\.\d+\.\d+(a|b|c|f|p|rc|x)\d+$")
+# IMPORTED from model, not respelled -- see model.UNITY_VERSION_RE. Shape-only;
+# see this module's docstring on why no exact literal is pinned.
+_UNITY_VERSION_RE = UNITY_VERSION_RE
 
 _RECEIPT_FIELDS = frozenset((
     "schema",

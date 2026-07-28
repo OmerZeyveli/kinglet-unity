@@ -64,13 +64,20 @@ from ..model import (
     SourceReference,
     Subject,
 )
+from .model import RECEIPT_SCHEMA
 
 OBSERVATIONS_SCHEMA = "kinglet.unity-probe.observations/v1"
 EVIDENCE_SCHEMA = "kinglet.spike.evidence/v1"
 
 # The subject id every unity cell in matrix-v1.json carries. Not the project id.
 SUBJECT_ID = "execution"
-PROBE_CONTRACT = "kinglet.unity-probe.receipt/v1"
+
+# BOUND, not spelled again. This value is written into `probe.contract` on
+# every published record, so a third unbound copy of the receipt schema string
+# (model.RECEIPT_SCHEMA and routes-v1.json's receipt_schema being the other
+# two) means an edit to the contract silently corrupts published provenance --
+# the records would name a contract nothing else in the tree answers to.
+PROBE_CONTRACT = RECEIPT_SCHEMA
 
 # The nine frozen unity probe values, exactly as spelled in matrix-v1.json.
 PROBES: tuple[str, ...] = (

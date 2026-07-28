@@ -1,6 +1,7 @@
 import unittest
 
 from tools.kinglet_spike.model import (
+    Artifact,
     AssertionResult,
     CoverageCell,
     Environment,
@@ -8,15 +9,27 @@ from tools.kinglet_spike.model import (
     Probe,
     Subject,
 )
-from tools.kinglet_spike.report import _known_artefact_lines, render_markdown
+from tools.kinglet_spike.report import (
+    _known_artefact_lines,
+    _shared_artifact_lines,
+    render_markdown,
+)
 
 
-def _unity_record(run_id: str, status: str, started: str, ended: str) -> EvidenceRecord:
+def _unity_record(
+    run_id: str,
+    status: str,
+    started: str,
+    ended: str,
+    *,
+    probe_id: str = "filesystem-only",
+    artifacts: tuple = (),
+) -> EvidenceRecord:
     return EvidenceRecord(
         schema="kinglet.spike.evidence/v1",
         run_id=run_id,
         subject=Subject(kind="unity", id="execution", version="6000.3.18f1"),
-        probe=Probe(id="filesystem-only", contract="c"),
+        probe=Probe(id=probe_id, contract="c"),
         environment=Environment(
             os="linux", release="ubuntu-24.04.4-lts", arch="x64",
             native=True, toolchain=("host=x",),
@@ -25,7 +38,7 @@ def _unity_record(run_id: str, status: str, started: str, ended: str) -> Evidenc
         ended_at=ended,
         status=status,
         command=("x",),
-        artifacts=(),
+        artifacts=artifacts,
         assertions=(AssertionResult(id="a", status="pass", detail="d"),),
         measurements=(),
         sources=(),
@@ -58,6 +71,91 @@ class KnownArtefactDisclosureTests(unittest.TestCase):
         )
         self.assertEqual(_known_artefact_lines(records), [])
 
+
+
+class ArtifactHonestyTests(unittest.TestCase):
+    """FINAL whole-branch review: the report claimed more evidence than exists."""
+
+    @staticmethod
+    def _artifact(digest: str) -> Artifact:
+        return Artifact(path=f"artifacts/{digest}.json", sha256=digest,
+                        media_type="application/json", required=True)
+
+    def test_a_record_with_no_artifact_is_named_not_covered_by_a_blanket_claim(self):
+        # ":44-46" said "every record regardless of the verdict" was verified
+        # against its artifact -- while `live-editor-mcp` has `artifacts: []`.
+        records = (
+            _unity_record("run-with", "pass", "T0", "T0",
+                          artifacts=(self._artifact("a" * 64),)),
+            _unity_record("run-without", "inconclusive", "T0", "T0"),
+        )
+        body = "\n".join(_known_artefact_lines(records))
+        self.assertIn("That is not every record", body)
+        self.assertIn("- `run-without`", body)
+        self.assertNotIn("for every record regardless of the verdict", body)
+
+    def test_the_blanket_claim_returns_when_every_record_has_an_artifact(self):
+        # Otherwise the correction would be an unconditional hedge.
+        records = (
+            _unity_record("run-a", "pass", "T0", "T0",
+                          artifacts=(self._artifact("a" * 64),)),
+            _unity_record("run-b", "pass", "T0", "T0",
+                          artifacts=(self._artifact("b" * 64),)),
+        )
+        body = "\n".join(_known_artefact_lines(records))
+        self.assertIn("for every record regardless of the verdict", body)
+        self.assertNotIn("That is not every record", body)
+
+    def test_the_duration_note_does_not_cite_values_it_cannot_support(self):
+        # ":51-54" cited three `wall_seconds` values; only two are distinct
+        # measurements and two of the three are `duration_seconds`.
+        records = (_unity_record("run-a", "pass", "T0", "T0"),)
+        body = "\n".join(_known_artefact_lines(records))
+        for value in ("14.216", "18.197", "22.151"):
+            self.assertNotIn(value, body)
+        self.assertIn("Some — not all —", body)
+
+    def test_two_cells_closed_by_one_artifact_are_disclosed_in_the_matrix(self):
+        digest = "c" * 64
+        records = (
+            _unity_record("run-cancel", "pass", "T0", "T1",
+                          probe_id="cancellation",
+                          artifacts=(self._artifact(digest),)),
+            _unity_record("run-orphan", "pass", "T0", "T1",
+                          probe_id="orphan-cleanup",
+                          artifacts=(self._artifact(digest),)),
+        )
+        body = "\n".join(_shared_artifact_lines(records))
+        self.assertIn("Cells that share one artifact", body)
+        self.assertIn("`cancellation` and `orphan-cleanup`", body)
+
+    def test_the_shared_artifact_note_reaches_the_rendered_matrix_section(self):
+        # The disclosure is worthless if it is computed and never emitted, so
+        # this drives the real renderer: deleting the call from
+        # render_unity_markdown must fail here.
+        from tools.kinglet_spike.report import render_unity_markdown
+
+        digest = "d" * 64
+        records = (
+            _unity_record("run-cancel", "pass", "T0", "T1",
+                          probe_id="cancellation",
+                          artifacts=(self._artifact(digest),)),
+            _unity_record("run-orphan", "pass", "T0", "T1",
+                          probe_id="orphan-cleanup",
+                          artifacts=(self._artifact(digest),)),
+        )
+        body = render_unity_markdown((), records)
+        self.assertIn("Cells that share one artifact", body)
+        self.assertIn("`cancellation` and `orphan-cleanup`", body)
+
+    def test_distinct_artifacts_produce_no_shared_artifact_section(self):
+        records = (
+            _unity_record("run-a", "pass", "T0", "T1", probe_id="cancellation",
+                          artifacts=(self._artifact("a" * 64),)),
+            _unity_record("run-b", "pass", "T0", "T1", probe_id="orphan-cleanup",
+                          artifacts=(self._artifact("b" * 64),)),
+        )
+        self.assertEqual([], _shared_artifact_lines(records))
 
 
 class ReportTests(unittest.TestCase):

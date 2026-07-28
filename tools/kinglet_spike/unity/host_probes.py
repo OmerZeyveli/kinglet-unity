@@ -65,6 +65,7 @@ from .results import (
     validate_unity_observations,
 )
 from .routes import (
+    HEADLESS_TIMEOUT_SECONDS,
     inventory_project,
     receipt_to_dict,
     run_filesystem,
@@ -105,7 +106,13 @@ _LOG_VERSION_RE = re.compile(
 )
 
 CANCELLATION_TIMEOUT_SECONDS = 14.0
-FULL_TIMEOUT_SECONDS = 780.0
+
+# BOUND to the route module's contract-derived budget, not respelled. This is
+# the value that actually times the host probe, so a literal here meant that
+# editing a phase in routes-v1.json updated `routes.HEADLESS_TIMEOUT_SECONDS`
+# (which test_unity_routes.py binds to the contract) and silently left the
+# twin that governs the real run.
+FULL_TIMEOUT_SECONDS = HEADLESS_TIMEOUT_SECONDS
 
 
 # ---------------------------------------------------------------------------
@@ -511,39 +518,82 @@ def _close_gui_editor(handle) -> int:
         return handle.wait(timeout=60)
 
 
-def _sweep_project_processes(project: Path) -> tuple[str, ...]:
-    """Kill anything still naming `project`, plus its shader compilers.
+class SweepRefused(RuntimeError):
+    """The sweep declined to run. NOT "the host was clean"."""
+
+
+# The one implementation of "what may this run kill", shared rather than
+# mirrored. See _sweep_project_processes for why there is no second one.
+SWEEP_SCRIPT = Path(__file__).resolve().parents[3] / "spikes/platform/unity/sweep-workspace.sh"
+
+
+def _sweep_project_processes(
+    project: Path,
+    owned_pgids: Path | None = None,
+    *,
+    runner=subprocess.run,
+) -> tuple[str, ...]:
+    """Sweep what this run left behind, THROUGH `sweep-workspace.sh`.
 
     A GUI Editor on this host does not always die cleanly on SIGTERM (measured:
     one SIGSEGV, one hang, one exit 255), and a parent that crashes reaps
     nothing -- its AssetImportWorkers reparent to PID 1. They are ours to
     remove because we launched the Editor that made them.
+
+    WHY THIS DELEGATES INSTEAD OF SELECTING ITS OWN TARGETS
+    ------------------------------------------------------
+    It used to select them itself, with
+
+        if str(project) in parts[3] or "UnityShaderCompiler" in parts[3]
+
+    and that single line carried every defect the shell sweep spent three
+    rounds removing, preserved intact in the runner that produced the
+    committed evidence:
+
+    * Unanchored on BOTH ends. A workspace `<ws>/main` selected
+      `<ws>/main-backup` and `<ws>/main2`, and selected any process merely
+      NAMING the path -- `tail -f <ws>/main/Logs/Editor.log`, or the very
+      shell running a mutation test.
+    * The second disjunct was a HOST-WIDE NAME MATCH with no project scoping
+      whatsoever: it killed the shader compilers of an Editor the operator had
+      open on an unrelated project. `sweep-workspace.sh`'s header states that a
+      name may never authorise a kill, and this was the exact thing round 1
+      removed from the shell.
+    * No owned-pgid authority model at all, and `process_rows()` splits on
+      lines, so a newline in a path forges a row and makes ANY pid selectable.
+
+    Fixing those here would have produced a SECOND authority model to keep in
+    agreement with the first. There is one, it lives in `sweep-workspace.sh`,
+    and this calls it: anchored workspace naming at both boundaries, plus
+    owned-pgid membership corroborated as Unity-shaped, with a name able only
+    to narrow a set scope has already authorised. Divergence is not possible
+    because there is nothing to diverge from.
+
+    The script's refusals (exit 2 -- an unusable workspace, or a process table
+    it could not read) are raised as `SweepRefused` and never swallowed: "I
+    could not sweep" must not be recorded as "nothing was left behind".
     """
-    swept: list[str] = []
-    for _ in range(2):
-        targets: list[int] = []
-        for row in process_rows():
-            parts = row.split(None, 3)
-            if len(parts) < 4:
-                continue
-            if str(project) in parts[3] or "UnityShaderCompiler" in parts[3]:
-                targets.append(int(parts[0]))
-                swept.append(row)
-        if not targets:
-            break
-        for pid in targets:
-            try:
-                os.kill(pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError):
-                pass
-        time.sleep(5)
-        for pid in targets:
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                pass
-        time.sleep(2)
-    return tuple(swept)
+    argv = ["bash", str(SWEEP_SCRIPT), str(project)]
+    if owned_pgids is not None:
+        argv.append(str(owned_pgids))
+    completed = runner(argv, capture_output=True, text=True, check=False)
+    if completed.returncode != 0:
+        raise SweepRefused(
+            f"sweep-workspace.sh exited {completed.returncode} for {project}: "
+            f"{(completed.stderr or '').strip()}"
+        )
+    return tuple(
+        line for line in (completed.stdout or "").splitlines() if line.startswith("swept ")
+    )
+
+
+def _sweep_and_note(context, project: Path) -> tuple[str, ...]:
+    """`_sweep_project_processes` with the refusal recorded, not discarded."""
+    try:
+        return _sweep_project_processes(project, context.owned_pgids)
+    except SweepRefused as error:
+        context.notes.append(f"SWEEP REFUSED (host may not be clean): {error}")
+        return ()
 
 
 def probe_isolated_and_collision(context) -> list[dict]:
@@ -573,7 +623,7 @@ def probe_isolated_and_collision(context) -> list[dict]:
     handle, owner = _open_gui_editor(context, main)
     if owner is None or not owner.confirmed:
         _close_gui_editor(handle)
-        _sweep_project_processes(main)
+        _sweep_and_note(context, main)
         reason = (
             "no GUI Editor took confirmed ownership of the main workspace on "
             "this host within 300s, so neither the concurrency claim nor the "
@@ -731,7 +781,7 @@ def probe_isolated_and_collision(context) -> list[dict]:
         ], context.staging.for_probe(col_id), col_started_at, col_ended_at))
     finally:
         exit_code = _close_gui_editor(handle)
-        swept = _sweep_project_processes(main)
+        swept = _sweep_and_note(context, main)
         context.notes.append(
             f"GUI Editor exit code {exit_code}; swept {len(swept)} residual process rows"
         )

@@ -34,6 +34,15 @@ means a host looked and could not establish the claim.
 | `unity.same-project-headless.windows-11-x64.collision-refusal` | missing | — |
 | `unity.same-project-headless.windows-11-x64.route` | missing | — |
 
+### Cells that share one artifact
+
+Each row above is a cell, not an independent observation. These cells
+are closed by the SAME byte-identical artifact:
+
+- `cancellation` and `orphan-cleanup`
+
+Count the evidence by artifact, not by cell, when reading the table.
+
 ## Why the open cells are open
 
 - **`live-editor-mcp@linux-ubuntu-24.04.4-lts`** — observed: BLOCKED by a confirmed plan-level defect, not by this run: the EditorPrefs a batchmode configure pass writes never become visible to a subsequently launched Editor on this host, so no Editor has ever registered with the pinned bridge and no `instances` poll has ever returned one. The key names were verified against MCPForUnity's own EditorPrefKeys.cs, and HttpAutoStartHandler.cs also returns early in batchmode unless UNITY_MCP_ALLOW_BATCH is set. Without a registered Editor there is no readiness to observe and no test to run through the bridge, and a receipt claiming otherwise would be fabricated. Escalated; not worked around.
@@ -41,17 +50,25 @@ means a host looked and could not establish the claim.
 ## Known artefacts of the committed records
 
 These are defects in the tooling that ASSEMBLED the records, found
-after they were published. Every measured fact in them was verified
-against its artifact and stands, and this applies to every record
-regardless of the verdict it reached. The assembling code is fixed; the
+after they were published. The assembling code is fixed; the
 records are immutable and were deliberately not regenerated, so the
 next run — a Linux re-run or the first macOS run — carries the
 corrections and these notes disappear from this report.
 
+Every measured fact in a record that HAS an artifact was verified
+against that artifact and stands. That is not every record: the
+following carry no artifact at all, so there was nothing to verify
+them against, and nothing in them should be read as measured.
+
+- `20260728T132858Z-unity-probe-live-editor-mcp-linux-ubuntu-24-04-4-lts-x64-01`
+
 1. **Zero-length spans.** 9 records report
-   `started_at == ended_at` although their artifacts record real
-   durations (`wall_seconds` of 14.216, 18.197 and 22.151 among
-   them). The probe's span is now carried through to the record.
+   `started_at == ended_at`. Some — not all — of their artifacts
+   record a real duration, under two different field names
+   (`wall_seconds` on the cancelled run, `duration_seconds` on the
+   headless summaries), and two cells share one artifact and so one
+   value. The probe's span is now carried through to the record, which
+   is the only place a per-record duration belongs.
 2. **One dangling artifact reference.** Inside
    `collision-refusal-receipt.json`, the `artifacts` field names
    `artifacts/unity/same-project-headless-summary.json` — the route's

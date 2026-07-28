@@ -4,6 +4,8 @@ from pathlib import Path
 
 from tools.kinglet_spike.model import EvidenceError
 from tools.kinglet_spike.unity.model import (
+    CONTRACT_RULES,
+    CONTRACT_SCHEMA,
     EXECUTING_ROUTES,
     PROJECT_ID,
     RECEIPT_SCHEMA,
@@ -249,6 +251,79 @@ class UnityReceiptTests(unittest.TestCase):
         self.assertEqual(EXECUTING_ROUTES, frozenset(contract["executing_routes"]))
         self.assertEqual(STATUS_VALUES, frozenset(contract["compile_statuses"]))
         self.assertEqual(STATUS_VALUES, frozenset(contract["test_statuses"]))
+
+    # --- FINAL whole-branch review, MINOR: routes-v1.json's `schema` and
+    #     `notes` were the only fields nothing read. MEASURED: deleting all
+    #     seven frozen rules -- including "refuse silent project upgrade" --
+    #     left the whole suite green.
+
+    def test_the_contract_declares_the_schema_the_code_expects(self):
+        contract = json.loads(ROUTES_CONTRACT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(CONTRACT_SCHEMA, contract["schema"])
+
+    def test_every_frozen_rule_is_still_stated_in_the_contract(self):
+        contract = json.loads(ROUTES_CONTRACT_PATH.read_text(encoding="utf-8"))
+        notes = contract["notes"]
+        self.assertEqual(
+            len(CONTRACT_RULES),
+            len(notes),
+            "the contract gained or lost a rule; CONTRACT_RULES must move with it",
+        )
+        for index, (phrase, _enforcer) in enumerate(CONTRACT_RULES):
+            with self.subTest(rule=phrase):
+                matching = [note for note in notes if phrase in note]
+                self.assertEqual(
+                    1,
+                    len(matching),
+                    f"rule {index} ({phrase!r}) is stated {len(matching)} times",
+                )
+
+    def test_every_frozen_rule_names_a_module_that_still_exists(self):
+        # A rule bound only to prose is bound to nothing. Each rule names the
+        # module responsible for it, and "refuse silent project upgrade" is
+        # the reason this matters: the contract itself says that rule is
+        # editor.py's, and that responsibility "is not lost between tasks".
+        import importlib
+
+        for phrase, enforcer in CONTRACT_RULES:
+            with self.subTest(rule=phrase):
+                module = importlib.import_module(
+                    f"tools.kinglet_spike.unity.{enforcer}"
+                )
+                self.assertTrue(hasattr(module, "__file__"))
+
+    def test_the_project_upgrade_rule_has_a_live_enforcement_point(self):
+        # Named specifically because it is the one rule with no receipt field
+        # to carry it, which is exactly why the contract note exists.
+        from tools.kinglet_spike.unity import editor
+
+        self.assertTrue(callable(editor.verify_project_editor))
+
+    def test_the_probe_contract_written_into_records_is_the_same_string(self):
+        # results.PROBE_CONTRACT is stamped into `probe.contract` on every
+        # published record. It was a THIRD unbound copy of the receipt schema,
+        # so an edit to the contract would have made published provenance name
+        # a contract nothing else in the tree answers to.
+        from tools.kinglet_spike.unity.results import PROBE_CONTRACT
+
+        contract = json.loads(ROUTES_CONTRACT_PATH.read_text(encoding="utf-8"))
+        self.assertEqual(RECEIPT_SCHEMA, PROBE_CONTRACT)
+        self.assertEqual(contract["receipt_schema"], PROBE_CONTRACT)
+
+    def test_the_host_probe_timeout_is_the_same_budget_the_route_uses(self):
+        # host_probes.FULL_TIMEOUT_SECONDS is the value that actually times the
+        # real host probe. It duplicated routes.HEADLESS_TIMEOUT_SECONDS, so
+        # editing a contract phase updated the bound twin and silently left the
+        # one that governs the run.
+        from tools.kinglet_spike.unity import host_probes, routes
+
+        contract = json.loads(ROUTES_CONTRACT_PATH.read_text(encoding="utf-8"))
+        expected = float(sum(
+            contract["timings_seconds"][phase]
+            for phase in routes.HEADLESS_TIMEOUT_PHASES
+        ))
+        self.assertEqual(expected, routes.HEADLESS_TIMEOUT_SECONDS)
+        self.assertEqual(routes.HEADLESS_TIMEOUT_SECONDS, host_probes.FULL_TIMEOUT_SECONDS)
 
     def test_routes_contract_json_has_the_briefed_timings(self):
         contract = json.loads(ROUTES_CONTRACT_PATH.read_text(encoding="utf-8"))
