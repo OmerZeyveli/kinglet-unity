@@ -746,6 +746,185 @@ class NonReapingWaitTests(unittest.TestCase):
                              and _pid_alive(managed.pid))
 
 
+class WindowsLaunchWiringTests(unittest.TestCase):
+    """Round 1 review: the Windows LAUNCH path had no seam.
+
+    `containment_factory` bypassed the Windows branch rather than exercising
+    it, and `os.name == "nt"` was read directly, so `create_job` and `assign`
+    were unreachable from any host that is not Windows -- dead code that the
+    user's manual Windows pass would have been debugging for the first time.
+    `start(windows=True, job_api_factory=...)` now drives the real branch.
+    """
+
+    def setUp(self):
+        self._tmp = TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.work = Path(self._tmp.name)
+        self.spawned: list[list[str]] = []
+
+    def _spawner(self, pid=4242, calls=None):
+        def spawn(argv, **kwargs):
+            self.spawned.append(argv)
+            self.kwargs = kwargs
+            return _FakeHandle(pid, calls if calls is not None else [])
+        return spawn
+
+    def _start(self, api, **extra):
+        managed = ManagedProcess.start(
+            ["unity.exe", "-batchmode"],
+            cwd=self.work, env={"PATH": "x"},
+            stdout_path=self.work / "o.log", stderr_path=self.work / "e.log",
+            spawner=self._spawner(), windows=True, job_api_factory=lambda: api,
+            **extra,
+        )
+        self.addCleanup(managed.cancel, 5.0)
+        return managed
+
+    def test_a_job_is_created_and_the_process_assigned_to_it(self):
+        api = _FakeJobApi(pids=(4242,))
+        managed = self._start(api)
+        self.assertTrue(api.kill_on_close, "job must be created kill-on-close")
+        self.assertEqual([4242], api.assigned)
+        self.assertEqual((4242,), managed.group_members())
+
+    def test_the_job_is_created_before_the_process_is_spawned(self):
+        """A job made after the launch cannot contain what already started."""
+        order: list[str] = []
+
+        class _OrderedApi(_FakeJobApi):
+            def create_job(self):
+                order.append("create_job")
+                return super().create_job()
+
+            def assign(self, handle, pid):
+                order.append("assign")
+                super().assign(handle, pid)
+
+        api = _OrderedApi(pids=(4242,))
+
+        def spawn(argv, **kwargs):
+            order.append("spawn")
+            return _FakeHandle(4242, [])
+
+        managed = ManagedProcess.start(
+            ["unity.exe"], cwd=self.work, env={},
+            stdout_path=self.work / "o.log", stderr_path=self.work / "e.log",
+            spawner=spawn, windows=True, job_api_factory=lambda: api,
+        )
+        self.addCleanup(managed.cancel, 5.0)
+        self.assertEqual(["create_job", "spawn", "assign"], order)
+
+    def test_windows_launch_does_not_ask_for_a_new_posix_session(self):
+        api = _FakeJobApi(pids=(4242,))
+        self._start(api)
+        self.assertNotIn("start_new_session", self.kwargs)
+
+    def test_posix_launch_does_ask_for_a_new_session(self):
+        recorded = {}
+
+        def spawn(argv, **kwargs):
+            recorded.update(kwargs)
+            return _FakeHandle(os.getpid(), [])
+
+        with self.assertRaises(EvidenceError):
+            # pgid == our own group, so containment is refused -- but the
+            # spawn kwargs were already recorded, which is what this asserts.
+            ManagedProcess.start(
+                ["x"], cwd=self.work, env={},
+                stdout_path=self.work / "o.log", stderr_path=self.work / "e.log",
+                spawner=spawn, windows=False,
+            )
+        self.assertIs(True, recorded.get("start_new_session"))
+
+    def test_a_failed_assignment_kills_the_process_and_closes_the_job(self):
+        """Otherwise Unity runs unjobbed AND a kill-on-close handle leaks.
+
+        A leaked kill-on-close job is worse than untidy: closing it later at
+        an arbitrary moment kills whatever it has collected by then.
+        """
+        api = _FakeJobApi(pids=(4242,), fail_assign=True)
+        calls: list[str] = []
+        with self.assertRaises(EvidenceError) as ctx:
+            ManagedProcess.start(
+                ["unity.exe"], cwd=self.work, env={},
+                stdout_path=self.work / "o.log", stderr_path=self.work / "e.log",
+                spawner=self._spawner(calls=calls), windows=True,
+                job_api_factory=lambda: api,
+            )
+        self.assertEqual("E_UNITY_PROCESS_UNSAFE", ctx.exception.code)
+        self.assertIn("handle-kill", calls)
+        self.assertTrue(api.closed, "the job handle must not leak")
+
+    def test_a_failed_spawn_closes_the_job_too(self):
+        api = _FakeJobApi()
+
+        def spawn(argv, **kwargs):
+            raise OSError("no such binary")
+
+        with self.assertRaises(OSError):
+            ManagedProcess.start(
+                ["unity.exe"], cwd=self.work, env={},
+                stdout_path=self.work / "o.log", stderr_path=self.work / "e.log",
+                spawner=spawn, windows=True, job_api_factory=lambda: api,
+            )
+        self.assertTrue(api.closed)
+
+    def test_cancel_on_a_windows_launch_terminates_and_closes_the_job(self):
+        api = _FakeJobApi(pids=(4242, 77))
+        managed = self._start(api)
+        result = managed.cancel(5.0)
+        self.assertTrue(api.terminated)
+        self.assertTrue(api.closed)
+        self.assertEqual((), result.survivors)
+
+    def test_the_platform_override_is_what_selects_the_branch(self):
+        """windows=False must take the POSIX path even if a job api is handed in."""
+        api = _FakeJobApi(pids=(4242,))
+        with self.assertRaises(EvidenceError):
+            ManagedProcess.start(
+                ["x"], cwd=self.work, env={},
+                stdout_path=self.work / "o.log", stderr_path=self.work / "e.log",
+                spawner=self._spawner(pid=os.getpgrp()), windows=False,
+                job_api_factory=lambda: api,
+            )
+        self.assertEqual([], api.assigned)
+        self.assertFalse(api.kill_on_close)
+
+
+class UnprovableCleanupTests(unittest.TestCase):
+    def _managed(self, sent):
+        def _broken():
+            raise EvidenceError("E_UNITY_PROCESS_UNKNOWN", "no process table")
+
+        containment = PosixGroupContainment(
+            pgid=9999, group_table_provider=_broken,
+            signaller=lambda pgid, sig: sent.append(sig),
+        )
+        managed, handle, calls = _managed_with(containment, pid=9999)
+        return managed, handle, calls
+
+    def test_the_leader_is_still_reaped_when_cleanliness_is_unprovable(self):
+        """Otherwise a controller holds one zombie per cancelled run, forever."""
+        sent: list[int] = []
+        managed, handle, calls = self._managed(sent)
+        with self.assertRaises(EvidenceError):
+            managed.cancel(1.0)
+        self.assertIn("wait", calls)
+        self.assertTrue(managed.is_reaped())
+
+    def test_a_second_cancel_reraises_instead_of_signalling_again(self):
+        """The pid was freed by the reap, so the pgid may now be someone else."""
+        sent: list[int] = []
+        managed, _handle, _calls = self._managed(sent)
+        with self.assertRaises(EvidenceError):
+            managed.cancel(1.0)
+        self.assertEqual([signal.SIGTERM, signal.SIGKILL], sent)
+        with self.assertRaises(EvidenceError) as ctx:
+            managed.cancel(1.0)
+        self.assertEqual("E_UNITY_PROCESS_UNKNOWN", ctx.exception.code)
+        self.assertEqual([signal.SIGTERM, signal.SIGKILL], sent)
+
+
 class PidLivenessTests(unittest.TestCase):
     def test_own_pid_is_live(self):
         self.assertIs(True, default_pid_is_live(os.getpid()))

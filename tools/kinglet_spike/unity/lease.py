@@ -65,7 +65,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..model import EvidenceError
-from .process import default_pid_is_live
+from .process import default_group_table, default_pid_is_live
 
 LEASE_SCHEMA: str = "kinglet.unity-probe.lease/v1"
 
@@ -86,6 +86,16 @@ _REQUIRED_FIELDS: tuple[tuple[str, type], ...] = (
     ("expiry_utc", str),
 )
 
+# Present on every record, but nullable: at `acquire()` time the Unity process
+# does not exist yet, so the lease can only name the controller. `bind_holder`
+# repoints it once there is something better to name. The KEYS are still
+# required -- a record missing them is malformed -- so a lease written by an
+# older or foreign writer can never be mistaken for an unbound one.
+_NULLABLE_FIELDS: tuple[tuple[str, type], ...] = (
+    ("pgid", int),
+    ("holder_starttime", str),
+)
+
 
 @dataclass(frozen=True)
 class LeaseRecord:
@@ -97,6 +107,8 @@ class LeaseRecord:
     acquired_utc: str
     renewed_utc: str
     expiry_utc: str
+    pgid: int | None = None
+    holder_starttime: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -108,7 +120,89 @@ class LeaseRecord:
             "acquired_utc": self.acquired_utc,
             "renewed_utc": self.renewed_utc,
             "expiry_utc": self.expiry_utc,
+            "pgid": self.pgid,
+            "holder_starttime": self.holder_starttime,
         }
+
+
+def default_process_starttime(pid: int) -> str | None:
+    """A pid's start time, as an opaque string, or None where unavailable.
+
+    This is what disambiguates a pid from a RECYCLED pid. Field 22 of Linux's
+    /proc/<pid>/stat is the process's start time in clock ticks since boot; two
+    processes that share a pid number cannot share it. macOS and Windows return
+    None here for now, where the conservative branch (refuse to reclaim)
+    applies instead -- see `_holder_liveness`.
+    """
+    try:
+        raw = Path(f"/proc/{pid}/stat").read_bytes()
+    except OSError:
+        return None
+    end = raw.rfind(b")")
+    if end == -1:
+        return None
+    fields = raw[end + 1:].split()
+    # After comm: state(3) ... starttime(22) -> index 19 here.
+    if len(fields) < 20:
+        return None
+    return fields[19].decode("ascii", errors="replace")
+
+
+def default_group_is_live(pgid: int) -> "bool | None":
+    """Does ANY process still belong to process group `pgid`?
+
+    The lease's real question is "does something still hold this workspace
+    open?", and after a controller crash the answer lives in the contained
+    GROUP, not in the controller's pid -- `start_new_session` puts Unity in its
+    own session precisely so it survives its launcher. None means the process
+    table could not be read, which is ambiguity, never "nothing there".
+    """
+    try:
+        table = default_group_table()
+    except EvidenceError:
+        return None
+    return any(row.pgid == pgid for row in table)
+
+
+def _holder_liveness(
+    record: "LeaseRecord",
+    *,
+    pid_is_live: Callable[[int], "bool | None"],
+    group_is_live: Callable[[int], "bool | None"],
+    starttime_reader: Callable[[int], "str | None"],
+) -> "bool | None":
+    """Is the thing that actually holds this workspace still running?
+
+    Round 1 review found this pointed at the wrong process. The lease recorded
+    the CONTROLLER's pid, but `ManagedProcess` launches Unity into its own
+    session, so killing the controller leaves the whole Unity group alive
+    (measured: "child alive after ManagedProcess dropped without cancel:
+    True"). At TTL the lease then read as reclaimable while a live Unity still
+    owned the project -- the exact double-open this module exists to prevent.
+
+    So once `bind_holder` has recorded the contained pgid, that group is the
+    authority: a live member means the workspace is held, whatever became of
+    the controller. Only an unbound lease -- one whose Unity process never
+    started -- falls back to the pid.
+
+    Pid recycling is disambiguated on the pid path where the platform offers a
+    start time: a pid that exists but was NOT started when we recorded it is a
+    different process, so the true holder is dead and the lease is reclaimable.
+    Where no start time is available the answer stays True (refuse), which is
+    the safe direction and is disclosed in the task report as a wedge.
+    """
+    if record.pgid is not None:
+        return group_is_live(record.pgid)
+
+    live = pid_is_live(record.pid)
+    if live is not True:
+        return live
+    if record.holder_starttime is None:
+        return True  # nothing to compare against -- cannot rule out the holder
+    current = starttime_reader(record.pid)
+    if current is None:
+        return True  # could not read it now -- same conservative answer
+    return current == record.holder_starttime
 
 
 def _utc(epoch_seconds: float) -> str:
@@ -193,6 +287,20 @@ def read_lease(path) -> LeaseRecord:
                 f"lease {path.name} field {field!r} is "
                 f"{type(value).__name__}, expected {kind.__name__}",
             )
+    for field, kind in _NULLABLE_FIELDS:
+        if field not in payload:
+            raise EvidenceError(
+                "E_UNITY_LEASE_MALFORMED", f"lease {path.name} has no {field!r} field"
+            )
+        value = payload[field]
+        if value is None:
+            continue
+        if not isinstance(value, kind) or isinstance(value, bool):
+            raise EvidenceError(
+                "E_UNITY_LEASE_MALFORMED",
+                f"lease {path.name} field {field!r} is "
+                f"{type(value).__name__}, expected {kind.__name__} or null",
+            )
     return LeaseRecord(
         schema=LEASE_SCHEMA,
         owner=payload["owner"],
@@ -202,6 +310,8 @@ def read_lease(path) -> LeaseRecord:
         acquired_utc=payload["acquired_utc"],
         renewed_utc=payload["renewed_utc"],
         expiry_utc=payload["expiry_utc"],
+        pgid=payload["pgid"],
+        holder_starttime=payload["holder_starttime"],
     )
 
 
@@ -209,12 +319,14 @@ class WorkspaceLease:
     """An acquired lease on one physical workspace. Release it in `finally`."""
 
     def __init__(self, *, path: Path, owner: str, record: LeaseRecord,
-                 ttl_seconds: float, clock: Callable[[], float]) -> None:
+                 ttl_seconds: float, clock: Callable[[], float],
+                 starttime_reader: Callable[[int], "str | None"] = None) -> None:
         self.path = path
         self.owner = owner
         self._record = record
         self._ttl = ttl_seconds
         self._clock = clock
+        self._starttime_reader = starttime_reader or default_process_starttime
         self._released = False
 
     # -- acquisition ------------------------------------------------------
@@ -231,6 +343,8 @@ class WorkspaceLease:
         clock: Callable[[], float] = None,
         uuid_factory: Callable[[], str] = None,
         pid_is_live: Callable[[int], "bool | None"] = default_pid_is_live,
+        group_is_live: Callable[[int], "bool | None"] = default_group_is_live,
+        starttime_reader: Callable[[int], "str | None"] = default_process_starttime,
     ) -> "WorkspaceLease":
         import time as _time
 
@@ -259,12 +373,22 @@ class WorkspaceLease:
             acquired_utc=_utc(now),
             renewed_utc=_utc(now),
             expiry_utc=_utc(now + ttl_seconds),
+            # Unity does not exist yet, so the only holder we can name is this
+            # controller. `bind_holder` repoints it the moment there is a
+            # contained group to name instead.
+            pgid=None,
+            holder_starttime=starttime_reader(pid),
         )
 
         if not _create_exclusive(target, record):
             # Someone holds this slot. Decide whether it is reclaimable; every
             # answer other than "provably dead and expired" raises.
-            _refuse_or_clear(target, path_hash, now, pid_is_live)
+            _refuse_or_clear(
+                target, path_hash, now,
+                pid_is_live=pid_is_live,
+                group_is_live=group_is_live,
+                starttime_reader=starttime_reader,
+            )
             if not _create_exclusive(target, record):
                 # Another acquirer won the race between our clear and our
                 # create. Refusing is correct: exactly one of us may hold it,
@@ -278,6 +402,7 @@ class WorkspaceLease:
         return cls(
             path=target, owner=record.owner, record=record,
             ttl_seconds=ttl_seconds, clock=clock,
+            starttime_reader=starttime_reader,
         )
 
     # -- maintenance ------------------------------------------------------
@@ -294,6 +419,40 @@ class WorkspaceLease:
             return False
         except EvidenceError:
             return False
+
+    def bind_holder(self, *, pid: int, pgid: int) -> LeaseRecord:
+        """Repoint this lease at the process that actually holds the workspace.
+
+        Call this as soon as `ManagedProcess.start` returns, with that
+        object's `pid` and `pgid`. Until it is called, the lease names the
+        controller, and a controller crash would make the lease reclaimable at
+        TTL while a live Unity still had the project open -- because
+        `start_new_session` deliberately puts Unity in its own session, so it
+        outlives whatever launched it.
+
+        The pgid is the durable handle: it identifies the contained group even
+        after the leader exits and its children are reparented to init, which
+        is precisely the state Unity leaves behind. It is also, as a side
+        effect, the on-disk handle a later run needs in order to clean up a
+        crashed run's leaked group -- without it, a reclaimer inherits the
+        workspace with no way to name what is still running in it.
+        """
+        current = self._read_own_lease()
+        bound = LeaseRecord(
+            schema=LEASE_SCHEMA,
+            owner=current.owner,
+            path_hash=current.path_hash,
+            route=current.route,
+            pid=pid,
+            acquired_utc=current.acquired_utc,
+            renewed_utc=current.renewed_utc,
+            expiry_utc=current.expiry_utc,
+            pgid=pgid,
+            holder_starttime=self._starttime_reader(pid),
+        )
+        _write_atomic(self.path, bound)
+        self._record = bound
+        return bound
 
     def renew(self, ttl_seconds: float | None = None) -> LeaseRecord:
         """Extend OUR lease. Raises E_UNITY_LEASE_LOST if it is no longer ours."""
@@ -313,6 +472,8 @@ class WorkspaceLease:
             acquired_utc=current.acquired_utc,  # never moves
             renewed_utc=_utc(now),
             expiry_utc=_utc(now + ttl),
+            pgid=current.pgid,
+            holder_starttime=current.holder_starttime,
         )
         _write_atomic(self.path, renewed)
         self._record = renewed
@@ -419,7 +580,10 @@ def _refuse_or_clear(
     target: Path,
     path_hash: str,
     now: float,
+    *,
     pid_is_live: Callable[[int], "bool | None"],
+    group_is_live: Callable[[int], "bool | None"],
+    starttime_reader: Callable[[int], "str | None"],
 ) -> None:
     """Either raise, or remove a lease PROVEN to be abandoned. Never anything else.
 
@@ -450,19 +614,28 @@ def _refuse_or_clear(
             f"pid {current.pid}) until {current.expiry_utc}",
         )
 
-    liveness = pid_is_live(current.pid)
+    liveness = _holder_liveness(
+        current,
+        pid_is_live=pid_is_live,
+        group_is_live=group_is_live,
+        starttime_reader=starttime_reader,
+    )
+    holder = (
+        f"process group {current.pgid}" if current.pgid is not None
+        else f"pid {current.pid}"
+    )
     if liveness is None:
         raise EvidenceError(
             "E_UNITY_LEASE_UNKNOWN",
             f"lease {target.name} expired at {current.expiry_utc}, but whether "
-            f"pid {current.pid} is still running could not be determined; "
+            f"{holder} is still running could not be determined; "
             "refusing to reclaim a workspace that may still be open",
         )
     if liveness:
         raise EvidenceError(
             "E_UNITY_LEASE_HELD",
             f"lease {target.name} expired at {current.expiry_utc}, but its owning "
-            f"pid {current.pid} is still running -- an expired timestamp is not "
+            f"{holder} is still running -- an expired timestamp is not "
             "proof of death",
         )
 

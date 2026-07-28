@@ -623,6 +623,7 @@ class ManagedProcess:
         self._sleeper = sleeper or time.sleep
         self._waiter = waiter
         self._result: CleanupResult | None = None
+        self._error: EvidenceError | None = None
         self._closers: list[Callable[[], None]] = []
 
     @property
@@ -642,6 +643,8 @@ class ManagedProcess:
         stderr_path,
         spawner: Callable[..., object] = None,
         containment_factory: Callable[..., object] = None,
+        job_api_factory: Callable[[], object] = None,
+        windows: bool | None = None,
         clock: Callable[[], float] = None,
         sleeper: Callable[[float], None] = None,
     ) -> "ManagedProcess":
@@ -659,12 +662,21 @@ class ManagedProcess:
         out = open(stdout_path, "wb")
         err = open(stderr_path, "wb")
 
-        windows = os.name == "nt"
+        # `windows` and `job_api_factory` are overrides, not detection results,
+        # so the Windows launch path -- job creation, then assignment, in that
+        # order -- is drivable from a POSIX host. Round 1 review found that
+        # `containment_factory` BYPASSED the Windows branch instead of
+        # exercising it, which left `create_job` and `assign` reachable only on
+        # real Win32: the user's manual Windows pass would have been debugging
+        # wiring no test had ever run. `containment_factory` remains, but only
+        # as the escape hatch for tests that care about neither platform's
+        # launch path.
+        windows = (os.name == "nt") if windows is None else windows
         job = None
         api = None
         try:
-            if windows and containment_factory is None:  # pragma: no cover - Win32
-                api = _default_windows_job_api()
+            if windows and containment_factory is None:
+                api = (job_api_factory or _default_windows_job_api)()
                 job = api.create_job()
 
             spawn = spawner or subprocess.Popen
@@ -681,7 +693,7 @@ class ManagedProcess:
         except BaseException:
             out.close()
             err.close()
-            if job is not None and api is not None:  # pragma: no cover - Win32
+            if job is not None and api is not None:
                 api.close(job)
             raise
 
@@ -689,7 +701,7 @@ class ManagedProcess:
             if containment_factory is not None:
                 containment = containment_factory(handle)
                 pgid = getattr(containment, "pgid", handle.pid)
-            elif windows:  # pragma: no cover - Win32
+            elif windows:
                 api.assign(job, handle.pid)
                 containment = WindowsJobContainment(handle=job, api=api)
                 pgid = handle.pid
@@ -699,11 +711,16 @@ class ManagedProcess:
                 containment = PosixGroupContainment(pgid)
         except BaseException:
             # Containment could not be established -- do not leave the process
-            # running unmanaged. Kill what we can reach directly and re-raise.
+            # running unmanaged, and do not leak the job handle either. A job
+            # abandoned here with kill-on-close still holds a kernel object,
+            # and (worse) closing it later at an arbitrary point would kill
+            # whatever it had by then collected.
             try:
                 handle.kill()
             except Exception:
                 pass
+            if job is not None and api is not None:
+                api.close(job)
             out.close()
             err.close()
             raise
@@ -772,6 +789,12 @@ class ManagedProcess:
         """
         if self._result is not None:
             return self._result
+        if self._error is not None:
+            # A previous cancel signalled the group and could not prove the
+            # outcome. Re-raise that rather than signalling again: the leader
+            # has since been reaped, so its pid -- which IS the pgid -- may
+            # already belong to someone else.
+            raise self._error
 
         signalled = False
         escalated = False
@@ -800,12 +823,19 @@ class ManagedProcess:
 
         if live is None:
             # Signalled, but unable to prove the outcome. Refuse to mint a
-            # clean-looking result out of an unreadable process table.
-            raise EvidenceError(
+            # clean-looking result out of an unreadable process table -- and
+            # still reap, because a controller that raises here would
+            # otherwise hold the leader's zombie for its own lifetime, once
+            # per cancelled run. There is nothing left to protect the pid for:
+            # both signals have been delivered and `self._error` stops any
+            # later call from signalling this pgid again.
+            self._reap_leader()
+            self._error = EvidenceError(
                 "E_UNITY_PROCESS_UNKNOWN",
                 f"process group {self.pgid} was signalled but its members "
                 "could not be enumerated; cleanliness is unproven",
             )
+            raise self._error
 
         # Reap LAST: until now the leader's zombie is what pins the pid, and
         # the pid is the pgid we have been signalling.
@@ -821,6 +851,10 @@ class ManagedProcess:
         if code is None:
             code = self.handle.wait()
         return code
+
+    def is_reaped(self) -> bool:
+        """True once the leader's zombie has been consumed by this object."""
+        return self.handle.poll() is not None
 
     # -- context manager --------------------------------------------------
 
