@@ -313,6 +313,19 @@ class SweepBehaviour(unittest.TestCase):
     def _alive(handle) -> bool:
         return handle.poll() is None
 
+    # ---- NEW 1: the argument guard, driven DIRECTLY ---------------------
+    #
+    # `--check` runs the guard and exits before the process table is even
+    # listed. These cases are driven through it deliberately: the act this
+    # guard forbids is selecting PID 1, and a test that had to launch a real
+    # sweep to prove the refusal would be a test that can perform it.
+
+    def _check(self, *arguments):
+        return subprocess.run(
+            ["bash", str(self.SWEEP), "--check", *arguments],
+            capture_output=True, text=True, timeout=60,
+        )
+
     def test_the_sweep_requires_a_workspace(self):
         result = subprocess.run(
             ["bash", str(self.SWEEP)], capture_output=True, text=True, timeout=60
@@ -320,25 +333,108 @@ class SweepBehaviour(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("workspace directory is required", result.stderr)
 
-    def test_it_kills_the_workspace_and_the_owned_group_and_spares_a_bystander(self):
-        victim_script = self.workspace / "victim.sh"
-        victim_script.write_text("sleep 300\n", encoding="utf-8")
-        workspace_victim = self._spawn(f"exec bash {victim_script}")
+    def test_the_filesystem_root_is_refused(self):
+        # MEASURED against the previous version: a kill-neutered copy run as
+        # `sweep-workspace.sh /` selected 237 processes including PID 1.
+        result = self._check("/")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("filesystem root", result.stderr)
+
+    def test_a_relative_path_is_refused(self):
+        result = self._check(".")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("absolute path", result.stderr)
+
+    def test_a_path_with_dotdot_is_refused(self):
+        result = self._check("/tmp/../")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("'..'", result.stderr)
+
+    def test_a_shallow_path_is_refused(self):
+        for shallow in ("/home", "/usr", "/tmp"):
+            if not Path(shallow).is_dir():
+                continue
+            result = self._check(shallow)
+            self.assertEqual(result.returncode, 2, shallow)
+            self.assertIn("too shallow", result.stderr)
+
+    def test_the_home_directory_is_refused(self):
+        home = os.environ.get("HOME")
+        if not home or not Path(home).is_dir():
+            self.skipTest("no HOME on this host")
+        result = self._check(home)
+        # Refused either as too shallow or as being the home directory; both
+        # are refusals, and which one fires is not the point.
+        self.assertEqual(result.returncode, 2)
+
+    def test_a_directory_containing_the_repository_is_refused(self):
+        result = self._check(str(REPO))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("repository", result.stderr)
+        parent = REPO.parent
+        result = self._check(str(parent))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("repository", result.stderr)
+
+    def test_a_nonexistent_directory_is_refused(self):
+        result = self._check("/nonexistent/deep/workspace")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("not an existing directory", result.stderr)
+
+    def test_a_real_run_directory_is_accepted(self):
+        # Otherwise "refuses everything" would look like a working guard.
+        result = self._check(str(self.workspace))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("ok ", result.stdout)
+
+    def test_the_guard_is_wired_into_the_real_sweep_not_only_check(self):
+        # A full invocation, no --check. The path is refused for a reason that
+        # is harmless even if the guard were deleted: nothing on the host can
+        # have /nonexistent/deep/workspace in its argv.
+        result = subprocess.run(
+            ["bash", str(self.SWEEP), "/nonexistent/deep/workspace"],
+            capture_output=True, text=True, timeout=60,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("not an existing directory", result.stderr)
+
+    # ---- the sweep's authority model, against real processes -------------
+
+    def test_it_kills_only_what_it_owns(self):
+        """Five real processes; two must die and three must live.
+
+        Each survivor is a defect that was actually demonstrated:
+
+          sibling         `<ws>2/proj` swept as `<ws>/proj` by an unanchored
+                          substring test -- the `/x/proj` vs `/x/proj2` case.
+          recycled pgid   an unrelated daemon whose pgid happened to be in the
+                          owned file was killed on bare pgid equality.
+          bystander       a process merely NAMED like an orphan class, killed
+                          by the original host-wide name match.
+        """
+        import time
+
+        victim_argv = f"Unity -projectPath {self.workspace}/proj"
+        workspace_victim = self._spawn(f'exec -a "{victim_argv}" sleep 300')
+
+        # Sibling directory whose name merely STARTS with the workspace name.
+        sibling_argv = f"Unity -projectPath {self.workspace}2/proj"
+        sibling = self._spawn(f'exec -a "{sibling_argv}" sleep 300')
 
         # No workspace path anywhere in its argv -- exactly like VBCSCompiler.
         owned_victim = self._spawn("exec -a VBCSCompiler sleep 300")
-        self.pgid_file.write_text(f"{owned_victim.pid}\n", encoding="utf-8")
+        # Same owned group, but nothing about it says Unity: a recycled PGID.
+        recycled = self._spawn("exec -a innocent-daemon sleep 300")
+        self.pgid_file.write_text(
+            f"{owned_victim.pid}\n{recycled.pid}\n", encoding="utf-8"
+        )
 
         # Named like an orphan class, in no workspace and no owned group.
         bystander = self._spawn("exec -a UnityShaderCompiler sleep 300")
 
-        import time
-
         time.sleep(1)
-        self.assertTrue(self._alive(workspace_victim))
-        self.assertTrue(self._alive(owned_victim))
-        self.assertTrue(self._alive(bystander))
-        self.assertNotIn(str(self.workspace), "exec -a VBCSCompiler sleep 300")
+        for handle in (workspace_victim, sibling, owned_victim, recycled, bystander):
+            self.assertTrue(self._alive(handle), "a process died before the sweep")
 
         result = subprocess.run(
             ["bash", str(self.SWEEP), str(self.workspace), str(self.pgid_file)],
@@ -351,12 +447,19 @@ class SweepBehaviour(unittest.TestCase):
         self.assertFalse(self._alive(workspace_victim), "workspace process survived")
         self.assertFalse(self._alive(owned_victim),
                          "a process reachable ONLY by owned pgid survived")
+        self.assertTrue(self._alive(sibling),
+                        "the sweep killed a SIBLING directory's process; the "
+                        "workspace match is an unanchored substring test")
+        self.assertTrue(self._alive(recycled),
+                        "the sweep killed an unrelated process on bare pgid "
+                        "equality; a recycled PGID must resolve to sparing")
         self.assertTrue(self._alive(bystander),
                         "the sweep killed a process it does not own")
 
         self.assertIn("workspace", result.stdout)
         self.assertIn("owned-pgid", result.stdout)
-        self.assertNotIn(str(bystander.pid), result.stdout)
+        for spared in (sibling, recycled, bystander):
+            self.assertNotIn(str(spared.pid), result.stdout)
 
     def test_without_a_pgid_file_the_owned_class_is_out_of_reach(self):
         # States the reason the pgid record exists at all: a workspace-only

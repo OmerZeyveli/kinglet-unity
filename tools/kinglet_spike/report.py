@@ -128,7 +128,71 @@ def render_unity_markdown(
         lines += ["", "## Why the open cells are open", ""]
         for key in sorted(reasons):
             lines.append(f"- **`{key}`** — {reasons[key]}")
+    lines += _known_artefact_lines(unity_records)
     return "\n".join(lines) + "\n"
+
+
+def _known_artefact_lines(records) -> list[str]:
+    """Disclose, to a READER of the evidence, defects the records still carry.
+
+    Four cosmetic defects were found in the assembling code after these records
+    were published. Published evidence is immutable and regenerating it would
+    mean either deleting committed records or launching Unity again for a
+    cosmetic gain, so the code was fixed and the records were left alone. That
+    decision is defensible; leaving it recorded only in a plan report under
+    `.superpowers/`, which ships to nobody, is not. A reader auditing this
+    evidence must not have to go looking to learn that a cited artifact name
+    does not resolve.
+
+    The trigger is DERIVED, not a hardcoded run id: a record whose start and
+    end stamps are identical is one the pre-fix assembler produced, because the
+    fixed one records each probe's real span. The section therefore retires
+    itself the moment no such record remains.
+    """
+    zero_span = sorted(
+        record.run_id
+        for record in records
+        if record.status == "pass" and record.started_at == record.ended_at
+    )
+    if not zero_span:
+        return []
+    lines = [
+        "",
+        "## Known artefacts of the committed records",
+        "",
+        "These are defects in the tooling that ASSEMBLED the records, found",
+        "after they were published. Every measured fact in them was verified",
+        "against its artifact and stands. The assembling code is fixed; the",
+        "records are immutable and were deliberately not regenerated, so the",
+        "next run — a Linux re-run or the first macOS run — carries the",
+        "corrections and these notes disappear from this report.",
+        "",
+        f"1. **Zero-length spans.** {len(zero_span)} records report",
+        "   `started_at == ended_at` although their artifacts record real",
+        "   durations (`wall_seconds` of 14.216, 18.197 and 22.151 among",
+        "   them). The probe's span is now carried through to the record.",
+        "2. **One dangling artifact reference.** Inside",
+        "   `collision-refusal-receipt.json`, the `artifacts` field names",
+        "   `artifacts/unity/same-project-headless-summary.json` — the route's",
+        "   own route-relative name. That cell publishes the file as",
+        "   `collision-refusal-summary.json`, so the reference resolves to",
+        "   nothing in its directory. The receipt's references are now",
+        "   rewritten to the paths actually published.",
+        "3. **`orphan-cleanup` wording.** Its assertion detail says \"peak",
+        "   population during the cold run\"; that run was CANCELLED at 14s,",
+        "   and it is the same run and the same artifact as the `cancellation`",
+        "   cell. A killed run is the stronger case for cleanup, and the",
+        "   artifact discloses the kill, but the wording did not.",
+        "4. **No post-run census on `isolated-headless`.** That artifact",
+        "   publishes `orphan_peak_during_run` and no `orphan_census_after`,",
+        "   so the suite's strongest `AssetImportWorker` cleanup datapoint is",
+        "   unpublished. The census is now collected and staged.",
+        "",
+        "Affected records:",
+        "",
+    ]
+    lines += [f"- `{run_id}`" for run_id in zero_span]
+    return lines
 
 
 def write_unity_reports(repo_root: Path, matrix_path: Path) -> tuple[CoverageCell, ...]:
