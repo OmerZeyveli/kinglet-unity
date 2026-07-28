@@ -553,3 +553,5 @@ tests/kinglet_spike/test_unity_host_scripts.py	original	-	-	-	original	kinglet-0
 tools/kinglet_spike/unity/host_probes.py	original	-	-	-	original	kinglet-00u-task8-native-route-probe-runner
 tools/kinglet_spike/unity/results.py	original	-	-	-	original	kinglet-00u-task8-unity-observations-to-evidence
 spikes/platform/unity/sweep-workspace.sh	original	-	-	-	original	kinglet-00u-task8-scoped-orphan-sweep
+docs/research/platform-spike/HOST-PASS-HANDOFF.md	original	-	-	-	original	native-host-pass-handoff-for-windows-macos-runner
+docs/research/platform-spike/MEASURED-UNITY-FACTS.md	original	-	-	-	original	measured-unity-batchmode-behaviour-reference
