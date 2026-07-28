@@ -106,22 +106,29 @@ PINNED_CELLS: tuple[tuple[str, str], ...] = (
     ("runtime.dotnet.linux-ubuntu-24-04-x64.host-probe", "pass"),
     ("runtime.dotnet.macos-26-arm64.host-probe", "missing"),
     ("runtime.dotnet.macos-26-x64.host-probe", "missing"),
-    ("runtime.dotnet.windows-10-x64.host-probe", "missing"),
+    # Windows 10 22H2 x64 native pass, run 20260728T170051Z. See
+    # docs/research/platform-spike/HOST-PASS-HANDOFF.md §9.
+    ("runtime.dotnet.windows-10-x64.host-probe", "pass"),
     ("runtime.dotnet.windows-11-x64.host-probe", "missing"),
     ("runtime.go.linux-ubuntu-24-04-x64.host-probe", "pass"),
     ("runtime.go.macos-26-arm64.host-probe", "missing"),
     ("runtime.go.macos-26-x64.host-probe", "missing"),
-    ("runtime.go.windows-10-x64.host-probe", "missing"),
+    ("runtime.go.windows-10-x64.host-probe", "pass"),
     ("runtime.go.windows-11-x64.host-probe", "missing"),
     ("runtime.python.linux-ubuntu-24-04-x64.host-probe", "pass"),
     ("runtime.python.macos-26-arm64.host-probe", "missing"),
     ("runtime.python.macos-26-x64.host-probe", "missing"),
-    ("runtime.python.windows-10-x64.host-probe", "missing"),
+    # FAIL, deliberately pinned as such: the probe uses POSIX-only os.killpg, so
+    # three process assertions cannot pass on Windows. A probe omission, not a
+    # Python limitation — see HOST-PASS-HANDOFF.md §9 before reading anything
+    # into it. Flipping this to "pass" requires a Windows process-tree
+    # implementation and a rerun, never a rubric edit.
+    ("runtime.python.windows-10-x64.host-probe", "fail"),
     ("runtime.python.windows-11-x64.host-probe", "missing"),
     ("runtime.rust.linux-ubuntu-24-04-x64.host-probe", "pass"),
     ("runtime.rust.macos-26-arm64.host-probe", "missing"),
     ("runtime.rust.macos-26-x64.host-probe", "missing"),
-    ("runtime.rust.windows-10-x64.host-probe", "missing"),
+    ("runtime.rust.windows-10-x64.host-probe", "pass"),
     ("runtime.rust.windows-11-x64.host-probe", "missing"),
     ("unity.editor-resolution.linux-ubuntu-24-04-x64.mismatched-editor", "pass"),
     ("unity.editor-resolution.macos-26-arm64.mismatched-editor", "missing"),

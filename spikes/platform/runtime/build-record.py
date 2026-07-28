@@ -60,7 +60,28 @@ def _split_lines(value: str) -> list[str]:
     return [line for line in value.splitlines() if line.strip() != ""]
 
 
-def _assertions_from_result(result: dict) -> list[dict]:
+def _assertions_from_result(result: dict) -> tuple[list[dict], str]:
+    """Map the probe's own result.json onto record assertions + a record status.
+
+    Returns (assertions, status) where status is "pass" only when all eighteen
+    assertions passed, and "fail" when any of them failed.
+
+    THIS USED TO REFUSE ANY NON-PASS ASSERTION and hardcode `"status": "pass"` at
+    the call site, which meant the evidence pipeline could not express a failing
+    cell AT ALL — while rubric-v1.json is built entirely around failures being
+    committed evidence ("A failed gate is committed evidence, not a low score")
+    and load.py's RECORD_STATUSES has always accepted "fail". The first real
+    failure (the Python candidate on native Windows: `os.killpg` is POSIX-only)
+    aborted the whole bake-off with nothing published, and no honest record of
+    the failure could be produced by the tooling that exists to produce records.
+
+    What is NOT relaxed: an assertion status outside {pass, fail} is still
+    refused rather than coerced, a missing assertion is still refused, and the
+    probe's own top-level `status` must agree with its assertions — a probe that
+    claims "pass" while reporting a failed assertion is self-contradictory and
+    gets no record at all. Those are the "I could not tell" branches; without
+    them, an unparseable result would fall through to the permissive answer.
+    """
     schema = result.get("schema")
     if schema != RESULT_SCHEMA:
         raise SystemExit(f"build-record: unexpected result schema: {schema!r}")
@@ -81,19 +102,42 @@ def _assertions_from_result(result: dict) -> list[dict]:
     if missing:
         raise SystemExit(f"build-record: result missing assertions: {missing}")
 
+    # Run-level diagnostics from the probe. They are not attributed to a single
+    # assertion by the contract, so they are carried on every FAILING assertion
+    # rather than dropped — this is the only free-text slot in the schema, and
+    # losing the diagnosis is what makes a committed failure useless later.
+    errors = result.get("errors")
+    error_detail = ""
+    if isinstance(errors, list) and errors:
+        error_detail = "; run-level errors: " + "; ".join(str(e) for e in errors)
+
     assertions: list[dict] = []
+    failed: list[str] = []
     for a_id in REQUIRED_ASSERTIONS:
         status = by_id[a_id]
-        if status != "pass":
-            raise SystemExit(f"build-record: non-pass assertion {a_id!r}: {status!r}")
-        assertions.append(
-            {
-                "id": a_id,
-                "status": "pass",
-                "detail": "host-probe assertion passed",
-            }
+        if status not in ("pass", "fail"):
+            raise SystemExit(
+                f"build-record: unusable assertion status for {a_id!r}: {status!r}"
+            )
+        if status == "fail":
+            failed.append(a_id)
+            detail = "host-probe assertion failed" + error_detail
+        else:
+            detail = "host-probe assertion passed"
+        assertions.append({"id": a_id, "status": status, "detail": detail})
+
+    record_status = "fail" if failed else "pass"
+
+    # Cross-check the probe's own verdict against its assertions. Disagreement in
+    # EITHER direction is a broken probe, not a result to publish.
+    claimed = result.get("status")
+    if isinstance(claimed, str) and claimed in ("pass", "fail") and claimed != record_status:
+        raise SystemExit(
+            f"build-record: probe reported status {claimed!r} but its assertions say "
+            f"{record_status!r} (failed: {failed or 'none'})"
         )
-    return assertions
+
+    return assertions, record_status
 
 
 def _measurements(measure: dict) -> list[dict]:
@@ -144,7 +188,7 @@ def main() -> int:
 
     result_path = Path(args.result_file)
     result = json.loads(result_path.read_text(encoding="utf-8"))
-    assertions = _assertions_from_result(result)
+    assertions, record_status = _assertions_from_result(result)
 
     measure = json.loads(args.measure_json)
     measurements = _measurements(measure)
@@ -180,7 +224,9 @@ def main() -> int:
         },
         "started_at": args.started_at,
         "ended_at": args.ended_at,
-        "status": "pass",
+        # Derived from the assertions — never a literal. A hardcoded "pass" here
+        # is what made a failing cell unrecordable.
+        "status": record_status,
         "command": command,
         "artifacts": [
             {

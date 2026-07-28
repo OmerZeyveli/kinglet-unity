@@ -1,0 +1,204 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/runtime/go/20260728T170051Z-runtime-go-windows-10-22h2-x64-01/result.json",
+      "required": true,
+      "sha256": "e080b33207edf6f1a63e943e725d52a25fb8e9cd87d8821fd519fe629a93d458"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "host-probe assertion passed",
+      "id": "manifest.accept-valid",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "manifest.reject-unknown",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "path.unicode-space",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "filesystem.atomic-replace",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.acquire",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.renew",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.reject-competitor",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.expire",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.release",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.child-grandchild",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.cancel",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.no-descendants",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "crypto.sha256",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "crypto.ed25519",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.success",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.crash",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.timeout",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.cancel",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "spikes/platform/runtime/measure.ps1",
+    ".kinglet/local/spikes/20260728T170051Z-runtime-go-windows-10-22h2-x64-01/exec/kinglet-host-probe.exe",
+    "run",
+    "--contract",
+    "spikes/platform/runtime/contract/host-probe-v1.json",
+    "--workspace",
+    "<clean-workspace>",
+    "--result",
+    "<result.json>"
+  ],
+  "ended_at": "2026-07-28T20:04:13Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "windows",
+    "release": "10-22H2",
+    "toolchain": [
+      "go=1.26.5",
+      "host=Microsoft Windows 10 Pro for Workstations (version=10.0.19045; build=19045.7548; display-version=22H2; arch=AMD64)",
+      "kernel=Windows NT 10.0.19045"
+    ]
+  },
+  "measurements": [
+    {
+      "id": "cold-start",
+      "samples": [
+        23,
+        20,
+        21,
+        21,
+        21,
+        20,
+        20,
+        22,
+        20,
+        22,
+        21,
+        21,
+        22,
+        21,
+        22,
+        23,
+        21,
+        34,
+        19,
+        19,
+        21,
+        19,
+        21,
+        21,
+        22,
+        22,
+        20,
+        22,
+        20,
+        22
+      ],
+      "unit": "milliseconds"
+    },
+    {
+      "id": "peak-rss",
+      "samples": [
+        6056
+      ],
+      "unit": "kilobytes"
+    },
+    {
+      "id": "artifact-size",
+      "samples": [
+        2789376
+      ],
+      "unit": "bytes"
+    },
+    {
+      "id": "dependency-count",
+      "samples": [
+        0
+      ],
+      "unit": "count"
+    }
+  ],
+  "probe": {
+    "contract": "kinglet.host-probe/v1",
+    "id": "host-probe"
+  },
+  "prompt": null,
+  "run_id": "20260728T170051Z-runtime-go-windows-10-22h2-x64-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [
+    {
+      "title": "Go 1.26.5",
+      "url": "https://go.dev/dl/"
+    }
+  ],
+  "started_at": "2026-07-28T20:03:09Z",
+  "status": "pass",
+  "subject": {
+    "id": "go",
+    "kind": "runtime",
+    "version": "1.26.5"
+  }
+}

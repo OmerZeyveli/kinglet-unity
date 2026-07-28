@@ -15,12 +15,16 @@ different set of cells:
 
 | Gate | Windows cells | Runner | Ready? |
 | --- | --- | --- | --- |
-| **0R** runtime bake-off | 8 | `spikes/platform/runtime/run-host.ps1` (Windows), `run-host.sh` (macOS) | **Yes** |
+| **0R** runtime bake-off | 8 | `spikes/platform/runtime/run-host.ps1` (Windows), `run-host.sh` (macOS) | **4 of 8 done — Windows 10 22H2 x64 ran 2026-07-28 (§9)** |
 | **0C** client capability | 1 per client (`capability-suite`) | `spikes/platform/clients/<client>/runbook.md` | Partly — runbooks were written for the Linux run and need adapting |
 | **0U** Unity execution | 9 | *none for Windows* | **No — see §6** |
 
 **Start with 0R.** It is fully scripted and it is the only thing standing between the project and
 the runtime decision (see §2).
+
+The Windows 10 x64 half of 0R is now done — see **§9** for what it measured and, more importantly,
+for the four defects the first real execution exposed. The Windows 11 x64 cells and both macOS
+hosts remain open.
 
 ## 2. Why 0R first: the runtime decision is gated, not merely waiting
 
@@ -179,3 +183,106 @@ it existed.** A whole-branch review then found a surviving instance of each. Do 
 Two derived rules: **a refusal test must not be able to perform the act it forbids**, and **report
 exactly what you did, never what you intended** — several reports on this project claimed
 verification that had not happened, and every one was caught.
+
+---
+
+## 9. The Windows 10 22H2 x64 0R pass — executed 2026-07-28
+
+Host: `Microsoft Windows 10 Pro for Workstations`, version 10.0.19045, build 19045.7548, x64,
+PowerShell 7.6.4. Recorded under matrix cell `windows-10-x64` with the **full caption in
+`environment.toolchain`** — the edition string is not `Microsoft Windows 10` exactly, so this
+follows the Pop!_OS precedent in §3.2: the deviation is disclosed in the record, which is what makes
+it legitimate.
+
+Run stamp `20260728T170051Z`. Four cells published, `run-host.ps1` exited 1 because one failed.
+
+| Candidate | Status | Cold start median | Peak RSS | Artifact |
+| --- | --- | --- | --- | --- |
+| rust | **pass** 18/18 | 16 ms | 2 940 KB | 0.61 MB |
+| go | **pass** 18/18 | 21 ms | 6 056 KB | 2.66 MB |
+| dotnet | **pass** 18/18 | 83 ms | 20 856 KB | 70.72 MB |
+| python | **FAIL** 15/18 | 2 116 ms | 7 204 KB | 12.17 MB |
+
+**Windows cold start is nothing like Linux.** Linux measured Rust 1.3 / Go 1.8 / .NET 23.7 /
+Python 311.7 ms. Every candidate is roughly an order of magnitude slower here (Python ~7x). Windows
+process creation plus on-access AV scanning of a freshly written binary dominates. **Do not compare a
+Windows column against a Linux column as if they were the same measurement.**
+
+### Why python failed — read this before concluding anything about Python
+
+`process.child-grandchild`, `process.cancel` and `process.no-descendants` all fail with
+`module 'os' has no attribute 'killpg'`. `kinglet_host_probe.py` spawns with
+`start_new_session=True` and reaps with `os.killpg(pgid, SIGKILL)` — both POSIX-only.
+
+**This is a probe omission, not a Python limitation.** Go, Rust and .NET each ship an explicit
+Windows process-tree implementation (`go/process_windows.go`, Job Objects in `rust/src/process.rs`,
+`dotnet/ProcessTree.cs`); the Python probe has no Windows path at all. Python could implement the
+same thing via Job Objects. Until someone writes that, the published `fail` record says the
+candidate as-built does not satisfy the contract on Windows — which is true, and is what a reader
+should take from it. It does **not** license the conclusion "Python cannot do this on Windows".
+
+Note also that the probe leaves live `kinglet-host-probe` descendants behind while it runs (nine
+were observed mid-run, all under the run's own exec dir). They did exit on their own — this was
+**not** a hang, and the pass completed unaided.
+
+### Four defects the first real execution exposed
+
+All four had survived because no Windows host had ever run this, and three of them are instances of
+the defect classes in §8.
+
+1. **`build-record.py` could not express a failure.** It hardcoded `"status": "pass"` and
+   `SystemExit`-ed on any non-pass assertion — while `rubric-v1.json` is built entirely around
+   failures being committed evidence and `load.py`'s `RECORD_STATUSES` has always accepted `fail`.
+   The tooling whose job is producing records could not produce the record this run needed. Status
+   is now derived from the assertions, and a probe whose own `status` contradicts its assertions is
+   refused outright rather than coerced (§8.3).
+2. **`run-host.ps1` aborted the whole bake-off at the first failure.** Because python runs first,
+   go/rust/dotnet were never built, never measured and never published, and the failure itself was
+   not recorded either. A candidate failure is now recorded and the pass continues; the run still
+   exits non-zero, and it distinguishes "recorded a fail" from "produced no record at all".
+3. **`.gitattributes` silently invalidated the entire evidence chain on Windows.** `* text=auto`
+   with `core.autocrlf=true` rewrites every committed evidence artifact to CRLF on checkout, so no
+   recorded `artifacts[].sha256` matches any more. Measured: the Linux go artifact hashed to
+   `292f7b63…` on disk against a recorded `e080b332…`, and normalising CRLF back to LF reproduced
+   `e080b332…` exactly. The failure was silent and destructive — `report` reclassified every
+   previously passing Linux runtime, unity and client cell as `invalid` and rewrote the committed
+   `reports/coverage.md` to say so. Fixed by marking the two hashed trees `-text`. **Scope it by
+   tree, not by extension** — a first attempt using `**/*.json` fixed the runtime cells and left the
+   client cells broken, because those artifacts are `.txt` and `.jsonl` (§8.1).
+4. **PyInstaller's work dir landed at the repo root.** The runner passed `--distpath` but not
+   `--workpath`, and cwd is the repo root, so each run left an untracked `build/`. `.gitignore`
+   already anticipated it at `spikes/platform/runtime/python/build/`. The Linux runner never hit it
+   because it reused a prebuilt onefile and never invoked PyInstaller at all.
+
+Also observed, **not fixed** — decide these before the next Windows run:
+
+- **`scripts/check-provenance.sh` cannot pass on a Windows checkout, for the same CRLF reason.** It
+  hashes the working-tree file against a recorded *upstream* digest computed over LF bytes, so all
+  76 `status=verbatim` rows fail. Verified: `templates/Model.cs.template` hashes to `aa51b6af…` on
+  disk against a recorded `62d735ed…`, and LF-normalising reproduces `62d735ed…` exactly. It is
+  **pre-existing and unrelated to this pass** — none of the 76 files were touched here, and the
+  structural checks (no orphan rows, no missing rows, field sanity, `rule=absent`, `rule=ours-wins`)
+  all pass. Fixing it properly means either normalising line endings before hashing in the script,
+  or widening the `-text` policy beyond the evidence trees. Both are judgement calls with real
+  trade-offs, so neither was made unattended. **Until then, run `check-provenance.sh` on Linux or
+  macOS**, and do not read a Windows failure as manifest rot.
+- **`dotnet publish` rewrites `dotnet/packages.lock.json`**, flipping the RID section
+  (`net10.0/linux-x64` → `net10.0/win-x64`). It is a tracked file, so every host swap dirties it. It
+  needs a lock covering all RIDs, or exclusion from the run.
+- **The Python probe needs a Windows process-tree implementation** before
+  `runtime.python.windows-*.host-probe` can mean anything about Python rather than about the probe.
+
+### Environment notes for whoever repeats this
+
+- Toolchains were installed per-user, at the exact pins: Go 1.26.5 (`~/.kinglet-toolchains/go`),
+  Rust 1.97.1 MSVC (`~/.cargo`), .NET SDK 10.0.302 (`~/.dotnet`), uv 0.11.28, CPython 3.14.6
+  fetched by uv. **Rust needs the MSVC linker** — `link.exe` ships only with Visual Studio Build
+  Tools (VS Code is not sufficient), and installing it needs one interactive UAC approval.
+- The system-wide .NET 8 SDK was dropped from `PATH` for the run. `run-host.ps1` strips the single
+  directory `Get-Command dotnet` resolves to; a second `dotnet` behind it would weaken the
+  toolchain-stripped-PATH proof.
+- `TEMP`/`TMP` were pointed at a volume with free space. The conformance harness writes its
+  workspaces under `TEMP` and the first attempt died with a genuine `ERROR_DISK_FULL`.
+- The suite's POSIX tests (`run-host.sh`, `measure.sh`) cannot pass on Windows even with Git Bash —
+  they need `/bin/true`, `/usr/bin/time` and `uname`/`sw_vers` PATH shims. Baseline at `f36aeda` on
+  this host: 13 failed. Judge a Windows run against that baseline, not against zero.

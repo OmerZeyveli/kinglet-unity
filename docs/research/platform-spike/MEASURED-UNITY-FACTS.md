@@ -116,3 +116,25 @@ PATH. Benign for test runs (exit 0).
   host.** Fixed only after `v9.7.1`. Keep the developer's own MCP server closed while fixtures run.
 - `McpCiBoot.cs` is byte-identical at `v10.1.0` and the batch guards are unchanged, so nothing here
   justifies moving the pin.
+
+---
+
+## Committed evidence is byte-hashed — never let git translate line endings
+
+Not a Unity fact, but it lives here because it silently invalidates every measurement this project
+records, including the Unity ones.
+
+`.gitattributes` had `* text=auto`, and with `core.autocrlf=true` a **Windows checkout rewrites every
+committed evidence artifact to CRLF**. Each record carries `artifacts[].sha256` over the artifact's
+exact bytes, so after checkout not one digest matches. Measured 2026-07-28 on the native Windows 0R
+pass: the Linux go artifact hashed to `292f7b63…` on disk against a recorded `e080b332…`, and
+normalising CRLF back to LF reproduced `e080b332…` exactly.
+
+The failure is silent and it does not stop at reporting: `tools.kinglet_spike report` reclassified
+every previously passing Linux **unity**, runtime and client cell as `invalid` and rewrote the
+committed `reports/coverage.md` accordingly. A reviewer who pulled that commit would have seen the
+whole Unity slice apparently collapse.
+
+`docs/research/platform-spike/artifacts/**` and `evidence/**` are now `-text` (no conversion in
+either direction). Scope such a rule **by tree, not by extension**: a `**/*.json` rule fixed the
+runtime cells while leaving the client cells broken, because those artifacts are `.txt` and `.jsonl`.

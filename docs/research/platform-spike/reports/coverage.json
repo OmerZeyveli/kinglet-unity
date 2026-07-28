@@ -241,8 +241,10 @@
     },
     {
       "id": "runtime.dotnet.windows-10-x64.host-probe",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "runtime.dotnet.windows-11-x64.host-probe",
@@ -268,8 +270,10 @@
     },
     {
       "id": "runtime.go.windows-10-x64.host-probe",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T170051Z-runtime-go-windows-10-22h2-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "runtime.go.windows-11-x64.host-probe",
@@ -295,8 +299,10 @@
     },
     {
       "id": "runtime.python.windows-10-x64.host-probe",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T170051Z-runtime-python-windows-10-22h2-x64-01"
+      ],
+      "state": "fail"
     },
     {
       "id": "runtime.python.windows-11-x64.host-probe",
@@ -322,8 +328,10 @@
     },
     {
       "id": "runtime.rust.windows-10-x64.host-probe",
-      "run_ids": [],
-      "state": "missing"
+      "run_ids": [
+        "20260728T170051Z-runtime-rust-windows-10-22h2-x64-01"
+      ],
+      "state": "pass"
     },
     {
       "id": "runtime.rust.windows-11-x64.host-probe",

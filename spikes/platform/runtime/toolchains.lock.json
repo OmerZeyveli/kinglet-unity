@@ -122,8 +122,9 @@
       "toolchain": {
         "name": "Go",
         "version": "1.26.5",
-        "download_url": "UNVERIFIED-pending-native-host-fetch",
-        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
+        "_note": "Filled on the native Windows 0R pass (2026-07-28). This is the windows-amd64 archive actually fetched and installed for that run; the digest was verified against go.dev's own release index before extraction. The other candidates' sentinels are deliberately left in place — their artifacts were not downloaded and hashed by hand on this host (uv resolved CPython, rustup resolved per-component tarballs, dotnet-install fetched and discarded the SDK zip), and a checksum that was not verified must not be written here.",
+        "download_url": "https://go.dev/dl/go1.26.5.windows-amd64.zip",
+        "download_sha256": "97e6b2a833b6d89f9ff17d25419ac0a7e3b482a044e9ab18cdef834bd834fd38",
         "license_spdx": "BSD-3-Clause"
       },
       "build_tool": {

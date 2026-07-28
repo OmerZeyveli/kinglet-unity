@@ -1,0 +1,210 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/runtime/dotnet/20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01/result.json",
+      "required": true,
+      "sha256": "dbb665cf1d1af0bd43562e5a61b0f4f89b2e392688ca82f5ae6553f0fbd9746b"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "host-probe assertion passed",
+      "id": "manifest.accept-valid",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "manifest.reject-unknown",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "path.unicode-space",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "filesystem.atomic-replace",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.acquire",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.renew",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.reject-competitor",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.expire",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "lease.release",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.child-grandchild",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.cancel",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "process.no-descendants",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "crypto.sha256",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "crypto.ed25519",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.success",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.crash",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.timeout",
+      "status": "pass"
+    },
+    {
+      "detail": "host-probe assertion passed",
+      "id": "cleanup.cancel",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "spikes/platform/runtime/measure.ps1",
+    ".kinglet/local/spikes/20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01/exec/kinglet-host-probe.exe",
+    "run",
+    "--contract",
+    "spikes/platform/runtime/contract/host-probe-v1.json",
+    "--workspace",
+    "<clean-workspace>",
+    "--result",
+    "<result.json>"
+  ],
+  "ended_at": "2026-07-28T20:04:38Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "windows",
+    "release": "10-22H2",
+    "toolchain": [
+      "dotnet-sdk=10.0.302",
+      "dotnet-runtime=10.0.10",
+      "nsec.cryptography=26.4.0",
+      "host=Microsoft Windows 10 Pro for Workstations (version=10.0.19045; build=19045.7548; display-version=22H2; arch=AMD64)",
+      "kernel=Windows NT 10.0.19045"
+    ]
+  },
+  "measurements": [
+    {
+      "id": "cold-start",
+      "samples": [
+        86,
+        85,
+        81,
+        82,
+        80,
+        82,
+        83,
+        82,
+        85,
+        85,
+        86,
+        81,
+        82,
+        82,
+        91,
+        84,
+        83,
+        83,
+        81,
+        84,
+        88,
+        95,
+        83,
+        82,
+        86,
+        81,
+        88,
+        96,
+        90,
+        83
+      ],
+      "unit": "milliseconds"
+    },
+    {
+      "id": "peak-rss",
+      "samples": [
+        20856
+      ],
+      "unit": "kilobytes"
+    },
+    {
+      "id": "artifact-size",
+      "samples": [
+        74151063
+      ],
+      "unit": "bytes"
+    },
+    {
+      "id": "dependency-count",
+      "samples": [
+        4
+      ],
+      "unit": "count"
+    }
+  ],
+  "probe": {
+    "contract": "kinglet.host-probe/v1",
+    "id": "host-probe"
+  },
+  "prompt": null,
+  "run_id": "20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [
+    {
+      "title": ".NET 10.0.10 runtime",
+      "url": "https://dotnet.microsoft.com/en-us/download/dotnet/10.0"
+    },
+    {
+      "title": "NSec.Cryptography 26.4.0",
+      "url": "https://nsec.rocks/"
+    }
+  ],
+  "started_at": "2026-07-28T20:04:26Z",
+  "status": "pass",
+  "subject": {
+    "id": "dotnet",
+    "kind": "runtime",
+    "version": "10.0.10"
+  }
+}

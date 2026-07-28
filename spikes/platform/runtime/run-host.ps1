@@ -65,6 +65,9 @@ $ErrorActionPreference = 'Stop'
 # Set-StrictMode makes an unset $LASTEXITCODE an error, and Invoke-Native reads it
 # immediately after the first native call.
 $global:LASTEXITCODE = 0
+# Set-StrictMode makes an unread script variable an error at first reference.
+$script:LastNativeExit = 0
+$script:CellStatus = @{}
 
 $script:Candidates = @('python', 'go', 'rust', 'dotnet')
 $script:ContractDir = 'spikes/platform/runtime/contract'
@@ -496,6 +499,37 @@ function Invoke-Native {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]] $ArgumentList,
         [string] $WorkingDirectory
     )
+    $null = Invoke-NativeAllowFailure -FilePath $FilePath -ArgumentList $ArgumentList `
+        -WorkingDirectory $WorkingDirectory -ThrowOnFailure
+}
+
+function Invoke-NativeAllowFailure {
+    <#
+      As Invoke-Native, but records the exit code in $script:LastNativeExit
+      instead of throwing, unless -ThrowOnFailure is given.
+
+      The exit code is published through a script-scoped variable rather than
+      RETURNED because `& $FilePath @ArgumentList` writes the child's stdout to
+      the PIPELINE: a `return $code` would hand the caller an array of the
+      child's output with the code tacked on the end, and `$exit -ne 0` would
+      then be comparing a JSON blob. The child's output must keep flowing to the
+      console exactly as before.
+
+      This exists because a candidate that FAILS the host probe is a result, not
+      an accident. The runner used to throw on the first non-zero exit, which on
+      the first native Windows run meant the Python candidate's three failed
+      process assertions aborted the entire bake-off: go, rust and dotnet were
+      never built, never measured and never published, and the failure itself was
+      never recorded either. rubric-v1.json is explicit that "A failed gate is
+      committed evidence, not a low score" — evidence the runner could not
+      produce.
+    #>
+    param(
+        [Parameter(Mandatory)] [string] $FilePath,
+        [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]] $ArgumentList,
+        [string] $WorkingDirectory,
+        [switch] $ThrowOnFailure
+    )
     $previous = $null
     if (-not [string]::IsNullOrWhiteSpace($WorkingDirectory)) {
         $previous = (Get-Location).ProviderPath
@@ -503,8 +537,9 @@ function Invoke-Native {
     }
     try {
         & $FilePath @ArgumentList
-        if ($LASTEXITCODE -ne 0) {
-            throw "run-host.ps1: command failed (exit $LASTEXITCODE): $FilePath $($ArgumentList -join ' ')"
+        $script:LastNativeExit = $LASTEXITCODE
+        if ($ThrowOnFailure -and $script:LastNativeExit -ne 0) {
+            throw "run-host.ps1: command failed (exit $script:LastNativeExit): $FilePath $($ArgumentList -join ' ')"
         }
     } finally {
         if ($null -ne $previous) { Set-Location -LiteralPath $previous }
@@ -529,9 +564,17 @@ function Build-Candidate {
             Invoke-Native -FilePath 'uv' -ArgumentList @(
                 'sync', '--project', "$script:RuntimeDir/python", '--frozen', '--python', '3.14.6'
             ) -WorkingDirectory $RepoRoot
+            # --workpath alongside --distpath: PyInstaller's work dir defaults to
+            # <cwd>/build, and cwd here is the REPO ROOT, so without this the run
+            # leaves an untracked `build/` at the top of the repository. .gitignore
+            # already covers spikes/platform/runtime/python/build/ — the Linux runner
+            # never hit this because it reused a prebuilt onefile and never invoked
+            # PyInstaller at all. (Found on the first native Windows run.)
             Invoke-Native -FilePath 'uv' -ArgumentList @(
                 'run', '--project', "$script:RuntimeDir/python",
-                'pyinstaller', '--clean', '--distpath', "$script:RuntimeDir/python/dist",
+                'pyinstaller', '--clean',
+                '--distpath', "$script:RuntimeDir/python/dist",
+                '--workpath', "$script:RuntimeDir/python/build",
                 "$script:RuntimeDir/python/kinglet-host-probe.spec"
             ) -WorkingDirectory $RepoRoot
         }
@@ -645,26 +688,33 @@ function Invoke-CandidateCell {
     # (a) Run the packaged artifact with the toolchain dirs REMOVED from the child
     #     PATH (self-contained proof).
     Write-Log "${Candidate}: running packaged artifact with toolchain-stripped PATH"
+    #     A non-zero exit here means the candidate FAILED assertions, which is a
+    #     result to record — not a reason to abandon the other candidates.
     $savedPath = $env:PATH
     try {
         $env:PATH = $RunPath
-        Invoke-Native -FilePath (Resolve-Path -LiteralPath $exe).ProviderPath -ArgumentList @(
+        Invoke-NativeAllowFailure -FilePath (Resolve-Path -LiteralPath $exe).ProviderPath -ArgumentList @(
             'run',
             '--contract', (Join-Path -Path $RepoRoot -ChildPath "$script:ContractDir/host-probe-v1.json"),
             '--workspace', (Join-Path -Path $RepoRoot -ChildPath $workspace),
             '--result', (Join-Path -Path $RepoRoot -ChildPath $resultFile)
         )
+        $probeExit = $script:LastNativeExit
 
         # (b) Independent black-box conformance verification (18/18), also with a
         #     toolchain-stripped PATH.
         Write-Log "${Candidate}: black-box conformance (runtime_contract)"
-        Invoke-Native -FilePath $PythonCommand -ArgumentList @(
+        Invoke-NativeAllowFailure -FilePath $PythonCommand -ArgumentList @(
             '-m', 'tools.kinglet_spike.runtime_contract',
             '--executable', $exe,
             '--contract-dir', $script:ContractDir
         )
+        $conformanceExit = $script:LastNativeExit
     } finally {
         $env:PATH = $savedPath
+    }
+    if ($probeExit -ne 0 -or $conformanceExit -ne 0) {
+        Write-Log "${Candidate}: FAILED the host probe (probe exit=$probeExit; conformance exit=$conformanceExit) — recording the failure"
     }
 
     if (-not (Test-Path -LiteralPath $resultFile -PathType Leaf)) {
@@ -719,12 +769,28 @@ function Invoke-CandidateCell {
         '--out', $recordFile
     )
 
+    # (d2) Cross-check: build-record.py derives the record status from the probe's
+    #      own assertions, and runtime_contract verifies the same artifact
+    #      independently. If those two disagree, one of them is wrong and neither
+    #      answer may be published — this is the "I could not tell" branch.
+    $recordStatus = [string]((Get-Content -LiteralPath $recordFile -Raw | ConvertFrom-Json).status)
+    $expectedStatus = if ($conformanceExit -eq 0) { 'pass' } else { 'fail' }
+    if ($recordStatus -ne $expectedStatus) {
+        throw ("run-host.ps1: {0}: record status '{1}' contradicts the independent conformance run " +
+               "(exit {2} => '{3}'); refusing to publish either answer" -f
+               $Candidate, $recordStatus, $conformanceExit, $expectedStatus)
+    }
+
     # (e) Publish.
     Write-Log "${Candidate}: publishing"
     Invoke-Native -FilePath $PythonCommand -ArgumentList @(
         '-m', 'tools.kinglet_spike', 'publish', $recordFile, '--repo-root', '.'
     )
-    Write-Log "${Candidate}: published OK"
+    Write-Log "${Candidate}: published (status=$recordStatus)"
+    # Reported through a script-scoped map, not a return value: this function's
+    # native calls write the child's stdout to the pipeline, so a `return` would
+    # come back as an array of that output.
+    $script:CellStatus[$Candidate] = $recordStatus
 }
 
 # ---------------------------------------------------------------------------
@@ -769,17 +835,60 @@ function Invoke-RunHost {
     $pythonCommand = Resolve-PythonCommand
     $stamp = [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssZ')
 
+    $script:CellStatus = @{}
+    $aborted = @{}
+
     foreach ($candidate in $script:Candidates) {
-        Invoke-CandidateCell -Candidate $candidate -HostEnvironment $hostEnvironment `
-            -Stamp $stamp -RepoRoot $repoRoot -RunPath $runPath `
-            -PythonCommand $pythonCommand -DryRun:$DryRun
+        # A candidate that fails its ASSERTIONS is published as a fail record by
+        # Invoke-CandidateCell. This catch is for the other kind: a build that
+        # does not produce a distributable, a probe that writes no result.json,
+        # a contradiction between the record and the conformance run. Those
+        # produce no record — but they still must not cost the remaining
+        # candidates their cells, because a bake-off that stops at the first
+        # problem can never compare four runtimes on a host where one is broken.
+        try {
+            Invoke-CandidateCell -Candidate $candidate -HostEnvironment $hostEnvironment `
+                -Stamp $stamp -RepoRoot $repoRoot -RunPath $runPath `
+                -PythonCommand $pythonCommand -DryRun:$DryRun
+        } catch {
+            $aborted[$candidate] = $_.Exception.Message
+            Write-Log "${candidate}: ABORTED (no record published): $($_.Exception.Message)"
+        }
     }
 
     if ($DryRun) {
         Write-Log 'dry-run complete; nothing published'
-    } else {
-        Write-Log 'all four candidates published'
+        return
     }
+
+    Write-Log '--- summary ---'
+    foreach ($candidate in $script:Candidates) {
+        if ($aborted.ContainsKey($candidate)) {
+            Write-Log ("  {0,-6} ABORTED — no record" -f $candidate)
+        } elseif ($script:CellStatus.ContainsKey($candidate)) {
+            Write-Log ("  {0,-6} published status={1}" -f $candidate, $script:CellStatus[$candidate])
+        } else {
+            Write-Log ("  {0,-6} NOT RUN" -f $candidate)
+        }
+    }
+
+    $failed = @($script:Candidates | Where-Object { $script:CellStatus[$_] -eq 'fail' })
+    $missing = @($script:Candidates | Where-Object {
+        -not $script:CellStatus.ContainsKey($_) -or $aborted.ContainsKey($_)
+    })
+
+    # A published FAIL is a successful run of the harness — the evidence exists.
+    # The pass still exits non-zero so no caller mistakes it for a clean sweep,
+    # but the distinction is stated rather than collapsed into "something broke".
+    if ($missing.Count -gt 0) {
+        throw ("run-host.ps1: {0} candidate(s) produced no record: {1}" -f
+            $missing.Count, ($missing -join ', '))
+    }
+    if ($failed.Count -gt 0) {
+        throw ("run-host.ps1: all four candidates recorded, but {0} FAILED the host probe: {1}" -f
+            $failed.Count, ($failed -join ', '))
+    }
+    Write-Log 'all four candidates published, all pass'
 }
 
 if ($LibraryOnly) { return }

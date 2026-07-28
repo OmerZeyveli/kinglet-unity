@@ -1,3 +1,24 @@
 # Tüm metni normalize et; shell script'leri LF tut (Linux/WSL/macOS'ta çalışsın)
 * text=auto
 *.sh text eol=lf
+
+# Platform-spike evidence: the BYTES are the evidence.
+#
+# Every record carries artifacts[].sha256 over the artifact's exact bytes. With
+# `* text=auto` and core.autocrlf=true, a Windows checkout rewrote all of these
+# to CRLF, so not one recorded digest matched any more. Measured on the native
+# Windows 0R pass (2026-07-28): the Linux go record's artifact hashed to
+# 292f7b63… on disk against a recorded e080b332…, and normalising CRLF back to
+# LF reproduced e080b332… exactly.
+#
+# The damage was silent and worse than a failed check: `report` reclassified
+# every previously passing Linux runtime and unity cell as `invalid` and
+# rewrote the committed coverage report to say so. A hashed file must never be
+# EOL-translated, so these are marked -text (no conversion in either direction)
+# rather than eol=lf.
+#
+# Scoped to the two trees whose bytes are hashed, and NOT by extension: the
+# artifacts are .json, .txt and .jsonl, and a `*.json` rule silently left the
+# client cells broken while making the runtime cells look fixed.
+docs/research/platform-spike/artifacts/** -text
+docs/research/platform-spike/evidence/**  -text

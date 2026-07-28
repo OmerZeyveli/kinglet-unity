@@ -492,6 +492,121 @@ class BuildRecordEnvironmentBehaviourTests(unittest.TestCase):
         self.assertEqual(record["environment"]["release"], "11-25H2")
 
 
+class BuildRecordFailureStatusTests(unittest.TestCase):
+    """A failing cell must be RECORDABLE, and a passing one must stay pass.
+
+    build-record.py hardcoded `"status": "pass"` and exited non-zero on any
+    non-pass assertion, so the evidence pipeline could only ever describe
+    success — while rubric-v1.json treats a failed gate as committed evidence
+    and load.py's RECORD_STATUSES has always accepted "fail". The gap surfaced
+    on the first native Windows run, where the Python candidate fails three
+    process assertions because `os.killpg` does not exist on Windows.
+
+    These are behavioural, not text: each one executes build-record.py and reads
+    the record it wrote. Re-hardcoding the literal makes the first test fail;
+    dropping the contradiction guard makes the third fail.
+    """
+
+    _ASSERTIONS = BuildRecordEnvironmentBehaviourTests._ASSERTIONS
+
+    def _run(self, tmp: Path, statuses: dict[str, str], *,
+             claimed: str | None = None,
+             errors: list[str] | None = None) -> subprocess.CompletedProcess:
+        payload: dict = {
+            "schema": "kinglet.host-probe.result/v1",
+            "assertions": [
+                {"id": a, "status": statuses.get(a, "pass")} for a in self._ASSERTIONS
+            ],
+        }
+        if claimed is not None:
+            payload["status"] = claimed
+        if errors is not None:
+            payload["errors"] = errors
+        result = tmp / "result.json"
+        result.write_text(json.dumps(payload), encoding="utf-8")
+        self._out = tmp / "record.json"
+        argv = [
+            "python3", str(_RUNTIME_DIR / "build-record.py"),
+            "--candidate", "python",
+            "--version", "3.14.6",
+            "--run-id", "20260728T000000Z-runtime-python-test-01",
+            "--started-at", "2026-07-28T00:00:00Z",
+            "--ended-at", "2026-07-28T00:00:01Z",
+            "--artifact-rel", "artifacts/runtime/python/x/result.json",
+            "--result-file", str(result),
+            "--measure-json", json.dumps({
+                "cold_start_ms": [1] * 30, "peak_rss_kb": 2048,
+                "artifact_bytes": 100, "dependency_count": 12,
+            }),
+            "--os", "windows", "--release", "10-22H2", "--arch", "x64",
+            "--host-line", "host=test", "--kernel-line", "kernel=test",
+            "--toolchain-data", "python=3.14.6",
+            "--sources-data", "Python|https://python.org/",
+            "--command-data", "measure.ps1",
+            "--out", str(self._out),
+        ]
+        return subprocess.run(argv, capture_output=True, text=True, check=False)
+
+    def test_an_all_pass_result_still_records_pass(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            completed = self._run(Path(tmpdir), {})
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            record = json.loads(self._out.read_text(encoding="utf-8"))
+        self.assertEqual(record["status"], "pass")
+        self.assertTrue(all(a["status"] == "pass" for a in record["assertions"]))
+
+    def test_a_failing_assertion_produces_a_fail_record(self):
+        # The exact Windows shape: three process assertions fail on os.killpg.
+        failing = {
+            "process.child-grandchild": "fail",
+            "process.cancel": "fail",
+            "process.no-descendants": "fail",
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            completed = self._run(
+                Path(tmpdir), failing, claimed="fail",
+                errors=["process: module 'os' has no attribute 'killpg'"],
+            )
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            record = json.loads(self._out.read_text(encoding="utf-8"))
+
+        self.assertEqual(record["status"], "fail")
+        by_id = {a["id"]: a for a in record["assertions"]}
+        # All eighteen are still present — a failure is not a truncated record.
+        self.assertEqual(len(record["assertions"]), len(self._ASSERTIONS))
+        for a_id in failing:
+            self.assertEqual(by_id[a_id]["status"], "fail", a_id)
+            # The diagnosis must survive into the committed record.
+            self.assertIn("killpg", by_id[a_id]["detail"], a_id)
+        self.assertEqual(by_id["crypto.sha256"]["status"], "pass")
+        self.assertNotIn("killpg", by_id["crypto.sha256"]["detail"])
+
+    def test_a_probe_contradicting_its_own_assertions_is_refused(self):
+        # Claims pass, reports a failed assertion: no record at all.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            completed = self._run(
+                Path(tmpdir), {"process.cancel": "fail"}, claimed="pass",
+            )
+            self.assertNotEqual(completed.returncode, 0, completed.stdout)
+            self.assertIn("but its assertions say", completed.stderr)
+            self.assertFalse(self._out.exists(), "a contradictory probe wrote a record")
+
+    def test_the_reverse_contradiction_is_also_refused(self):
+        # Claims fail, reports all pass. Same refusal — the guard is not one-sided.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            completed = self._run(Path(tmpdir), {}, claimed="fail")
+            self.assertNotEqual(completed.returncode, 0, completed.stdout)
+            self.assertFalse(self._out.exists())
+
+    def test_an_unusable_assertion_status_is_refused_not_coerced(self):
+        # "skipped" is neither pass nor fail — it must not silently become either.
+        with tempfile.TemporaryDirectory() as tmpdir:
+            completed = self._run(Path(tmpdir), {"lease.renew": "skipped"})
+            self.assertNotEqual(completed.returncode, 0, completed.stdout)
+            self.assertIn("unusable assertion status", completed.stderr)
+            self.assertFalse(self._out.exists())
+
+
 # ==========================================================================
 # macOS support in the POSIX runner — source text
 # ==========================================================================
@@ -1536,6 +1651,11 @@ class WindowsRunnerEntryPointTests(unittest.TestCase):
     host is precisely what the runner must refuse.
     """
 
+    @unittest.skipIf(
+        os.name == "nt",
+        "asserts the NON-Windows refusal; on Windows the live gate correctly "
+        "accepts — see test_the_production_entry_point_accepts_the_live_windows_host",
+    )
     def test_the_production_entry_point_gates_the_live_host(self):
         # run-host.ps1 executed as a SCRIPT, with no injection: the bottom-of-file
         # call must reach Resolve-HostEnvironment against the LIVE host, which on
@@ -1568,6 +1688,41 @@ class WindowsRunnerEntryPointTests(unittest.TestCase):
                 forbidden, combined,
                 f"refused host still produced runner output ({forbidden!r}): {combined}",
             )
+
+    @unittest.skipUnless(
+        os.name == "nt",
+        "the live-host ACCEPT path is only observable on a native Windows host",
+    )
+    def test_the_production_entry_point_accepts_the_live_windows_host(self):
+        # The mirror image of the refusal test above, and the half that could not
+        # exist while this suite only ever ran on Linux: on a locked Windows host
+        # the un-injected entry point must reach Resolve-HostEnvironment against
+        # the LIVE host and ACCEPT it, then plan all four candidates.
+        #
+        # Refusal alone is not proof the gate works — a gate that refuses
+        # everything passes the Linux test and would still make the Windows pass
+        # impossible. This is the positive direction of the same invariant.
+        result = _run_pwsh_file([str(_RUNTIME_DIR / "run-host.ps1"), "-DryRun"])
+        combined = result.stdout + result.stderr
+        self.assertEqual(
+            result.returncode, 0,
+            f"a locked Windows host must be ACCEPTED, not refused: {combined}",
+        )
+        # The gate must have been REACHED and passed — not bypassed. The accept
+        # line carries facts read from the live host, so it cannot be produced by
+        # a runner that skipped Resolve-HostEnvironment.
+        self.assertIn("host accepted:", combined, combined)
+        self.assertRegex(
+            combined,
+            r"host accepted: Microsoft Windows (10|11)[^\n]*"
+            r"release=(10|11)-[0-9A-Za-z]+; arch=(x64|arm64); rid=win-(x64|arm64)",
+            f"the accept line must carry live-host facts: {combined}",
+        )
+        # All four candidate cells planned, and nothing published on a dry run.
+        for candidate in ("python", "go", "rust", "dotnet"):
+            self.assertIn(f"DRY-RUN {candidate}:", combined, combined)
+        self.assertIn("dry-run complete; nothing published", combined, combined)
+        self.assertNotIn("published OK", combined, combined)
 
     def test_the_entry_point_refuses_an_injected_non_locked_host(self):
         # The gate's call site, not the gate: Invoke-RunHost must propagate the

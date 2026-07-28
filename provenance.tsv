@@ -555,3 +555,11 @@ tools/kinglet_spike/unity/results.py	original	-	-	-	original	kinglet-00u-task8-u
 spikes/platform/unity/sweep-workspace.sh	original	-	-	-	original	kinglet-00u-task8-scoped-orphan-sweep
 docs/research/platform-spike/HOST-PASS-HANDOFF.md	original	-	-	-	original	native-host-pass-handoff-for-windows-macos-runner
 docs/research/platform-spike/MEASURED-UNITY-FACTS.md	original	-	-	-	original	measured-unity-batchmode-behaviour-reference
+docs/research/platform-spike/evidence/runtime/python/20260728T170051Z-runtime-python-windows-10-22h2-x64-01.json	original	-	-	-	original	kinglet-0r-windows-python-w10-22h2-evidence-record
+docs/research/platform-spike/artifacts/runtime/python/20260728T170051Z-runtime-python-windows-10-22h2-x64-01/result.json	original	-	-	-	original	kinglet-0r-windows-python-w10-22h2-host-probe-result
+docs/research/platform-spike/evidence/runtime/go/20260728T170051Z-runtime-go-windows-10-22h2-x64-01.json	original	-	-	-	original	kinglet-0r-windows-go-w10-22h2-evidence-record
+docs/research/platform-spike/artifacts/runtime/go/20260728T170051Z-runtime-go-windows-10-22h2-x64-01/result.json	original	-	-	-	original	kinglet-0r-windows-go-w10-22h2-host-probe-result
+docs/research/platform-spike/evidence/runtime/rust/20260728T170051Z-runtime-rust-windows-10-22h2-x64-01.json	original	-	-	-	original	kinglet-0r-windows-rust-w10-22h2-evidence-record
+docs/research/platform-spike/artifacts/runtime/rust/20260728T170051Z-runtime-rust-windows-10-22h2-x64-01/result.json	original	-	-	-	original	kinglet-0r-windows-rust-w10-22h2-host-probe-result
+docs/research/platform-spike/evidence/runtime/dotnet/20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01.json	original	-	-	-	original	kinglet-0r-windows-dotnet-w10-22h2-evidence-record
+docs/research/platform-spike/artifacts/runtime/dotnet/20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01/result.json	original	-	-	-	original	kinglet-0r-windows-dotnet-w10-22h2-host-probe-result

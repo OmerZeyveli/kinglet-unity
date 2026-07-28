@@ -1,0 +1,87 @@
+{
+  "schema": "kinglet.host-probe.result/v1",
+  "candidate": {
+    "id": "python-bundled",
+    "version": "3.14.6-pyinstaller6.21.0"
+  },
+  "status": "fail",
+  "errors": [
+    "process: module 'os' has no attribute 'killpg'"
+  ],
+  "assertions": [
+    {
+      "id": "manifest.accept-valid",
+      "status": "pass"
+    },
+    {
+      "id": "manifest.reject-unknown",
+      "status": "pass"
+    },
+    {
+      "id": "path.unicode-space",
+      "status": "pass"
+    },
+    {
+      "id": "filesystem.atomic-replace",
+      "status": "pass"
+    },
+    {
+      "id": "lease.acquire",
+      "status": "pass"
+    },
+    {
+      "id": "lease.renew",
+      "status": "pass"
+    },
+    {
+      "id": "lease.reject-competitor",
+      "status": "pass"
+    },
+    {
+      "id": "lease.expire",
+      "status": "pass"
+    },
+    {
+      "id": "lease.release",
+      "status": "pass"
+    },
+    {
+      "id": "process.child-grandchild",
+      "status": "fail"
+    },
+    {
+      "id": "process.cancel",
+      "status": "fail"
+    },
+    {
+      "id": "process.no-descendants",
+      "status": "fail"
+    },
+    {
+      "id": "crypto.sha256",
+      "status": "pass"
+    },
+    {
+      "id": "crypto.ed25519",
+      "status": "pass"
+    },
+    {
+      "id": "cleanup.success",
+      "status": "pass"
+    },
+    {
+      "id": "cleanup.crash",
+      "status": "pass"
+    },
+    {
+      "id": "cleanup.timeout",
+      "status": "pass"
+    },
+    {
+      "id": "cleanup.cancel",
+      "status": "pass"
+    }
+  ],
+  "descendant_pids": [],
+  "active_lease": false
+}
