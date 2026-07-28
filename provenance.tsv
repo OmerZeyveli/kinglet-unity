@@ -479,3 +479,9 @@ spikes/platform/clients/codex/observations-linux.json	original	-	-	-	original	cl
 docs/research/platform-spike/artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/invocations.json	original	-	-	-	original	kinglet-0c-codex-linux-local-executable-artifact-invocations-json
 docs/research/platform-spike/artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/invocations.json	original	-	-	-	original	kinglet-0c-codex-linux-mcp-discovery-artifact-invocations-json
 docs/research/platform-spike/artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/invocations.json	original	-	-	-	original	kinglet-0c-codex-linux-path-semantics-artifact-invocations-json
+spikes/platform/unity/contracts/routes-v1.json	original	-	-	-	original	kinglet-00u-task1-unity-route-receipt-contract
+tools/kinglet_spike/unity/__init__.py	original	-	-	-	original	kinglet-00u-task1-unity-receipt-package-init
+tools/kinglet_spike/unity/model.py	original	-	-	-	original	kinglet-00u-task1-unity-receipt-types
+tools/kinglet_spike/unity/receipt.py	original	-	-	-	original	kinglet-00u-task1-unity-receipt-parse-validate-convert
+tests/kinglet_spike/unity_support.py	original	-	-	-	original	kinglet-00u-task1-unity-receipt-test-fixtures
+tests/kinglet_spike/test_unity_receipt.py	original	-	-	-	original	kinglet-00u-task1-unity-receipt-tests
