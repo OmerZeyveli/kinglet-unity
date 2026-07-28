@@ -1,0 +1,9 @@
+Assets/KingletSpike/Editor/Broken.cs(1,102): error CS1002: ; expected
+Assets/KingletSpike/Editor/Broken.cs(1,102): error CS1002: ; expected
+Assets/KingletSpike/Editor/Broken.cs(1,102): error CS1002: ; expected
+Scripts have compiler errors.
+--- captured stdout ---
+
+Aborting batchmode due to failure:
+Scripts have compiler errors.
+
