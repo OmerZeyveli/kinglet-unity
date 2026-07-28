@@ -426,7 +426,7 @@ docs/research/platform-spike/evidence/client/claude-code/20260727T095800Z-client
 tests/kinglet_spike/test_coverage_pin.py	original	-	-	-	original	committed-coverage-cell-state-and-report-drift-pin
 spikes/platform/clients/codex/.codex-plugin/plugin.json	original	-	-	-	original	client-probe-codex-plugin-manifest
 spikes/platform/clients/codex/.agents/plugins/marketplace.json	original	-	-	-	original	client-probe-codex-local-marketplace-entry
-spikes/platform/clients/codex/hooks/hooks.json	original	-	-	-	original	client-probe-codex-pretooluse-hook-config
+spikes/platform/clients/codex/hooks.json	original	-	-	-	original	client-probe-codex-pretooluse-hook-config
 spikes/platform/clients/codex/hooks/pre-mutation-hook.sh	original	-	-	-	original	client-probe-codex-deny-translation-wrapper
 spikes/platform/clients/codex/.mcp.json	original	-	-	-	original	client-probe-codex-local-mcp-server-config
 spikes/platform/clients/codex/runbook.md	original	-	-	-	original	client-probe-codex-live-pass-runbook

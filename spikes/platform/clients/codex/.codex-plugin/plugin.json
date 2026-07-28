@@ -6,6 +6,17 @@
     "name": "kinglet"
   },
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.json",
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Kinglet Client Probe",
+    "shortDescription": "Disposable client-capability probe overlay",
+    "longDescription": "Exercises skill invocation, sub-agent delegation, PreToolUse hook blocking, and local stdio MCP against a disposable Unity-shaped project, for the 00C client-capability spike. Not for production use.",
+    "developerName": "kinglet",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "defaultPrompt": [
+      "Use the installed Kinglet capability workflow to inspect the Unity version.",
+      "Ask the installed Kinglet capability reviewer to check the project marker."
+    ]
+  }
 }

@@ -3,7 +3,8 @@
     "kinglet-client-probe": {
       "command": "./bin/kinglet-client-probe",
       "args": ["mcp"],
-      "cwd": "."
+      "cwd": ".",
+      "default_tools_approval_mode": "prompt"
     }
   }
 }

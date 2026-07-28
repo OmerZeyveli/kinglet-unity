@@ -6,22 +6,30 @@ marketplace add` / `codex plugin add` — that is the later live dispatch's
 job, not this test suite's). They confirm:
 
   - .codex-plugin/plugin.json: name, version, description, skills: "./skills/",
-    mcpServers: "./.mcp.json", hooks: "./hooks/hooks.json", and that every
-    path-shaped field is relative and begins with "./" (codex-cli's own
+    mcpServers: "./.mcp.json", a full required `interface` block, NO `hooks`
+    field (codex-cli's own bundled `validate_plugin.py` rejects that key
+    outright — see PluginJsonTests docstring), and that every path-shaped
+    field is relative and begins with "./" (codex-cli's own
     plugin-json-spec.md: "Path values should be relative and begin with ./").
   - .agents/plugins/marketplace.json: one local plugin entry whose
     source.path begins with "./" (Codex's real marketplace schema nests
     source under {source, path}, unlike Claude Code's flat "source" string —
     see PluginJsonTests docstring for how this was established).
-  - hooks/hooks.json: wrapper "hooks" key, PreToolUse event, Write|Edit
-    matcher, command invokes kinglet-client-probe hook subcommand via the
-    wrapper script (not the binary directly), relative path (no fabricated
-    ${PLUGIN_ROOT} token — see runbook.md "Open question 1").
+  - hooks.json (plugin ROOT, auto-discovered — not hooks/hooks.json; moved
+    there in fix round 1 because the manifest field the earlier draft
+    declared is rejected by codex-cli's own validator): wrapper "hooks" key,
+    PreToolUse event, Write|Edit matcher, command invokes
+    kinglet-client-probe hook subcommand via the wrapper script (not the
+    binary directly), relative path (no fabricated ${PLUGIN_ROOT} token —
+    see runbook.md "Open question 1").
   - .mcp.json: "mcpServers" wrapper key (Codex's real schema, unlike Claude
-    Code's flat file), relative command path, "mcp" subcommand present.
+    Code's flat file), relative command path, "mcp" subcommand present,
+    `default_tools_approval_mode: "prompt"` on the server entry (the brief's
+    explicit MCP approval-policy requirement).
   - runbook.md: CLI install/uninstall commands, twelve case IDs, four prompt
     texts, PreToolUse exit-2 deny note, build-time copy instruction, the
-    ${PLUGIN_ROOT} and `codex plugin update` open questions.
+    ${PLUGIN_ROOT} open question, and the documented (not guessed)
+    cachebuster update mechanism.
   - hook wrapper shell script: strict mode, reads stdin, calls probe hook
     subcommand, parses decision field, exits 2 on deny, exits 0 on allow,
     no absolute user paths, no bash 4 constructs, no GNU-only flags.
@@ -38,9 +46,17 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _PKG = _REPO_ROOT / "spikes" / "platform" / "clients" / "codex"
 
 # ---------------------------------------------------------------------------
-# Read files at import time so every test class gets the same bytes and
-# missing files surface as a clean AttributeError rather than a per-test
-# FileNotFoundError that hides which file is absent.
+# Read files at import time so every test class gets the same bytes.
+#
+# If any of these files is missing, `_read` raises FileNotFoundError
+# immediately at MODULE IMPORT time (not per-test). unittest then reports
+# the whole module as a single collection error rather than 66 individual
+# failures — but that error's traceback names the exact missing path (it is
+# `_read`'s own `(_PKG / rel)` argument), so the missing file is still
+# identifiable, just via one failure instead of many. This is a deliberate
+# trade — Step 2 of the brief ("run tests and verify missing manifests")
+# exercised exactly this collection-error shape when the package did not
+# exist yet, and it named the first missing file in its traceback.
 # ---------------------------------------------------------------------------
 def _read(rel: str) -> str:
     return (_PKG / rel).read_text(encoding="utf-8")
@@ -48,7 +64,7 @@ def _read(rel: str) -> str:
 
 PLUGIN_JSON_TEXT = _read(".codex-plugin/plugin.json")
 MARKETPLACE_JSON_TEXT = _read(".agents/plugins/marketplace.json")
-HOOKS_JSON_TEXT = _read("hooks/hooks.json")
+HOOKS_JSON_TEXT = _read("hooks.json")
 MCP_JSON_TEXT = _read(".mcp.json")
 RUNBOOK_TEXT = _read("runbook.md")
 HOOK_WRAPPER_TEXT = _read("hooks/pre-mutation-hook.sh")
@@ -67,11 +83,22 @@ class PluginJsonTests(unittest.TestCase):
     """Asserts on .codex-plugin/plugin.json.
 
     codex-cli 0.145.0 ships its own plugin-creator skill with a field guide
-    (`plugin-json-spec.md`) documenting this exact shape: name, version,
-    description, skills/hooks/mcpServers as relative path strings beginning
-    with "./". That guide was read directly off the tested build's own
-    config directory, not inferred from Claude Code's schema — the plan's
-    architecture rule is that no shared manifest format grants Codex a pass.
+    (`plugin-json-spec.md`) documenting this shape, AND a bundled validator
+    script (`~/.codex/skills/.system/plugin-creator/scripts/
+    validate_plugin.py`) that enforces it. That validator's `allowed_keys`
+    set for the top-level manifest is exactly: id, name, version,
+    description, skills, apps, mcpServers, interface, author, homepage,
+    repository, license, keywords — `hooks` is NOT in that set, and
+    `validate_manifest_shape` rejects any key outside it with
+    "plugin.json field `<key>` is not accepted by plugin validation". It
+    also requires a full `interface` object (displayName, shortDescription,
+    longDescription, developerName, category, capabilities, and either
+    defaultPrompt or default_prompt), rejected in fix round 1 with
+    "plugin.json field `interface` must be an object" when that block was
+    absent. Round 1 ran `validate_plugin.py` against the committed package
+    directly (see the fix report in task-5-report.md for the transcript) —
+    this is not inferred from Claude Code's schema, and no shared manifest
+    format grants Codex a pass.
     """
 
     def test_name_is_kinglet_client_probe(self):
@@ -82,9 +109,13 @@ class PluginJsonTests(unittest.TestCase):
         cross-client comparability of the version-update case)."""
         self.assertEqual(PLUGIN_JSON.get("version"), "0.0.1")
 
-    def test_description_is_present_and_non_empty(self):
+    def test_description_matches_the_committed_manifest_text(self):
+        """description must be the actual committed sentence, not a
+        placeholder — bound to real content rather than a bare length check,
+        so a one-character stub can no longer satisfy this test."""
         desc = PLUGIN_JSON.get("description", "")
-        self.assertGreater(len(desc), 0, "description must not be empty")
+        self.assertIn("Kinglet client-probe overlay for Codex", desc)
+        self.assertIn("PreToolUse hook blocking", desc)
 
     def test_skills_path_is_dot_skills_dir(self):
         """plugin.json must declare skills: './skills/' per codex-cli's own spec."""
@@ -94,19 +125,26 @@ class PluginJsonTests(unittest.TestCase):
         """plugin.json must reference MCP via the relative path ./.mcp.json."""
         self.assertEqual(PLUGIN_JSON.get("mcpServers"), "./.mcp.json")
 
-    def test_hooks_path_is_hooks_hooks_json(self):
-        """plugin.json must declare hooks: './hooks/hooks.json'.
+    def test_manifest_does_not_declare_a_hooks_field(self):
+        """plugin.json must NOT carry a 'hooks' key.
 
-        This is a custom (non-default) hooks path. Real installed Codex
-        plugins observed on the probe host that ship a top-level hooks.json
-        (e.g. figma) do NOT declare a 'hooks' field at all — auto-discovery
-        picks up a root-level hooks.json. Nesting under hooks/ is a
-        deliberate, explicit declaration so there is no ambiguity about
-        which file is loaded, and no collision with any auto-discovered
-        default (which — unlike Claude Code's hooks/hooks.json default —
-        would be a flat ./hooks.json, a different path).
+        codex-cli's own bundled validator (`validate_plugin.py`) does not
+        accept `hooks` as a top-level manifest field at all — declaring it
+        fails validation outright ("plugin.json field `hooks` is not
+        accepted by plugin validation"), confirmed by running the validator
+        against an earlier draft of this manifest in fix round 1. Real
+        installed plugins observed on the probe host that ship a top-level
+        hooks.json (e.g. figma) do NOT declare a 'hooks' field either —
+        auto-discovery picks up the plugin-root hooks.json with no manifest
+        reference at all, which is why the committed hooks.json lives at
+        the plugin root, not nested under hooks/.
         """
-        self.assertEqual(PLUGIN_JSON.get("hooks"), "./hooks/hooks.json")
+        self.assertNotIn(
+            "hooks", PLUGIN_JSON,
+            "plugin.json must not declare 'hooks' — codex-cli's own "
+            "validate_plugin.py rejects that key, and hooks.json at the "
+            "plugin root is auto-discovered without one"
+        )
 
     def test_all_path_shaped_fields_are_relative_and_begin_with_dot_slash(self):
         """Every path-shaped manifest field must start with './'.
@@ -116,7 +154,7 @@ class PluginJsonTests(unittest.TestCase):
         confirm this rule is enforced at runtime: '<path> must start with
         `./` relative to plugin root'.
         """
-        for field in ("skills", "hooks", "mcpServers"):
+        for field in ("skills", "mcpServers"):
             value = PLUGIN_JSON.get(field)
             self.assertIsNotNone(value, f"plugin.json must declare '{field}'")
             self.assertTrue(
@@ -125,11 +163,67 @@ class PluginJsonTests(unittest.TestCase):
                 f"'./'; got {value!r}"
             )
 
+    def test_interface_block_has_all_required_fields(self):
+        """codex-cli's validate_plugin.py requires interface.{displayName,
+        shortDescription, longDescription, developerName, category} as
+        non-empty strings, interface.capabilities as a non-empty array of
+        strings, and either defaultPrompt or default_prompt present."""
+        interface = PLUGIN_JSON.get("interface")
+        self.assertIsInstance(interface, dict, "plugin.json field 'interface' must be an object")
+        for field in ("displayName", "shortDescription", "longDescription",
+                      "developerName", "category"):
+            value = interface.get(field)
+            self.assertIsInstance(value, str, f"interface.{field} must be a string")
+            self.assertGreater(len(value.strip()), 0, f"interface.{field} must be non-empty")
+        capabilities = interface.get("capabilities")
+        self.assertIsInstance(capabilities, list)
+        self.assertGreater(len(capabilities), 0)
+        self.assertTrue(all(isinstance(c, str) and c.strip() for c in capabilities))
+        self.assertTrue(
+            "defaultPrompt" in interface or "default_prompt" in interface,
+            "interface must declare defaultPrompt or default_prompt"
+        )
+
     def test_no_absolute_paths_anywhere_in_manifest(self):
         """No field in plugin.json may contain an absolute filesystem path."""
         self.assertNotIn("/home/", PLUGIN_JSON_TEXT)
         self.assertNotIn("/Users/", PLUGIN_JSON_TEXT)
         self.assertIsNone(re.search(r'"[A-Za-z]:\\\\', PLUGIN_JSON_TEXT))
+
+
+@unittest.skipUnless(
+    (Path.home() / ".codex" / "skills" / ".system" / "plugin-creator"
+     / "scripts" / "validate_plugin.py").is_file(),
+    "codex-cli's bundled plugin-creator validator is not present on this host — skip",
+)
+class PluginValidatorTests(unittest.TestCase):
+    """Gate: codex-cli's OWN bundled `validate_plugin.py` must pass against
+    the committed package.
+
+    There is no `codex plugin validate` CLI subcommand. This script,
+    shipped inside codex-cli 0.145.0's own `plugin-creator` skill, is the
+    closest thing the tested build offers to a manifest-ingestion check, and
+    it independently confirmed the CRITICAL-1 finding from fix round 1
+    (plugin.json's `hooks` field and missing `interface` block). It never
+    calls the `codex` CLI itself, registers a marketplace, or touches a
+    config root, so it stays in scope for a headless dispatch.
+    """
+
+    def test_validate_plugin_passes(self):
+        import subprocess
+        script = str(
+            Path.home() / ".codex" / "skills" / ".system" / "plugin-creator"
+            / "scripts" / "validate_plugin.py"
+        )
+        result = subprocess.run(
+            ["python3", script, str(_PKG)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"validate_plugin.py failed:\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+        )
+        self.assertIn("Plugin validation passed", result.stdout)
 
 
 # ---------------------------------------------------------------------------
@@ -209,18 +303,32 @@ class MarketplaceJsonTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# hooks/hooks.json tests
+# hooks.json tests (plugin ROOT — see PluginJsonTests docstring for why)
 # ---------------------------------------------------------------------------
 
 class HooksJsonTests(unittest.TestCase):
-    """Asserts on hooks/hooks.json."""
+    """Asserts on the plugin-root hooks.json.
+
+    Moved from hooks/hooks.json to the plugin root in fix round 1: codex-cli's
+    own validate_plugin.py rejects a 'hooks' field in plugin.json, and the
+    real installed plugins observed on the probe host (figma) auto-discover
+    a root-level hooks.json with no manifest reference at all.
+    """
 
     def test_hooks_json_is_valid_json(self):
         self.assertIsInstance(HOOKS_JSON, dict)
 
+    def test_hooks_json_lives_at_plugin_root(self):
+        """hooks.json must be discoverable at the plugin root, not nested,
+        since plugin.json declares no 'hooks' field to point at it."""
+        self.assertTrue(
+            (_PKG / "hooks.json").is_file(),
+            "hooks.json must exist at the plugin root for auto-discovery"
+        )
+
     def test_has_top_level_hooks_key(self):
         self.assertIn("hooks", HOOKS_JSON,
-                      "hooks/hooks.json must have a top-level 'hooks' wrapper key")
+                      "hooks.json must have a top-level 'hooks' wrapper key")
 
     def test_pretooluse_event_is_present(self):
         """PreToolUse is a confirmed real codex-cli 0.145.0 hook event — its
@@ -278,10 +386,15 @@ class HooksJsonTests(unittest.TestCase):
         self.assertNotIn("kinglet-client-probe hook", cmd)
 
     def test_pretooluse_command_references_existing_hook_script(self):
+        """Regression guard: `cmd.lstrip("./")` strips a CHARACTER SET, not a
+        prefix — it would mangle a path like './.probe/x.sh' into
+        'probe/x.sh' and turn a real existence check into a confusing
+        false failure. Use a literal prefix strip instead."""
         entries = HOOKS_JSON.get("hooks", {}).get("PreToolUse", [])
         inner = entries[0].get("hooks", [])
         cmd = inner[0].get("command", "")
-        rel_path = cmd.lstrip("./")
+        self.assertTrue(cmd.startswith("./"), f"command must start with './'; got {cmd!r}")
+        rel_path = cmd[2:]
         self.assertTrue(rel_path.endswith(".sh"))
         script_file = _PKG / rel_path
         self.assertTrue(script_file.is_file(),
@@ -339,6 +452,23 @@ class McpJsonTests(unittest.TestCase):
         server = MCP_JSON.get("mcpServers", {}).get("kinglet-client-probe", {})
         self.assertEqual(server.get("cwd"), ".")
 
+    def test_default_tools_approval_mode_is_prompt(self):
+        """The brief's Interfaces line requires 'plugin-scoped MCP approval
+        policy' and Step 3 requires approval mode 'prompt', never 'approve'.
+        codex-cli 0.145.0's own RawMcpServerConfig struct (confirmed via
+        `strings` over the native binary) carries a
+        `default_tools_approval_mode` field per server entry, with value
+        alphabet prompt|writes|approve."""
+        server = MCP_JSON.get("mcpServers", {}).get("kinglet-client-probe", {})
+        self.assertEqual(server.get("default_tools_approval_mode"), "prompt")
+
+    def test_default_tools_approval_mode_is_never_approve(self):
+        """Belt-and-suspenders: assert the forbidden value is not merely
+        absent but explicitly not present anywhere in the server entry,
+        since 'approve' would auto-approve every tool call unattended."""
+        server = MCP_JSON.get("mcpServers", {}).get("kinglet-client-probe", {})
+        self.assertNotEqual(server.get("default_tools_approval_mode"), "approve")
+
 
 # ---------------------------------------------------------------------------
 # runbook.md tests
@@ -390,15 +520,23 @@ class RunbookTests(unittest.TestCase):
     def test_plugin_update_command_open_question_documented(self):
         """codex-cli 0.145.0 has no `codex plugin update` subcommand — this
         must be recorded so the live pass knows to observe, not assume."""
-        self.assertIn("no `update` command", RUNBOOK_TEXT)
+        self.assertIn("no `update` verb", RUNBOOK_TEXT)
 
     def test_build_step_copies_shared_skill_and_agent(self):
-        self.assertIn("skill", RUNBOOK_TEXT.lower())
-        self.assertIn("agent", RUNBOOK_TEXT.lower())
-        lower = RUNBOOK_TEXT.lower()
-        has_copy = "copy" in lower or " cp " in lower or "\ncp " in lower
-        self.assertTrue(has_copy,
-                        "runbook must include a copy instruction for the shared skill/agent")
+        """Bound to the actual `cp` invocations, not a bare substring match —
+        a runbook that merely mentions the words 'skill'/'agent'/'copy' in
+        prose would previously satisfy this test without giving an operator
+        anything runnable."""
+        self.assertIn(
+            "cp spikes/platform/clients/shared/skills/kinglet-capability-probe/SKILL.md",
+            RUNBOOK_TEXT,
+            "runbook must contain the literal cp command for the shared skill"
+        )
+        self.assertIn(
+            "cp spikes/platform/clients/shared/agents/kinglet-capability-reviewer.agent.md",
+            RUNBOOK_TEXT,
+            "runbook must contain the literal cp command for the shared agent"
+        )
 
     def test_all_twelve_case_ids_present(self):
         from tests.kinglet_spike.client_support import CASE_IDS
@@ -444,6 +582,34 @@ class RunbookTests(unittest.TestCase):
         self.assertIn("kinglet-client-probe@kinglet-client-probe", RUNBOOK_TEXT,
                       "install command must use the name@marketplace form")
 
+    def test_mcp_approval_mode_documented(self):
+        """The brief's Step 3 MCP approval-policy requirement must be
+        recorded in the runbook, not just in the manifest."""
+        self.assertIn("default_tools_approval_mode", RUNBOOK_TEXT)
+        self.assertIn("prompt", RUNBOOK_TEXT)
+        self.assertIn("Never `approve`", RUNBOOK_TEXT,
+                      "runbook must record 'prompt, never approve'")
+
+    def test_validate_plugin_py_documented(self):
+        """codex-cli 0.145.0 has no `codex plugin validate`, but it ships
+        `validate_plugin.py` inside its own plugin-creator skill — the
+        runbook must point the operator at it, since it is the closest
+        thing the tested build offers to a manifest correctness check."""
+        self.assertIn("validate_plugin.py", RUNBOOK_TEXT)
+        self.assertIn("codex plugin validate", RUNBOOK_TEXT)
+
+    def test_cachebuster_update_mechanism_documented(self):
+        """Fix round 1: the update step must use the documented cachebuster
+        loop (installing-and-updating.md), not a numeric version bump
+        presented as the only path."""
+        self.assertIn("cachebuster", RUNBOOK_TEXT.lower())
+        self.assertIn("update_plugin_cachebuster.py", RUNBOOK_TEXT)
+        self.assertIn(
+            "Do not keep incrementing numeric version components",
+            RUNBOOK_TEXT,
+            "runbook must cite the reference's own policy statement verbatim"
+        )
+
     def test_cli_not_gui_deviation_documented(self):
         """The human ruling — the CLI binds, not the Plugins Directory GUI —
         must be recorded in the runbook, mirroring how Claude Code's runbook
@@ -464,10 +630,12 @@ class HookWrapperTests(unittest.TestCase):
         self.assertIn("set -euo pipefail", HOOK_WRAPPER_TEXT)
 
     def test_reads_stdin_into_variable(self):
-        lower = HOOK_WRAPPER_TEXT.lower()
-        self.assertTrue(
-            "$(cat)" in HOOK_WRAPPER_TEXT or "read" in lower,
-            "wrapper must read stdin into a variable using $(cat) or read"
+        """Bound to the actual assignment, not a bare substring search for
+        'read' — that previously matched inside unrelated words like
+        'already', which would pass even if stdin capture were deleted."""
+        self.assertIn(
+            'TOOL_EVENT="$(cat)"', HOOK_WRAPPER_TEXT,
+            "wrapper must capture stdin into TOOL_EVENT via $(cat)"
         )
 
     def test_extracts_file_path_from_tool_input(self):

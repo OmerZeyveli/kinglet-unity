@@ -27,6 +27,69 @@ codex plugin add kinglet-client-probe@kinglet-client-probe
 codex plugin list
 ```
 
+## MCP approval mode — `prompt`, never `approve`
+
+The brief requires the probe MCP be enabled with approval mode `prompt`.
+codex-cli 0.145.0's own `RawMcpServerConfig` struct (confirmed via `strings`
+over the native binary) carries a `default_tools_approval_mode` field on
+each MCP server entry, alongside `enabled_tools`/`disabled_tools`. The
+binary's string table shows the value alphabet directly:
+`approval_mode` → `prompt` | `writes` | `approve`.
+
+The committed `.mcp.json` sets this explicitly on the `kinglet-client-probe`
+server entry:
+
+```json
+"default_tools_approval_mode": "prompt"
+```
+
+**Never `approve`** — this disposable profile runs an unattended, untrusted
+probe binary; `approve` would auto-approve every tool call without a human
+in the loop, which is exactly the safety control the plan's disposable-profile
+constraint exists to prevent. `writes` (approval only for write-shaped calls)
+was considered and rejected too: the brief names `prompt` specifically, and
+`prompt` is the only mode that gives an operator a chance to observe and
+record `approvals.mutation` at the MCP layer, not just at the hook layer.
+
+**Live pass action:** confirm that `codex plugin add` and `codex plugin
+list`/`--json` actually reflect this setting once installed, and that a real
+MCP tool call surfaces a prompt rather than auto-proceeding — this manifest
+field has not been exercised against a live session yet.
+
+## Validation — codex-cli's own bundled validator, not `codex plugin validate`
+
+There is no `codex plugin validate` subcommand (checked with `--help`; see
+below). codex-cli 0.145.0 does, however, ship a validator script inside its
+own `plugin-creator` skill (`~/.codex/skills/.system/plugin-creator/scripts/
+validate_plugin.py`) that "mirrors the workspace plugin ingestion schema" per
+that skill's own `plugin-json-spec.md`. This is the closest thing to a
+build-time correctness check the tested build offers, and it is authoritative
+about `plugin.json`'s accepted top-level fields — critically, it **rejects**
+a `hooks` field outright (`allowed_keys` does not include `hooks`) and
+**requires** a full `interface` object (`displayName`, `shortDescription`,
+`longDescription`, `developerName`, `category`, `capabilities`, and either
+`defaultPrompt` or `default_prompt`).
+
+This is why the committed `.codex-plugin/plugin.json` declares no `hooks`
+field at all — `hooks.json` lives at the **plugin root**
+(`spikes/platform/clients/codex/hooks.json`, not nested under `hooks/`),
+auto-discovered the same way `figma`'s real installed plugin's root-level
+`hooks.json` is, with no manifest reference. The wrapper script itself still
+lives at `hooks/pre-mutation-hook.sh`; only the hook **manifest** moved.
+
+Run this from the repo root to reproduce:
+
+```bash
+python3 ~/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py \
+  spikes/platform/clients/codex
+```
+
+Expected: `Plugin validation passed: <path>`. This dispatch ran it and pasted
+the real output — see the round-1 fix report appended to
+`task-5-report.md`. Re-run it any time the manifest changes; it is a static
+check with no side effects (it never calls `codex plugin add` and touches no
+config root).
+
 ## Open question 1 — no documented `${PLUGIN_ROOT}` token was found
 
 The brief asks to resolve the packaged executable with "Codex's documented
@@ -42,7 +105,7 @@ probe host:
 2. Every real installed/cached plugin's `hooks.json` and `.mcp.json` found in
    `~/.codex/.tmp/plugins/plugins/*` on the probe host uses a **bare relative
    path**, not a token — e.g. `"command": "./scripts/post_write_figma_parity_check.sh"`
-   (figma, replayio `hooks.json`) and `"command": "node", "args":
+   (figma, replayio root-level `hooks.json`) and `"command": "node", "args":
    ["./mcp/server.mjs"], "cwd": "."` (openai-developers `.mcp.json`).
 3. `strings` over the codex-cli native binary
    (`@openai/codex-linux-x64/.../bin/codex`) contains no `CODEX_PLUGIN_ROOT`
@@ -53,7 +116,7 @@ probe host:
    enterprise-policy interop concern with Claude Code, not a token Codex
    expands for its own plugins.
 
-**Conclusion for this dispatch:** the committed `hooks/hooks.json` and
+**Conclusion for this dispatch:** the committed root-level `hooks.json` and
 `.mcp.json` use bare relative paths (`./hooks/pre-mutation-hook.sh`,
 `./bin/kinglet-client-probe`), matching every real plugin observed on the
 probe host, instead of fabricating a token that no source confirms exists.
@@ -66,23 +129,50 @@ inside the installed plugin cache" implies) or the *disposable project*
 directory. `hooks/pre-mutation-hook.sh` self-locates via `${BASH_SOURCE[0]}`
 precisely because this was unconfirmed — record what actually happens.
 
-## Open question 2 — no `codex plugin update` subcommand exists
+## Update mechanism — documented, not guessed (corrected in fix round 1)
 
-Unlike `claude plugin update`, codex-cli 0.145.0's `plugin` subcommand tree
-has **no `update` command** (subcommands are exactly `add`, `list`,
-`marketplace`, `remove` — verified with `--help`). `codex plugin marketplace
-upgrade` only refreshes **Git** marketplace snapshots; our marketplace source
-is `local`, which is read live off disk with no cache to refresh.
+codex-cli 0.145.0's `plugin` subcommand tree has no `update` verb
+(subcommands are exactly `add`, `list`, `marketplace`, `remove` — verified
+with `--help`), and `codex plugin marketplace upgrade` only refreshes **Git**
+marketplace snapshots; our marketplace source is `local`, read live off disk.
 
-**Live pass action for `install.update`:** bump both `.codex-plugin/plugin.json`
-and `.agents/plugins/marketplace.json` in the assembled package to `0.0.2`
-(see Step E below), then re-run `codex plugin add
-kinglet-client-probe@kinglet-client-probe` and record whether that updates
-the installed plugin in place. If it instead reports "already installed" or
-similar, fall back to `codex plugin remove kinglet-client-probe` followed by
-`codex plugin add kinglet-client-probe@kinglet-client-probe` and record that
-this was the path actually taken. Either outcome is a valid observation —
-what matters is recording which one happened, not which one is neater.
+An earlier draft of this runbook read that absence as "no documented update
+mechanism exists" and proposed re-running `codex plugin add` after a plain
+numeric version bump (0.0.1 → 0.0.2), falling back to `remove`+`add`. That
+was inference presented as fact: codex-cli 0.145.0 ships a **sibling
+reference file** to the `plugin-json-spec.md` this package's schema is built
+from — `~/.codex/skills/.system/plugin-creator/references/
+installing-and-updating.md` — that documents the local-plugin update loop
+end to end, verbatim:
+
+> "Do not keep incrementing numeric version components just to trigger
+> reinstall behavior."
+
+The documented loop is a **cachebuster suffix**, not a version bump:
+
+```text
+<base-version>+codex.<token>
+```
+
+e.g. `0.0.1` → `0.0.1+codex.local-20260519-184516`. The reference ships a
+helper for this: `scripts/update_plugin_cachebuster.py <plugin-path>`
+(defaults to a UTC-timestamp token; only override with `--cachebuster` when a
+workflow depends on a specific string). Reinstall is then just:
+
+```bash
+codex plugin add kinglet-client-probe@kinglet-client-probe
+```
+
+**Deviation from the brief's literal wording, recorded here:** the brief's
+Step 4 sequence names the update target as version `0.0.2`. The documented
+Codex-native mechanism does not bump the semver component at all — it
+appends/replaces a `+codex.<token>` build-metadata suffix on the existing
+`0.0.1` base. The live pass should use the **cachebuster form** (this is
+what the tested build's own reference instructs, and semver build metadata
+after `+` is not part of precedence, so `0.0.1+codex.<token>` is a strictly
+correct evolution of `0.0.1`, not a regression of the brief's "0.0.2"
+intent). Record the exact string codex-cli reports for the version field
+after the update as the `install.update` evidence, whatever it reads.
 
 ## The hook block mechanism — confirmed, not assumed
 
@@ -183,12 +273,16 @@ chmod +x "$PROBE_PKG/bin/kinglet-client-probe"
 
 The assembled package lives at `/tmp/kinglet-codex-probe-pkg` (or your chosen
 `PROBE_PKG` path). It now contains:
-- `.codex-plugin/plugin.json` — plugin manifest (name: kinglet-client-probe, version: 0.0.1)
+- `.codex-plugin/plugin.json` — plugin manifest (name: kinglet-client-probe,
+  version: 0.0.1, full `interface` block, no `hooks` field — see "Validation"
+  above)
 - `.agents/plugins/marketplace.json` — local marketplace entry (source path `./`)
-- `hooks/hooks.json` — PreToolUse hook config
+- `hooks.json` — PreToolUse hook config, at plugin **root** (auto-discovered;
+  not referenced from `plugin.json`)
 - `hooks/pre-mutation-hook.sh` — deny-translation wrapper
 - `.mcp.json` — local MCP server config (`mcpServers` wrapper key, matching
-  the schema of every real `.mcp.json` observed on the probe host)
+  the schema of every real `.mcp.json` observed on the probe host;
+  `default_tools_approval_mode: "prompt"` set on the server entry)
 - `skills/kinglet-capability-probe/SKILL.md` — capability workflow skill
 - `agents/kinglet-capability-reviewer.agent.md` — reviewer agent
 - `rules/kinglet-capability-probe.md` — receipt schema rule (reference copy)
@@ -339,44 +433,49 @@ Expected behavior:
 
 Cases evidenced: `mcp.discover-call`, `structured-result`
 
-## Step E — Version update and reload
+## Step E — Update via the documented cachebuster loop
 
-Edit `plugin.json` and `marketplace.json` in the assembled package to bump to
-`0.0.2` — POSIX-portable, no GNU `sed -i`:
+Per "Update mechanism — documented, not guessed" above, this is the
+tested build's own reference procedure
+(`~/.codex/skills/.system/plugin-creator/references/installing-and-updating.md`),
+not a version-number bump:
 
 ```bash
-sed 's/"version": "0.0.1"/"version": "0.0.2"/' \
-  /tmp/kinglet-codex-probe-pkg/.codex-plugin/plugin.json \
-  > /tmp/kinglet-codex-probe-pkg/.codex-plugin/plugin.json.tmp \
-  && mv /tmp/kinglet-codex-probe-pkg/.codex-plugin/plugin.json.tmp \
-        /tmp/kinglet-codex-probe-pkg/.codex-plugin/plugin.json
-
-sed 's/"version": "0.0.1"/"version": "0.0.2"/' \
-  /tmp/kinglet-codex-probe-pkg/.agents/plugins/marketplace.json \
-  > /tmp/kinglet-codex-probe-pkg/.agents/plugins/marketplace.json.tmp \
-  && mv /tmp/kinglet-codex-probe-pkg/.agents/plugins/marketplace.json.tmp \
-        /tmp/kinglet-codex-probe-pkg/.agents/plugins/marketplace.json
+python3 ~/.codex/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py \
+  /tmp/kinglet-codex-probe-pkg
 ```
 
-As covered in "Open question 2" above, codex-cli 0.145.0 has **no `codex
-plugin update` command**. Re-run the install command and record what
-actually happens:
+Omit `--cachebuster` to let the helper default to a UTC-timestamp token —
+the reference's recommended path for routine local iteration. This rewrites
+the `version` field of `/tmp/kinglet-codex-probe-pkg/.codex-plugin/plugin.json`
+to `0.0.1+codex.<token>` in place (preserving the `0.0.1` prefix — the
+reference's "Cachebuster Policy" is explicit that the prefix is everything
+before `+`, and to replace rather than append a second `+codex.` suffix on
+repeat runs).
+
+The reference's Update Loop step 2-3 reads the marketplace name from the
+**personal** marketplace file (`~/.agents/plugins/marketplace.json`) via
+`scripts/read_marketplace_name.py`. This package was registered as a
+**local, non-personal** marketplace in Step B
+(`spikes/platform/clients/codex/.agents/plugins/marketplace.json`, added via
+`codex plugin marketplace add`, not the implicit personal-marketplace path),
+so the reference's own fallback applies instead: "If the plugin is not using
+the personal marketplace file... reinstall from that marketplace name".
+Reinstall from the marketplace name already known from Step B:
 
 ```bash
 codex plugin add kinglet-client-probe@kinglet-client-probe
 codex plugin list
 ```
 
-If that does not pick up `0.0.2`, fall back to:
+Record the version string `codex plugin list` reports after this — it
+should read `0.0.1+codex.<token>`, not `0.0.2`. If it does not update at
+all, that is itself the `install.update` observation (failed, not
+inconclusive — the documented mechanism was followed exactly). Per the
+reference's closing step, start a **new thread** afterward before testing
+the updated plugin, so Codex picks up the new skills/tools.
 
-```bash
-codex plugin remove kinglet-client-probe
-codex plugin add kinglet-client-probe@kinglet-client-probe
-codex plugin list
-```
-
-Record the output showing `0.0.2` and which of the two paths above actually
-worked. This satisfies `install.update`.
+This satisfies `install.update`.
 
 ## Step F — Scope resolution check
 

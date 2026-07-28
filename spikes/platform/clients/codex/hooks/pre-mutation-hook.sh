@@ -2,7 +2,8 @@
 # pre-mutation-hook.sh — PreToolUse deny-translation wrapper for Codex.
 #
 # Codex invokes this script before a matched tool call (matcher "Write|Edit"
-# in hooks/hooks.json). It reads the tool-use JSON event from stdin, extracts
+# in the plugin-root hooks.json — auto-discovered; see the manifest note
+# below). It reads the tool-use JSON event from stdin, extracts
 # the target file path, delegates the allow/deny decision to the native
 # kinglet-client-probe binary, and translates a "deny" decision into exit 2 —
 # the block signal codex-cli 0.145.0 documents for PreToolUse hooks (verified
