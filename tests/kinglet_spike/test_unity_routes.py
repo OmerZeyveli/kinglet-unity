@@ -178,7 +178,10 @@ class _TempCase(unittest.TestCase):
         self.editor.write_text("#!/bin/sh\n", encoding="utf-8")
 
     def lease_dir(self):
-        return self.raw.resolve() / "lease"
+        # A HOST-WIDE lease directory, deliberately not derived from raw_dir --
+        # see routes.default_lease_dir(). Tests point it at a temp dir so the
+        # real one is never touched.
+        return self.root / "leases"
 
     def lease_files(self):
         directory = self.lease_dir()
@@ -186,17 +189,20 @@ class _TempCase(unittest.TestCase):
             return []
         return sorted(p.name for p in directory.glob("*.lease.json"))
 
-    def run_headless(self, fake: FakeUnity, **overrides):
+    def run_headless(self, fake: FakeUnity, *, raw_dir_override=None, **overrides):
         kwargs = dict(
             process_table_provider=empty_process_table,
             windows=False,
             run_version_flag=version_stdout(),
             process_factory=fake.factory,
             env={"PATH": "/usr/bin"},
+            lease_dir=self.lease_dir(),
         )
         kwargs.update(overrides)
         return routes.run_same_project_headless(
-            self.editor, self.project, self.raw, **kwargs
+            self.editor, self.project,
+            self.raw if raw_dir_override is None else raw_dir_override,
+            **kwargs
         )
 
 
@@ -343,7 +349,7 @@ class FilesystemRouteTests(_TempCase):
 
 class HeadlessArgvTests(unittest.TestCase):
     def build(self, project="/w/proj"):
-        return routes.headless_argv(
+        return routes._headless_argv(
             Path("/opt/Unity"), Path(project),
             Path("/raw/r.xml"), Path("/raw/r.log"),
         )
@@ -392,6 +398,7 @@ class ArgvAbsolutenessTests(_TempCase):
             run_version_flag=version_stdout(),
             process_factory=fake.factory,
             env={"PATH": "/usr/bin"},
+            lease_dir=self.lease_dir(),
         )
         argv = fake.argv
         for flag in ("-projectPath", "-testResults", "-logFile"):
@@ -492,6 +499,33 @@ class CompileLogTests(unittest.TestCase):
             "Assets/B.cs(2,2): error CS0103: name not found\n"
         )
         self.assertEqual(2, routes.count_compile_errors(text))
+
+    def test_prose_mentioning_a_diagnostic_code_is_not_a_compile_error(self):
+        """A passing run whose log echoes a test name must not read as a failure.
+
+        A bare `error CS` substring search counted this as a compile error, and
+        because a passing run ALSO has a results file, the route then raised
+        E_UNITY_RESULTS_CONFLICT and refused a good run.
+        """
+        text = (
+            "Running KingletSpike.Tests.Handles_error_CS1002_Gracefully\n"
+            "  Expected: no error CS1002 in output\n"
+            "Test run finished.\n"
+        )
+        self.assertEqual(0, routes.count_compile_errors(text))
+
+    def test_an_assembly_level_diagnostic_with_no_file_position_still_counts(self):
+        # Not every Unity diagnostic carries a (line,col) prefix.
+        self.assertEqual(1, routes.count_compile_errors("error CS8034: no analyzer\n"))
+
+    def test_a_prose_only_log_alongside_a_results_file_does_not_conflict(self):
+        # The end-to-end consequence of the anchor, driven through _derive_outcome.
+        compile_result, tests = routes._derive_outcome(
+            exit_code=0, results_text=PASSED_XML,
+            log_text="Ran Handles_error_CS1002_Gracefully\n",
+        )
+        self.assertEqual("pass", compile_result.status)
+        self.assertEqual("pass", tests.status)
 
     def test_a_clean_log_reports_zero(self):
         self.assertEqual(0, routes.count_compile_errors("Refreshing native plugins\nExiting\n"))
@@ -689,8 +723,8 @@ class StartBoundTests(_TempCase):
                 raise EvidenceError("E_UNITY_LEASE_LOST", "gone")
 
         with self.assertRaises(EvidenceError) as caught:
-            routes.start_bound(
-                BrokenLease(), routes.headless_argv(
+            routes._start_bound(
+                BrokenLease(), routes._headless_argv(
                     self.editor, self.project,
                     self.root / "r.xml", self.root / "r.log",
                 ),
@@ -709,8 +743,8 @@ class StartBoundTests(_TempCase):
                 seen.update(pid=pid, pgid=pgid)
 
         fake = FakeUnity(pid=777, pgid=778)
-        returned = routes.start_bound(
-            RecordingLease(), routes.headless_argv(
+        returned = routes._start_bound(
+            RecordingLease(), routes._headless_argv(
                 self.editor, self.project, self.root / "r.xml", self.root / "r.log",
             ),
             cwd=self.project, env={},
@@ -785,6 +819,135 @@ class CleanupAndLeaseTests(_TempCase):
         with self.assertRaises(EvidenceError) as caught:
             self.run_headless(FakeUnity(results_text=None))
         self.assertEqual("E_UNITY_RESULTS_MISSING", caught.exception.code)
+
+
+# ---------------------------------------------------------------------------
+# Lease scope -- the lock is per WORKSPACE, not per invocation
+# ---------------------------------------------------------------------------
+
+class LeaseScopeTests(_TempCase):
+    """Two runs of one project must collide however they name their run dirs.
+
+    Round-1 review proved the hole these tests close: the lease directory was
+    derived from `raw_dir`, so two invocations differing only in `--raw-dir`
+    both acquired cleanly for the SAME project. `lease_path_for` keys the
+    FILENAME on the project's physical-path hash, which is worth nothing if the
+    two callers never look in the same directory.
+    """
+
+    def test_two_runs_with_different_raw_dirs_cannot_both_hold_the_lease(self):
+        held = WorkspaceLease.acquire(
+            self.project,
+            route=routes.SAME_PROJECT_HEADLESS_ROUTE,
+            lease_dir=self.lease_dir(),
+        )
+        self.addCleanup(held.release)
+        with self.assertRaises(EvidenceError) as caught:
+            # lease_dir=None -> the route uses default_lease_dir(), which is
+            # what a second operator invoking the CLI would get.
+            self.run_headless(
+                FakeUnity(), raw_dir_override=self.root / "raw-b", lease_dir=None
+            )
+        self.assertEqual("E_UNITY_LEASE_HELD", caught.exception.code)
+
+    def test_a_concurrent_second_invocation_is_refused_mid_run(self):
+        """The real scenario: run B starts while run A's Unity is still up."""
+        inner: dict = {}
+        outer = FakeUnity()
+
+        def wait_and_launch_a_second_run(timeout_seconds):
+            # Called while run A holds the lease and its "Unity" is live.
+            try:
+                self.run_headless(
+                    FakeUnity(), raw_dir_override=self.root / "raw-b", lease_dir=None
+                )
+                inner["error"] = None
+            except EvidenceError as error:
+                inner["error"] = error.code
+            return 0
+
+        outer.wait = wait_and_launch_a_second_run
+        self.run_headless(outer, lease_dir=None)
+        self.assertEqual("E_UNITY_LEASE_HELD", inner["error"])
+
+    def test_the_lease_does_not_live_under_the_run_directory(self):
+        self.run_headless(FakeUnity(), lease_dir=None)
+        stray = list(self.raw.rglob("*.lease.json"))
+        self.assertEqual([], stray)
+
+    def test_the_default_lease_dir_ignores_the_run_directory_entirely(self):
+        with mock.patch.dict(os.environ, {routes.LEASE_DIR_ENV: str(self.root / "shared")}):
+            self.assertEqual(self.root / "shared", routes.default_lease_dir())
+
+    def test_the_default_lease_dir_follows_xdg_state_home(self):
+        environ = {k: v for k, v in os.environ.items() if k != routes.LEASE_DIR_ENV}
+        environ["XDG_STATE_HOME"] = "/state"
+        with mock.patch.dict(os.environ, environ, clear=True):
+            self.assertEqual(Path("/state/kinglet-unity/leases"), routes.default_lease_dir())
+
+    def test_the_default_lease_dir_falls_back_to_the_home_state_dir(self):
+        environ = {
+            k: v for k, v in os.environ.items()
+            if k not in (routes.LEASE_DIR_ENV, "XDG_STATE_HOME")
+        }
+        with mock.patch.dict(os.environ, environ, clear=True), \
+             mock.patch.object(Path, "home", staticmethod(lambda: Path("/hometest"))):
+            self.assertEqual(
+                Path("/hometest/.local/state/kinglet-unity/leases"),
+                routes.default_lease_dir(),
+            )
+
+    def test_a_crashed_runs_pgid_is_findable_by_a_run_with_another_raw_dir(self):
+        """The crashed-run half: the recorded pgid must be reachable later.
+
+        `bind_holder` records the contained pgid so a later run can clean up a
+        leaked group. A per-run lease directory made that record unreachable to
+        any later run that chose a different `--raw-dir`.
+        """
+        crashed = WorkspaceLease.acquire(
+            self.project,
+            route=routes.SAME_PROJECT_HEADLESS_ROUTE,
+            lease_dir=self.lease_dir(),
+        )
+        crashed.bind_holder(pid=6100, pgid=6100)
+        self.addCleanup(crashed.release)
+        # A different run directory entirely -- the later run still finds it.
+        from tools.kinglet_spike.unity.lease import lease_path_for
+        found = read_lease(lease_path_for(self.project, routes.default_lease_dir()))
+        self.assertEqual(6100, found.pgid)
+
+    def setUp(self):
+        super().setUp()
+        # default_lease_dir() must be the one every caller in these tests
+        # agrees on, without touching the real host directory.
+        patcher = mock.patch.dict(
+            os.environ, {routes.LEASE_DIR_ENV: str(self.root / "leases")}
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+
+# ---------------------------------------------------------------------------
+# Module surface
+# ---------------------------------------------------------------------------
+
+class ModuleSurfaceTests(unittest.TestCase):
+    def test_the_launcher_is_not_part_of_the_public_surface(self):
+        # Either of these lets a caller launch Unity while skipping ownership
+        # detection and Editor verification.
+        self.assertNotIn("start_bound", routes.__all__)
+        self.assertNotIn("headless_argv", routes.__all__)
+        self.assertFalse(hasattr(routes, "start_bound"))
+        self.assertFalse(hasattr(routes, "headless_argv"))
+
+    def test_the_two_routes_are_public(self):
+        self.assertIn("run_filesystem", routes.__all__)
+        self.assertIn("run_same_project_headless", routes.__all__)
+
+    def test_every_name_in_all_actually_exists(self):
+        for name in routes.__all__:
+            with self.subTest(name=name):
+                self.assertTrue(hasattr(routes, name))
 
 
 # ---------------------------------------------------------------------------
@@ -873,6 +1036,7 @@ class EditorVerificationTests(_TempCase):
             run_version_flag=version_stdout("6000.0.68f1"),
             process_factory=fake.factory,
             env={"PATH": "/usr/bin"},
+            lease_dir=self.lease_dir(),
         )
         self.assertEqual("6000.0.68f1", receipt.unity_version)
 

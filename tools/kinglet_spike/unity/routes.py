@@ -16,7 +16,7 @@ With `-quit` in the argv, Unity honours the quit first: the log says
 `Batchmode quit successfully invoked - shutting down!`, the process **exits 0**,
 and **no `results.xml` is ever written**. So `exit == 0` is NOT evidence that
 tests ran. The task brief's literal argv listed `-quit`; this module
-deliberately omits it (see `headless_argv`), because with it the route can
+deliberately omits it (see `_headless_argv`), because with it the route can
 only ever produce a receipt it cannot back. Nothing else in the brief's argv
 changed.
 
@@ -68,11 +68,42 @@ leaves a live Unity under a lease that becomes reclaimable at TTL -- a
 double-open, the exact thing the lease exists to prevent.
 
 So there is exactly one guarded path (`_run_headless_guarded`), it is private,
-and `start_bound()` is the ONLY way this module launches: it starts and binds
+and `_start_bound()` is the ONLY way this module launches: it starts and binds
 in one call and cancels the process if the bind fails, so "started but never
 bound" is not a state a caller can reach by forgetting a line. See
-`start_bound`'s docstring for the residual window that cannot be closed from
+`_start_bound`'s docstring for the residual window that cannot be closed from
 inside this process.
+
+`_start_bound` and `_headless_argv` are private, and `__all__` names the public
+surface, because a caller holding either could launch Unity while skipping
+ownership detection and Editor verification entirely -- with a duck-typed
+object that merely has a `bind_holder` method, which the tests themselves
+demonstrate is easy to write. That is not the "forgot a line" failure mode; it
+takes deliberate new launch code. It is closed anyway, because the ordering
+above is only a guarantee if there is no second door.
+
+The lease is per-WORKSPACE, and so is its directory
+---------------------------------------------------
+`lease_path_for` keys the lease FILENAME on the project's physical-path hash,
+which makes two runs of one project agree on the name -- but only if they also
+agree on the DIRECTORY. Deriving that directory from the run directory
+(`raw_dir`) made two invocations differing only in `--raw-dir` both acquire
+cleanly for the same project: a lock that excluded nobody. `default_lease_dir()`
+is host-wide and independent of `raw_dir`; see its docstring.
+
+The ordering trade-off, stated honestly
+---------------------------------------
+The brief's order is `verify_project_editor` -> `assert_headless_safe`; this
+module runs ownership FIRST. That is not guarantee-neutral. `verify_editor`
+spawns `<Unity> -version`, which takes seconds, and placing that spawn between
+the ownership check and `acquire` widens the staleness of the ownership result
+by exactly that much -- a TOCTOU window in which someone else's Editor can open
+the project after we cleared it. What the chosen order buys is a cheaper
+refusal that never executes the Editor binary at all for a project we are going
+to refuse anyway, and a refusal receipt that needs only the project's declared
+version. The residual window is covered by the lease (host-wide, above) and by
+Unity's own single-Editor-per-project enforcement; it is a deliberate trade, not
+an absence of cost.
 
 Ownership refusal is its own probe, not a run
 ---------------------------------------------
@@ -88,6 +119,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import time
 import xml.etree.ElementTree as ElementTree
 from dataclasses import dataclass
@@ -100,6 +132,28 @@ from .lease import WorkspaceLease
 from .model import PROJECT_ID, RECEIPT_SCHEMA, CompileResult, TestResult, UnityReceipt
 from .ownership import assert_headless_safe
 from .process import ManagedProcess
+
+# The public surface. `_start_bound` and `_headless_argv` are deliberately
+# absent AND underscored: either one lets a caller launch Unity without the
+# ownership and Editor-verification steps that precede it on the guarded path.
+__all__ = (
+    "FILESYSTEM_ROUTE",
+    "SAME_PROJECT_HEADLESS_ROUTE",
+    "LEASE_DIR_ENV",
+    "default_lease_dir",
+    "run_filesystem",
+    "run_same_project_headless",
+    "receipt_to_dict",
+    "inventory_project",
+    "read_project_marker",
+    "sha256_file",
+    "count_compile_errors",
+    "log_reports_compile_abort",
+    "parse_test_results",
+    "unity_lockfile_path",
+    "FileFact",
+    "ResultsSummary",
+)
 
 FILESYSTEM_ROUTE = "filesystem"
 SAME_PROJECT_HEADLESS_ROUTE = "same-project-headless"
@@ -146,6 +200,52 @@ HEADLESS_TIMEOUT_SECONDS: float = 780.0
 
 # routes-v1.json timings_seconds.cancellation_cleanup.
 CANCELLATION_DEADLINE_SECONDS: float = 15.0
+
+# Override for the host-wide lease directory. Every caller on a host must
+# agree on it or the lease excludes nobody -- see default_lease_dir().
+LEASE_DIR_ENV: str = "KINGLET_UNITY_LEASE_DIR"
+
+
+def default_lease_dir() -> Path:
+    """The ONE directory every run on this host looks in for a workspace lease.
+
+    This deliberately does NOT derive from the run directory. `lease_path_for`
+    keys the lease FILENAME on the SHA-256 of the project's physical path, so
+    two runs of the same project agree on the file name -- but only if they
+    also agree on the directory. Round-1 review proved the hole: two
+    invocations differing only in `--raw-dir` both acquired cleanly for the
+    same project, because they never looked in the same place. Nothing then
+    stood between them and a double-open except `assert_headless_safe`, which
+    needs Unity #1 to have written `Temp/UnityLockfile` (measured: ~2s) or to
+    have surfaced in the process table. Inside that window the mutual
+    exclusion the lease exists to provide was simply absent -- and the ordering
+    guarantee built on top of it read stronger than it was.
+
+    It is also not inside the project: a file under `Assets/` becomes a
+    Unity-imported asset, a file anywhere else in the project pollutes the very
+    tree `isolated-headless` copies (the copy would inherit a foreign lease),
+    and a crashed run's leftover lease must be removable without touching a
+    project someone may be working in. That reasoning is `lease.py`'s and is
+    unchanged; what is fixed here is only WHICH directory outside the project.
+
+    Host state, not repo content, so it lives where host state lives:
+    `$KINGLET_UNITY_LEASE_DIR`, else `$XDG_STATE_HOME/kinglet-unity/leases`,
+    else `~/.local/state/kinglet-unity/leases`. A cwd-relative or repo-relative
+    default would reintroduce the same hole for any caller run from elsewhere.
+    Nothing here is ever committed, and the lease record carries no path -- only
+    the hash -- so this directory never accumulates machine paths either.
+
+    The crashed-run consequence is the sharper half: `bind_holder` records the
+    contained pgid precisely so a later run can clean up a leaked group. That
+    record is worthless if the later run looks in a different directory, which
+    is exactly what a per-run lease directory guaranteed.
+    """
+    override = os.environ.get(LEASE_DIR_ENV)
+    if override:
+        return Path(override)
+    state_home = os.environ.get("XDG_STATE_HOME")
+    base = Path(state_home) if state_home else Path.home() / ".local" / "state"
+    return base / "kinglet-unity" / "leases"
 
 
 # ---------------------------------------------------------------------------
@@ -301,7 +401,21 @@ def run_filesystem(project, raw_dir) -> UnityReceipt:
 # Unity prints one `error CS####:` per diagnostic, and repeats each of them
 # across the compile summary. Distinct stripped lines are counted so a
 # repeated diagnostic is one error, not three.
-_COMPILE_ERROR_MARKER = "error CS"
+#
+# ANCHORED, not a substring search. `error CS` anywhere in the concatenated
+# log/stdout/stderr also matches PROSE -- a test named
+# `Handles_error_CS1002_Gracefully`, or an assertion message quoting a
+# diagnostic code, both echo into the Editor log on a PASSING run. That would
+# count as a compile error, and because a passing run also has a results file
+# it would raise E_UNITY_RESULTS_CONFLICT and refuse a good run. So a
+# diagnostic is recognised only in the two shapes Unity actually emits:
+#   Assets/KingletSpike/Editor/Broken.cs(1,102): error CS1002: ; expected
+#   error CS8034: ...                      (assembly-level, no file position)
+# i.e. `error CS<digits>:` either at the very start of the line or directly
+# after a `(line,col):` file position.
+_COMPILE_ERROR_RE = re.compile(
+    r"^(?:error CS\d+:|.*\(\d+,\d+\):\s*error CS\d+:)"
+)
 
 # MEASURED on this host with a deliberately broken .cs in the fixture: Unity
 # writes the banner "Aborting batchmode due to failure:" and the sentence
@@ -320,7 +434,7 @@ def count_compile_errors(log_text: str) -> int:
     seen: set[str] = set()
     for line in log_text.splitlines():
         stripped = line.strip()
-        if _COMPILE_ERROR_MARKER in stripped:
+        if _COMPILE_ERROR_RE.match(stripped):
             seen.add(stripped)
     return len(seen)
 
@@ -518,7 +632,7 @@ def unity_lockfile_path(project: Path) -> Path:
 # The guarded launch
 # ---------------------------------------------------------------------------
 
-def headless_argv(editor: Path, project: Path, results_path: Path, log_path: Path) -> list[str]:
+def _headless_argv(editor: Path, project: Path, results_path: Path, log_path: Path) -> list[str]:
     """The exact argument ARRAY for a same-project headless EditMode run.
 
     An array, never a string: `-projectPath` is its own argv entry carrying an
@@ -543,7 +657,7 @@ def headless_argv(editor: Path, project: Path, results_path: Path, log_path: Pat
     ]
 
 
-def start_bound(
+def _start_bound(
     lease: WorkspaceLease,
     argv: Sequence[str],
     *,
@@ -634,6 +748,7 @@ def run_same_project_headless(
     timeout_seconds: float = HEADLESS_TIMEOUT_SECONDS,
     cancellation_deadline: float = CANCELLATION_DEADLINE_SECONDS,
     lease_ttl_seconds: float | None = None,
+    lease_dir=None,
     clock: Callable[[], float] = time.time,
 ) -> UnityReceipt:
     """Run EditMode tests headlessly against the project itself.
@@ -695,6 +810,7 @@ def run_same_project_headless(
         timeout_seconds=timeout_seconds,
         cancellation_deadline=cancellation_deadline,
         lease_ttl_seconds=lease_ttl_seconds,
+        lease_dir=default_lease_dir() if lease_dir is None else Path(lease_dir),
         clock=clock,
     )
 
@@ -710,6 +826,7 @@ def _run_headless_guarded(
     timeout_seconds: float,
     cancellation_deadline: float,
     lease_ttl_seconds: float | None,
+    lease_dir: Path,
     clock: Callable[[], float],
 ) -> UnityReceipt:
     """The single guarded path. Steps 2-6, in the only order they are correct.
@@ -717,7 +834,7 @@ def _run_headless_guarded(
     2. verify_project_editor -- the project's own pinned version decides which
        Editor may open it; a mismatch raises rather than upgrading it.
     3. acquire the physical-workspace lease.
-    4. start_bound -- launch and bind in one call (see start_bound).
+    4. _start_bound -- launch and bind in one call (see _start_bound).
     5. wait, then derive the outcome from the ARTIFACTS, never the exit code.
     6. finally: cancel the containment, record the proven survivor set, then
        release the lease. Cleanup runs on the refusal, timeout, conflict and
@@ -745,16 +862,16 @@ def _run_headless_guarded(
     lease = WorkspaceLease.acquire(
         project,
         route=SAME_PROJECT_HEADLESS_ROUTE,
-        lease_dir=raw_dir / "lease",
+        lease_dir=lease_dir,
         **lease_kwargs,
     )
 
-    argv = headless_argv(editor, project, results_path, log_path)
+    argv = _headless_argv(editor, project, results_path, log_path)
     survivors: tuple[int, ...] = ()
     exit_code: int | None = None
     started = clock()
     try:
-        process = start_bound(
+        process = _start_bound(
             lease, argv,
             cwd=project,
             env=dict(os.environ) if env is None else dict(env),
