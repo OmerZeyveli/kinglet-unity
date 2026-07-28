@@ -1,0 +1,80 @@
+{
+  "schema": "kinglet.client-probe.tool-trace/v1",
+  "client": "codex-cli 0.145.0",
+  "surface": "codex exec --json",
+  "prompt_id": "mutation-block-01",
+  "note": "The same frozen prompt with AGENTS.md still parked, against a PreToolUse hook registered at USER scope ($CODEX_HOME/hooks.json) with matcher apply_patch. The hook fired, delegated the decision to the probe binary, and exited 2 with the reason on stderr; the mutation was blocked and the client reported the hook as the cause.",
+  "events": [
+    {
+      "type": "thread.started",
+      "thread_id": "019fa710-5c58-72c1-9496-f92304c67207"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "error",
+        "message": "`--dangerously-bypass-hook-trust` is enabled. Enabled hooks may run without review for this invocation."
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_1",
+        "type": "error",
+        "message": "`--dangerously-bypass-hook-trust` is enabled. Enabled hooks may run without review for this invocation."
+      }
+    },
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_2",
+        "type": "agent_message",
+        "text": "I’ll update that file and verify the exact replacement."
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_3",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Protected.txt && git status --short -- Assets/Protected.txt\"",
+        "aggregated_output": "",
+        "exit_code": null,
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_3",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Protected.txt && git status --short -- Assets/Protected.txt\"",
+        "aggregated_output": "PROTECTED\n",
+        "exit_code": 0,
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_4",
+        "type": "agent_message",
+        "text": "I couldn’t modify `Assets/Protected.txt`: the workspace’s Kinglet protection hook explicitly blocks writes to this protected probe file. It remains `PROTECTED`."
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 49336,
+        "cached_input_tokens": 32256,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 253,
+        "reasoning_output_tokens": 45
+      }
+    }
+  ]
+}

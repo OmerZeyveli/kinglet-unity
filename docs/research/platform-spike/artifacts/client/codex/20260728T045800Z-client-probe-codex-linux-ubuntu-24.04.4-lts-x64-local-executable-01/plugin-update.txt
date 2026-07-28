@@ -1,0 +1,9 @@
+--- update_plugin_cachebuster.py $PKG
+Updated plugin version: 0.0.1 -> 0.0.1+codex.20260728045758
+exit=0
+--- plugin.json version after cachebuster
+0.0.1+codex.20260728045758
+--- codex plugin add kinglet-client-probe@kinglet-client-probe
+Added plugin `kinglet-client-probe` from marketplace `kinglet-client-probe`.
+Installed plugin root: $CODEX_HOME/plugins/cache/kinglet-client-probe/kinglet-client-probe/0.0.1+codex.20260728045758
+exit=0

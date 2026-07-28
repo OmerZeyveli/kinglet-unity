@@ -1,0 +1,130 @@
+{
+  "schema": "kinglet.client-probe.tool-trace/v1",
+  "client": "codex-cli 0.145.0",
+  "surface": "codex exec --json",
+  "prompt_id": null,
+  "note": "Diagnostic. The plugin's root-level hooks.json was replaced IN THE INSTALLED CACHE with a catch-all PreToolUse hook (no matcher) whose only action is to append its stdin to a log and exit 0, and the run added --dangerously-bypass-hook-trust. The log was never created: no plugin hook ran, for any tool. So the committed Write|Edit matcher is not what failed -- the plugin hook surface itself is inert.",
+  "events": [
+    {
+      "type": "thread.started",
+      "thread_id": "019fa70d-c913-7981-aed5-1d4596d94c45"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "error",
+        "message": "`--dangerously-bypass-hook-trust` is enabled. Enabled hooks may run without review for this invocation."
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_1",
+        "type": "error",
+        "message": "`--dangerously-bypass-hook-trust` is enabled. Enabled hooks may run without review for this invocation."
+      }
+    },
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_2",
+        "type": "agent_message",
+        "text": "I’ll update the requested file and verify the exact change."
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_3",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Scratch.txt\"",
+        "aggregated_output": "",
+        "exit_code": null,
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_3",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Scratch.txt\"",
+        "aggregated_output": "HELLO\n",
+        "exit_code": 0,
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_4",
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "<project-root>/Assets/Scratch.txt",
+            "kind": "update"
+          }
+        ],
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_4",
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "<project-root>/Assets/Scratch.txt",
+            "kind": "update"
+          }
+        ],
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_5",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Scratch.txt\"",
+        "aggregated_output": "",
+        "exit_code": null,
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_5",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Scratch.txt\"",
+        "aggregated_output": "GOODBYE\n",
+        "exit_code": 0,
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_6",
+        "type": "agent_message",
+        "text": "Updated [Assets/Scratch.txt](<project-root>/Assets/Scratch.txt) to `GOODBYE`."
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 66170,
+        "cached_input_tokens": 48384,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 390,
+        "reasoning_output_tokens": 0
+      }
+    }
+  ]
+}

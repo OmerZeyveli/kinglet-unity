@@ -1,0 +1,11 @@
+[marketplaces.kinglet-client-probe]
+last_updated = "2026-07-28T04:41:42Z"
+source_type = "local"
+source = "<probe-package>"
+
+[plugins."kinglet-client-probe@kinglet-client-probe"]
+enabled = true
+
+[projects."<project-root>"]
+trust_level = "trusted"
+

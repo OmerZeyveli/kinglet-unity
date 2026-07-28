@@ -1,0 +1,10 @@
+{
+  "schema": "kinglet.client-probe.prompts-used/v1",
+  "note": "Prompt bodies are referenced by id and SHA-256 only; raw prompt text is never written into evidence.",
+  "prompts": [
+    {
+      "id": "workflow-natural-language-01",
+      "sha256": "a055e13fb7618d3eaf63f91b52d71b42c74b4483722a175a7e59d29e8e3021bd"
+    }
+  ]
+}

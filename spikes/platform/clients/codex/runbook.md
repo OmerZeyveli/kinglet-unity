@@ -538,3 +538,79 @@ absolute home path.
 Grade each as Native, Emulated, Unavailable, failed, or inconclusive per
 `spikes/platform/clients/contracts/cases-v1.json`. Do not infer an agents
 pass from skills.
+
+---
+
+# Live pass results — Steps 4–6, executed
+
+The live pass ran on codex-cli **0.145.0**, linux x64 (Ubuntu 24.04 base), against a
+disposable `$CODEX_HOME` outside the operator's real config root. Published evidence:
+`docs/research/platform-spike/evidence/client/codex/`. Observations:
+`observations-linux.json`. Tally: **8 pass, 4 inconclusive, 0 fail, 0 unavailable**;
+`gate 0C:codex` exits **1** with the macOS and Windows cells `missing`, as expected on a
+Linux host.
+
+## Deviation — `codex exec`, not the interactive TUI
+
+Steps C–D drive the interactive `codex` TUI, which an automated operator cannot run. Every
+case was exercised with `codex exec --json -s workspace-write`, one fresh invocation per
+prompt — which satisfies the "new session, no prior skill invocation" constraint more
+strictly than reusing a terminal. **Whether `codex exec` loads plugins at all was unverified
+before this pass, so it was established first**: a cold session asked to enumerate its
+skills answered `kinglet-client-probe:kinglet-capability-probe`, and the skill then ran. It
+does load plugin skills and plugin MCP servers. It does **not** load plugin hooks — but
+neither does the TUI (see below), so that is not an artifact of the surface.
+
+Two cases cannot be closed on this surface at all and are recorded `inconclusive` pending a
+manual interactive pass: `approvals.mutation` (exec runs with `approval_policy = never` and
+the client states it cannot request escalation) and `mcp.discover-call` (the tool resolved by
+name and was called, but `default_tools_approval_mode: "prompt"` auto-cancels for want of an
+approver).
+
+## The four open questions, answered
+
+1. **Plugin-root resolution.** `codex plugin add` copies the whole package into
+   `$CODEX_HOME/plugins/cache/<marketplace>/<plugin>/<version>/`, preserving the layout, and
+   the session reads component files from that cache path. So the `BASH_SOURCE` self-location
+   in `hooks/pre-mutation-hook.sh` would resolve correctly — but it was never exercised,
+   because the hook never runs (question 3).
+2. **Project-instructions filename: `AGENTS.md`**, confirmed at *project* scope with a
+   control (park it, and the refusal disappears), not inferred from the personal-scope file.
+   Codex injects it as a first-class session object, headed
+   `# AGENTS.md instructions for <project-root>` and mirrored in `world_state.agents_md`.
+3. **`Write|Edit` is NOT the runtime matcher, and plugin hooks do not run at all.**
+   `codex features list` reports `plugin_hooks  removed  false`; writing
+   `features.plugin_hooks = true` into `config.toml` leaves the effective state `false`. A
+   catch-all PreToolUse hook installed into the plugin cache never fired for any tool, even
+   with `--dangerously-bypass-hook-trust`, so the matcher was not what failed. The hook
+   *capability* is live (`hooks  stable  true`): the same wrapper registered at user scope in
+   `$CODEX_HOME/hooks.json` fired, exited 2, and blocked the mutation. Codex's edit tool
+   surfaces to hooks as **`apply_patch`** and its shell tool as **`Bash`**, and the target
+   path arrives inside `tool_input.command` as an apply-patch body
+   (`*** Update File: <path>`), **not** in `tool_input.file_path`.
+4. **The cachebuster loop does drive `install.update`.**
+   `update_plugin_cachebuster.py` printed `Updated plugin version: 0.0.1 -> 0.0.1+codex.<utc>`,
+   `codex plugin add <plugin>@<marketplace>` reinstalled into a cache root named for the new
+   version, and `codex plugin list` reported it. No `update` verb is needed.
+
+## Corrections this package needs before it is used again
+
+These are recorded, not applied: the committed package is what the published evidence was
+gathered against, and editing it now would leave the evidence describing something that no
+longer exists. Apply them in a follow-up.
+
+- `hooks.json` cannot ship in the plugin on codex-cli 0.145.0. A Kinglet mutation guard has
+  to be installed into `$CODEX_HOME/hooks.json` (or a project hook config), not carried by
+  the plugin.
+- The matcher must be `apply_patch`, not `Write|Edit`.
+- `hooks/pre-mutation-hook.sh` must parse the target out of `tool_input.command`'s
+  `*** Update File:` / `*** Add File:` / `*** Delete File:` line. Its current
+  `.tool_input.file_path` lookup finds nothing on a real Codex event and allows the write.
+- `agents/` has no effect: `plugin.json`'s accepted top-level fields (per the CLI's own
+  bundled validator) are `id`, `name`, `version`, `description`, `skills`, `apps`,
+  `mcpServers`, `interface`, `author`, `homepage`, `repository`, `license`, `keywords` —
+  there is no `agents` surface. Codex's multi-agent tools (`collaboration.spawn_agent`)
+  take a free-text task name with no plugin agent registry behind them.
+- `codex plugin remove` requires the qualified `<plugin>@<marketplace>` form; the bare name
+  errors. Removing the plugin leaves the marketplace registered — a full teardown also needs
+  `codex plugin marketplace remove <marketplace>`.

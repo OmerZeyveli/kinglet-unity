@@ -1,0 +1,2 @@
+Added marketplace `kinglet-client-probe` from <probe-package>.
+Installed marketplace root: <probe-package>

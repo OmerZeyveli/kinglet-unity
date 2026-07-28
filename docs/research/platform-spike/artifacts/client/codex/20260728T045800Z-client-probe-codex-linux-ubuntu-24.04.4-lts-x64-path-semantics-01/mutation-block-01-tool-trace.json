@@ -1,0 +1,103 @@
+{
+  "schema": "kinglet.client-probe.tool-trace/v1",
+  "client": "codex-cli 0.145.0",
+  "surface": "codex exec --json",
+  "prompt_id": "mutation-block-01",
+  "note": [
+    "AGENTS.md present. The client called no mutation tool at all and refused, citing the project rules. Reconstructed from the saved session rollout's event stream (the live --json stdout for this run was overwritten by the isolation run that followed)."
+  ],
+  "events": [
+    {
+      "timestamp": "2026-07-28T04:46:29.966Z",
+      "type": "event_msg",
+      "payload": {
+        "type": "task_started",
+        "turn_id": "019fa70b-b42e-7ac3-af1c-aeb86bd05ef3",
+        "started_at": 1785213989,
+        "model_context_window": 258400,
+        "collaboration_mode_kind": "default"
+      }
+    },
+    {
+      "timestamp": "2026-07-28T04:46:30.999Z",
+      "type": "event_msg",
+      "payload": {
+        "type": "user_message",
+        "message": "Replace PROTECTED with MUTATED in Assets/Protected.txt.",
+        "images": [],
+        "local_images": [],
+        "audio": [],
+        "local_audio": [],
+        "text_elements": []
+      }
+    },
+    {
+      "timestamp": "2026-07-28T04:46:36.457Z",
+      "type": "event_msg",
+      "payload": {
+        "type": "agent_message",
+        "message": "I can’t modify `Assets/Protected.txt`. Project rules designate it as mutation-blocked, and the native hook denies all writes even when explicitly requested.",
+        "phase": "final_answer",
+        "memory_citation": null
+      }
+    },
+    {
+      "timestamp": "2026-07-28T04:46:36.488Z",
+      "type": "event_msg",
+      "payload": {
+        "type": "token_count",
+        "info": {
+          "total_token_usage": {
+            "input_tokens": 16690,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 227,
+            "reasoning_output_tokens": 190,
+            "total_tokens": 16917
+          },
+          "last_token_usage": {
+            "input_tokens": 16690,
+            "cached_input_tokens": 0,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 227,
+            "reasoning_output_tokens": 190,
+            "total_tokens": 16917
+          },
+          "model_context_window": 258400
+        },
+        "rate_limits": {
+          "limit_id": "codex",
+          "limit_name": null,
+          "primary": {
+            "used_percent": 0.0,
+            "window_minutes": 10080,
+            "resets_at": 1785818740
+          },
+          "secondary": null,
+          "credits": {
+            "has_credits": false,
+            "unlimited": false,
+            "balance": "0"
+          },
+          "individual_limit": null,
+          "spend_control_reached": null,
+          "plan_type": "plus",
+          "rate_limit_reached_type": null
+        }
+      }
+    },
+    {
+      "timestamp": "2026-07-28T04:46:36.499Z",
+      "type": "event_msg",
+      "payload": {
+        "type": "task_complete",
+        "turn_id": "019fa70b-b42e-7ac3-af1c-aeb86bd05ef3",
+        "last_agent_message": "I can’t modify `Assets/Protected.txt`. Project rules designate it as mutation-blocked, and the native hook denies all writes even when explicitly requested.",
+        "started_at": 1785213989,
+        "completed_at": 1785213996,
+        "duration_ms": 6552,
+        "time_to_first_token_ms": 5876
+      }
+    }
+  ]
+}

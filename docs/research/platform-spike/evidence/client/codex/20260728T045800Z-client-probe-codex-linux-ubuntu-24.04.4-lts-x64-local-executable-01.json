@@ -1,0 +1,169 @@
+{
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/workflow-tool-trace.json",
+      "required": true,
+      "sha256": "4965f566c74a32fb4c672ad9f134937e6fdbed635f85d6470d77ea9f9e56de75"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/receipts-listing.txt",
+      "required": true,
+      "sha256": "f5aea69861a5422a768c860c18d07575a6a2fae434640b1441f0d3501f44677b"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/prompts-used.json",
+      "required": true,
+      "sha256": "290e9e079c2facafe3e156b8113344d500563a3165ce0fcc808b408ed45ecef6"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/marketplace-add.txt",
+      "required": true,
+      "sha256": "31c892a18ce975744c327d947fc99ce30d0598227028ab5db9da690ff30ac56c"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/marketplace-list.txt",
+      "required": true,
+      "sha256": "6ef6487fcd8858a2649d68331468c290fe2e76545198469cd06203ded33f56b5"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-add.txt",
+      "required": true,
+      "sha256": "b9aac7bd6220c759bc72b3b9d26a7ec88bc590e2f0663043626ed0341c301876"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list.txt",
+      "required": true,
+      "sha256": "29e6ae45396b5ba5af8f7d4858f8c32e1fe0798cea855f6b66611bcd226a98a2"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list.json",
+      "required": true,
+      "sha256": "b4777d699ff3510464dfb72d572019c2e47df650100752eefd751c6c4b2a52fd"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/capability-listing-installed.json",
+      "required": true,
+      "sha256": "62a8903ab5611fa9c7fb218cb6a0b7ff414b596bc775b9bd795166f0a23d3040"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/codex-version.txt",
+      "required": true,
+      "sha256": "f9eb0c462cdded1fb971b33c647ff1b8b491dfe962a1506026e07a06f634f651"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-remove.txt",
+      "required": true,
+      "sha256": "8110a5e9edd34f2d9a6300d46d3d4c3108b68cf66b031034f45dcc1920427f93"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list-after-remove.txt",
+      "required": true,
+      "sha256": "b9026d298c687b317e8560c76ff373639c195a74390564d0a563c30f52c46298"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/config-after-remove.txt",
+      "required": true,
+      "sha256": "21f932749c62768436969a32606278839798af45ca1a500c98c2c11df71dbe87"
+    },
+    {
+      "media_type": "application/json",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/capability-listing-after-remove.json",
+      "required": true,
+      "sha256": "915aea4313f3c4478c0701046e890bc616e3e3f0591f47fefe8439f30ea378ab"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-update.txt",
+      "required": true,
+      "sha256": "c0bf2dc73497dcd1aee5c538810901effdf838fa0c8344675c084a32e35dffeb"
+    },
+    {
+      "media_type": "text/plain",
+      "path": "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list-after-update.txt",
+      "required": true,
+      "sha256": "1d129cd50a5a3c078f9784d04a497348ad3e0005ca2daf173d22e001255d470c"
+    }
+  ],
+  "assertions": [
+    {
+      "detail": "Located and invoked, exit 0. Under the frozen workflow-natural-language-01 prompt the client resolved the packaged binary to an absolute path and ran '<project-root>/.kinglet-probe/bin/kinglet-client-probe exec --project <project-root> --output <project-root>/.kinglet-probe/receipts/workflow.json' as a command_execution item that completed with exit_code 0. The receipt the binary writes appeared on disk with exactly the frozen contents, which is independent confirmation that the process actually ran rather than merely being spawned.",
+      "id": "executable.local",
+      "status": "pass"
+    },
+    {
+      "detail": "Cold discovery succeeded end to end. Against a disposable $CODEX_HOME that started with 'No marketplace plugins found.', 'codex plugin marketplace add <pkg>' registered the local marketplace, 'codex plugin add kinglet-client-probe@kinglet-client-probe' installed it into $CODEX_HOME/plugins/cache/..., and 'codex plugin list' reported STATUS 'installed, enabled' at VERSION 0.0.1 (--json reports installed[0] with installed true, enabled true, source.source 'local'). The capability was then reachable from a session that was never told where it lived: a new `codex exec` session asked to enumerate its skills answered with 'kinglet-client-probe:kinglet-capability-probe' alongside the CLI's built-ins.",
+      "id": "install.discover",
+      "status": "pass"
+    },
+    {
+      "detail": "'codex plugin remove kinglet-client-probe@kinglet-client-probe' reported 'Removed plugin `kinglet-client-probe` from marketplace `kinglet-client-probe`', the following 'codex plugin list' showed STATUS 'not installed' with an empty VERSION, the [plugins.\"kinglet-client-probe@kinglet-client-probe\"] table disappeared from config.toml, and the version directory under the plugin cache was emptied. A NEW session then enumerated its skills and MCP tools and kinglet-client-probe:kinglet-capability-probe was absent, as was any kinglet MCP tool.",
+      "id": "install.remove",
+      "status": "pass"
+    },
+    {
+      "detail": "The documented cachebuster loop applied and was reflected. codex-cli's own bundled helper, scripts/update_plugin_cachebuster.py, rewrote the package manifest in place and printed 'Updated plugin version: 0.0.1 -> 0.0.1+codex.20260728045758'. 'codex plugin add kinglet-client-probe@kinglet-client-probe' then reinstalled it, reporting an installed plugin root ending in '/0.0.1+codex.20260728045758', and the subsequent 'codex plugin list' reported VERSION 0.0.1+codex.20260728045758 with STATUS 'installed, enabled'.",
+      "id": "install.update",
+      "status": "pass"
+    }
+  ],
+  "command": [
+    "codex",
+    "exec",
+    "--json",
+    "-s",
+    "workspace-write",
+    "<frozen-prompt-text-elided>"
+  ],
+  "ended_at": "2026-07-28T04:58:00Z",
+  "environment": {
+    "arch": "x64",
+    "native": true,
+    "os": "linux",
+    "release": "ubuntu-24.04.4-lts",
+    "toolchain": [
+      "codex=0.145.0",
+      "model=gpt-5.6-sol",
+      "jq=jq-1.7",
+      "host=Pop!_OS 24.04 LTS (ID=pop; ID_LIKE=ubuntu debian; codename=noble)",
+      "kernel=7.0.11-76070011-generic"
+    ]
+  },
+  "measurements": [],
+  "probe": {
+    "contract": "kinglet.client-probe.observations/v1",
+    "id": "local-executable"
+  },
+  "prompt": null,
+  "run_id": "20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01",
+  "schema": "kinglet.spike.evidence/v1",
+  "sources": [
+    {
+      "title": "Codex CLI 0.145.0 (@openai/codex)",
+      "url": "https://registry.npmjs.org/@openai/codex"
+    },
+    {
+      "title": "Codex CLI documentation",
+      "url": "https://developers.openai.com/codex/cli/"
+    }
+  ],
+  "started_at": "2026-07-28T04:58:00Z",
+  "status": "pass",
+  "subject": {
+    "id": "codex",
+    "kind": "client",
+    "version": "0.145.0"
+  }
+}

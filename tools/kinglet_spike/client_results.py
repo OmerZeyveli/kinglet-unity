@@ -192,6 +192,15 @@ CLIENT_SOURCES: tuple[tuple[str, tuple[tuple[str, str], ...]], ...] = (
         ("Claude Code documentation",
          "https://code.claude.com/docs/en/overview"),
     )),
+    ("codex", (
+        # The published release the probed build was installed from; the
+        # registry document lists 0.145.0 among its versions.
+        ("Codex CLI {version} (@openai/codex)",
+         "https://registry.npmjs.org/@openai/codex"),
+        # The vendor documentation for the subject.
+        ("Codex CLI documentation",
+         "https://developers.openai.com/codex/cli/"),
+    )),
 )
 
 

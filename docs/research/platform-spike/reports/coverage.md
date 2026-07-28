@@ -16,9 +16,9 @@
 | `client.claude-code.macos-26-arm64.mcp-discovery` | missing | — |
 | `client.claude-code.macos-26-arm64.path-semantics` | missing | — |
 | `client.claude-code.windows-11-x64.capability-suite` | missing | — |
-| `client.codex.linux-ubuntu-24-04-x64.local-executable` | missing | — |
-| `client.codex.linux-ubuntu-24-04-x64.mcp-discovery` | missing | — |
-| `client.codex.linux-ubuntu-24-04-x64.path-semantics` | missing | — |
+| `client.codex.linux-ubuntu-24-04-x64.local-executable` | pass | `20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01` |
+| `client.codex.linux-ubuntu-24-04-x64.mcp-discovery` | fail | `20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01` |
+| `client.codex.linux-ubuntu-24-04-x64.path-semantics` | fail | `20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01` |
 | `client.codex.macos-26-arm64.local-executable` | missing | — |
 | `client.codex.macos-26-arm64.mcp-discovery` | missing | — |
 | `client.codex.macos-26-arm64.path-semantics` | missing | — |

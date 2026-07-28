@@ -1,0 +1,91 @@
+{
+  "schema": "kinglet.client-probe.subagent/v1",
+  "note": [
+    "Codex's multi-agent surface. collaboration.spawn_agent takes a free-text task_name chosen by the model; there is no plugin agent registry to resolve it against. plugin.json's accepted top-level fields (per codex-cli 0.145.0's own bundled validate_plugin.py) are id/name/version/description/skills/apps/mcpServers/interface/author/homepage/repository/license/keywords -- no `agents` field. The packaged agents/ directory was copied into the plugin cache but nothing bound it to the spawned sub-agent, whose agent_role is null and whose receipt follows the AGENTS.md schema rather than the reviewer agent's own kinglet.client-probe.agent/v1."
+  ],
+  "parent_calls": [
+    {
+      "type": "response_item",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_08f13361c24903d5016a6835d4ee9481919758e5c0dc54c21f",
+        "name": "spawn_agent",
+        "namespace": "collaboration",
+        "arguments": {
+          "task_name": "kinglet_capability_reviewer",
+          "fork_turns": "all",
+          "message": "<opaque encrypted blob, 996 chars>"
+        },
+        "call_id": "call_DAvogX2N68aQAiIjaPC4TWqw",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "019fa711-f503-7d40-bb6e-96a9e6806e36"
+        }
+      }
+    },
+    {
+      "type": "response_item",
+      "payload": {
+        "type": "function_call",
+        "id": "fc_08f13361c24903d5016a6835d8bdb0819194a4da02a31be4ca",
+        "name": "wait_agent",
+        "namespace": "collaboration",
+        "arguments": "{\"timeout_ms\":60000}",
+        "call_id": "call_iUTSf9VOO0LbJcYeu7wzQjEy",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "019fa711-f503-7d40-bb6e-96a9e6806e36"
+        }
+      }
+    }
+  ],
+  "subagent_session_meta": {
+    "session_id": "019fa711-f4a7-7270-b4ec-0e83b5e60075",
+    "id": "019fa712-5155-7461-9d4f-08c3f6fd9178",
+    "forked_from_id": "019fa711-f4a7-7270-b4ec-0e83b5e60075",
+    "parent_thread_id": "019fa711-f4a7-7270-b4ec-0e83b5e60075",
+    "timestamp": "2026-07-28T04:53:43.394Z",
+    "cwd": "<project-root>",
+    "originator": "codex_exec",
+    "cli_version": "0.145.0",
+    "source": {
+      "subagent": {
+        "thread_spawn": {
+          "parent_thread_id": "019fa711-f4a7-7270-b4ec-0e83b5e60075",
+          "depth": 1,
+          "agent_path": "/root/kinglet_capability_reviewer",
+          "agent_nickname": "Kepler",
+          "agent_role": null
+        }
+      }
+    },
+    "thread_source": "subagent",
+    "agent_nickname": "Kepler",
+    "agent_path": "/root/kinglet_capability_reviewer",
+    "model_provider": "openai",
+    "history_mode": "legacy",
+    "multi_agent_version": "v2",
+    "context_window": {
+      "window_id": "019fa712-5155-7461-9d4f-08d18a6e6464"
+    },
+    "git": {
+      "commit_hash": "4d16e821dd1465cdf4a6161a9719cb7014b311cd",
+      "branch": "master"
+    }
+  },
+  "subagent_receipt_write": [
+    {
+      "timestamp": "2026-07-28T04:54:22.400Z",
+      "type": "response_item",
+      "payload": {
+        "type": "custom_tool_call",
+        "id": "ctc_02f9d65a7fd8f405016a6835fcf1fc8191a62edcc23c06cbc8",
+        "status": "completed",
+        "call_id": "call_Fb5ODtOo8Xdw74olvhzFMFZj",
+        "name": "apply_patch",
+        "input": "*** Begin Patch\n*** Add File: .kinglet-probe/receipts/agent.json\n+{\n+  \"schema\": \"kinglet.client-probe.receipt/v1\",\n+  \"marker\": \"KINGLET_CLIENT_PROBE_PROJECT\",\n+  \"unity_version\": \"6000.3.11f1\"\n+}\n*** End Patch\n",
+        "internal_chat_message_metadata_passthrough": {
+          "turn_id": "019fa712-51c6-7982-ac8a-bf9a819cb5f2"
+        }
+      }
+    }
+  ]
+}

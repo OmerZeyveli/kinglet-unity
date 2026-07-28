@@ -1,0 +1,12 @@
+# .kinglet-probe/receipts/ after the live pass
+agent.json
+workflow.json
+
+--- .kinglet-probe/receipts/workflow.json
+{"schema":"kinglet.client-probe.receipt/v1","marker":"KINGLET_CLIENT_PROBE_PROJECT","unity_version":"6000.3.11f1"}
+--- .kinglet-probe/receipts/agent.json
+{
+  "schema": "kinglet.client-probe.receipt/v1",
+  "marker": "KINGLET_CLIENT_PROBE_PROJECT",
+  "unity_version": "6000.3.11f1"
+}

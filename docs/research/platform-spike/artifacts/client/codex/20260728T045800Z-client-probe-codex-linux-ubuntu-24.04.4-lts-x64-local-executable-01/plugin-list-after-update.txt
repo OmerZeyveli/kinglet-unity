@@ -1,0 +1,5 @@
+Marketplace `kinglet-client-probe`
+<probe-package>/.agents/plugins/marketplace.json
+
+PLUGIN                                     STATUS              VERSION                     PATH                                                                    
+kinglet-client-probe@kinglet-client-probe  installed, enabled  0.0.1+codex.20260728045758  <probe-package>

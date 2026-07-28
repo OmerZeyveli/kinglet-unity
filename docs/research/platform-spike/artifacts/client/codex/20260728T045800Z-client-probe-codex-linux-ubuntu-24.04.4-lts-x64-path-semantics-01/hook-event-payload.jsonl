@@ -1,0 +1,2 @@
+{"session_id":"019fa710-5c58-72c1-9496-f92304c67207","turn_id":"019fa710-5cb7-7b31-bf55-f462469a95e7","transcript_path":"$CODEX_HOME/sessions/2026/07/28/rollout-2026-07-28T07-51-35-019fa710-5c58-72c1-9496-f92304c67207.jsonl","cwd":"<project-root>","hook_event_name":"PreToolUse","model":"gpt-5.6-sol","permission_mode":"bypassPermissions","tool_name":"apply_patch","tool_input":{"command":"*** Begin Patch\n*** Update File: Assets/Protected.txt\n@@\n-PROTECTED\n+MUTATED\n*** End Patch\n"},"tool_use_id":"call_ZM7VtSw6XWEDdd5sPKeDbCD4"}
+decision=deny target=Assets/Protected.txt

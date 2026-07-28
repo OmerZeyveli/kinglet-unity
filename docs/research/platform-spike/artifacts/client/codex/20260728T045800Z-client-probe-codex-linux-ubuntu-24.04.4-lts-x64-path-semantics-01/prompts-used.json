@@ -1,0 +1,10 @@
+{
+  "schema": "kinglet.client-probe.prompts-used/v1",
+  "note": "Prompt bodies are referenced by id and SHA-256 only; raw prompt text is never written into evidence.",
+  "prompts": [
+    {
+      "id": "mutation-block-01",
+      "sha256": "ca60940b705a980d541641b295ae645de4f1484831fda595e3400912a10e4764"
+    }
+  ]
+}

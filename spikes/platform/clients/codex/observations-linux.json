@@ -1,0 +1,195 @@
+{
+  "schema": "kinglet.client-probe.observations/v1",
+  "subject": "codex",
+  "client_version": "0.145.0",
+  "cases": [
+    {
+      "id": "agents.delegation",
+      "advertised": false,
+      "observed": "A sub-agent was spawned and did the work, but nothing bound it to the plugin's packaged agent definition. The parent thread called collaboration.spawn_agent with task_name 'kinglet_capability_reviewer' -- a free-text string the model composed after reading the name out of SKILL.md and AGENTS.md, not a registry lookup -- and a real child thread ran (thread_source 'subagent', depth 1, agent_role null). That child never received kinglet-capability-reviewer.agent.md: it read SKILL.md and AGENTS.md itself, ignored the agent's declared 'tools: Read' by calling apply_patch and exec_command, and wrote a receipt in the AGENTS.md schema (kinglet.client-probe.receipt/v1) rather than the reviewer's own kinglet.client-probe.agent/v1 with its required 'agreement' field.",
+      "status": "inconclusive",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/agent-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/subagent-spawn.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipt-agent.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/prompts-used.json"
+      ],
+      "notes": "Inconclusive rather than pass, and inconclusive rather than fail. Generic multi-agent delegation plainly works -- the spawn, the child thread and its final answer are all in the artifacts -- so calling this a failure of the client would be wrong. But the case asks for delegation to a NAMED sub-agent that returns ITS structured receipt, and what was observed cannot be distinguished from the model spontaneously spawning a helper and naming it after a string it had just read. Two facts keep it open. First, codex-cli 0.145.0's plugin manifest has no agents surface at all: the accepted top-level plugin.json fields, per the validator the CLI itself ships, are id, name, version, description, skills, apps, mcpServers, interface, author, homepage, repository, license and keywords. The package's agents/ directory was copied verbatim into the installed plugin cache and then had no effect. Second, the receipt that landed does not match the schema the agent definition declares, so 'receipt_saved' in the sense this probe defines it does not hold. Inconclusive rather than Unavailable because no official source was found that states plugin-supplied sub-agents are unsupported -- the validator's field list is strong evidence but it is not a vendor statement about the feature, and this schema requires status=unavailable plus a citation before a capability may be called Unavailable. Closing this cell needs a Codex-native agent-definition surface to exist and be exercised, or a vendor source confirming there is none.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "approvals.mutation",
+      "advertised": true,
+      "observed": "No approval prompt on a mutation was ever surfaced, because the surface under test cannot surface one. Every session ran through `codex exec`, whose turn_context records approval_policy 'never'; asked explicitly to escalate under -s read-only with approval_policy=on-request, the client answered that it 'cannot request escalated permissions under the current approval policy' and the write did not happen. The mutation was blocked in every configuration tested, but by the sandbox or by the hook, never by an observed approval gate on a file write.",
+      "status": "inconclusive",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/s-approval-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/s-approval-file.txt"
+      ],
+      "notes": "Half the expected receipt holds and half is unobservable on this surface. mutation_blocked_without_approval holds -- Assets/Protected.txt is byte-identical before and after every run in which approval was not granted. approval_prompted does not: `codex exec` is non-interactive, so there is no channel on which a prompt could appear, and the client says so in its own words. One adjacent observation is worth recording without counting it toward this case: the plugin MCP server was configured with default_tools_approval_mode 'prompt', and when the client called its tool the call came back with error 'user cancelled MCP tool call' -- the approval gate did engage and did block, it simply auto-cancelled for want of an approver. That is evidence an approval mechanism exists and denies by default; it is not evidence of a prompt on a mutation, which is what this case names. Closing this cell requires an interactive TUI pass by the operator.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "executable.local",
+      "advertised": true,
+      "grade": "Native",
+      "observed": "Located and invoked, exit 0. Under the frozen workflow-natural-language-01 prompt the client resolved the packaged binary to an absolute path and ran '<project-root>/.kinglet-probe/bin/kinglet-client-probe exec --project <project-root> --output <project-root>/.kinglet-probe/receipts/workflow.json' as a command_execution item that completed with exit_code 0. The receipt the binary writes appeared on disk with exactly the frozen contents, which is independent confirmation that the process actually ran rather than merely being spawned.",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/workflow-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/receipts-listing.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/prompts-used.json"
+      ],
+      "notes": "Both halves of the expected receipt are covered by one artifact: executable_found by the resolved absolute path in the command line, invocation_succeeded by exit_code 0 plus the receipt on disk. This is the case Claude Code's linux run could not close -- there the approval gate refused the Bash call twice and the model then chose the MCP tool instead. Codex ran it directly under -s workspace-write. Note that the binary was invoked through Codex's shell tool, not through a dedicated executable surface; the case asks only that the client discover and invoke a local executable, which it did.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "hooks.pre-mutation-block",
+      "advertised": true,
+      "grade": "Native",
+      "observed": "Two distinct results, and the order matters. (1) The hook the PLUGIN registered never fired. Under the frozen mutation-block-01 prompt with project instructions parked, the client mutated Assets/Protected.txt unimpeded. That is not a matcher bug: the plugin's root-level hooks.json was then replaced in the installed cache with a catch-all PreToolUse hook that only logs its stdin and exits 0, and even with --dangerously-bypass-hook-trust it never ran, for any tool. `codex features list` names the reason directly -- 'plugin_hooks  removed  false' -- and writing features.plugin_hooks = true into config.toml leaves the effective state false, because the feature is removed from this build. (2) The hook capability itself is present and blocks. The same wrapper logic, registered at user scope in $CODEX_HOME/hooks.json with matcher 'apply_patch', fired on the frozen prompt, passed the target to the probe binary, got decision 'deny', exited 2 with the reason on stderr, and the mutation was blocked: Assets/Protected.txt is byte-identical before and after, and the client reported 'the workspace's Kinglet protection hook explicitly blocks writes to this protected probe file'.",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/s-hook-block-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/s-hook-block-file.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/hook-event-payload.jsonl",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/s-plugin-hook-nofire-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/features-hooks.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/features-enable-plugin-hooks.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/features-after-enable.txt"
+      ],
+      "notes": "The pass is scored on hook_fired and mutation_blocked, both of which were watched happening, and the deviation that made it possible is recorded rather than hidden: the hook had to be registered at USER scope instead of through the plugin, and the matcher had to be 'apply_patch' instead of the committed 'Write|Edit'. Two of the four questions Steps 1-3 left open are answered here. Codex's file-edit tool surfaces to hooks as 'apply_patch' and its shell tool as 'Bash' -- 'Write|Edit' matches nothing, so the committed hooks.json would not have worked even if the plugin surface were live. And the hook payload carries the target inside tool_input.command as an apply_patch body ('*** Update File: Assets/Protected.txt'), not in tool_input.file_path, so the committed wrapper's jq extraction would have found nothing and allowed the write; the user-scope wrapper parses the '*** Update File:' line instead and delegates the decision to the same probe binary. Exit 2 with the reason on stderr is confirmed as the block signal, matching what the binary's own diagnostic string said. The practical consequence for the toolkit is larger than this cell: on codex-cli 0.145.0 a plugin cannot ship a hook at all, so any Kinglet mutation guard has to be installed into the user or project hook configuration, not carried by the plugin.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "install.discover",
+      "advertised": true,
+      "grade": "Native",
+      "observed": "Cold discovery succeeded end to end. Against a disposable $CODEX_HOME that started with 'No marketplace plugins found.', 'codex plugin marketplace add <pkg>' registered the local marketplace, 'codex plugin add kinglet-client-probe@kinglet-client-probe' installed it into $CODEX_HOME/plugins/cache/..., and 'codex plugin list' reported STATUS 'installed, enabled' at VERSION 0.0.1 (--json reports installed[0] with installed true, enabled true, source.source 'local'). The capability was then reachable from a session that was never told where it lived: a new `codex exec` session asked to enumerate its skills answered with 'kinglet-client-probe:kinglet-capability-probe' alongside the CLI's built-ins.",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/marketplace-add.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/marketplace-list.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-add.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/capability-listing-installed.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/codex-version.txt"
+      ],
+      "notes": "toolkit_version_present is covered by the VERSION column and by --json's version field; capabilities_listed by the cold session's own enumeration. The enumeration prompt is a diagnostic, not one of the four frozen prompts, and it is recorded as such -- it exists because the whole headless approach rested on an unverified assumption (that `codex exec` loads plugins the way the TUI does) and that assumption had to be settled before any other observation could be trusted. It did load skills. Note what it did NOT list: no MCP tool appeared in that enumeration, and no hook. The MCP server proved to be there anyway (see mcp.discover-call); the hook was not (see hooks.pre-mutation-block).",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "install.remove",
+      "advertised": true,
+      "grade": "Native",
+      "observed": "'codex plugin remove kinglet-client-probe@kinglet-client-probe' reported 'Removed plugin `kinglet-client-probe` from marketplace `kinglet-client-probe`', the following 'codex plugin list' showed STATUS 'not installed' with an empty VERSION, the [plugins.\"kinglet-client-probe@kinglet-client-probe\"] table disappeared from config.toml, and the version directory under the plugin cache was emptied. A NEW session then enumerated its skills and MCP tools and kinglet-client-probe:kinglet-capability-probe was absent, as was any kinglet MCP tool.",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-remove.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list-after-remove.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/config-after-remove.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/capability-listing-after-remove.json"
+      ],
+      "notes": "Both halves hold, and no_residual_capabilities is covered by the stronger check Claude Code's run left open -- a fresh session after removal, not merely a listing. A negative result is preserved in the same artifact: the bare name fails, 'codex plugin remove kinglet-client-probe' returns 'Error: plugin requires --marketplace unless passed as <plugin>@<marketplace>', and only the fully qualified <plugin>@<marketplace> form removes it. Removing the plugin does not remove the marketplace: the [marketplaces.kinglet-client-probe] table survives in config.toml and the plugin remains listed as available-but-not-installed, so a full teardown needs 'codex plugin marketplace remove' as well.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "install.update",
+      "advertised": true,
+      "grade": "Native",
+      "observed": "The documented cachebuster loop applied and was reflected. codex-cli's own bundled helper, scripts/update_plugin_cachebuster.py, rewrote the package manifest in place and printed 'Updated plugin version: 0.0.1 -> 0.0.1+codex.20260728045758'. 'codex plugin add kinglet-client-probe@kinglet-client-probe' then reinstalled it, reporting an installed plugin root ending in '/0.0.1+codex.20260728045758', and the subsequent 'codex plugin list' reported VERSION 0.0.1+codex.20260728045758 with STATUS 'installed, enabled'.",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-update.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01/plugin-list-after-update.txt"
+      ],
+      "notes": "This answers the fourth question Steps 1-3 left open: yes, the documented cachebuster loop does drive install.update, and no separate update verb is needed or exists. The deviation the runbook recorded in advance stands as written -- the brief names version '0.0.2', the tested build's own reference explicitly says not to increment numeric components to force a reinstall, and what the client actually reports is 0.0.1+codex.<utc-token>. Under semver, build metadata after '+' does not participate in precedence, so this is an evolution of 0.0.1 rather than the brief's literal 0.0.2; the exact string the client reported is recorded above and in the artifact so a reader can judge that for themselves. update_applied is covered by the reinstall line naming the new cache root, new_version_present by the listing. Reinstalling from the same marketplace name registered at install time is the reference's own documented fallback for a plugin that is not using the personal marketplace file, which is this package's situation.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "instructions.project",
+      "advertised": true,
+      "grade": "Native",
+      "observed": "Project instructions were loaded without being mentioned and were followed, and the filename is AGENTS.md. Given the frozen mutation-block-01 prompt, the client read the target file and then declined, answering 'I can't modify Assets/Protected.txt. Project rules designate it as mutation-blocked, and the native hook denies all writes even when explicitly requested.' It called no mutation tool at all and the file was unchanged. The instructions are carried in the session as a first-class object, not merely as a file the model happened to read: the saved rollout shows them injected as an input_text block headed '# AGENTS.md instructions for <project-root>' and again in a world_state payload under key 'agents_md'.",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/mutation-block-01-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/mutation-block-01-file.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/s-instructions-isolation-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/s-instructions-isolation-file.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/prompts-used.json"
+      ],
+      "notes": "This case has a genuine control, and the control is what makes it a finding rather than an anecdote. Same prompt, same project, same session shape, one variable changed: with AGENTS.md at the project root the client attempted no mutation tool and refused, citing project rules; with AGENTS.md moved aside it went straight to apply_patch and the file read MUTATED. The control also settles the second question Steps 1-3 left open -- Codex's project-instructions filename is AGENTS.md, confirmed at PROJECT scope on this host rather than inferred from the personal-scope file that exists in the operator's real config root. It rules out a confound too: the plugin package also ships the same rule text at rules/kinglet-capability-probe.md and that directory was installed into the plugin cache, so if plugin rules were auto-loaded the refusal would have survived parking AGENTS.md. It did not, so the refusal came from AGENTS.md.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "mcp.discover-call",
+      "advertised": true,
+      "observed": "Discovered by name, called, and the call was cancelled. Under the frozen mcp-call-01 prompt the client emitted an mcp_tool_call item with server 'kinglet-client-probe' and tool 'kinglet_probe_read_marker', with arguments {\"project_root\": \"<project-root>\"} -- the correct server, the correct tool name and the correct argument, none of which were in the prompt. The item then completed with status 'failed' and error 'user cancelled MCP tool call', so no result body was returned and no receipt was saved.",
+      "status": "inconclusive",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/mcp-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/prompts-used.json"
+      ],
+      "notes": "mcp_tool_listed holds; mcp_call_result_present does not. The blocker is the probe's own configuration meeting a headless surface, not a client limitation: the committed .mcp.json sets default_tools_approval_mode 'prompt' because the plan requires 'prompt, never approve', and `codex exec` has no interactive approver, so the prompt resolves as a cancellation. Two further things this observation does establish. The plugin's MCP server registers because plugin.json declares \"mcpServers\": \"./.mcp.json\" -- the mcpServers-wrapped file shape the package was built to was accepted. And the approval mode is not decorative: it engaged, and it denied. This cell is deliberately not closed by relaxing the approval mode or by --dangerously-bypass-approvals-and-sandbox; either would be an unattended auto-approval of an untrusted binary, which is the exact control the disposable-profile constraint exists to preserve. Closing it needs an interactive TUI pass in which the operator approves the call.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "scope.project-user",
+      "advertised": true,
+      "observed": "User scope resolved; project scope was not observed to exist. The marketplace and the install were both recorded in the disposable $CODEX_HOME/config.toml ([marketplaces.kinglet-client-probe] and [plugins.\"kinglet-client-probe@kinglet-client-probe\"]) and 'codex plugin list' returned byte-identical output from inside the disposable project and from an unrelated directory. A project-level .agents/plugins/marketplace.json placed at the project root under a distinct marketplace name was not picked up: neither 'codex plugin list' nor 'codex plugin marketplace list' run from inside that project mentioned it. 'codex plugin add' exposes no --scope flag.",
+      "status": "inconclusive",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/scope-plugin-list-in-project.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/scope-marketplace-list-in-project.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/scope-plugin-list-other-dir.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01/config-after-remove.txt"
+      ],
+      "notes": "user_scope_resolved holds and is unambiguous. project_scope_resolved does not, so the case cannot close, and the honest verdict is inconclusive rather than fail: what was tested was the CLI's listing surface, not an in-session load, and a negative from `codex plugin list` does not by itself prove a session would ignore a project marketplace. It is suggestive that the session's own permission profile grants read access to <project-root>/.agents and <project-root>/.codex, which implies the paths mean something at session scope even though the CLI ignored them. Not Unavailable, because no vendor source was found stating that project-scoped plugin installs do not exist. Codex does resolve SOMETHING per project -- config.toml gained a [projects.\"<project-root>\"] table with trust_level 'trusted', and AGENTS.md is project-scoped and was honoured (see instructions.project) -- but per-project trust state stored in the user config is not the project-scoped settings STORE this case asks for. Closing this cell needs either a documented project-scope install surface exercised live, or a vendor source confirming there is none.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "structured-result",
+      "advertised": true,
+      "grade": "Native",
+      "observed": "A structured JSON receipt was written to disk by the client at the path the probe rules declare. In the agent-delegation-01 run the client used apply_patch to add .kinglet-probe/receipts/agent.json -- the path AGENTS.md reserves for the reviewer -- containing valid JSON with schema kinglet.client-probe.receipt/v1, marker KINGLET_CLIENT_PROBE_PROJECT and unity_version 6000.3.11f1, matching the on-disk marker file and ProjectSettings/ProjectVersion.txt. The post-run listing confirms both that file and .kinglet-probe/receipts/workflow.json on disk with those contents.",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipt-agent.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipt-workflow.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipts-listing.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/subagent-spawn.json"
+      ],
+      "notes": "Both halves of the expected receipt hold: receipt_path_present and receipt_is_valid_json. One qualification, recorded because it matters to a different case rather than to this one: agent.json's CONTENT follows the receipt schema AGENTS.md declares, not the kinglet.client-probe.agent/v1 shape with an 'agreement' field that kinglet-capability-reviewer.agent.md declares, because that agent definition was never loaded. This case asks only that a structured receipt be saved to the declared location and be valid JSON, which it was; the schema divergence is scored against agents.delegation, where it belongs. workflow.json is cited as corroboration only -- it was written by the probe binary the client invoked rather than by the client itself, so agent.json is the artifact that carries this case.",
+      "emulation_mechanism": null
+    },
+    {
+      "id": "workflow.natural-language",
+      "advertised": true,
+      "grade": "Native",
+      "observed": "Invoked by natural language and produced its defined receipt, both halves. Given the frozen workflow-natural-language-01 prompt, the client opened with 'I'm using the installed kinglet-capability-probe skill because it exactly matches this workflow request', loaded the skill body, ran the executable invocation the skill's Step 2 specifies, and returned exactly 'KINGLET_CLIENT_PROBE_OK 6000.3.11f1' -- the string Step 4 mandates, with no additional prose. .kinglet-probe/receipts/workflow.json was created with the frozen schema, marker and unity_version, and no file outside the skill's declared write was touched.",
+      "status": "pass",
+      "source_urls": [],
+      "artifact_paths": [
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/workflow-tool-trace.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipt-workflow.json",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/receipts-listing.txt",
+        "artifacts/client/codex/20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01/prompts-used.json"
+      ],
+      "notes": "workflow_invoked and receipt_matches_schema both hold -- the cell Claude Code's linux run could only half-close. The mechanism is worth recording because it is not Claude Code's: Codex advertises a plugin skill to the session as a name plus its frontmatter description, and the agent then reads the SKILL.md body itself with its shell tool from the installed plugin cache. There is no dedicated Skill tool call in the trace. That still satisfies the prompt's 'Do not search for the skill by filename' constraint -- the client did not go looking, it was handed the location as part of the skill advertisement and matched on the description -- but a reader should know the discovery surface is an advertised-name-plus-description list, not a tool. Graded Native rather than Emulated on that basis: this is Codex's own first-party skills feature working as designed, not a workaround standing in for a missing one.",
+      "emulation_mechanism": null
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "schema": "kinglet.client-probe.tool-trace/v1",
+  "client": "codex-cli 0.145.0",
+  "surface": "codex exec --json",
+  "prompt_id": "mutation-block-01",
+  "note": "Control run: identical prompt, identical project, AGENTS.md moved aside. The client went straight to apply_patch and the file was mutated. This is what makes instructions.project a controlled result rather than an anecdote -- and it is also the run in which the plugin-registered PreToolUse hook failed to fire.",
+  "events": [
+    {
+      "type": "thread.started",
+      "thread_id": "019fa70c-0d68-7352-8d6a-ddf808e6a6fc"
+    },
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "agent_message",
+        "text": "I’ll make the single requested text replacement and verify the file."
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_1",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Protected.txt\"",
+        "aggregated_output": "",
+        "exit_code": null,
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_1",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Protected.txt\"",
+        "aggregated_output": "PROTECTED\n",
+        "exit_code": 0,
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_2",
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "<project-root>/Assets/Protected.txt",
+            "kind": "update"
+          }
+        ],
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_2",
+        "type": "file_change",
+        "changes": [
+          {
+            "path": "<project-root>/Assets/Protected.txt",
+            "kind": "update"
+          }
+        ],
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.started",
+      "item": {
+        "id": "item_3",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Protected.txt\"",
+        "aggregated_output": "",
+        "exit_code": null,
+        "status": "in_progress"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_3",
+        "type": "command_execution",
+        "command": "/bin/bash -lc \"sed -n '1,120p' Assets/Protected.txt\"",
+        "aggregated_output": "MUTATED\n",
+        "exit_code": 0,
+        "status": "completed"
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_4",
+        "type": "agent_message",
+        "text": "Updated [Assets/Protected.txt](<project-root>/Assets/Protected.txt) from `PROTECTED` to `MUTATED`."
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 66113,
+        "cached_input_tokens": 32256,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 368,
+        "reasoning_output_tokens": 0
+      }
+    }
+  ]
+}

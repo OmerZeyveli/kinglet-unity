@@ -1,0 +1,2 @@
+Added plugin `kinglet-client-probe` from marketplace `kinglet-client-probe`.
+Installed plugin root: $CODEX_HOME/plugins/cache/kinglet-client-probe/kinglet-client-probe/0.0.1

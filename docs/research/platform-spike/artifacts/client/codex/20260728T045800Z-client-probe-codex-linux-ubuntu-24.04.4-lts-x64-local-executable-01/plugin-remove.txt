@@ -1,0 +1,4 @@
+--- attempt: plugin remove <name>
+Error: plugin requires --marketplace unless passed as <plugin>@<marketplace>
+--- attempt: plugin remove <name>@<marketplace>
+Removed plugin `kinglet-client-probe` from marketplace `kinglet-client-probe`.

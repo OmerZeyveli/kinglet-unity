@@ -1,0 +1,42 @@
+{
+  "schema": "kinglet.client-probe.tool-trace/v1",
+  "client": "codex-cli 0.145.0",
+  "surface": "codex exec --json",
+  "prompt_id": null,
+  "note": "Approvals probe. Sandbox read-only, approval_policy=on-request, no hook registered. The write was refused by the sandbox and the client reported that it cannot request escalated permissions under this policy: `codex exec` has no channel on which an approval prompt could be surfaced.",
+  "events": [
+    {
+      "type": "thread.started",
+      "thread_id": "019fa711-5796-7cf0-978b-8b15164d7bb6"
+    },
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "agent_message",
+        "text": "I’ll create the file with a shell command and then verify its exact contents."
+      }
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_1",
+        "type": "agent_message",
+        "text": "The shell command was run, but the write failed because the workspace is read-only:\n\n```text\nAssets/ApprovalProbe.txt: Read-only file system\n```\n\nI cannot request escalated permissions under the current approval policy, so the file was not created."
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 32069,
+        "cached_input_tokens": 15104,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 230,
+        "reasoning_output_tokens": 34
+      }
+    }
+  ]
+}

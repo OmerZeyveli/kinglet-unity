@@ -1,0 +1,23 @@
+{
+  "installed": [
+    {
+      "pluginId": "kinglet-client-probe@kinglet-client-probe",
+      "name": "kinglet-client-probe",
+      "marketplaceName": "kinglet-client-probe",
+      "version": "0.0.1",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "<probe-package>"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "<probe-package>"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    }
+  ],
+  "available": []
+}

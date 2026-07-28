@@ -1,0 +1,5 @@
+{
+  "schema": "kinglet.client-probe.receipt/v1",
+  "marker": "KINGLET_CLIENT_PROBE_PROJECT",
+  "unity_version": "6000.3.11f1"
+}

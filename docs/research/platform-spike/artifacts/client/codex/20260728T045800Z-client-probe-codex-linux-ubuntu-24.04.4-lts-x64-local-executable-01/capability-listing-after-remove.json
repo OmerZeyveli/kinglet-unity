@@ -1,0 +1,34 @@
+{
+  "schema": "kinglet.client-probe.tool-trace/v1",
+  "client": "codex-cli 0.145.0",
+  "surface": "codex exec --json",
+  "prompt_id": null,
+  "note": "Same diagnostic prompt in a NEW session after `codex plugin remove`. kinglet-client-probe:kinglet-capability-probe is absent from the listing.",
+  "events": [
+    {
+      "type": "thread.started",
+      "thread_id": "019fa716-a7fc-7553-8847-b96585f633a8"
+    },
+    {
+      "type": "turn.started"
+    },
+    {
+      "type": "item.completed",
+      "item": {
+        "id": "item_0",
+        "type": "agent_message",
+        "text": "- imagegen\n- openai-docs\n- plugin-creator\n- skill-creator\n- skill-installer\n- tool_search\n- functions.wait\n- functions.exec_command\n- functions.write_stdin\n- functions.list_mcp_resources\n- functions.list_mcp_resource_templates\n- functions.read_mcp_resource\n- functions.update_plan\n- functions.request_user_input\n- functions.request_plugin_install\n- functions.view_image\n- functions.get_goal\n- functions.create_goal\n- functions.update_goal\n- functions.exec\n- functions.apply_patch\n- collaboration.followup_task\n- collaboration.interrupt_agent\n- collaboration.list_agents\n- collaboration.send_message\n- collaboration.spawn_agent\n- collaboration.wait_agent\n- web.run\n- image_gen.imagegen"
+      }
+    },
+    {
+      "type": "turn.completed",
+      "usage": {
+        "input_tokens": 16384,
+        "cached_input_tokens": 13056,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 262,
+        "reasoning_output_tokens": 103
+      }
+    }
+  ]
+}
