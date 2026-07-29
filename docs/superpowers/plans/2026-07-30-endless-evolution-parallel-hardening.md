@@ -52,6 +52,21 @@ cp "$MAIN"/*.csproj /tmp/ee-unit-$UNIT/
 ln -sfn "$MAIN/Library" /tmp/ee-unit-$UNIT/Library
 ```
 
+**One-time fix, run once against `$MAIN`, before any worktree is created:** the tracked
+`.gitignore` ignores `Library` with `/[Ll]ibrary/` — the trailing slash means the pattern
+only matches a real directory. A symlink named `Library` does not match it, so every
+worktree above will show `Library` as untracked in `git status --porcelain`. This was
+caught by running S4 end to end, not assumed. Fix it once, centrally, without touching
+the tracked `.gitignore` (which the owner did not ask to change) by adding a local-only
+exclude rule shared across all worktrees via the common `.git` dir:
+
+```bash
+grep -qxF 'Library' "$MAIN/.git/info/exclude" || echo 'Library' >> "$MAIN/.git/info/exclude"
+```
+
+This file is never committed and is shared by every worktree automatically. Do this once
+in the setup phase, not per-agent.
+
 ### Your compile gate
 
 ```bash
@@ -70,6 +85,24 @@ Baseline at the time of writing: **0 errors, 29 warnings.** If your Unit's build
 
 - `Library/` is a symlink into the owner's checkout. If the owner opens Unity while you work, Unity rewrites `Library/ScriptAssemblies` and your build may fail transiently through no fault of your own. Re-run it before concluding anything.
 - The gate proves your code **compiles**. It proves nothing about whether the game still behaves. See "The missing net".
+
+### Read these three before you touch a file
+
+The setup phase ran and left you things. Skipping them will cost you more than reading them.
+
+1. **`docs/hardening/migration-map.md`** — where the project's own guidance was carried, restructured, or left in place, and **four stale claims** found while checking it. It also records gotchas migrated out of `AGENTS.md`, at least one of which is a **real pre-existing bug** (in `DNASample`, Unit 2's territory). These were paid for in someone's debugging time; do not rediscover them.
+
+2. **The project's root `AGENTS.md`.** Yes, actually read it. Its claims were spot-checked and found accurate, and it records incidents — the `UnityEventTools` prefab-override corruption among them — that will not be obvious from the code.
+
+3. **`docs/hardening/baseline.md`** — 0 errors, 29 warnings, grouped by which Unit owns them. **Your Unit's warnings are your starting backlog**, already classified and waiting. Units 1, 4, 6 and 7 have entries; the rest are vendor code and out of scope.
+
+### A known-broken csproj that is not your fault
+
+`Assembly-CSharp-Editor.csproj` currently **fails to build** — a stale generated-file reference, not a code defect. It self-heals the next time the owner opens Unity. The workspace recipe copies `*.csproj` verbatim, so **every worktree inherits it.**
+
+`Assembly-CSharp.csproj` — the one your compile gate builds — is unaffected: 0 errors.
+
+This matters most to **Unit 8**, which owns editor tooling and would otherwise spend an hour investigating it as a regression it caused. If your gate reports errors, check whether they are in `Assembly-CSharp-Editor` before assuming they are yours.
 
 ### The missing net, and what to do about it
 
@@ -120,17 +153,17 @@ Write it the way you would brief a competent colleague who has never seen the fi
 
 ---
 
-## Setup Phase — serial, run once before any Unit
+## Setup Phase — DONE 2026-07-30, all five steps. Evidence: `.superpowers/sdd/ee-setup-phase-report.md`
 
-- [ ] **S1. Create the integration branch.** From `omer-sfx`, create `hardening/base`. Every Unit branches from it and merges back to it. **`omer-sfx` is never touched.**
+- [x] **S1. Create the integration branch.** From `omer-sfx`, create `hardening/base`. Every Unit branches from it and merges back to it. **`omer-sfx` is never touched.**
 
-- [ ] **S2. Record the baseline.** Run the compile gate on `hardening/base` and record the exact error and warning counts into `docs/hardening/baseline.md`. Capture the 29 warnings in full — they are the first concrete backlog and several Units will find their own entries there.
+- [x] **S2. Record the baseline.** Run the compile gate on `hardening/base` and record the exact error and warning counts into `docs/hardening/baseline.md`. Capture the 29 warnings in full — they are the first concrete backlog and several Units will find their own entries there.
 
-- [ ] **S3. Migrate the existing guidance.** This is where the project's `AGENTS.md` and `docs/` tree get restructured into the toolkit's mechanism (rules, skills, subsystem docs) rather than left as a second competing system. Preserve every accurate claim; the survey found them accurate. Where the toolkit has no equivalent structure for something `AGENTS.md` does well, **say so and keep the original** rather than dropping it to fit.
+- [x] **S3. Migrate the existing guidance.** This is where the project's `AGENTS.md` and `docs/` tree get restructured into the toolkit's mechanism (rules, skills, subsystem docs) rather than left as a second competing system. Preserve every accurate claim; the survey found them accurate. Where the toolkit has no equivalent structure for something `AGENTS.md` does well, **say so and keep the original** rather than dropping it to fit.
 
-- [ ] **S4. Prove the workspace recipe once**, end to end: create a throwaway worktree, copy the csprojs, symlink `Library/`, run the gate, confirm `0 Error(s)`, remove the worktree. If any step fails, fix the recipe **before** eight agents hit the same wall.
+- [x] **S4. Prove the workspace recipe once**, end to end: create a throwaway worktree, copy the csprojs, symlink `Library/`, run the gate, confirm `0 Error(s)`, remove the worktree. If any step fails, fix the recipe **before** eight agents hit the same wall.
 
-- [ ] **S5. Write the cross-unit notice file** at `docs/hardening/cross-unit-notices.md`, empty but present, with a header explaining its use: any agent proposing a signature change to one of the ten shared singletons appends a notice here rather than making the change.
+- [x] **S5. Write the cross-unit notice file** at `docs/hardening/cross-unit-notices.md`, empty but present, with a header explaining its use: any agent proposing a signature change to one of the ten shared singletons appends a notice here rather than making the change.
 
 ---
 
