@@ -313,27 +313,45 @@ exists**, and this is worth stating plainly before anyone spends another hour in
 | `windows-11-x64` | none owned — a friend's machine, deferred until the project justifies asking | **blocked, deferred** |
 | `macos-26-x64` | **none, and none expected** | **unreachable** |
 
-`macos-26-x64` has no path to closure. That is not a scheduling problem, it is a permanent gap in a
-frozen matrix, and it means the `host-probe-all-cases-all-hosts` hard gate can never be satisfied as
-written. There are exactly three honest responses and **none of them has been chosen**:
+`macos-26-x64` had no path to closure. That is not a scheduling problem, it was a permanent gap in a
+frozen matrix, and it meant the `host-probe-all-cases-all-hosts` hard gate could never be satisfied
+as written.
 
-1. Amend the matrix to drop `macos-26-x64` (and possibly demote `windows-11-x64`), with the
-   reasoning recorded — Apple has shipped no Intel Mac since 2023 and macOS 26 is the last release
-   to support any of them, so "we do not test Intel Macs" is a defensible product decision, not a
-   dodge.
-2. Amend `rubric-v1.json` to define "every required native host" as a named subset rather than
-   every cell in the matrix.
-3. Leave both open and accept that 0R never closes, taking the runtime decision another way — which
-   contradicts §2 and should be chosen deliberately if at all.
+### Resolved 2026-07-29 — matrix v2, by written amendment
 
-**Do not silently edit the matrix into agreement with the hardware.** The matrix was frozen before
-results existed precisely so it could not be moved to fit them; moving it now needs the amendment
-written down as an amendment. Until one of the three is chosen, `gate 0R` exits 1 and that is the
-correct answer.
+**Do not silently edit a frozen matrix into agreement with the hardware.** It was frozen before
+results existed precisely so it could not be moved to fit them. So it was not edited: `matrix-v1.json`
+stays on disk untouched, and `spikes/platform/contracts/matrix-v2.json` (`kinglet.spike.matrix/v2`,
+`supersedes: kinglet.spike.matrix/v1`) adds two things.
 
-The interim position the user has taken: **the Windows 10 cells stand in for Windows**, and the
-Windows 11 pass waits until the project is far enough along to be worth asking a friend for their
-machine.
+A per-cell `disposition` — `required` (the default), `deferred`, or `dropped` — and a top-level
+`amendments` array. The coupling between them is the whole mechanism: **a cell may leave `required`
+only if a committed amendment names it and says why**, and an amendment naming a cell that is still
+required, or a cell that does not exist, is refused. Marking a cell deferred therefore costs exactly
+as much as writing the reason down, which is the only thing separating this from deleting the cell.
+
+Two amendments were recorded:
+
+| Amendment | Cells | Disposition |
+| --- | --- | --- |
+| `2026-07-29-no-intel-mac` | 4 × `macos-26-x64` runtime | **dropped** — no Intel Mac is owned and none is expected. Apple has shipped none since 2023 and macOS 26 is the last release to support any, so x86-64 macOS is a platform Kinglet does not target rather than one it failed to test. |
+| `2026-07-29-windows-11-deferred` | 19 × `windows-11-x64` | **deferred** — the Windows 10 22H2 pass of §9 is the Windows evidence the project stands on; a Windows 11 pass waits until borrowing a machine is justified. Expected back; re-running needs evidence, not a matrix change. |
+
+`deferred` and `dropped` behave identically for gating, on purpose, and are kept distinct because
+they answer different questions later: *is this cell coming back?*
+
+What did **not** change: the cells are still in the matrix and still in every coverage report, now
+annotated (`missing (dropped)`), so a reader can still see what is not covered and that it was once
+required. `rubric-v1.json` was not touched. Nothing was converted to `pass`.
+
+`tests/kinglet_spike/test_coverage_pin.py` pins the 23 non-required cells as literal data and
+asserts the complement is still required — a silent flip to `deferred` is the one edit that makes a
+gate look better with no new evidence, and every derived test in the suite would stay green through
+it.
+
+**0R and 0U now show only reachable work**: the macOS arm64 pass, the Python probe's Windows
+process-tree omission, and the Linux `live-editor-mcp` cell. Both gates still exit 1, which is
+correct — they are open on things that can actually be done.
 
 ### The macOS release pin is exact — check it before installing anything
 

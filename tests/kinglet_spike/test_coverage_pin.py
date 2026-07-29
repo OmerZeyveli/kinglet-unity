@@ -40,9 +40,47 @@ from tools.kinglet_spike.report import (
 )
 
 REPO = Path(__file__).resolve().parents[2]
-MATRIX = REPO / "spikes/platform/contracts/matrix-v1.json"
-MATRIX_NAME = "spikes/platform/contracts/matrix-v1.json"
+MATRIX = REPO / "spikes/platform/contracts/matrix-v2.json"
+MATRIX_NAME = "spikes/platform/contracts/matrix-v2.json"
 REPORTS = REPO / "docs/research/platform-spike/reports"
+
+
+# Every cell that is NOT `required`, pinned as literal data.
+#
+# This is the pin that matters most in this file. A cell state changes because
+# evidence changed -- visible, reviewable. A DISPOSITION changes because someone
+# edited the matrix, and the effect is that a gate stops waiting for a host:
+# `gate 0R` gets quieter and closer to closing without one new observation. The
+# amendment mechanism forces a written reason into the matrix; this forces the
+# consequence into a diff a reviewer reads.
+#
+# The complement is asserted too, so ADDING a deferred cell fails here just as
+# loudly as removing one.
+PINNED_NON_REQUIRED: tuple[tuple[str, str], ...] = (
+    ("client.antigravity.windows-11-x64.capability-suite", "deferred"),
+    ("client.claude-code.windows-11-x64.capability-suite", "deferred"),
+    ("client.codex.windows-11-x64.capability-suite", "deferred"),
+    ("client.copilot-cli.windows-11-x64.capability-suite", "deferred"),
+    ("client.copilot-vscode.windows-11-x64.capability-suite", "deferred"),
+    ("client.cursor.windows-11-x64.capability-suite", "deferred"),
+    ("runtime.dotnet.macos-26-x64.host-probe", "dropped"),
+    ("runtime.dotnet.windows-11-x64.host-probe", "deferred"),
+    ("runtime.go.macos-26-x64.host-probe", "dropped"),
+    ("runtime.go.windows-11-x64.host-probe", "deferred"),
+    ("runtime.python.macos-26-x64.host-probe", "dropped"),
+    ("runtime.python.windows-11-x64.host-probe", "deferred"),
+    ("runtime.rust.macos-26-x64.host-probe", "dropped"),
+    ("runtime.rust.windows-11-x64.host-probe", "deferred"),
+    ("unity.editor-resolution.windows-11-x64.mismatched-editor", "deferred"),
+    ("unity.execution.windows-11-x64.cancellation", "deferred"),
+    ("unity.execution.windows-11-x64.orphan-cleanup", "deferred"),
+    ("unity.filesystem-only.windows-11-x64.route", "deferred"),
+    ("unity.isolated-headless.windows-11-x64.route", "deferred"),
+    ("unity.live-editor-mcp.windows-11-x64.bridge-not-ready", "deferred"),
+    ("unity.live-editor-mcp.windows-11-x64.route", "deferred"),
+    ("unity.same-project-headless.windows-11-x64.collision-refusal", "deferred"),
+    ("unity.same-project-headless.windows-11-x64.route", "deferred"),
+)
 
 # A cell is "closed" only in state `pass`; every other state leaves it open.
 CLOSED_STATE = "pass"
@@ -56,7 +94,9 @@ PINNED_GATE_OPEN_CELLS = (
     "client.claude-code.macos-26-arm64.local-executable",
     "client.claude-code.macos-26-arm64.mcp-discovery",
     "client.claude-code.macos-26-arm64.path-semantics",
-    "client.claude-code.windows-11-x64.capability-suite",
+    # windows-11-x64.capability-suite is DEFERRED as of the 2026-07-29 amendment,
+    # so it no longer holds this gate open and no longer appears here. It is still
+    # in the coverage report, annotated, which is where "not covered" is recorded.
 )
 
 # The state of every matrix cell as committed. Literal on purpose.
@@ -233,6 +273,41 @@ class CoveragePinTests(unittest.TestCase):
             "`python3 -m tools.kinglet_spike report --matrix "
             f"{MATRIX_NAME}`",
         )
+
+class DispositionPinTests(unittest.TestCase):
+    """Which cells stopped being required, pinned.
+
+    A silent flip to `deferred` is the one change that makes a gate look better
+    without any new evidence, and every other test in the suite recomputes from
+    the matrix, so all of them would stay green.
+    """
+
+    def setUp(self):
+        self.cells = evaluate_coverage(load_published_records(REPO), MATRIX)
+
+    def test_the_non_required_cells_are_exactly_the_pinned_set(self):
+        actual = tuple(
+            sorted(
+                (cell.id, cell.disposition)
+                for cell in self.cells
+                if cell.disposition != "required"
+            )
+        )
+        self.assertEqual(
+            PINNED_NON_REQUIRED,
+            actual,
+            "the set of cells excused from their gate changed; gained "
+            f"{sorted(set(actual) - set(PINNED_NON_REQUIRED))}, lost "
+            f"{sorted(set(PINNED_NON_REQUIRED) - set(actual))}",
+        )
+
+    def test_every_other_cell_is_still_required(self):
+        excused = {cell_id for cell_id, _ in PINNED_NON_REQUIRED}
+        for cell in self.cells:
+            if cell.id not in excused:
+                self.assertEqual(
+                    "required", cell.disposition, f"{cell.id} was quietly excused"
+                )
 
 
 class GateOpenItemPinTests(unittest.TestCase):

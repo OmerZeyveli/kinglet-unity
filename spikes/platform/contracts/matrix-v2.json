@@ -1,0 +1,1051 @@
+{
+  "amendments": [
+    {
+      "cells": [
+        "runtime.dotnet.macos-26-x64.host-probe",
+        "runtime.go.macos-26-x64.host-probe",
+        "runtime.python.macos-26-x64.host-probe",
+        "runtime.rust.macos-26-x64.host-probe"
+      ],
+      "date": "2026-07-29",
+      "decided_by": "repository owner",
+      "disposition": "dropped",
+      "id": "2026-07-29-no-intel-mac",
+      "reason": "No Intel Mac is owned and none is expected. Apple has shipped no Intel Mac since 2023 and macOS 26 is the last release to support any of them, so x86-64 macOS is a platform Kinglet does not target rather than one it has failed to test. Kept in the matrix as a dropped cell, not deleted, so the coverage report still shows that this was once required and why it stopped being so."
+    },
+    {
+      "cells": [
+        "client.antigravity.windows-11-x64.capability-suite",
+        "client.claude-code.windows-11-x64.capability-suite",
+        "client.codex.windows-11-x64.capability-suite",
+        "client.copilot-cli.windows-11-x64.capability-suite",
+        "client.copilot-vscode.windows-11-x64.capability-suite",
+        "client.cursor.windows-11-x64.capability-suite",
+        "runtime.dotnet.windows-11-x64.host-probe",
+        "runtime.go.windows-11-x64.host-probe",
+        "runtime.python.windows-11-x64.host-probe",
+        "runtime.rust.windows-11-x64.host-probe",
+        "unity.editor-resolution.windows-11-x64.mismatched-editor",
+        "unity.execution.windows-11-x64.cancellation",
+        "unity.execution.windows-11-x64.orphan-cleanup",
+        "unity.filesystem-only.windows-11-x64.route",
+        "unity.isolated-headless.windows-11-x64.route",
+        "unity.live-editor-mcp.windows-11-x64.bridge-not-ready",
+        "unity.live-editor-mcp.windows-11-x64.route",
+        "unity.same-project-headless.windows-11-x64.collision-refusal",
+        "unity.same-project-headless.windows-11-x64.route"
+      ],
+      "date": "2026-07-29",
+      "decided_by": "repository owner",
+      "disposition": "deferred",
+      "id": "2026-07-29-windows-11-deferred",
+      "reason": "No Windows 11 machine is owned. The Windows 10 22H2 x64 host pass of 2026-07-28 is the Windows evidence the project stands on for now; a Windows 11 pass waits until the project is far enough along to justify borrowing a machine. Deferred rather than dropped: these cells are expected back, and re-running them requires no matrix change, only evidence."
+    }
+  ],
+  "cells": [
+    {
+      "arch": "x64",
+      "id": "client.antigravity.linux-ubuntu-24-04-x64.local-executable",
+      "os": "linux",
+      "probe": "local-executable",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "antigravity",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.antigravity.linux-ubuntu-24-04-x64.mcp-discovery",
+      "os": "linux",
+      "probe": "mcp-discovery",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "antigravity",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.antigravity.linux-ubuntu-24-04-x64.path-semantics",
+      "os": "linux",
+      "probe": "path-semantics",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "antigravity",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.antigravity.macos-26-arm64.local-executable",
+      "os": "macos",
+      "probe": "local-executable",
+      "release": "26.5.2",
+      "subject": {
+        "id": "antigravity",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.antigravity.macos-26-arm64.mcp-discovery",
+      "os": "macos",
+      "probe": "mcp-discovery",
+      "release": "26.5.2",
+      "subject": {
+        "id": "antigravity",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.antigravity.macos-26-arm64.path-semantics",
+      "os": "macos",
+      "probe": "path-semantics",
+      "release": "26.5.2",
+      "subject": {
+        "id": "antigravity",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "client.antigravity.windows-11-x64.capability-suite",
+      "os": "windows",
+      "probe": "client-capability-suite",
+      "release": "11-25H2",
+      "subject": {
+        "id": "antigravity",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.claude-code.linux-ubuntu-24-04-x64.local-executable",
+      "os": "linux",
+      "probe": "local-executable",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "claude-code",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.claude-code.linux-ubuntu-24-04-x64.mcp-discovery",
+      "os": "linux",
+      "probe": "mcp-discovery",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "claude-code",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.claude-code.linux-ubuntu-24-04-x64.path-semantics",
+      "os": "linux",
+      "probe": "path-semantics",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "claude-code",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.claude-code.macos-26-arm64.local-executable",
+      "os": "macos",
+      "probe": "local-executable",
+      "release": "26.5.2",
+      "subject": {
+        "id": "claude-code",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.claude-code.macos-26-arm64.mcp-discovery",
+      "os": "macos",
+      "probe": "mcp-discovery",
+      "release": "26.5.2",
+      "subject": {
+        "id": "claude-code",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.claude-code.macos-26-arm64.path-semantics",
+      "os": "macos",
+      "probe": "path-semantics",
+      "release": "26.5.2",
+      "subject": {
+        "id": "claude-code",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "client.claude-code.windows-11-x64.capability-suite",
+      "os": "windows",
+      "probe": "client-capability-suite",
+      "release": "11-25H2",
+      "subject": {
+        "id": "claude-code",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.codex.linux-ubuntu-24-04-x64.local-executable",
+      "os": "linux",
+      "probe": "local-executable",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "codex",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.codex.linux-ubuntu-24-04-x64.mcp-discovery",
+      "os": "linux",
+      "probe": "mcp-discovery",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "codex",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.codex.linux-ubuntu-24-04-x64.path-semantics",
+      "os": "linux",
+      "probe": "path-semantics",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "codex",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.codex.macos-26-arm64.local-executable",
+      "os": "macos",
+      "probe": "local-executable",
+      "release": "26.5.2",
+      "subject": {
+        "id": "codex",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.codex.macos-26-arm64.mcp-discovery",
+      "os": "macos",
+      "probe": "mcp-discovery",
+      "release": "26.5.2",
+      "subject": {
+        "id": "codex",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.codex.macos-26-arm64.path-semantics",
+      "os": "macos",
+      "probe": "path-semantics",
+      "release": "26.5.2",
+      "subject": {
+        "id": "codex",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "client.codex.windows-11-x64.capability-suite",
+      "os": "windows",
+      "probe": "client-capability-suite",
+      "release": "11-25H2",
+      "subject": {
+        "id": "codex",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.copilot-cli.linux-ubuntu-24-04-x64.local-executable",
+      "os": "linux",
+      "probe": "local-executable",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "copilot-cli",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.copilot-cli.linux-ubuntu-24-04-x64.mcp-discovery",
+      "os": "linux",
+      "probe": "mcp-discovery",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "copilot-cli",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.copilot-cli.linux-ubuntu-24-04-x64.path-semantics",
+      "os": "linux",
+      "probe": "path-semantics",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "copilot-cli",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.copilot-cli.macos-26-arm64.local-executable",
+      "os": "macos",
+      "probe": "local-executable",
+      "release": "26.5.2",
+      "subject": {
+        "id": "copilot-cli",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.copilot-cli.macos-26-arm64.mcp-discovery",
+      "os": "macos",
+      "probe": "mcp-discovery",
+      "release": "26.5.2",
+      "subject": {
+        "id": "copilot-cli",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.copilot-cli.macos-26-arm64.path-semantics",
+      "os": "macos",
+      "probe": "path-semantics",
+      "release": "26.5.2",
+      "subject": {
+        "id": "copilot-cli",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "client.copilot-cli.windows-11-x64.capability-suite",
+      "os": "windows",
+      "probe": "client-capability-suite",
+      "release": "11-25H2",
+      "subject": {
+        "id": "copilot-cli",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.local-executable",
+      "os": "linux",
+      "probe": "local-executable",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "copilot-vscode",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.mcp-discovery",
+      "os": "linux",
+      "probe": "mcp-discovery",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "copilot-vscode",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.path-semantics",
+      "os": "linux",
+      "probe": "path-semantics",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "copilot-vscode",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.copilot-vscode.macos-26-arm64.local-executable",
+      "os": "macos",
+      "probe": "local-executable",
+      "release": "26.5.2",
+      "subject": {
+        "id": "copilot-vscode",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.copilot-vscode.macos-26-arm64.mcp-discovery",
+      "os": "macos",
+      "probe": "mcp-discovery",
+      "release": "26.5.2",
+      "subject": {
+        "id": "copilot-vscode",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.copilot-vscode.macos-26-arm64.path-semantics",
+      "os": "macos",
+      "probe": "path-semantics",
+      "release": "26.5.2",
+      "subject": {
+        "id": "copilot-vscode",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "client.copilot-vscode.windows-11-x64.capability-suite",
+      "os": "windows",
+      "probe": "client-capability-suite",
+      "release": "11-25H2",
+      "subject": {
+        "id": "copilot-vscode",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.cursor.linux-ubuntu-24-04-x64.local-executable",
+      "os": "linux",
+      "probe": "local-executable",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "cursor",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.cursor.linux-ubuntu-24-04-x64.mcp-discovery",
+      "os": "linux",
+      "probe": "mcp-discovery",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "cursor",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "client.cursor.linux-ubuntu-24-04-x64.path-semantics",
+      "os": "linux",
+      "probe": "path-semantics",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "cursor",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.cursor.macos-26-arm64.local-executable",
+      "os": "macos",
+      "probe": "local-executable",
+      "release": "26.5.2",
+      "subject": {
+        "id": "cursor",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.cursor.macos-26-arm64.mcp-discovery",
+      "os": "macos",
+      "probe": "mcp-discovery",
+      "release": "26.5.2",
+      "subject": {
+        "id": "cursor",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "client.cursor.macos-26-arm64.path-semantics",
+      "os": "macos",
+      "probe": "path-semantics",
+      "release": "26.5.2",
+      "subject": {
+        "id": "cursor",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "client.cursor.windows-11-x64.capability-suite",
+      "os": "windows",
+      "probe": "client-capability-suite",
+      "release": "11-25H2",
+      "subject": {
+        "id": "cursor",
+        "kind": "client"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "runtime.dotnet.linux-ubuntu-24-04-x64.host-probe",
+      "os": "linux",
+      "probe": "host-probe",
+      "release": "ubuntu-24.04-noble",
+      "subject": {
+        "id": "dotnet",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "runtime.dotnet.macos-26-arm64.host-probe",
+      "os": "macos",
+      "probe": "host-probe",
+      "release": "26.5.2",
+      "subject": {
+        "id": "dotnet",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "dropped",
+      "id": "runtime.dotnet.macos-26-x64.host-probe",
+      "os": "macos",
+      "probe": "host-probe",
+      "release": "26.5.2",
+      "subject": {
+        "id": "dotnet",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "runtime.dotnet.windows-10-x64.host-probe",
+      "os": "windows",
+      "probe": "host-probe",
+      "release": "10-22H2",
+      "subject": {
+        "id": "dotnet",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "runtime.dotnet.windows-11-x64.host-probe",
+      "os": "windows",
+      "probe": "host-probe",
+      "release": "11-25H2",
+      "subject": {
+        "id": "dotnet",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "runtime.go.linux-ubuntu-24-04-x64.host-probe",
+      "os": "linux",
+      "probe": "host-probe",
+      "release": "ubuntu-24.04-noble",
+      "subject": {
+        "id": "go",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "runtime.go.macos-26-arm64.host-probe",
+      "os": "macos",
+      "probe": "host-probe",
+      "release": "26.5.2",
+      "subject": {
+        "id": "go",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "dropped",
+      "id": "runtime.go.macos-26-x64.host-probe",
+      "os": "macos",
+      "probe": "host-probe",
+      "release": "26.5.2",
+      "subject": {
+        "id": "go",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "runtime.go.windows-10-x64.host-probe",
+      "os": "windows",
+      "probe": "host-probe",
+      "release": "10-22H2",
+      "subject": {
+        "id": "go",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "runtime.go.windows-11-x64.host-probe",
+      "os": "windows",
+      "probe": "host-probe",
+      "release": "11-25H2",
+      "subject": {
+        "id": "go",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "runtime.python.linux-ubuntu-24-04-x64.host-probe",
+      "os": "linux",
+      "probe": "host-probe",
+      "release": "ubuntu-24.04-noble",
+      "subject": {
+        "id": "python",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "runtime.python.macos-26-arm64.host-probe",
+      "os": "macos",
+      "probe": "host-probe",
+      "release": "26.5.2",
+      "subject": {
+        "id": "python",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "dropped",
+      "id": "runtime.python.macos-26-x64.host-probe",
+      "os": "macos",
+      "probe": "host-probe",
+      "release": "26.5.2",
+      "subject": {
+        "id": "python",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "runtime.python.windows-10-x64.host-probe",
+      "os": "windows",
+      "probe": "host-probe",
+      "release": "10-22H2",
+      "subject": {
+        "id": "python",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "runtime.python.windows-11-x64.host-probe",
+      "os": "windows",
+      "probe": "host-probe",
+      "release": "11-25H2",
+      "subject": {
+        "id": "python",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "runtime.rust.linux-ubuntu-24-04-x64.host-probe",
+      "os": "linux",
+      "probe": "host-probe",
+      "release": "ubuntu-24.04-noble",
+      "subject": {
+        "id": "rust",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "runtime.rust.macos-26-arm64.host-probe",
+      "os": "macos",
+      "probe": "host-probe",
+      "release": "26.5.2",
+      "subject": {
+        "id": "rust",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "dropped",
+      "id": "runtime.rust.macos-26-x64.host-probe",
+      "os": "macos",
+      "probe": "host-probe",
+      "release": "26.5.2",
+      "subject": {
+        "id": "rust",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "runtime.rust.windows-10-x64.host-probe",
+      "os": "windows",
+      "probe": "host-probe",
+      "release": "10-22H2",
+      "subject": {
+        "id": "rust",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "runtime.rust.windows-11-x64.host-probe",
+      "os": "windows",
+      "probe": "host-probe",
+      "release": "11-25H2",
+      "subject": {
+        "id": "rust",
+        "kind": "runtime"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.editor-resolution.linux-ubuntu-24-04-x64.mismatched-editor",
+      "os": "linux",
+      "probe": "mismatched-editor",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.editor-resolution.macos-26-arm64.mismatched-editor",
+      "os": "macos",
+      "probe": "mismatched-editor",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.editor-resolution.windows-11-x64.mismatched-editor",
+      "os": "windows",
+      "probe": "mismatched-editor",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.execution.linux-ubuntu-24-04-x64.cancellation",
+      "os": "linux",
+      "probe": "cancellation",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.execution.linux-ubuntu-24-04-x64.orphan-cleanup",
+      "os": "linux",
+      "probe": "orphan-cleanup",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.execution.macos-26-arm64.cancellation",
+      "os": "macos",
+      "probe": "cancellation",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.execution.macos-26-arm64.orphan-cleanup",
+      "os": "macos",
+      "probe": "orphan-cleanup",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.execution.windows-11-x64.cancellation",
+      "os": "windows",
+      "probe": "cancellation",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.execution.windows-11-x64.orphan-cleanup",
+      "os": "windows",
+      "probe": "orphan-cleanup",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.filesystem-only.linux-ubuntu-24-04-x64.route",
+      "os": "linux",
+      "probe": "filesystem-only",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.filesystem-only.macos-26-arm64.route",
+      "os": "macos",
+      "probe": "filesystem-only",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.filesystem-only.windows-11-x64.route",
+      "os": "windows",
+      "probe": "filesystem-only",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.isolated-headless.linux-ubuntu-24-04-x64.route",
+      "os": "linux",
+      "probe": "isolated-headless",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.isolated-headless.macos-26-arm64.route",
+      "os": "macos",
+      "probe": "isolated-headless",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.isolated-headless.windows-11-x64.route",
+      "os": "windows",
+      "probe": "isolated-headless",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.live-editor-mcp.linux-ubuntu-24-04-x64.bridge-not-ready",
+      "os": "linux",
+      "probe": "bridge-not-ready",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.live-editor-mcp.linux-ubuntu-24-04-x64.route",
+      "os": "linux",
+      "probe": "live-editor-mcp",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.live-editor-mcp.macos-26-arm64.bridge-not-ready",
+      "os": "macos",
+      "probe": "bridge-not-ready",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.live-editor-mcp.macos-26-arm64.route",
+      "os": "macos",
+      "probe": "live-editor-mcp",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.live-editor-mcp.windows-11-x64.bridge-not-ready",
+      "os": "windows",
+      "probe": "bridge-not-ready",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.live-editor-mcp.windows-11-x64.route",
+      "os": "windows",
+      "probe": "live-editor-mcp",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.same-project-headless.linux-ubuntu-24-04-x64.collision-refusal",
+      "os": "linux",
+      "probe": "collision-refusal",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "id": "unity.same-project-headless.linux-ubuntu-24-04-x64.route",
+      "os": "linux",
+      "probe": "same-project-headless",
+      "release": "ubuntu-24.04.4-lts",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.same-project-headless.macos-26-arm64.collision-refusal",
+      "os": "macos",
+      "probe": "collision-refusal",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "arm64",
+      "id": "unity.same-project-headless.macos-26-arm64.route",
+      "os": "macos",
+      "probe": "same-project-headless",
+      "release": "26.5.2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.same-project-headless.windows-11-x64.collision-refusal",
+      "os": "windows",
+      "probe": "collision-refusal",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    },
+    {
+      "arch": "x64",
+      "disposition": "deferred",
+      "id": "unity.same-project-headless.windows-11-x64.route",
+      "os": "windows",
+      "probe": "same-project-headless",
+      "release": "11-25H2",
+      "subject": {
+        "id": "execution",
+        "kind": "unity"
+      }
+    }
+  ],
+  "schema": "kinglet.spike.matrix/v2",
+  "supersedes": "kinglet.spike.matrix/v1"
+}

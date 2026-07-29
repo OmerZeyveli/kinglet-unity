@@ -83,6 +83,9 @@ class CoverageCell:
     id: str
     state: str
     run_ids: tuple[str, ...]
+    # "required" | "deferred" | "dropped". Defaulted so a v1 matrix, which has no
+    # disposition at all, keeps producing exactly what it always did.
+    disposition: str = "required"
 
 
 @dataclass(frozen=True)

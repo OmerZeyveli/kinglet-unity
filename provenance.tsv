@@ -563,3 +563,5 @@ docs/research/platform-spike/evidence/runtime/rust/20260728T170051Z-runtime-rust
 docs/research/platform-spike/artifacts/runtime/rust/20260728T170051Z-runtime-rust-windows-10-22h2-x64-01/result.json	original	-	-	-	original	kinglet-0r-windows-rust-w10-22h2-host-probe-result
 docs/research/platform-spike/evidence/runtime/dotnet/20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01.json	original	-	-	-	original	kinglet-0r-windows-dotnet-w10-22h2-evidence-record
 docs/research/platform-spike/artifacts/runtime/dotnet/20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01/result.json	original	-	-	-	original	kinglet-0r-windows-dotnet-w10-22h2-host-probe-result
+spikes/platform/contracts/matrix-v2.json	original	-	-	-	original	matrix-amendment-v2-dispositions-and-amendment-record
+tests/kinglet_spike/test_matrix_amendment.py	original	-	-	-	original	matrix-amendment-coupling-and-gate-tests

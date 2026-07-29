@@ -38,7 +38,7 @@ def _parser() -> argparse.ArgumentParser:
     unity_report.add_argument(
         "--matrix",
         type=Path,
-        default=Path("spikes/platform/contracts/matrix-v1.json"),
+        default=Path("spikes/platform/contracts/matrix-v2.json"),
     )
 
     gate = commands.add_parser("gate")
@@ -60,8 +60,19 @@ def validate_path(path: Path, repo_root: Path) -> tuple[Diagnostic, ...]:
 
 
 def _all_pass(cells: tuple, prefix: str) -> bool:
+    """Does every cell a gate still REQUIRES pass?
+
+    `bool(selected)` is the vacuity guard: a mistyped prefix selects nothing, and
+    "all of nothing passed" would read as success. It is deliberately checked
+    BEFORE the disposition filter, so a gate whose entire membership was amended
+    away still closes — that gate was abolished by a committed amendment, which is
+    a different thing from a prefix that matches no cell in the matrix at all.
+    """
     selected = tuple(cell for cell in cells if cell.id.startswith(prefix))
-    return bool(selected) and all(cell.state == "pass" for cell in selected)
+    if not selected:
+        return False
+    required = tuple(cell for cell in selected if cell.disposition == "required")
+    return all(cell.state == "pass" for cell in required)
 
 
 def _gate_0a_files(repo_root: Path) -> tuple[Path, ...]:
@@ -88,7 +99,7 @@ def gate_is_closed(gate_id: str, repo_root: Path) -> bool:
     if gate_id == "0A":
         return all(path.is_file() for path in _gate_0a_files(repo_root))
 
-    matrix = repo_root / "spikes/platform/contracts/matrix-v1.json"
+    matrix = repo_root / "spikes/platform/contracts/matrix-v2.json"
     cells = evaluate_coverage(load_published_records(repo_root), matrix)
     if gate_id == "0R":
         return _all_pass(cells, "runtime.")
@@ -133,7 +144,7 @@ def gate_open_items(gate_id: str, repo_root: Path) -> tuple[str, ...]:
     if not prefixes:
         return ()
 
-    matrix = repo_root / "spikes/platform/contracts/matrix-v1.json"
+    matrix = repo_root / "spikes/platform/contracts/matrix-v2.json"
     cells = evaluate_coverage(load_published_records(repo_root), matrix)
     open_items: list[str] = []
     for prefix in prefixes:
@@ -142,6 +153,12 @@ def gate_open_items(gate_id: str, repo_root: Path) -> tuple[str, ...]:
             open_items.append(f"no coverage cell matches prefix {prefix!r}")
             continue
         for cell in selected:
+            # Mirrors _all_pass: a deferred or dropped cell is not keeping this
+            # gate open, so listing it here would name something the operator
+            # cannot act on. It is still in the coverage report, which is where a
+            # reader goes to see what is NOT covered.
+            if cell.disposition != "required":
+                continue
             if cell.state != "pass":
                 runs = ", ".join(cell.run_ids) if cell.run_ids else "-"
                 open_items.append(f"{cell.state:<10} {cell.id}  runs=[{runs}]")

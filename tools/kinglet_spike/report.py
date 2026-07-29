@@ -14,6 +14,21 @@ from .validate import validate_record
 COVERAGE_SCHEMA = "kinglet.spike.coverage/v1"
 
 
+def _state_text(cell: CoverageCell) -> str:
+    """The cell's state, annotated when the cell is no longer required.
+
+    `missing` and "missing because there is no Intel Mac and never will be" are
+    the same state and completely different facts. Without the annotation a
+    reader counts a dropped cell as outstanding work forever, and nothing on the
+    row reveals that the matrix was amended. `required` is left unwritten: it is
+    true of 66 of 89 rows, and repeating it is how the two that matter get
+    skimmed past.
+    """
+    if cell.disposition == "required":
+        return cell.state
+    return f"{cell.state} ({cell.disposition})"
+
+
 def render_markdown(cells: Iterable[CoverageCell]) -> str:
     lines = [
         "# Kinglet Platform Spike Coverage",
@@ -27,7 +42,7 @@ def render_markdown(cells: Iterable[CoverageCell]) -> str:
             if cell.run_ids
             else "—"
         )
-        lines.append(f"| `{cell.id}` | {cell.state} | {runs} |")
+        lines.append(f"| `{cell.id}` | {_state_text(cell)} | {runs} |")
     return "\n".join(lines) + "\n"
 
 
@@ -118,12 +133,17 @@ def render_unity_markdown(
         "`pass` record; `missing` means no host has run it, and `inconclusive`",
         "means a host looked and could not establish the claim.",
         "",
+        "A state followed by `(deferred)` or `(dropped)` is a cell a committed",
+        "matrix amendment excused from its gate — deferred means it is expected",
+        "back, dropped means no hardware exists for it. Neither is covered, and",
+        "neither holds 0U open. See `amendments` in the matrix for the reason.",
+        "",
         "| Cell | State | Runs |",
         "| --- | --- | --- |",
     ]
     for cell in unity_cells:
         runs = ", ".join(f"`{run}`" for run in cell.run_ids) if cell.run_ids else "—"
-        lines.append(f"| `{cell.id}` | {cell.state} | {runs} |")
+        lines.append(f"| `{cell.id}` | {_state_text(cell)} | {runs} |")
     lines += _shared_artifact_lines(unity_records)
     if reasons:
         lines += ["", "## Why the open cells are open", ""]

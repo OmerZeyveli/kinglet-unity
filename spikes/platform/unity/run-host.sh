@@ -237,5 +237,5 @@ if [ "$PUBLISH" = "yes" ]; then
         python3 -m tools.kinglet_spike publish "$record" --repo-root "$REPO_ROOT"
     done
     python3 -m tools.kinglet_spike report --repo-root "$REPO_ROOT" \
-        --matrix spikes/platform/contracts/matrix-v1.json
+        --matrix spikes/platform/contracts/matrix-v2.json
 fi

@@ -1,41 +1,49 @@
 {
   "cells": [
     {
+      "disposition": "required",
       "id": "client.antigravity.linux-ubuntu-24-04-x64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.antigravity.linux-ubuntu-24-04-x64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.antigravity.linux-ubuntu-24-04-x64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.antigravity.macos-26-arm64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.antigravity.macos-26-arm64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.antigravity.macos-26-arm64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "client.antigravity.windows-11-x64.capability-suite",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.claude-code.linux-ubuntu-24-04-x64.local-executable",
       "run_ids": [
         "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-local-executable-01"
@@ -43,6 +51,7 @@
       "state": "fail"
     },
     {
+      "disposition": "required",
       "id": "client.claude-code.linux-ubuntu-24-04-x64.mcp-discovery",
       "run_ids": [
         "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01"
@@ -50,6 +59,7 @@
       "state": "fail"
     },
     {
+      "disposition": "required",
       "id": "client.claude-code.linux-ubuntu-24-04-x64.path-semantics",
       "run_ids": [
         "20260727T095800Z-client-probe-claudecode-linux-ubuntu-24.04.4-lts-x64-path-semantics-01"
@@ -57,26 +67,31 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "client.claude-code.macos-26-arm64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.claude-code.macos-26-arm64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.claude-code.macos-26-arm64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "client.claude-code.windows-11-x64.capability-suite",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.codex.linux-ubuntu-24-04-x64.local-executable",
       "run_ids": [
         "20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-local-executable-01"
@@ -84,6 +99,7 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "client.codex.linux-ubuntu-24-04-x64.mcp-discovery",
       "run_ids": [
         "20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-mcp-discovery-01"
@@ -91,6 +107,7 @@
       "state": "fail"
     },
     {
+      "disposition": "required",
       "id": "client.codex.linux-ubuntu-24-04-x64.path-semantics",
       "run_ids": [
         "20260728T045800Z-client-probe-codex-linux-ubuntu-24.04.4-lts-x64-path-semantics-01"
@@ -98,131 +115,157 @@
       "state": "fail"
     },
     {
+      "disposition": "required",
       "id": "client.codex.macos-26-arm64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.codex.macos-26-arm64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.codex.macos-26-arm64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "client.codex.windows-11-x64.capability-suite",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-cli.linux-ubuntu-24-04-x64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-cli.linux-ubuntu-24-04-x64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-cli.linux-ubuntu-24-04-x64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-cli.macos-26-arm64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-cli.macos-26-arm64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-cli.macos-26-arm64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "client.copilot-cli.windows-11-x64.capability-suite",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-vscode.linux-ubuntu-24-04-x64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-vscode.macos-26-arm64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-vscode.macos-26-arm64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.copilot-vscode.macos-26-arm64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "client.copilot-vscode.windows-11-x64.capability-suite",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.cursor.linux-ubuntu-24-04-x64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.cursor.linux-ubuntu-24-04-x64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.cursor.linux-ubuntu-24-04-x64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.cursor.macos-26-arm64.local-executable",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.cursor.macos-26-arm64.mcp-discovery",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "client.cursor.macos-26-arm64.path-semantics",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "client.cursor.windows-11-x64.capability-suite",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "runtime.dotnet.linux-ubuntu-24-04-x64.host-probe",
       "run_ids": [
         "20260727T051518Z-runtime-dotnet-linux-noble-01"
@@ -230,16 +273,19 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "runtime.dotnet.macos-26-arm64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "dropped",
       "id": "runtime.dotnet.macos-26-x64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "runtime.dotnet.windows-10-x64.host-probe",
       "run_ids": [
         "20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01"
@@ -247,11 +293,13 @@
       "state": "pass"
     },
     {
+      "disposition": "deferred",
       "id": "runtime.dotnet.windows-11-x64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "runtime.go.linux-ubuntu-24-04-x64.host-probe",
       "run_ids": [
         "20260727T051518Z-runtime-go-linux-noble-01"
@@ -259,16 +307,19 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "runtime.go.macos-26-arm64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "dropped",
       "id": "runtime.go.macos-26-x64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "runtime.go.windows-10-x64.host-probe",
       "run_ids": [
         "20260728T170051Z-runtime-go-windows-10-22h2-x64-01"
@@ -276,11 +327,13 @@
       "state": "pass"
     },
     {
+      "disposition": "deferred",
       "id": "runtime.go.windows-11-x64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "runtime.python.linux-ubuntu-24-04-x64.host-probe",
       "run_ids": [
         "20260727T051518Z-runtime-python-linux-noble-01"
@@ -288,16 +341,19 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "runtime.python.macos-26-arm64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "dropped",
       "id": "runtime.python.macos-26-x64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "runtime.python.windows-10-x64.host-probe",
       "run_ids": [
         "20260728T170051Z-runtime-python-windows-10-22h2-x64-01"
@@ -305,11 +361,13 @@
       "state": "fail"
     },
     {
+      "disposition": "deferred",
       "id": "runtime.python.windows-11-x64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "runtime.rust.linux-ubuntu-24-04-x64.host-probe",
       "run_ids": [
         "20260727T051518Z-runtime-rust-linux-noble-01"
@@ -317,16 +375,19 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "runtime.rust.macos-26-arm64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "dropped",
       "id": "runtime.rust.macos-26-x64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "runtime.rust.windows-10-x64.host-probe",
       "run_ids": [
         "20260728T170051Z-runtime-rust-windows-10-22h2-x64-01"
@@ -334,11 +395,13 @@
       "state": "pass"
     },
     {
+      "disposition": "deferred",
       "id": "runtime.rust.windows-11-x64.host-probe",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.editor-resolution.linux-ubuntu-24-04-x64.mismatched-editor",
       "run_ids": [
         "20260728T132858Z-unity-probe-mismatched-editor-linux-ubuntu-24-04-4-lts-x64-01"
@@ -346,16 +409,19 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "unity.editor-resolution.macos-26-arm64.mismatched-editor",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.editor-resolution.windows-11-x64.mismatched-editor",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.execution.linux-ubuntu-24-04-x64.cancellation",
       "run_ids": [
         "20260728T132858Z-unity-probe-cancellation-linux-ubuntu-24-04-4-lts-x64-01"
@@ -363,6 +429,7 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "unity.execution.linux-ubuntu-24-04-x64.orphan-cleanup",
       "run_ids": [
         "20260728T132858Z-unity-probe-orphan-cleanup-linux-ubuntu-24-04-4-lts-x64-01"
@@ -370,26 +437,31 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "unity.execution.macos-26-arm64.cancellation",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.execution.macos-26-arm64.orphan-cleanup",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.execution.windows-11-x64.cancellation",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.execution.windows-11-x64.orphan-cleanup",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.filesystem-only.linux-ubuntu-24-04-x64.route",
       "run_ids": [
         "20260728T132858Z-unity-probe-filesystem-only-linux-ubuntu-24-04-4-lts-x64-01"
@@ -397,16 +469,19 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "unity.filesystem-only.macos-26-arm64.route",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.filesystem-only.windows-11-x64.route",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.isolated-headless.linux-ubuntu-24-04-x64.route",
       "run_ids": [
         "20260728T132858Z-unity-probe-isolated-headless-linux-ubuntu-24-04-4-lts-x64-01"
@@ -414,16 +489,19 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "unity.isolated-headless.macos-26-arm64.route",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.isolated-headless.windows-11-x64.route",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.live-editor-mcp.linux-ubuntu-24-04-x64.bridge-not-ready",
       "run_ids": [
         "20260728T132858Z-unity-probe-bridge-not-ready-linux-ubuntu-24-04-4-lts-x64-01"
@@ -431,6 +509,7 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "unity.live-editor-mcp.linux-ubuntu-24-04-x64.route",
       "run_ids": [
         "20260728T132858Z-unity-probe-live-editor-mcp-linux-ubuntu-24-04-4-lts-x64-01"
@@ -438,26 +517,31 @@
       "state": "inconclusive"
     },
     {
+      "disposition": "required",
       "id": "unity.live-editor-mcp.macos-26-arm64.bridge-not-ready",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.live-editor-mcp.macos-26-arm64.route",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.live-editor-mcp.windows-11-x64.bridge-not-ready",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.live-editor-mcp.windows-11-x64.route",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.same-project-headless.linux-ubuntu-24-04-x64.collision-refusal",
       "run_ids": [
         "20260728T132858Z-unity-probe-collision-refusal-linux-ubuntu-24-04-4-lts-x64-01"
@@ -465,6 +549,7 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "unity.same-project-headless.linux-ubuntu-24-04-x64.route",
       "run_ids": [
         "20260728T132858Z-unity-probe-same-project-headless-linux-ubuntu-24-04-4-lts-x64-01"
@@ -472,26 +557,30 @@
       "state": "pass"
     },
     {
+      "disposition": "required",
       "id": "unity.same-project-headless.macos-26-arm64.collision-refusal",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "required",
       "id": "unity.same-project-headless.macos-26-arm64.route",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.same-project-headless.windows-11-x64.collision-refusal",
       "run_ids": [],
       "state": "missing"
     },
     {
+      "disposition": "deferred",
       "id": "unity.same-project-headless.windows-11-x64.route",
       "run_ids": [],
       "state": "missing"
     }
   ],
-  "generated_from_matrix": "spikes/platform/contracts/matrix-v1.json",
+  "generated_from_matrix": "spikes/platform/contracts/matrix-v2.json",
   "schema": "kinglet.spike.coverage/v1"
 }
