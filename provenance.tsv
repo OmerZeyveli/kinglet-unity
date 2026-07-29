@@ -575,3 +575,4 @@ tools/kinglet_spike/provenance.py	original	-	-	-	original	kinglet-00d-task3-supp
 tests/kinglet_spike/test_spike_provenance.py	original	-	-	-	original	kinglet-00d-task3-provenance-tests
 docs/research/platform-spike/reports/dependency-provenance.json	original	-	-	-	original	kinglet-00d-task3-generated-provenance-data
 docs/research/platform-spike/reports/dependency-provenance.md	original	-	-	-	original	kinglet-00d-task3-generated-provenance-report
+docs/superpowers/specs/2026-07-29-kinglet-pioneer-design.md	original	-	-	-	original	approved-kinglet-pioneer-edition-design
