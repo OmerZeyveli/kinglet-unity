@@ -76,7 +76,19 @@ assert_contains() {
     local haystack="$1"
     local needle="$2"
     local message="${3:-assert_contains}"
-    if echo "$haystack" | grep -qF "$needle"; then
+    # `grep -qF` exits the instant it finds a match, without reading the rest of its input.
+    # Piping into it (`echo "$haystack" | grep -qF ...`) makes `echo` the write end of a real
+    # pipe: on a haystack bigger than one pipe-buffer write, grep can close its read end while
+    # echo is still writing, and echo dies of SIGPIPE (128+13=141). This runner sources every
+    # test file under `set -euo pipefail` (inherited into the sourcing subshell), so pipefail
+    # reports THAT failure as the pipeline's exit status — even though grep already found the
+    # needle. Two concurrent full suite runs create enough scheduling pressure (CPU contention
+    # from every other test file's subprocesses) for this race to land inside these two
+    # assertions specifically, which is what made receipt lines near the front of a ~20KB
+    # haystack fail unpredictably while later ones passed: it was never the receipt's content.
+    # A here-string has no such race — bash writes it to a temp file before grep ever runs, so
+    # there is no live writer for grep's early exit to signal.
+    if grep -qF -- "$needle" <<< "$haystack"; then
         PASS=$((PASS + 1))
         echo -e "  ${GREEN}PASS${NC} $message"
     else
@@ -91,7 +103,8 @@ assert_not_contains() {
     local haystack="$1"
     local needle="$2"
     local message="${3:-assert_not_contains}"
-    if ! echo "$haystack" | grep -qF "$needle"; then
+    # See assert_contains above — same SIGPIPE-under-pipefail hazard, same here-string fix.
+    if ! grep -qF -- "$needle" <<< "$haystack"; then
         PASS=$((PASS + 1))
         echo -e "  ${GREEN}PASS${NC} $message"
     else

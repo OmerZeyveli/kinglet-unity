@@ -215,7 +215,7 @@ templates/ScriptableObject.cs.template	ecu	1.5.0	templates/ScriptableObject.cs.t
 templates/System.cs.template	ecu	1.5.0	templates/System.cs.template	44eabd3ede128feee0df904d5f55e84fcd034d874a2dae4b9f67f188c01ca4d5	verbatim	-
 templates/View.cs.template	ecu	1.5.0	templates/View.cs.template	c77939301d6476dfd52d8496bc5aad0fff1b1c2f41972616ed664fca8f692dbd	verbatim	-
 tests/fixtures/mkproject.sh	original	-	-	-	original	-
-tests/run-tests.sh	ecu	1.5.0	tests/run-tests.sh	b8c6280bf30aa4834a15255b9f4d3c0f4f3b6aa9e39d7b6c73bd49b334f510d8	modified	test-runner-fix: sourced files ended in exit, killing the runner after file 1; --source-only was unimplemented; dynamic test source is intentional
+tests/run-tests.sh	ecu	1.5.0	tests/run-tests.sh	b8c6280bf30aa4834a15255b9f4d3c0f4f3b6aa9e39d7b6c73bd49b334f510d8	modified	test-runner-fix: sourced files ended in exit, killing the runner after file 1; --source-only was unimplemented; dynamic test source is intentional. Also: assert_contains/assert_not_contains piped `echo "$haystack" | grep -qF` under this runner's inherited pipefail — an early grep match SIGPIPEs echo, and pipefail reports that as the assertion failing even though the needle was found. Concurrent full-suite runs supplied enough scheduling pressure to trigger it. Fixed by replacing the pipe with a here-string, which has no live writer process to SIGPIPE.
 tests/test-bash32-compat.sh	original	-	-	-	original	bash32-static-regression-gate
 tests/test-bash-gate-precision.sh	original	-	-	-	original	pioneer-wave-1b1-task-4: the gate must classify commands, not text that merely co-occurs with a path
 tests/test-hook-advisory-exit.sh	original	-	-	-	original	pins-advisory-stop-hooks-to-exit-0-outside-and-inside-a-git-repository
@@ -588,3 +588,4 @@ docs/superpowers/plans/2026-07-29-kinglet-pioneer-baseline-regenerator.md	origin
 tests/kinglet/test_baseline_regenerator.py	original	-	-	-	original	gates-the-baseline-regeneration-against-laundered-regressions
 docs/research/pioneer/smoke-pass.md	original	-	-	-	original	pioneer-smoke-pass-record-2026-07-29
 docs/superpowers/plans/2026-07-29-kinglet-pioneer-wave-1b1-make-it-work.md	original	-	-	-	original	pioneer-wave-1b1-make-it-work-implementation-plan
+tests/test-assert-helpers-under-load.sh	original	-	-	-	original	regression-test-for-the-assert-contains-sigpipe-under-pipefail-race
