@@ -22,6 +22,28 @@ The scope below comes from a survey at `.superpowers/sdd/surface-selection-surve
 
 **2. The exemption for `core/` skills may rest on nothing.** `docs/ARCHITECTURE.md` and `docs/SKILL-CATALOG.md` both state that the nine `core/` skills marked `alwaysApply: true` are loaded for every agent in every session, which would make their descriptions irrelevant to selection. The survey found **no hook, no `settings.json` entry, and no script anywhere in this repository that reads `alwaysApply` or injects skill content unconditionally.** If it is inert metadata, those skills face exactly the selection failure the smoke pass measured, and the "core skills are safe" assumption in this repo's own documentation is false. Task 1 settles this before anything is scoped around it.
 
+**2a. Task 1 has run. `alwaysApply` is inert, and the scope decision it forced is recorded here.**
+
+Result: **no hook, no `settings.json` entry, no script reads `alwaysApply`.** The serialization probe made zero tool calls and answered from `.claude/rules/serialization.md`. A second probe settled it — a fact that exists **only** in the `commit-trailers` skill was answered correctly only after the model went looking for and read that file itself. Skills marked `alwaysApply: true` are selected from their description like every other skill. `docs/ARCHITECTURE.md` and `docs/SKILL-CATALOG.md` have been corrected (`041c52d`).
+
+So the nine `core/` skills are **not** exempt. But that does not make all nine a rewrite, because five spine rules **do** auto-load, and where a rule already carries a skill's content, the skill never being selected costs nothing:
+
+| Core skill | Covered by an auto-loading rule? | Decision |
+|---|---|---|
+| `serialization-safety` | **Yes** — `serialization.md`, and the probe proved the rule answered the question | Leave |
+| `event-systems` | Largely — `architecture.md`'s MessagePipe section | Leave; record the overlap |
+| `scriptable-objects` | Partly — `architecture.md` | Leave; record the overlap |
+| `object-pooling` | Partly — one line in `performance.md` | Leave; record the overlap |
+| `assembly-definitions` | Partly — one line in `architecture.md` | Leave; record the overlap |
+| `commit-trailers` | **No** | **Rewrite** — process-triggered ("when committing") |
+| `unity-mcp-patterns` | **No** | **Rewrite** |
+| `deep-interview` | **No** | **Rewrite** (already REWRITE) |
+| `model-routing` | **No** | **Rewrite** (already REWRITE) |
+
+**Skills scope becomes 4, not 2.** The 25 non-core knowledge skills are unaffected: they are `globs`-scoped and topic-matched, and nothing measured suggests that is failing.
+
+**A finding to carry forward, not to act on here.** Four skills substantially duplicate content in an auto-loading rule. They cost provenance churn and dilute a 103-surface selection pool while the rule does the actual work. That is consolidation evidence for the deferred stocktake decision — **record it, do not act on it in this wave.**
+
 **3. Sixty-two independent edits would make the problem worse.** Several surfaces cover near-identical ground. The worst is the feature/prototype family — `/unity-feature`, `/unity-prototype`, `unity-coder`, `unity-coder-lite`, `unity-prototyper` — five surfaces that would all naturally phrase their trigger around *"let's add X"*, which is the exact prompt that failed. Rewritten independently they tie, and the model picks arbitrarily among them. **Arbitrary selection among five is worse than today's uniform non-selection**, because it looks like it works. Task 2 designs the differentiation rule before any of those files is touched.
 
 ## Global Constraints
@@ -111,7 +133,7 @@ Plus the **shadow pairs** — `/unity-ui`+`unity-ui-builder`, `/unity-scene`+`un
 **Files:**
 - Modify: `.claude/commands/*.md` — 36, all REWRITE
 - Modify: `.claude/agents/*.md` — 24 REWRITE (4 are UNSURE; leave those and report why)
-- Modify: `.claude/skills/**/SKILL.md` — 2 REWRITE, plus any the controller adds after Task 1
+- Modify: `.claude/skills/**/SKILL.md` — 4 REWRITE: `core/deep-interview`, `core/model-routing`, `core/commit-trailers`, `core/unity-mcp-patterns` (see correction 2a)
 - Modify: `provenance.tsv` — 27 verbatim flips
 - Separate commit: `migration/baseline-inventory.json`
 
