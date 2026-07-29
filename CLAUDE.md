@@ -94,7 +94,7 @@ print, and the user gets a silent exit 1.
 ## Testing
 
 ```bash
-bash tests/run-tests.sh                       # 8 files, 80 assertions
+bash tests/run-tests.sh                       # 21 files, 227 assertions (counts drift — see below)
 bash scripts/check-provenance.sh              # manifest integrity  (--online to verify upstream)
 bash tests/fixtures/mkproject.sh /tmp/p       # synthetic Unity project (--variant urp|builtin|bare|dirty)
 bash install.sh --project-dir /tmp/p --dry-run
@@ -107,8 +107,10 @@ because Unity writes two lines and both match the version regex.
 
 The runner sources nothing into itself — each file runs in a subshell with stdin at `/dev/null`. It
 used to `source` them, and since several end in `exit`, the runner died in the first file and 7 of 8
-never ran while reporting green. If you touch the runner, confirm all 8 files still appear in the
-output.
+never ran while reporting green. If you touch the runner, confirm the number of `--- test-*.sh ---`
+headers in the output equals `ls tests/test-*.sh | wc -l` (currently 21) — a hardcoded count here
+would itself go stale the next time a test file is added or removed, which is exactly the failure
+mode this note exists to prevent.
 
 None of this proves the toolkit works *in Claude Code* — only that the installer places correct
 bytes. Frontmatter validity, command registration, and agent invocation still need one manual pass in
