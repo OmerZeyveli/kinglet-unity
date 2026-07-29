@@ -134,7 +134,11 @@ if [ -f provenance-skip.tsv ]; then
     case "$skip_path" in ''|\#*) continue ;; esac
     [ "$rule" = ours-wins ] || continue
     [ -e "$skip_path" ] || continue   # e.g. .claude/VERSION before it is written
-    if ! grep -qP "^$(printf '%s' "$skip_path" | sed 's/[.[\*^$]/\\&/g')\toriginal\t" "$MANIFEST"; then
+    # -E, not -P: PCRE mode is a GNU extension and BSD/macOS grep has no -P at all. The tab between
+    # fields is a literal tab character ($'\t'), not the "\t" escape — POSIX ERE has no such escape
+    # and only GNU grep accepts it as an extension.
+    ours_wins_pattern="^$(printf '%s' "$skip_path" | sed 's/[.[\*^$]/\\&/g')"$'\t'"original"$'\t'
+    if ! grep -qE -- "$ours_wins_pattern" "$MANIFEST"; then
       fail "rule=ours-wins but not marked origin=original: $skip_path"; MISCLAIM=$((MISCLAIM + 1))
     fi
   done < <(grep -v '^#' provenance-skip.tsv)
