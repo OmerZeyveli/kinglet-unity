@@ -69,7 +69,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/commands/unity-ui.md	ecu	1.5.0	.claude/commands/unity-ui.md	c489321ee43a95a2e2795f911fa5872c366deeb48346270814e2ff83d613f395	verbatim	-
 .claude/commands/unity-workflow.md	ecu	1.5.0	.claude/commands/unity-workflow.md	3fe77f54481d4e09c55e8feda98d669b0e56a47f3eca8b9f4bc3f00ac12ff052	modified	mobile-strip
 .claude/hooks/auto-learn.sh	ecu	1.5.0	.claude/hooks/auto-learn.sh	89f8e2d2d8bd0050a4948483529d60149d8bcefb3c6e8a87b28b8dd8b20b8064	modified	adopts advisory_exit_guard so this Stop hook cannot block a session
-.claude/hooks/bash-gate.sh	ecu	1.5.0	.claude/hooks/bash-gate.sh	402b11ca2bc35c47e27c06716d21fe0b7300e5ae8b106ac3cf4eab118560d081	verbatim	-
+.claude/hooks/bash-gate.sh	ecu	1.5.0	.claude/hooks/bash-gate.sh	402b11ca2bc35c47e27c06716d21fe0b7300e5ae8b106ac3cf4eab118560d081	modified	anchored destructive-verb patterns to command position (start-of-line or after ;/&&/||/|) and bounded the verb-to-path gap to the same command segment, so text merely co-occurring with a path (JSON argument, unrelated chained command) no longer misclassifies as a destructive write (Defect 6); corrected the retry-affordance message to state byte-identical retry and print the recorded key (Defect 7)
 .claude/hooks/block-legacy-input.sh	original	-	-	-	original	shellcheck-unreachable-tail-removed
 .claude/hooks/block-meta-edit.sh	ecu	1.5.0	.claude/hooks/block-meta-edit.sh	47d80f65b4ffd88d04f59a1ae6710d3680df9a8c86ea40426a492c2759a45c6d	verbatim	-
 .claude/hooks/block-projectsettings.sh	ecu	1.5.0	.claude/hooks/block-projectsettings.sh	792e663195845faa1e61fecb4cb571a33c224a43d81e45c5e63f2455a1493eac	verbatim	-
@@ -217,6 +217,7 @@ templates/View.cs.template	ecu	1.5.0	templates/View.cs.template	c77939301d6476df
 tests/fixtures/mkproject.sh	original	-	-	-	original	-
 tests/run-tests.sh	ecu	1.5.0	tests/run-tests.sh	b8c6280bf30aa4834a15255b9f4d3c0f4f3b6aa9e39d7b6c73bd49b334f510d8	modified	test-runner-fix: sourced files ended in exit, killing the runner after file 1; --source-only was unimplemented; dynamic test source is intentional
 tests/test-bash32-compat.sh	original	-	-	-	original	bash32-static-regression-gate
+tests/test-bash-gate-precision.sh	original	-	-	-	original	pioneer-wave-1b1-task-4: the gate must classify commands, not text that merely co-occurs with a path
 tests/test-hook-advisory-exit.sh	original	-	-	-	original	pins-advisory-stop-hooks-to-exit-0-outside-and-inside-a-git-repository
 tests/test-block-legacy-input.sh	original	-	-	-	original	-
 tests/test-cross-validation.sh	ecu	1.5.0	tests/test-cross-validation.sh	ed11cf897a74a90ce8d3bd6a072dd3ba09e9ce412d2bfc51c7975a91faaafd33	verbatim	-

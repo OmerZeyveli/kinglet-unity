@@ -10,9 +10,19 @@
 
 TBG_HOOK="${REPO_DIR}/.claude/hooks/bash-gate.sh"
 
+# bash-gate.sh remembers a denied command's hash so an identical retry passes. That state
+# lives in UNITY_HOOK_STATE_DIR, which defaults to the real repo's .claude/state — shared
+# with every real Bash call this session makes. Without isolating it here, this test would
+# both pollute that real state and become order-dependent: a "must still block" assertion
+# would silently flip to "allowed" the moment its hash was ever recorded once, by this test
+# or by real prior use. Give every run of this file a throwaway state directory instead.
+TBG_STATE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/bash-gate-precision-test.XXXXXX")"
+trap 'rm -rf "$TBG_STATE_DIR"' EXIT
+
 tbg_run() {
     printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":%s}}' \
-        "$(printf '%s' "$1" | jq -Rs .)" | bash "$TBG_HOOK" > /dev/null 2>&1
+        "$(printf '%s' "$1" | jq -Rs .)" \
+        | UNITY_HOOK_STATE_DIR="$TBG_STATE_DIR" bash "$TBG_HOOK" > /dev/null 2>&1
     printf '%s' "$?"
 }
 
@@ -29,3 +39,16 @@ assert_eq "0" "$(tbg_run 'echo "see ProjectSettings/ProjectSettings.asset for de
     "does not block an echo that merely mentions the path"
 assert_eq "0" "$(tbg_run 'git log -- Assets/Player.cs.meta')" \
     "does not block reading history of a .meta file"
+
+# --- Additional assertions, added while implementing the fix -----------------------------
+# The three assertions above, as literally given in the brief, do not actually trip the
+# unmodified classifier: none of them contain a bare "rm"/">"/"mv"/"cp" substring anywhere
+# on the line, so the permissive `.*` in the original pattern never gets a foothold. The two
+# cases below are faithful reproductions of the measured defect — a verb-shaped substring
+# and the ProjectSettings path genuinely co-occurring on one line with no target relationship
+# between them — confirmed to false-block on the original pattern and confirmed fixed by the
+# command-position anchor.
+assert_eq "0" "$(tbg_run 'curl -s https://api.example.com/report -d "{\"reason\": \"cp shows drift\", \"target\":\"ProjectSettings/ProjectSettings.asset\"}"')" \
+    "does not block a JSON argument that merely contains the word cp and the path as data"
+assert_eq "0" "$(tbg_run 'echo build > build.log; grep ProjectSettings/ProjectSettings.asset build.log')" \
+    "does not block an unrelated grep chained after a redirect to a different file"

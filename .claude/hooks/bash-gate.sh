@@ -42,30 +42,49 @@ touch "$BASH_GATE_DENIED"
 DANGER_KIND=""
 DANGER_MSG=""
 
+# A destructive verb only counts where a command can actually start: the beginning of the
+# line, or right after a control operator (;, &&, ||, |). Without this anchor, "rm" or "cp"
+# matches anywhere those letters occur in unrelated text (inside "notes.txt", inside a JSON
+# value, inside another word entirely) and the permissive `.*` that used to follow let any
+# amount of intervening text pair a verb with a path it never touched.
+#
+# CMD_START also bounds the gap between the verb and its path to `[^;&|]*` — text within the
+# same command segment, not across a `;`/`&&`/`||`/`|` into an unrelated command that merely
+# happens to mention the path later on the same line.
+CMD_START='(^|[;&|]+[[:space:]]*)'
+SAME_CMD='[^;&|]*'
+
 # Unity directory wipes
-if echo "$COMMAND" | grep -qE 'rm\s+-[rRf]+\s+.*(Library|Temp|Logs|obj|Build|Builds)/'; then
+if echo "$COMMAND" | grep -qE "${CMD_START}rm[[:space:]]+-[rRf]+[[:space:]]+${SAME_CMD}(Library|Temp|Logs|obj|Build|Builds)/"; then
     DANGER_KIND="unity-dir-wipe"
     DANGER_MSG="Deleting Library/Temp/Logs/obj/Build triggers a full Unity reimport (minutes to hours) and can corrupt GUIDs if done while editor is open."
 fi
 
-# .meta deletion/mass-rename
-if echo "$COMMAND" | grep -qE '(rm|find).*\.meta'; then
+# .meta deletion/mass-rename — verb must start a command; path must be its argument.
+if echo "$COMMAND" | grep -qE "${CMD_START}(rm|find)[[:space:]]+${SAME_CMD}\.meta"; then
     DANGER_KIND="meta-deletion"
     DANGER_MSG=".meta files hold GUIDs — deleting them silently breaks every reference (scenes, prefabs, ScriptableObjects, AssetReferences)."
 fi
-if echo "$COMMAND" | grep -qE '(mv|rename).*\.meta'; then
+if echo "$COMMAND" | grep -qE "${CMD_START}(mv|rename)[[:space:]]+${SAME_CMD}\.meta"; then
     DANGER_KIND="meta-rename"
     DANGER_MSG="Renaming .meta files without their asset sibling orphans references. Unity will not recover from this automatically."
 fi
 
-# ProjectSettings direct mutation
-if echo "$COMMAND" | grep -qE '(rm|>|mv|cp)\s+.*ProjectSettings/[A-Za-z]+\.asset'; then
+# ProjectSettings direct mutation.
+# `rm`/`mv`/`cp` are commands — anchor them to a command position. `>`/`>>` is a redirect
+# operator, not a command word, so it cannot be anchored the same way; instead its target
+# must follow immediately (only whitespace, no permissive gap at all), which is exactly how
+# a shell redirect actually reads its destination.
+if echo "$COMMAND" | grep -qE "${CMD_START}(rm|mv|cp)[[:space:]]+${SAME_CMD}ProjectSettings/[A-Za-z]+\.asset" \
+    || echo "$COMMAND" | grep -qE '>{1,2}[[:space:]]*ProjectSettings/[A-Za-z]+\.asset'; then
     DANGER_KIND="projectsettings-write"
     DANGER_MSG="Direct mutation of ProjectSettings/*.asset resets render pipeline / input system / tags / quality layers."
 fi
 
-# Packages/manifest mutation outside of unity-mcp
-if echo "$COMMAND" | grep -qE '(rm|>|truncate).*Packages/(manifest|packages-lock)\.json'; then
+# Packages/manifest mutation outside of unity-mcp — same split: command verbs anchored,
+# redirect target immediate.
+if echo "$COMMAND" | grep -qE "${CMD_START}(rm|mv|truncate)[[:space:]]+${SAME_CMD}Packages/(manifest|packages-lock)\.json" \
+    || echo "$COMMAND" | grep -qE '>{1,2}[[:space:]]*Packages/(manifest|packages-lock)\.json'; then
     DANGER_KIND="manifest-wipe"
     DANGER_MSG="Rewriting Packages/manifest.json outside unity-mcp drops package entries with no prompt — compiler errors cascade on next reimport."
 fi
@@ -170,6 +189,11 @@ echo "  2. Write a one-line rollback procedure (even if the answer is" >&2
 echo "     'restore from git' or 'Unity will reimport')." >&2
 echo "  3. Quote the user's instruction that motivates this destructive op." >&2
 echo "" >&2
-echo "  After presenting these facts, retry the same command — it will pass." >&2
+echo "  After presenting these facts, retry with the BYTE-IDENTICAL command — including" >&2
+echo "  every other line of this same invocation — and it will pass." >&2
+echo "  Recorded key: $KEY" >&2
+echo "  (This is derived from the whole command string. Reformatting anything — even" >&2
+echo "  unrelated lines, quoting, or whitespace — produces a different key and will be" >&2
+echo "  blocked again as a new command.)" >&2
 echo "" >&2
-unity_hook_block "BashGate: present facts above for '$DANGER_KIND', then retry."
+unity_hook_block "BashGate: present facts above for '$DANGER_KIND', then retry byte-identically (key: $KEY)."
