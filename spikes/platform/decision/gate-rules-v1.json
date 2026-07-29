@@ -1,0 +1,81 @@
+{
+  "_note": "The downstream gate contract. Generated from tools/kinglet_spike/decision.py and pinned to it by tests/kinglet_spike/test_decision_gates.py -- the evaluators never read this file at call time, because rules an evaluator loads are rules an edit can unlock. This copy exists so downstream tooling can read the contract without importing Python.",
+  "close0D": {
+    "all": [
+      "0A",
+      "0R",
+      "0U"
+    ],
+    "allowOpenPrefixes": [
+      "0C:"
+    ]
+  },
+  "gates": [
+    "0A",
+    "0R",
+    "0C:claude-code",
+    "0C:codex",
+    "0C:cursor",
+    "0C:copilot-cli",
+    "0C:copilot-vscode",
+    "0C:antigravity",
+    "0U",
+    "0D"
+  ],
+  "schema": "kinglet.spike.gate-rules/v1",
+  "unlocks": {
+    "adapter:antigravity-spec": {
+      "gates": [
+        "0C:antigravity"
+      ]
+    },
+    "adapter:claude-code-spec": {
+      "gates": [
+        "0C:claude-code"
+      ]
+    },
+    "adapter:codex-spec": {
+      "gates": [
+        "0C:codex"
+      ]
+    },
+    "adapter:copilot-cli-spec": {
+      "gates": [
+        "0C:copilot-cli"
+      ]
+    },
+    "adapter:copilot-vscode-spec": {
+      "gates": [
+        "0C:copilot-vscode"
+      ]
+    },
+    "adapter:cursor-spec": {
+      "gates": [
+        "0C:cursor"
+      ]
+    },
+    "canonical-foundation-spec": {
+      "gates": [
+        "0R"
+      ]
+    },
+    "platform-plan-rewrite": {
+      "gates": [
+        "0D"
+      ]
+    },
+    "unity-execution-spec": {
+      "gates": [
+        "0U"
+      ]
+    },
+    "windows-reference-slice": {
+      "gates": [
+        "0R",
+        "0C:claude-code",
+        "0C:codex"
+      ],
+      "windowsCellsPassed": true
+    }
+  }
+}

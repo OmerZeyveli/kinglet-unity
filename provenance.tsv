@@ -565,3 +565,6 @@ docs/research/platform-spike/evidence/runtime/dotnet/20260728T170051Z-runtime-do
 docs/research/platform-spike/artifacts/runtime/dotnet/20260728T170051Z-runtime-dotnet-windows-10-22h2-x64-01/result.json	original	-	-	-	original	kinglet-0r-windows-dotnet-w10-22h2-host-probe-result
 spikes/platform/contracts/matrix-v2.json	original	-	-	-	original	matrix-amendment-v2-dispositions-and-amendment-record
 tests/kinglet_spike/test_matrix_amendment.py	original	-	-	-	original	matrix-amendment-coupling-and-gate-tests
+spikes/platform/decision/gate-rules-v1.json	original	-	-	-	original	kinglet-00d-task1-downstream-gate-rules
+tools/kinglet_spike/decision.py	original	-	-	-	original	kinglet-00d-task1-gate-evaluators
+tests/kinglet_spike/test_decision_gates.py	original	-	-	-	original	kinglet-00d-task1-gate-semantics-tests
