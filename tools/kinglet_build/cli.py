@@ -1,8 +1,10 @@
 import argparse
 from collections.abc import Mapping, Sequence
+import json
 from pathlib import Path, PurePosixPath
 import sys
 
+from .baseline import apply_regeneration, regeneration_plan
 from .errors import BuildError
 from .loader import load_adapter_profiles, load_graph
 from .model import AdapterProfile, CanonicalGraph
@@ -15,6 +17,8 @@ _EXIT_VALIDATION = 2
 _EXIT_DRIFT = 3
 _EXIT_USAGE = 64
 _EXIT_IO = 74
+
+_BASELINE_INVENTORY_RELATIVE = ("migration", "baseline-inventory.json")
 
 
 class _UsageError(ValueError):
@@ -69,6 +73,35 @@ def _parser() -> _ArgumentParser:
         "--check",
         action="store_true",
         help="compare generated products without writing",
+    )
+    regenerate = commands.add_parser(
+        "baseline-regenerate",
+        help="regenerate migration/baseline-inventory.json against an anchor commit",
+        allow_abbrev=False,
+    )
+    regenerate.add_argument(
+        "--anchor",
+        required=True,
+        help="commit to read the .claude tree from",
+    )
+    regenerate.add_argument(
+        "--expect-drift",
+        type=int,
+        required=True,
+        dest="expect_drift",
+        help="the number of drifted records the caller expects to find",
+    )
+    regenerate.add_argument(
+        "--repo-root",
+        type=Path,
+        dest="repo_root",
+        help="repository root (default: this repository)",
+    )
+    regenerate.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="print the plan and write nothing",
     )
     return parser
 
@@ -193,6 +226,40 @@ def _build(
     return 0
 
 
+def _baseline_regenerate(
+    repository_root: Path,
+    anchor: str,
+    expect_drift: int,
+    *,
+    dry_run: bool,
+) -> int:
+    inventory_path = repository_root.joinpath(*_BASELINE_INVENTORY_RELATIVE)
+    baseline = json.loads(inventory_path.read_text(encoding="utf-8"))
+
+    plan = regeneration_plan(
+        repository_root,
+        anchor,
+        baseline,
+        expected_drift=expect_drift,
+    )
+
+    if not plan.approved:
+        for refusal in plan.refusals:
+            print(refusal, file=sys.stderr)
+        return _EXIT_VALIDATION
+
+    updated = apply_regeneration(baseline, plan)
+    print(f"{len(plan.changes)} change(s) at anchor {plan.anchor}.")
+    if dry_run:
+        return 0
+
+    inventory_path.write_text(
+        json.dumps(updated, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return 0
+
+
 def main(
     argv: Sequence[str] | None = None,
     *,
@@ -212,6 +279,22 @@ def main(
         if repository_root is not None
         else Path(__file__).parents[2]
     )
+
+    if arguments.command == "baseline-regenerate":
+        target_root = (
+            Path(arguments.repo_root) if arguments.repo_root is not None else root
+        )
+        try:
+            return _baseline_regenerate(
+                target_root,
+                arguments.anchor,
+                arguments.expect_drift,
+                dry_run=arguments.dry_run,
+            )
+        except OSError as error:
+            print(f"I/O error: {error}", file=sys.stderr)
+            return _EXIT_IO
+
     try:
         graph, profiles = _load_validated(root)
         if arguments.command == "validate":

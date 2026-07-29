@@ -580,3 +580,4 @@ docs/superpowers/plans/2026-07-29-kinglet-pioneer-wave-1a-identity.md	original	-
 tests/test-pioneer-identity.sh	original	-	-	-	original	pins-the-pioneer-identity-contract-by-behaviour
 docs/research/pioneer/smoke-pass-runbook.md	original	-	-	-	original	operator-runbook-for-the-pioneer-smoke-pass
 docs/superpowers/plans/2026-07-29-kinglet-pioneer-baseline-regenerator.md	original	-	-	-	original	baseline-regenerator-implementation-plan
+tests/kinglet/test_baseline_regenerator.py	original	-	-	-	original	gates-the-baseline-regeneration-against-laundered-regressions
