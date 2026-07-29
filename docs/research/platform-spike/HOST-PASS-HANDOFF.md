@@ -297,3 +297,62 @@ Also observed, **not fixed** — decide these before the next Windows run:
 - The suite's POSIX tests (`run-host.sh`, `measure.sh`) cannot pass on Windows even with Git Bash —
   they need `/bin/true`, `/usr/bin/time` and `uname`/`sw_vers` PATH shims. Baseline at `f36aeda` on
   this host: 13 failed. Judge a Windows run against that baseline, not against zero.
+
+---
+
+## 10. The host inventory does not cover the matrix — an open plan-level decision
+
+Established 2026-07-29, on the Linux review pass of §9. **0R cannot close on the hardware that
+exists**, and this is worth stating plainly before anyone spends another hour installing toolchains:
+
+| Matrix host | Hardware | Status |
+| --- | --- | --- |
+| `linux-ubuntu-24-04-x64` | Pop!_OS dev box | done, 4/4 pass |
+| `windows-10-x64` | Windows 10 Pro for Workstations box | done, 3 pass + 1 fail (§9) |
+| `macos-26-arm64` | Mac mini, Apple Silicon | **available, not yet run** |
+| `windows-11-x64` | none owned — a friend's machine, deferred until the project justifies asking | **blocked, deferred** |
+| `macos-26-x64` | **none, and none expected** | **unreachable** |
+
+`macos-26-x64` has no path to closure. That is not a scheduling problem, it is a permanent gap in a
+frozen matrix, and it means the `host-probe-all-cases-all-hosts` hard gate can never be satisfied as
+written. There are exactly three honest responses and **none of them has been chosen**:
+
+1. Amend the matrix to drop `macos-26-x64` (and possibly demote `windows-11-x64`), with the
+   reasoning recorded — Apple has shipped no Intel Mac since 2023 and macOS 26 is the last release
+   to support any of them, so "we do not test Intel Macs" is a defensible product decision, not a
+   dodge.
+2. Amend `rubric-v1.json` to define "every required native host" as a named subset rather than
+   every cell in the matrix.
+3. Leave both open and accept that 0R never closes, taking the runtime decision another way — which
+   contradicts §2 and should be chosen deliberately if at all.
+
+**Do not silently edit the matrix into agreement with the hardware.** The matrix was frozen before
+results existed precisely so it could not be moved to fit them; moving it now needs the amendment
+written down as an amendment. Until one of the three is chosen, `gate 0R` exits 1 and that is the
+correct answer.
+
+The interim position the user has taken: **the Windows 10 cells stand in for Windows**, and the
+Windows 11 pass waits until the project is far enough along to be worth asking a friend for their
+machine.
+
+### The macOS release pin is exact — check it before installing anything
+
+Coverage matches a record to a cell by **exact string equality** on `os`/`release`/`arch`
+(`coverage.py`: `record.environment.release == cell.release`). The macOS cells are pinned to
+`release = "26.5.2"` — the full patch version, not a `26` bucket. And `run-host.sh` sets
+`RECORD_RELEASE="$MACOS_PRODUCT_VERSION"` straight from `sw_vers -productVersion`.
+
+So a Mac mini on 26.5.1, or 26.6.0, or anything but exactly **26.5.2**, publishes four perfectly
+valid records that match **no cell at all**. The run reports success, `gate 0R` does not move, and
+the hour of toolchain installs buys nothing. Windows did not expose this because
+`Get-WindowsRelease` composes a coarse bucket (`10-22H2`) from the caption and DisplayVersion; the
+macOS path has no such widening.
+
+**First command on the Mac mini, before anything else:**
+
+```bash
+sw_vers -productVersion
+```
+
+If it does not print `26.5.2` exactly, stop and decide — update/hold the Mac, or amend that cell's
+release the same way §10 requires for the others. Do not run the pass and hope.
