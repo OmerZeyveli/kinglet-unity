@@ -1471,6 +1471,55 @@ class PowerShellHelperExecutionTests(unittest.TestCase):
 
 
 @unittest.skipIf(_PWSH_SKIP_REASON, _PWSH_SKIP_REASON)
+class InvokeNativeOutputTests(unittest.TestCase):
+    """The child's stdout must reach the console, and failure must still throw.
+
+    When Invoke-Native was re-expressed as a wrapper over Invoke-NativeAllowFailure
+    it was written as `$null = Invoke-NativeAllowFailure ...`. In PowerShell a
+    native command writes to the PIPELINE, and an assigned pipeline no longer
+    reaches the host — so every build step (uv sync, pyinstaller, cargo, go,
+    dotnet publish, and the publish call) went silent. stderr still surfaced, so
+    a failure was still visible and no test caught it; what was lost was the
+    build log, on hosts that are expensive to get back to.
+
+    These execute the real functions. Re-adding the assignment fails the first
+    test; dropping -ThrowOnFailure fails the second.
+    """
+
+    def _echo(self, marker: str) -> str:
+        return (
+            _PS1_LIB_PREAMBLE
+            + f"Invoke-Native -FilePath '/bin/echo' -ArgumentList @('{marker}')\n"
+        )
+
+    def test_invoke_native_passes_child_stdout_through(self):
+        out = _run_pwsh(self._echo("CHILD-STDOUT-MARKER"))
+        self.assertIn("CHILD-STDOUT-MARKER", out)
+
+    def test_invoke_native_still_throws_on_a_non_zero_exit(self):
+        body = _PS1_LIB_PREAMBLE + (
+            "try {\n"
+            "  Invoke-Native -FilePath '/bin/sh' -ArgumentList @('-c', 'exit 7')\n"
+            "  Write-Output 'NO-THROW'\n"
+            "} catch { Write-Output ('THREW=' + $_.Exception.Message) }\n"
+        )
+        out = _run_pwsh(body)
+        self.assertNotIn("NO-THROW", out)
+        self.assertIn("THREW=", out)
+        self.assertIn("exit 7", out)
+
+    def test_allow_failure_records_the_exit_code_and_keeps_stdout(self):
+        body = _PS1_LIB_PREAMBLE + (
+            "Invoke-NativeAllowFailure -FilePath '/bin/sh' "
+            "-ArgumentList @('-c', 'echo ALLOW-STDOUT; exit 3')\n"
+            "Write-Output ('EXIT=' + $script:LastNativeExit)\n"
+        )
+        out = _run_pwsh(body)
+        self.assertIn("ALLOW-STDOUT", out)
+        self.assertIn("EXIT=3", out)
+
+
+@unittest.skipIf(_PWSH_SKIP_REASON, _PWSH_SKIP_REASON)
 class WindowsHostGateRefusalTests(unittest.TestCase):
     """The Windows gate's REFUSAL path, executed under pwsh on this Linux box.
 

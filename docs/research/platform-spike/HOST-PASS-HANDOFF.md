@@ -254,6 +254,17 @@ the defect classes in §8.
    already anticipated it at `spikes/platform/runtime/python/build/`. The Linux runner never hit it
    because it reused a prebuilt onefile and never invoked PyInstaller at all.
 
+5. **The fix for (2) silently blanked every build log.** Found on the Linux review pass, not on the
+   Windows host. Re-expressing `Invoke-Native` as a wrapper over the new
+   `Invoke-NativeAllowFailure` wrote it as `$null = Invoke-NativeAllowFailure …`. A native command
+   writes to the PowerShell **pipeline**, and an assigned pipeline never reaches the host, so `uv
+   sync`, PyInstaller, `cargo build`, `go build`, `dotnet publish` and the `publish` call all
+   produced no console output at all. stderr still surfaced — which is why the Windows run still
+   looked normal and why nothing failed. `Invoke-NativeAllowFailure`'s own doc-block asserted the
+   opposite ("the child's output must keep flowing to the console exactly as before"): a comment
+   describing an invariant the code next to it broke. Fixed by dropping the assignment, with
+   `InvokeNativeOutputTests` executing the real function under `pwsh`; re-adding `$null =` fails it.
+
 Also observed, **not fixed** — decide these before the next Windows run:
 
 - **`scripts/check-provenance.sh` cannot pass on a Windows checkout, for the same CRLF reason.** It

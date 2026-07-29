@@ -499,7 +499,14 @@ function Invoke-Native {
         [Parameter(Mandatory)] [AllowEmptyCollection()] [string[]] $ArgumentList,
         [string] $WorkingDirectory
     )
-    $null = Invoke-NativeAllowFailure -FilePath $FilePath -ArgumentList $ArgumentList `
+    # NOT `$null = ...`. Assigning the call would CAPTURE the child's stdout and
+    # discard it: `& $FilePath @ArgumentList` writes to the pipeline, and a
+    # pipeline that is assigned no longer reaches the console. That silently
+    # blanked every build step's output (uv sync, pyinstaller, cargo, go, dotnet
+    # publish, and the publish call itself) — stderr still surfaced, so a failure
+    # was still visible, but the operator lost the whole build log on a host that
+    # is by definition hard to get back to.
+    Invoke-NativeAllowFailure -FilePath $FilePath -ArgumentList $ArgumentList `
         -WorkingDirectory $WorkingDirectory -ThrowOnFailure
 }
 
