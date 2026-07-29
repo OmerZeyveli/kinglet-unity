@@ -20,7 +20,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/agents/unity-linter.md	ecu	1.5.0	.claude/agents/unity-linter.md	a03dba62790624871c05b2978fe6e1badf27e48b50cd30e7a1667cf624b36bce	modified	mobile-strip
 .claude/agents/unity-migrator.md	ecu	1.5.0	.claude/agents/unity-migrator.md	499c36972c73021b3b25f651f5d423662967437a714703769c0667ccde495928	verbatim	-
 .claude/agents/unity-network-dev.md	ecu	1.5.0	.claude/agents/unity-network-dev.md	d3d989a38b5019f248e24092f04d8c1c392a9240b1b33f6cbb38b50dde3f1cc4	verbatim	-
-.claude/agents/unity-optimizer.md	ecu	1.5.0	.claude/agents/unity-optimizer.md	5a0da0b10b56935c7405c7ce989eb8a900fc6e645a8472280e7df5c0a4bc27d5	modified	mobile-strip; mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4
+.claude/agents/unity-optimizer.md	ecu	1.5.0	.claude/agents/unity-optimizer.md	5a0da0b10b56935c7405c7ce989eb8a900fc6e645a8472280e7df5c0a4bc27d5	modified	mobile-strip; mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4; corrects installer script path references from ./scripts/ to ./.claude/scripts/ (scripts only exist under .claude/scripts after install)
 .claude/agents/unity-prototyper.md	ecu	1.5.0	.claude/agents/unity-prototyper.md	0d4fd59ee9a5260ee2a592b80af793343dc5394bc1207bcd755dbabd193f8115	modified	mobile-strip
 .claude/agents/unity-reviewer.md	ecu	1.5.0	.claude/agents/unity-reviewer.md	7f83e615daa8b3bc31c43006bc99f6a282ae36ed82721964dda833c8a22669f2	modified	mobile-strip
 .claude/agents/unity-scene-builder.md	ecu	1.5.0	.claude/agents/unity-scene-builder.md	fac0c0e1c8f4fa7e158573d2764d4cf8e73326103a2c88d46aa9cf28f7583588	verbatim	-
@@ -41,7 +41,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/commands/retrospective.md	donchitos	984023d	.claude/skills/retrospective/SKILL.md	60f9525887c94e4cf8239de3a2078389e6d6b19dd9f10705772490650c11ffda	modified	skill-to-ecu-command
 .claude/commands/scope-check.md	donchitos	984023d	.claude/skills/scope-check/SKILL.md	f91150df11aadf32cfa64a1476c608396e12eeeba9aca03836c52299f3a0efa0	modified	skill-to-ecu-command
 .claude/commands/sprint-plan.md	donchitos	984023d	.claude/skills/sprint-plan/SKILL.md	d402a9f276f81663c8b07f6c4fd2b19a3fa9d4ee9411e3d57e6868daa095ee42	modified	skill-to-ecu-command
-.claude/commands/unity-audit.md	ecu	1.5.0	.claude/commands/unity-audit.md	bbc58f9480952ec81089b59f9541719a01e5418cb234d1ae0c76326cddfa5f4b	verbatim	-
+.claude/commands/unity-audit.md	ecu	1.5.0	.claude/commands/unity-audit.md	bbc58f9480952ec81089b59f9541719a01e5418cb234d1ae0c76326cddfa5f4b	modified	corrects installer script path references from ./scripts/ to ./.claude/scripts/ (scripts only exist under .claude/scripts after install)
 .claude/commands/unity-build.md	ecu	1.5.0	.claude/commands/unity-build.md	93023918c4632922e10c0dfe8d9ea72627973a00c3f039b30d46c83890f18acf	modified	mobile-strip
 .claude/commands/unity-doctor.md	ecu	1.5.0	.claude/commands/unity-doctor.md	9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588	modified	mcp-config-location: Check 1 pointed at .claude/settings.json for mcpServers.unityMCP.url, which install.sh no longer writes there (Task 2 moved it to .mcp.json at the project root); corrected to match what install.sh actually writes
 .claude/commands/unity-feature.md	ecu	1.5.0	.claude/commands/unity-feature.md	b90e90bee6f79efc42a4a206d1da869d349b0ca4a10740e257626361e8a30ee2	verbatim	-
@@ -52,7 +52,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/commands/unity-learn.md	ecu	1.5.0	.claude/commands/unity-learn.md	7ec4b1791d321d05e58449178eedf03fb8e9295494ab5d1b4b96ff539548950e	verbatim	-
 .claude/commands/unity-migrate.md	ecu	1.5.0	.claude/commands/unity-migrate.md	bc66c34bc991031cf9ddbbfea07858da3739dffdd772dde3d5928d64df01cd9e	verbatim	-
 .claude/commands/unity-network.md	ecu	1.5.0	.claude/commands/unity-network.md	59b0d72edb8a453712ad45a317dd9515e7a0d4474f7df2268024b6f55e640b82	verbatim	-
-.claude/commands/unity-optimize.md	ecu	1.5.0	.claude/commands/unity-optimize.md	b50cd8a2e4645800d249518dec32ad17961da42943b118baa41197028ef6e09d	modified	mobile-strip
+.claude/commands/unity-optimize.md	ecu	1.5.0	.claude/commands/unity-optimize.md	b50cd8a2e4645800d249518dec32ad17961da42943b118baa41197028ef6e09d	modified	mobile-strip; corrects installer script path references from ./scripts/ to ./.claude/scripts/ (scripts only exist under .claude/scripts after install)
 .claude/commands/unity-profile.md	ecu	1.5.0	.claude/commands/unity-profile.md	a584e7b43c1b1e8ce0ad41313601c626484d238e3cf6fd68e909ad8f580f47d7	modified	mobile-strip
 .claude/commands/unity-prototype.md	ecu	1.5.0	.claude/commands/unity-prototype.md	45cf4331dd68ef583cad14dbc7ff4530a0e3ae695447111b9bf02fa6afe56445	verbatim	-
 .claude/commands/unity-ralph.md	ecu	1.5.0	.claude/commands/unity-ralph.md	93d0618e35e6dbe47cb6fee5cb9ceb35db181f9930bfccc9290c6bc756148e82	verbatim	-

@@ -11,25 +11,25 @@ Run a comprehensive audit of the Unity project.
 ## Checks
 
 ### 1. Meta File Integrity
-Run `./scripts/validate-meta-integrity.sh --all`:
+Run `./.claude/scripts/validate-meta-integrity.sh --all`:
 - Every asset has a `.meta` file
 - No orphaned `.meta` files
 - No duplicate GUIDs
 
 ### 2. Missing References
-Run `./scripts/detect-missing-refs.sh`:
+Run `./.claude/scripts/detect-missing-refs.sh`:
 - Broken script references in scenes/prefabs
 - Missing asset GUIDs
 - Null serialized references
 
 ### 3. Assembly Definition Graph
-Run `./scripts/validate-asmdefs.sh`:
+Run `./.claude/scripts/validate-asmdefs.sh`:
 - No circular dependencies
 - Editor/Runtime properly separated
 - All scripts covered by an asmdef
 
 ### 4. Code Quality
-Run `./scripts/validate-code-quality.sh`:
+Run `./.claude/scripts/validate-code-quality.sh`:
 - GetComponent/Camera.main in Update
 - LINQ in gameplay code
 - Allocations in hot paths

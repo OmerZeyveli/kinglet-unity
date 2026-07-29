@@ -119,7 +119,7 @@ local rather than pushing it (no per-machine override path for `.mcp.json` has b
 do not assume `.claude/settings.local.json` still does this, since the same defect that put
 `mcpServers` in `.claude/settings.json` in the first place applies to `settings.local.json` too).
 
-`./scripts/studio-doctor.sh --project-dir <project>` speaks JSON-RPC to whatever answers at the
+`./.claude/scripts/studio-doctor.sh --project-dir <project>` speaks JSON-RPC to whatever answers at the
 configured URL, so it tells you when something other than Unity is on the line.
 
 ### Running the bridge headlessly (no Editor UI)
@@ -166,7 +166,7 @@ Open Claude Code in your Unity project and ask something that requires the Edito
 If MCP is connected, Claude reads the live scene (via tools like `manage_scene`, `manage_gameobject`,
 `read_console`). If it can't, check that (a) the Unity Editor is open, (b) the bridge is started in
 the MCP window, and (c) `python3 --version` ≥ 3.10 and `uv --version` both succeed.
-`scripts/studio-doctor.sh` checks all of these for you.
+`.claude/scripts/studio-doctor.sh` checks all of these for you.
 
 ---
 

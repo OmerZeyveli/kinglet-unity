@@ -458,6 +458,18 @@ else
 fi
 [ -n "$MCP_JSON_RECEIPT_LINE" ] && printf '%s\n' "$MCP_JSON_RECEIPT_LINE" >> "$RECEIPT_TMP"
 
+# ── Step 8c: MCP-SETUP.md — the setup guide the "Next steps" summary points at ──
+# It used to point a freshly installed project at MCP-SETUP.md while never installing it: the
+# payload is .claude/** only, so the file was absent from every project this toolkit set up. Copied
+# alongside CLAUDE.md (project root, never overwritten if the user already has one) so the pointer
+# in the summary below actually resolves.
+MCP_SETUP_MD="$PROJECT_DIR/MCP-SETUP.md"
+if [ -f "$SCRIPT_DIR/MCP-SETUP.md" ] && [ ! -f "$MCP_SETUP_MD" ]; then
+  cp "$SCRIPT_DIR/MCP-SETUP.md" "$MCP_SETUP_MD"
+  ok "Installed MCP-SETUP.md"
+  printf '%s\n' "$(printf 'MCP-SETUP.md\t%s\t644\ttoolkit' "$(sha_of "$MCP_SETUP_MD")")" >> "$RECEIPT_TMP"
+fi
+
 # ── Step 9: Write the receipt ────────────────────────────────────────────────
 {
   printf '# kinglet install receipt\n'
@@ -510,6 +522,6 @@ Next steps:
   1. Install the Unity MCP bridge — see MCP-SETUP.md (Window > MCP for Unity > Auto-Setup).
   2. $CLAUDE_MD_STEP
   3. Run 'claude' in your project and try /brainstorm, or /unity-audit for a health check.
-  4. Health check any time: ./scripts/studio-doctor.sh --project-dir "$PROJECT_DIR"
+  4. Health check any time: ./.claude/scripts/studio-doctor.sh --project-dir "$PROJECT_DIR"
 EOF
 exit 0
