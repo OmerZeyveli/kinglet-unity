@@ -80,8 +80,11 @@ fi
 # JSON-RPC and require an MCP-shaped reply.
 read_mcp_url() {
   local f url=""
-  # settings.local.json wins — that is where a machine-local port override belongs.
-  for f in "$CLAUDE_DIR/settings.local.json" "$CLAUDE_DIR/settings.json"; do
+  # settings.local.json wins — that is where a machine-local port override belongs. .mcp.json is
+  # where install.sh actually writes the server config (Task 2 moved it there because Claude Code
+  # never read mcpServers out of settings.json); settings.json is kept as a last-resort fallback
+  # for older installs that still have it there.
+  for f in "$CLAUDE_DIR/settings.local.json" "$PROJECT_DIR/.mcp.json" "$CLAUDE_DIR/settings.json"; do
     [ -f "$f" ] || continue
     if command -v jq >/dev/null 2>&1; then
       url=$(jq -r '.mcpServers.unityMCP.url // empty' "$f" 2>/dev/null || true)
@@ -91,8 +94,17 @@ try:
     print(json.load(open(sys.argv[1])).get("mcpServers",{}).get("unityMCP",{}).get("url",""))
 except Exception: pass' "$f" 2>/dev/null || true)
     fi
-    [ -n "$url" ] && { printf '%s' "$url"; return; }
+    if [ -n "$url" ]; then
+      printf '%s' "$url"
+      return 0
+    fi
   done
+  # Nothing matched. This must return 0: the caller does `MCP_URL=$(read_mcp_url)` under `set -e`,
+  # and a bare fall-through here would return the exit status of the last `[ -n "$url" ] && { ... }`
+  # — false — which kills the whole script two checks in and reports success on a project it never
+  # examined the rest of. Returning 1 is a real failure; "no URL configured" is not one, it is a
+  # WARN the caller already prints.
+  return 0
 }
 
 MCP_URL=$(read_mcp_url)
@@ -121,37 +133,42 @@ else
   fi
 fi
 
-# ── settings.json wiring (parsed, not grepped) ───────────────────────────────
-# The old check was `grep -q unityMCP`, which passes on the word appearing in a comment or an
-# unrelated key. The user can edit this file, so it gets a real parse.
+# ── .mcp.json wiring (parsed, not grepped) ───────────────────────────────────
+# This used to check .claude/settings.json — that was correct before Task 2, which moved the
+# mcpServers key to .mcp.json at the project root because Claude Code never read it out of
+# settings.json. Left pointed at settings.json, this check would FAIL every healthy install, since
+# a correct install no longer puts mcpServers there at all. Check the file install.sh actually
+# writes. The old check was also `grep -q unityMCP`, which passes on the word appearing in a
+# comment or an unrelated key — the user can edit this file, so it gets a real parse.
+MCP_JSON="$PROJECT_DIR/.mcp.json"
 SETTINGS="$CLAUDE_DIR/settings.json"
-if [ ! -f "$SETTINGS" ]; then
-  fail "No .claude/settings.json — run install.sh."
+if [ ! -f "$MCP_JSON" ]; then
+  fail "No .mcp.json at project root — run install.sh."
 else
   MCP_CONFIGURED=""
   if command -v jq >/dev/null 2>&1; then
-    MCP_CONFIGURED=$(jq -r '.mcpServers.unityMCP.url // empty' "$SETTINGS" 2>/dev/null || true)
+    MCP_CONFIGURED=$(jq -r '.mcpServers.unityMCP.url // empty' "$MCP_JSON" 2>/dev/null || true)
   elif [ -n "$PY" ]; then
     MCP_CONFIGURED=$("$PY" -c 'import json,sys
 try:
     d = json.load(open(sys.argv[1]))
     print(d.get("mcpServers", {}).get("unityMCP", {}).get("url", ""))
 except Exception:
-    pass' "$SETTINGS" 2>/dev/null || true)
+    pass' "$MCP_JSON" 2>/dev/null || true)
   fi
   if [ -n "$MCP_CONFIGURED" ]; then
-    # Say which file actually wins. Reporting settings.json's URL while the probe above used a
+    # Say which file actually wins. Reporting .mcp.json's URL while the probe above used a
     # different one from settings.local.json is two lines contradicting each other about the same
     # fact — the reader has to guess which is live.
     if [ -n "$MCP_URL" ] && [ "$MCP_URL" != "$MCP_CONFIGURED" ]; then
-      pass "settings.json: unityMCP → $MCP_CONFIGURED (overridden by settings.local.json → $MCP_URL)"
+      pass ".mcp.json: unityMCP → $MCP_CONFIGURED (overridden by settings.local.json → $MCP_URL)"
     else
-      pass "settings.json: mcpServers.unityMCP → $MCP_CONFIGURED"
+      pass ".mcp.json: mcpServers.unityMCP → $MCP_CONFIGURED"
     fi
   elif command -v jq >/dev/null 2>&1 || [ -n "$PY" ]; then
-    fail "settings.json has no mcpServers.unityMCP.url — MCP tools will not work."
+    fail ".mcp.json has no mcpServers.unityMCP.url — MCP tools will not work."
   else
-    warn "Neither jq nor python available — could not parse settings.json."
+    warn "Neither jq nor python available — could not parse .mcp.json."
   fi
 fi
 

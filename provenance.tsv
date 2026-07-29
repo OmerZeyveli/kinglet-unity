@@ -197,7 +197,7 @@ scripts/check-provenance.sh	original	-	-	-	original	-
 scripts/detect-missing-refs.sh	ecu	1.5.0	scripts/detect-missing-refs.sh	89408c708bf8fde7374b4a0601f6ded140af3a8469480c6f3dd0b49f7355ec71	verbatim	-
 scripts/generate-claude-md.sh	ecu	1.5.0	scripts/generate-claude-md.sh	a834e4ce5f9cfa638ee24ac9e0433117dc75480a3f617baa1c2f14bc4dfd7f9e	modified	stdout-contract-fix: upstream wrote CLAUDE.md itself while logging to stdout; see MERGE-NOTES
 scripts/recompute-adapter-authorities.py	original	-	-	-	original	kinglet-adapter-authority-maintainer-command
-scripts/studio-doctor.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours
+scripts/studio-doctor.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours; pioneer-wave-1b1-task-6: read_mcp_url now returns 0 explicitly and reads .mcp.json; the settings.json-wiring check was repointed at .mcp.json too, since Task 2 moved mcpServers out of settings.json and that check still expected it there
 scripts/validate-architecture.sh	ecu	1.5.0	scripts/validate-architecture.sh	14dc5e48d0bf775ab3793f811e05367ddfc727c240d8d3c0fe6d11155c1a3d4d	verbatim	-
 scripts/validate-asmdefs.sh	ecu	1.5.0	scripts/validate-asmdefs.sh	57688143049a14326a81ed6c3ca645528ee725e96588b61576799c5ee4b5f725	verbatim	-
 scripts/validate-code-quality.sh	ecu	1.5.0	scripts/validate-code-quality.sh	4c937f12aceb329370b9506e4b0e1fb43d3306f31c30c18405c1927dcfb8a4b6	verbatim	-
@@ -228,6 +228,7 @@ tests/test-lib.sh	ecu	1.5.0	tests/test-lib.sh	8c8810123ca75250158286eae310a380d9
 tests/test-mcp-config.sh	original	-	-	-	original	pins-.mcp.json-as-the-file-claude-code-reads-mcp-servers-from
 tests/test-no-mobile.sh	original	-	-	-	original	-
 tests/test-skills.sh	ecu	1.5.0	tests/test-skills.sh	324561e8e83be33761d519e6e04bf4a7eaaac7eef453bc431db05e13228d434a	modified	shellcheck-warning-fix: read find output without word splitting
+tests/test-studio-doctor.sh	original	-	-	-	original	pioneer-wave-1b1-task-6: covers read_mcp_url's fall-through-under-set-e defect and the summary-line/exit-code contract
 tests/test-state.sh	ecu	1.5.0	tests/test-state.sh	dc05b5a953fb23fb14ab0a009a276152f891d85b939f9c0c0aea16608ffcb321	modified	remove-invalid-bash-source-environment-assignment
 tests/test-templates.sh	ecu	1.5.0	tests/test-templates.sh	0f38c2bc95d65cd2fe4e6baba50ede9dae4dfed80185c20b2f4d372dbe535f0f	verbatim	-
 uninstall.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours
