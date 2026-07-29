@@ -70,8 +70,9 @@ override them.
 
 ## Shell conventions
 
-Everything here is bash, and `.gitattributes` says macOS is a target. That rules out `declare -A`
-(bash 4; macOS ships 3.2) and `grep -oP` (GNU-only).
+Everything here is bash. A macOS host pass is planned (`.claude/UPSTREAM` currently claims exactly
+one shipped host, `linux-x64`, but macOS compatibility is being kept intact for that future pass).
+That rules out `declare -A` (bash 4; macOS ships 3.2) and `grep -oP` (GNU-only).
 
 Under `set -euo pipefail`, **do not pipe into `head`**. When head exits early the writer gets SIGPIPE,
 pipefail turns 141 into a failure, and `set -e` kills the script. It fires on large inputs and hides

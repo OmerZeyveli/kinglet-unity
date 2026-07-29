@@ -1,8 +1,8 @@
 # Merge Notes (developer record)
 
-How `cloud-nine-unity` was assembled: what was taken from where, what was adapted, what was
-deliberately left out, and which calls/assumptions were mine. This is a build record for
-maintainers — end users want `README.md`.
+How Kinglet Pioneer (assembled and first shipped as `cloud-nine-unity`, then renamed) was put
+together: what was taken from where, what was adapted, what was deliberately left out, and which
+calls/assumptions were mine. This is a build record for maintainers — end users want `README.md`.
 
 It has two parts, because the project was built twice:
 
@@ -95,8 +95,9 @@ Donchitos runs a heavy multi-gate pipeline. I cut it to keep the toolkit solo-fr
 
 ## Decisions I made (assumptions)
 
-- **Repo name** `cloud-nine-unity` (user-chosen, "cloud nine" pun; an earlier "cloude-nine" typo was
-  corrected to a single consistent spelling).
+- **Repo name** was originally `cloud-nine-unity` (user-chosen, "cloud nine" pun; an earlier
+  "cloude-nine" typo was corrected to a single consistent spelling). It was later renamed to
+  Kinglet Pioneer; the current repo is `kinglet-unity`.
 - **Design docs path** `docs/` at project root (lowercase), created in the **user's Unity project**,
   not in this repo. Subfolders: `docs/design`, `docs/adr`, `docs/production`.
 - **5 design templates** = the 3 named in scope (GDD, ADR, sprint-plan) + 2 the included commands
