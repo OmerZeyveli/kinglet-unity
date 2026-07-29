@@ -12,6 +12,11 @@ from .inventory import (
 )
 from .load import load_record
 from .model import Diagnostic, EvidenceError
+from .provenance import (
+    build_provenance,
+    render_provenance_json,
+    render_provenance_markdown,
+)
 from .publish import publish_record
 from .report import load_published_records, write_reports, write_unity_reports
 from .validate import validate_record
@@ -57,6 +62,14 @@ def _parser() -> argparse.ArgumentParser:
         default=Path("docs/research/platform-spike/reports"),
     )
     inventory.add_argument("--allow-dirty-inventory", action="store_true")
+
+    provenance = commands.add_parser("provenance")
+    provenance.add_argument("--repo-root", type=Path, default=Path("."))
+    provenance.add_argument(
+        "--out-dir",
+        type=Path,
+        default=Path("docs/research/platform-spike/reports"),
+    )
 
     gate = commands.add_parser("gate")
     gate.add_argument("gate_id")
@@ -231,6 +244,22 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"inventoried {len(report.rows)} foundation files for "
                 f"{report.selected_runtime}"
+            )
+            return 0
+        if arguments.command == "provenance":
+            report = build_provenance(arguments.repo_root)
+            out_dir = Path(arguments.out_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "dependency-provenance.json").write_text(
+                render_provenance_json(report), encoding="utf-8"
+            )
+            (out_dir / "dependency-provenance.md").write_text(
+                render_provenance_markdown(report), encoding="utf-8"
+            )
+            print(
+                f"provenance: {len(report.items)} recorded, "
+                f"{len(report.unlicensed)} without a licence, "
+                f"{len(report.declared_version_mismatches)} stale declared pins"
             )
             return 0
         if arguments.command == "gate":

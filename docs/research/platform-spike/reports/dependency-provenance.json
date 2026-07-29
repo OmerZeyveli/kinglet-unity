@@ -1,0 +1,805 @@
+{
+  "declared_version_mismatches": [
+    {
+      "declared_license_spdx": "MIT OR Apache-2.0",
+      "declared_version": "1.0.219",
+      "ecosystem": "cargo",
+      "name": "serde",
+      "owner": "rust",
+      "resolved_version": "1.0.229"
+    },
+    {
+      "declared_license_spdx": "MIT OR Apache-2.0",
+      "declared_version": "1.0.140",
+      "ecosystem": "cargo",
+      "name": "serde_json",
+      "owner": "rust",
+      "resolved_version": "1.0.151"
+    },
+    {
+      "declared_license_spdx": "MIT OR Apache-2.0",
+      "declared_version": "1.16.0",
+      "ecosystem": "cargo",
+      "name": "uuid",
+      "owner": "rust",
+      "resolved_version": "1.24.0"
+    }
+  ],
+  "items": [
+    {
+      "checksum": "6ebaa1a2bf1290ab3bfe5a7b771d050ebffab2711c19a81691c683a5144a25de",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "BSD-3-Clause",
+      "name": "ed25519-dalek",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/ed25519-dalek/3.0.0",
+      "usage": "runtime-candidate",
+      "version_or_commit": "3.0.0"
+    },
+    {
+      "checksum": "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "MIT OR Apache-2.0",
+      "name": "hex",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/hex/0.4.3",
+      "usage": "runtime-candidate",
+      "version_or_commit": "0.4.3"
+    },
+    {
+      "checksum": "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "MIT OR Apache-2.0",
+      "name": "sha2",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/sha2/0.10.9",
+      "usage": "runtime-candidate",
+      "version_or_commit": "0.10.9"
+    },
+    {
+      "checksum": "0vsCtY5f+YgQROiWNqzgWp+l2pddfk9FkWoGV/bEo0MuEYPKlJWuoA8aOfO6qp3f+EnObKE3zSJhn1PspJeJVg==",
+      "checksum_algorithm": "sha512-base64",
+      "ecosystem": "nuget",
+      "license_spdx": "MIT",
+      "name": "NSec.Cryptography",
+      "owner": "dotnet",
+      "source_url": "https://www.nuget.org/packages/NSec.Cryptography/26.4.0",
+      "usage": "runtime-candidate",
+      "version_or_commit": "26.4.0"
+    },
+    {
+      "checksum": "f89660a348f4f78a92366240a61404e337586ef7f5909a2fef59ca88ef505493",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "Apache-2.0 OR BSD-3-Clause",
+      "name": "cryptography",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/cryptography/49.0.0/",
+      "usage": "runtime-candidate",
+      "version_or_commit": "49.0.0"
+    },
+    {
+      "checksum": "10069bec8783596484a610332f090d562802a41b9b40e3327a5a5688b572e10c296ae300f940d40461f23c157ed1b0843c2f8e6b3f20d8d8d9d83432d8143bac",
+      "checksum_algorithm": "sha512",
+      "ecosystem": "toolchain",
+      "license_spdx": "MIT",
+      "name": ".NET SDK (ubuntu-lts-x64)",
+      "owner": "dotnet",
+      "source_url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-linux-x64.tar.gz",
+      "usage": "direct-toolchain",
+      "version_or_commit": "10.0.302"
+    },
+    {
+      "checksum": "c172314f4a8ec137a8f605289010c3d19c8b56867d968f0095074cc68efa1d29",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "toolchain",
+      "license_spdx": "PSF-2.0",
+      "name": "CPython (ubuntu-lts-x64)",
+      "owner": "python-bundled",
+      "source_url": "https://releases.astral.sh/github/python-build-standalone/releases/download/20260623/cpython-3.14.6%2B20260623-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "usage": "direct-toolchain",
+      "version_or_commit": "3.14.6"
+    },
+    {
+      "checksum": "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "toolchain",
+      "license_spdx": "BSD-3-Clause",
+      "name": "Go (ubuntu-lts-x64)",
+      "owner": "go",
+      "source_url": "https://go.dev/dl/go1.26.5.linux-amd64.tar.gz",
+      "usage": "direct-toolchain",
+      "version_or_commit": "1.26.5"
+    },
+    {
+      "checksum": "97e6b2a833b6d89f9ff17d25419ac0a7e3b482a044e9ab18cdef834bd834fd38",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "toolchain",
+      "license_spdx": "BSD-3-Clause",
+      "name": "Go (windows-10-x64)",
+      "owner": "go",
+      "source_url": "https://go.dev/dl/go1.26.5.windows-amd64.zip",
+      "usage": "direct-toolchain",
+      "version_or_commit": "1.26.5"
+    },
+    {
+      "checksum": "b4cdbc7cc6b0ee0a2666b1872769fdb2ad8393b28b63952f6493b4b400e4832b",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "toolchain",
+      "license_spdx": "MIT OR Apache-2.0",
+      "name": "Rust (ubuntu-lts-x64)",
+      "owner": "rust",
+      "source_url": "https://static.rust-lang.org/dist/rust-1.97.1-x86_64-unknown-linux-gnu.tar.gz",
+      "usage": "direct-toolchain",
+      "version_or_commit": "1.97.1"
+    },
+    {
+      "checksum": "e490a6464492183c5d4534a5527fb4440f7f2bb2f228162ad7e4afe076dc0224",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "toolchain",
+      "license_spdx": "MIT",
+      "name": "uv (ubuntu-lts-x64)",
+      "owner": "python-bundled",
+      "source_url": "https://github.com/astral-sh/uv/releases/download/0.11.28/uv-x86_64-unknown-linux-gnu.tar.gz",
+      "usage": "direct-toolchain",
+      "version_or_commit": "0.11.28"
+    },
+    {
+      "checksum": "78ee5418415953b79c358bfe6355fcc3fde7912b",
+      "checksum_algorithm": "git-commit",
+      "ecosystem": "unity-package",
+      "license_spdx": "MIT",
+      "name": "com.coplaydev.unity-mcp",
+      "owner": "unity-mcp",
+      "source_url": "https://github.com/CoplayDev/unity-mcp",
+      "usage": "unity-probe",
+      "version_or_commit": "v9.7.1"
+    }
+  ],
+  "schema": "kinglet.spike.dependency-provenance/v1",
+  "unrecorded_licenses": [
+    {
+      "checksum": "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "block-buffer",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/block-buffer/0.10.4",
+      "version_or_commit": "0.10.4"
+    },
+    {
+      "checksum": "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "block-buffer",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/block-buffer/0.12.1",
+      "version_or_commit": "0.12.1"
+    },
+    {
+      "checksum": "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "bumpalo",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/bumpalo/3.20.3",
+      "version_or_commit": "3.20.3"
+    },
+    {
+      "checksum": "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "cfg-if",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/cfg-if/1.0.4",
+      "version_or_commit": "1.0.4"
+    },
+    {
+      "checksum": "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "cpufeatures",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/cpufeatures/0.2.17",
+      "version_or_commit": "0.2.17"
+    },
+    {
+      "checksum": "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "cpufeatures",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/cpufeatures/0.3.0",
+      "version_or_commit": "0.3.0"
+    },
+    {
+      "checksum": "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "crypto-common",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/crypto-common/0.1.7",
+      "version_or_commit": "0.1.7"
+    },
+    {
+      "checksum": "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "crypto-common",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/crypto-common/0.2.2",
+      "version_or_commit": "0.2.2"
+    },
+    {
+      "checksum": "b5eed333089e2e1c1ac8c6c0398e5e2497b4c9926ca6d0365ed1e099afa5bc23",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "curve25519-dalek",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/curve25519-dalek/5.0.0",
+      "version_or_commit": "5.0.0"
+    },
+    {
+      "checksum": "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "curve25519-dalek-derive",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/curve25519-dalek-derive/0.1.1",
+      "version_or_commit": "0.1.1"
+    },
+    {
+      "checksum": "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "digest",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/digest/0.10.7",
+      "version_or_commit": "0.10.7"
+    },
+    {
+      "checksum": "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "digest",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/digest/0.11.3",
+      "version_or_commit": "0.11.3"
+    },
+    {
+      "checksum": "29fcf32e6c73d1079f83ab4d782de2d81620346a5f38c6237a86a22f8368980a",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "ed25519",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/ed25519/3.0.0",
+      "version_or_commit": "3.0.0"
+    },
+    {
+      "checksum": "64cd1e32ddd350061ae6edb1b082d7c54915b5c672c389143b9a63403a109f24",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "fiat-crypto",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/fiat-crypto/0.3.0",
+      "version_or_commit": "0.3.0"
+    },
+    {
+      "checksum": "2cd50c473c80f6d7c3670a752354b8e569b1a7cbfdc0419ec88e5edad85e0dc7",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "futures-core",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/futures-core/0.3.33",
+      "version_or_commit": "0.3.33"
+    },
+    {
+      "checksum": "b231ed28831efb4a61a08580c4bc233ec56bc009f4cd8f52da2c3cb97df0c109",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "futures-task",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/futures-task/0.3.33",
+      "version_or_commit": "0.3.33"
+    },
+    {
+      "checksum": "a77a90a256fce34da66415271e30f94ee91c57b04b8a2c042d9cf3220179deaa",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "futures-util",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/futures-util/0.3.33",
+      "version_or_commit": "0.3.33"
+    },
+    {
+      "checksum": "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "generic-array",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/generic-array/0.14.7",
+      "version_or_commit": "0.14.7"
+    },
+    {
+      "checksum": "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "getrandom",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/getrandom/0.4.3",
+      "version_or_commit": "0.4.3"
+    },
+    {
+      "checksum": "818356c5132c1fede50f837ca96afbe78ff42413047f4abb886217845e1b6c8c",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "hybrid-array",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/hybrid-array/0.4.13",
+      "version_or_commit": "0.4.13"
+    },
+    {
+      "checksum": "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "itoa",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/itoa/1.0.18",
+      "version_or_commit": "1.0.18"
+    },
+    {
+      "checksum": "53b44bfcdb3f8d5837a46dae1ca9660a837176eee74a28b229bc626816589102",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "js-sys",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/js-sys/0.3.103",
+      "version_or_commit": "0.3.103"
+    },
+    {
+      "checksum": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "libc",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/libc/0.2.189",
+      "version_or_commit": "0.2.189"
+    },
+    {
+      "checksum": "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "memchr",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/memchr/2.8.3",
+      "version_or_commit": "2.8.3"
+    },
+    {
+      "checksum": "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "once_cell",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/once_cell/1.21.4",
+      "version_or_commit": "1.21.4"
+    },
+    {
+      "checksum": "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "pin-project-lite",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/pin-project-lite/0.2.17",
+      "version_or_commit": "0.2.17"
+    },
+    {
+      "checksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "proc-macro2",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/proc-macro2/1.0.107",
+      "version_or_commit": "1.0.107"
+    },
+    {
+      "checksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "quote",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/quote/1.0.47",
+      "version_or_commit": "1.0.47"
+    },
+    {
+      "checksum": "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "r-efi",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/r-efi/6.0.0",
+      "version_or_commit": "6.0.0"
+    },
+    {
+      "checksum": "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "rustc_version",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/rustc_version/0.4.1",
+      "version_or_commit": "0.4.1"
+    },
+    {
+      "checksum": "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "rustversion",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/rustversion/1.0.23",
+      "version_or_commit": "1.0.23"
+    },
+    {
+      "checksum": "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "semver",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/semver/1.0.28",
+      "version_or_commit": "1.0.28"
+    },
+    {
+      "checksum": "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "serde",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/serde/1.0.229",
+      "version_or_commit": "1.0.229"
+    },
+    {
+      "checksum": "67dca2c9c51e58a4791a4b1ed58308b39c64224d349a935ab5039aa360942a48",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "serde_core",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/serde_core/1.0.229",
+      "version_or_commit": "1.0.229"
+    },
+    {
+      "checksum": "e7a5d71263a5a7d47b41f6b3f06ba276f10cc18b0931f1799f710578e2309348",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "serde_derive",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/serde_derive/1.0.229",
+      "version_or_commit": "1.0.229"
+    },
+    {
+      "checksum": "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "serde_json",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/serde_json/1.0.151",
+      "version_or_commit": "1.0.151"
+    },
+    {
+      "checksum": "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "sha2",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/sha2/0.11.0",
+      "version_or_commit": "0.11.0"
+    },
+    {
+      "checksum": "28d567dcbaf0049cb8ac2608a76cd95ff9e4412e1899d389ee400918ca7537f5",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "signature",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/signature/3.0.0",
+      "version_or_commit": "3.0.0"
+    },
+    {
+      "checksum": "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "slab",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/slab/0.4.12",
+      "version_or_commit": "0.4.12"
+    },
+    {
+      "checksum": "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "subtle",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/subtle/2.6.1",
+      "version_or_commit": "2.6.1"
+    },
+    {
+      "checksum": "872831b642d1a07999a962a351ed35b955ea2cfc8f3862091e2a240a84f17297",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "syn",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/syn/2.0.119",
+      "version_or_commit": "2.0.119"
+    },
+    {
+      "checksum": "53e9bae58849f64dfa4f5d5ae372c8341f7305f82a3868709269343628b659a3",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "syn",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/syn/3.0.3",
+      "version_or_commit": "3.0.3"
+    },
+    {
+      "checksum": "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "typenum",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/typenum/1.20.1",
+      "version_or_commit": "1.20.1"
+    },
+    {
+      "checksum": "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "unicode-ident",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/unicode-ident/1.0.24",
+      "version_or_commit": "1.0.24"
+    },
+    {
+      "checksum": "bf3923a6f5c4c6382e0b653c4117f48d631ea17f38ed86e2a828e6f7412f5239",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "uuid",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/uuid/1.24.0",
+      "version_or_commit": "1.24.0"
+    },
+    {
+      "checksum": "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "version_check",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/version_check/0.9.5",
+      "version_or_commit": "0.9.5"
+    },
+    {
+      "checksum": "4b067c0c11094aef6b7a801c1e34a26affafdf3d051dba08456b868789aaf9a4",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "wasm-bindgen",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/wasm-bindgen/0.2.126",
+      "version_or_commit": "0.2.126"
+    },
+    {
+      "checksum": "167ce5e579f6bcf889c4f7175a8a5a585de84e8ff93976ce393efa5f2837aab1",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "wasm-bindgen-macro",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/wasm-bindgen-macro/0.2.126",
+      "version_or_commit": "0.2.126"
+    },
+    {
+      "checksum": "f3997c7839262f4ef12cf90b818d6340c18e80f263f1a94bf157d0ec4420380e",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "wasm-bindgen-macro-support",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/wasm-bindgen-macro-support/0.2.126",
+      "version_or_commit": "0.2.126"
+    },
+    {
+      "checksum": "dc1b4cb0cc549fcf58d7dfc081778139b3d283a081644e833e84682ad71cea24",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "wasm-bindgen-shared",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/wasm-bindgen-shared/0.2.126",
+      "version_or_commit": "0.2.126"
+    },
+    {
+      "checksum": "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "zeroize",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/zeroize/1.9.0",
+      "version_or_commit": "1.9.0"
+    },
+    {
+      "checksum": "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "cargo",
+      "license_spdx": "",
+      "name": "zmij",
+      "owner": "rust",
+      "source_url": "https://crates.io/crates/zmij/1.0.23",
+      "version_or_commit": "1.0.23"
+    },
+    {
+      "checksum": "f5VCIE7AJpd5YvzNTeMGVzQIgyE9tX+AreTYwQF+REbu+DZo/2Ae+jNSwhPEYrVz6RRkd7y8ubXjk6Nn6Ka+Cg==",
+      "checksum_algorithm": "sha512-base64",
+      "ecosystem": "nuget",
+      "license_spdx": "",
+      "name": "Microsoft.NET.ILLink.Tasks",
+      "owner": "dotnet",
+      "source_url": "https://www.nuget.org/packages/Microsoft.NET.ILLink.Tasks/10.0.10",
+      "version_or_commit": "10.0.10"
+    },
+    {
+      "checksum": "KPD9SloJFclrsjnhABu7dzWrcyYkwPbvx5l1gRSPAX/0n+OBtSiVCKtGFv4n+ecWUHU0tCG9LSSwoZZx673zBQ==",
+      "checksum_algorithm": "sha512-base64",
+      "ecosystem": "nuget",
+      "license_spdx": "",
+      "name": "libsodium",
+      "owner": "dotnet",
+      "source_url": "https://www.nuget.org/packages/libsodium/1.0.22",
+      "version_or_commit": "1.0.22"
+    },
+    {
+      "checksum": "c87b395dd12fabde9c99573a9749d67da8d29ef9de0125c7f536699b4a9bc9e7",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "altgraph",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/altgraph/0.17.5/",
+      "version_or_commit": "0.17.5"
+    },
+    {
+      "checksum": "efc1cdd798b1aaf39b4610bba7aad28c9bea9b910f25c784ccf9ec1fa719d1f9",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "cffi",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/cffi/2.1.0/",
+      "version_or_commit": "2.1.0"
+    },
+    {
+      "checksum": "f408c93ab2e995cd2c46e34fe328b130404be143469e41bc366c807448979362",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "macholib",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/macholib/1.16.4/",
+      "version_or_commit": "1.16.4"
+    },
+    {
+      "checksum": "ff452ff5a3e828ce110190feff1178bb1f2ea2281fa2075aadb987c2fb221661",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "packaging",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/packaging/26.2/",
+      "version_or_commit": "26.2"
+    },
+    {
+      "checksum": "3ff6c5d8b43e8c37bb6e6dd5085658d658a7a0bdcd20b6a07b1fcfc1c4e9d632",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "pefile",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/pefile/2024.8.26/",
+      "version_or_commit": "2024.8.26"
+    },
+    {
+      "checksum": "600f49d217304a5902ac3c37e1281c9fe94e4d0489de643a9504c5cdfdfc6b29",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "pycparser",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/pycparser/3.0/",
+      "version_or_commit": "3.0"
+    },
+    {
+      "checksum": "bb9fab705983e393a2d1cac77d6972513057ad800215fd861dc15ff5272e98fd",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "pyinstaller",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/pyinstaller/6.21.0/",
+      "version_or_commit": "6.21.0"
+    },
+    {
+      "checksum": "bef5002c32f4f50bd55b005da12cff64eca8783e7eaf86a06a62410164bab725",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "pyinstaller-hooks-contrib",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/pyinstaller-hooks-contrib/2026.6/",
+      "version_or_commit": "2026.6"
+    },
+    {
+      "checksum": "d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "pywin32-ctypes",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/pywin32-ctypes/0.2.3/",
+      "version_or_commit": "0.2.3"
+    },
+    {
+      "checksum": "025bccbbf0fa05b6192bc64ae1e7b16e001fd6d6d4d5de03c97b1c1ade523bef",
+      "checksum_algorithm": "sha256",
+      "ecosystem": "pypi",
+      "license_spdx": "",
+      "name": "setuptools",
+      "owner": "python-bundled",
+      "source_url": "https://pypi.org/project/setuptools/83.0.0/",
+      "version_or_commit": "83.0.0"
+    }
+  ]
+}

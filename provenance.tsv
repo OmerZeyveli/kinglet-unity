@@ -571,3 +571,7 @@ tests/kinglet_spike/test_decision_gates.py	original	-	-	-	original	kinglet-00d-t
 spikes/platform/decision/inventory-rules-v1.json	original	-	-	-	original	kinglet-00d-task2-foundation-classification-rules
 tools/kinglet_spike/inventory.py	original	-	-	-	original	kinglet-00d-task2-git-aware-foundation-inventory
 tests/kinglet_spike/test_foundation_inventory.py	original	-	-	-	original	kinglet-00d-task2-inventory-exhaustiveness-tests
+tools/kinglet_spike/provenance.py	original	-	-	-	original	kinglet-00d-task3-supply-chain-provenance
+tests/kinglet_spike/test_spike_provenance.py	original	-	-	-	original	kinglet-00d-task3-provenance-tests
+docs/research/platform-spike/reports/dependency-provenance.json	original	-	-	-	original	kinglet-00d-task3-generated-provenance-data
+docs/research/platform-spike/reports/dependency-provenance.md	original	-	-	-	original	kinglet-00d-task3-generated-provenance-report
