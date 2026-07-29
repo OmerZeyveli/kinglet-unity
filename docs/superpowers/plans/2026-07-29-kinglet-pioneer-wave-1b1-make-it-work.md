@@ -734,6 +734,45 @@ reintroducing the error: `MCP-SETUP.md` (lines 5, 101, 120), `scripts/studio-doc
 
 **Note for whoever takes this.** This is the fifth round of the same class: two found by a task, one by a reviewer, one by an implementer's honesty, six by a sweep. The lesson is not that people are careless — it is that **a value duplicated into prose has no mechanism keeping it true**. If a cheap one exists, propose it; if not, say so plainly.
 
+### Task 11: Six shipped scripts use bash 4 syntax, and the guard named for it looks elsewhere
+
+**Added 2026-07-29, from Task 9's out-of-scope observation.** Task 9's implementer noticed one
+`declare -A` while sweeping for something else and flagged it. A sweep finds six files:
+
+| File | Occurrences |
+|---|---|
+| `scripts/validate-asmdefs.sh` | 8 (lines 105–111, 192) |
+| `scripts/analyze-build-size.sh` | 1 (line 304) |
+| `scripts/detect-missing-refs.sh` | 1 (line 102) |
+| `scripts/validate-code-quality.sh` | 1 (line 94) |
+| `scripts/validate-meta-integrity.sh` | 1 (line 84) |
+
+`CLAUDE.md` forbids `declare -A` because macOS ships bash 3.2, where it is a syntax error. **These
+scripts are payload** — `install.sh` copies `scripts/` into the user's `.claude/`, and
+`.claude/commands/unity-build.md` tells the agent to run one of them by name. On a macOS host they
+do not run at all.
+
+**Why nothing caught it.** `tests/test-bash32-compat.sh` exists for precisely this, and scans
+exactly one glob:
+
+```bash
+grep -lE '…declare[[:space:]]+-A…' "$REPO_DIR"/.claude/hooks/*.sh
+```
+
+Hooks only. Not `scripts/`, which ships alongside them. This is the same shape as the rest of this
+wave: **a guard that reads as though it covers a class, while covering one directory of it.**
+
+This is bigger than the other tasks here — rewriting associative-array logic in a dependency graph
+walker (`validate-asmdefs.sh` uses eight of them, including a DFS visit-state map) is real work, not
+a mechanical substitution. `scripts/generate-claude-md.sh:102` already documents the idiom this
+repository uses instead — a newline-separated `id<TAB>label` table — and is the reference.
+
+- [ ] **Step 1: Widen the guard first, and watch it fail.** Extend `test-bash32-compat.sh` to every shipped shell script, not just hooks. It must fail now, naming all six files. A guard written after the fixes proves nothing.
+- [ ] **Step 2: Sweep for the other banned constructs in the same scope** — `grep -oP`, `grep -qP`, `${var,,}`, `${var^^}`, `mapfile`/`readarray`, `&>>`. If the guard is being widened, widen it to the whole convention rather than the one construct that happened to be noticed.
+- [ ] **Step 3: Convert the six**, following `generate-claude-md.sh`'s documented idiom. `validate-asmdefs.sh` is the hard one and may deserve its own commit.
+- [ ] **Step 4: Prove one runs.** If a bash 3.2 binary is available, run a converted script under it. If not, say so — an untested claim of 3.2 compatibility is what produced this task.
+- [ ] **Step 5:** Suite green with every file present; `check-provenance.sh` OK; `verbatim` rows flipped where edited; baseline regenerated in a separate commit if `.claude/` drifted.
+
 ## What this plan does not do
 
 | Deferred | To | Why |
