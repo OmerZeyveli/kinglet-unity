@@ -21,7 +21,7 @@ one.
 |---------|------------------------|------|
 | everything-claude-unity (ECU) | **v1.5.0** (`bb28ccb`) | Engineering layer. **Vendored** — see Part 2. (Upstream's `plugin.json` is stale at 1.3.0 with old counts 22/41; `.claude/VERSION` was the reliable read.) |
 | Claude-Code-Game-Studios (Donchitos) | **`984023d`** | Source of the adapted design/production layer. |
-| unity-mcp (CoplayDev) | package `com.coplaydev.unity-mcp` **10.1.0** (2026-07-13) | MCP bridge targeted by docs/automation — **not vendored**; `settings.json` points at it on localhost. |
+| unity-mcp (CoplayDev) | package `com.coplaydev.unity-mcp` **10.1.0** (2026-07-13) | MCP bridge targeted by docs/automation — **not vendored**; `settings.json` used to point at it on localhost. That moved to `.mcp.json`. |
 
 Pins of record live in `.claude/UPSTREAM`; per-file truth lives in `provenance.tsv`.
 

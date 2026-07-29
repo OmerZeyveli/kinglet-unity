@@ -27,7 +27,7 @@ plans into `docs/`.
 - **Medium-weight process.** Enough structure for a solo dev or small team. Senior
   "creative/technical director" reviews are optional, not gates.
 - **One MCP.** The open-source [CoplayDev Unity MCP](https://github.com/CoplayDev/unity-mcp) bridge,
-  preconfigured in `settings.json`. A migration note for Unity's official MCP is in
+  preconfigured in `.mcp.json`. A migration note for Unity's official MCP is in
   [MCP-SETUP.md](MCP-SETUP.md), but only one at a time is supported.
 
 ## What's in the box

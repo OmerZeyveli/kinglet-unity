@@ -76,7 +76,7 @@ After installation, your project contains:
     genre/           Genre-specific patterns (RPG, platformer, top-down, match-3, puzzle, idle)
     systems/         Unity subsystems (Input System, Addressables, Cinemachine, etc.)
     third-party/     Third-party integrations (DOTween, UniTask, VContainer, etc.)
-  settings.json    Permissions, MCP server config, hook definitions
+  settings.json    Permissions, hook definitions
 ```
 
 There is no `platform/` category. This toolkit targets PC and console only, and that guidance lives
@@ -116,7 +116,7 @@ The MCP bridge gives Claude direct control over the Unity Editor: creating GameO
 
 3. Verify the server is running on `localhost:8080`
 
-4. The `settings.json` is already configured to connect:
+4. The `.mcp.json` is already configured to connect:
    ```json
    "mcpServers": {
      "unityMCP": {

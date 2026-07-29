@@ -129,7 +129,7 @@ SOFTWARE.
 - **License:** MIT
 
 This toolkit targets CoplayDev's open-source **Unity MCP bridge** (Unity package
-`com.coplaydev.unity-mcp`). Our `.claude/settings.json` points at it on `http://localhost:8080/mcp`,
+`com.coplaydev.unity-mcp`). Our `.mcp.json` points at it on `http://localhost:8080/mcp`,
 and the `unity-mcp-patterns` skill documents its `snake_case` tools (`manage_scene`,
 `manage_gameobject`, `create_script`, `validate_script`, `read_console`, `batch_execute`).
 

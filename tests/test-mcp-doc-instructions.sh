@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================================
-# test-mcp-doc-instructions.sh — no instruction in .claude/ sends a reader
-# back to the file Claude Code never reads MCP config from.
+# test-mcp-doc-instructions.sh — no instruction in .claude/ OR in the
+# repository's own documentation sends a reader back to the file Claude Code
+# never reads MCP config from.
+#
+# Round 3 (2026-07-29, controller sweep after Task 8) found the SAME stale
+# claim in six places outside .claude/: CLAUDE.md, CREDITS.md, README.md,
+# docs/ARCHITECTURE.md, docs/GETTING-STARTED.md (two spots, one of which
+# the sweep itself missed — see the widening note below), and MERGE-NOTES.md.
+# All six are fixed in the same commit that widens this guard past .claude/.
+# See the "Round 3" section near the end of this file for the widened scan,
+# its exclusion list, and why MERGE-NOTES.md is handled separately from it.
 #
 # Task 2 moved MCP server configuration to .mcp.json at the project root,
 # because Claude Code silently ignores an mcpServers key inside settings.json.
@@ -120,3 +129,167 @@ assert_contains "$TMDI_DOCTOR_LINE" ".mcp.json" \
 TMDI_NOTICE=$(cat "${REPO_DIR}/.claude/NOTICE.md")
 assert_contains "$TMDI_NOTICE" "\`.mcp.json\` merely points at it" \
     "NOTICE.md's MCP-bridge sentence now names .mcp.json, not settings.json"
+
+# ============================================================================
+# Round 3 — widen past .claude/ to the repository's own documentation.
+#
+# The .claude/ scan above is unchanged: it is the payload a user's project
+# receives, and the reasoning above it still holds. This section is a
+# SEPARATE scan over root-level and docs/ Markdown, because a controller
+# sweep after Task 8 found the identical stale claim ("settings.json holds
+# MCP config") in six places no .claude/-scoped guard could ever see.
+#
+# --- Scope: every tracked root-level *.md, plus every tracked docs/**/*.md ---
+#
+# This is deliberately a moving target, not a fixed file list: a new doc added
+# under docs/ tomorrow is in scope automatically. Only paths named below are
+# excluded, each for a stated reason — a new file is never exempt by default.
+#
+# --- Excluded, by exact path/prefix, each because it EXPLAINS the mistake
+# rather than repeating it (deleting the words would delete the evidence) ---
+#
+#   MCP-SETUP.md                        — the whole document's job is to record
+#                                          why settings.json is the WRONG place;
+#                                          the brief names lines 5, 101, 120
+#                                          specifically, but the surrounding
+#                                          prose repeats the same juxtaposition
+#                                          deliberately, so the exclusion is the
+#                                          whole file, not three lines.
+#   docs/research/pioneer/smoke-pass.md — the investigative record of the exact
+#                                          finding that motivated this whole
+#                                          guard (Task 8's origin).
+#   docs/superpowers/plans/*            — frozen plan documents; historical
+#                                          record of what was planned, not a
+#                                          claim about current behavior.
+#   docs/superpowers/specs/*            — frozen spec documents; same reasoning.
+#
+# MERGE-NOTES.md is tracked docs but is EXCLUDED from this proximity scan and
+# checked separately below (see "MERGE-NOTES.md" section) — it is a historical
+# build record whose OTHER entries legitimately place "settings.json" and
+# "mcp" near each other while describing what was true when it was written
+# (e.g. "Part 1 did not ship a settings.json ... We ship .claude/settings.json
+# now"). A same-file proximity match cannot distinguish past tense from
+# present tense; a human already made that call for this file (the same
+# treatment MERGE-NOTES.md's own repo-name entry received during the product
+# rename, tense-fixing "was originally ... later renamed" rather than
+# rewriting the history) and it is not something a regex should re-decide.
+#
+# scripts/studio-doctor.sh's explanatory comment needs no exclusion entry:
+# it is a .sh file, not a root *.md or docs/**/*.md, so this scan's scope
+# never reaches it — the same reason it never needed one in the .claude/-only
+# scan above.
+#
+# --- What this does NOT solve, stated plainly ---
+#
+# This is a proximity heuristic, not a grammar checker. It cannot tell "X used
+# to be true" from "X is true" within a single juxtaposition — that is exactly
+# why MERGE-NOTES.md needed a human call instead of being folded into this
+# scan. If a future doc mixes historical and current claims about
+# settings.json/MCP the way MERGE-NOTES.md does, it will need the same
+# judgment call and the same kind of narrow, line-anchored check below instead
+# of being added to this proximity scan.
+
+tmdi3_is_excluded() {
+    case "$1" in
+        MCP-SETUP.md) return 0 ;;
+        MERGE-NOTES.md) return 0 ;;
+        docs/research/pioneer/smoke-pass.md) return 0 ;;
+        docs/superpowers/plans/*) return 0 ;;
+        docs/superpowers/specs/*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Classifier self-check: proves the exclusion list is a named allowlist of
+# exceptions, not a stand-in for "skip everything" — including a check that a
+# BRAND NEW, never-seen doc path is still classified as in-scope.
+TMDI3_CLASSIFY_FAILURES=""
+for tmdi3_case in \
+    "MCP-SETUP.md:excluded" \
+    "MERGE-NOTES.md:excluded" \
+    "docs/research/pioneer/smoke-pass.md:excluded" \
+    "docs/superpowers/plans/2026-07-22-kinglet-01-identity-foundation.md:excluded" \
+    "docs/superpowers/specs/2026-07-22-kinglet-for-unity-design.md:excluded" \
+    "CLAUDE.md:included" \
+    "README.md:included" \
+    "docs/ARCHITECTURE.md:included" \
+    "docs/some-brand-new-doc-nobody-has-written-yet.md:included" \
+; do
+    tmdi3_path="${tmdi3_case%%:*}"
+    tmdi3_expected="${tmdi3_case##*:}"
+    if tmdi3_is_excluded "$tmdi3_path"; then
+        tmdi3_actual="excluded"
+    else
+        tmdi3_actual="included"
+    fi
+    if [ "$tmdi3_actual" != "$tmdi3_expected" ]; then
+        TMDI3_CLASSIFY_FAILURES="${TMDI3_CLASSIFY_FAILURES}${tmdi3_path}: expected ${tmdi3_expected}, got ${tmdi3_actual}
+"
+    fi
+done
+assert_eq "" "$TMDI3_CLASSIFY_FAILURES" \
+    "the exclusion classifier only exempts the named paths -- a brand-new doc is scanned by default"
+
+# --- The scan itself: root *.md (non-recursive) + every docs/**/*.md ---
+TMDI3_ROOT_MD=$(cd "$REPO_DIR" && git ls-files -- '*.md' | grep -v '/' || true)
+TMDI3_DOCS_MD=$(cd "$REPO_DIR" && git ls-files -- 'docs/' | grep '\.md$' || true)
+TMDI3_TRACKED=$(printf '%s\n%s\n' "$TMDI3_ROOT_MD" "$TMDI3_DOCS_MD")
+
+TMDI3_HITS=""
+while IFS= read -r tmdi3_relpath; do
+    [ -z "$tmdi3_relpath" ] && continue
+    tmdi3_is_excluded "$tmdi3_relpath" && continue
+    tmdi3_abspath="${REPO_DIR}/${tmdi3_relpath}"
+    [ -f "$tmdi3_abspath" ] || continue
+    tmdi3_match=$(tr '\n' ' ' < "$tmdi3_abspath" \
+        | grep -ioE 'settings\.json.{0,120}mcp|mcp.{0,120}settings\.json' || true)
+    if [ -n "$tmdi3_match" ]; then
+        TMDI3_HITS="${TMDI3_HITS}${tmdi3_relpath}: ${tmdi3_match}
+"
+    fi
+done <<< "$TMDI3_TRACKED"
+
+if [ -n "$TMDI3_HITS" ]; then
+    echo "--- offending repository doc(s) still tie settings.json to MCP config ---"
+    echo "$TMDI3_HITS"
+    echo "--- end offenders ---"
+fi
+assert_eq "" "$TMDI3_HITS" \
+    "no non-excluded repository doc ties settings.json to MCP config within ~120 characters"
+
+# --- Positive controls: the six corrected locations now name .mcp.json ---
+TMDI3_CLAUDE_MD=$(cat "${REPO_DIR}/CLAUDE.md")
+assert_contains "$TMDI3_CLAUDE_MD" "\`.mcp.json\` points at it on \`localhost:8080\`" \
+    "CLAUDE.md's unity-mcp bullet now names .mcp.json, not settings.json"
+
+TMDI3_CREDITS_MD=$(cat "${REPO_DIR}/CREDITS.md")
+assert_contains "$TMDI3_CREDITS_MD" "Our \`.mcp.json\` points at it on \`http://localhost:8080/mcp\`" \
+    "CREDITS.md's MCP bridge paragraph now names .mcp.json, not settings.json"
+
+TMDI3_README_MD=$(cat "${REPO_DIR}/README.md")
+assert_contains "$TMDI3_README_MD" "preconfigured in \`.mcp.json\`" \
+    "README.md's One MCP bullet now names .mcp.json, not settings.json"
+
+TMDI3_ARCH_MD=$(cat "${REPO_DIR}/docs/ARCHITECTURE.md")
+assert_not_contains "$TMDI3_ARCH_MD" "settings.json      Configuration: permissions, MCP servers" \
+    "docs/ARCHITECTURE.md's component tree no longer credits settings.json with MCP servers"
+
+TMDI3_GETTING_STARTED_MD=$(cat "${REPO_DIR}/docs/GETTING-STARTED.md")
+assert_not_contains "$TMDI3_GETTING_STARTED_MD" "settings.json    Permissions, MCP server config" \
+    "docs/GETTING-STARTED.md's directory tree no longer credits settings.json with MCP server config"
+assert_contains "$TMDI3_GETTING_STARTED_MD" "The \`.mcp.json\` is already configured to connect" \
+    "docs/GETTING-STARTED.md's setup step 4 now names .mcp.json, not settings.json"
+
+# --- MERGE-NOTES.md: the judgment call. Not scanned by the proximity check
+# above (see the exclusion rationale). Checked narrowly instead: the specific
+# table row is anchored by stable surrounding text (the package name), then
+# asserted to have the tense-honest wording and NOT the flatly-present-tense
+# stale wording it used to carry. Its other entries (Part 1/Part 2 history)
+# are untouched and are not re-checked here -- they were never wrong.
+TMDI3_MERGE_ROW=$(grep "com.coplaydev.unity-mcp" "${REPO_DIR}/MERGE-NOTES.md" | grep "not vendored" || true)
+assert_contains "$TMDI3_MERGE_ROW" "used to point at it on localhost" \
+    "MERGE-NOTES.md's unity-mcp row now states the settings.json claim in the past tense"
+assert_contains "$TMDI3_MERGE_ROW" "\`.mcp.json\`" \
+    "MERGE-NOTES.md's unity-mcp row now names where MCP config actually lives"
+assert_not_contains "$TMDI3_MERGE_ROW" "\`settings.json\` points at it on localhost." \
+    "MERGE-NOTES.md's unity-mcp row no longer states the stale claim as a present-tense fact"

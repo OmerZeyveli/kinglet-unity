@@ -17,7 +17,7 @@ It is assembled from other people's work, and that is the central fact about mai
   repo's `scripts/`, `tests/`, `docs/`, `examples/`, `templates/`.
 - **Claude-Code-Game-Studios (Donchitos)** — MIT, **adapted** at `984023d`. The design/production
   layer: 8 agents, 9 commands, 5 templates. Each carries an inline attribution comment.
-- **CoplayDev unity-mcp** — not vendored. `settings.json` points at it on `localhost:8080`.
+- **CoplayDev unity-mcp** — not vendored. `.mcp.json` points at it on `localhost:8080`.
 
 ## The provenance contract
 

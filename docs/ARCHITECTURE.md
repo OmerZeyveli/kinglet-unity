@@ -20,7 +20,7 @@ This project follows the architecture established by [everything-claude-code](ht
 
 ```
 .claude/
-  settings.json      Configuration: permissions, MCP servers, hook definitions
+  settings.json      Configuration: permissions, hook definitions
   agents/            28 agent definitions (.md files with frontmatter)
   commands/          36 user-invocable slash commands
   hooks/             25 shell scripts + _lib.sh (safety, quality, session, learning)
