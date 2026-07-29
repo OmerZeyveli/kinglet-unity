@@ -226,6 +226,7 @@ tests/test-input-system-check.sh	original	-	-	-	original	pioneer-wave-1b1-task-3
 tests/test-install.sh	ecu	1.5.0	tests/test-install.sh	9561a3bcf8e75e2ee92b7e2ddadbe6dea6e8c3b4464c575e14339864b5eea971	modified	test-runner-fix: PASS output no longer gated on --verbose, so the tally can count it
 tests/test-lib.sh	ecu	1.5.0	tests/test-lib.sh	8c8810123ca75250158286eae310a380d907cfb7adf30cf63fb6bc557e3cfe4d	modified	project-local-state-assertion
 tests/test-mcp-config.sh	original	-	-	-	original	pins-.mcp.json-as-the-file-claude-code-reads-mcp-servers-from
+tests/test-mcp-doc-instructions.sh	original	-	-	-	original	pioneer-wave-1b1-task-8: guards that no line under .claude/ instructs a reader to find MCP config in settings.json
 tests/test-no-mobile.sh	original	-	-	-	original	-
 tests/test-skills.sh	ecu	1.5.0	tests/test-skills.sh	324561e8e83be33761d519e6e04bf4a7eaaac7eef453bc431db05e13228d434a	modified	shellcheck-warning-fix: read find output without word splitting
 tests/test-studio-doctor.sh	original	-	-	-	original	pioneer-wave-1b1-task-6: covers read_mcp_url's fall-through-under-set-e defect and the summary-line/exit-code contract
