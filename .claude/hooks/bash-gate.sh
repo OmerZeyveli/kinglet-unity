@@ -48,10 +48,25 @@ DANGER_MSG=""
 # value, inside another word entirely) and the permissive `.*` that used to follow let any
 # amount of intervening text pair a verb with a path it never touched.
 #
+# A real shell tolerates more than bare start-of-line at a command position, and the first
+# cut of this anchor was measured to be too narrow — four genuinely destructive commands
+# (leading whitespace, a `sudo`/`env` prefix, a `(` subshell, and a verb reached through
+# `xargs`) slipped through as false negatives. CMD_START now also allows:
+#   - leading whitespace at the start of the line (common in indented blocks/heredocs)
+#   - an opening `(` or `{` (subshell / brace group)
+#   - a `sudo`/`env`/`doas`/`nice`/`nohup`/`exec`/`command`/`time` prefix and its own flags
+#   - an `xargs` prefix and its own flags — xargs execs its trailing arguments as a command,
+#     so a verb reached through it IS in command position for the process that actually runs,
+#     even though it is not lexically the first word of the shell line. Deliberately covered
+#     here rather than left as a silent gap: the whole point of this fix is a gate that does
+#     what its classification claims, and "we don't check xargs" would be exactly that kind
+#     of silent gap.
+#
 # CMD_START also bounds the gap between the verb and its path to `[^;&|]*` — text within the
 # same command segment, not across a `;`/`&&`/`||`/`|` into an unrelated command that merely
 # happens to mention the path later on the same line.
-CMD_START='(^|[;&|]+[[:space:]]*)'
+CMD_PREFIX='((sudo|doas|env|nice|nohup|exec|command|time|xargs)([[:space:]]+[A-Za-z0-9_=./{}-]+)*[[:space:]]+)?'
+CMD_START="(^[[:space:]]*|[;&|]+[[:space:]]*|[({][[:space:]]*)${CMD_PREFIX}"
 SAME_CMD='[^;&|]*'
 
 # Unity directory wipes

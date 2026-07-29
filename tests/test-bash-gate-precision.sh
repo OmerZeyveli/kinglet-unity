@@ -52,3 +52,20 @@ assert_eq "0" "$(tbg_run 'curl -s https://api.example.com/report -d "{\"reason\"
     "does not block a JSON argument that merely contains the word cp and the path as data"
 assert_eq "0" "$(tbg_run 'echo build > build.log; grep ProjectSettings/ProjectSettings.asset build.log')" \
     "does not block an unrelated grep chained after a redirect to a different file"
+
+# --- Round-1 review finding: the command-start anchor was too narrow --------------------
+# A prior version of this fix anchored a destructive verb only to literal string-start or
+# right after ;/&&/||/|. That is narrower than where a real shell actually starts a command:
+# leading whitespace, a sudo/env-style prefix, and an opening ( or { are all ordinary, and a
+# verb reached through xargs is a real command position for the process xargs execs even
+# though it is not the lexical first word of the line. All four were measured to slip through
+# as false negatives (RC=0 where the command really does destroy something) before CMD_START
+# was broadened to account for them.
+assert_eq "2" "$(tbg_run '  rm -rf Library/')" \
+    "still blocks rm -rf Library/ with leading whitespace"
+assert_eq "2" "$(tbg_run 'sudo rm -rf Library/')" \
+    "still blocks rm -rf Library/ behind a sudo prefix"
+assert_eq "2" "$(tbg_run '(rm -rf Library/)')" \
+    "still blocks rm -rf Library/ inside a subshell"
+assert_eq "2" "$(tbg_run 'echo x | xargs -I{} rm -f Assets/Player.cs.meta')" \
+    "still blocks a .meta deletion reached through xargs"
