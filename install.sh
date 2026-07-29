@@ -6,10 +6,11 @@
 # settings, and a generated CLAUDE.md. One repo, one script, no prerequisites beyond Unity itself.
 #
 # Usage:
-#   ./install.sh [--project-dir <path>] [--with-mcp] [--yes] [--dry-run]
+#   ./install.sh [--project-dir <path>] [--with-mcp] [--with-input-system] [--yes] [--dry-run]
 #
 #   --project-dir <path>  Target Unity project root (default: current directory)
 #   --with-mcp            Also add the CoplayDev Unity MCP package to Packages/manifest.json
+#   --with-input-system   Also add Unity's New Input System package to Packages/manifest.json
 #   --yes                 Non-interactive; take the safe default at every prompt
 #   --dry-run             Report what would happen; write nothing
 #   -h, --help            Show this help
@@ -32,7 +33,7 @@ warn() { printf '%s\n' "${YELLOW}warn${NC} $*"; }
 err()  { printf '%s\n' "${RED}err ${NC} $*" >&2; }
 die()  { err "$*"; exit 1; }
 
-usage() { sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOOLKIT_VERSION="$(cat "$SCRIPT_DIR/.claude/VERSION" 2>/dev/null || echo unknown)"
@@ -42,21 +43,29 @@ MCP_PKG_NAME="com.coplaydev.unity-mcp"
 # not #main — which version a user got used to depend on the day they ran --with-mcp.
 MCP_PKG_URL="https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#a4c2d0a84573"
 
+# unity-specifics.md makes the New Input System non-negotiable and block-legacy-input.sh blocks
+# `Input.*` outright. Without the package a compliant script fails to compile — and a compile
+# error also aborts Unity's -executeMethod, so Editor automation stops too (smoke-pass.md §6c).
+# It is a first-party Unity registry package, so a version pin (not a git URL) is all it needs.
+INPUT_SYSTEM_PKG_NAME="com.unity.inputsystem"
+INPUT_SYSTEM_PKG_VERSION="1.11.2"
+
 RECEIPT_REL=".claude/state/install-receipt.tsv"
 
 # ── Args ─────────────────────────────────────────────────────────────────────
 PROJECT_DIR="$(pwd)"
-WITH_MCP=0; ASSUME_YES=0; DRY_RUN=0
+WITH_MCP=0; WITH_INPUT_SYSTEM=0; ASSUME_YES=0; DRY_RUN=0
 while [ $# -gt 0 ]; do
   case "$1" in
     # Validate before shift 2: under `set -u`, `shift 2` on a trailing flag kills the script
     # before any error message can print.
-    --project-dir) [ $# -ge 2 ] || die "--project-dir requires a path"; PROJECT_DIR="$2"; shift 2 ;;
-    --with-mcp)    WITH_MCP=1; shift ;;
-    --yes|-y)      ASSUME_YES=1; shift ;;
-    --dry-run)     DRY_RUN=1; shift ;;
-    -h|--help)     usage ;;
-    *)             die "Unknown argument: $1 (use --help)" ;;
+    --project-dir)      [ $# -ge 2 ] || die "--project-dir requires a path"; PROJECT_DIR="$2"; shift 2 ;;
+    --with-mcp)          WITH_MCP=1; shift ;;
+    --with-input-system) WITH_INPUT_SYSTEM=1; shift ;;
+    --yes|-y)            ASSUME_YES=1; shift ;;
+    --dry-run)           DRY_RUN=1; shift ;;
+    -h|--help)           usage ;;
+    *)                   die "Unknown argument: $1 (use --help)" ;;
   esac
 done
 
@@ -87,6 +96,22 @@ if [ -f "$MANIFEST" ]; then
   grep -q 'com.unity.render-pipelines.high-definition' "$MANIFEST" && RENDER_PIPELINE="HDRP"
 fi
 ok "Unity $UNITY_VERSION · $RENDER_PIPELINE"
+
+HAS_INPUT_SYSTEM=0
+if [ -f "$MANIFEST" ] && grep -q "$INPUT_SYSTEM_PKG_NAME" "$MANIFEST"; then
+  HAS_INPUT_SYSTEM=1
+fi
+if [ "$HAS_INPUT_SYSTEM" -eq 1 ]; then
+  ok "$INPUT_SYSTEM_PKG_NAME already in manifest.json."
+else
+  # Unconditional — unlike --with-mcp this is not an optional integration, it is what the toolkit's
+  # own rules require to compile. A warning that only fires with a flag nobody knows to pass is a
+  # warning nobody reads.
+  warn "$INPUT_SYSTEM_PKG_NAME is missing. unity-specifics.md makes the New Input System"
+  warn "non-negotiable and blocks legacy Input.* — without the package, the first script written"
+  warn "under this toolkit's own rules will fail to compile."
+  warn "Re-run with --with-input-system to add it, or add it to Packages/manifest.json yourself."
+fi
 
 # ── Step 3: Decide how to handle an existing .claude/ ────────────────────────
 # Three cases, and the receipt is what tells them apart:
@@ -181,6 +206,15 @@ if [ "$DRY_RUN" -eq 1 ]; then
       printf '  --with-mcp: %s already present — would skip\n' "$MCP_PKG_NAME"
     else
       printf '  --with-mcp: add %s to Packages/manifest.json\n' "$MCP_PKG_NAME"
+    fi
+  fi
+  if [ "$WITH_INPUT_SYSTEM" -eq 1 ]; then
+    if [ ! -f "$MANIFEST" ]; then
+      printf '  --with-input-system: no Packages/manifest.json — would skip\n'
+    elif [ "$HAS_INPUT_SYSTEM" -eq 1 ]; then
+      printf '  --with-input-system: %s already present — would skip\n' "$INPUT_SYSTEM_PKG_NAME"
+    else
+      printf '  --with-input-system: add %s to Packages/manifest.json\n' "$INPUT_SYSTEM_PKG_NAME"
     fi
   fi
   [ -n "$BACKUP_DIR" ] && printf '  backup: %s\n' "$(basename "$BACKUP_DIR")"
@@ -332,43 +366,52 @@ else
   [ "$ADDED" -gt 0 ] && ok "Updated .gitignore ($ADDED entries)" || ok ".gitignore already has our entries."
 fi
 
-# ── Step 8: Optional — CoplayDev MCP package ─────────────────────────────────
-if [ "$WITH_MCP" -eq 1 ]; then
+# ── Step 8: Optional — manifest.json package additions ───────────────────────
+# One helper for every "--with-X adds a package to Packages/manifest.json" flag, so --with-mcp and
+# --with-input-system share the same surgical insert, the same backup behaviour, and the same
+# "could not edit safely" fallback rather than two hand-maintained copies drifting apart.
+add_manifest_dependency() {
+  local pkg_name="$1" pkg_value="$2" flag_name="$3"
   if [ ! -f "$MANIFEST" ]; then
-    warn "No Packages/manifest.json — skipping --with-mcp."
-  elif grep -q "$MCP_PKG_NAME" "$MANIFEST"; then
-    ok "$MCP_PKG_NAME already in manifest.json."
-  else
-    # Surgical insert. The old installer round-tripped the JSON through a re-indenting dump, which
-    # reformatted the user's whole manifest to add one line.
-    cp "$MANIFEST" "$MANIFEST.bak"
-    if sed -i.tmp "s|\"dependencies\"[[:space:]]*:[[:space:]]*{|\"dependencies\": {\n    \"$MCP_PKG_NAME\": \"$MCP_PKG_URL\",|" "$MANIFEST" 2>/dev/null && grep -q "$MCP_PKG_NAME" "$MANIFEST"; then
-      rm -f "$MANIFEST.tmp"
-      # If git already tracks the manifest, git IS the backup — keeping a .bak just drops untracked
-      # debris into someone's repo for no benefit.
-      if git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/manifest.json >/dev/null 2>&1; then
-        rm -f "$MANIFEST.bak"
-        ok "Added $MCP_PKG_NAME to manifest.json"
-        # Naming only manifest.json here would be half the truth: the next time Unity opens the
-        # project it resolves the package and writes packages-lock.json too, which is also tracked.
-        # Reverting one and not the other leaves the lock referencing a package the manifest no
-        # longer asks for.
-        if git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/packages-lock.json >/dev/null 2>&1; then
-          info "To undo: git checkout Packages/manifest.json Packages/packages-lock.json"
-          info "  (Unity writes the lock file when it next resolves packages.)"
-        else
-          info "To undo: git checkout Packages/manifest.json"
-        fi
+    warn "No Packages/manifest.json — skipping $flag_name."
+    return
+  fi
+  if grep -q "$pkg_name" "$MANIFEST"; then
+    ok "$pkg_name already in manifest.json."
+    return
+  fi
+  # Surgical insert. The old installer round-tripped the JSON through a re-indenting dump, which
+  # reformatted the user's whole manifest to add one line.
+  cp "$MANIFEST" "$MANIFEST.bak"
+  if sed -i.tmp "s|\"dependencies\"[[:space:]]*:[[:space:]]*{|\"dependencies\": {\n    \"$pkg_name\": \"$pkg_value\",|" "$MANIFEST" 2>/dev/null && grep -q "$pkg_name" "$MANIFEST"; then
+    rm -f "$MANIFEST.tmp"
+    # If git already tracks the manifest, git IS the backup — keeping a .bak just drops untracked
+    # debris into someone's repo for no benefit.
+    if git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/manifest.json >/dev/null 2>&1; then
+      rm -f "$MANIFEST.bak"
+      ok "Added $pkg_name to manifest.json"
+      # Naming only manifest.json here would be half the truth: the next time Unity opens the
+      # project it resolves the package and writes packages-lock.json too, which is also tracked.
+      # Reverting one and not the other leaves the lock referencing a package the manifest no
+      # longer asks for.
+      if git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/packages-lock.json >/dev/null 2>&1; then
+        info "To undo: git checkout Packages/manifest.json Packages/packages-lock.json"
+        info "  (Unity writes the lock file when it next resolves packages.)"
       else
-        ok "Added $MCP_PKG_NAME to manifest.json (backup: manifest.json.bak)"
+        info "To undo: git checkout Packages/manifest.json"
       fi
     else
-      mv "$MANIFEST.bak" "$MANIFEST"; rm -f "$MANIFEST.tmp"
-      warn "Could not edit manifest.json safely — add this under \"dependencies\" yourself:"
-      warn "    \"$MCP_PKG_NAME\": \"$MCP_PKG_URL\""
+      ok "Added $pkg_name to manifest.json (backup: manifest.json.bak)"
     fi
+  else
+    mv "$MANIFEST.bak" "$MANIFEST"; rm -f "$MANIFEST.tmp"
+    warn "Could not edit manifest.json safely — add this under \"dependencies\" yourself:"
+    warn "    \"$pkg_name\": \"$pkg_value\""
   fi
-fi
+}
+
+[ "$WITH_MCP" -eq 1 ] && add_manifest_dependency "$MCP_PKG_NAME" "$MCP_PKG_URL" "--with-mcp"
+[ "$WITH_INPUT_SYSTEM" -eq 1 ] && add_manifest_dependency "$INPUT_SYSTEM_PKG_NAME" "$INPUT_SYSTEM_PKG_VERSION" "--with-input-system"
 
 # ── Step 8b: .mcp.json — the file Claude Code actually reads MCP servers from ──
 # Project-scoped MCP servers live in .mcp.json at the project root, not in .claude/settings.json.

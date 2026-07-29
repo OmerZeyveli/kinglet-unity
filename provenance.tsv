@@ -221,6 +221,7 @@ tests/test-hook-advisory-exit.sh	original	-	-	-	original	pins-advisory-stop-hook
 tests/test-block-legacy-input.sh	original	-	-	-	original	-
 tests/test-cross-validation.sh	ecu	1.5.0	tests/test-cross-validation.sh	ed11cf897a74a90ce8d3bd6a072dd3ba09e9ce412d2bfc51c7975a91faaafd33	verbatim	-
 tests/test-hooks.sh	ecu	1.5.0	tests/test-hooks.sh	ff362d3e26718ca81d6857af46c7579317ee5ba8179c6ebfb95e5f8eba6dd3a8	verbatim	-
+tests/test-input-system-check.sh	original	-	-	-	original	pioneer-wave-1b1-task-3: covers install.sh warning/flag for the mandated com.unity.inputsystem package
 tests/test-install.sh	ecu	1.5.0	tests/test-install.sh	9561a3bcf8e75e2ee92b7e2ddadbe6dea6e8c3b4464c575e14339864b5eea971	modified	test-runner-fix: PASS output no longer gated on --verbose, so the tally can count it
 tests/test-lib.sh	ecu	1.5.0	tests/test-lib.sh	8c8810123ca75250158286eae310a380d907cfb7adf30cf63fb6bc557e3cfe4d	modified	project-local-state-assertion
 tests/test-mcp-config.sh	original	-	-	-	original	pins-.mcp.json-as-the-file-claude-code-reads-mcp-servers-from

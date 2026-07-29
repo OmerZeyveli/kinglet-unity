@@ -155,6 +155,25 @@ except Exception:
   fi
 fi
 
+# ── New Input System package ─────────────────────────────────────────────────
+# unity-specifics.md makes it non-negotiable and block-legacy-input.sh blocks the legacy API, but
+# neither one checks that com.unity.inputsystem is actually installed. A project missing it cannot
+# compile the first script written under its own rules, and that compile error also aborts Unity's
+# -executeMethod, so Editor automation stops too (smoke-pass.md §6c). install.sh warns about this at
+# install time; this lets an already-installed project find out without reinstalling.
+INPUT_SYSTEM_PKG_NAME="com.unity.inputsystem"
+MANIFEST="$PROJECT_DIR/Packages/manifest.json"
+if [ ! -f "$MANIFEST" ]; then
+  warn "No Packages/manifest.json — could not check for $INPUT_SYSTEM_PKG_NAME."
+elif grep -q "$INPUT_SYSTEM_PKG_NAME" "$MANIFEST"; then
+  pass "$INPUT_SYSTEM_PKG_NAME present in manifest.json"
+else
+  warn "$INPUT_SYSTEM_PKG_NAME is missing. unity-specifics.md makes the New Input System"
+  warn "     non-negotiable and blocks legacy Input.* — the first script written under this"
+  warn "     toolkit's own rules will fail to compile without it."
+  warn "     Re-run install.sh --with-input-system to add it, or add it to manifest.json yourself."
+fi
+
 # ── Install integrity, against the receipt ───────────────────────────────────
 if [ ! -d "$CLAUDE_DIR" ]; then
   fail "No .claude/ directory — run install.sh --project-dir \"$PROJECT_DIR\"."
