@@ -119,7 +119,20 @@ Claude Code discovers skills via glob patterns. Agents reference skills by categ
 
 ### Always-Apply Skills
 
-Skills with `alwaysApply: true` in frontmatter (like `unity-mcp-patterns`) are loaded for every agent that has MCP tool access. These contain critical patterns that should never be skipped.
+Nine `core/` skills (including `unity-mcp-patterns` and `serialization-safety`) carry `alwaysApply: true`
+in frontmatter. **As of a 2026-07-30 behavioural probe (`.superpowers/sdd/2026-07-30-alwaysapply-finding.md`),
+this key is inert in Claude Code: nothing in this repository's hooks, `settings.json`, or `install.sh`
+reads it or injects skill content unconditionally.** A skill is selected the same way any Claude Code
+skill is — the model reads its `description` frontmatter and decides whether to invoke it — regardless
+of `alwaysApply`. Two probes confirmed this: a serialization-rename question was answered correctly with
+zero tool calls, citing `.claude/rules/serialization.md` (which genuinely does auto-load) instead of the
+`serialization-safety` skill; a commit-trailers question — answerable only from the `commit-trailers`
+skill, since that content has no counterpart in `.claude/rules/` — was answered correctly only after the
+model actively `grep`/`Read` the skill file itself, not through automatic loading.
+
+The key is kept in frontmatter because it is vendored from upstream ECU and may carry meaning in another
+tool; it is not removed here. Do not rely on it for correctness-critical knowledge reaching the model —
+that guarantee does not exist today.
 
 ---
 

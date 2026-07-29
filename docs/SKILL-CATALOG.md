@@ -6,13 +6,28 @@ One-page reference for all skills in everything-claude-unity.
 
 ## Overview
 
-39 skills organized into 5 categories. Skills are loaded on-demand based on file glob patterns or loaded always if `alwaysApply: true`. Each skill is a Markdown file at `.claude/skills/<category>/<name>/SKILL.md` with YAML frontmatter.
+39 skills organized into 5 categories. Skills are loaded on-demand based on file glob patterns, or — for the rest — by the model choosing to invoke them based on their `description` frontmatter, the same as any other skill.
+
+**Correction (2026-07-30):** the table below was previously titled "Always-Loaded Skills" on the claim
+that `alwaysApply: true` makes these nine load unconditionally, for every agent, every session. A
+behavioural probe found no code anywhere in this repository — no hook, no `settings.json` entry, no
+`install.sh` step — that reads `alwaysApply` or injects a skill's content without the model choosing to
+invoke it. Two test prompts confirmed the key has no observable effect: one answerable from
+`.claude/rules/serialization.md` was answered correctly with zero tool calls (the rule auto-loads, the
+`serialization-safety` skill below was never invoked); one answerable only from the `commit-trailers`
+skill below was answered correctly only after the model actively searched for and read the skill file —
+i.e. exactly like any other on-demand skill, not "always loaded." See
+`.superpowers/sdd/2026-07-30-alwaysapply-finding.md` for the full trace. These nine skills are selected
+by description like every other skill in this catalog; `alwaysApply: true` is inert metadata retained
+from the vendored upstream frontmatter.
 
 ---
 
-## Always-Loaded Skills
+## Skills Marked `alwaysApply: true` (not verified to load unconditionally — see correction above)
 
-These skills have `alwaysApply: true` and are loaded for every agent, every session. They contain critical knowledge that should never be skipped.
+These skills carry `alwaysApply: true` in frontmatter. They contain critical knowledge that should never
+be skipped, but — per the correction above — reaching the model depends on the same description-based
+selection as any other skill, not on this key.
 
 | Skill | Description |
 |-------|-------------|
@@ -128,7 +143,10 @@ Integration patterns for popular Unity packages.
 
 ## How Skills Are Loaded
 
-1. **Always-apply skills** (`alwaysApply: true`) are loaded for every agent in every session.
+1. **`alwaysApply: true` skills are not verified to load unconditionally.** No mechanism reading this
+   key was found in this repository (see the correction above and
+   `.superpowers/sdd/2026-07-30-alwaysapply-finding.md`). Treat these nine as selected the same way as
+   any other skill, by the model reading their `description` frontmatter.
 2. **Glob-matched skills** are loaded when the agent works with files matching the skill's `globs` patterns.
 3. **Agent-referenced skills** can be explicitly loaded by agents or commands that reference them by name.
 
