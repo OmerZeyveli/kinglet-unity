@@ -257,7 +257,7 @@ for channelIndex in $(seq 0 $(( CHANNEL_COUNT - 1 ))); do
     while [ "$EVENT_INDEX" -lt "${#EVENTS_TO_FIRE[@]}" ]; do
         event="${EVENTS_TO_FIRE[$EVENT_INDEX]}"
         # Check if this channel subscribes to this event
-        if echo "$CHANNEL_EVENTS" | grep -qxF "$event"; then
+        if grep -qxF "$event" <<< "$CHANNEL_EVENTS"; then
             MESSAGE="${EVENT_MESSAGES[$EVENT_INDEX]}"
             if [ -n "$MESSAGE" ]; then
                 _notify_channel "$CHANNEL_URL" "$CHANNEL_FORMAT" "$MESSAGE"

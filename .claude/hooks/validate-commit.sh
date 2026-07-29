@@ -19,7 +19,7 @@ INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 # Only run on git commit
-if ! echo "$COMMAND" | grep -qE 'git\s+commit'; then
+if ! grep -qE 'git\s+commit' <<< "$COMMAND"; then
     exit 0
 fi
 
@@ -30,7 +30,8 @@ WARNINGS=0
 STAGED_CS=$(git diff --cached --name-only --diff-filter=A 2>/dev/null | grep '\.cs$' || true)
 for CS_FILE in $STAGED_CS; do
     META_FILE="${CS_FILE}.meta"
-    if ! git diff --cached --name-only 2>/dev/null | grep -qF "$META_FILE"; then
+    STAGED_NAMES=$(git diff --cached --name-only 2>/dev/null || true)
+    if ! grep -qF "$META_FILE" <<< "$STAGED_NAMES"; then
         if [ ! -f "$META_FILE" ]; then
             echo "WARNING: New script '$CS_FILE' has no .meta file staged." >&2
             echo "  Unity needs the .meta file to track this asset." >&2
@@ -45,7 +46,8 @@ done
 STAGED_META=$(git diff --cached --name-only --diff-filter=A 2>/dev/null | grep '\.meta$' || true)
 for META_FILE in $STAGED_META; do
     ASSET_FILE="${META_FILE%.meta}"
-    if ! git diff --cached --name-only 2>/dev/null | grep -qF "$ASSET_FILE"; then
+    STAGED_NAMES=$(git diff --cached --name-only 2>/dev/null || true)
+    if ! grep -qF "$ASSET_FILE" <<< "$STAGED_NAMES"; then
         if [ ! -f "$ASSET_FILE" ] && [ ! -d "$ASSET_FILE" ]; then
             echo "WARNING: Orphaned .meta file '$META_FILE' — no corresponding asset found." >&2
             echo "" >&2

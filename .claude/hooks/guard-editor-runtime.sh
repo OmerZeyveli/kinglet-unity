@@ -37,9 +37,9 @@ if [ -z "$NEW_CONTENT" ]; then
 fi
 
 # Check if the new content uses UnityEditor namespace
-if echo "$NEW_CONTENT" | grep -qE '(using\s+UnityEditor|UnityEditor\.)'; then
+if grep -qE '(using\s+UnityEditor|UnityEditor\.)' <<< "$NEW_CONTENT"; then
     # Check if it's properly guarded with #if UNITY_EDITOR
-    if ! echo "$NEW_CONTENT" | grep -qE '#if\s+UNITY_EDITOR'; then
+    if ! grep -qE '#if\s+UNITY_EDITOR' <<< "$NEW_CONTENT"; then
         MSG="UnityEditor namespace used in runtime code without #if UNITY_EDITOR guard."
         echo "" >&2
         echo "  File: $FILE_PATH" >&2

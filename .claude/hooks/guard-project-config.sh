@@ -65,7 +65,7 @@ esac
 # Block analyzer severity changes in Directory.Build.props
 if [ "$BASENAME" = "Directory.Build.props" ]; then
     CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty')
-    if echo "$CONTENT" | grep -qiE '(NoWarn|WarningsAsErrors|TreatWarningsAsErrors|Severity)'; then
+    if grep -qiE '(NoWarn|WarningsAsErrors|TreatWarningsAsErrors|Severity)' <<< "$CONTENT"; then
         echo "" >&2
         echo "  BLOCKED: Modifying analyzer severity in Directory.Build.props" >&2
         echo "  Fix the code instead of suppressing warnings." >&2
@@ -77,7 +77,7 @@ fi
 case "$BASENAME" in
     *.csproj)
         CONTENT=$(echo "$INPUT" | jq -r '.tool_input.new_string // .tool_input.content // empty')
-        if echo "$CONTENT" | grep -qiE '(NoWarn|RuleSet|AnalyzerConfig|CodeAnalysis)'; then
+        if grep -qiE '(NoWarn|RuleSet|AnalyzerConfig|CodeAnalysis)' <<< "$CONTENT"; then
             echo "" >&2
             echo "  BLOCKED: Modifying analyzer settings in .csproj" >&2
             echo "  Fix the code rather than disabling analyzers." >&2

@@ -57,7 +57,9 @@ fi
 # Gather warnings from session
 WARNINGS_FIRED="[]"
 if [ -f "$UNITY_WARNINGS_FILE" ]; then
-    WARNINGS_FIRED=$(sort "$UNITY_WARNINGS_FILE" | uniq -c | sort -rn | head -20 | awk '{$1=$1; print}' | jq -Rs 'split("\n") | map(select(length > 0))')
+    # awk 'NR<=20' (not head -20) — head would stop reading before sort -rn
+    # finished writing, risking SIGPIPE on a large warnings file.
+    WARNINGS_FIRED=$(sort "$UNITY_WARNINGS_FILE" | uniq -c | sort -rn | awk 'NR<=20{$1=$1; print}' | jq -Rs 'split("\n") | map(select(length > 0))')
 fi
 
 # Session duration
@@ -72,11 +74,11 @@ SHADER_COUNT_VAL=$(echo "$SHADER_FILES" | jq 'length')
 # Detect session category heuristically
 CATEGORY="workflow"
 RECENT_COMMITS=$(git log --oneline -5 --format="%s" 2>/dev/null || echo "")
-if echo "$RECENT_COMMITS" | grep -qiE '(fix|bug|patch|hotfix)'; then
+if grep -qiE '(fix|bug|patch|hotfix)' <<< "$RECENT_COMMITS"; then
     CATEGORY="bug-fix"
 elif [ "$SHADER_COUNT_VAL" -gt 0 ] 2>/dev/null; then
     CATEGORY="integration"
-elif echo "$EDITED_FILES" | jq -r '.[]' 2>/dev/null | grep -qiE '(performance|optim|pool|cache)'; then
+elif grep -qiE '(performance|optim|pool|cache)' <<< "$(echo "$EDITED_FILES" | jq -r '.[]' 2>/dev/null)"; then
     CATEGORY="performance"
 elif [ "$MODEL_COUNT" -gt 0 ] && [ "$SYSTEM_COUNT" -gt 0 ]; then
     CATEGORY="architecture"

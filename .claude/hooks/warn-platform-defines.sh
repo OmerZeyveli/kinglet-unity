@@ -35,7 +35,7 @@ fi
 PLATFORM_DEFINES="UNITY_ANDROID|UNITY_IOS|UNITY_WEBGL|UNITY_STANDALONE_WIN|UNITY_STANDALONE_OSX|UNITY_STANDALONE_LINUX|UNITY_PS4|UNITY_PS5|UNITY_XBOXONE|UNITY_GAMECORE|UNITY_SWITCH"
 
 # Check for platform defines without else
-if echo "$CONTENT" | grep -qE "#if\s+($PLATFORM_DEFINES)"; then
+if grep -qE "#if\s+($PLATFORM_DEFINES)" <<< "$CONTENT"; then
     # Count #if UNITY_PLATFORM and #else occurrences
     IF_COUNT=$(echo "$CONTENT" | grep -cE "#if\s+($PLATFORM_DEFINES)" || true)
     ELSE_COUNT=$(echo "$CONTENT" | grep -cE "#else|#elif" || true)

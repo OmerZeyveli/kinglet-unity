@@ -43,9 +43,9 @@ fi
 
 # Check if any old field names disappeared (renamed) without FormerlySerializedAs
 for OLD_FIELD in $OLD_FIELDS; do
-    if ! echo "$NEW_FIELDS" | grep -qx "$OLD_FIELD"; then
+    if ! grep -qx "$OLD_FIELD" <<< "$NEW_FIELDS"; then
         # Field was renamed — check if FormerlySerializedAs is present
-        if ! echo "$NEW_STRING" | grep -q "FormerlySerializedAs.*\"$OLD_FIELD\""; then
+        if ! grep -q "FormerlySerializedAs.*\"$OLD_FIELD\"" <<< "$NEW_STRING"; then
             echo "WARNING: Serialized field '$OLD_FIELD' was renamed without [FormerlySerializedAs]." >&2
             echo "" >&2
             echo "  File: $FILE_PATH" >&2

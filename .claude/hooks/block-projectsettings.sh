@@ -24,7 +24,7 @@ if [ -z "$COMMAND" ]; then
 fi
 
 # Check if the command is staging ProjectSettings or Packages files
-if echo "$COMMAND" | grep -qE 'git\s+add.*ProjectSettings/'; then
+if grep -qE 'git\s+add.*ProjectSettings/' <<< "$COMMAND"; then
     MSG="Do not stage ProjectSettings/ files directly."
     echo "" >&2
     echo "  Command: $COMMAND" >&2
@@ -39,7 +39,7 @@ if echo "$COMMAND" | grep -qE 'git\s+add.*ProjectSettings/'; then
     unity_hook_block "$MSG"
 fi
 
-if echo "$COMMAND" | grep -qE 'git\s+add.*Packages/(manifest|packages-lock)\.json'; then
+if grep -qE 'git\s+add.*Packages/(manifest|packages-lock)\.json' <<< "$COMMAND"; then
     MSG="Do not stage Packages/ manifest files directly."
     echo "" >&2
     echo "  Command: $COMMAND" >&2

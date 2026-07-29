@@ -34,7 +34,7 @@ esac
 
 if ! $IS_BUILD; then
     # Also check if output mentions build completion
-    if echo "$OUTPUT$STDERR" | grep -qiE '(Build completed|Build succeeded|Build failed|BuildPlayer)'; then
+    if grep -qiE '(Build completed|Build succeeded|Build failed|BuildPlayer)' <<< "$OUTPUT$STDERR"; then
         IS_BUILD=true
     fi
 fi
@@ -47,7 +47,7 @@ COMBINED="$OUTPUT$STDERR"
 WARNINGS=""
 
 # --- Check for build failure ---
-if echo "$COMBINED" | grep -qiE '(Build failed|error CS|Fatal error)'; then
+if grep -qiE '(Build failed|error CS|Fatal error)' <<< "$COMBINED"; then
     ERRORS=$(echo "$COMBINED" | grep -ciE '(error CS|Fatal error)' || true)
     WARNINGS="${WARNINGS}  BUILD FAILED — $ERRORS compilation error(s) detected.\n"
 fi
@@ -75,7 +75,7 @@ if [ "$STRIP_WARNINGS" -gt 5 ]; then
 fi
 
 # --- Check for managed code stripping issues ---
-if echo "$COMBINED" | grep -qiE '(MissingMethodException|TypeLoadException|link\.xml)'; then
+if grep -qiE '(MissingMethodException|TypeLoadException|link\.xml)' <<< "$COMBINED"; then
     WARNINGS="${WARNINGS}  Potential code stripping issue — types may be stripped that are needed at runtime.\n"
     WARNINGS="${WARNINGS}  Add [Preserve] attribute or entries in link.xml for reflection-accessed types.\n"
 fi
@@ -95,9 +95,9 @@ fi
 
 # Write build_complete event for notification system
 BUILD_STATUS=""
-if echo "$COMBINED" | grep -qiE '(Build failed|error CS|Fatal error)'; then
+if grep -qiE '(Build failed|error CS|Fatal error)' <<< "$COMBINED"; then
     BUILD_STATUS="FAILED — ${ERRORS:-unknown} error(s)"
-elif echo "$COMBINED" | grep -qiE '(Build completed|Build succeeded)'; then
+elif grep -qiE '(Build completed|Build succeeded)' <<< "$COMBINED"; then
     BUILD_STATUS="SUCCESS"
     if [ -n "${BUILD_SIZE:-}" ]; then
         BUILD_STATUS="SUCCESS (${BUILD_SIZE})"

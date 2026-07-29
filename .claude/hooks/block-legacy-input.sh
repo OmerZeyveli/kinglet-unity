@@ -45,14 +45,14 @@ esac
 
 LEGACY='Input\.(GetKey|GetKeyDown|GetKeyUp|GetAxis|GetAxisRaw|GetButton|GetButtonDown|GetButtonUp|GetMouseButton|GetMouseButtonDown|GetMouseButtonUp|mousePosition|mouseScrollDelta|touches|touchCount|GetTouch|anyKey|anyKeyDown)'
 
-echo "$NEW_CONTENT" | grep -qE "$LEGACY" || exit 0
+grep -qE "$LEGACY" <<< "$NEW_CONTENT" || exit 0
 
 # A correctly-authored dual path is not a violation — it is the fix. Code that
 # guards its legacy branch behind ENABLE_LEGACY_INPUT_MANAGER (and reads the new
 # system under ENABLE_INPUT_SYSTEM) works on both, which is exactly what you want
 # in editor-only tooling that must survive either project setting.
-if echo "$NEW_CONTENT" | grep -qE '#if\s+(ENABLE_LEGACY_INPUT_MANAGER|UNITY_EDITOR)' \
-   && echo "$NEW_CONTENT" | grep -qE 'ENABLE_INPUT_SYSTEM'; then
+if grep -qE '#if\s+(ENABLE_LEGACY_INPUT_MANAGER|UNITY_EDITOR)' <<< "$NEW_CONTENT" \
+   && grep -qE 'ENABLE_INPUT_SYSTEM' <<< "$NEW_CONTENT"; then
     exit 0
 fi
 

@@ -134,8 +134,12 @@ check_counterpart() {
     local counterpart_name="${base}${suffix}"
 
     for search_dir in "$DIR" "$(dirname "$DIR")"; do
-        local candidate
-        candidate=$(find "$search_dir" -name "${counterpart_name}.cs" -maxdepth 3 2>/dev/null | head -1)
+        local candidate matches
+        # Capture into a variable first, then take the first line with awk —
+        # head would stop reading before find finished writing, risking SIGPIPE
+        # on a directory with many matches.
+        matches=$(find "$search_dir" -name "${counterpart_name}.cs" -maxdepth 3 2>/dev/null || true)
+        candidate=$(awk 'NR==1' <<< "$matches")
         if [ -n "$candidate" ] && [ -f "$candidate" ]; then
             if ! unity_was_read "$candidate"; then
                 echo "  SUGGESTION: Consider reading the ${role} first: ${candidate}" >&2

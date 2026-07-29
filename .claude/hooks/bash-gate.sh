@@ -70,17 +70,17 @@ CMD_START="(^[[:space:]]*|[;&|]+[[:space:]]*|[({][[:space:]]*)${CMD_PREFIX}"
 SAME_CMD='[^;&|]*'
 
 # Unity directory wipes
-if echo "$COMMAND" | grep -qE "${CMD_START}rm[[:space:]]+-[rRf]+[[:space:]]+${SAME_CMD}(Library|Temp|Logs|obj|Build|Builds)/"; then
+if grep -qE "${CMD_START}rm[[:space:]]+-[rRf]+[[:space:]]+${SAME_CMD}(Library|Temp|Logs|obj|Build|Builds)/" <<< "$COMMAND"; then
     DANGER_KIND="unity-dir-wipe"
     DANGER_MSG="Deleting Library/Temp/Logs/obj/Build triggers a full Unity reimport (minutes to hours) and can corrupt GUIDs if done while editor is open."
 fi
 
 # .meta deletion/mass-rename — verb must start a command; path must be its argument.
-if echo "$COMMAND" | grep -qE "${CMD_START}(rm|find)[[:space:]]+${SAME_CMD}\.meta"; then
+if grep -qE "${CMD_START}(rm|find)[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
     DANGER_KIND="meta-deletion"
     DANGER_MSG=".meta files hold GUIDs — deleting them silently breaks every reference (scenes, prefabs, ScriptableObjects, AssetReferences)."
 fi
-if echo "$COMMAND" | grep -qE "${CMD_START}(mv|rename)[[:space:]]+${SAME_CMD}\.meta"; then
+if grep -qE "${CMD_START}(mv|rename)[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
     DANGER_KIND="meta-rename"
     DANGER_MSG="Renaming .meta files without their asset sibling orphans references. Unity will not recover from this automatically."
 fi
@@ -90,31 +90,31 @@ fi
 # operator, not a command word, so it cannot be anchored the same way; instead its target
 # must follow immediately (only whitespace, no permissive gap at all), which is exactly how
 # a shell redirect actually reads its destination.
-if echo "$COMMAND" | grep -qE "${CMD_START}(rm|mv|cp)[[:space:]]+${SAME_CMD}ProjectSettings/[A-Za-z]+\.asset" \
-    || echo "$COMMAND" | grep -qE '>{1,2}[[:space:]]*ProjectSettings/[A-Za-z]+\.asset'; then
+if grep -qE "${CMD_START}(rm|mv|cp)[[:space:]]+${SAME_CMD}ProjectSettings/[A-Za-z]+\.asset" <<< "$COMMAND" \
+    || grep -qE '>{1,2}[[:space:]]*ProjectSettings/[A-Za-z]+\.asset' <<< "$COMMAND"; then
     DANGER_KIND="projectsettings-write"
     DANGER_MSG="Direct mutation of ProjectSettings/*.asset resets render pipeline / input system / tags / quality layers."
 fi
 
 # Packages/manifest mutation outside of unity-mcp — same split: command verbs anchored,
 # redirect target immediate.
-if echo "$COMMAND" | grep -qE "${CMD_START}(rm|mv|truncate)[[:space:]]+${SAME_CMD}Packages/(manifest|packages-lock)\.json" \
-    || echo "$COMMAND" | grep -qE '>{1,2}[[:space:]]*Packages/(manifest|packages-lock)\.json'; then
+if grep -qE "${CMD_START}(rm|mv|truncate)[[:space:]]+${SAME_CMD}Packages/(manifest|packages-lock)\.json" <<< "$COMMAND" \
+    || grep -qE '>{1,2}[[:space:]]*Packages/(manifest|packages-lock)\.json' <<< "$COMMAND"; then
     DANGER_KIND="manifest-wipe"
     DANGER_MSG="Rewriting Packages/manifest.json outside unity-mcp drops package entries with no prompt — compiler errors cascade on next reimport."
 fi
 
 # git destructive ops
-if echo "$COMMAND" | grep -qE 'git\s+reset\s+--hard'; then
+if grep -qE 'git\s+reset\s+--hard' <<< "$COMMAND"; then
     DANGER_KIND="git-reset-hard"
     DANGER_MSG="git reset --hard discards uncommitted edits AND Unity-generated cached artifacts (.asset cache files). Cannot be undone."
 fi
-if echo "$COMMAND" | grep -qE 'git\s+clean\s+-[fFdDxX]+'; then
+if grep -qE 'git\s+clean\s+-[fFdDxX]+' <<< "$COMMAND"; then
     DANGER_KIND="git-clean"
     DANGER_MSG="git clean -fdx deletes untracked files including Library/, potentially .meta files, and local-only assets the team may have asked you to keep."
 fi
-if echo "$COMMAND" | grep -qE 'git\s+push\s+.*--force(\s|$)|git\s+push\s+.*-f(\s|$)'; then
-    if echo "$COMMAND" | grep -qE '\b(main|master|develop|release)\b'; then
+if grep -qE 'git\s+push\s+.*--force(\s|$)|git\s+push\s+.*-f(\s|$)' <<< "$COMMAND"; then
+    if grep -qE '\b(main|master|develop|release)\b' <<< "$COMMAND"; then
         DANGER_KIND="git-force-push-protected"
         DANGER_MSG="Force-pushing to a protected branch rewrites shared history — every teammate's local copy becomes inconsistent."
     else
@@ -124,13 +124,13 @@ if echo "$COMMAND" | grep -qE 'git\s+push\s+.*--force(\s|$)|git\s+push\s+.*-f(\s
 fi
 
 # DB/SQL destructive ops (occasionally used in tooling)
-if echo "$COMMAND" | grep -qiE '\b(drop\s+table|truncate\s+table|drop\s+database)\b'; then
+if grep -qiE '\b(drop\s+table|truncate\s+table|drop\s+database)\b' <<< "$COMMAND"; then
     DANGER_KIND="db-destructive"
     DANGER_MSG="Schema-level destructive SQL. Data loss is immediate and irreversible."
 fi
 
 # PlayerPrefs wipes
-if echo "$COMMAND" | grep -qE 'defaults\s+delete.*unity|PlayerPrefs\.DeleteAll'; then
+if grep -qE 'defaults\s+delete.*unity|PlayerPrefs\.DeleteAll' <<< "$COMMAND"; then
     DANGER_KIND="playerprefs-wipe"
     DANGER_MSG="Wipes persistent user data (saves, settings). Use targeted DeleteKey unless you specifically intend a full reset."
 fi

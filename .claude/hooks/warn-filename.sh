@@ -43,14 +43,16 @@ fi
 
 # Check if the file contains a class/struct matching the filename
 # Look for: public/internal/sealed class/struct FileName
-if echo "$CONTENT" | grep -qE "(class|struct|interface)\s+$FILENAME\b"; then
+if grep -qE "(class|struct|interface)\s+$FILENAME\b" <<< "$CONTENT"; then
     exit 0
 fi
 
 # Check if there's any MonoBehaviour or ScriptableObject subclass
-if echo "$CONTENT" | grep -qE ':\s*(MonoBehaviour|ScriptableObject|NetworkBehaviour|StateMachineBehaviour)'; then
-    # There IS a Unity component but the name doesn't match
-    CLASS_NAME=$(echo "$CONTENT" | grep -oE '(class|struct)\s+\w+' | head -1 | awk '{print $2}')
+if grep -qE ':\s*(MonoBehaviour|ScriptableObject|NetworkBehaviour|StateMachineBehaviour)' <<< "$CONTENT"; then
+    # There IS a Unity component but the name doesn't match.
+    # awk (not head) picks the first match — head would stop reading before
+    # grep finished writing the rest, risking SIGPIPE on a large file.
+    CLASS_NAME=$(grep -oE '(class|struct)\s+\w+' <<< "$CONTENT" | awk 'NR==1{print $2}')
     if [ -n "$CLASS_NAME" ] && [ "$CLASS_NAME" != "$FILENAME" ]; then
         echo "WARNING: File name '$FILENAME.cs' does not match class name '$CLASS_NAME'." >&2
         echo "" >&2
