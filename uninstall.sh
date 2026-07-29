@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# cloud-nine-unity — uninstaller
+# Kinglet Pioneer — uninstaller
 #
 # Removes what install.sh wrote, and nothing else. Every removal is checked against the install
 # receipt: a file is deleted only if its checksum still matches what we recorded writing. If you
@@ -53,7 +53,7 @@ PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd)" || die "Project directory 
 CLAUDE_DIR="$PROJECT_DIR/.claude"
 RECEIPT="$CLAUDE_DIR/state/install-receipt.tsv"
 
-printf '%s\n' "${BOLD}cloud-nine-unity — uninstaller${NC}"
+printf '%s\n' "${BOLD}Kinglet Pioneer — uninstaller${NC}"
 info "Project: $PROJECT_DIR"
 
 [ -d "$CLAUDE_DIR" ] || die "No .claude/ directory in $PROJECT_DIR — nothing to remove."
@@ -61,7 +61,7 @@ info "Project: $PROJECT_DIR"
 if [ ! -f "$RECEIPT" ]; then
   err "No install receipt at ${RECEIPT#"$PROJECT_DIR"/}."
   err ""
-  err "cloud-nine-unity did not install this .claude/ — or it was installed by someone else and"
+  err "Kinglet did not install this .claude/ — or it was installed by someone else and"
   err "reached you through git, which does not carry the receipt (it is machine-local by design:"
   err "it records what was written to THIS filesystem)."
   err ""

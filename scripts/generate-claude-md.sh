@@ -260,7 +260,7 @@ fi
 cat <<'MDEOF'
 # [FILL: Game Title] — Project Guide
 
-> Unity 6 · C# · PC / Console · built with cloud-nine-unity.
+> Unity 6 · C# · PC / Console · built with Kinglet Pioneer.
 
 ## Vision
 
@@ -287,13 +287,13 @@ cat <<'MDEOF'
 
 MDEOF
 
-echo "<!-- cloud-nine-unity:generated:begin — content between these markers is rewritten on re-install. Everything outside is yours. -->"
+echo "<!-- kinglet:generated:begin — content between these markers is rewritten on re-install. Everything outside is yours. -->"
 echo ""
 echo "## Project Facts (auto-detected)"
 echo ""
 emit_facts
 echo ""
-echo "<!-- cloud-nine-unity:generated:end -->"
+echo "<!-- kinglet:generated:end -->"
 
 cat <<'MDEOF'
 

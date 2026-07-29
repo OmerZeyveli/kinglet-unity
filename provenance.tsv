@@ -577,3 +577,4 @@ docs/research/platform-spike/reports/dependency-provenance.json	original	-	-	-	o
 docs/research/platform-spike/reports/dependency-provenance.md	original	-	-	-	original	kinglet-00d-task3-generated-provenance-report
 docs/superpowers/specs/2026-07-29-kinglet-pioneer-design.md	original	-	-	-	original	approved-kinglet-pioneer-edition-design
 docs/superpowers/plans/2026-07-29-kinglet-pioneer-wave-1a-identity.md	original	-	-	-	original	pioneer-wave-1a-identity-implementation-plan
+tests/test-pioneer-identity.sh	original	-	-	-	original	pins-the-pioneer-identity-contract-by-behaviour

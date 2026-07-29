@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# cloud-nine-unity — installer
+# Kinglet Pioneer — installer
 #
 # Installs the toolkit into a Unity project: agents, commands, skills, hooks, rules, templates,
 # settings, and a generated CLAUDE.md. One repo, one script, no prerequisites beyond Unity itself.
@@ -62,14 +62,14 @@ PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd)" || die "Project directory 
 CLAUDE_DIR="$PROJECT_DIR/.claude"
 RECEIPT="$PROJECT_DIR/$RECEIPT_REL"
 
-printf '%s\n' "${BOLD}cloud-nine-unity ${TOOLKIT_VERSION}${NC} — installer"
+printf '%s\n' "${BOLD}Kinglet Pioneer ${TOOLKIT_VERSION}${NC} — installer"
 info "Project: $PROJECT_DIR"
 [ "$DRY_RUN" -eq 1 ] && warn "Dry run — nothing will be written."
 
 # ── Step 1: Validate Unity project ───────────────────────────────────────────
 [ -d "$PROJECT_DIR/Assets" ] || die "No Assets/ directory — this does not look like a Unity project."
 [ -d "$PROJECT_DIR/ProjectSettings" ] || die "No ProjectSettings/ directory — this does not look like a Unity project."
-[ -d "$SCRIPT_DIR/.claude" ] || die "Payload not found at $SCRIPT_DIR/.claude — run install.sh from the cloud-nine-unity repo root."
+[ -d "$SCRIPT_DIR/.claude" ] || die "Payload not found at $SCRIPT_DIR/.claude — run install.sh from the kinglet-unity repo root."
 ok "Unity project detected."
 
 # ── Step 2: Scan project ─────────────────────────────────────────────────────
@@ -102,12 +102,12 @@ case "$MODE" in
   fresh)   ok "No existing .claude/ — clean install." ;;
   ours)
     PREV=$(grep -m1 '^# toolkit-version:' "$RECEIPT" 2>/dev/null | sed 's/.*: //' || echo unknown)
-    info "Existing cloud-nine-unity install found (version $PREV) — upgrading to $TOOLKIT_VERSION."
+    info "Existing Kinglet install found (version $PREV) — upgrading to $TOOLKIT_VERSION."
     info "Files you modified will be reported and kept; untouched files are replaced."
     ;;
   foreign)
     warn "$CLAUDE_DIR exists but has no install receipt."
-    warn "cloud-nine-unity did not create it, so it will not be removed or merged blindly."
+    warn "Kinglet did not create it, so it will not be removed or merged blindly."
     if [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
       REPLY_CHOICE=1
       info "Non-interactive — backing up the existing .claude/ and installing fresh."
@@ -165,7 +165,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # misreports the only step capable of destroying work is worse than having no dry run.
   if [ ! -f "$PROJECT_DIR/CLAUDE.md" ]; then
     printf '  CLAUDE.md (new — generated)\n'
-  elif grep -q 'cloud-nine-unity:generated:begin' "$PROJECT_DIR/CLAUDE.md" 2>/dev/null; then
+  elif grep -q 'kinglet:generated:begin' "$PROJECT_DIR/CLAUDE.md" 2>/dev/null; then
     printf '  CLAUDE.md — refresh the generated section only; your prose untouched\n'
   else
     printf '  CLAUDE.md.generated — yours exists and has no markers, so it is NOT touched\n'
@@ -220,7 +220,7 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 if [ -f "$SCRIPT_DIR/provenance.tsv" ]; then
   {
     printf '# Provenance for the files installed under .claude/ — the evidence behind NOTICE.md.\n'
-    printf '# The full manifest (tests, docs, repo tooling) lives in the cloud-nine-unity repo.\n'
+    printf '# The full manifest (tests, docs, repo tooling) lives in the kinglet-unity repo.\n'
     # awk reads the file directly and exits after the line it wants. `grep ... | head -1` would
     # SIGPIPE the grep when head closes the pipe, and pipefail turns that into a 141 that set -e
     # acts on — the installer would die here having written half a payload.
@@ -260,12 +260,12 @@ if [ -f "$GEN" ]; then
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md generation failed — skipped."
     fi
-  elif grep -q 'cloud-nine-unity:generated:begin' "$CLAUDE_MD"; then
+  elif grep -q 'kinglet:generated:begin' "$CLAUDE_MD"; then
     # Refresh only the fenced block; everything the user wrote stays byte-for-byte.
     if bash "$GEN" --facts-only "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       awk -v factsfile="$TMP_MD" '
-        /cloud-nine-unity:generated:begin/ { print; print ""; print "## Project Facts (auto-detected)"; print ""; while ((getline l < factsfile) > 0) print l; skip=1; next }
-        /cloud-nine-unity:generated:end/   { print ""; print; skip=0; next }
+        /kinglet:generated:begin/ { print; print ""; print "## Project Facts (auto-detected)"; print ""; while ((getline l < factsfile) > 0) print l; skip=1; next }
+        /kinglet:generated:end/   { print ""; print; skip=0; next }
         !skip { print }
       ' "$CLAUDE_MD" > "$TMP_MD.merged" && mv "$TMP_MD.merged" "$CLAUDE_MD"
       rm -f "$TMP_MD"
@@ -363,7 +363,8 @@ fi
 
 # ── Step 9: Write the receipt ────────────────────────────────────────────────
 {
-  printf '# cloud-nine-unity install receipt\n'
+  printf '# kinglet install receipt\n'
+  printf '# edition: pioneer\n'
   printf '# Written by install.sh. uninstall.sh removes only what is listed here, and only if the\n'
   printf '# checksum still matches — so anything you edited or added is left alone.\n'
   printf '# toolkit-version: %s\n' "$TOOLKIT_VERSION"
