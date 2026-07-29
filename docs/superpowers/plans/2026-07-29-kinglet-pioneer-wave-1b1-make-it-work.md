@@ -701,6 +701,39 @@ hides the handful that matter.
 - [ ] **Step 3: Prove at least one.** Pick the worst case, reproduce a false result under contention the way Task 7 did, then show it fixed. A sweep with no reproduction is a guess with a table attached.
 - [ ] **Step 4:** Suite green with every file present; `check-provenance.sh` OK; `verbatim` rows flipped where edited; baseline regenerated in a separate commit if `.claude/` drifted.
 
+### Task 10: The same claim is stale in six more places, all outside the guard's reach
+
+**Added 2026-07-29, from a controller sweep after Task 8.** Task 8 fixed three references and added a
+guard — but scoped to `.claude/`, because that was its brief. A repository-wide sweep finds six more,
+and every one of them is read by a human deciding how to configure their project.
+
+**Stale — each states as fact that `settings.json` holds MCP configuration, which it no longer does:**
+
+| File | Text |
+|---|---|
+| `CLAUDE.md:20` | *"`settings.json` points at it on `localhost:8080`"* |
+| `CREDITS.md:132` | *"Our `.claude/settings.json` points at it on `http://localhost:8080/mcp`"* |
+| `README.md:30` | *"preconfigured in `settings.json`"* |
+| `docs/ARCHITECTURE.md:23` | *"settings.json — Configuration: permissions, MCP servers, hook definitions"* |
+| `docs/GETTING-STARTED.md:79` | *"settings.json — Permissions, MCP server config, hook definitions"* |
+| `MERGE-NOTES.md:24` | *"`settings.json` points at it on localhost"* — a build record written in the present tense |
+
+`MERGE-NOTES.md` is the judgement call. It is a historical record and its other entries are
+deliberately left true-as-of-then; the fix is to make the tense honest, not to rewrite the history.
+The same treatment the file already received during the rename.
+
+**Leave alone** — these are explanations of *why*, and they are what stops the next person
+reintroducing the error: `MCP-SETUP.md` (lines 5, 101, 120), `scripts/studio-doctor.sh:85`,
+`docs/research/pioneer/smoke-pass.md` (the record of the finding), and every file under
+`docs/superpowers/plans/` and `specs/` (frozen or spec text).
+
+- [ ] **Step 1: Widen the guard past `.claude/`.** `tests/test-mcp-doc-instructions.sh` currently scopes to the payload. Extend it to the repository's own documentation, with the excluded paths listed by exact path and a reason each — the explanation files above. The test must still fail if a new bad claim appears in a file not on that list.
+- [ ] **Step 2: Fix the six.** Each states a fact; make each true. Do not reword surrounding prose.
+- [ ] **Step 3: Verify the guard would have caught all six** by reverting one and watching it fail. A guard written after the fixes, never seen to fail, is decoration.
+- [ ] **Step 4:** Suite green with every file present; `check-provenance.sh` OK; baseline regenerated in a separate commit if `.claude/` drifted.
+
+**Note for whoever takes this.** This is the fifth round of the same class: two found by a task, one by a reviewer, one by an implementer's honesty, six by a sweep. The lesson is not that people are careless — it is that **a value duplicated into prose has no mechanism keeping it true**. If a cheap one exists, propose it; if not, say so plainly.
+
 ## What this plan does not do
 
 | Deferred | To | Why |
