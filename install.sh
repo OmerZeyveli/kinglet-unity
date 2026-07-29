@@ -38,7 +38,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOOLKIT_VERSION="$(cat "$SCRIPT_DIR/.claude/VERSION" 2>/dev/null || echo unknown)"
 
 MCP_PKG_NAME="com.coplaydev.unity-mcp"
-MCP_PKG_URL="https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main"
+# Pinned to the commit the Pioneer smoke pass actually measured against (see .claude/UPSTREAM),
+# not #main — which version a user got used to depend on the day they ran --with-mcp.
+MCP_PKG_URL="https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#a4c2d0a84573"
 
 RECEIPT_REL=".claude/state/install-receipt.tsv"
 
@@ -182,6 +184,13 @@ if [ "$DRY_RUN" -eq 1 ]; then
     fi
   fi
   [ -n "$BACKUP_DIR" ] && printf '  backup: %s\n' "$(basename "$BACKUP_DIR")"
+  if [ ! -f "$PROJECT_DIR/.mcp.json" ]; then
+    printf '  .mcp.json (new — unityMCP -> http://localhost:8080/mcp)\n'
+  elif grep -q '"unityMCP"' "$PROJECT_DIR/.mcp.json" 2>/dev/null; then
+    printf '  .mcp.json already has unityMCP — would leave alone\n'
+  else
+    printf '  .mcp.json exists without unityMCP — would print the block, not rewrite\n'
+  fi
   printf '\nDry run complete — nothing written.\n'
   exit 0
 fi
@@ -360,6 +369,37 @@ if [ "$WITH_MCP" -eq 1 ]; then
     fi
   fi
 fi
+
+# ── Step 8b: .mcp.json — the file Claude Code actually reads MCP servers from ──
+# Project-scoped MCP servers live in .mcp.json at the project root, not in .claude/settings.json.
+# Claude Code silently ignores an mcpServers key there, so writing it was the whole defect: the
+# unity-* agents had no tools to call. See MCP-SETUP.md for the approval step this still requires.
+MCP_JSON="$PROJECT_DIR/.mcp.json"
+MCP_JSON_RECEIPT_LINE=""
+if [ ! -f "$MCP_JSON" ]; then
+  cat > "$MCP_JSON" <<'MCPJSON'
+{
+  "mcpServers": {
+    "unityMCP": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+MCPJSON
+  ok "Wrote .mcp.json (unityMCP → http://localhost:8080/mcp)"
+  MCP_JSON_RECEIPT_LINE=$(printf '.mcp.json\t%s\t644\ttoolkit' "$(sha_of "$MCP_JSON")")
+elif grep -q '"unityMCP"' "$MCP_JSON" 2>/dev/null; then
+  ok ".mcp.json already has unityMCP — left alone."
+else
+  warn ".mcp.json exists without a unityMCP entry — not rewriting it. Add this under \"mcpServers\":"
+  warn ''
+  warn '    "unityMCP": {'
+  warn '      "type": "http",'
+  warn '      "url": "http://localhost:8080/mcp"'
+  warn '    }'
+fi
+[ -n "$MCP_JSON_RECEIPT_LINE" ] && printf '%s\n' "$MCP_JSON_RECEIPT_LINE" >> "$RECEIPT_TMP"
 
 # ── Step 9: Write the receipt ────────────────────────────────────────────────
 {

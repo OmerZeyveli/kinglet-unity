@@ -14,4 +14,6 @@ donchitos_repo=https://github.com/Donchitos/Claude-Code-Game-Studios
 donchitos_note=adapted; reformatted to this toolkit's conventions
 unity_mcp=10.1.0
 unity_mcp_repo=https://github.com/CoplayDev/unity-mcp
-unity_mcp_note=not vendored; settings.json points at it on localhost:8080
+unity_mcp_note=not vendored; .mcp.json (project root) points at it on localhost:8080
+unity_mcp_ref=a4c2d0a84573
+unity_mcp_smoke_pass_commit=a4c2d0a84573

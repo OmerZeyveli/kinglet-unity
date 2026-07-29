@@ -2,18 +2,36 @@
 
 `Kinglet Pioneer` uses **one** MCP server: CoplayDev's open-source **Unity MCP** bridge.
 
-The toolkit ships `.claude/settings.json` preconfigured — it already contains
-`mcpServers.unityMCP` → `http://localhost:8080/mcp`, which matches the bridge's default HTTP
-transport. So there is **nothing to write in `settings.json` yourself**; you only need to install
-the Unity-side package and start the bridge.
+**Claude Code does not read MCP server configuration from `.claude/settings.json`** — a version of
+this toolkit shipped `mcpServers.unityMCP` there and `claude mcp list` reported no servers at all in
+a freshly installed project. Project-scoped MCP servers live in `.mcp.json` at the project root, and
+that is what `install.sh` writes for you:
+
+```json
+{
+  "mcpServers": {
+    "unityMCP": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp"
+    }
+  }
+}
+```
+
+If `.mcp.json` already exists and has no `unityMCP` entry, the installer will not touch it — merging
+JSON by script is how a hand-written config gets destroyed. It prints the block above for you to add
+yourself. Either way, you do not need to write this by hand on a fresh install; you only need to
+install the Unity-side package, start the bridge, and approve the server (next section).
 
 > The `unity-*` agents (coder, scene-builder, prototyper, build-runner, …) are what drive the Editor
 > through MCP. The design/production layer — `/brainstorm`, `/map-systems`, `game-designer`,
 > `technical-director`, and friends — is a **documentation layer** and calls no MCP tools at all. It
 > works fine with the bridge offline.
 
-**Version:** these instructions were checked against **`com.coplaydev.unity-mcp` v10.1.0**
-(released 2026-07-13). See `.claude/UPSTREAM` for the pin of record.
+**Version:** these instructions — including the MCP-location fix, the approval step, and the
+headless bridge recipe below — were checked against `com.coplaydev.unity-mcp` at commit
+`a4c2d0a84573` (the same commit the toolkit pins with `--with-mcp`). See `.claude/UPSTREAM` for the
+pin of record.
 
 ---
 
@@ -39,16 +57,17 @@ In the Unity Editor:
 3. Paste:
 
    ```
-   https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main
+   https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#a4c2d0a84573
    ```
 
-This installs `com.coplaydev.unity-mcp` (the "MCP for Unity" editor package). Swap `#main` for a tag
-(e.g. `#v10.1.0`) if you'd rather pin than track the branch.
+This installs `com.coplaydev.unity-mcp` (the "MCP for Unity" editor package), pinned to the commit
+this toolkit was last measured against (see `.claude/UPSTREAM`) rather than `#main` — which version
+you got used to depend on the day you installed. `./install.sh --with-mcp` pins the same commit.
 
 > Prefer to edit the manifest directly? Add this line to your project's
 > `Packages/manifest.json` dependencies:
 > ```json
-> "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main"
+> "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#a4c2d0a84573"
 > ```
 > Or run `./install.sh --with-mcp`, which inserts exactly that dependency into
 > `Packages/manifest.json` for you. It's a surgical insert, not a reformat: your manifest keeps its
@@ -66,26 +85,75 @@ This installs `com.coplaydev.unity-mcp` (the "MCP for Unity" editor package). Sw
 
 Keep the Unity Editor open while you work — the MCP tools talk to the live Editor.
 
+### One-time approval, every fresh install
+
+Writing `.mcp.json` makes the server visible, but project-scoped MCP servers still require a
+one-time interactive approval before Claude Code will call their tools:
+
+```
+$ claude mcp list
+unityMCP: http://localhost:8080/mcp (HTTP) - ⏸ Pending approval (run `claude` to approve)
+```
+
+Run `claude` interactively in the project and approve it when prompted. This is a required manual
+step, not a bug — do it once per project/checkout.
+
+**Adding `enabledMcpjsonServers: ["unityMCP"]` to `.claude/settings.json` did NOT clear this in the
+version tested.** Do not rely on it to skip the approval; nothing verified here bypasses it. If you
+find a way that reliably does, update this file and say how you confirmed it.
+
 ### If port 8080 is taken
 
-`settings.json` ships `http://localhost:8080/mcp` because that is the bridge's default. **We cannot
+`.mcp.json` ships `http://localhost:8080/mcp` because that is the bridge's default. **We cannot
 detect the real one.** The Editor stores its HTTP URL in a machine-local EditorPref, not in the
 project — so if you change it in the MCP window, nothing in your repo records that, and the shipped
 default silently stops matching.
 
-This is not hypothetical: on a machine where an unrelated service already held 8080, `settings.json`
-pointed at that service instead of Unity. Worse, a naive reachability check *passes* — the other
+This is not hypothetical: on a machine where an unrelated service already held 8080, the configured
+URL pointed at that service instead of Unity. Worse, a naive reachability check *passes* — the other
 service answers HTTP perfectly well. It just isn't Unity.
 
-Set the port in the MCP window, then record it where per-machine settings belong:
+Set the port in the MCP window, then edit the `url` in `.mcp.json` to match. `.mcp.json` lives at the
+project root and is typically committed — if the port really is machine-specific, keep the change
+local rather than pushing it (no per-machine override path for `.mcp.json` has been verified here;
+do not assume `.claude/settings.local.json` still does this, since the same defect that put
+`mcpServers` in `.claude/settings.json` in the first place applies to `settings.local.json` too).
 
-```jsonc
-// .claude/settings.local.json — gitignored, overrides settings.json
-{ "mcpServers": { "unityMCP": { "url": "http://127.0.0.1:8081/mcp" } } }
+`./scripts/studio-doctor.sh --project-dir <project>` speaks JSON-RPC to whatever answers at the
+configured URL, so it tells you when something other than Unity is on the line.
+
+### Running the bridge headlessly (no Editor UI)
+
+The bridge does **not** require the Editor UI — the package ships `MCPForUnity.Editor.McpCiBoot` and
+an `HttpAutoStartHandler` whose batchmode guard only blocks the auto-start when the environment
+variable below is unset. Measured working recipe:
+
+```bash
+UNITY_MCP_ALLOW_BATCH=1 Unity -batchmode -nographics \
+  -projectPath <project> -executeMethod <Boot>.StartHttpBridge
 ```
 
-`./scripts/studio-doctor.sh --project-dir <project>` reads that file first and speaks JSON-RPC to
-whatever answers, so it tells you when something other than Unity is on the line.
+where the boot method:
+
+1. Sets `MCPForUnity.UseHttpTransport` and calls
+   `MCPServiceLocator.Server.StartLocalHttpServer(quiet: true)`.
+   **`quiet: true` is load-bearing.** The default `quiet: false` opens an
+   `EditorUtility.DisplayDialog` confirmation; batchmode auto-cancels it, `StartLocalHttpServer`
+   returns `False`, and nothing starts — silently, with no exception.
+2. **Waits for the port to start listening** before continuing — `StartLocalHttpServer` returns as
+   soon as the server process is *spawned*, not once it is accepting connections. Calling
+   `Bridge.StartAsync()` immediately loses that race: the WebSocket dial reports "Unable to connect
+   to the remote server."
+3. Then calls `MCPServiceLocator.Bridge.StartAsync()`. This is what makes Unity connect *out* to the
+   HTTP server over WebSocket (`ws://127.0.0.1:8080/hub/plugin`) and register a session. Skipping it
+   leaves the server up with nobody on the Unity end — a client sees `no_unity_session` /
+   `instance_count: 0`.
+
+**`-nographics` crashes on real scenes.** `-batchmode -nographics` is fine for a scratch/empty
+project, but loading a real scene with URP content (e.g. a Tilemap) under `-nographics` crashes the
+Editor with a fatal signal in `UniversalRenderPipeline:RenderSingleCamera` — URP needs an actual
+graphics device to render. This is a Unity batchmode limitation, not a Kinglet or CoplayDev defect.
+Drop `-nographics` (keep an existing `DISPLAY`) when driving a real project's scenes.
 
 ---
 

@@ -2,11 +2,6 @@
   "permissions": {
     "defaultMode": "acceptEdits"
   },
-  "mcpServers": {
-    "unityMCP": {
-      "url": "http://localhost:8080/mcp"
-    }
-  },
   "hooks": {
     "PreToolUse": [
       {

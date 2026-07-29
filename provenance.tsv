@@ -103,7 +103,7 @@ CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 .claude/rules/performance.md	ecu	1.5.0	.claude/rules/performance.md	757676620b64b53761f27499a6939693a27612d153d004f90b04407aa246a2ca	verbatim	-
 .claude/rules/serialization.md	ecu	1.5.0	.claude/rules/serialization.md	64d2bf49758afc495e3898225dc0d31282f66a09eecf0c1a7a9074c376ca4ae9	verbatim	-
 .claude/rules/unity-specifics.md	ecu	1.5.0	.claude/rules/unity-specifics.md	99eca581114f56b4a95b4a7ca758a34bdc16bcae470421b4f3b850b2c5aefdd6	modified	mobile-strip
-.claude/settings.json	ecu	1.5.0	.claude/settings.json	ab1c4eb6dc55f5290205e89e85999d54fb8a526eb4661c0c8626347879ebc6b1	modified	wired in block-legacy-input.sh — rules claimed a hook blocked legacy input; none existed
+.claude/settings.json	ecu	1.5.0	.claude/settings.json	ab1c4eb6dc55f5290205e89e85999d54fb8a526eb4661c0c8626347879ebc6b1	modified	wired in block-legacy-input.sh (rules claimed a hook blocked legacy input; none existed); removed the mcpServers key — Claude Code ignores mcpServers here, ".mcp.json" at the project root is what it reads
 .claude/settings.local.json.template	ecu	1.5.0	.claude/settings.local.json.template	6f7ce8c899a2a1696c46160deee234ba20a9ded615bcc1da505a6b68f3333149	verbatim	-
 .claude/skills/core/assembly-definitions/SKILL.md	ecu	1.5.0	.claude/skills/core/assembly-definitions/SKILL.md	d677e254a933b4a8c95346fa26b5fd88937e9721a65571e9a10f04caf6738a9e	verbatim	-
 .claude/skills/core/commit-trailers/SKILL.md	ecu	1.5.0	.claude/skills/core/commit-trailers/SKILL.md	900218e54f1a53bcdfb23003e1cf8ff7ee78fcc834f280ec0872a5ad04e359b1	verbatim	-
@@ -223,6 +223,7 @@ tests/test-cross-validation.sh	ecu	1.5.0	tests/test-cross-validation.sh	ed11cf89
 tests/test-hooks.sh	ecu	1.5.0	tests/test-hooks.sh	ff362d3e26718ca81d6857af46c7579317ee5ba8179c6ebfb95e5f8eba6dd3a8	verbatim	-
 tests/test-install.sh	ecu	1.5.0	tests/test-install.sh	9561a3bcf8e75e2ee92b7e2ddadbe6dea6e8c3b4464c575e14339864b5eea971	modified	test-runner-fix: PASS output no longer gated on --verbose, so the tally can count it
 tests/test-lib.sh	ecu	1.5.0	tests/test-lib.sh	8c8810123ca75250158286eae310a380d907cfb7adf30cf63fb6bc557e3cfe4d	modified	project-local-state-assertion
+tests/test-mcp-config.sh	original	-	-	-	original	pins-.mcp.json-as-the-file-claude-code-reads-mcp-servers-from
 tests/test-no-mobile.sh	original	-	-	-	original	-
 tests/test-skills.sh	ecu	1.5.0	tests/test-skills.sh	324561e8e83be33761d519e6e04bf4a7eaaac7eef453bc431db05e13228d434a	modified	shellcheck-warning-fix: read find output without word splitting
 tests/test-state.sh	ecu	1.5.0	tests/test-state.sh	dc05b5a953fb23fb14ab0a009a276152f891d85b939f9c0c0aea16608ffcb321	modified	remove-invalid-bash-source-environment-assignment
