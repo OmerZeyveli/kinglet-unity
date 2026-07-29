@@ -35,6 +35,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK_PROFILE_LEVEL="standard"
 source "${SCRIPT_DIR}/_lib.sh"
+advisory_exit_guard
 
 # --- Guard: notifications must be explicitly enabled ---
 if [ "${UNITY_NOTIFY_ENABLED:-}" != "1" ]; then
@@ -240,7 +241,7 @@ fi
 
 # --- Dispatch notifications ---
 SENT_COUNT=0
-CHANNEL_COUNT=$(echo "$CHANNELS_JSON" | jq 'length' 2>/dev/null || echo "0")
+CHANNEL_COUNT=$(printf '%s' "$CHANNELS_JSON" | jq 'length' 2>/dev/null || printf '0')
 
 for channelIndex in $(seq 0 $(( CHANNEL_COUNT - 1 ))); do
     CHANNEL_URL=$(echo "$CHANNELS_JSON" | jq -r ".[$channelIndex].url // empty" 2>/dev/null || true)

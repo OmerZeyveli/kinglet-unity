@@ -68,7 +68,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/commands/unity-test.md	ecu	1.5.0	.claude/commands/unity-test.md	e0506c46598807898b7d35ea37e25847eac6e1b680558c3e1e698698e0c684aa	verbatim	-
 .claude/commands/unity-ui.md	ecu	1.5.0	.claude/commands/unity-ui.md	c489321ee43a95a2e2795f911fa5872c366deeb48346270814e2ff83d613f395	verbatim	-
 .claude/commands/unity-workflow.md	ecu	1.5.0	.claude/commands/unity-workflow.md	3fe77f54481d4e09c55e8feda98d669b0e56a47f3eca8b9f4bc3f00ac12ff052	modified	mobile-strip
-.claude/hooks/auto-learn.sh	ecu	1.5.0	.claude/hooks/auto-learn.sh	89f8e2d2d8bd0050a4948483529d60149d8bcefb3c6e8a87b28b8dd8b20b8064	verbatim	-
+.claude/hooks/auto-learn.sh	ecu	1.5.0	.claude/hooks/auto-learn.sh	89f8e2d2d8bd0050a4948483529d60149d8bcefb3c6e8a87b28b8dd8b20b8064	modified	adopts advisory_exit_guard so this Stop hook cannot block a session
 .claude/hooks/bash-gate.sh	ecu	1.5.0	.claude/hooks/bash-gate.sh	402b11ca2bc35c47e27c06716d21fe0b7300e5ae8b106ac3cf4eab118560d081	verbatim	-
 .claude/hooks/block-legacy-input.sh	original	-	-	-	original	shellcheck-unreachable-tail-removed
 .claude/hooks/block-meta-edit.sh	ecu	1.5.0	.claude/hooks/block-meta-edit.sh	47d80f65b4ffd88d04f59a1ae6710d3680df9a8c86ea40426a492c2759a45c6d	verbatim	-
@@ -80,14 +80,14 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/hooks/guard-editor-runtime.sh	ecu	1.5.0	.claude/hooks/guard-editor-runtime.sh	1e31bac6b3f7b29859fb48d756b6984da0f5bb80984238b689cc726abe9cda9e	verbatim	-
 .claude/hooks/guard-project-config.sh	ecu	1.5.0	.claude/hooks/guard-project-config.sh	741d011f91987cef934bda6d922bc512e8a065f979727cab6da23cf7f76f5b6e	verbatim	-
 .claude/hooks/instinct-capture.sh	ecu	1.5.0	.claude/hooks/instinct-capture.sh	9065b7a00ffd86ea538023fd7077c5ec87005d7a130eb738d330005d3e7b3bcb	verbatim	-
-.claude/hooks/instinct-distill.sh	ecu	1.5.0	.claude/hooks/instinct-distill.sh	26d43d82aabb5b8695bb6c1bc607b62ac445e626c5366f8fbefe47ab70d93381	verbatim	-
-.claude/hooks/_lib.sh	ecu	1.5.0	.claude/hooks/_lib.sh	d721c808d7b56625aefe362e17ff1524186b45108a2829eb4b8b85ebc3546bb3	verbatim	-
-.claude/hooks/notify.sh	ecu	1.5.0	.claude/hooks/notify.sh	b5aa82142acdb12e3ce08d1c80fc741afbe78a6ed1b3c9dae0ed5bc07dcded4c	modified	bash32-compat: replace associative event map with parallel indexed arrays
+.claude/hooks/instinct-distill.sh	ecu	1.5.0	.claude/hooks/instinct-distill.sh	26d43d82aabb5b8695bb6c1bc607b62ac445e626c5366f8fbefe47ab70d93381	modified	adopts advisory_exit_guard so this Stop hook cannot block a session
+.claude/hooks/_lib.sh	ecu	1.5.0	.claude/hooks/_lib.sh	d721c808d7b56625aefe362e17ff1524186b45108a2829eb4b8b85ebc3546bb3	modified	adds advisory_exit_guard, the shared trap-EXIT guard advisory Stop hooks adopt
+.claude/hooks/notify.sh	ecu	1.5.0	.claude/hooks/notify.sh	b5aa82142acdb12e3ce08d1c80fc741afbe78a6ed1b3c9dae0ed5bc07dcded4c	modified	bash32-compat: replace associative event map with parallel indexed arrays; adopts advisory_exit_guard and fixes the CHANNEL_COUNT pipe-with-fallback shape
 .claude/hooks/pre-compact.sh	ecu	1.5.0	.claude/hooks/pre-compact.sh	b17c7e4ce26cf6b23f72530f62f3f68218d55ee7bb1963ab29dd835baa8a9a75	verbatim	-
 .claude/hooks/quality-gate.sh	ecu	1.5.0	.claude/hooks/quality-gate.sh	34518dfc74e4f53caabfc3277ca73ecba5d8011e064db5a484ce33616b772469	verbatim	-
 .claude/hooks/session-restore.sh	ecu	1.5.0	.claude/hooks/session-restore.sh	e3fffec6abc7c1cea29e9d719bd78b643401c41b1e4195facc2a6f1fc65b4757	verbatim	-
-.claude/hooks/session-save.sh	ecu	1.5.0	.claude/hooks/session-save.sh	5b23330845ae08560067340d9300a037688f5012c2618b18e1c44ee6fa7c73c6	verbatim	-
-.claude/hooks/stop-validate.sh	ecu	1.5.0	.claude/hooks/stop-validate.sh	faddb38c73e6235a7f7cfe81bcbd6b76c4615c25c8ea9de5f4df4f9254fe03a7	verbatim	-
+.claude/hooks/session-save.sh	ecu	1.5.0	.claude/hooks/session-save.sh	5b23330845ae08560067340d9300a037688f5012c2618b18e1c44ee6fa7c73c6	modified	adopts advisory_exit_guard; fixes RECENT_COMMITS pipe-with-fallback that built invalid JSON with no git repo, hanging every Stop
+.claude/hooks/stop-validate.sh	ecu	1.5.0	.claude/hooks/stop-validate.sh	faddb38c73e6235a7f7cfe81bcbd6b76c4615c25c8ea9de5f4df4f9254fe03a7	modified	adopts advisory_exit_guard so this Stop hook cannot block a session
 .claude/hooks/suggest-verify.sh	ecu	1.5.0	.claude/hooks/suggest-verify.sh	f4f00021b86c7a166fdd5b6e5ad8b3802bf84f0d68f8b4c9c5ab1c58b3a14c94	verbatim	-
 .claude/hooks/track-edits.sh	ecu	1.5.0	.claude/hooks/track-edits.sh	fb3d2e9ba0116065cc73e4c5106cde68aae76c32e3ffec9b19addb1bb7c6f791	verbatim	-
 .claude/hooks/track-reads.sh	ecu	1.5.0	.claude/hooks/track-reads.sh	47b4e734ee145bb9d36620302209879786f819de7fde933142733f69f8eef211	verbatim	-

@@ -173,3 +173,18 @@ unity_track_warning() {
         echo "${hook_name}: ${message}" >> "$UNITY_WARNINGS_FILE"
     fi
 }
+
+# ---------------------------------------------------------------------------
+# advisory_exit_guard — for hooks whose contract is "advisory, exit 0 always".
+#
+# Claude Code reads a non-zero exit from a Stop hook as a refusal to stop: it
+# feeds the hook's stderr back to the model as a reason to continue, and the
+# session never ends. Under `set -e` any unhandled failure inside an advisory
+# hook therefore turns a cosmetic bug into a hang.
+#
+# Call this immediately after sourcing _lib.sh in every advisory hook. It is
+# deliberately blunt: whatever goes wrong below, the process exits 0.
+# ---------------------------------------------------------------------------
+advisory_exit_guard() {
+    trap 'exit 0' EXIT
+}

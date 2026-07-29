@@ -14,6 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK_PROFILE_LEVEL="standard"
 source "${SCRIPT_DIR}/_lib.sh"
+advisory_exit_guard
 
 # Get list of C# files modified during this session
 if [ ! -f "$UNITY_EDITS_FILE" ]; then

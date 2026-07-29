@@ -18,6 +18,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK_PROFILE_LEVEL="strict"
 source "${SCRIPT_DIR}/_lib.sh"
+advisory_exit_guard
 
 # Use project-local state dir for learnings, fall back to old location
 PERSISTENT_LOG="${UNITY_HOOK_STATE_DIR}/learnings.jsonl"

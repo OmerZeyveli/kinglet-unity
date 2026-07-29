@@ -14,10 +14,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOK_PROFILE_LEVEL="standard"
 source "${SCRIPT_DIR}/_lib.sh"
+advisory_exit_guard
 
 # Gather git state
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
-RECENT_COMMITS=$(git log --oneline -3 2>/dev/null | jq -Rs 'split("\n") | map(select(length > 0))' || echo '[]')
+# Two statements, not a pipeline with a fallback. Under `set -euo pipefail` a
+# failing `git log` makes the pipeline fail *after* jq has already written its
+# output, so `|| echo '[]'` appends a second value instead of replacing the
+# first — and `[]\n[]` is not JSON. Capturing git separately removes the race
+# between "did the pipeline fail" and "did anything get written".
+COMMIT_LINES=$(git log --oneline -3 2>/dev/null || true)
+RECENT_COMMITS=$(printf '%s' "$COMMIT_LINES" | jq -Rs 'split("\n") | map(select(length > 0))')
 
 # Gather modified files from session tracking
 MODIFIED_FILES="[]"
