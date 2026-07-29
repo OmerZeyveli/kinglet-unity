@@ -282,11 +282,6 @@ C# Source Files    Unity Editor
   "permissions": {
     "defaultMode": "acceptEdits"     // Claude can edit files without asking
   },
-  "mcpServers": {
-    "unityMCP": {
-      "url": "http://localhost:8080/mcp"  // unity-mcp bridge endpoint
-    }
-  },
   "hooks": {
     "PreToolUse": [ ... ],           // Blocking hooks (safety gates)
     "PostToolUse": [ ... ],          // Warning hooks (quality, tracking)
@@ -296,6 +291,11 @@ C# Source Files    Unity Editor
   }
 }
 ```
+
+`.claude/settings.json` has no `mcpServers` key, and never has: Claude Code does not read MCP server
+config from there. The unity-mcp bridge endpoint (`http://localhost:8080/mcp`) is configured in
+`.mcp.json` at the project root instead — `install.sh` writes it in a separate step (see "Step 8b"
+in `install.sh`), independent of `.claude/settings.json`.
 
 The `settings.local.json.template` provides a starting point for per-developer overrides.
 

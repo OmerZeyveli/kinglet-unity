@@ -12,6 +12,22 @@
 # See the "Round 3" section near the end of this file for the widened scan,
 # its exclusion list, and why MERGE-NOTES.md is handled separately from it.
 #
+# Round 4 (2026-07-30, wave-1b1 final review) found a SEVENTH instance the
+# Round 3 window missed by six characters: docs/ARCHITECTURE.md's own
+# "Settings.json Structure" heading sat 126 characters from the mcpServers key
+# in the JSON sample below it — past the 120-character bound. Rather than
+# widen the number (the next instance is free to land past whatever it grows
+# to), this file now also runs a fenced-code-block scan with no distance bound
+# at all: it tracks each block's governing Markdown heading and flags a block
+# only when that heading names settings.json (not .mcp.json) AND the block
+# itself carries an mcpServers key. See the "Round 4" section for the scan,
+# and why docs/ARCHITECTURE.md joins MERGE-NOTES.md as excluded from the
+# Round 3 proximity scan (the same reason MERGE-NOTES.md was: the correction
+# has to say both words close together to explain itself). The Round 3
+# proximity scan and its 120-character window are UNCHANGED and remain in
+# place for the prose-level cases it still catches; the fenced-block scan is
+# additive, not a replacement.
+#
 # Task 2 moved MCP server configuration to .mcp.json at the project root,
 # because Claude Code silently ignores an mcpServers key inside settings.json.
 # Task 8 round 1 found two stale instructions pointing at the dead location:
@@ -174,6 +190,18 @@ assert_contains "$TMDI_NOTICE" "\`.mcp.json\` merely points at it" \
 # rename, tense-fixing "was originally ... later renamed" rather than
 # rewriting the history) and it is not something a regex should re-decide.
 #
+# docs/ARCHITECTURE.md is EXCLUDED here for the same class of reason, added in
+# the fix for the reviewer's six-characters-past-the-window finding: its
+# "Settings.json Structure" section corrects a stale mcpServers example, and
+# the correction sentence necessarily explains the settings.json/MCP
+# relationship — it says both words within 120 characters BECAUSE it is
+# telling the truth about them, not because it repeats the error. It is
+# checked narrowly instead, below (see "docs/ARCHITECTURE.md: the corrected
+# Settings.json Structure section"), and by the fenced-code-block scan further
+# down, which is a permanent, structural replacement for this file's slice of
+# the proximity heuristic (see that scan's header for why it does not have
+# this same false-positive problem).
+#
 # scripts/studio-doctor.sh's explanatory comment needs no exclusion entry:
 # it is a .sh file, not a root *.md or docs/**/*.md, so this scan's scope
 # never reaches it — the same reason it never needed one in the .claude/-only
@@ -183,16 +211,20 @@ assert_contains "$TMDI_NOTICE" "\`.mcp.json\` merely points at it" \
 #
 # This is a proximity heuristic, not a grammar checker. It cannot tell "X used
 # to be true" from "X is true" within a single juxtaposition — that is exactly
-# why MERGE-NOTES.md needed a human call instead of being folded into this
-# scan. If a future doc mixes historical and current claims about
-# settings.json/MCP the way MERGE-NOTES.md does, it will need the same
-# judgment call and the same kind of narrow, line-anchored check below instead
-# of being added to this proximity scan.
+# why MERGE-NOTES.md and docs/ARCHITECTURE.md both needed a human call instead
+# of being folded into this scan. If a future doc mixes historical and current
+# claims about settings.json/MCP the same way, it will need the same judgment
+# call and the same kind of narrow, line-anchored check below instead of being
+# added to this proximity scan. The fenced-code-block scan further down closes
+# the specific defect class that motivated this file (a code sample shown as
+# settings.json content that actually carries an mcpServers key) without this
+# limitation — see its header for why.
 
 tmdi3_is_excluded() {
     case "$1" in
         MCP-SETUP.md) return 0 ;;
         MERGE-NOTES.md) return 0 ;;
+        docs/ARCHITECTURE.md) return 0 ;;
         docs/research/pioneer/smoke-pass.md) return 0 ;;
         docs/superpowers/plans/*) return 0 ;;
         docs/superpowers/specs/*) return 0 ;;
@@ -207,12 +239,13 @@ TMDI3_CLASSIFY_FAILURES=""
 for tmdi3_case in \
     "MCP-SETUP.md:excluded" \
     "MERGE-NOTES.md:excluded" \
+    "docs/ARCHITECTURE.md:excluded" \
     "docs/research/pioneer/smoke-pass.md:excluded" \
     "docs/superpowers/plans/2026-07-22-kinglet-01-identity-foundation.md:excluded" \
     "docs/superpowers/specs/2026-07-22-kinglet-for-unity-design.md:excluded" \
     "CLAUDE.md:included" \
     "README.md:included" \
-    "docs/ARCHITECTURE.md:included" \
+    "docs/GETTING-STARTED.md:included" \
     "docs/some-brand-new-doc-nobody-has-written-yet.md:included" \
 ; do
     tmdi3_path="${tmdi3_case%%:*}"
@@ -293,3 +326,160 @@ assert_contains "$TMDI3_MERGE_ROW" "\`.mcp.json\`" \
     "MERGE-NOTES.md's unity-mcp row now names where MCP config actually lives"
 assert_not_contains "$TMDI3_MERGE_ROW" "\`settings.json\` points at it on localhost." \
     "MERGE-NOTES.md's unity-mcp row no longer states the stale claim as a present-tense fact"
+
+# --- docs/ARCHITECTURE.md: the corrected Settings.json Structure section. ---
+# The judgment call above (excluded from the proximity scan). Checked narrowly instead: the
+# section's JSON code sample must no longer carry an mcpServers key (the actual finding — a reader
+# copying that code block would reproduce the dead configuration), and the corrective prose that
+# replaced it must state where MCP config actually lives.
+TMDI3_ARCH_SETTINGS_SECTION=$(awk '
+    /^## Settings\.json Structure/ { p = 1; print; next }
+    p && /^## / { exit }
+    p { print }
+' "${REPO_DIR}/docs/ARCHITECTURE.md")
+# The code sample only, not the whole section — the corrective prose right below it legitimately
+# says "mcpServers" (that is the word it is correcting the record about), so checking the whole
+# section for absence of the word would fail on the fix itself.
+TMDI3_ARCH_SETTINGS_CODE=$(awk '
+    /^## Settings\.json Structure/ { p = 1; next }
+    p && /^## / { exit }
+    p && /^```/ { inblock = !inblock; next }
+    p && inblock { print }
+' "${REPO_DIR}/docs/ARCHITECTURE.md")
+assert_not_contains "$TMDI3_ARCH_SETTINGS_CODE" "mcpServers" \
+    "docs/ARCHITECTURE.md's Settings.json Structure code sample no longer shows an mcpServers key"
+assert_contains "$TMDI3_ARCH_SETTINGS_SECTION" "has no \`mcpServers\` key, and never has" \
+    "docs/ARCHITECTURE.md's Settings.json Structure section now states settings.json carries no mcpServers key"
+assert_contains "$TMDI3_ARCH_SETTINGS_SECTION" "\`.mcp.json\` at the project root" \
+    "docs/ARCHITECTURE.md's Settings.json Structure section now names where the MCP entry actually lives"
+
+# ============================================================================
+# Round 4 — fenced-code-block scan: the durable replacement for this file's
+# specific defect class, not just a wider window.
+#
+# The reviewer's finding was a code sample: a "Settings.json Structure" heading
+# followed by a fenced JSON block that carried an mcpServers key 126 characters
+# past this test's 120-character window — a gap of exactly six characters. A
+# wider window buys margin, not closure: whatever number replaces 120, the
+# next stale example is free to sit one character past it. And the window's
+# actual failure mode cuts the other way too — MERGE-NOTES.md and
+# docs/ARCHITECTURE.md both have to be EXCLUDED from the proximity scan
+# because correcting the claim in prose necessarily says "settings.json" and
+# "mcp" close together. A single distance bound cannot both catch the code
+# sample and ignore the correction that mentions the same two words to explain
+# it: it has no way to tell which juxtaposition it is looking at.
+#
+# A code sample does not have that ambiguity. It is not prose explaining
+# history — it is something a reader will copy verbatim, and its "topic" is
+# unambiguous: the heading immediately governing it. So this scan is per
+# FENCED BLOCK, not per file: track the nearest preceding Markdown heading as
+# each block is read, and flag a block only when BOTH hold:
+#   1. its governing heading mentions settings.json (and not .mcp.json — a
+#      block correctly documenting .mcp.json's own structure, which legitimately
+#      contains mcpServers, is introduced by a heading naming .mcp.json instead);
+#   2. the block's own content contains the mcpServers key.
+#
+# This has no distance bound to outgrow, and does not need docs/ARCHITECTURE.md
+# or MERGE-NOTES.md excluded from it — a hit here is the actual defect, not a
+# proximity coincidence, and (as confirmed below) it finds zero matches across
+# every currently-tracked file, including the ones the proximity scan cannot
+# safely look at.
+tmdi4_fenced_block_hits() {
+    local file="$1"
+    awk '
+        BEGIN { heading = ""; inblock = 0; sawmcp = 0; bstart = 0 }
+        /^```/ {
+            if (inblock == 0) {
+                inblock = 1
+                sawmcp = 0
+                bstart = NR
+            } else {
+                inblock = 0
+                h = tolower(heading)
+                if (sawmcp && h ~ /settings\.json/ && h !~ /\.mcp\.json/) {
+                    print FILENAME ":" bstart "-" NR ": heading=[" heading "]"
+                }
+            }
+            next
+        }
+        /^#+[ \t]/ { heading = $0 }
+        {
+            if (inblock == 1 && tolower($0) ~ /mcpservers/) { sawmcp = 1 }
+        }
+    ' "$file"
+}
+
+TMDI4_HITS=""
+TMDI4_ALL_TRACKED=$(cd "$REPO_DIR" && git ls-files -- .claude/ '*.md' 'docs/')
+while IFS= read -r tmdi4_relpath; do
+    [ -z "$tmdi4_relpath" ] && continue
+    case "$tmdi4_relpath" in
+        *.md) ;;
+        *) continue ;;
+    esac
+    tmdi4_abspath="${REPO_DIR}/${tmdi4_relpath}"
+    [ -f "$tmdi4_abspath" ] || continue
+    tmdi4_match=$(tmdi4_fenced_block_hits "$tmdi4_abspath")
+    if [ -n "$tmdi4_match" ]; then
+        TMDI4_HITS="${TMDI4_HITS}${tmdi4_relpath}: ${tmdi4_match}
+"
+    fi
+done <<< "$TMDI4_ALL_TRACKED"
+
+if [ -n "$TMDI4_HITS" ]; then
+    echo "--- fenced code block(s) shown under a settings.json heading still carry mcpServers ---"
+    echo "$TMDI4_HITS"
+    echo "--- end offenders ---"
+fi
+assert_eq "" "$TMDI4_HITS" \
+    "no fenced code block under a settings.json heading (in any tracked .md, including excluded-from-proximity-scan files) carries an mcpServers key"
+
+# Canary: the scan still binds. Reconstruct the reviewer's exact original finding as a fixture and
+# confirm this scan catches it — proving a green result above means "found nothing," not "checked
+# nothing."
+TMDI4_FIXTURE="$(mktemp -d "${TMPDIR:-/tmp}/tmdi4-fixture.XXXXXX")/bad.md"
+cat > "$TMDI4_FIXTURE" <<'TMDI4EOF'
+## Settings.json Structure
+
+```json
+{
+  "permissions": {},
+  "mcpServers": {
+    "unityMCP": { "url": "http://localhost:8080/mcp" }
+  }
+}
+```
+TMDI4EOF
+TMDI4_CANARY=$(tmdi4_fenced_block_hits "$TMDI4_FIXTURE")
+rm -rf "$(dirname "$TMDI4_FIXTURE")"
+assert_contains "$TMDI4_CANARY" "Settings.json Structure" \
+    "the fenced-code-block scan still catches the reviewer's exact original finding, reconstructed"
+
+# Canary: a block correctly documenting .mcp.json's OWN structure (which legitimately contains
+# mcpServers) must NOT be flagged just because it mentions settings.json somewhere else in the
+# file's other headings.
+TMDI4_GOOD_FIXTURE="$(mktemp -d "${TMPDIR:-/tmp}/tmdi4-good-fixture.XXXXXX")/good.md"
+cat > "$TMDI4_GOOD_FIXTURE" <<'TMDI4EOF'
+## Settings.json Structure
+
+```json
+{
+  "permissions": {},
+  "hooks": {}
+}
+```
+
+## .mcp.json Structure
+
+```json
+{
+  "mcpServers": {
+    "unityMCP": { "url": "http://localhost:8080/mcp" }
+  }
+}
+```
+TMDI4EOF
+TMDI4_GOOD_CANARY=$(tmdi4_fenced_block_hits "$TMDI4_GOOD_FIXTURE")
+rm -rf "$(dirname "$TMDI4_GOOD_FIXTURE")"
+assert_eq "" "$TMDI4_GOOD_CANARY" \
+    "the fenced-code-block scan does not flag a block correctly documenting .mcp.json's own mcpServers structure"

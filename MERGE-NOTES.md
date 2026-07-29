@@ -181,8 +181,11 @@ note. That content lived in the mobile *skill*; `pc-console.md` was misattributi
 
 - Part 1 **did not** ship a `settings.json` — ECU's already had
   `mcpServers.unityMCP → http://localhost:8080/mcp`, and `install.sh` only *verified* the entry and
-  warned if absent. **We ship `.claude/settings.json` now**, preconfigured with that entry, because
-  there is no ECU install to inherit it from.
+  warned if absent. We ship `.claude/settings.json` now because there is no ECU install to inherit
+  it from — but it does **not** carry an `mcpServers` entry, and never has: Claude Code silently
+  ignores an `mcpServers` key in `settings.json` (see the source-projects table above). The
+  `unityMCP → http://localhost:8080/mcp` entry lives in `.mcp.json` at the project root instead,
+  written by `install.sh`'s own step, independent of `.claude/settings.json`.
 - The vendored `unity-mcp-patterns` skill uses CoplayDev's `snake_case` tool names (`manage_scene`,
   `manage_gameobject`, `batch_execute`, `read_console`, …) → no tool-name rework needed.
 - **The CoplayDev version reference was stale, not broken.** Docs said `9.7.x`; current is **10.1.0**

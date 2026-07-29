@@ -155,7 +155,7 @@ CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 CONTRIBUTING.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 CREDITS.md	original	-	-	-	original	-
 docs/AGENT-GUIDE.md	ecu	1.5.0	docs/AGENT-GUIDE.md	138ac65721897705a730ff29f5cd2ea26e2aa9c783dc63457e52c02afe29d80b	modified	mobile-strip
-docs/ARCHITECTURE.md	ecu	1.5.0	docs/ARCHITECTURE.md	3ff6cb5efbab6cecdeb4d05f235b568f3615356bf51e58fbea167d45eecdaf06	modified	mobile-strip
+docs/ARCHITECTURE.md	ecu	1.5.0	docs/ARCHITECTURE.md	3ff6cb5efbab6cecdeb4d05f235b568f3615356bf51e58fbea167d45eecdaf06	modified	mobile-strip; removed stale mcpServers key from the Settings.json Structure code sample; settings.json never carries MCP config, .mcp.json does
 docs/GETTING-STARTED.md	ecu	1.5.0	docs/GETTING-STARTED.md	5c86accc13f26624068cb3ec4a0df1c18b910175cbe242e8f9a554b0773f26de	modified	mobile-strip
 docs/HOOK-REFERENCE.md	ecu	1.5.0	docs/HOOK-REFERENCE.md	3369a90e917bd229e3e398300f67168757e40a94cbb693225c80797ea35fe767	modified	mobile-strip
 docs/MODEL-ROUTING.md	ecu	1.5.0	docs/MODEL-ROUTING.md	585fb9c38d0d88021632614e03893ef1ff3cb3c1935f9be148b3b3c986520512	verbatim	-
