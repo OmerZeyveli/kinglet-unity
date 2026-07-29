@@ -457,9 +457,22 @@ Makes the suite green again, per the ruling above. Runs **last**, because it rec
 `.claude/**` and Tasks 1 and 2 are what change it.
 
 **Files:**
-- Modify: `migration/baseline-inventory.json` — `source_commit`, the `full_claude_tree.files`
-  sha256 entries for every file Tasks 1 and 2 edited, and deletion of the whole
-  `legacy_product_positioning` object
+- Modify: `migration/baseline-inventory.json` — `source_commit`, **both** the `full_claude_tree.files`
+  and the `categories.<name>.files` sha256 entries for every file Tasks 1 and 2 edited, and deletion
+  of the whole `legacy_product_positioning` object
+
+**Corrected 2026-07-29, from Task 2's report.** This task's first draft named only `full_claude_tree`.
+The baseline pins the same payload files **twice**, in two independent structures checked by two
+independent tests, and regenerating one leaves the other red:
+
+| Structure | Test | Covers |
+|---|---|---|
+| `full_claude_tree.files` | `test_full_claude_tree_baseline_covers_all_147_tracked_files` | all 147 `.claude/**` files |
+| `categories.{agents,commands,skills,hooks,rules,claude_templates,code_templates}.files` | `test_tracked_legacy_paths_and_sha256_match_exactly` | 150 files across 7 categories |
+
+Every path this plan edited under `.claude/` must be updated in **both** wherever it appears.
+`.claude/VERSION`, `.claude/UPSTREAM` and `.claude/NOTICE.md` appear only in `full_claude_tree`;
+`.claude/rules/pc-console.md` and the five `.claude/templates/*.md` appear in both.
 - Modify: `tests/kinglet/test_baseline_inventory.py` — delete `is_legacy_marker_occurrence` (~line
   136), `identity_occurrences` (~line 155), `test_active_legacy_product_positioning_matches_grandfathered_baseline` (~line 432), `scan_identity_fixture` (~line 442), and the six fixture tests that call it (~lines 462, 479, 488, 495, 504, 523)
 
@@ -470,16 +483,20 @@ Makes the suite green again, per the ruling above. Runs **last**, because it rec
 
 - [ ] **Step 1: Confirm the failure list is exactly what the ruling predicts**
 
-Run: `bash tests/run-tests.sh 2>&1 | grep '^FAIL:'`
+Run: `timeout 90 python3 -m unittest discover -s tests/kinglet -t . 2>&1 | grep -E '^FAIL:|^FAILED'`
 
-Expected: exactly two lines —
-`test_active_legacy_product_positioning_matches_grandfathered_baseline` and
-`test_full_claude_tree_baseline_covers_all_147_tracked_files`.
+Expected: **8 failures across exactly 3 test names**, and nothing else —
 
-**If any other test appears, stop and report BLOCKED.** Tasks 1 and 2 were supposed to break these
-two and nothing else; a third failure means something was damaged, and regenerating a baseline over
-damage would bake it in permanently. This step is the only thing standing between a deliberate
-baseline advance and a laundered regression.
+| Test | Count |
+|---|---|
+| `test_active_legacy_product_positioning_matches_grandfathered_baseline` | 1 |
+| `test_full_claude_tree_baseline_covers_all_147_tracked_files` | 1 |
+| `test_tracked_legacy_paths_and_sha256_match_exactly` | 6 subtests: `.claude/rules/pc-console.md` and the five `.claude/templates/*.md` |
+
+**If any fourth test name appears, stop and report BLOCKED.** Tasks 1 and 2 were supposed to break
+these three and nothing else; another failure means something was damaged, and regenerating a
+baseline over damage would bake it in permanently and call it evidence. This step is the only thing
+standing between a deliberate baseline advance and a laundered regression.
 
 - [ ] **Step 2: Delete the scanner and its tests**
 
@@ -507,16 +524,18 @@ including its `term`, `policy`, `historical_exact_paths`, `historical_path_prefi
 `legacy_marker_test_path_prefix`, `legacy_marker_tokens`, and `grandfathered_active_occurrences`
 keys. Leave `schema_version`, `description`, `source_commit`, `full_claude_tree`, and `categories`.
 
-- [ ] **Step 4: Run the tests — one failure must remain**
+- [ ] **Step 4: Run the tests — the drift failures must remain**
 
-Run: `bash tests/run-tests.sh 2>&1 | grep '^FAIL:'`
+Run: `timeout 90 python3 -m unittest discover -s tests/kinglet -t . 2>&1 | grep -E '^FAIL:|^FAILED'`
 
-Expected: exactly one line, `test_full_claude_tree_baseline_covers_all_147_tracked_files`. The
-positioning failure is gone because its test is gone.
+Expected: 7 failures across 2 test names —
+`test_full_claude_tree_baseline_covers_all_147_tracked_files` (1) and
+`test_tracked_legacy_paths_and_sha256_match_exactly` (6). The positioning failure is gone because
+its test is gone.
 
-If it is still listed, the deletion was incomplete. If the drift failure disappeared too, something
-is wrong — stop and report, because the drift is real and must be fixed by Step 5, not by deleting
-the check that finds it.
+If the positioning test is still listed, the deletion was incomplete. **If the drift failures
+disappeared too, stop and report** — the drift is real, it is fixed by Step 5, and a deletion that
+silences the check which finds it is the failure mode this whole task is meant to avoid.
 
 - [ ] **Step 5: Commit the payload state, then advance the anchor**
 
@@ -530,10 +549,54 @@ ANCHOR=$(git rev-parse HEAD)
 echo "$ANCHOR"
 ```
 
-Now regenerate `full_claude_tree` against `$ANCHOR`. For every entry in
-`full_claude_tree.files`, `sha256` must equal the sha256 of that path's blob **at `$ANCHOR`**, and
-`git_mode` its mode there. Set `source_commit` to `$ANCHOR`. Verify the regenerated file is valid
-JSON and that `expected_count` still equals the number of entries:
+Now regenerate **both** structures against `$ANCHOR`. For every entry in `full_claude_tree.files`
+and in every `categories.<name>.files`, `sha256` must equal the sha256 of that path's blob **at
+`$ANCHOR`** and `git_mode` its mode there. Set `source_commit` to `$ANCHOR`.
+
+Regenerate from git, not from the working tree — they are identical here only because the tree is
+clean, and reading from git is what the checks compare against:
+
+```bash
+python3 - "$ANCHOR" <<'PY'
+import hashlib, json, subprocess, sys
+anchor = sys.argv[1]
+root = "migration/baseline-inventory.json"
+doc = json.load(open(root))
+
+raw = subprocess.run(["git", "ls-tree", "-r", "-z", anchor],
+                     capture_output=True, check=True).stdout
+tree = {}
+for entry in raw.split(b"\0"):
+    if not entry:
+        continue
+    meta, path = entry.split(b"\t", 1)
+    mode, kind, oid = meta.decode("ascii").split()
+    tree[path.decode("utf-8")] = (mode, oid)
+
+def refresh(records):
+    for record in records:
+        mode, oid = tree[record["path"]]
+        blob = subprocess.run(["git", "cat-file", "blob", oid],
+                              capture_output=True, check=True).stdout
+        record["sha256"] = hashlib.sha256(blob).hexdigest()
+        record["git_mode"] = mode
+
+refresh(doc["full_claude_tree"]["files"])
+for category in doc["categories"].values():
+    refresh(category["files"])
+doc["source_commit"] = anchor
+
+with open(root, "w", encoding="utf-8") as handle:
+    json.dump(doc, handle, indent=2, ensure_ascii=False)
+    handle.write("\n")
+PY
+```
+
+If a `KeyError` names a path, that path is in the baseline but not in the tree at `$ANCHOR` — stop
+and report rather than dropping the record, because a silently shrinking baseline is how coverage
+evidence rots.
+
+Then verify the result:
 
 ```bash
 python3 -c "
@@ -542,9 +605,13 @@ d = json.load(open('migration/baseline-inventory.json'))
 t = d['full_claude_tree']
 assert t['expected_count'] == len(t['files']), (t['expected_count'], len(t['files']))
 assert 'legacy_product_positioning' not in d, 'scanner section still present'
-print('anchor', d['source_commit'], '| files', len(t['files']))
+print('anchor', d['source_commit'], '| full tree', len(t['files']),
+      '| categories', {k: len(v['files']) for k, v in d['categories'].items()})
 "
 ```
+
+Confirm the JSON's formatting is unchanged in shape — the file was 2-space indented before and must
+stay so, or the diff becomes unreadable and the change unreviewable.
 
 - [ ] **Step 6: Run the full suite and confirm green**
 
