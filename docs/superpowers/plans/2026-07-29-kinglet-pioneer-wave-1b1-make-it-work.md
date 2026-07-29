@@ -529,6 +529,64 @@ Two small measured defects. Together they are one commit.
 
 ---
 
+### Task 6: The health check must not stop halfway and call it success
+
+**Added 2026-07-29, after Task 3, from a controller-confirmed defect.** Task 3's implementer reported
+a symptom; the diagnosis and the cause below are the controller's, verified directly.
+
+**Measured, on a freshly installed project:**
+
+```
+$ bash scripts/studio-doctor.sh --project-dir /tmp/fixture
+Kinglet Pioneer — studio-doctor
+Project: /tmp/fixture
+Installed: Kinglet Pioneer 3.0.0-pioneer.1 (vendored ECU 1.5.0)
+
+PASS Python 3.13 (3.10+ required)
+PASS uv present (uv 0.11.32)
+$ echo $?
+0
+```
+
+Two checks, then silence, then **exit 0**. The MCP bridge check, the `.claude/` integrity check, the
+hook-reference check and the summary line never run. A health check that reports a fraction of its
+checks and exits successfully does not merely fail — it **certifies a project it never examined**.
+
+**Root cause.** `read_mcp_url()` ends with a `for` loop whose body returns on success. When nothing
+matches, the loop falls through and the function's exit status is that of its last command — a false
+`[ -n "$url" ] && { … }` — so it returns 1. `MCP_URL=$(read_mcp_url)` then fails under `set -e` and
+kills the script. There is no explicit `return 0`.
+
+**Why it appeared now.** The bug was latent for as long as the URL was always found. Task 2 removed
+`mcpServers` from `.claude/settings.json` — correctly, because Claude Code never read it — and
+`read_mcp_url` looks **only** at `settings.local.json` and `settings.json`. It does not know
+`.mcp.json` exists. So the lookup now always fails, and the latent bug fires on every run.
+
+Neither task was wrong in isolation. This is the failure that only appears where they meet, which is
+why a task-scoped review could not have caught it.
+
+**Files:**
+- Modify: `scripts/studio-doctor.sh` — `read_mcp_url` returns 0 explicitly and reads `.mcp.json`; audit the whole script for other early exits
+- Test: `tests/test-studio-doctor.sh` (create)
+- Modify: `provenance.tsv`
+
+- [ ] **Step 1: Write the failing test**
+
+Assert against a real fixture (`bash tests/fixtures/mkproject.sh <dir> --variant urp`, then install):
+
+- `studio-doctor.sh` **reaches its summary line** — the output contains `passed ·` and the warning/failure counts.
+- It reports on the MCP bridge rather than skipping it, now that `.mcp.json` is where the URL lives.
+- It exits 0 on a healthy project **and** non-zero when a check genuinely fails — the second half matters, because "always exit 0" would pass the first assertion while being a worse bug than the one being fixed.
+- A **direct** assertion on the cause: `read_mcp_url` returns 0 when it finds nothing. Call it in a subshell with no config present and check `$?`. Without this, the next refactor reintroduces the same fall-through and only the indirect assertions catch it, three steps downstream.
+
+- [ ] **Step 2: Run it and watch it fail.** Expected: the summary-line assertion fails because the script died after two checks. Confirm that is the reason, not a fixture problem.
+
+- [ ] **Step 3: Fix `read_mcp_url`.** Add an explicit `return 0`, and teach it to read `.mcp.json` at the project root — `mcpServers.unityMCP.url`, the same shape `install.sh` now writes — before falling back to the settings files. Preserve the existing precedence comment's intent: a machine-local override still wins.
+
+- [ ] **Step 4: Audit the rest of the script for the same shape.** Any function whose last statement is a conditional, assigned through `$(...)` under `set -e`, is the same defect waiting. **List every function you checked and its verdict in the report** — a sweep whose clean cases are invisible cannot be told apart from one that missed them.
+
+- [ ] **Step 5: Verify and commit.** `bash tests/run-tests.sh` green with every file present; `scripts/check-provenance.sh` OK; regenerate the baseline in a separate commit if `.claude/` drifted.
+
 ## What this plan does not do
 
 | Deferred | To | Why |
