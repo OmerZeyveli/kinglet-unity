@@ -81,10 +81,20 @@ error_count=0
 warning_count=0
 missing_meta=()
 orphaned_meta=()
-declare -A guid_map  # guid -> file path
+# guid -> path is not `declare -A guid_map`: associative arrays need bash 4, and macOS still ships
+# bash 3.2. It is also not a newline table probed with one `grep` per .meta file the way
+# generate-claude-md.sh's KNOWN_PACKAGES table is: a real Unity project has tens of thousands of
+# .meta files, and a grep-per-lookup against an ever-growing table turns an O(1) hash test into
+# O(n) per file and the whole pass into O(n^2). GUID_TABLE collects "guid<TAB>relpath" once per
+# .meta file (a single pass, same as before); duplicate detection then sorts that table once
+# (O(n log n)) and walks it linearly (O(n)), comparing each entry only to its immediate neighbor —
+# duplicates are adjacent after a sort on the guid field. `-s` keeps the sort stable, so among
+# entries sharing a GUID the first one encountered during the walk (by scan order, matching the
+# original's "first write wins" map semantics) still prints first.
+GUID_TABLE=""
 
-err()  { echo "  ${RED}[ERROR]${RESET}   $*"; ((error_count++)); }
-warn_msg() { echo "  ${YELLOW}[WARN]${RESET}    $*"; ((warning_count++)); }
+err()  { echo "  ${RED}[ERROR]${RESET}   $*"; (( error_count += 1 )); }
+warn_msg() { echo "  ${YELLOW}[WARN]${RESET}    $*"; (( warning_count += 1 )); }
 info() { echo "  ${CYAN}[INFO]${RESET}    $*"; }
 
 echo ""
@@ -195,19 +205,16 @@ collect_guids() {
     local meta="$1"
     [[ "$meta" != *.meta ]] && return
     local guid
-    guid=$(grep -oP '^guid:\s*\K[0-9a-f]+' "$meta" 2>/dev/null || true)
+    # sed with a self-terminating `q`, not `grep -oP ... | head -1`: `-P` is GNU-only PCRE mode,
+    # absent from BSD/macOS grep entirely; and piping into `head` is a reader that can exit before
+    # its writer finishes. `q` here has sed quit itself after the one match it wants — there is no
+    # second process racing to close the pipe.
+    guid=$(sed -n '/^guid:/{s/^guid:[[:space:]]*\([0-9a-f]*\).*/\1/p;q;}' "$meta" 2>/dev/null)
     if [[ -z "$guid" ]]; then
         return
     fi
     local rel="${meta#"$PROJECT_ROOT/"}"
-    if [[ -n "${guid_map[$guid]:-}" ]]; then
-        err "Duplicate GUID $guid:"
-        echo "         ${guid_map[$guid]}"
-        echo "         $rel"
-        found_dupes=1
-    else
-        guid_map["$guid"]="$rel"
-    fi
+    GUID_TABLE="${GUID_TABLE}${guid}"$'\t'"${rel}"$'\n'
 }
 
 if [[ "$MODE" == "all" ]]; then
@@ -218,6 +225,25 @@ else
     for f in "${FILE_LIST[@]}"; do
         collect_guids "$f"
     done
+fi
+
+# One sorted pass instead of a map probed per file: see the note above GUID_TABLE.
+if [[ -n "$GUID_TABLE" ]]; then
+    SORTED_GUID_TABLE=$(printf '%s' "$GUID_TABLE" | sort -s -t $'\t' -k1,1)
+    prev_guid=""
+    first_rel=""
+    while IFS=$'\t' read -r guid rel; do
+        [[ -z "$guid" ]] && continue
+        if [[ "$guid" == "$prev_guid" ]]; then
+            err "Duplicate GUID $guid:"
+            echo "         $first_rel"
+            echo "         $rel"
+            found_dupes=1
+        else
+            first_rel="$rel"
+        fi
+        prev_guid="$guid"
+    done <<< "$SORTED_GUID_TABLE"
 fi
 
 if (( found_dupes == 0 )); then

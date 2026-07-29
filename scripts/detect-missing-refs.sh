@@ -99,18 +99,57 @@ info_msg() { echo "  ${CYAN}[INFO]${RESET}  $*"; }
 
 info_msg "Building GUID index from .meta files..."
 
-declare -A KNOWN_GUIDS
+# KNOWN_GUIDS is a *set*: the value was always 1, used only for membership tests. `declare -A`
+# needs bash 4 (macOS still ships 3.2), but the mechanical substitution — a newline table probed
+# with one `grep` per lookup, as generate-claude-md.sh's KNOWN_PACKAGES table does — turns an O(1)
+# hash test into O(n) per lookup. A real Unity project has tens of thousands of .meta files, so
+# with m reference lines to check against n known GUIDs that is O(n*m): the difference between
+# seconds and never finishing.
+#
+# KNOWN_GUIDS_SORTED is a sorted, deduplicated indexed array built once (O(n log n)), and
+# guid_known() below binary-searches it (O(log n) per lookup) instead of scanning linearly.
+KNOWN_GUIDS_RAW=""
 meta_count=0
 
 while IFS= read -r -d '' meta_file; do
-    guid=$(grep -oP '^guid:\s*\K[0-9a-fA-F]+' "$meta_file" 2>/dev/null | head -1 || true)
+    # sed with a self-terminating `q`, not `grep -oP ... | head -1`: `-P` is GNU-only PCRE mode,
+    # absent from BSD/macOS grep; piping into `head` is a reader that can exit before its writer
+    # finishes. `q` has sed quit itself after the one match — no second process racing the pipe.
+    guid=$(sed -n '/^guid:/{s/^guid:[[:space:]]*\([0-9a-fA-F]*\).*/\1/p;q;}' "$meta_file" 2>/dev/null)
     if [[ -n "$guid" ]]; then
-        KNOWN_GUIDS["$guid"]=1
+        KNOWN_GUIDS_RAW="${KNOWN_GUIDS_RAW}${guid}"$'\n'
     fi
-    ((meta_count++))
+    (( meta_count += 1 ))
 done < <(find "$PROJECT_ROOT/Assets" "$PROJECT_ROOT/Packages" -name '*.meta' -print0 2>/dev/null || find "$PROJECT_ROOT/Assets" -name '*.meta' -print0 2>/dev/null)
 
-info_msg "Indexed $meta_count .meta files (${#KNOWN_GUIDS[@]} unique GUIDs)."
+KNOWN_GUIDS_SORTED=()
+if [[ -n "$KNOWN_GUIDS_RAW" ]]; then
+    while IFS= read -r g; do
+        [[ -n "$g" ]] && KNOWN_GUIDS_SORTED+=("$g")
+    done < <(printf '%s' "$KNOWN_GUIDS_RAW" | sort -u)
+fi
+
+# Binary search over the sorted, deduplicated GUID list. GUIDs are fixed-length (32 hex chars), so
+# lexicographic `[[ < ]]` string comparison agrees with their natural order.
+guid_known() {
+    local target="$1"
+    local lo=0 hi=$(( ${#KNOWN_GUIDS_SORTED[@]} - 1 ))
+    local mid val
+    while (( lo <= hi )); do
+        mid=$(( (lo + hi) / 2 ))
+        val="${KNOWN_GUIDS_SORTED[$mid]}"
+        if [[ "$val" == "$target" ]]; then
+            return 0
+        elif [[ "$val" < "$target" ]]; then
+            lo=$(( mid + 1 ))
+        else
+            hi=$(( mid - 1 ))
+        fi
+    done
+    return 1
+}
+
+info_msg "Indexed $meta_count .meta files (${#KNOWN_GUIDS_SORTED[@]} unique GUIDs)."
 echo ""
 
 # ---------------------------------------------------------------------------
@@ -127,7 +166,7 @@ report() {
     local rel="${file#"$PROJECT_ROOT/"}"
     echo "  ${RED}[$type]${RESET} ${rel}:${lineno}"
     echo "    ${YELLOW}${detail}${RESET}"
-    ((total_issues++))
+    (( total_issues += 1 ))
 }
 
 # ---------------------------------------------------------------------------
@@ -139,7 +178,7 @@ echo ""
 process_file() {
     local filepath="$1"
     local rel="${filepath#"$PROJECT_ROOT/"}"
-    ((files_scanned++))
+    (( files_scanned += 1 ))
 
     # --- Null/zero GUIDs ---
     while IFS=: read -r lineno line; do
@@ -147,7 +186,7 @@ process_file() {
         # Match guid: followed by all zeros (either 16 or 32 hex digits)
         if echo "$line" | grep -qE 'guid:\s*(0{16}|0{32})'; then
             report "NULL GUID" "$filepath" "$lineno" "$(echo "$line" | sed 's/^[[:space:]]*//')"
-            ((null_guid_count++))
+            (( null_guid_count += 1 ))
         fi
     done < <(grep -n 'guid:' "$filepath" 2>/dev/null || true)
 
@@ -155,14 +194,17 @@ process_file() {
     while IFS=: read -r lineno line; do
         [[ -z "$lineno" ]] && continue
         report "MISSING SCRIPT" "$filepath" "$lineno" "$(echo "$line" | sed 's/^[[:space:]]*//')"
-        ((missing_script_count++))
+        (( missing_script_count += 1 ))
     done < <(grep -n 'm_Script:\s*{fileID:\s*0}' "$filepath" 2>/dev/null || true)
 
     # --- Dangling script GUIDs ---
     while IFS=: read -r lineno line; do
         [[ -z "$lineno" ]] && continue
-        # Extract the GUID from m_Script: {fileID: 11500000, guid: <GUID>, ...}
-        guid=$(echo "$line" | grep -oP 'guid:\s*\K[0-9a-fA-F]+' || true)
+        # Extract the GUID from m_Script: {fileID: 11500000, guid: <GUID>, ...}. Not `grep -oP
+        # ... \K` (GNU-only PCRE): the matched line always contains exactly one "guid:" (it is
+        # already filtered to lines matching the literal `m_Script: {fileID: 11500000, guid:`
+        # prefix below), so a greedy `sed` up to that single occurrence is unambiguous.
+        guid=$(printf '%s\n' "$line" | sed -n 's/.*guid:[[:space:]]*\([0-9a-fA-F]*\).*/\1/p')
         if [[ -z "$guid" ]]; then
             continue
         fi
@@ -170,10 +212,10 @@ process_file() {
         if [[ "$guid" =~ ^0+$ ]]; then
             continue
         fi
-        # Check if GUID exists in our index
-        if [[ -z "${KNOWN_GUIDS[$guid]:-}" ]]; then
+        # Check if GUID exists in our index (binary search — see guid_known() above)
+        if ! guid_known "$guid"; then
             report "DANGLING GUID" "$filepath" "$lineno" "Script GUID $guid not found in any .meta file"
-            ((dangling_guid_count++))
+            (( dangling_guid_count += 1 ))
         fi
     done < <(grep -n 'm_Script:\s*{fileID:\s*11500000,\s*guid:' "$filepath" 2>/dev/null || true)
 }
