@@ -122,7 +122,7 @@ else
       -d "$MCP_REQ" 2>/dev/null || true)
   if [ -z "$MCP_RESP" ]; then
     warn "Nothing answered at $MCP_URL — open Unity and start the bridge (Window > MCP for Unity)."
-  elif printf '%s' "$MCP_RESP" | grep -q '"jsonrpc"'; then
+  elif grep -q '"jsonrpc"' <<< "$MCP_RESP"; then
     SRV=$(printf '%s' "$MCP_RESP" | sed -n 's/.*"serverInfo"[^{]*{[^}]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
     pass "MCP bridge answered at $MCP_URL${SRV:+ (${SRV})}"
   else

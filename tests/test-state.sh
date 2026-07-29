@@ -11,7 +11,11 @@ source "${SCRIPT_DIR}/run-tests.sh" --source-only 2>/dev/null || true
 if ! type assert_eq &>/dev/null 2>&1; then
     TESTS_RUN=0; TESTS_PASSED=0; TESTS_FAILED=0
     assert_eq() { TESTS_RUN=$((TESTS_RUN+1)); if [ "$1" = "$2" ]; then TESTS_PASSED=$((TESTS_PASSED+1)); echo "PASS: $3"; else TESTS_FAILED=$((TESTS_FAILED+1)); echo "FAIL: $3 (expected '$2', got '$1')"; fi; }
-    assert_contains() { TESTS_RUN=$((TESTS_RUN+1)); if echo "$1" | grep -qF "$2"; then TESTS_PASSED=$((TESTS_PASSED+1)); echo "PASS: $3"; else TESTS_FAILED=$((TESTS_FAILED+1)); echo "FAIL: $3 (expected to contain '$2')"; fi; }
+    # Mirrors the fixed assert_contains in run-tests.sh: a piped `echo "$1" | grep -qF` lets
+    # grep exit (and SIGPIPE the writer) before a large haystack is fully written, which
+    # `set -euo pipefail` then reports as a failure the needle never actually caused. Use a
+    # here-string instead — bash writes it before grep ever runs.
+    assert_contains() { TESTS_RUN=$((TESTS_RUN+1)); if grep -qF -- "$2" <<< "$1"; then TESTS_PASSED=$((TESTS_PASSED+1)); echo "PASS: $3"; else TESTS_FAILED=$((TESTS_FAILED+1)); echo "FAIL: $3 (expected to contain '$2')"; fi; }
     assert_file_exists() { TESTS_RUN=$((TESTS_RUN+1)); if [ -f "$1" ]; then TESTS_PASSED=$((TESTS_PASSED+1)); echo "PASS: $2"; else TESTS_FAILED=$((TESTS_FAILED+1)); echo "FAIL: $2 (file not found: $1)"; fi; }
 fi
 

@@ -34,7 +34,9 @@ SETTINGS_CONTENT=$(cat "$PROJECT_ROOT/.claude/settings.json")
 for hook_file in "$PROJECT_ROOT/.claude/hooks/"*.sh; do
     basename=$(basename "$hook_file")
     if [ "$basename" = "_lib.sh" ]; then continue; fi
-    if ! echo "$SETTINGS_CONTENT" | grep -q "$basename"; then
+    # SETTINGS_CONTENT is the whole settings.json — big enough in principle to exceed
+    # PIPE_BUF, so this must not go through a pipe (see tests/run-tests.sh assert_contains).
+    if ! grep -q "$basename" <<< "$SETTINGS_CONTENT"; then
         echo "  UNREFERENCED: $basename"
         UNREFERENCED=$((UNREFERENCED + 1))
     fi

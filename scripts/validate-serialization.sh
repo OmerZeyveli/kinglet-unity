@@ -162,9 +162,11 @@ while IFS= read -r FILE; do
         [[ -z "$OLD_FIELD" ]] && continue
 
         # Check if the field still exists in the new version
-        if ! echo "$NEW_FIELDS" | grep -qx "$OLD_FIELD"; then
+        if ! grep -qx "$OLD_FIELD" <<< "$NEW_FIELDS"; then
             # Field was removed or renamed — check for FormerlySerializedAs
-            if ! echo "$NEW_CONTENT" | grep -q "FormerlySerializedAs.*\"$OLD_FIELD\""; then
+            # NEW_CONTENT is the whole file's text — large enough to exceed PIPE_BUF, so this
+            # must not go through a pipe (see tests/run-tests.sh assert_contains for why).
+            if ! grep -q "FormerlySerializedAs.*\"$OLD_FIELD\"" <<< "$NEW_CONTENT"; then
                 echo "${YELLOW}WARNING${RESET}: ${BOLD}$FILE${RESET}"
                 echo "  Serialized field '${RED}$OLD_FIELD${RESET}' was removed/renamed without [FormerlySerializedAs(\"$OLD_FIELD\")]"
                 echo "  This will silently reset values in all scenes, prefabs, and ScriptableObjects."
