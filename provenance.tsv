@@ -43,7 +43,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/commands/sprint-plan.md	donchitos	984023d	.claude/skills/sprint-plan/SKILL.md	d402a9f276f81663c8b07f6c4fd2b19a3fa9d4ee9411e3d57e6868daa095ee42	modified	skill-to-ecu-command
 .claude/commands/unity-audit.md	ecu	1.5.0	.claude/commands/unity-audit.md	bbc58f9480952ec81089b59f9541719a01e5418cb234d1ae0c76326cddfa5f4b	verbatim	-
 .claude/commands/unity-build.md	ecu	1.5.0	.claude/commands/unity-build.md	93023918c4632922e10c0dfe8d9ea72627973a00c3f039b30d46c83890f18acf	modified	mobile-strip
-.claude/commands/unity-doctor.md	ecu	1.5.0	.claude/commands/unity-doctor.md	9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588	verbatim	-
+.claude/commands/unity-doctor.md	ecu	1.5.0	.claude/commands/unity-doctor.md	9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588	modified	mcp-config-location: Check 1 pointed at .claude/settings.json for mcpServers.unityMCP.url, which install.sh no longer writes there (Task 2 moved it to .mcp.json at the project root); corrected to match what install.sh actually writes
 .claude/commands/unity-feature.md	ecu	1.5.0	.claude/commands/unity-feature.md	b90e90bee6f79efc42a4a206d1da869d349b0ca4a10740e257626361e8a30ee2	verbatim	-
 .claude/commands/unity-fix.md	ecu	1.5.0	.claude/commands/unity-fix.md	93509f96278a765492e4cfc6c5ad465c765c2382709e136c5a6f1d04509293b1	verbatim	-
 .claude/commands/unity-init.md	ecu	1.5.0	.claude/commands/unity-init.md	f12a6810e7ca56fdfb9cfff531fa9ae610da64535edf5a0e02d175b6243d8bb7	verbatim	-

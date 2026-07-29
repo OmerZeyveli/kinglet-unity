@@ -170,7 +170,7 @@ Run `/unity-doctor` as a first troubleshooting step. It checks MCP connectivity,
 - Confirm the server is running: check Unity's MCP for Unity window
 - Verify `localhost:8080` is reachable: `curl http://localhost:8080/mcp`
 - Check for port conflicts: another service on 8080
-- Ensure `settings.json` has the correct `mcpServers` block
+- Ensure `.mcp.json` (project root) has the correct `mcpServers` block
 - See [MCP-SETUP.md](MCP-SETUP.md) for detailed troubleshooting
 
 ### Permission Issues
