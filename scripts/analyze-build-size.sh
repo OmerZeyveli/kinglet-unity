@@ -164,10 +164,18 @@ parse_size_to_kb() {
 }
 
 # Parse the build report for asset lines
+#
+# The regex is a variable, not an inline literal in the `[[ =~ ]]` test: unpatched bash 3.2 fails
+# to parse an unquoted literal regex containing parenthesised groups here with a hard syntax error
+# ("unexpected token `('"), found while proving this script runs under bash 3.2 for Task 11's
+# Step 4. A regex held in a variable and referenced unquoted (`=~ $line_re`, not `=~ "$line_re"` —
+# quoting it would make bash match it as a literal string instead of a pattern) parses on both 3.2
+# and later bash.
+line_re='^[[:space:]]*([0-9]+\.?[0-9]*)[[:space:]]*(kb|mb|gb|b)[[:space:]]+([0-9]+\.?[0-9]*)%[[:space:]]+(.*)'
 line_count=0
 while IFS= read -r line; do
     # Match lines like: " 2.1 mb	 3.2% Assets/..."
-    if [[ "$line" =~ ^[[:space:]]*([0-9]+\.?[0-9]*)[[:space:]]*(kb|mb|gb|b)[[:space:]]+([0-9]+\.?[0-9]*)%[[:space:]]+(.*) ]]; then
+    if [[ "$line" =~ $line_re ]]; then
         size_num="${BASH_REMATCH[1]}"
         size_unit="${BASH_REMATCH[2]}"
         percentage="${BASH_REMATCH[3]}"
@@ -178,7 +186,7 @@ while IFS= read -r line; do
         ASSET_LINES+=("$(printf '%012.2f|%s %s|%s%%|%s' "$size_kb" "$size_num" "$size_unit" "$percentage" "$asset_path")")
         ASSET_SIZES_KB+=("$size_kb")
         ASSET_PATHS+=("$asset_path")
-        ((line_count++))
+        (( line_count += 1 ))
     fi
 done <<< "$BUILD_REPORT"
 
@@ -248,7 +256,7 @@ for i in "${!ASSET_PATHS[@]}"; do
         if (( $(echo "$size_kb > 2048" | bc 2>/dev/null || echo 0) )); then
             echo "  ${RED}[LARGE TEXTURE]${RESET} $(echo "scale=1; $size_kb / 1024" | bc) MB - $path"
             echo "    ${CYAN}Consider: compress texture, reduce resolution, or use crunch compression.${RESET}"
-            ((issue_count++))
+            (( issue_count += 1 ))
         fi
     fi
 
@@ -257,7 +265,7 @@ for i in "${!ASSET_PATHS[@]}"; do
         if (( $(echo "$size_kb > 1024" | bc 2>/dev/null || echo 0) )); then
             echo "  ${RED}[UNCOMPRESSED AUDIO]${RESET} $(echo "scale=1; $size_kb / 1024" | bc) MB - $path"
             echo "    ${CYAN}Consider: use Vorbis/MP3 compression in the Audio import settings.${RESET}"
-            ((issue_count++))
+            (( issue_count += 1 ))
         fi
     fi
 
@@ -266,7 +274,7 @@ for i in "${!ASSET_PATHS[@]}"; do
         if (( $(echo "$size_kb > 5120" | bc 2>/dev/null || echo 0) )); then
             echo "  ${YELLOW}[LARGE MESH]${RESET} $(echo "scale=1; $size_kb / 1024" | bc) MB - $path"
             echo "    ${CYAN}Consider: reduce polygon count, use LODs, or optimize mesh in DCC tool.${RESET}"
-            ((issue_count++))
+            (( issue_count += 1 ))
         fi
     fi
 
@@ -275,7 +283,7 @@ for i in "${!ASSET_PATHS[@]}"; do
         if (( $(echo "$size_kb > 10240" | bc 2>/dev/null || echo 0) )); then
             echo "  ${YELLOW}[LARGE VIDEO]${RESET} $(echo "scale=1; $size_kb / 1024" | bc) MB - $path"
             echo "    ${CYAN}Consider: reduce resolution/bitrate or stream from a URL instead.${RESET}"
-            ((issue_count++))
+            (( issue_count += 1 ))
         fi
     fi
 done
@@ -285,7 +293,7 @@ for path in "${ASSET_PATHS[@]}"; do
     if echo "$path" | grep -qi '/Editor/'; then
         echo "  ${YELLOW}[EDITOR ASSET IN BUILD]${RESET} $path"
         echo "    ${CYAN}Assets under Editor/ folders should not appear in builds. Check your build settings.${RESET}"
-        ((issue_count++))
+        (( issue_count += 1 ))
     fi
 done
 
@@ -301,8 +309,13 @@ echo ""
 echo "${BOLD}--- Category Breakdown ---${RESET}"
 echo ""
 
-declare -A CATEGORY_SIZE
+# CATEGORY_SIZE is a parallel indexed array, not `declare -A`: associative arrays need bash 4, and
+# macOS still ships bash 3.2. `categories` is already a fixed, ordered indexed array, so
+# CATEGORY_SIZE[i] is the running total for categories[i] — an exact substitution.
 categories=("Textures" "Audio" "Meshes" "Scripts" "Shaders" "Animations" "Fonts" "Other")
+CATEGORY_SIZE=(0 0 0 0 0 0 0 0)
+CATEGORY_TEXTURES=0; CATEGORY_AUDIO=1; CATEGORY_MESHES=2; CATEGORY_SCRIPTS=3
+CATEGORY_SHADERS=4; CATEGORY_ANIMATIONS=5; CATEGORY_FONTS=6; CATEGORY_OTHER=7
 
 for path in "${ASSET_PATHS[@]}"; do
     idx=-1
@@ -316,26 +329,27 @@ for path in "${ASSET_PATHS[@]}"; do
     size_kb="${ASSET_SIZES_KB[$idx]}"
 
     if echo "$path" | grep -qiE '\.(png|jpg|jpeg|tga|psd|tif|tiff|bmp|exr|tex)'; then
-        CATEGORY_SIZE["Textures"]=$(echo "${CATEGORY_SIZE["Textures"]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
+        CATEGORY_SIZE[CATEGORY_TEXTURES]=$(echo "${CATEGORY_SIZE[CATEGORY_TEXTURES]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
     elif echo "$path" | grep -qiE '\.(wav|mp3|ogg|aiff|aif|flac)'; then
-        CATEGORY_SIZE["Audio"]=$(echo "${CATEGORY_SIZE["Audio"]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
+        CATEGORY_SIZE[CATEGORY_AUDIO]=$(echo "${CATEGORY_SIZE[CATEGORY_AUDIO]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
     elif echo "$path" | grep -qiE '\.(fbx|obj|blend|dae|3ds|mesh)'; then
-        CATEGORY_SIZE["Meshes"]=$(echo "${CATEGORY_SIZE["Meshes"]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
+        CATEGORY_SIZE[CATEGORY_MESHES]=$(echo "${CATEGORY_SIZE[CATEGORY_MESHES]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
     elif echo "$path" | grep -qiE '\.(cs|dll)'; then
-        CATEGORY_SIZE["Scripts"]=$(echo "${CATEGORY_SIZE["Scripts"]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
+        CATEGORY_SIZE[CATEGORY_SCRIPTS]=$(echo "${CATEGORY_SIZE[CATEGORY_SCRIPTS]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
     elif echo "$path" | grep -qiE '\.(shader|shadergraph|hlsl|cginc|compute)'; then
-        CATEGORY_SIZE["Shaders"]=$(echo "${CATEGORY_SIZE["Shaders"]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
+        CATEGORY_SIZE[CATEGORY_SHADERS]=$(echo "${CATEGORY_SIZE[CATEGORY_SHADERS]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
     elif echo "$path" | grep -qiE '\.(anim|controller|overridecontroller)'; then
-        CATEGORY_SIZE["Animations"]=$(echo "${CATEGORY_SIZE["Animations"]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
+        CATEGORY_SIZE[CATEGORY_ANIMATIONS]=$(echo "${CATEGORY_SIZE[CATEGORY_ANIMATIONS]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
     elif echo "$path" | grep -qiE '\.(ttf|otf|fontsettings)'; then
-        CATEGORY_SIZE["Fonts"]=$(echo "${CATEGORY_SIZE["Fonts"]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
+        CATEGORY_SIZE[CATEGORY_FONTS]=$(echo "${CATEGORY_SIZE[CATEGORY_FONTS]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
     else
-        CATEGORY_SIZE["Other"]=$(echo "${CATEGORY_SIZE["Other"]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
+        CATEGORY_SIZE[CATEGORY_OTHER]=$(echo "${CATEGORY_SIZE[CATEGORY_OTHER]:-0} + $size_kb" | bc 2>/dev/null || echo "0")
     fi
 done
 
-for cat in "${categories[@]}"; do
-    size_kb="${CATEGORY_SIZE[$cat]:-0}"
+for i in "${!categories[@]}"; do
+    cat="${categories[$i]}"
+    size_kb="${CATEGORY_SIZE[$i]:-0}"
     if (( $(echo "$size_kb > 0" | bc 2>/dev/null || echo 0) )); then
         if (( $(echo "$size_kb > 1024" | bc 2>/dev/null || echo 0) )); then
             printf "  %-14s %8.1f MB\n" "$cat:" "$(echo "scale=1; $size_kb / 1024" | bc)"

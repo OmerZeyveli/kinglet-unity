@@ -90,8 +90,11 @@ echo ""
 
 # ---------------------------------------------------------------------------
 # Counters
+#
+# COUNTS is a parallel indexed array, not `declare -A`: associative arrays need bash 4, and macOS
+# still ships bash 3.2. CATEGORIES is already a fixed, ordered indexed array, so COUNTS[i] is the
+# count for CATEGORIES[i] — an exact substitution, no lookup table needed.
 # ---------------------------------------------------------------------------
-declare -A COUNTS
 CATEGORIES=(
     "GetComponent-in-Update"
     "Camera.main-uncached"
@@ -103,11 +106,27 @@ CATEGORIES=(
     "Unguarded-Debug.Log"
     "foreach-array-in-Update"
 )
-for cat in "${CATEGORIES[@]}"; do
-    COUNTS["$cat"]=0
+COUNTS=()
+for ((init_idx = 0; init_idx < ${#CATEGORIES[@]}; init_idx++)); do
+    COUNTS[init_idx]=0
 done
 
 total_issues=0
+
+# ---------------------------------------------------------------------------
+# Helper: find the index of a category name in CATEGORIES.
+# ---------------------------------------------------------------------------
+category_index() {
+    local target="$1"
+    local i
+    for ((i = 0; i < ${#CATEGORIES[@]}; i++)); do
+        if [[ "${CATEGORIES[$i]}" == "$target" ]]; then
+            echo "$i"
+            return 0
+        fi
+    done
+    return 1
+}
 
 # ---------------------------------------------------------------------------
 # Helper: report an issue
@@ -118,8 +137,16 @@ report() {
     echo "    ${RED}> ${line}${RESET}"
     echo "    ${CYAN}Fix: ${fix}${RESET}"
     echo ""
-    COUNTS["$category"]=$(( ${COUNTS["$category"]} + 1 ))
-    ((total_issues++))
+    local idx
+    idx=$(category_index "$category")
+    COUNTS[idx]=$(( ${COUNTS[idx]} + 1 ))
+    # `(( total_issues += 1 ))`, not `((total_issues++))`: post-increment evaluates to the OLD
+    # value, so when the counter is 0 (its first hit) the arithmetic command's exit status is
+    # non-zero (false) and `set -e` aborts the whole script — silently, before any issue is ever
+    # reported. Found while proving this script runs at all under Task 11's Step 4; pre-existing,
+    # not part of the bash-3.2 conversion, but it blocks every counter in this file from ever
+    # completing a single scan, so it is fixed here rather than reported and left broken.
+    (( total_issues += 1 ))
 }
 
 # ---------------------------------------------------------------------------
@@ -130,9 +157,24 @@ report() {
 # ---------------------------------------------------------------------------
 is_in_update_method() {
     local file="$1" target_line="$2"
-    # Extract lines before target_line, reversed, look for method signature
+    # Extract lines before target_line, reversed, look for method signature.
+    #
+    # NOT `head -n "$target_line" "$file" | tac | head -n 100`: when target_line exceeds 100 (any
+    # method past line 100 of a file), the final `head` reads its 100 lines and exits, closing the
+    # pipe while `tac` may still be writing. Under `set -euo pipefail` that SIGPIPE (141) becomes
+    # the pipeline's exit status and `set -e` aborts the whole script — silently, on exactly the
+    # large-file case this scanner exists to handle. One awk pass reads the file once and prints the
+    # same window (the up-to-100 lines immediately before target_line, in descending order) without
+    # a second reader that can outrun the first.
     local context
-    context=$(head -n "$target_line" "$file" | tac | head -n 100)
+    context=$(awk -v end="$target_line" -v n=100 '
+        NR <= end { buf[NR] = $0 }
+        END {
+            start = end - n + 1
+            if (start < 1) start = 1
+            for (i = end; i >= start; i--) if (i in buf) print buf[i]
+        }
+    ' "$file")
     local brace_depth=0
     while IFS= read -r cline; do
         # Count braces to find method boundary
@@ -169,7 +211,7 @@ is_editor_file() {
 # ---------------------------------------------------------------------------
 file_count=0
 while IFS= read -r -d '' csfile; do
-    ((file_count++))
+    (( file_count += 1 ))
     rel_path="${csfile#"$SCAN_DIR/"}"
 
     # --- 1. GetComponent in Update ---
@@ -282,8 +324,9 @@ echo "  Files scanned: $file_count"
 echo ""
 
 has_issues=false
-for cat in "${CATEGORIES[@]}"; do
-    count=${COUNTS["$cat"]}
+for ((summary_idx = 0; summary_idx < ${#CATEGORIES[@]}; summary_idx++)); do
+    cat="${CATEGORIES[$summary_idx]}"
+    count=${COUNTS[$summary_idx]}
     if (( count > 0 )); then
         echo "  ${YELLOW}${cat}${RESET}: $count"
         has_issues=true
