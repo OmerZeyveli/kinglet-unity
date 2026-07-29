@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review.",
-  "source_commit": "ef518c618f2661a8af789c80f540a8d003b73e1c",
+  "source_commit": "15d09c64894a441b9918a96d74d0f4f5daa307d4",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 147,
@@ -353,7 +353,7 @@
       },
       {
         "path": ".claude/hooks/bash-gate.sh",
-        "sha256": "4c4590a8c0ee8509c1b8dbb88dfdeb8cfa84f1be6f0b7c180088a5c408506056",
+        "sha256": "b34771345f8c49a22c6ce1e53fd2c705c29d221eee48d96faed9aab224212cf4",
         "git_mode": "100755"
       },
       {
@@ -1288,7 +1288,7 @@
         },
         {
           "path": ".claude/hooks/bash-gate.sh",
-          "sha256": "4c4590a8c0ee8509c1b8dbb88dfdeb8cfa84f1be6f0b7c180088a5c408506056",
+          "sha256": "b34771345f8c49a22c6ce1e53fd2c705c29d221eee48d96faed9aab224212cf4",
           "git_mode": "100755"
         },
         {
