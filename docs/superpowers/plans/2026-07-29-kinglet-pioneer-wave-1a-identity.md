@@ -14,19 +14,71 @@
 - **Never pipe into `head`** under `set -euo pipefail`. Read with `awk` instead.
 - **Validate an argument before `shift 2`** — `shift` fails under `set -u` before an error message can print.
 - **`scripts/check-provenance.sh` must pass at every commit.** A red manifest is a failed change, not a follow-up.
-- **`bash tests/run-tests.sh` must pass at every commit.** It currently reports 99 assertions across 8 files; after this plan it is 9 files. Confirm every file still appears in the output — the runner has silently skipped files before.
+- **`bash tests/run-tests.sh` must pass by the end of Task 3.** It goes red in between, and that is expected and ruled on below. Confirm every test file still appears in the output — the runner has silently skipped files before, reporting green while running one of eight.
+  - At the base commit `c35d0e5` it is **already red**: `test_active_legacy_product_positioning_matches_grandfathered_baseline` fails because the Pioneer spec and this plan were committed, and both discuss the retired name at length. That failure is inherited, not introduced.
+  - Tasks 1 and 2 each edit files under `.claude/`, which adds `sha256 drift` failures to `test_full_claude_tree_baseline_covers_all_147_tracked_files`. Also expected.
+  - **Task 3 is what makes it green**, and no task may be considered complete on the grounds that the suite was already red — each task's own new assertions must pass, and the failure list must contain nothing but the two baseline tests named here.
 - **Upstream attribution is untouched.** Every mention of Everything Claude Unity, Claude-Code-Game-Studios, XeldarAlz, Donchitos, CoplayDev, their repository URLs, their commits, and their MIT notices survives verbatim. This rename changes our name, not theirs.
 - **Do NOT edit these files.** They contain `cloud-nine` legitimately and permanently:
 
   | Path | Why |
   |---|---|
-  | `migration/baseline-inventory.json` | Evidence anchored at commit `72e4218b8837e295ece20b17cd38aa26c58298fb`. `tools/kinglet_build/baseline.py` verifies it with `git ls-tree` + `git cat-file` **at that commit**, so the working tree cannot invalidate it — but editing the record would. |
+  | ~~`migration/baseline-inventory.json`~~ | **Superseded — see the ruling below. Task 3 edits this file deliberately.** |
   | `docs/superpowers/plans/2026-07-22-*.md` | Frozen history. Superseded, must not be executed, must not be rewritten. |
   | `docs/superpowers/specs/2026-07-22-kinglet-for-unity-design.md` | Same. |
   | `docs/superpowers/specs/2026-07-29-kinglet-pioneer-design.md` | Describes the rename; the old name is the subject matter. |
   | `docs/superpowers/plans/2026-07-29-kinglet-pioneer-wave-1a-identity.md` | This file, for the same reason. |
 
 - **Provenance status transitions: none.** Every file this plan edits is already `origin=original status=original` or already `status=modified`. Verified against `provenance.tsv`. New files added by this plan need a new row with `origin=original`, `status=original`.
+
+## Ruling: the baseline is advanced, and the legacy scanner is retired
+
+**Amended 2026-07-29, after Task 1, by the project owner.** This section overrides the original
+"do not edit `migration/baseline-inventory.json`" constraint above.
+
+### What the original constraint got wrong
+
+`tools/kinglet_build/baseline.py::source_commit_errors` reads blobs with `git ls-tree` and
+`git cat-file` **at the anchored commit**, so the working tree genuinely cannot invalidate it. That
+much was right. What it missed is that `tests/kinglet/test_baseline_inventory.py` runs **two more
+checks against the working tree**:
+
+| Check | Reads | Breaks when |
+|---|---|---|
+| `test_full_claude_tree_baseline_covers_all_147_tracked_files` | the sha256 of every `.claude/**` file **in the working tree** | any payload file is edited |
+| `test_active_legacy_product_positioning_matches_grandfathered_baseline` | 49 pinned occurrences of the retired name, with their text | any occurrence is added or removed |
+
+The second is a **rename guard that already existed**, and its policy states its own purpose:
+
+> *"Plan 01 preserves the active cloud-nine-unity identity **until the public rename in Plan 06**.
+> Historical paths and explicit legacy-marker test occurrences are permitted; every other current
+> occurrence is grandfathered exactly, and new active occurrences or paths **require an intentional
+> baseline update**."*
+
+So the rename was always foreseen — as Plan 06, which is now frozen history that must not be
+executed. The guard does not know that, and is still holding the line for a plan that will never
+run. It also left the door open by name: *an intentional baseline update*. This rename is that.
+
+### The ruling
+
+1. **Advance the baseline.** Move `source_commit` to the commit that completes the payload rename
+   and regenerate `full_claude_tree` from it, so both the at-commit check and the working-tree
+   check agree again.
+2. **Retire `legacy_product_positioning` entirely** — the JSON section, the scanner that reads it,
+   and the tests that exercise the scanner. Its job was to hold the old identity until the rename;
+   the rename is now, and afterwards it would pin 49 occurrences of a name that no longer exists.
+3. **Task 2's guard is its replacement, not a duplicate.** Retiring an audit mechanism at the exact
+   moment it proved useful, and leaving nothing behind, would be strictly worse than not renaming.
+   Task 2's assertion is the successor and it is simpler by design: the goal state is *zero*
+   occurrences outside a short recorded exclusion list, so an absence check expresses it, where
+   pinning 49 occurrences with their surrounding text no longer expresses anything.
+
+### Also recorded
+
+The base commit `c35d0e5` was already red. Committing the Pioneer spec and this plan — both of
+which discuss the retired name throughout — added occurrences the grandfathered list did not have.
+`scripts/check-provenance.sh` was run after those commits and `tests/run-tests.sh` was not, which is
+how it went unnoticed until Task 1's implementer reported it.
 
 ## Deviation from the spec, recorded
 
@@ -398,6 +450,125 @@ produce something called Kinglet."
 ```
 
 ---
+
+### Task 3: Advance the baseline and retire the legacy scanner
+
+Makes the suite green again, per the ruling above. Runs **last**, because it records the state of
+`.claude/**` and Tasks 1 and 2 are what change it.
+
+**Files:**
+- Modify: `migration/baseline-inventory.json` — `source_commit`, the `full_claude_tree.files`
+  sha256 entries for every file Tasks 1 and 2 edited, and deletion of the whole
+  `legacy_product_positioning` object
+- Modify: `tests/kinglet/test_baseline_inventory.py` — delete `is_legacy_marker_occurrence` (~line
+  136), `identity_occurrences` (~line 155), `test_active_legacy_product_positioning_matches_grandfathered_baseline` (~line 432), `scan_identity_fixture` (~line 442), and the six fixture tests that call it (~lines 462, 479, 488, 495, 504, 523)
+
+**Interfaces:**
+- Consumes: the final payload byte-state produced by Tasks 1 and 2. Nothing in this task is correct
+  until both are committed.
+- Produces: a green `tests/run-tests.sh`. Nothing later consumes it — this is the last task.
+
+- [ ] **Step 1: Confirm the failure list is exactly what the ruling predicts**
+
+Run: `bash tests/run-tests.sh 2>&1 | grep '^FAIL:'`
+
+Expected: exactly two lines —
+`test_active_legacy_product_positioning_matches_grandfathered_baseline` and
+`test_full_claude_tree_baseline_covers_all_147_tracked_files`.
+
+**If any other test appears, stop and report BLOCKED.** Tasks 1 and 2 were supposed to break these
+two and nothing else; a third failure means something was damaged, and regenerating a baseline over
+damage would bake it in permanently. This step is the only thing standing between a deliberate
+baseline advance and a laundered regression.
+
+- [ ] **Step 2: Delete the scanner and its tests**
+
+In `tests/kinglet/test_baseline_inventory.py`, delete the two module-level helpers
+`is_legacy_marker_occurrence` and `identity_occurrences`, the method `scan_identity_fixture`, and
+these seven test methods:
+
+```
+test_active_legacy_product_positioning_matches_grandfathered_baseline
+test_legacy_marker_exception_is_per_occurrence_for_begin_and_end
+```
+plus the five remaining methods whose bodies call `self.scan_identity_fixture(...)`. Find them with:
+
+```bash
+awk '/def test_/{name=$2} /scan_identity_fixture/{print name}' tests/kinglet/test_baseline_inventory.py | sort -u
+```
+
+Delete nothing else. `full_tree_errors`, `source_commit_errors`, the category checks, and the
+`.github/workflows/ci.yml` assertion all stay. Remove any import left unused by the deletion.
+
+- [ ] **Step 3: Delete the JSON section**
+
+Remove the entire `legacy_product_positioning` object from `migration/baseline-inventory.json`,
+including its `term`, `policy`, `historical_exact_paths`, `historical_path_prefixes`,
+`legacy_marker_test_path_prefix`, `legacy_marker_tokens`, and `grandfathered_active_occurrences`
+keys. Leave `schema_version`, `description`, `source_commit`, `full_claude_tree`, and `categories`.
+
+- [ ] **Step 4: Run the tests — one failure must remain**
+
+Run: `bash tests/run-tests.sh 2>&1 | grep '^FAIL:'`
+
+Expected: exactly one line, `test_full_claude_tree_baseline_covers_all_147_tracked_files`. The
+positioning failure is gone because its test is gone.
+
+If it is still listed, the deletion was incomplete. If the drift failure disappeared too, something
+is wrong — stop and report, because the drift is real and must be fixed by Step 5, not by deleting
+the check that finds it.
+
+- [ ] **Step 5: Commit the payload state, then advance the anchor**
+
+This is deliberately two commits. `source_commit` must name a commit that already exists and whose
+tree contains the renamed payload, so the anchor cannot be written in the same commit it points at.
+
+```bash
+git add migration/baseline-inventory.json tests/kinglet/test_baseline_inventory.py
+git commit -m "test: retire the legacy-identity scanner along with the identity it guarded"
+ANCHOR=$(git rev-parse HEAD)
+echo "$ANCHOR"
+```
+
+Now regenerate `full_claude_tree` against `$ANCHOR`. For every entry in
+`full_claude_tree.files`, `sha256` must equal the sha256 of that path's blob **at `$ANCHOR`**, and
+`git_mode` its mode there. Set `source_commit` to `$ANCHOR`. Verify the regenerated file is valid
+JSON and that `expected_count` still equals the number of entries:
+
+```bash
+python3 -c "
+import json
+d = json.load(open('migration/baseline-inventory.json'))
+t = d['full_claude_tree']
+assert t['expected_count'] == len(t['files']), (t['expected_count'], len(t['files']))
+assert 'legacy_product_positioning' not in d, 'scanner section still present'
+print('anchor', d['source_commit'], '| files', len(t['files']))
+"
+```
+
+- [ ] **Step 6: Run the full suite and confirm green**
+
+Run: `bash tests/run-tests.sh`
+
+Expected: PASS, zero failures, and every test file present in the output. Count the files.
+
+Run: `bash scripts/check-provenance.sh`
+Expected: `provenance OK`
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add migration/baseline-inventory.json
+git commit -m "chore: advance the migration baseline to the renamed payload
+
+The baseline's own policy left this door open by name — an intentional
+baseline update — while deferring the rename to Plan 06. Plan 06 is frozen
+history now, and the guard was still holding the line for a plan that will
+never run.
+
+Two commits, because source_commit must name a commit that already exists
+and whose tree carries the renamed payload."
+```
 
 ## What this plan does not do, and what unblocks it
 
