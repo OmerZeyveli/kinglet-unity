@@ -1,6 +1,6 @@
 # PC / Console Rules
 
-The platform spec for this toolkit. cloud-nine-unity ships **no mobile content** — the mobile skill
+The platform spec for this toolkit. Kinglet Pioneer ships **no mobile content** — the mobile skill
 and the mobile genre skills were removed at build time, not disabled (see `provenance-skip.tsv`), and
 the agents' mobile guidance was rewritten. So this file does not neutralize anything; it states what
 we target.

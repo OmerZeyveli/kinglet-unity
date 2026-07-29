@@ -1,5 +1,5 @@
 <!-- Adapted from Claude-Code-Game-Studios (Donchitos), MIT — https://github.com/Donchitos/Claude-Code-Game-Studios -->
-<!-- cloud-nine-unity game concept template (output of /brainstorm). Authored copy goes to docs/design/game-concept.md. -->
+<!-- Kinglet Pioneer game concept template (output of /brainstorm). Authored copy goes to docs/design/game-concept.md. -->
 
 # Game Concept: [Working Title]
 

@@ -17,7 +17,7 @@ are verifiable rather than asserted.
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) | adapted at `984023d`; reformatted to this toolkit's conventions | 8 design agents, 9 design commands, 5 templates |
 
 Files not attributable to either — `rules/pc-console.md`, this notice, and the manifest — are
-original to cloud-nine-unity, MIT, Copyright (c) 2026 OmerZeyveli.
+original to Kinglet Pioneer, MIT, Copyright (c) 2026 OmerZeyveli.
 
 The [CoplayDev Unity MCP bridge](https://github.com/CoplayDev/unity-mcp) is **not** included here.
 `settings.json` merely points at it on `localhost`; install it yourself via Package Manager.

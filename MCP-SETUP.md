@@ -1,6 +1,6 @@
 # MCP Setup — CoplayDev Unity MCP
 
-`cloud-nine-unity` uses **one** MCP server: CoplayDev's open-source **Unity MCP** bridge.
+`Kinglet Pioneer` uses **one** MCP server: CoplayDev's open-source **Unity MCP** bridge.
 
 The toolkit ships `.claude/settings.json` preconfigured — it already contains
 `mcpServers.unityMCP` → `http://localhost:8080/mcp`, which matches the bridge's default HTTP

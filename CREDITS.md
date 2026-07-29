@@ -1,6 +1,6 @@
 # Credits & Third-Party Licenses
 
-`cloud-nine-unity` is built out of two excellent open-source projects, both MIT-licensed. It does not
+`Kinglet Pioneer` is built out of two excellent open-source projects, both MIT-licensed. It does not
 merely depend on them — it **contains** them. Attribution is therefore an obligation, not a courtesy.
 
 `provenance.tsv` at the repo root records, for every tracked file, which upstream it came from,
@@ -27,7 +27,7 @@ the copies.
 - **License:** MIT
 
 **ECU is the engineering backbone of this toolkit and its source is included here.** Earlier versions
-of cloud-nine-unity were an overlay that required you to install ECU separately and shipped none of
+of Kinglet Pioneer were an overlay that required you to install ECU separately and shipped none of
 its code. That is no longer true: the `unity-*` agents and commands, the skills, the hooks, the five
 spine rules in `.claude/rules/`, `settings.json`, and the repo's `scripts/`, `tests/`, `docs/`,
 `examples/`, and `templates/` are all ECU's work, vendored into this repository.
@@ -143,4 +143,4 @@ open-source bridge needs no API key (that is Coplay's separate commercial produc
 
 Files marked `origin=original` in `provenance.tsv` — `.claude/rules/pc-console.md`, the installer,
 the provenance tooling, the tests we added, and this documentation — are original to
-cloud-nine-unity: MIT, Copyright (c) 2026 OmerZeyveli. See `LICENSE`.
+Kinglet Pioneer: MIT, Copyright (c) 2026 OmerZeyveli. See `LICENSE`.

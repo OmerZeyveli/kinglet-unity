@@ -1,5 +1,5 @@
 <!-- Adapted from Claude-Code-Game-Studios (Donchitos), MIT — https://github.com/Donchitos/Claude-Code-Game-Studios -->
-<!-- cloud-nine-unity sprint plan template. Authored copies go to docs/production/sprints/. -->
+<!-- Kinglet Pioneer sprint plan template. Authored copies go to docs/production/sprints/. -->
 
 # Sprint [N] — [Start Date] to [End Date]
 

@@ -257,7 +257,7 @@ C# Source Files    Unity Editor
 4. **Hybrid Agents** -- both code and MCP access
    - `unity-coder`, `unity-coder-lite`, `unity-prototyper`, `unity-fixer`, `unity-fixer-lite`, `unity-optimizer`, `unity-shader-dev`, `unity-network-dev`, `unity-ui-builder`, `unity-verifier`
 
-5. **Design and Production Agents** (cloud-nine-unity overlay) -- author documentation under `docs/`, no code, no MCP
+5. **Design and Production Agents** (Kinglet Pioneer overlay) -- author documentation under `docs/`, no code, no MCP
    - `game-designer`, `systems-designer`, `level-designer`, `creative-director`, `technical-director`, `narrative-director`, `world-builder`, `writer`
 
 ---

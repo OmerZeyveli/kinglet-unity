@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# cloud-nine-unity — studio-doctor
+# Kinglet Pioneer — studio-doctor
 #
 # Health check for an installed toolkit and the environment it needs: Python/uv, the MCP bridge,
 # settings.json wiring, and the integrity of the install itself.
@@ -41,12 +41,12 @@ PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd)" || { printf 'Project direc
 CLAUDE_DIR="$PROJECT_DIR/.claude"
 RECEIPT="$CLAUDE_DIR/state/install-receipt.tsv"
 
-printf '%s\n' "${BOLD}cloud-nine-unity — studio-doctor${NC}"
+printf '%s\n' "${BOLD}Kinglet Pioneer — studio-doctor${NC}"
 printf 'Project: %s\n' "$PROJECT_DIR"
 if [ -f "$CLAUDE_DIR/VERSION" ]; then
   VER=$(cat "$CLAUDE_DIR/VERSION")
   ECU_VER=$(sed -n 's/^ecu=//p' "$CLAUDE_DIR/UPSTREAM" 2>/dev/null || echo '?')
-  printf 'Installed: cloud-nine-unity %s (vendored ECU %s)\n' "$VER" "$ECU_VER"
+  printf 'Installed: Kinglet Pioneer %s (vendored ECU %s)\n' "$VER" "$ECU_VER"
 fi
 printf '\n'
 
@@ -159,7 +159,7 @@ fi
 if [ ! -d "$CLAUDE_DIR" ]; then
   fail "No .claude/ directory — run install.sh --project-dir \"$PROJECT_DIR\"."
 elif [ ! -f "$RECEIPT" ]; then
-  warn "No install receipt. .claude/ exists but cloud-nine-unity did not write it here"
+  warn "No install receipt. .claude/ exists but Kinglet did not write it here"
   warn "     (a teammate's git clone will look like this — the receipt is machine-local)."
 else
   VERIFIED=0; MODIFIED=0; MISSING=0

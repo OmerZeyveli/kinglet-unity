@@ -61,4 +61,45 @@ for pid_script in "${REPO_DIR}/install.sh" "${REPO_DIR}/uninstall.sh" \
     assert_not_contains "$PID_BODY" "cloud-nine" "$(basename "$pid_script") carries no retired name"
 done
 
+# --- Guard: the retired name is gone from every file it should be gone from ---
+#
+# The exclusion list is not laziness. Each entry contains the old name for a
+# reason that outlives the rename:
+#   migration/baseline-inventory.json — evidence anchored at a commit; the
+#       baseline verifier reads blobs AT that commit, so the working tree
+#       cannot invalidate it, but editing the record would.
+#   docs/superpowers/{plans,specs}/2026-07-22-* — frozen, superseded history.
+#   the pioneer spec and this plan — the rename is their subject matter.
+#   MERGE-NOTES.md — the build record. Its one live occurrence is deliberately
+#       kept, in the parenthetical "Kinglet Pioneer (then named cloud-nine-unity)",
+#       because the sentence describes what Part 2 of the merge produced at the
+#       time, under the name it had then. Rewriting it to omit the old name
+#       would make the record claim something untrue.
+#   tests/test-pioneer-identity.sh — this file. Its subject matter IS the
+#       retired name: the assertions above assert its absence by naming it
+#       literally, so the string necessarily appears here forever, the same
+#       way the pioneer spec and plan are excluded for being about the rename.
+#
+# Anything NOT on this list that still says cloud-nine is a missed rename.
+PID_OFFENDERS=$(cd "$REPO_DIR" && git grep -lie "cloud.nine" \
+    -- . \
+    ':(exclude)migration/baseline-inventory.json' \
+    ':(exclude)docs/superpowers/plans/2026-07-22-*' \
+    ':(exclude)docs/superpowers/specs/2026-07-22-*' \
+    ':(exclude)docs/superpowers/specs/2026-07-29-kinglet-pioneer-design.md' \
+    ':(exclude)docs/superpowers/plans/2026-07-29-kinglet-pioneer-wave-1a-identity.md' \
+    ':(exclude)MERGE-NOTES.md' \
+    ':(exclude)tests/test-pioneer-identity.sh' \
+    || true)
+assert_eq "" "$PID_OFFENDERS" "no tracked file outside the recorded exclusions says cloud-nine"
+
+# --- Guard: upstream attribution survived the rename ---
+# A careless sweep is capable of eating the MIT obligations along with our own
+# name. These are the licence conditions, not decoration.
+PID_CREDITS=$(cat "${REPO_DIR}/CREDITS.md")
+assert_contains "$PID_CREDITS" "everything-claude-unity" "ECU attribution survives"
+assert_contains "$PID_CREDITS" "Claude-Code-Game-Studios" "Donchitos attribution survives"
+PID_NOTICE=$(cat "${REPO_DIR}/.claude/NOTICE.md")
+assert_contains "$PID_NOTICE" "MIT" "the shipped NOTICE still states the licence"
+
 rm -rf "$PID_MOCK"

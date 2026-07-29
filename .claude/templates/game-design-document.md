@@ -1,5 +1,5 @@
 <!-- Adapted from Claude-Code-Game-Studios (Donchitos), MIT — https://github.com/Donchitos/Claude-Code-Game-Studios -->
-<!-- cloud-nine-unity GDD template. Lives at .claude/templates/ after install; authored copies go to docs/design/. -->
+<!-- Kinglet Pioneer GDD template. Lives at .claude/templates/ after install; authored copies go to docs/design/. -->
 
 # [Mechanic/System Name]
 

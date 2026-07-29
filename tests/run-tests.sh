@@ -147,7 +147,7 @@ fi
 # --- Runner ---
 
 echo ""
-echo -e "${CYAN}cloud-nine-unity test suite${NC}"
+echo -e "${CYAN}Kinglet Pioneer test suite${NC}"
 echo "========================================"
 echo ""
 

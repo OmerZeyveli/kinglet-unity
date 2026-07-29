@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# test-no-mobile.sh — cloud-nine-unity is PC/console only. Prove it.
+# test-no-mobile.sh — Kinglet Pioneer is PC/console only. Prove it.
 #
 # This toolkit vendors everything-claude-unity, which targeted mobile devs. The
 # mobile content was removed rather than disabled. Without this test, the next

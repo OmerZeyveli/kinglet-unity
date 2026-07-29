@@ -31,7 +31,7 @@ How to use, customize, and create agents for everything-claude-unity.
 | `unity-git-master` | sonnet | Unity-aware git operations -- LFS, merge strategies, .meta hygiene, .gitattributes |
 | `unity-critic` | opus | Challenges implementation plans -- identifies risks, missed edge cases, over-engineering |
 
-### Design and production agents (cloud-nine-unity overlay)
+### Design and production agents (Kinglet Pioneer overlay)
 
 These author documentation under `docs/` -- design docs, ADRs, sprint plans. They never write C# or drive the editor.
 

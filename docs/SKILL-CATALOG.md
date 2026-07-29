@@ -85,7 +85,7 @@ Genre-specific architecture and patterns loaded by file glob matching.
 
 ## Platform Skills
 
-_None._ cloud-nine-unity targets PC/console only, so there is no platform-switching layer. Platform
+_None._ Kinglet Pioneer targets PC/console only, so there is no platform-switching layer. Platform
 guidance lives in `.claude/rules/pc-console.md`, which is always in force.
 
 > Upstream shipped a `mobile` skill here with `alwaysApply: true` and `globs: ["**/*.cs"]` — it

@@ -111,8 +111,8 @@ Donchitos runs a heavy multi-gate pipeline. I cut it to keep the toolkit solo-fr
 # Part 2 — the standalone merge
 
 ECU is no longer an upstream you install first. It is vendored into this repo at **v1.5.0
-(`bb28ccb`)**, and cloud-nine-unity is a single toolkit with a single installer. `.claude/VERSION`
-is **2.0.0** — ours, and a major bump because the install contract broke.
+(`bb28ccb`)**, and Kinglet Pioneer (then named cloud-nine-unity) is a single toolkit with a single
+installer. `.claude/VERSION` is **2.0.0** — ours, and a major bump because the install contract broke.
 
 ## What shipped
 

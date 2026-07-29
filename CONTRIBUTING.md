@@ -1,11 +1,11 @@
-# Contributing to cloud-nine-unity
+# Contributing to Kinglet Pioneer
 
 Thanks for your interest! This is a small, **low-support** project — issues and PRs are welcome,
 but responses may be slow. To keep the toolkit coherent, please follow a few conventions.
 
 ## What this project is (and isn't)
 
-cloud-nine-unity is a **standalone Unity 6 toolkit for Claude Code**. It vendors
+Kinglet Pioneer is a **standalone Unity 6 toolkit for Claude Code**. It vendors
 [everything-claude-unity (ECU)](https://github.com/XeldarAlz/everything-claude-unity) as its
 engineering layer and adapts [Claude-Code-Game-Studios
 (Donchitos)](https://github.com/Donchitos/Claude-Code-Game-Studios) for its design/production layer.

@@ -1,5 +1,5 @@
 <!-- Adapted from Claude-Code-Game-Studios (Donchitos), MIT — https://github.com/Donchitos/Claude-Code-Game-Studios -->
-<!-- cloud-nine-unity systems index (output of /map-systems). Authored copy goes to docs/design/systems-index.md. -->
+<!-- Kinglet Pioneer systems index (output of /map-systems). Authored copy goes to docs/design/systems-index.md. -->
 
 # Systems Index: [Game Title]
 

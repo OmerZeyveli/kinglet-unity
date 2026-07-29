@@ -1,4 +1,4 @@
-# cloud-nine-unity
+# Kinglet Pioneer
 
 **A standalone, PC/console-focused Claude Code toolkit for Unity 6.** One repo, one installer.
 
@@ -82,8 +82,8 @@ demand, outside `Assets/` so Unity doesn't import them.
 ## Installation
 
 ```bash
-git clone https://github.com/OmerZeyveli/cloud-nine-unity.git
-cd cloud-nine-unity
+git clone https://github.com/OmerZeyveli/kinglet-unity.git
+cd kinglet-unity
 ./install.sh --project-dir /path/to/your/UnityProject
 
 # optionally add the CoplayDev MCP package to Packages/manifest.json at the same time
@@ -99,7 +99,7 @@ non-interactive.
 
 **Re-installing is safe.** Every file written is recorded in `.claude/state/install-receipt.tsv` with
 its checksum. On upgrade, files you edited are reported and kept. In `CLAUDE.md`, only the region
-between the `cloud-nine-unity:generated` markers is refreshed — your prose is left byte-for-byte.
+between the `kinglet:generated` markers is refreshed — your prose is left byte-for-byte.
 
 ### Then set up the MCP bridge
 

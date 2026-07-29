@@ -1,4 +1,4 @@
-# cloud-nine-unity — repo guide
+# kinglet-unity — repo guide
 
 > This file is for working **on the toolkit**. It is not a game template.
 >

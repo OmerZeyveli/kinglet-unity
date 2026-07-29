@@ -1,5 +1,5 @@
 <!-- Adapted from Claude-Code-Game-Studios (Donchitos), MIT — https://github.com/Donchitos/Claude-Code-Game-Studios -->
-<!-- cloud-nine-unity ADR template. Authored copies go to docs/adr/. -->
+<!-- Kinglet Pioneer ADR template. Authored copies go to docs/adr/. -->
 
 # ADR-[NNNN]: [Title]
 
