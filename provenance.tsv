@@ -217,6 +217,7 @@ templates/View.cs.template	ecu	1.5.0	templates/View.cs.template	c77939301d6476df
 tests/fixtures/mkproject.sh	original	-	-	-	original	-
 tests/run-tests.sh	ecu	1.5.0	tests/run-tests.sh	b8c6280bf30aa4834a15255b9f4d3c0f4f3b6aa9e39d7b6c73bd49b334f510d8	modified	test-runner-fix: sourced files ended in exit, killing the runner after file 1; --source-only was unimplemented; dynamic test source is intentional
 tests/test-bash32-compat.sh	original	-	-	-	original	bash32-static-regression-gate
+tests/test-hook-advisory-exit.sh	original	-	-	-	original	pins-advisory-stop-hooks-to-exit-0-outside-and-inside-a-git-repository
 tests/test-block-legacy-input.sh	original	-	-	-	original	-
 tests/test-cross-validation.sh	ecu	1.5.0	tests/test-cross-validation.sh	ed11cf897a74a90ce8d3bd6a072dd3ba09e9ce412d2bfc51c7975a91faaafd33	verbatim	-
 tests/test-hooks.sh	ecu	1.5.0	tests/test-hooks.sh	ff362d3e26718ca81d6857af46c7579317ee5ba8179c6ebfb95e5f8eba6dd3a8	verbatim	-

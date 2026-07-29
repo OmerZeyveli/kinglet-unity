@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review.",
-  "source_commit": "6b1f5f45beddf45aadef1dbf34beeb7ed3458cbe",
+  "source_commit": "fc29bf3da40b794974d543ac18734a7de6e1cb06",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 147,
@@ -343,12 +343,12 @@
       },
       {
         "path": ".claude/hooks/_lib.sh",
-        "sha256": "d721c808d7b56625aefe362e17ff1524186b45108a2829eb4b8b85ebc3546bb3",
+        "sha256": "9fa064054598c4480813642d5e74db0f63384f942ea339de864f7cc3bbfaa8bb",
         "git_mode": "100755"
       },
       {
         "path": ".claude/hooks/auto-learn.sh",
-        "sha256": "89f8e2d2d8bd0050a4948483529d60149d8bcefb3c6e8a87b28b8dd8b20b8064",
+        "sha256": "ff48873e53cbb32be1b48596b982827057b605109f47def78222222dfc055ba8",
         "git_mode": "100755"
       },
       {
@@ -408,12 +408,12 @@
       },
       {
         "path": ".claude/hooks/instinct-distill.sh",
-        "sha256": "26d43d82aabb5b8695bb6c1bc607b62ac445e626c5366f8fbefe47ab70d93381",
+        "sha256": "823e798c2872755741bb9c049b7ce176537ec72dbe5e68a28543f222188ec44d",
         "git_mode": "100755"
       },
       {
         "path": ".claude/hooks/notify.sh",
-        "sha256": "4a2e82cb82fdb0b3595e8681593fc138e444efe5eab7508230d9bdd111ce9985",
+        "sha256": "c061e3f44c3981b4384641724074865e749a1d932421d04885712ddf6f62f317",
         "git_mode": "100755"
       },
       {
@@ -433,12 +433,12 @@
       },
       {
         "path": ".claude/hooks/session-save.sh",
-        "sha256": "5b23330845ae08560067340d9300a037688f5012c2618b18e1c44ee6fa7c73c6",
+        "sha256": "9c811ec88513d9add5e66bbcdb5786a4b8d1e21df47256d7019c2743cec5b341",
         "git_mode": "100755"
       },
       {
         "path": ".claude/hooks/stop-validate.sh",
-        "sha256": "faddb38c73e6235a7f7cfe81bcbd6b76c4615c25c8ea9de5f4df4f9254fe03a7",
+        "sha256": "8d1a4755f262c769c2233a341729be44aa78a3b1f40835db4f8645fe4bdf8251",
         "git_mode": "100755"
       },
       {
@@ -1283,7 +1283,7 @@
       "files": [
         {
           "path": ".claude/hooks/auto-learn.sh",
-          "sha256": "89f8e2d2d8bd0050a4948483529d60149d8bcefb3c6e8a87b28b8dd8b20b8064",
+          "sha256": "ff48873e53cbb32be1b48596b982827057b605109f47def78222222dfc055ba8",
           "git_mode": "100755"
         },
         {
@@ -1343,12 +1343,12 @@
         },
         {
           "path": ".claude/hooks/instinct-distill.sh",
-          "sha256": "26d43d82aabb5b8695bb6c1bc607b62ac445e626c5366f8fbefe47ab70d93381",
+          "sha256": "823e798c2872755741bb9c049b7ce176537ec72dbe5e68a28543f222188ec44d",
           "git_mode": "100755"
         },
         {
           "path": ".claude/hooks/notify.sh",
-          "sha256": "4a2e82cb82fdb0b3595e8681593fc138e444efe5eab7508230d9bdd111ce9985",
+          "sha256": "c061e3f44c3981b4384641724074865e749a1d932421d04885712ddf6f62f317",
           "git_mode": "100755"
         },
         {
@@ -1368,12 +1368,12 @@
         },
         {
           "path": ".claude/hooks/session-save.sh",
-          "sha256": "5b23330845ae08560067340d9300a037688f5012c2618b18e1c44ee6fa7c73c6",
+          "sha256": "9c811ec88513d9add5e66bbcdb5786a4b8d1e21df47256d7019c2743cec5b341",
           "git_mode": "100755"
         },
         {
           "path": ".claude/hooks/stop-validate.sh",
-          "sha256": "faddb38c73e6235a7f7cfe81bcbd6b76c4615c25c8ea9de5f4df4f9254fe03a7",
+          "sha256": "8d1a4755f262c769c2233a341729be44aa78a3b1f40835db4f8645fe4bdf8251",
           "git_mode": "100755"
         },
         {
