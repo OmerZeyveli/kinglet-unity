@@ -47,8 +47,11 @@ MCP_PKG_URL="https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#a4c2d0
 # `Input.*` outright. Without the package a compliant script fails to compile — and a compile
 # error also aborts Unity's -executeMethod, so Editor automation stops too (smoke-pass.md §6c).
 # It is a first-party Unity registry package, so a version pin (not a git URL) is all it needs.
+# Pinned to 1.18.0 — the version measured in a real, working Unity 6 project (URP, 1073 C# files,
+# Unity 6000.0.68f1) per docs/research/pioneer/smoke-pass.md §9. It is the only version of this
+# package this toolkit has been observed alongside in a working Unity 6 project.
 INPUT_SYSTEM_PKG_NAME="com.unity.inputsystem"
-INPUT_SYSTEM_PKG_VERSION="1.11.2"
+INPUT_SYSTEM_PKG_VERSION="1.18.0"
 
 RECEIPT_REL=".claude/state/install-receipt.tsv"
 
