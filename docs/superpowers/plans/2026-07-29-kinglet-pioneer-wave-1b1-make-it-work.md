@@ -587,6 +587,70 @@ Assert against a real fixture (`bash tests/fixtures/mkproject.sh <dir> --variant
 
 - [ ] **Step 5: Verify and commit.** `bash tests/run-tests.sh` green with every file present; `scripts/check-provenance.sh` OK; regenerate the baseline in a separate commit if `.claude/` drifted.
 
+### Task 7: The suite fails under concurrency, and the reproduction is deterministic
+
+**Added 2026-07-29, after Task 5.** Three implementers independently reported a flake in this suite,
+each under a concurrent run, none reproducible in isolation. Three independent reports is a signal.
+The controller reproduced it deterministically; the hard part is done, and this task is to explain
+and fix it.
+
+**Reproduction — fails every time:**
+
+```bash
+( bash tests/run-tests.sh > /tmp/a.txt 2>&1 ) &
+( bash tests/run-tests.sh > /tmp/b.txt 2>&1 ) &
+wait
+```
+
+Both runs fail. Run either alone and it passes.
+
+**What was already narrowed:**
+
+| Observation | What it rules out |
+|---|---|
+| Two concurrent copies of `tests/test-pioneer-identity.sh` **alone** both pass | The collision is not within that file — it is **cross-file** |
+| The scratch dir is `mktemp -d`, not PID-keyed | Not the scratch directory |
+
+**The clue, and it is a strange one.** Three assertions read the same receipt. Two fail, one passes:
+
+```
+FAIL receipt header is brand-level      needle: # kinglet install receipt
+PASS receipt records the edition as data      (needle: # edition: pioneer)
+FAIL receipt stamps the version         needle: # toolkit-version: 3.0.0-pioneer.1
+```
+
+`install.sh` writes those three lines consecutively — `# kinglet install receipt`, then
+`# edition: pioneer`, then the version. **A receipt containing the second but not the first or third
+is not a truncation and not a missing file.** Whatever explains that asymmetry is the defect.
+
+Do not stop at "it is a race, so isolate the directory". An isolation fix that makes the symptom go
+away without explaining the asymmetry leaves the real cause in place, and the next concurrent run
+finds it again somewhere else.
+
+**Files:** `tests/test-pioneer-identity.sh`, and whatever the investigation implicates. Likely
+suspects to check rather than assume: `install.sh`'s payload enumeration reads the repository's own
+`.claude/` tree while another test may be writing under it; `.claude/hooks/_lib.sh` resolves
+`UNITY_HOOK_STATE_DIR` to a machine-global path when unset; several test files key scratch paths on
+`$$`, which under this runner is the **runner's** PID, shared by every file in that run.
+
+- [ ] **Step 1: Explain the asymmetry before changing anything.** Instrument the test to dump the
+  receipt's actual bytes when an assertion fails, run the concurrent reproduction, and put the real
+  content in the report. Everything after this depends on knowing what was actually in the file.
+
+- [ ] **Step 2: Name the two files that collide.** Bisect by running the identity test concurrently
+  with one other test file at a time. Report the pair and the shared resource.
+
+- [ ] **Step 3: Write a failing test.** It must fail on the current tree under the concurrent
+  reproduction and pass after the fix. If the cause cannot be expressed as a test, say so and explain
+  why rather than shipping a fix with no net.
+
+- [ ] **Step 4: Fix the cause, not the symptom.** State plainly which you fixed. If the honest answer
+  is that the suite is not safe to run concurrently and should declare that rather than pretend
+  otherwise, that is an acceptable outcome — but it must be a written decision, not a silence.
+
+- [ ] **Step 5: Verify.** The concurrent reproduction passes twice in a row; `bash tests/run-tests.sh`
+  green with every file present; `scripts/check-provenance.sh` OK.
+
 ## What this plan does not do
 
 | Deferred | To | Why |
