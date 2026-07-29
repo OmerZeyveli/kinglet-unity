@@ -303,6 +303,24 @@ Phase 1 completes.
 - **Not found:** say so explicitly and offer `/design-system`. Never proceed silently, and never
   invent the design decisions the GDD would have contained.
 
+### Amendment, 2026-07-29 — Wave 1b is reordered by measurement
+
+The smoke pass (Item 0) ran, and `docs/research/pioneer/smoke-pass.md` is now the authority for what
+Wave 1b contains and in what order. Two defects it found outrank every item designed above, because
+both stop the toolkit from functioning at all:
+
+- **Sessions hang in a Unity project that is not a git repository** — the first-contact case.
+- **The MCP configuration is written to a file Claude Code never reads**, so the entire
+  editor-control half of the toolkit is inert as installed, while `MCP-SETUP.md` states the opposite.
+
+It also measured, rather than predicted, the surface-selection failure this design anticipated:
+asked to add a double jump, on an empty project and again on a real 1073-script one, **not one of the
+36 commands or 39 skills was selected** — a competing plugin won both times.
+
+Wave 1b is therefore split into three plans, executed in order: **1b-1 make it work**, **1b-2 make it
+findable**, **1b-3 make it durable**. The items designed below are not withdrawn; they are the
+content of 1b-3.
+
 ### Wave 2 — the discipline layer
 
 Delivered after the install, as an upgrade. `install.sh` already supports this precisely: a receipt

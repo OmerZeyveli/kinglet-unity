@@ -582,3 +582,4 @@ docs/research/pioneer/smoke-pass-runbook.md	original	-	-	-	original	operator-run
 docs/superpowers/plans/2026-07-29-kinglet-pioneer-baseline-regenerator.md	original	-	-	-	original	baseline-regenerator-implementation-plan
 tests/kinglet/test_baseline_regenerator.py	original	-	-	-	original	gates-the-baseline-regeneration-against-laundered-regressions
 docs/research/pioneer/smoke-pass.md	original	-	-	-	original	pioneer-smoke-pass-record-2026-07-29
+docs/superpowers/plans/2026-07-29-kinglet-pioneer-wave-1b1-make-it-work.md	original	-	-	-	original	pioneer-wave-1b1-make-it-work-implementation-plan
