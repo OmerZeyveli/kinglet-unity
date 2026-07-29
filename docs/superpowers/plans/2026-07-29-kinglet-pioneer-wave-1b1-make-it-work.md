@@ -767,6 +767,38 @@ walker (`validate-asmdefs.sh` uses eight of them, including a DFS visit-state ma
 a mechanical substitution. `scripts/generate-claude-md.sh:102` already documents the idiom this
 repository uses instead — a newline-separated `id<TAB>label` table — and is the reference.
 
+**Controller reading of all five, 2026-07-29.** There are *two* kinds of hard here, not one, and the
+split decides how to sequence the work:
+
+| Script | Map | Keyed on | Shape |
+|---|---|---|---|
+| `validate-code-quality.sh` | `COUNTS` | the fixed 9-element `CATEGORIES` indexed array | trivial |
+| `analyze-build-size.sh` | `CATEGORY_SIZE` | the fixed 8-element `categories` indexed array | trivial |
+| `validate-meta-integrity.sh` | `guid_map` | GUID → path, unbounded | **scale** |
+| `detect-missing-refs.sh` | `KNOWN_GUIDS` | GUID set, unbounded | **scale** |
+| `validate-asmdefs.sh` | 7 maps + `VISIT_STATE` | assembly name, mutated during a DFS | **correctness** |
+
+The two trivial ones are genuinely trivial: their keys are already ordered indexed arrays, so a
+parallel array of values at the same indices is an exact substitution.
+
+**The two scale ones are the sleeper risk.** `KNOWN_GUIDS` is a *set* — its value is always `1` and
+it exists only for membership tests. A real Unity project has tens of thousands of `.meta` files. A
+newline table plus a `grep` per lookup turns an O(1) test into O(n) and the pass into O(n×m); on a
+50k-asset project that is the difference between seconds and never finishing. Porting the shape
+mechanically would leave a script that passes every test here and is unusable in the field — which
+is the same failure this whole wave keeps finding, in a new costume.
+
+`detect-missing-refs.sh` also carries **three banned constructs within two lines** — `declare -A`,
+`grep -oP`, and `| head -1`. `generate-claude-md.sh:147` documents `sed` as the replacement for the
+first.
+
+For `validate-asmdefs.sh`, six of the seven collection maps are keyed on the same thing — the
+assembly `name`. Only `ASMDEF_PATH_TO_NAME` is keyed on path. So the natural conversion is **one
+table with one record per assembly**, not seven parallel tables. Two traps: `ASMDEF_REFS` holds
+newline-separated `jq` output, which a `<TAB>` record cannot carry in one field; and duplicate-name
+detection depends on probing the map before insertion, so whatever replaces it must still detect
+duplicates.
+
 - [ ] **Step 1: Widen the guard first, and watch it fail.** Extend `test-bash32-compat.sh` to every shipped shell script, not just hooks. It must fail now, naming all six files. A guard written after the fixes proves nothing.
 - [ ] **Step 2: Sweep for the other banned constructs in the same scope** — `grep -oP`, `grep -qP`, `${var,,}`, `${var^^}`, `mapfile`/`readarray`, `&>>`. If the guard is being widened, widen it to the whole convention rather than the one construct that happened to be noticed.
 - [ ] **Step 3: Convert the six**, following `generate-claude-md.sh`'s documented idiom. `validate-asmdefs.sh` is the hard one and may deserve its own commit.
