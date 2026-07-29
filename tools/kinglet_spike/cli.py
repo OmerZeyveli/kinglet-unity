@@ -5,6 +5,11 @@ import sys
 from pathlib import Path
 
 from .coverage import evaluate_coverage
+from .inventory import (
+    build_inventory,
+    render_inventory_json,
+    render_inventory_markdown,
+)
 from .load import load_record
 from .model import Diagnostic, EvidenceError
 from .publish import publish_record
@@ -40,6 +45,18 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("spikes/platform/contracts/matrix-v2.json"),
     )
+
+    inventory = commands.add_parser("inventory")
+    inventory.add_argument("--repo-root", type=Path, default=Path("."))
+    # Required, with NO default. 0R is open and no runtime has been selected; a
+    # default here would produce a report that reads as a decision nobody made.
+    inventory.add_argument("--selected-runtime", required=True)
+    inventory.add_argument(
+        "--out-dir",
+        type=Path,
+        default=Path("docs/research/platform-spike/reports"),
+    )
+    inventory.add_argument("--allow-dirty-inventory", action="store_true")
 
     gate = commands.add_parser("gate")
     gate.add_argument("gate_id")
@@ -196,6 +213,25 @@ def main(argv: list[str] | None = None) -> int:
             unity = [cell for cell in cells if cell.id.startswith("unity.")]
             closed = sum(1 for cell in unity if cell.state == "pass")
             print(f"unity cells: {closed} closed, {len(unity) - closed} open")
+            return 0
+        if arguments.command == "inventory":
+            report = build_inventory(
+                arguments.repo_root,
+                arguments.selected_runtime,
+                allow_dirty=arguments.allow_dirty_inventory,
+            )
+            out_dir = Path(arguments.out_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "python-foundation-inventory.json").write_text(
+                render_inventory_json(report), encoding="utf-8"
+            )
+            (out_dir / "python-foundation-inventory.md").write_text(
+                render_inventory_markdown(report), encoding="utf-8"
+            )
+            print(
+                f"inventoried {len(report.rows)} foundation files for "
+                f"{report.selected_runtime}"
+            )
             return 0
         if arguments.command == "gate":
             if gate_is_closed(arguments.gate_id, arguments.repo_root):

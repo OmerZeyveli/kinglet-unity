@@ -1,0 +1,52 @@
+{
+  "_note": "Classification rules for the existing Python foundation, frozen. Generated from tools/kinglet_spike/inventory.py and pinned to it by tests/kinglet_spike/test_foundation_inventory.py. The inventory reads this tree and never writes to it; no source file is deleted, ported or rewritten by 00D.",
+  "dispositions": [
+    "keep",
+    "adapt",
+    "replace",
+    "retire-after-parity"
+  ],
+  "packagingEntryPoints": [
+    "tools/kinglet_build/__main__.py"
+  ],
+  "roots": [
+    "adapters",
+    "migration",
+    "src",
+    "tests/kinglet",
+    "tools/kinglet_build"
+  ],
+  "rules": [
+    {
+      "disposition": "keep",
+      "match": "tests/kinglet/fixtures/**",
+      "why": "Fixture data is runtime-neutral; every candidate reads the same canonical shapes."
+    },
+    {
+      "disposition": "keep if python wins, otherwise adapt",
+      "match": "tests/kinglet/**",
+      "why": "A behavioural test is a migration ASSET: its assertions are the only written specification of what the builder does. It is never `replace`, and never retired without parity."
+    },
+    {
+      "disposition": "keep if python wins, otherwise replace",
+      "match": "tools/kinglet_build/__main__.py",
+      "why": "Packaging entry point only. No behaviour survives the move, so `replace` is honest -- but only with every current test module named as the parity suite."
+    },
+    {
+      "disposition": "keep if python wins, otherwise retire-after-parity",
+      "match": "tools/kinglet_build/**",
+      "why": "Implementation behaviour must exist in the winner and be proved equivalent before retirement. Every current test module is named."
+    },
+    {
+      "disposition": "keep",
+      "match": "src/**, adapters/**, migration/**",
+      "why": "Canonical data consumed by the builder. No runtime choice touches it; marking it for migration would be busywork with risk."
+    },
+    {
+      "disposition": "excluded",
+      "match": "untracked build output (__pycache__, egg-info)",
+      "why": "Not inventoried at all. Discovery comes from `git ls-files`, so exclusion is by construction rather than by a filter someone must remember to widen."
+    }
+  ],
+  "schema": "kinglet.spike.inventory-rules/v1"
+}

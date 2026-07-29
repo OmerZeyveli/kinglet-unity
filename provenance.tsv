@@ -568,3 +568,6 @@ tests/kinglet_spike/test_matrix_amendment.py	original	-	-	-	original	matrix-amen
 spikes/platform/decision/gate-rules-v1.json	original	-	-	-	original	kinglet-00d-task1-downstream-gate-rules
 tools/kinglet_spike/decision.py	original	-	-	-	original	kinglet-00d-task1-gate-evaluators
 tests/kinglet_spike/test_decision_gates.py	original	-	-	-	original	kinglet-00d-task1-gate-semantics-tests
+spikes/platform/decision/inventory-rules-v1.json	original	-	-	-	original	kinglet-00d-task2-foundation-classification-rules
+tools/kinglet_spike/inventory.py	original	-	-	-	original	kinglet-00d-task2-git-aware-foundation-inventory
+tests/kinglet_spike/test_foundation_inventory.py	original	-	-	-	original	kinglet-00d-task2-inventory-exhaustiveness-tests
