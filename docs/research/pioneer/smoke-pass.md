@@ -278,14 +278,56 @@ PIONEER_BOOT: StartLocalHttpServer returned False
 With `quiet: true`: `returned True`, and a Python process listening on `127.0.0.1:8080` whose
 `/mcp` endpoint answers correctly (`{"jsonrpc":"2.0",…"Bad Request: Missing session ID"}`).
 
-### Still unmeasured
+### Resolved: the full chain works, headless, including on a real project
 
-The Editor↔server session never established under batchmode — the server ran, but the bridge
-reported no active Unity session, so no scene data was ever returned. Whether that is a batchmode
-limitation or a further configuration step is unknown.
+The first attempt failed because the Unity Editor never connected to the server it had just started.
+Two steps were missing, and both are recorded here because they are the whole recipe:
 
-**Remaining for a human:** one interactive session with the Editor open, to confirm that
-`mcp__unityMCP__*` calls return real scene data.
+1. **`Bridge.StartAsync()`.** `StartLocalHttpServer` only spawns the server process. Unity connects
+   *out* to it over WebSocket (`ws://127.0.0.1:8080/hub/plugin`) and registers a session. Without
+   `MCPServiceLocator.Bridge.StartAsync()` the server is up with nobody on the Unity end, which a
+   client sees as `no_unity_session` / `instance_count: 0`.
+2. **Wait for the port first.** `StartLocalHttpServer` returns as soon as the process is spawned,
+   not when it is listening. Connecting immediately loses the race and the WebSocket reports
+   *"Unable to connect to the remote server"*. Polling `127.0.0.1:8080` before calling `StartAsync`
+   fixes it; blocking there is safe, because the server is a separate process and needs nothing from
+   the editor loop.
+
+With both in place, on the scratch project:
+
+```
+mcp__unityMCP__manage_scene → rootCount: 0, name: "", path: ""
+```
+
+— real data, and the right answer for a freshly created empty project.
+
+**And on the operator's own project** (Endless Evolution, URP, 1073 scripts), after opening
+`Assets/Scenes/MainMenu.unity` through the bridge:
+
+```
+Player · Level · Tilemaps (6 children) · Managers (4) · Canvas (2)
+InputContext (SceneInputContext, SystemsBootstrapper) · Slimes (7)
+WaterReflection (1) — tag Water, BuoyancyEffector2D, BoxCollider2D
+Polish Items (5) · Title (3)
+```
+
+That is the project's actual hierarchy, read live out of the Editor. **MCP works end-to-end.**
+
+### The one remaining boundary: `-nographics` and real scenes
+
+Loading that same scene under `-batchmode -nographics` **crashed the Editor**:
+
+```
+Caught fatal signal - signo:11 code:1 errno:0 addr:0x8
+  GfxDevice::DrawSharedGeometryJobs(...)
+  TilemapRendererJobs::TilemapRendererGeometryJob::Schedule(...)
+  UniversalRenderPipeline:RenderSingleCamera(...)
+```
+
+URP tried to render a Tilemap with no graphics device. This is a Unity batchmode limitation, **not a
+Kinglet or CoplayDev defect** — and it is why the successful run above dropped `-nographics` and used
+the session's existing `DISPLAY`. Recorded so nobody re-diagnoses it later: automating a real scene
+needs a graphics device, not just batchmode.
 
 ## 6b. Failing loudly — pass, twice
 
@@ -418,7 +460,7 @@ Ordered by what blocks a real project first.
 | # | Defect | § | Severity |
 |---|---|---|---|
 | 1 | `session-save.sh` hangs every session in a non-git project — the first-contact case | §2 | Critical |
-| 2 | MCP config is written to a file Claude Code does not read; the entire editor-control half of the toolkit is inert as installed, and `MCP-SETUP.md` states the opposite | §6 | Critical |
+| 2 | MCP config is written to a file Claude Code does not read (`.claude/settings.json` instead of `.mcp.json`); the editor-control half of the toolkit is inert as installed, and `MCP-SETUP.md` states the opposite. The bridge itself is proven working once the config is in the right file. | §6 | Critical |
 | 3 | The surface is not machine-selectable — a competing plugin wins the most ordinary request | §4 | Critical |
 | 4 | The New Input System is mandated and hook-enforced, but never added to the manifest, so the first compliant script fails to compile — and that aborts Editor automation | §6c | Important |
 | 5 | No MCP version is pinned; the installer writes a branch ref, so the version depends on the install date | §7 | Important |
@@ -438,8 +480,6 @@ were reachable from the test suite, which only ever proved the installer places 
 
 One interactive session with the Unity Editor open, to close:
 
-- **§6** — whether `mcp__unityMCP__*` calls return real scene data once the Editor↔server session is
-  established. Everything up to that point is now measured.
 - **§8** — the `/unity-skill-stocktake` output.
 - **§1 of the runbook** — the `/` completion-list count, which headless mode has no equivalent for.
 
