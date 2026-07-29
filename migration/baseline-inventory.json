@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review.",
-  "source_commit": "026a33553277d6202949ba115b4af60fe6720469",
+  "source_commit": "a1ccbf818067ccad58f473014ea7bbcb35e97fe0",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 147,
     "files": [
       {
         "path": ".claude/NOTICE.md",
-        "sha256": "aa76bd2690f332171a1c37acb391fcd668739ad2bd40465abdff25070726c19a",
+        "sha256": "81f77a1f5bcac0435c556c103836b7d5ddaa1681bcf14366e26af34b4da69c6b",
         "git_mode": "100644"
       },
       {
