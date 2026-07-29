@@ -3,7 +3,7 @@
 **Date run:** 2026-07-29
 **Host:** Pop!_OS, Linux 7.0.11-76070011-generic, x86_64
 **Unity:** 6000.3.18f1 (5ebeb53e4c07), created via `-batchmode -createProject`
-**Render pipeline:** Built-in — *not* URP. `-createProject` produces a built-in project, and the
+**Render pipeline:** Built-in — *not* URP in the scratch pass. The URP path was covered by the second pass in §9. `-createProject` produces a built-in project, and the
 runbook asks for URP. Recorded as a deviation; it exercised the installer's built-in detection path
 instead of the URP one, so the URP path remains unmeasured.
 **MCP package:** `com.coplaydev.unity-mcp` resolved to `a4c2d0a84573` from
@@ -21,8 +21,13 @@ read as more than it is:
   interactive UI affordance and headless mode has no equivalent. What *was* measured is stronger in
   one respect and weaker in another: which surface the model actually selects when asked a real
   question, with the tool-call stream as evidence rather than self-report.
-- **The MCP-dependent measurements are incomplete.** The package installs and compiles; the bridge
-  does not auto-start in batchmode. See §6.
+- **The MCP measurements are partly complete.** The package installs and compiles, and the bridge
+  *can* be started headlessly — but the Editor↔server session never established under batchmode. See
+  §6, which also corrects the runbook's claim that the bridge needs the Editor UI.
+
+A second pass on the operator's real Unity project — URP, 1073 C# files, a live git repository, an
+existing `AGENTS.md` — is recorded in §9. It confirms the findings are not artifacts of an empty
+scratch project.
 
 Nothing was repaired during the pass. Every finding below is recorded as observed.
 
@@ -342,6 +347,70 @@ interactive pass in §6.
 
 ---
 
+## 9. Second pass: a real game project
+
+Run on the operator's own Unity project — **Endless Evolution**, Unity `6000.0.68f1`, **URP**,
+1073 C# files, a live git repository — on a throwaway branch, installed, measured, then uninstalled
+and the branch deleted. The repository was returned to its prior commit with a clean tree.
+
+This pass exists because the scratch project was empty, freshly created, built-in pipeline, and had
+no prior agent configuration. Every one of those could have been the reason a finding appeared.
+
+### What it confirmed
+
+| | |
+|---|---|
+| **The hang is git-shaped** | With a real git repository present, `claude -p` returned `exit 0`, `OK`. §2's diagnosis holds from the other direction: the hang is not "the payload", it is specifically the non-git case. |
+| **URP detection** | `ok Unity 6000.0.68f1 · URP` — the pipeline branch the scratch project could not exercise. |
+| **An existing `CLAUDE.md` is safe** | The project's own `CLAUDE.md` (a pointer to its `AGENTS.md`) was **not touched** — no diff, no git-status entry. The installer wrote `CLAUDE.md.generated` beside it, exactly as the dry run predicted. |
+| **Uninstall is exact** | `uninstall.sh` removed 171 files, all "unchanged since install", kept three runtime state files it correctly did not own, and reported *"Left alone: CLAUDE.md, docs/, and anything you wrote."* |
+| **The rules load beside a foreign guidance system** | The project has its own 171-line `AGENTS.md`. Probed for `const` casing, the answer was still `UPPER_SNAKE_CASE` — Pioneer's spine applies where `AGENTS.md` is silent, without a fight. |
+
+### What it reproduced — §4 is not an artifact of an empty project
+
+Same request, real codebase:
+
+```
+Skill   superpowers:brainstorming
+Bash    grep -ril "playermovement\|PlayerSystem\|playercontroller"
+Read    Assets/Player/…
+Bash    find … -maxdepth …
+Bash    grep -n -i "double jump\|PlayerMovement\|jump"
+Read    Assets/Player/…
+```
+
+**Again: not one Kinglet command, agent, or skill.** The work that followed was good — it located the
+player movement code, found the DNA-form system, and asked whether the double jump should be a base
+ability or an evolution unlock like the bunny's wall jump. But it did that with `grep` and `Read`,
+against a project carrying 36 commands, 28 agents and 39 skills that all went unused.
+
+Measured twice now, on an empty project and on a substantial one, with and without a competing
+guidance file. The finding is robust.
+
+### Two new minor defects
+
+- **The uninstaller's backup directory is not ignored.** The installer adds `.claude/`-scoped
+  entries to `.gitignore`; `uninstall.sh` then writes `.claude.backup.<timestamp>/`, which no entry
+  matches, so it appears as untracked and dirties `git status` in the user's repository.
+- **The installer's "Next steps" do not match the branch it took.** It printed *"Fill in the `FILL:`
+  markers in CLAUDE.md"* in the very run where it had deliberately **not** written `CLAUDE.md`. The
+  markers are in `CLAUDE.md.generated`, which the instruction never mentions.
+
+### An adoption observation, not a defect
+
+This project has already solved by hand two of the problems Wave 1b intends to solve:
+
+- `docs/project-map.md`, `docs/dependency-map.md`, `docs/scene-index.md`, `docs/architecture.md` —
+  the code map, maintained manually.
+- `AGENTS.md` with read-first order, domain routing, evidence rules, build-and-verify, and a
+  definition of done — a process authority that Pioneer's `/unity-workflow` would sit beside rather
+  than replace.
+
+Neither is a conflict today, because Pioneer's rules are conventions and `AGENTS.md` is process. But
+Wave 1b's code-map item should be designed to **adopt an existing map** rather than assume it is
+creating the first one, and the durable-artifact item should not assume `docs/` is empty. The first
+real user already has both.
+
 ## Defect list this pass hands to Wave 1b
 
 Ordered by what blocks a real project first.
@@ -355,7 +424,9 @@ Ordered by what blocks a real project first.
 | 5 | No MCP version is pinned; the installer writes a branch ref, so the version depends on the install date | §7 | Important |
 | 6 | `bash-gate.sh` matches unanchored substrings — blocked a command that wrote nothing, because a path appeared inside a JSON argument | §5 | Important |
 | 7 | `bash-gate.sh`'s retry affordance requires a **byte-identical** retry, including unrelated lines in the same invocation; its message says "retry the same command" without saying that | §5 | Minor |
-| 8 | The generated `CLAUDE.md` lists the rules in a way that reads as though the listing is what loads them. They load anyway (§3), so this is not a defect today — recorded because it would mislead whoever edits that file next | §3 | Minor |
+| 8 | `uninstall.sh` writes `.claude.backup.<timestamp>/`, which no `.gitignore` entry the installer adds will match — it dirties the user's `git status` | §9 | Minor |
+| 9 | The installer's "Next steps" tell the user to fill markers in `CLAUDE.md` even in the run where it deliberately did not write `CLAUDE.md` | §9 | Minor |
+| 10 | The generated `CLAUDE.md` lists the rules in a way that reads as though the listing is what loads them. They load anyway (§3), so this is not a defect today — recorded because it would mislead whoever edits that file next | §3 | Minor |
 
 Defects 1, 2 and 4 share a shape worth naming: **each is a case where the toolkit's documentation
 asserts something the code does not do.** The receipt says the bridge is preconfigured; the rules say
