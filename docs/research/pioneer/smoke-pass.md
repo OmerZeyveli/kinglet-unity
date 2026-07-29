@@ -396,20 +396,20 @@ guidance file. The finding is robust.
   markers in CLAUDE.md"* in the very run where it had deliberately **not** written `CLAUDE.md`. The
   markers are in `CLAUDE.md.generated`, which the instruction never mentions.
 
-### An adoption observation, not a defect
+### A correction to an earlier reading of this project
 
-This project has already solved by hand two of the problems Wave 1b intends to solve:
+An earlier version of this record described this project's `AGENTS.md` and its `docs/project-map.md`,
+`dependency-map.md` and `scene-index.md` as having "already solved by hand" two of the problems Wave
+1b intends to solve, and drew a design conclusion from it.
 
-- `docs/project-map.md`, `docs/dependency-map.md`, `docs/scene-index.md`, `docs/architecture.md` —
-  the code map, maintained manually.
-- `AGENTS.md` with read-first order, domain routing, evidence rules, build-and-verify, and a
-  definition of done — a process authority that Pioneer's `/unity-workflow` would sit beside rather
-  than replace.
+**The project's owner has corrected that.** Those files are old, primitive documentation — not a
+deliberate system, not a source of truth, and not offered as one. The project was offered as a real
+Unity repository to test MCP and the rest of the toolkit against, nothing more.
 
-Neither is a conflict today, because Pioneer's rules are conventions and `AGENTS.md` is process. But
-Wave 1b's code-map item should be designed to **adopt an existing map** rather than assume it is
-creating the first one, and the durable-artifact item should not assume `docs/` is empty. The first
-real user already has both.
+The observation is withdrawn, and so is the design conclusion drawn from it. What survives is
+narrower and still worth stating: **a real project's `docs/` is not empty**, and Pioneer's
+durable-artifact and code-map items will land next to whatever is already there. That is a fact about
+the general case, not a claim about this project's contents.
 
 ## Defect list this pass hands to Wave 1b
 
