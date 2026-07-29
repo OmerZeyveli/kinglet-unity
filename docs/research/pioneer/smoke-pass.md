@@ -188,21 +188,137 @@ the developer every day.
 filesystem. Arguably by design; recorded because the name `bash-gate` invites a broader reading than
 the implementation delivers.
 
-## 6. MCP — partially measured
+## 6. MCP — the configuration the toolkit ships is inert — **Critical**
 
-- **Package resolution: pass.** `install.sh --with-mcp` wrote the dependency into
-  `Packages/manifest.json`, and Unity fetched and compiled it —
-  `Library/PackageCache/com.coplaydev.unity-mcp@a4c2d0a84573`, with `MCPForUnity.Editor.dll` and
-  `MCPForUnity.Runtime.dll` built. No compile errors.
-- **Bridge start: not measured.** With the Editor running in `-batchmode -nographics`, nothing
-  listened on `localhost:8080`. The bridge is started from the Editor UI
-  (`Window > MCP for Unity > Auto-Setup`), which batchmode has no path to.
-- **Therefore untested:** whether `mcp__unityMCP__*` tools work with the bridge up, and — the more
-  important one — whether they fail **loudly** with the bridge down or silently no-op. That
-  distinction is a design requirement and it remains unverified.
+### The finding
 
-**This needs one interactive pass on a machine with the Editor open.** It is the only part of the
-runbook that could not be automated.
+```
+$ claude mcp list
+No MCP servers configured. Use `claude mcp add` to add a server.
+```
+
+Run inside the freshly installed project, with `.claude/settings.json` containing exactly what the
+toolkit ships:
+
+```json
+"mcpServers": { "unityMCP": { "url": "http://localhost:8080/mcp" } }
+```
+
+**Claude Code does not read MCP server configuration from `.claude/settings.json`.** Project-scoped
+servers live in `.mcp.json` at the project root. The key the toolkit writes is simply ignored.
+
+This makes `MCP-SETUP.md`'s central claim false:
+
+> *"The toolkit ships `.claude/settings.json` preconfigured — it already contains
+> `mcpServers.unityMCP` … So there is **nothing to write in `settings.json` yourself**."*
+
+There is nothing to write in `settings.json` because writing it there does nothing. And the
+consequence is not narrow: **every `unity-*` agent and command drives the Editor through MCP.** As
+installed, that entire half of the toolkit — 20 engineering agents, 27 `/unity-*` commands — has no
+tools to call.
+
+### Confirmed remedy
+
+Writing `.mcp.json` at the project root makes the server visible:
+
+```
+$ claude mcp list
+unityMCP: http://localhost:8080/mcp (HTTP) - ⏸ Pending approval (run `claude` to approve)
+```
+
+Two things follow, and the installer must handle both:
+
+1. **Location.** `.mcp.json` at the project root, with `{"mcpServers": {"unityMCP": {"type": "http",
+   "url": "…"}}}`.
+2. **Approval.** Project-scoped MCP servers require a one-time interactive approval. Adding
+   `enabledMcpjsonServers: ["unityMCP"]` to `.claude/settings.json` did **not** clear it in this
+   version — the approval still showed as pending. Whatever the correct mechanism is, it is a
+   required install step and is currently absent from both the installer and the documentation.
+
+With the server reachable and approval bypassed, `mcp__unityMCP__manage_scene` appeared in the tool
+list and was called three times. The wiring works once the configuration is in the right file.
+
+### The bridge *can* be started headlessly — the runbook was wrong about this
+
+The runbook said the bridge needs the Editor UI. It does not. The package ships
+`MCPForUnity.Editor.McpCiBoot` and an `HttpAutoStartHandler` whose batch-mode guard is a door, not
+a wall:
+
+```csharp
+if (Application.isBatchMode &&
+    string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("UNITY_MCP_ALLOW_BATCH")))
+    return;
+```
+
+Working recipe, measured:
+
+```bash
+UNITY_MCP_ALLOW_BATCH=1 Unity -batchmode -nographics \
+  -projectPath <project> -executeMethod <Boot>.StartHttpBridge
+```
+
+where the boot method sets `MCPForUnity.UseHttpTransport` and calls
+`MCPServiceLocator.Server.StartLocalHttpServer(quiet: true)`.
+
+**`quiet: true` is load-bearing.** With the default `quiet: false` the method opens an
+`EditorUtility.DisplayDialog` confirmation, batchmode auto-cancels it, and the call returns `False`:
+
+```
+Canceling DisplayDialog: Start Local HTTP Server  Start the local MCP server in the background?
+This should not be called in batch mode.
+  ServerManagementService:StartLocalHttpServer (bool) at ServerManagementService.cs:301
+PIONEER_BOOT: StartLocalHttpServer returned False
+```
+
+With `quiet: true`: `returned True`, and a Python process listening on `127.0.0.1:8080` whose
+`/mcp` endpoint answers correctly (`{"jsonrpc":"2.0",…"Bad Request: Missing session ID"}`).
+
+### Still unmeasured
+
+The Editor↔server session never established under batchmode — the server ran, but the bridge
+reported no active Unity session, so no scene data was ever returned. Whether that is a batchmode
+limitation or a further configuration step is unknown.
+
+**Remaining for a human:** one interactive session with the Editor open, to confirm that
+`mcp__unityMCP__*` calls return real scene data.
+
+## 6b. Failing loudly — pass, twice
+
+The design requires that MCP-dependent work fail loudly rather than silently no-op or invent an
+answer. This was exercised under two different failure modes and passed both times.
+
+**Tools absent** (settings.json config ignored):
+
+> *"No Unity MCP tools are available in this session — the CoplayDev Unity MCP bridge doesn't appear
+> to be connected… I won't guess at the scene contents in the meantime."*
+
+**Tools present, bridge session dead:**
+
+> *"The Unity MCP bridge isn't connected — Unity Editor doesn't currently have an active MCP
+> session. I'm not going to guess at scene contents."*
+
+Both name the failure, cite `MCP-SETUP.md`, and explicitly refuse to fabricate. Note *how* this is
+achieved: by the rules and the model's judgment, not by a hook or any mechanism the toolkit enforces.
+It is a real pass, and it is a softer guarantee than the enforced ones.
+
+## 6c. The New Input System is mandated but not installed — **Important**
+
+Told to write `Input.GetKey`, the model correctly wrote `Keyboard.current.spaceKey.isPressed`
+(§5). The project then failed to compile:
+
+```
+Assets/Scripts/JumpInput.cs(2,19): error CS0234: The type or namespace name 'InputSystem'
+does not exist in the namespace 'UnityEngine'
+Scripts have compiler errors.
+```
+
+`unity-specifics.md` makes the New Input System **non-negotiable** and a hook blocks the legacy API,
+but nothing adds `com.unity.inputsystem` to `Packages/manifest.json`. The first script written under
+the project's own rules does not compile. The installer already edits the manifest for the MCP
+package, so the same mechanism is available.
+
+Consequence beyond the compile error: **compilation failure aborts `-executeMethod`**, so a broken
+script blocks Editor automation entirely.
 
 ## 7. Version pin — resolved
 
@@ -230,16 +346,31 @@ interactive pass in §6.
 
 Ordered by what blocks a real project first.
 
-1. **`session-save.sh` hangs any session in a non-git project** (§2). Highest priority: it makes the
-   toolkit unusable on first contact with a new Unity project.
-2. **The surface is not machine-selectable** (§4). Promoted to the first content item of Wave 1b.
-3. **No MCP version is pinned; the installer tracks `#main`** (§7).
-4. **`bash-gate.sh` matches unanchored substrings** (§5) — false positives on harmless commands.
-5. **The generated `CLAUDE.md` names the rules but does not import them** — they load anyway (§3), so
-   this is not a defect today; recorded because the file reads as though the listing is what loads
-   them, which would mislead anyone editing it.
+| # | Defect | § | Severity |
+|---|---|---|---|
+| 1 | `session-save.sh` hangs every session in a non-git project — the first-contact case | §2 | Critical |
+| 2 | MCP config is written to a file Claude Code does not read; the entire editor-control half of the toolkit is inert as installed, and `MCP-SETUP.md` states the opposite | §6 | Critical |
+| 3 | The surface is not machine-selectable — a competing plugin wins the most ordinary request | §4 | Critical |
+| 4 | The New Input System is mandated and hook-enforced, but never added to the manifest, so the first compliant script fails to compile — and that aborts Editor automation | §6c | Important |
+| 5 | No MCP version is pinned; the installer writes a branch ref, so the version depends on the install date | §7 | Important |
+| 6 | `bash-gate.sh` matches unanchored substrings — blocked a command that wrote nothing, because a path appeared inside a JSON argument | §5 | Important |
+| 7 | `bash-gate.sh`'s retry affordance requires a **byte-identical** retry, including unrelated lines in the same invocation; its message says "retry the same command" without saying that | §5 | Minor |
+| 8 | The generated `CLAUDE.md` lists the rules in a way that reads as though the listing is what loads them. They load anyway (§3), so this is not a defect today — recorded because it would mislead whoever edits that file next | §3 | Minor |
+
+Defects 1, 2 and 4 share a shape worth naming: **each is a case where the toolkit's documentation
+asserts something the code does not do.** The receipt says the bridge is preconfigured; the rules say
+the New Input System is mandatory; the hook says retrying will pass. All three are true as intentions
+and false as behaviour. That is the class of defect a smoke pass exists to find, and none of them
+were reachable from the test suite, which only ever proved the installer places correct bytes.
 
 ## What remains for a human
 
-An interactive session with the Unity Editor open and the MCP bridge started, to close §6 (bridge-up
-and bridge-down behaviour), §8 (stocktake), and the `/` completion-list count from the runbook's §1.
+One interactive session with the Unity Editor open, to close:
+
+- **§6** — whether `mcp__unityMCP__*` calls return real scene data once the Editor↔server session is
+  established. Everything up to that point is now measured.
+- **§8** — the `/unity-skill-stocktake` output.
+- **§1 of the runbook** — the `/` completion-list count, which headless mode has no equivalent for.
+
+Everything else in the runbook was measured. The runbook's claim that the bridge cannot be started
+without the Editor UI was wrong and has been corrected in §6.
