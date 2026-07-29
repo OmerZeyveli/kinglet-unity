@@ -95,25 +95,61 @@ echo ""
 error_count=0
 warning_count=0
 
-err()  { echo "  ${RED}[ERROR]${RESET} $*"; ((error_count++)); }
-warn_msg() { echo "  ${YELLOW}[WARN]${RESET}  $*"; ((warning_count++)); }
+err()  { echo "  ${RED}[ERROR]${RESET} $*"; (( error_count += 1 )); }
+warn_msg() { echo "  ${YELLOW}[WARN]${RESET}  $*"; (( warning_count += 1 )); }
 info() { echo "  ${CYAN}[INFO]${RESET}  $*"; }
 
 # ---------------------------------------------------------------------------
 # 1. Collect all .asmdef files
-# ---------------------------------------------------------------------------
-declare -A ASMDEF_NAME_TO_PATH    # name -> file path
-declare -A ASMDEF_PATH_TO_NAME    # file path -> name
-declare -A ASMDEF_REFS            # name -> space-separated list of ref names
-declare -A ASMDEF_DIR             # name -> directory containing the asmdef
-declare -A ASMDEF_IS_EDITOR       # name -> true/false
-declare -A ASMDEF_IS_TEST         # name -> true/false
-declare -A ASMDEF_TEST_ONLY       # name -> true/false (from JSON)
+#
+# Seven `declare -A` maps become parallel indexed arrays, not seven separate tables: six of the
+# seven were keyed on the same thing (assembly `name`) — ASMDEF_NAME_TO_PATH, ASMDEF_REFS,
+# ASMDEF_DIR, ASMDEF_IS_EDITOR, ASMDEF_IS_TEST, ASMDEF_TEST_ONLY — so index i in every array below
+# is one record: the i-th assembly discovered. ASMDEF_PATHS[i] is that assembly's path, which is
+# what ASMDEF_PATH_TO_NAME existed for; it was written but never read anywhere in this script, and
+# is fully recoverable from ASMDEF_PATHS[i] if something needs it later, so it is not resurrected
+# as a separate reverse-lookup structure here.
+#
+# Name -> index lookups (needed for duplicate detection and for resolving a reference name to the
+# assembly it points at) use a linear scan (asmdef_index_of_name, below) rather than a sanitised
+# `printf -v` variable name per assembly. Two reasons: assembly counts are small (tens, maybe a
+# few hundred even in a large studio — nothing like the tens-of-thousands .meta-file scale that
+# made detect-missing-refs.sh and validate-meta-integrity.sh need a real lookup structure), so O(n)
+# per lookup costs nothing here; and assembly names contain dots (e.g. "MyCompany.MyGame.Core"),
+# which are illegal in bash identifiers, so a `printf -v`-based scheme would need its own
+# collision-free sanitisation — a second problem to get right for no measurable win at this scale.
+#
+# ASMDEF_REFS[i] holds jq's reference-list output with internal newlines converted to spaces:
+# a `<TAB>`-delimited record can't carry an embedded newline in one field, and the original already
+# consumed this value with `for ref in $refs`, which word-splits on any whitespace — so joining on
+# spaces instead of newlines changes nothing about how it's read.
+ASMDEF_NAMES=()
+ASMDEF_PATHS=()
+ASMDEF_DIRS=()
+ASMDEF_REFS=()
+ASMDEF_IS_EDITOR=()
+ASMDEF_IS_TEST=()
+ASMDEF_TEST_ONLY=()
 
 asmdef_count=0
 
+# Linear scan for the index of `target` in ASMDEF_NAMES. Prints the index and returns 0 if found;
+# returns 1 (nothing printed) otherwise. Assembly counts don't justify anything smarter — see the
+# note above ASMDEF_NAMES.
+asmdef_index_of_name() {
+    local target="$1"
+    local i
+    for ((i = 0; i < ${#ASMDEF_NAMES[@]}; i++)); do
+        if [[ "${ASMDEF_NAMES[$i]}" == "$target" ]]; then
+            echo "$i"
+            return 0
+        fi
+    done
+    return 1
+}
+
 while IFS= read -r -d '' asmdef_file; do
-    ((asmdef_count++))
+    (( asmdef_count += 1 ))
 
     # Parse JSON
     name=$(jq -r '.name // empty' "$asmdef_file" 2>/dev/null || true)
@@ -123,23 +159,24 @@ while IFS= read -r -d '' asmdef_file; do
     fi
 
     # Check for duplicate names
-    if [[ -n "${ASMDEF_NAME_TO_PATH[$name]:-}" ]]; then
+    if existing_idx=$(asmdef_index_of_name "$name"); then
         err "Duplicate assembly name '$name':"
-        echo "         ${ASMDEF_NAME_TO_PATH[$name]#"$PROJECT_ROOT/"}"
+        echo "         ${ASMDEF_PATHS[$existing_idx]#"$PROJECT_ROOT/"}"
         echo "         ${asmdef_file#"$PROJECT_ROOT/"}"
         continue
     fi
 
-    ASMDEF_NAME_TO_PATH["$name"]="$asmdef_file"
-    ASMDEF_PATH_TO_NAME["$asmdef_file"]="$name"
-    ASMDEF_DIR["$name"]="$(dirname "$asmdef_file")"
+    idx=${#ASMDEF_NAMES[@]}
+    ASMDEF_NAMES[idx]="$name"
+    ASMDEF_PATHS[idx]="$asmdef_file"
+    ASMDEF_DIRS[idx]="$(dirname "$asmdef_file")"
 
     # Extract references (can be plain names or GUIDs in GUID: format)
-    refs=$(jq -r '(.references // [])[] | select(startswith("GUID:") | not)' "$asmdef_file" 2>/dev/null || true)
-    ASMDEF_REFS["$name"]="$refs"
+    refs_raw=$(jq -r '(.references // [])[] | select(startswith("GUID:") | not)' "$asmdef_file" 2>/dev/null || true)
+    ASMDEF_REFS[idx]=$(printf '%s' "$refs_raw" | tr '\n' ' ')
 
     # Determine if Editor assembly
-    asmdef_dir_lower=$(echo "$(dirname "$asmdef_file")" | tr '[:upper:]' '[:lower:]')
+    asmdef_dir_lower=$(echo "${ASMDEF_DIRS[idx]}" | tr '[:upper:]' '[:lower:]')
     include_platforms=$(jq -r '(.includePlatforms // [])[]' "$asmdef_file" 2>/dev/null || true)
     is_editor=false
     if echo "$include_platforms" | grep -qi 'editor'; then
@@ -147,7 +184,7 @@ while IFS= read -r -d '' asmdef_file; do
     elif [[ "$asmdef_dir_lower" == */editor* ]] || echo "$name" | grep -qi '\.editor'; then
         is_editor=true
     fi
-    ASMDEF_IS_EDITOR["$name"]="$is_editor"
+    ASMDEF_IS_EDITOR[idx]="$is_editor"
 
     # Determine if Test assembly
     is_test=false
@@ -159,7 +196,7 @@ while IFS= read -r -d '' asmdef_file; do
     if echo "$define_constraints" | grep -q 'UNITY_INCLUDE_TESTS'; then
         is_test=true
     fi
-    ASMDEF_IS_TEST["$name"]="$is_test"
+    ASMDEF_IS_TEST[idx]="$is_test"
 
     # testOnly field (Unity doesn't have this natively, but some projects use defineConstraints)
     # We consider it "test only" if defineConstraints includes UNITY_INCLUDE_TESTS
@@ -167,7 +204,7 @@ while IFS= read -r -d '' asmdef_file; do
     if echo "$define_constraints" | grep -q 'UNITY_INCLUDE_TESTS'; then
         test_only=true
     fi
-    ASMDEF_TEST_ONLY["$name"]="$test_only"
+    ASMDEF_TEST_ONLY[idx]="$test_only"
 
     if $VERBOSE; then
         info "Assembly: $name (editor=$is_editor, test=$is_test)"
@@ -189,35 +226,45 @@ fi
 # ---------------------------------------------------------------------------
 echo "${BOLD}--- Circular Reference Check ---${RESET}"
 
-declare -A VISIT_STATE  # 0=unvisited, 1=in-progress, 2=done
+# VISIT_STATE indexed the same way as ASMDEF_NAMES/ASMDEF_REFS/etc: index i is this assembly's DFS
+# state (0=unvisited, 1=in-progress, 2=done). It is mutated on every recursive call, which is the
+# actual design question here (not just "which container type") — a structure rewritten wholesale
+# per mutation would make each visit O(n) inside an already-recursive walk. A single-element
+# indexed-array write, `VISIT_STATE[idx]=1`, is O(1) regardless of how many assemblies exist, same
+# as the `declare -A` version was, so nothing is lost by leaving `declare -A` behind here.
+VISIT_STATE=()
+for ((vi = 0; vi < ${#ASMDEF_NAMES[@]}; vi++)); do
+    VISIT_STATE[vi]=0
+done
 cycle_found=false
 
 detect_cycle() {
-    local node="$1"
+    local idx="$1"
     local path="$2"
 
-    VISIT_STATE["$node"]=1  # in-progress
+    VISIT_STATE[idx]=1  # in-progress
 
-    local refs="${ASMDEF_REFS[$node]:-}"
+    local refs="${ASMDEF_REFS[$idx]:-}"
+    local ref ref_idx state
     for ref in $refs; do
         # Skip references to assemblies not in our project (Unity packages etc.)
-        [[ -z "${ASMDEF_NAME_TO_PATH[$ref]:-}" ]] && continue
+        ref_idx=$(asmdef_index_of_name "$ref") || continue
 
-        local state="${VISIT_STATE[$ref]:-0}"
+        state="${VISIT_STATE[$ref_idx]}"
         if (( state == 1 )); then
             err "Circular reference detected: ${path} -> ${ref}"
             cycle_found=true
         elif (( state == 0 )); then
-            detect_cycle "$ref" "${path} -> ${ref}"
+            detect_cycle "$ref_idx" "${path} -> ${ref}"
         fi
     done
 
-    VISIT_STATE["$node"]=2  # done
+    VISIT_STATE[idx]=2  # done
 }
 
-for name in "${!ASMDEF_NAME_TO_PATH[@]}"; do
-    if [[ "${VISIT_STATE[$name]:-0}" == "0" ]]; then
-        detect_cycle "$name" "$name"
+for ((di = 0; di < ${#ASMDEF_NAMES[@]}; di++)); do
+    if [[ "${VISIT_STATE[$di]}" == "0" ]]; then
+        detect_cycle "$di" "${ASMDEF_NAMES[$di]}"
     fi
 done
 
@@ -233,18 +280,22 @@ echo ""
 echo "${BOLD}--- Editor Assembly Checks ---${RESET}"
 editor_issues=false
 
-for name in "${!ASMDEF_NAME_TO_PATH[@]}"; do
-    is_editor="${ASMDEF_IS_EDITOR[$name]}"
-    refs="${ASMDEF_REFS[$name]:-}"
+for ((ei = 0; ei < ${#ASMDEF_NAMES[@]}; ei++)); do
+    name="${ASMDEF_NAMES[$ei]}"
+    is_editor="${ASMDEF_IS_EDITOR[$ei]}"
 
     if [[ "$is_editor" == "true" ]]; then
         # Editor assemblies should not be referenced by runtime assemblies
-        for other_name in "${!ASMDEF_NAME_TO_PATH[@]}"; do
-            [[ "$other_name" == "$name" ]] && continue
-            [[ "${ASMDEF_IS_EDITOR[$other_name]}" == "true" ]] && continue
-            [[ "${ASMDEF_IS_TEST[$other_name]}" == "true" ]] && continue
+        for ((ej = 0; ej < ${#ASMDEF_NAMES[@]}; ej++)); do
+            (( ej == ei )) && continue
+            [[ "${ASMDEF_IS_EDITOR[$ej]}" == "true" ]] && continue
+            [[ "${ASMDEF_IS_TEST[$ej]}" == "true" ]] && continue
 
-            other_refs="${ASMDEF_REFS[$other_name]:-}"
+            other_name="${ASMDEF_NAMES[$ej]}"
+            other_refs="${ASMDEF_REFS[$ej]:-}"
+            # Left as `echo | grep -qw` — Task 9 examined this exact line (an asmdef's own
+            # reference list, jq-derived, bounded in practice) and classified it clean; not
+            # redone here.
             if echo "$other_refs" | grep -qw "$name"; then
                 err "Runtime assembly '$other_name' references Editor assembly '$name'."
                 editor_issues=true
@@ -265,9 +316,10 @@ echo ""
 echo "${BOLD}--- Test Assembly Checks ---${RESET}"
 test_issues=false
 
-for name in "${!ASMDEF_NAME_TO_PATH[@]}"; do
-    is_test="${ASMDEF_IS_TEST[$name]}"
-    test_only="${ASMDEF_TEST_ONLY[$name]}"
+for ((ti = 0; ti < ${#ASMDEF_NAMES[@]}; ti++)); do
+    name="${ASMDEF_NAMES[$ti]}"
+    is_test="${ASMDEF_IS_TEST[$ti]}"
+    test_only="${ASMDEF_TEST_ONLY[$ti]}"
 
     if [[ "$is_test" == "true" && "$test_only" == "false" ]]; then
         warn_msg "Test assembly '$name' lacks UNITY_INCLUDE_TESTS defineConstraint. It may be included in production builds."
@@ -288,10 +340,7 @@ echo "${BOLD}--- Uncovered C# Files ---${RESET}"
 uncovered_count=0
 
 # Build list of asmdef directories (sorted deepest first for matching)
-asmdef_dirs=()
-for name in "${!ASMDEF_DIR[@]}"; do
-    asmdef_dirs+=("${ASMDEF_DIR[$name]}")
-done
+asmdef_dirs=("${ASMDEF_DIRS[@]}")
 
 is_covered() {
     local cs_dir="$1"
@@ -310,7 +359,7 @@ while IFS= read -r -d '' csfile; do
         if (( uncovered_count < 20 )); then
             warn_msg "No .asmdef coverage: $rel"
         fi
-        ((uncovered_count++))
+        (( uncovered_count += 1 ))
     fi
 done < <(find "$ASSETS_DIR" -name '*.cs' -not -path '*/Editor/*' -print0 2>/dev/null)
 
