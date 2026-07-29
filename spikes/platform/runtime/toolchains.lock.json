@@ -1,164 +1,204 @@
 {
+  "_note": "Toolchain artifacts are pinned PER HOST, because the artifact differs per host: `downloads` is a list of {host_id, url, checksum, checksum_algorithm, verified}. A single download_url per candidate was wrong and had already gone wrong -- the native Windows pass filled Go's one field with a windows-amd64 zip, which would have made the lock read as if Go were pinned to a Windows artifact on every host. An entry EXISTS only when the bytes were downloaded and hashed and the digest matched the vendor's published value; a host with no entry is simply not yet pinned, which is unambiguous in a way the old UNVERIFIED sentinel string was not. `checksum_algorithm` is recorded rather than assumed: Microsoft publishes SHA-512 for .NET SDK artifacts while Go, Rust and Astral publish SHA-256. A fabricated checksum is worse than an absent one.",
   "_schema": "kinglet.toolchains-lock/v1",
-  "_note": "Download checksums (download_sha256) and download URLs that cannot be verified offline are set to the sentinel UNVERIFIED-pending-native-host-fetch. They are filled during Task 7 native-host runs where the exact artifact can be fetched and hashed. A fabricated checksum is worse than an honest placeholder.",
-
-  "hosts": [
-    {
-      "id": "windows-10-x64",
-      "os": "Windows",
-      "release": "10 22H2",
-      "arch": "x64"
-    },
-    {
-      "id": "windows-11-x64",
-      "os": "Windows",
-      "release": "11 25H2",
-      "arch": "x64"
-    },
-    {
-      "id": "macos-apple-silicon",
-      "os": "macOS",
-      "release": "Tahoe 26.5.2",
-      "arch": "arm64"
-    },
-    {
-      "id": "macos-intel",
-      "os": "macOS",
-      "release": "Tahoe 26.5.2",
-      "arch": "x64"
-    },
-    {
-      "id": "ubuntu-lts-x64",
-      "os": "Ubuntu",
-      "release": "24.04.4 LTS",
-      "arch": "x64"
-    }
-  ],
-
   "candidates": [
     {
-      "id": "python-bundled",
-      "version": "3.14.6-pyinstaller6.21.0",
-      "toolchain": {
-        "name": "CPython",
-        "version": "3.14.6",
-        "download_url": "UNVERIFIED-pending-native-host-fetch",
-        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
-        "license_spdx": "PSF-2.0"
-      },
       "build_tool": {
+        "downloads": [
+          {
+            "checksum": "e490a6464492183c5d4534a5527fb4440f7f2bb2f228162ad7e4afe076dc0224",
+            "checksum_algorithm": "sha256",
+            "host_id": "ubuntu-lts-x64",
+            "url": "https://github.com/astral-sh/uv/releases/download/0.11.28/uv-x86_64-unknown-linux-gnu.tar.gz",
+            "verified": "downloaded and hashed on ubuntu-lts-x64 2026-07-29; the computed digest matches the vendor's published value"
+          }
+        ],
+        "license_spdx": "MIT",
         "name": "uv",
-        "version": "0.11.28",
-        "download_url": "UNVERIFIED-pending-native-host-fetch",
-        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
-        "license_spdx": "MIT"
-      },
-      "packager": {
-        "name": "PyInstaller",
-        "version": "6.21.0",
-        "license_spdx": "GPL-2.0-or-later WITH Bootloader-exception"
+        "version": "0.11.28"
       },
       "dependencies": [
         {
+          "license_spdx": "Apache-2.0 OR BSD-3-Clause",
           "name": "cryptography",
-          "version": "49.0.0",
-          "license_spdx": "Apache-2.0 OR BSD-3-Clause"
+          "version": "49.0.0"
         }
       ],
-      "dependency_lock_path": "spikes/platform/runtime/python/uv.lock"
+      "dependency_lock_path": "spikes/platform/runtime/python/uv.lock",
+      "id": "python-bundled",
+      "packager": {
+        "license_spdx": "GPL-2.0-or-later WITH Bootloader-exception",
+        "name": "PyInstaller",
+        "version": "6.21.0"
+      },
+      "toolchain": {
+        "downloads": [
+          {
+            "checksum": "c172314f4a8ec137a8f605289010c3d19c8b56867d968f0095074cc68efa1d29",
+            "checksum_algorithm": "sha256",
+            "host_id": "ubuntu-lts-x64",
+            "url": "https://releases.astral.sh/github/python-build-standalone/releases/download/20260623/cpython-3.14.6%2B20260623-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "verified": "downloaded and hashed on ubuntu-lts-x64 2026-07-29; the computed digest matches the vendor's published value; artifact resolved by asking the PINNED uv 0.11.28 itself, which fixes python-build-standalone build 20260623 -- a different uv version pins a different build, so the locally installed uv 0.11.32 could not answer this"
+          }
+        ],
+        "license_spdx": "PSF-2.0",
+        "name": "CPython",
+        "version": "3.14.6"
+      },
+      "version": "3.14.6-pyinstaller6.21.0"
     },
     {
-      "id": "rust",
-      "version": "1.97.1",
-      "toolchain": {
-        "name": "Rust",
-        "version": "1.97.1",
-        "download_url": "UNVERIFIED-pending-native-host-fetch",
-        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
-        "license_spdx": "MIT OR Apache-2.0"
-      },
       "build_tool": {
+        "license_spdx": "MIT OR Apache-2.0",
         "name": "Cargo",
-        "version": "1.97.1",
-        "license_spdx": "MIT OR Apache-2.0"
+        "version": "1.97.1"
       },
       "dependencies": [
         {
+          "license_spdx": "BSD-3-Clause",
           "name": "ed25519-dalek",
-          "version": "3.0.0",
-          "license_spdx": "BSD-3-Clause"
+          "version": "3.0.0"
         },
         {
+          "license_spdx": "MIT OR Apache-2.0",
           "name": "hex",
-          "version": "0.4.3",
-          "license_spdx": "MIT OR Apache-2.0"
+          "version": "0.4.3"
         },
         {
+          "license_spdx": "MIT OR Apache-2.0",
           "name": "serde",
-          "version": "1.0.219",
-          "license_spdx": "MIT OR Apache-2.0"
+          "version": "1.0.219"
         },
         {
+          "license_spdx": "MIT OR Apache-2.0",
           "name": "serde_json",
-          "version": "1.0.140",
-          "license_spdx": "MIT OR Apache-2.0"
+          "version": "1.0.140"
         },
         {
+          "license_spdx": "MIT OR Apache-2.0",
           "name": "sha2",
-          "version": "0.10.9",
-          "license_spdx": "MIT OR Apache-2.0"
+          "version": "0.10.9"
         },
         {
+          "license_spdx": "MIT OR Apache-2.0",
           "name": "uuid",
-          "version": "1.16.0",
-          "license_spdx": "MIT OR Apache-2.0"
+          "version": "1.16.0"
         }
       ],
-      "dependency_lock_path": "spikes/platform/runtime/rust/Cargo.lock"
+      "dependency_lock_path": "spikes/platform/runtime/rust/Cargo.lock",
+      "id": "rust",
+      "toolchain": {
+        "downloads": [
+          {
+            "checksum": "b4cdbc7cc6b0ee0a2666b1872769fdb2ad8393b28b63952f6493b4b400e4832b",
+            "checksum_algorithm": "sha256",
+            "host_id": "ubuntu-lts-x64",
+            "url": "https://static.rust-lang.org/dist/rust-1.97.1-x86_64-unknown-linux-gnu.tar.gz",
+            "verified": "downloaded and hashed on ubuntu-lts-x64 2026-07-29; the computed digest matches the vendor's published value"
+          }
+        ],
+        "license_spdx": "MIT OR Apache-2.0",
+        "name": "Rust",
+        "version": "1.97.1"
+      },
+      "version": "1.97.1"
     },
     {
-      "id": "go",
-      "version": "1.26.5",
-      "toolchain": {
-        "name": "Go",
-        "version": "1.26.5",
-        "_note": "Filled on the native Windows 0R pass (2026-07-28). This is the windows-amd64 archive actually fetched and installed for that run; the digest was verified against go.dev's own release index before extraction. The other candidates' sentinels are deliberately left in place — their artifacts were not downloaded and hashed by hand on this host (uv resolved CPython, rustup resolved per-component tarballs, dotnet-install fetched and discarded the SDK zip), and a checksum that was not verified must not be written here.",
-        "download_url": "https://go.dev/dl/go1.26.5.windows-amd64.zip",
-        "download_sha256": "97e6b2a833b6d89f9ff17d25419ac0a7e3b482a044e9ab18cdef834bd834fd38",
-        "license_spdx": "BSD-3-Clause"
-      },
       "build_tool": {
+        "license_spdx": "BSD-3-Clause",
         "name": "go",
-        "version": "1.26.5",
-        "license_spdx": "BSD-3-Clause"
+        "version": "1.26.5"
       },
       "dependencies": [],
-      "dependency_lock_path": "spikes/platform/runtime/go/go.sum"
+      "dependency_lock_path": "spikes/platform/runtime/go/go.sum",
+      "id": "go",
+      "toolchain": {
+        "_note": "Filled on the native Windows 0R pass (2026-07-28). This is the windows-amd64 archive actually fetched and installed for that run; the digest was verified against go.dev's own release index before extraction. The other candidates' sentinels are deliberately left in place — their artifacts were not downloaded and hashed by hand on this host (uv resolved CPython, rustup resolved per-component tarballs, dotnet-install fetched and discarded the SDK zip), and a checksum that was not verified must not be written here.",
+        "downloads": [
+          {
+            "checksum": "5c2c3b16caefa1d968a94c1daca04a7ca301a496d9b086e17ad77bb81393f053",
+            "checksum_algorithm": "sha256",
+            "host_id": "ubuntu-lts-x64",
+            "url": "https://go.dev/dl/go1.26.5.linux-amd64.tar.gz",
+            "verified": "downloaded and hashed on ubuntu-lts-x64 2026-07-29; the computed digest matches the vendor's published value"
+          },
+          {
+            "checksum": "97e6b2a833b6d89f9ff17d25419ac0a7e3b482a044e9ab18cdef834bd834fd38",
+            "checksum_algorithm": "sha256",
+            "host_id": "windows-10-x64",
+            "url": "https://go.dev/dl/go1.26.5.windows-amd64.zip",
+            "verified": "fetched and installed on the native windows-10-x64 pass 2026-07-28; digest verified against go.dev's release index, and re-confirmed against that index from Linux 2026-07-29"
+          }
+        ],
+        "license_spdx": "BSD-3-Clause",
+        "name": "Go",
+        "version": "1.26.5"
+      },
+      "version": "1.26.5"
     },
     {
-      "id": "dotnet",
-      "version": "10.0.302",
-      "toolchain": {
-        "name": ".NET SDK",
-        "version": "10.0.302",
-        "runtime_version": "10.0.10",
-        "download_url": "UNVERIFIED-pending-native-host-fetch",
-        "download_sha256": "UNVERIFIED-pending-native-host-fetch",
-        "license_spdx": "MIT"
-      },
       "build_tool": {
+        "license_spdx": "MIT",
         "name": "dotnet",
-        "version": "10.0.302",
-        "license_spdx": "MIT"
+        "version": "10.0.302"
       },
       "dependencies": [
         {
+          "license_spdx": "MIT",
           "name": "NSec.Cryptography",
-          "version": "26.4.0",
-          "license_spdx": "MIT"
+          "version": "26.4.0"
         }
       ],
-      "dependency_lock_path": "spikes/platform/runtime/dotnet/packages.lock.json"
+      "dependency_lock_path": "spikes/platform/runtime/dotnet/packages.lock.json",
+      "id": "dotnet",
+      "toolchain": {
+        "downloads": [
+          {
+            "checksum": "10069bec8783596484a610332f090d562802a41b9b40e3327a5a5688b572e10c296ae300f940d40461f23c157ed1b0843c2f8e6b3f20d8d8d9d83432d8143bac",
+            "checksum_algorithm": "sha512",
+            "host_id": "ubuntu-lts-x64",
+            "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.302/dotnet-sdk-10.0.302-linux-x64.tar.gz",
+            "verified": "downloaded and hashed on ubuntu-lts-x64 2026-07-29; the computed digest matches the vendor's published value; Microsoft publishes SHA-512 for SDK artifacts, not SHA-256, which is why the algorithm is recorded beside the digest instead of assumed"
+          }
+        ],
+        "license_spdx": "MIT",
+        "name": ".NET SDK",
+        "runtime_version": "10.0.10",
+        "version": "10.0.302"
+      },
+      "version": "10.0.302"
+    }
+  ],
+  "hosts": [
+    {
+      "arch": "x64",
+      "id": "windows-10-x64",
+      "os": "Windows",
+      "release": "10 22H2"
+    },
+    {
+      "arch": "x64",
+      "id": "windows-11-x64",
+      "os": "Windows",
+      "release": "11 25H2"
+    },
+    {
+      "arch": "arm64",
+      "id": "macos-apple-silicon",
+      "os": "macOS",
+      "release": "Tahoe 26.5.2"
+    },
+    {
+      "arch": "x64",
+      "id": "macos-intel",
+      "os": "macOS",
+      "release": "Tahoe 26.5.2"
+    },
+    {
+      "arch": "x64",
+      "id": "ubuntu-lts-x64",
+      "os": "Ubuntu",
+      "release": "24.04.4 LTS"
     }
   ]
 }

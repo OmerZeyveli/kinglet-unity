@@ -106,9 +106,11 @@ recorded truthfully.
 5. Send back: the console output, `git status --short`, and the published evidence records. **Do
    not hand-edit any record.**
 
-This pass also fills the `download_url` / `download_sha256` fields in
-`spikes/platform/runtime/toolchains.lock.json`, which currently hold the honest sentinel
-`UNVERIFIED-pending-native-host-fetch`. They were deliberately not fabricated.
+This pass also adds this host's entries to `downloads` in
+`spikes/platform/runtime/toolchains.lock.json`. **That structure changed on 2026-07-29** — see §11.
+Artifacts are now pinned per host as `{host_id, url, checksum, checksum_algorithm, verified}`, and a
+host with no entry is simply not yet pinned. There is no sentinel string any more, and nothing is
+recorded that was not downloaded and hashed.
 
 **`run-host.ps1` has never executed on real Windows.** Two reviews found and fixed real bugs in it
 (`Split-Path -LiteralPath … -Parent` is an unresolvable parameter set; `$ErrorActionPreference='Stop'`
@@ -374,3 +376,61 @@ sw_vers -productVersion
 
 If it does not print `26.5.2` exactly, stop and decide — update/hold the Mac, or amend that cell's
 release the same way §10 requires for the others. Do not run the pass and hope.
+
+---
+
+## 11. Toolchain artifacts are pinned per host — the Linux pass, 2026-07-29
+
+`toolchains.lock.json` had one `download_url` / `download_sha256` pair per candidate, and eight of
+them still held the sentinel `UNVERIFIED-pending-native-host-fetch`. Both facts were problems.
+
+**The single field was wrong, and had already gone wrong.** A toolchain artifact differs per host —
+`go1.26.5.linux-amd64.tar.gz` and `go1.26.5.windows-amd64.zip` are different files with different
+digests. The native Windows pass filled Go's one field with the Windows zip, which left the lock
+reading as though Go were pinned to a Windows artifact on every host. Filling the remaining three
+with Linux artifacts would have produced a lock that was *coherent-looking and wrong*: one candidate
+pinned to Windows, three to Linux, nothing saying so.
+
+So the shape is now a list:
+
+```json
+"toolchain": {
+  "name": "Go", "version": "1.26.5", "license_spdx": "BSD-3-Clause",
+  "downloads": [
+    {"host_id": "ubuntu-lts-x64", "url": "...", "checksum": "...",
+     "checksum_algorithm": "sha256", "verified": "how it was verified"}
+  ]
+}
+```
+
+**An entry exists only when the bytes were downloaded and hashed here and the computed digest matched
+the vendor's published value.** A host with no entry is not yet pinned — unambiguous in a way a
+sentinel string is not, and impossible to mistake for a real value.
+
+What was pinned on 2026-07-29, all five downloaded on this Linux host and all five matching:
+
+| Candidate | Artifact | Published by | Algorithm |
+| --- | --- | --- | --- |
+| python-bundled (CPython 3.14.6) | python-build-standalone `20260623` linux-gnu | Astral `SHA256SUMS` | sha256 |
+| python-bundled (uv 0.11.28) | `uv-x86_64-unknown-linux-gnu.tar.gz` | GitHub release sidecar | sha256 |
+| rust 1.97.1 | `rust-1.97.1-x86_64-unknown-linux-gnu.tar.gz` | `static.rust-lang.org` sidecar | sha256 |
+| go 1.26.5 | `go1.26.5.linux-amd64.tar.gz` | go.dev release index | sha256 |
+| dotnet SDK 10.0.302 | `dotnet-sdk-10.0.302-linux-x64.tar.gz` | dotnet release-metadata | **sha512** |
+
+Three things this exposed that are worth carrying forward:
+
+1. **`checksum_algorithm` is recorded, not assumed.** Microsoft publishes SHA-512 for .NET SDK
+   artifacts; Go, Rust and Astral publish SHA-256. A field called `download_sha256` cannot hold
+   Microsoft's value without either lying about the algorithm or discarding the authoritative digest
+   and substituting one nobody published.
+2. **CPython's artifact can only be named by the pinned uv.** uv 0.11.28 fixes
+   python-build-standalone build `20260623`; the uv installed on this box is 0.11.32 and pins a
+   different build. So the pinned uv was itself downloaded, verified, and asked. Recording the
+   locally installed uv's answer would have pinned an artifact the project never uses.
+3. **Go's Windows entry was independently confirmed.** go.dev's index gives
+   `97e6b2a8…` for `go1.26.5.windows-amd64.zip` — byte-for-byte what the Windows pass recorded on
+   2026-07-28, checked from a different host on a different day.
+
+Still unpinned, and correctly so: every macOS entry, and the windows-10 entries for python, rust and
+dotnet. Those hosts' passes add them. Nothing about the runtime comparison depends on this; the lock
+is a supply-chain record, and 00D Task 3 is what consumes it.
