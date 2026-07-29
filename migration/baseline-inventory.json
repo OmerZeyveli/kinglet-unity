@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review.",
-  "source_commit": "72e4218b8837e295ece20b17cd38aa26c58298fb",
+  "source_commit": "6b1f5f45beddf45aadef1dbf34beeb7ed3458cbe",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 147,
     "files": [
       {
         "path": ".claude/NOTICE.md",
-        "sha256": "a5439f3f24e26b425805d241d34e00d2a776939db9cdffffadec33e651954d29",
+        "sha256": "aa76bd2690f332171a1c37acb391fcd668739ad2bd40465abdff25070726c19a",
         "git_mode": "100644"
       },
       {
         "path": ".claude/UPSTREAM",
-        "sha256": "a8cff64eca8b90dfaf2e8ded0a8d454aaaf723f013de0de914cefe751dda7b33",
+        "sha256": "bd0258cfa7db1efb06b89a3035da49edadffecb68cadc714429e59ca0afe7073",
         "git_mode": "100644"
       },
       {
         "path": ".claude/VERSION",
-        "sha256": "c28fcca53637bc88e124af1725df13cb98c69dedefd62fb3cdbe1cdb6b760624",
+        "sha256": "33bc14078f2fd2547bff74abf8ad5442c454c620225d3ca5afedb5448fcd5b77",
         "git_mode": "100644"
       },
       {
@@ -488,7 +488,7 @@
       },
       {
         "path": ".claude/rules/pc-console.md",
-        "sha256": "19c266510d5b0d9f906a2a765aef412869cddf46dcc793702a7c14668c6de78b",
+        "sha256": "bfaba7400e8b611096486159999f3813eced328993e45af49761a4eb95162458",
         "git_mode": "100644"
       },
       {
@@ -718,27 +718,27 @@
       },
       {
         "path": ".claude/templates/architecture-decision-record.md",
-        "sha256": "f431c45c91b8de23709e6c8520653b12eb28b4250cb0f853b98ab2d3509853e1",
+        "sha256": "d80f149aa9d17966df078b424528037c96f20afbcfddafddc04527840e905cb5",
         "git_mode": "100644"
       },
       {
         "path": ".claude/templates/game-concept.md",
-        "sha256": "155481ca3249400ddf96a4bf59b8ce646c44ec57f2ecd165f069e6fdfad75b10",
+        "sha256": "8ccb0447bae6c74b7b07968d192ddb802256a827b440d870d505b3a59fefae81",
         "git_mode": "100644"
       },
       {
         "path": ".claude/templates/game-design-document.md",
-        "sha256": "b83503c8fe5f4cd271b3b0a2b1fea7ce760250a2a4f9d236721b73cd62fac215",
+        "sha256": "f136f557424f842ccc742883b9f1a7906adf15b3b8e8f5aae73e155616292c18",
         "git_mode": "100644"
       },
       {
         "path": ".claude/templates/sprint-plan.md",
-        "sha256": "b3372faa8c3ceff172ebcbd80a018b675ab67aa4e24d5b00c1b0280220414bdd",
+        "sha256": "3ced8bc7b48cd4828f51feb48a3dbd88b22fdfb8b1eaa6e5268092e89e2e3c77",
         "git_mode": "100644"
       },
       {
         "path": ".claude/templates/systems-index.md",
-        "sha256": "a521e2ff6d3ab86ffff200ed5e02aa2786df2ad9f38914f3af2141ece9d5d0eb",
+        "sha256": "3d644e0bf8a04faa1c7a46b31e585a8e2007e3349ebdbd59c9cf1bc0630c0847",
         "git_mode": "100644"
       }
     ]
@@ -1429,7 +1429,7 @@
         },
         {
           "path": ".claude/rules/pc-console.md",
-          "sha256": "19c266510d5b0d9f906a2a765aef412869cddf46dcc793702a7c14668c6de78b",
+          "sha256": "bfaba7400e8b611096486159999f3813eced328993e45af49761a4eb95162458",
           "git_mode": "100644"
         },
         {
@@ -1455,27 +1455,27 @@
       "files": [
         {
           "path": ".claude/templates/architecture-decision-record.md",
-          "sha256": "f431c45c91b8de23709e6c8520653b12eb28b4250cb0f853b98ab2d3509853e1",
+          "sha256": "d80f149aa9d17966df078b424528037c96f20afbcfddafddc04527840e905cb5",
           "git_mode": "100644"
         },
         {
           "path": ".claude/templates/game-concept.md",
-          "sha256": "155481ca3249400ddf96a4bf59b8ce646c44ec57f2ecd165f069e6fdfad75b10",
+          "sha256": "8ccb0447bae6c74b7b07968d192ddb802256a827b440d870d505b3a59fefae81",
           "git_mode": "100644"
         },
         {
           "path": ".claude/templates/game-design-document.md",
-          "sha256": "b83503c8fe5f4cd271b3b0a2b1fea7ce760250a2a4f9d236721b73cd62fac215",
+          "sha256": "f136f557424f842ccc742883b9f1a7906adf15b3b8e8f5aae73e155616292c18",
           "git_mode": "100644"
         },
         {
           "path": ".claude/templates/sprint-plan.md",
-          "sha256": "b3372faa8c3ceff172ebcbd80a018b675ab67aa4e24d5b00c1b0280220414bdd",
+          "sha256": "3ced8bc7b48cd4828f51feb48a3dbd88b22fdfb8b1eaa6e5268092e89e2e3c77",
           "git_mode": "100644"
         },
         {
           "path": ".claude/templates/systems-index.md",
-          "sha256": "a521e2ff6d3ab86ffff200ed5e02aa2786df2ad9f38914f3af2141ece9d5d0eb",
+          "sha256": "3d644e0bf8a04faa1c7a46b31e585a8e2007e3349ebdbd59c9cf1bc0630c0847",
           "git_mode": "100644"
         }
       ]
