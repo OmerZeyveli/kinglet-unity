@@ -32,6 +32,23 @@ assert_not_contains "$TMC_SETTINGS" "mcpServers" \
 TMC_RECEIPT=$(cat "${TMC_MOCK}/.claude/state/install-receipt.tsv" 2>/dev/null || echo "")
 assert_contains "$TMC_RECEIPT" ".mcp.json" "the receipt records .mcp.json"
 
+# Direct field-structure assertion — not incidental. A tab written as a literal `\t` inside double
+# quotes (instead of an actual tab character) produces a row that "contains .mcp.json" as a string
+# and would still pass the assert_contains above, but splits into one field, not four, and
+# uninstall.sh's `IFS=$'\t' read` then never matches it against any project path. This is the
+# assertion that catches that bug directly, at the row itself, instead of three steps downstream
+# in whichever uninstall assertion happens to depend on the row being well-formed.
+TMC_RECEIPT_LINE=$(awk -F'\t' '$1 == ".mcp.json" {print; exit}' \
+    "${TMC_MOCK}/.claude/state/install-receipt.tsv" 2>/dev/null || echo "")
+TMC_FIELD_COUNT=$(printf '%s' "$TMC_RECEIPT_LINE" | awk -F'\t' '{print NF}')
+assert_eq "4" "$TMC_FIELD_COUNT" \
+    "the .mcp.json receipt row splits into exactly 4 tab-separated fields (path, sha256, mode, origin)"
+
+IFS=$'\t' read -r TMC_RECEIPT_PATH TMC_RECEIPT_SHA TMC_RECEIPT_MODE TMC_RECEIPT_ORIGIN <<EOF
+$TMC_RECEIPT_LINE
+EOF
+assert_eq ".mcp.json" "$TMC_RECEIPT_PATH" "the .mcp.json receipt row's first field is exactly the path"
+
 # An existing .mcp.json belongs to the user and is not overwritten.
 rm -rf "$TMC_MOCK/.claude" "$TMC_MOCK/.mcp.json"
 printf '{"mcpServers":{"mine":{"type":"http","url":"http://localhost:9999/mcp"}}}\n' \
