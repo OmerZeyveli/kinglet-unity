@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review.",
-  "source_commit": "15d09c64894a441b9918a96d74d0f4f5daa307d4",
+  "source_commit": "026a33553277d6202949ba115b4af60fe6720469",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 147,
@@ -218,7 +218,7 @@
       },
       {
         "path": ".claude/commands/unity-doctor.md",
-        "sha256": "9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588",
+        "sha256": "167816dc2a3ba6ebba882100c767273c440d1fcfb03f3bc2d64651f909126dae",
         "git_mode": "100644"
       },
       {
@@ -951,7 +951,7 @@
         },
         {
           "path": ".claude/commands/unity-doctor.md",
-          "sha256": "9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588",
+          "sha256": "167816dc2a3ba6ebba882100c767273c440d1fcfb03f3bc2d64651f909126dae",
           "git_mode": "100644"
         },
         {
