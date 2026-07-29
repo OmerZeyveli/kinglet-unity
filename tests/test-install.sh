@@ -99,5 +99,53 @@ fi
 # Verify CLAUDE.md was generated
 assert_file_exists "${MOCK_DIR}/CLAUDE.md" "install generates CLAUDE.md"
 
+# --- Test: .gitignore matches a realistic uninstall backup path (Defect 8) ---
+# uninstall.sh writes .claude.backup.<timestamp>/ at the project root. The .gitignore entries the
+# installer adds must match that path, or the backup shows up as untracked and dirties the user's
+# git status in their own repository.
+BACKUP_SAMPLE="${MOCK_DIR}/.claude.backup.20260101120000"
+mkdir -p "$BACKUP_SAMPLE"
+if command -v git >/dev/null 2>&1; then
+    ( cd "$MOCK_DIR" && git init -q . ) 2>/dev/null
+    IGNORE_EXIT=0
+    ( cd "$MOCK_DIR" && git check-ignore -q ".claude.backup.20260101120000/" ) || IGNORE_EXIT=$?
+    assert_eq "0" "$IGNORE_EXIT" ".gitignore matches a realistic uninstall backup path"
+else
+    assert_contains "$(cat "${MOCK_DIR}/.gitignore" 2>/dev/null)" ".claude.backup" ".gitignore has a pattern for backup dirs (no git available)"
+fi
+rm -rf "$BACKUP_SAMPLE"
+
+# --- Test: next-steps message follows the CLAUDE.md branch actually taken (Defect 9) ---
+# Fresh mock project without an existing CLAUDE.md: install writes CLAUDE.md directly, so telling
+# the user to edit CLAUDE.md is correct here.
+assert_contains "$INSTALL_OUTPUT" "CLAUDE.md" "next steps mention CLAUDE.md when it was freshly generated"
+
+# --- Test: a project that already has a CLAUDE.md gets CLAUDE.md.generated, and the message says so ---
+MOCK_DIR2="/tmp/unity-test-mock-existing-claudemd-$$"
+mkdir -p "${MOCK_DIR2}/Assets/Scripts"
+mkdir -p "${MOCK_DIR2}/ProjectSettings"
+mkdir -p "${MOCK_DIR2}/Packages"
+echo "m_EditorVersion: 2022.3.20f1" > "${MOCK_DIR2}/ProjectSettings/ProjectVersion.txt"
+cat > "${MOCK_DIR2}/Packages/manifest.json" << 'MANIFEST2'
+{
+  "dependencies": {
+    "com.unity.ugui": "1.0.0"
+  }
+}
+MANIFEST2
+cat > "${MOCK_DIR2}/CLAUDE.md" << 'EXISTINGCLAUDEMD'
+# My Own Project Notes
+
+This project already has its own CLAUDE.md with no generated markers.
+EXISTINGCLAUDEMD
+
+INSTALL_OUTPUT2=$(bash "$INSTALL_SCRIPT" --project-dir "$MOCK_DIR2" 2>&1) || true
+
+assert_file_exists "${MOCK_DIR2}/CLAUDE.md.generated" "install writes CLAUDE.md.generated when a CLAUDE.md already exists without markers"
+assert_contains "$INSTALL_OUTPUT2" "CLAUDE.md.generated" "next steps name CLAUDE.md.generated when that is the branch taken"
+assert_not_contains "$INSTALL_OUTPUT2" "Fill in the FILL: markers in CLAUDE.md —" "next steps do not tell the user to edit CLAUDE.md when it was left untouched"
+
+rm -rf "$MOCK_DIR2"
+
 # --- Cleanup ---
 rm -rf "$MOCK_DIR"

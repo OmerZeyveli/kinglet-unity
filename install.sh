@@ -298,11 +298,16 @@ ok "Installed $WRITTEN file(s)$([ "$KEPT" -gt 0 ] && printf ', kept %s of yours'
 # writing the same path, which corrupted fresh files and destroyed existing ones.
 CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
 GEN="$SCRIPT_DIR/scripts/generate-claude-md.sh"
+# Tracks which branch below actually ran, so the "Next steps" summary can name the file it really
+# touched instead of assuming CLAUDE.md was (re)written. See defect 9: the installer already knows
+# this — it just wasn't asked.
+CLAUDE_MD_BRANCH="skipped"
 if [ -f "$GEN" ]; then
   TMP_MD=$(mktemp)
   if [ ! -f "$CLAUDE_MD" ]; then
     if bash "$GEN" "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       mv "$TMP_MD" "$CLAUDE_MD"; ok "Generated CLAUDE.md"
+      CLAUDE_MD_BRANCH="new"
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md generation failed — skipped."
     fi
@@ -316,6 +321,7 @@ if [ -f "$GEN" ]; then
       ' "$CLAUDE_MD" > "$TMP_MD.merged" && mv "$TMP_MD.merged" "$CLAUDE_MD"
       rm -f "$TMP_MD"
       ok "Refreshed the generated section of CLAUDE.md (your prose untouched)"
+      CLAUDE_MD_BRANCH="refreshed"
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md refresh failed — left as-is."
     fi
@@ -324,6 +330,7 @@ if [ -f "$GEN" ]; then
       mv "$TMP_MD" "$PROJECT_DIR/CLAUDE.md.generated"
       warn "CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead."
       warn "Yours was not touched. Merge by hand, or add the markers to let us refresh in place."
+      CLAUDE_MD_BRANCH="separate"
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md generation failed — skipped."
     fi
@@ -337,7 +344,8 @@ fi
 # covered, and appending our three entries to it is just noise in someone else's file.
 GITIGNORE="$PROJECT_DIR/.gitignore"
 WANT_IGNORED='.claude/settings.local.json
-.claude/state/session.json'
+.claude/state/session.json
+.claude.backup.20260101120000/'
 
 already_ignored() {
   git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1 || return 1
@@ -366,6 +374,9 @@ else
   add_ignore '.claude/settings.local.json'
   add_ignore '.claude/state/*'
   add_ignore '!.claude/state/.gitkeep'
+  # uninstall.sh writes its backup to .claude.backup.<timestamp>/ at the project root. Without this,
+  # every uninstall leaves an untracked directory that dirties `git status` in the user's own repo.
+  add_ignore '.claude.backup.*/'
   [ "$ADDED" -gt 0 ] && ok "Updated .gitignore ($ADDED entries)" || ok ".gitignore already has our entries."
 fi
 
@@ -476,11 +487,28 @@ printf '  %sSkills%s    %s\n'   "$CYAN" "$NC" "$(count_in skills 'SKILL.md')"
 printf '  %sHooks%s     %s\n'   "$CYAN" "$NC" "$(count_hooks)"
 printf '  %sRules%s     %s\n'   "$CYAN" "$NC" "$(count_in rules '*.md')"
 printf '  %sTemplates%s %s\n'   "$CYAN" "$NC" "$(count_in templates '*.md')"
+# The CLAUDE.md step names whichever file this run actually wrote to — not a fixed string. See
+# defect 9: telling the user to edit CLAUDE.md in the run where CLAUDE.md.generated was written
+# instead sends them to markers that live in a file the message never mentioned.
+case "$CLAUDE_MD_BRANCH" in
+  new)
+    CLAUDE_MD_STEP='Fill in the FILL: markers in CLAUDE.md — genre, pillars, vision, scope.'
+    ;;
+  separate)
+    CLAUDE_MD_STEP='Fill in the FILL: markers in CLAUDE.md.generated, then merge what you want into your own CLAUDE.md.'
+    ;;
+  refreshed)
+    CLAUDE_MD_STEP='CLAUDE.md already had its generated section refreshed — your own prose was left untouched.'
+    ;;
+  *)
+    CLAUDE_MD_STEP='CLAUDE.md generation was skipped — see the warning above.'
+    ;;
+esac
 cat <<EOF
 
 Next steps:
   1. Install the Unity MCP bridge — see MCP-SETUP.md (Window > MCP for Unity > Auto-Setup).
-  2. Fill in the FILL: markers in CLAUDE.md — genre, pillars, vision, scope.
+  2. $CLAUDE_MD_STEP
   3. Run 'claude' in your project and try /brainstorm, or /unity-audit for a health check.
   4. Health check any time: ./scripts/studio-doctor.sh --project-dir "$PROJECT_DIR"
 EOF
