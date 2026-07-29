@@ -680,6 +680,27 @@ record that explains the fix.
 - [ ] **Step 3:** Add a test asserting no *instruction* in `.claude/` tells a reader to find MCP configuration in `settings.json`. Scope it so the two legitimate explanatory comments do not fail it — if that cannot be expressed cleanly, say so and record the exclusion by exact path with its reason, the way the identity guard does.
 - [ ] **Step 4:** `.claude/` changed, so regenerate the baseline in a separate commit. Verify the suite and provenance.
 
+### Task 9: Sweep the early-exit pipe shape out of the rest of the tree
+
+**Added 2026-07-29, from Task 7.** Task 7 found that `echo "$haystack" | grep -qF "$needle"` in the
+assertion helpers reported failures that never happened: `grep -q` exits on first match without
+draining stdin, a haystack over `PIPE_BUF` cannot be written atomically, and the inherited
+`set -euo pipefail` turned the writer's SIGPIPE into a failed assertion.
+
+`grep -rn '| *grep -q' scripts/*.sh tests/*.sh` finds **39 occurrences across 12 files**:
+`scripts/{studio-doctor,validate-asmdefs,validate-architecture,validate-code-quality,validate-serialization,detect-missing-refs,analyze-build-size}.sh`,
+`tests/{run-tests,test-cross-validation,test-state,test-skills,test-assert-helpers-under-load}.sh`.
+
+**Most of them are fine, and that is the point of the task.** The shape is only dangerous when the
+left-hand side can produce more than a pipe buffer holds. `printf '%s' "$one_line" | grep -q …` is
+harmless; `find … | grep -q …` over a large tree is not. A sweep that rewrites all 39 is churn that
+hides the handful that matter.
+
+- [ ] **Step 1: Classify all 39 with a verdict each**, in a table in the report: file, line, what the writer produces, bounded or unbounded, verdict. Unreported clean cases are indistinguishable from missed ones.
+- [ ] **Step 2: Fix only the unbounded ones**, with a here-string or a form with no pipe.
+- [ ] **Step 3: Prove at least one.** Pick the worst case, reproduce a false result under contention the way Task 7 did, then show it fixed. A sweep with no reproduction is a guess with a table attached.
+- [ ] **Step 4:** Suite green with every file present; `check-provenance.sh` OK; `verbatim` rows flipped where edited; baseline regenerated in a separate commit if `.claude/` drifted.
+
 ## What this plan does not do
 
 | Deferred | To | Why |

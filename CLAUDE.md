@@ -74,9 +74,19 @@ Everything here is bash. A macOS host pass is planned (`.claude/UPSTREAM` curren
 one shipped host, `linux-x64`, but macOS compatibility is being kept intact for that future pass).
 That rules out `declare -A` (bash 4; macOS ships 3.2) and `grep -oP` (GNU-only).
 
-Under `set -euo pipefail`, **do not pipe into `head`**. When head exits early the writer gets SIGPIPE,
-pipefail turns 141 into a failure, and `set -e` kills the script. It fires on large inputs and hides
-on small ones, so it will pass your test and break in the field. Read the file with `awk` instead.
+Under `set -euo pipefail`, **do not pipe into a reader that exits early**. When it exits the writer
+gets SIGPIPE, pipefail turns 141 into a failure, and `set -e` kills the script. It fires on large
+inputs and hides on small ones, so it will pass your test and break in the field.
+
+`head` is the obvious one. **`grep -q` is the same trap** — it exits the instant it matches, without
+draining stdin. `tests/run-tests.sh`'s own assertion helpers did `echo "$haystack" | grep -qF
+"$needle"`, and on a haystack over `PIPE_BUF` under CPU contention that reported *assertion failed*
+while the needle was present the whole time. Three implementers hit it, called it a flake, and moved
+on; it reproduces every time if you run two suites at once. Use a here-string — `grep -qF -- "$needle"
+<<< "$haystack"` — or any form with no pipe.
+
+The reader does not have to be `head`. Ask of any pipeline: can the right-hand side stop reading
+before the left-hand side stops writing? Read the file with `awk` instead.
 
 Validate an argument before `shift 2` — `shift` fails under `set -u` before your error message can
 print, and the user gets a silent exit 1.
