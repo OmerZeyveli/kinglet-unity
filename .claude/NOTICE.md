@@ -20,7 +20,7 @@ Files not attributable to either — `rules/pc-console.md`, this notice, and the
 original to Kinglet Pioneer, MIT, Copyright (c) 2026 OmerZeyveli.
 
 The [CoplayDev Unity MCP bridge](https://github.com/CoplayDev/unity-mcp) is **not** included here.
-`settings.json` merely points at it on `localhost`; install it yourself via Package Manager.
+`.mcp.json` merely points at it on `localhost`; install it yourself via Package Manager.
 
 ---
 
