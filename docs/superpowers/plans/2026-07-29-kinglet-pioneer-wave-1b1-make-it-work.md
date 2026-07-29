@@ -651,6 +651,35 @@ suspects to check rather than assume: `install.sh`'s payload enumeration reads t
 - [ ] **Step 5: Verify.** The concurrent reproduction passes twice in a row; `bash tests/run-tests.sh`
   green with every file present; `scripts/check-provenance.sh` OK.
 
+### Task 8: Two documents still send the reader to the file Claude Code never reads
+
+**Added 2026-07-29, from Task 6's review.** Task 2 moved MCP configuration to `.mcp.json`; Task 6
+found `studio-doctor.sh` still looking in the old place, twice. The reviewer then found a third
+instance, and a sweep of the payload and docs found a fourth.
+
+Four references remain. **Two are stale instructions and must be fixed:**
+
+| File | Says |
+|---|---|
+| `.claude/commands/unity-doctor.md:19` | *"Check `.claude/settings.json` → `mcpServers.unityMCP.url`"* — this **ships to users** and tells their agent to diagnose the bridge by reading a key that no longer exists |
+| `docs/GETTING-STARTED.md:173` | *"Ensure `settings.json` has the correct `mcpServers` block"* — troubleshooting advice that cannot work |
+
+**Two are legitimate and must be left alone:**
+
+| File | Why it stays |
+|---|---|
+| `scripts/studio-doctor.sh:85` | A comment recording *why* settings.json is only a last-resort fallback — history, not instruction |
+| `MCP-SETUP.md:120` | Explains why `settings.local.json` fails for the same reason — explanation, not instruction |
+
+The distinction is the whole task: **prose that tells someone to do something must be true; prose that
+records why something is the way it is must stay.** A sweep that deletes both kinds destroys the
+record that explains the fix.
+
+- [ ] **Step 1:** Correct `.claude/commands/unity-doctor.md` to name `.mcp.json` and the key path that exists there. This is payload — it lands in a user's project, so it must match what `install.sh` writes.
+- [ ] **Step 2:** Correct `docs/GETTING-STARTED.md`'s troubleshooting step likewise.
+- [ ] **Step 3:** Add a test asserting no *instruction* in `.claude/` tells a reader to find MCP configuration in `settings.json`. Scope it so the two legitimate explanatory comments do not fail it — if that cannot be expressed cleanly, say so and record the exclusion by exact path with its reason, the way the identity guard does.
+- [ ] **Step 4:** `.claude/` changed, so regenerate the baseline in a separate commit. Verify the suite and provenance.
+
 ## What this plan does not do
 
 | Deferred | To | Why |
