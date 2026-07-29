@@ -44,12 +44,44 @@ shipped_scripts() {
 # Comment-line exclusion is deliberately simple (a line whose first non-blank character is '#');
 # it does not need to catch trailing inline comments because none of the constructs checked here
 # appear in one.
+#
+# NOT `grep -n "$@" "$f" | grep -vE '^[0-9]+:[[:space:]]*#' | grep -q .` — that was this guard's
+# own first draft, and it is the exact trap this file exists to close. `grep -q` exits the instant
+# it matches, without draining the rest of its input; on a shipped script large enough and with
+# enough real matches that the middle `grep -v`'s filtered output exceeds one pipe buffer before
+# the final `grep -q` reads its first line, the middle `grep -v` gets SIGPIPE'd (its own write end
+# closes early) and *its* exit status — not the final grep's — is what `pipefail` reports, because
+# pipefail returns the rightmost command that exited non-zero, and the final `grep -q` exiting 0
+# doesn't stop pipefail from finding the SIGPIPE'd middle command. That reports a genuinely present
+# violation as absent. Every shipped script is comfortably under that threshold today (the largest
+# is 398 lines), which is exactly why it would have shipped invisibly and bitten the first script
+# to grow past it.
+#
+# Fixed by removing the multi-stage pipe entirely: `grep -n "$@" "$f"` is captured once via command
+# substitution (which fully drains its writer — no early-exiting reader, same reason a here-string
+# is safe), then comment-filtering and match-detection happen in a plain bash loop reading that
+# already-captured text via a here-string. Nothing here reads from a live process that can close
+# its end while another process is still writing.
 grep_shipped() {
     local self
     self="$(basename "${BASH_SOURCE[0]}")"
+    local f matches line content trimmed hit
     shipped_scripts | while IFS= read -r f; do
         [ "$(basename "$f")" = "$self" ] && continue
-        if grep -n "$@" "$f" 2>/dev/null | grep -vE '^[0-9]+:[[:space:]]*#' | grep -q .; then
+        matches=$(grep -n "$@" "$f" 2>/dev/null || true)
+        [ -z "$matches" ] && continue
+        hit=0
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            content="${line#*:}"                                  # strip grep -n's "NNN:" prefix
+            trimmed="${content#"${content%%[![:space:]]*}"}"       # strip leading whitespace
+            case "$trimmed" in
+                '#'*) continue ;;
+            esac
+            hit=1
+            break
+        done <<< "$matches"
+        if [ "$hit" -eq 1 ]; then
             printf '%s\n' "$f"
         fi
     done
