@@ -10,6 +10,18 @@
 
 ---
 
+## Sequencing: Track 1 runs alone, first
+
+The owner's call, and it is the right one. **Track 1 runs by itself. Tracks 2, 3 and 4 start only once it has landed.**
+
+The reason is the dependency the four-way split otherwise hides: **this repository has no automated test of any kind.** Until Track 1 changes that, any code change is unverifiable — a compile proves the syntax, nothing proves the game still plays. Running a redesign Track in parallel with the Track that builds its safety net means the redesign finishes before the net exists.
+
+**What this changes for Tracks 2–4.** With a net in place they are no longer confined to reporting. **They may change code — and each writes tests for what it changes**, using the harness Track 1 established. A change without a test is a change nobody can verify later, including the person who made it.
+
+The Track descriptions below are written for the with-a-net world. Where one says "read-only" or "propose, do not apply", read that as the floor rather than the ceiling: propose first, then implement what you can cover with a test. **If Track 1 reports that this codebase cannot be tested without a structural change the owner has not approved, the floor is where Tracks 2–4 stay** — and that is the honest outcome, not a failure.
+
+---
+
 ## Ground rules — every Track
 
 ### Unity stays closed
@@ -144,7 +156,7 @@ The target is documentation **an AI acts on**, which is not documentation a pers
 
 ## Track 3 — The correctness sweep
 
-**Own:** `docs/hardening/review/`. **Read-only on all code.** You produce findings, not diffs.
+**Own:** `docs/hardening/review/`, plus any code you can fix **and cover with a test**. Track 1 has landed, so a fix you can test is a fix you may make.
 
 Go file by file through the ~150 first-party files. For each: do the bindings hold, do the call sites match the signatures, are the lifecycle assumptions sound, is there dead or unreachable code, does anything contradict its own comments?
 
@@ -167,13 +179,17 @@ Fan out to subagents — one per subsystem, or one per file for the large ones. 
 
 The bar for "certain" is not *am I confident this is better* — it is **would a wrong answer here stay invisible until someone plays the game.** If in doubt, it is Behavioural.
 
-Your report is the primary output. **Do not fix anything**, including the certain ones — Track 4 and the owner sequence what actually changes, and a read-only Track cannot conflict with the other three.
+**Fix the Certain findings, each with a test that fails before your fix and passes after.** No test, no fix — write it up instead. That rule is what keeps a sweep across 150 files from becoming 150 unverifiable edits.
+
+Behavioural and Structural findings stay reports regardless of how confident you are. Track 4 and the owner sequence those.
+
+Your report is still the primary output. A finding written clearly is worth more than a fix nobody can check.
 
 ---
 
 ## Track 4 — Design for quality and speed
 
-**Own:** `docs/hardening/design/`. **Read-only on code.** You produce proposals with enough specificity that someone could execute them.
+**Own:** `docs/hardening/design/`, and — for proposals you can cover with tests — their implementation. Propose first, implement second, and only what a test can hold.
 
 The owner's stated aim is a project that is faster to develop in and higher quality. Work out what would actually deliver that here, and be concrete enough to be argued with.
 
@@ -189,7 +205,7 @@ Ground it in what exists. Read the code, `AGENTS.md`, `docs/system-inventory.md`
 
 **Constraints on your proposals:**
 
-- **No test net exists.** Any proposal that requires broad refactoring is dangerous until Track 1 lands. Say what each proposal depends on.
+- **The net is only as wide as Track 1 made it.** Read what it actually covers before assuming a refactor is safe. A proposal touching untested code stays a proposal — say so explicitly rather than implementing past the coverage.
 - **Cost and risk, not just benefit.** A proposal without them is a wish.
 - **Sequence them.** Which must come first, which are independent, which are only worth doing together.
 - **"Leave it alone" is a real recommendation.** This project works. Say so where it is true.
