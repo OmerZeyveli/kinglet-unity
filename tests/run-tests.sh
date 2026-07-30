@@ -5,6 +5,22 @@
 # No external dependencies — plain bash with built-in assertion helpers.
 #
 # Usage: bash tests/run-tests.sh [--verbose]
+#
+# WHAT THE TOTAL COUNTS, AND WHAT IT DOES NOT.
+#
+# Results are aggregated by grepping each file's output for PASS/FAIL/SKIP tokens (see the subshell
+# note further down for why they cannot be shared variables), and `Total` is simply their sum — not a
+# count of tests that exist.
+#
+# So the Python suites reached through test-kinglet-build.sh and test-kinglet-spike.sh contribute
+# **nothing to Total when they pass**: `unittest -v` prints `ok`, not `PASS`. As of 2026-07-30 that is
+# 126 tests and 459 subtests invisible to the number below. When one of them FAILS it prints `FAIL:`
+# and is counted, and a file that exits non-zero without reporting a failure is caught separately —
+# so the omission is only ever in the safe direction, and no failure can hide in it.
+#
+# Left as-is deliberately rather than "fixed" by also counting `ok`: the totals are quoted in CLAUDE.md
+# and in several reports, and changing the arithmetic would silently invalidate every one of them. If
+# you do change it, update those in the same commit.
 # ============================================================================
 
 set -euo pipefail
