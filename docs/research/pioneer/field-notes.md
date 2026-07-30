@@ -807,5 +807,55 @@ Not a proposal yet — a note of what the evidence supports:
   because that is where the conversation was, and a decision written next to the work is written and a
   decision written into an empty folder is not. Worth understanding before prescribing `docs/adr/`
   harder.
-- Minor but real: `.claude/` is gitignored in this project, so the toolkit that ran the work is not
-  versioned alongside it. Anything Pioneer wants a project to keep must live outside `.claude/`.
+- Minor but real: `.claude/` was gitignored in this project, so the toolkit that ran the work was not
+  versioned alongside it. That turned out to have a cause worth its own section — see §37.
+
+---
+
+## 37. A blanket `/.claude/` predates the toolkit, and the installer reads it as consent
+
+`install.sh` asks git whether three specific paths are already ignored, and if they are, leaves the
+project's `.gitignore` alone. The comment explaining it is good manners and says so plainly: a project
+that ignores `/.claude/` wholesale is "a perfectly sensible choice, and one real projects make", so
+appending our entries would be "just noise in someone else's file".
+
+In Endless Evolution the wholesale line was added on **2026-06-10**. Pioneer was installed on
+**2026-07-30**. The line was written seven weeks before there was any toolkit to have an opinion
+about — by someone ignoring the settings file of a different tool entirely.
+
+The measured consequence: **179 files and 27,905 lines** — every agent, command, skill, hook and rule
+the hardening waves ran under, plus the provenance manifest recording what each vendored file is —
+existed on exactly one disk for the whole engagement. Every gate those waves built is reproducible
+from the repository. The thing that built them was not.
+
+The check conflates two different questions:
+
+- *Is the machine-specific local state ignored?* — Yes, and that is all `check-ignore` can answer.
+- *Has this project decided how to version the toolkit?* — Unanswerable from a line that predates it.
+
+The fix is not to edit someone else's `.gitignore`; leaving it alone is still right. It is to **say
+what it implies**, once, at install time: `/.claude/` is ignored wholesale, so the agents, commands,
+skills, hooks and rules being installed will not be versioned with the project — and here is the
+narrower rule if that is not what you want.
+
+### The checklist for actually tracking it, because this is a quiet way to blind a gate
+
+Committing `.claude/` in a Unity project is safe, but only after five checks, and four of them are
+the kind that fail silently:
+
+1. **No `.cs` anywhere under `.claude/`.** A compile gate that asserts "every tracked first-party
+   `.cs` appears in a project it builds" goes blind the moment a tracked `.cs` exists outside the
+   assembly graph. (Note how the operator-tools directory in this project ships an editor script as
+   `.cs.txt` for exactly this reason.)
+2. **It is outside `Assets/`**, so Unity neither imports it nor wants `.meta` files for it.
+3. **It is outside the documentation drift-test's map set**, or every path cited in a skill becomes a
+   claim the suite must verify.
+4. **No absolute paths or usernames in the tracked files** — the hook commands must be repo-relative,
+   or a collaborator's clone gets hooks pointing at your home directory.
+5. **The hook scripts keep mode `100755`.** Git preserves the executable bit, but only if it was set
+   when they were added; a fresh clone with `100644` hooks fails in a way that reads as "the hook did
+   not fire" rather than "the hook could not run".
+
+What stays ignored, and now for a stated reason rather than a blanket one: the local settings file
+(per-machine MCP enablement), `state/*` (session state and the install receipt, which carries machine
+paths), and the scheduled-tasks lock, which holds a live session id and pid.
