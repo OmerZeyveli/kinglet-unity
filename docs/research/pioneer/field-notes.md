@@ -723,3 +723,89 @@ Both are cheap to fix at the integration point and impossible to prevent at the 
 the convention matters more than the format: **number nothing that two writers can number
 simultaneously**, or accept that renumbering is part of merging and say so in the file. Sequential IDs
 in a file with concurrent writers are a distributed counter, and nobody treats them like one.
+
+---
+
+## 36. The documentation structure this project needed, and the one Pioneer ships
+
+Pioneer has three documentation folders, and every one of them is forward-looking:
+
+| Folder | Written by | Used in Endless Evolution |
+|---|---|---|
+| `docs/design/` | the eight design agents, `/brainstorm`, `/design-system` | **not at all** |
+| `docs/production/` | `/sprint-plan`, `/milestone-review`, `/retrospective` | **not at all** |
+| `docs/adr/` | `technical-director` | **not at all** |
+
+Zero of three, across a day that produced 17,316 lines of documentation. That is not a criticism of
+the design layer — it is the correct outcome for the job. Those folders describe a game being
+designed. This was an existing codebase being understood, and **Pioneer has no slot for
+reverse-documenting code that already exists.**
+
+### What the project already had, and what we did to it
+
+A pre-existing `AGENTS.md` layer: one at the repository root acting as a domain-routing table, plus
+one per subtree — twelve in all. We kept it. Four were deleted, all covering directories with no
+first-party logic (`Sprites/`, `TextMesh Pro/`, `URP Settings/`, and one whose contents moved). The
+rest were barely touched: the root grew 171 → 210 lines, `Assets/Core/` 94 → 95, `Assets/Enemies/`
+47 → 47.
+
+On top of it we added a layer that did not exist: **`docs/systems/`** — 21 documents, 8,926 lines, one
+per subsystem, each answering the same four questions.
+
+1. What does this own — the state it is authoritative for.
+2. What may I call, and what must be true first — the real public surface, found by grepping call
+   sites, with preconditions. **Not a generated member dump.**
+3. What breaks if I change it — callers and callees by filename, in both directions.
+4. Which numbers are somebody's tuning decision — the hand-tuned values and the gotchas already paid
+   for in debugging time.
+
+The division of labour is stated in the entry point rather than left to be inferred: **the routing
+table gets you to the folder, the subsystem document gets you to the contract, and both layers are
+maintained — neither replaces the other.**
+
+### The thing that actually made the difference, and it is not the shape
+
+Only one of those two layers is machine-checked. `DocumentationMapSpec` has an explicit map set —
+`docs/systems/` plus five root documents — and resolves every `Type.Member` citation in it by
+reflection over the loaded assemblies. **`AGENTS.md` is not in that set.** No test verifies a single
+claim in it.
+
+The difference showed up immediately and in both directions:
+
+- The moment the map test gained reflection it found real drift in the checked layer: a flag
+  documented as `BlockChase` that the code calls `BlocksChase`, and a `Detach()` method the docs
+  described that no longer existed.
+- The unchecked layer carried a wrong diagnosis for two full waves. The root `AGENTS.md` claimed 69
+  missing script references with "shared prefab suspected". The count was right; the diagnosis was
+  wrong — they are hand-placed components, not one prefab's instances — and nothing could tell anyone,
+  because prose about a *suspicion* has no symbol to resolve.
+
+So the transferable claim is narrow and strong: **a documentation layer is worth what its verification
+is worth.** Shape helps a reader; only a test keeps a document true. Everything else decays at the
+speed of the code.
+
+### Two design details worth copying
+
+- **Exempt the history explicitly, and say why.** `docs/hardening/**` and the change log are
+  deliberately outside the map set: they cite files that were correct when written and have since been
+  deleted, and rewriting history to satisfy a test would destroy exactly what makes it useful. A drift
+  test without an exemption category forces you to choose between a green suite and an honest record.
+- **Give the escape hatch a syntax.** A document that must cite something which does not exist —
+  describing a deletion, or quoting a finding about a name that was always wrong — declares it inline:
+  `<!-- map-check: allow-missing <path> -->` and `<!-- map-check: allow-name <symbol> -->`. Without
+  that, the first legitimate exception teaches someone to disable the check.
+
+### What this suggests for the toolkit, when we get to it
+
+Not a proposal yet — a note of what the evidence supports:
+
+- Pioneer would benefit from a **brownfield documentation slot** alongside the design-first three.
+  `docs/systems/` earned its place here: every track read it, and it is what the prompts pointed at.
+- The **drift test matters more than the template.** If only one of the two ships, ship the test.
+- The ADR slot did not attract the decisions it was built for. Architecture decisions in this project
+  landed in `docs/hardening/cross-unit-notices.md` — a cross-track proposal file with a status field —
+  because that is where the conversation was, and a decision written next to the work is written and a
+  decision written into an empty folder is not. Worth understanding before prescribing `docs/adr/`
+  harder.
+- Minor but real: `.claude/` is gitignored in this project, so the toolkit that ran the work is not
+  versioned alongside it. Anything Pioneer wants a project to keep must live outside `.claude/`.
