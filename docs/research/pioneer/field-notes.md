@@ -625,3 +625,101 @@ Advisory only, so nothing broke; but it is noise on exactly the message that wou
 real, which is how a guard trains its readers to ignore it. **Interpolating a path into a pattern is
 a bug unless the path is escaped or the match is anchored** — and `.` is the single most likely value
 in a tool that takes a directory argument.
+
+---
+
+## 30. Never gate on a warning count; gate on a keyed ceiling
+
+The recommended practice, written into this toolkit's own guidance, was to record a per-project
+compile-warning count and treat a number far below it as evidence that nothing was compiled. Three
+measurements retired it, and they generalise past this project:
+
+1. **The recorded numbers rot downward because the project improves.** Every cleanup that removes an
+   unused using makes the floor fire.
+2. **A per-project "N Warning(s)" is not a property of the code at all.** It is the sum over that
+   project and everything msbuild rebuilt underneath it, so it depends on build order and cache
+   state. Same tree, same sources, three different answers — sequential into a shared empty obj dir,
+   each project rebuilt in isolation, and a warm second pass — and two consecutive runs of the *same*
+   loop disagreed with each other. No floor can be stated for a number that is not stable.
+3. **The thing the rule was a proxy for is better done structurally.** A gate that deletes its own
+   scratch directories before building cannot produce an incremental no-op, so it does not need a
+   human to remember to clean-build. Measured cost: 12.0s clean against 10.5s warm for four projects.
+
+What replaced it is a **ceiling keyed by file and warning code**, not by line number, so ordinary
+edits do not churn it. A new or more-numerous warning fails. A warning that has been *fixed* does not
+fail — it prints a line asking you to delete the entry.
+
+That asymmetry is the reusable part: **a gate that fires when the project gets better is a gate people
+learn to ignore.** The floor rule had already trained one reader to conclude a working gate was blind.
+
+---
+
+## 31. An incremental no-op build reports a clean bill of health
+
+`0 Warning(s), 0 Error(s)` is what a build prints when it decided there was nothing to do. It is
+indistinguishable from a clean compile of everything, and it is the second-cheapest way this project
+found to make a gate lie (the first being a stale `.csproj`). A build gate should delete its own
+`obj`/`bin` scratch directories before it starts. It is worth about a second and a half.
+
+---
+
+## 32. Guards need their own tests, because all three failure modes look like silence
+
+After the `.`-as-regex bug, the fix came with a committed self-test — eleven cases run against fake
+processes — and its header makes the argument better than an abstraction could: a guard that decides
+whether Unity may run against a directory can be wrong in three directions, and **none of them is
+visible by reading the function.**
+
+- Permissive: corrupts a 3.7 GB `Library` four worktrees share.
+- Restrictive: blocks a run that had no conflict.
+- Advisory-but-always-firing: trains everyone to ignore the one message that matters.
+
+The evidence that this is not over-engineering: the *rewritten* guard failed three of its own cases on
+first run — it matched the test harness's own shell, and it read only the first `-projectPath` on a
+line carrying several. Both were found before the commit rather than after a corrupted Library.
+
+**Any check whose output is "nothing" when it passes should have a test that makes it say something.**
+
+---
+
+## 33. Tier a gate by what it needs, and make it say which tier ran
+
+The batch-tool gate runs source-level assertions with no Unity and no licence in about a second — that
+tier runs in cloud CI — and optionally spawns Unity per tool to read the real exit codes. It prints
+`PASS (STATIC only)` or `PASS (STATIC + FULL)`.
+
+This is the shape for anything licence-gated or slow: the cheap tier is honest about being cheap, so
+a CI badge means what it says, and the expensive tier is available locally without a second script to
+maintain. Compare the failure it avoids — a single-tier gate that silently degrades to the cheap
+checks and still prints PASS.
+
+---
+
+## 34. Writing the operator's steps is what finally measures the finding
+
+The worklist for editor-only work (§ the Developer Action Items pattern) produced seven entries in one
+wave, and the first one **corrected the finding it was written for.** The finding claimed the data sat
+"across 17 build scenes"; writing executable steps forced someone to look, and it was five assets, two
+of them shipping. Two other entries recommend *not* doing the work, with the cost of each option
+stated.
+
+That is the argument for the file beyond convenience: a finding can sit in a backlog for three waves
+carrying an unmeasured number, because nothing forces the measurement until someone has to write
+"open this asset, change this field". Requiring "which asset, which menu, which field, what to verify"
+is a measurement requirement disguised as a formatting rule.
+
+The rule that makes it work: **"the operator should decide about X" is not an entry.** State the
+options with costs and recommend one, so the operator decides rather than researches.
+
+---
+
+## 35. Shared append-only files need a merge convention, not just a format
+
+Two tracks independently wrote an "Entry 5" into the operator worklist in the same wave; the merge
+kept both and renumbered one. The same file had already produced a claim collision where one track
+claimed work another had finished, because an append-only file is only as fresh as your last pull.
+
+Both are cheap to fix at the integration point and impossible to prevent at the authoring point, so
+the convention matters more than the format: **number nothing that two writers can number
+simultaneously**, or accept that renumbering is part of merging and say so in the file. Sequential IDs
+in a file with concurrent writers are a distributed counter, and nobody treats them like one.
