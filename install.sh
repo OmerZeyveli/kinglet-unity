@@ -39,9 +39,20 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOOLKIT_VERSION="$(cat "$SCRIPT_DIR/.claude/VERSION" 2>/dev/null || echo unknown)"
 
 MCP_PKG_NAME="com.coplaydev.unity-mcp"
-# Pinned to the commit the Pioneer smoke pass actually measured against (see .claude/UPSTREAM),
-# not #main — which version a user got used to depend on the day they ran --with-mcp.
-MCP_PKG_URL="https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#a4c2d0a84573"
+# Pinned to v10.1.0's commit (see .claude/UPSTREAM), not #main — which version a user got used to
+# depend on the day they ran --with-mcp.
+#
+# It must be a FULL 40-character SHA or a tag. UPM rejects a short hash outright:
+#   "Could not clone. Make sure [<ref>] is a valid branch name, tag or full commit hash"
+#
+# The previous value here, `a4c2d0a84573`, was neither. It was read off the Unity package cache
+# directory `Library/PackageCache/com.coplaydev.unity-mcp@a4c2d0a84573` and recorded as a commit.
+# That suffix is Unity's own content hash, not a git revision — the same cache directory appears
+# with that identical suffix after resolving from this pin, and registry packages that have no git
+# repository at all carry one too (`com.unity.2d.animation@6e14714a57c6`). GitHub returns
+# "No commit found for SHA" for it. So --with-mcp could never have worked, and did not, until it
+# was run end to end on 2026-07-30.
+MCP_PKG_URL="https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#c14de1e6dc01ab42d2bb358730cff954bce0ce6b"
 
 # unity-specifics.md makes the New Input System non-negotiable and block-legacy-input.sh blocks
 # `Input.*` outright. Without the package a compliant script fails to compile — and a compile

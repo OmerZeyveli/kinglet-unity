@@ -28,10 +28,23 @@ install the Unity-side package, start the bridge, and approve the server (next s
 > `technical-director`, and friends — is a **documentation layer** and calls no MCP tools at all. It
 > works fine with the bridge offline.
 
-**Version:** these instructions — including the MCP-location fix, the approval step, and the
-headless bridge recipe below — were checked against `com.coplaydev.unity-mcp` at commit
-`a4c2d0a84573` (the same commit the toolkit pins with `--with-mcp`). See `.claude/UPSTREAM` for the
-pin of record.
+**Version:** the toolkit pins `com.coplaydev.unity-mcp` at `v10.1.0`, commit
+`c14de1e6dc01ab42d2bb358730cff954bce0ce6b`. That is what `--with-mcp` installs and what
+`.claude/UPSTREAM` records.
+
+The instructions below — the MCP-location fix, the approval step, the headless bridge recipe — were
+written against whatever `#main` resolved to during the smoke pass, which was never recorded. Read
+them as verified in shape, not against this exact commit. **What has been verified against this pin,
+end to end on 2026-07-30: the package resolves, the bridge starts, and `claude mcp list` reports it
+connected.**
+
+> **The pin must be a full 40-character SHA or a tag.** UPM refuses a short hash:
+> `Could not clone. Make sure [<ref>] is a valid branch name, tag or full commit hash`.
+> This file and `install.sh` carried `a4c2d0a84573` until 2026-07-30, which is not a commit at all —
+> it is the suffix of Unity's package cache directory
+> (`Library/PackageCache/com.coplaydev.unity-mcp@a4c2d0a84573`), a content hash rather than a git
+> revision. Registry packages with no git repository carry one too. Every `--with-mcp` install
+> failed on it, and nobody found out because the smoke pass had installed from `#main`.
 
 ---
 
@@ -57,7 +70,7 @@ In the Unity Editor:
 3. Paste:
 
    ```
-   https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#a4c2d0a84573
+   https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#c14de1e6dc01ab42d2bb358730cff954bce0ce6b
    ```
 
 This installs `com.coplaydev.unity-mcp` (the "MCP for Unity" editor package), pinned to the commit
@@ -67,7 +80,7 @@ you got used to depend on the day you installed. `./install.sh --with-mcp` pins 
 > Prefer to edit the manifest directly? Add this line to your project's
 > `Packages/manifest.json` dependencies:
 > ```json
-> "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#a4c2d0a84573"
+> "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#c14de1e6dc01ab42d2bb358730cff954bce0ce6b"
 > ```
 > Or run `./install.sh --with-mcp`, which inserts exactly that dependency into
 > `Packages/manifest.json` for you. It's a surgical insert, not a reformat: your manifest keeps its
@@ -84,6 +97,26 @@ you got used to depend on the day you installed. `./install.sh --with-mcp` pins 
 3. If the bridge isn't already running, click **Start Bridge** (a.k.a. "Start Server").
 
 Keep the Unity Editor open while you work — the MCP tools talk to the live Editor.
+
+### Auto-Setup empties the `.mcp.json` this toolkit ships
+
+Measured 2026-07-30. Before Auto-Setup, `.mcp.json` holds Pioneer's project-scoped entry. After it,
+that file reads `{"mcpServers": {}}` — the wizard **removed** the entry and registered its own server
+under `~/.claude.json` as *Local config (private to you in this project)*, at `127.0.0.1` rather than
+`localhost`.
+
+Both work. The difference is who else gets it: the project-scoped file is in git and every clone
+picks it up; the wizard's registration is private to one machine and one user, and a teammate cloning
+the repo sees nothing.
+
+Restoring `.mcp.json` while the wizard's entry exists gives you **two connected servers pointing at
+the same bridge**, which means duplicate tool sets in every session. Pick one:
+
+```bash
+git checkout .mcp.json                 # keep the versioned, team-visible registration
+claude mcp remove UnityMCP -s local    # and drop the wizard's private duplicate
+claude mcp list                        # expect exactly one, Connected
+```
 
 ### One-time approval, every fresh install
 
