@@ -859,3 +859,50 @@ the kind that fail silently:
 What stays ignored, and now for a stated reason rather than a blanket one: the local settings file
 (per-machine MCP enablement), `state/*` (session state and the install receipt, which carries machine
 paths), and the scheduled-tasks lock, which holds a live session id and pid.
+
+---
+
+## 38. Six green gates, and none of them built the game
+
+166 commits landed in one day behind a gate stack that grew from nothing to six checks: source
+layout, missing-script resolution, a runner guard self-test, a batch-tool exit-code gate, a compile
+gate with a file-set assertion and a warning ceiling, and 600 tests across EditMode and PlayMode. All
+six green. **No player build existed, and nothing had ever produced one.**
+
+The common property is easy to miss while you are building them one at a time: **every gate read the
+source tree, and none read the artifact.** `dotnet build` over Unity's generated `.csproj` files is
+the strongest of them and it is still the *Editor's* view of the world — those projects reference the
+Editor assemblies. The class of defect it cannot see:
+
+- runtime code reaching `UnityEditor`,
+- an asmdef whose platform list excludes the target,
+- a `#if UNITY_EDITOR` block that turned out to be load-bearing.
+
+All three compile cleanly and all three are fatal to a build. And the two changes most likely to
+produce one landed on exactly the day the gate did not exist: assembly definitions were introduced,
+and two editor-only classes were moved out of the player build behind an asmref.
+
+The fix is a `-executeMethod` entry point that calls `BuildPipeline.BuildPlayer` and gates on the
+result, wrapped in a runner that spawns it and reads `$?`. Three details earned their place:
+
+- **Treat a `Succeeded` report of zero bytes as a failure**, and an empty scene list as a failure
+  rather than a harness problem. A player built from no scenes succeeds and ships nothing — the same
+  green-but-meaningless shape as a compile gate that compiled nothing (§1) and a validator that
+  ignored its own findings.
+- **Keep it out of the pre-commit/pre-push path.** A build is minutes. A gate that makes `git push`
+  take five minutes is a gate people bypass with `--no-verify`, and a bypassed gate is worth less than
+  no gate because it still reads as coverage.
+- **Give it its own sandbox.** A build writes into `Library`; sharing the test sandbox makes builds
+  and test runs evict each other's warm caches, turning a 35-second suite back into minutes.
+
+Verified in both directions before it was believed, which is the standard the rest of this stack is
+held to: `StandaloneLinux64` produced a 167 MB player from 36 scenes in 1m40s, and a target whose
+module is not installed came back `result: Unknown`, 0 bytes, exit 2, printing the reason rather than
+the code alone. **A gate nobody has watched fail is a hypothesis.**
+
+### The general form, for the toolkit
+
+The question to ask of any gate stack is not "how many checks" but **"which of these reads what I
+ship?"** A stack can be arbitrarily thorough about sources and still be silent about the artifact.
+For Unity specifically, that means a player build; the equivalent elsewhere is whatever the user
+actually receives.
