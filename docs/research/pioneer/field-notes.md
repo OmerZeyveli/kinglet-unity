@@ -521,3 +521,107 @@ that aborted on compiler errors, because the pipeline's status is `tail`'s. This
 class as the compile gate that could not fail (§1, §8) and the validator that ignored its own findings —
 and it appeared here in the *invocation* rather than the script, which is the one place no amount of
 hardening inside the script can reach. Read `PIPESTATUS`, or do not pipe a gate.
+
+---
+
+## 24. An error message ran a `git merge`
+
+The compile gate's blind-file-set message contained this line:
+
+```bash
+echo "after `git merge hardening/base`, because the merge brings files your projects predate." >&2
+```
+
+Backticks inside a double-quoted string are command substitution. The gate did not *print*
+`git merge hardening/base` — it **ran** it, every time it reported a problem, and spliced the merge's
+output into its own sentence. The tell was the printed text reading "This is the usual state right
+after Already up to date., because the merge brings files your projects predate."
+
+A diagnostic that mutates the repository it is diagnosing. On a branch behind the integration branch
+it performs a real merge while the reader is being told about stale project files. The class is
+familiar from §1 and §8 — a tool doing something other than what it says — but this one *writes*.
+
+**Error-message strings are code.** `grep -n '"[^"]*`[^`]*`' *.sh` is a one-line check for the whole
+family, and inside comments it is harmless, so the false-positive rate is low enough to gate on.
+
+---
+
+## 25. The claim list paid for itself in one wave, and the way it failed is the interesting part
+
+A one-line-per-claim file, appended when work *starts*, was added after two tracks wrote the same
+spec twice (§21). Within a wave it caught a real collision: one track claimed a finding another had
+already fixed and merged. But it caught it **after** the fact, and the note the track left says why:
+*"I did not see the claim because it was written after I had already committed."*
+
+That is the honest limit of an append-only file behind a merge — it is only as fresh as your last
+pull. It still worked, because the collision surfaced as a written note in a shared file rather than
+as two competing implementations discovered by whoever integrated. **Cheap coordination does not have
+to be reliable coordination to be worth it; it has to fail visibly.**
+
+---
+
+## 26. A report an agent is told to trust as memory will go stale, and stale "not done" is the worst kind
+
+The model here is: clear the terminal between waves, and let each track's report file be its memory.
+It works — but one track's report listed fourteen findings as *not done* that had been done in the
+wave in between, and a cleared session reading it would have redone all fourteen against code that no
+longer matched the findings being quoted.
+
+The track that found this re-derived every verdict from the source, quoting lines, rather than
+believing any report — and then put a banner on the stale table rather than silently editing it.
+Both halves matter:
+
+- **A "not done" list decays faster than anything else in a report**, because every other section
+  describes what happened and only this one describes what did not — a claim about the *present*,
+  written in the past.
+- **Banner it, do not quietly correct it.** The banner is what tells the next reader the rest of the
+  document may have the same exposure.
+
+---
+
+## 27. Anything a build regenerates in a scratch directory has to be carried back
+
+§20 recorded `.meta` files being minted in the sandbox and never reaching the repository. The fix
+that shipped generalises past `.meta`: the sandboxed pass now carries back **both** the `.meta` files
+and the four generated `.csproj` files, and says what it carried in the same breath:
+
+```
+meta carry-back: nothing new to carry back.
+csproj carry-back: refreshed 4 generated project file(s) in <repo>.
+```
+
+That second line closes a loop this project spent two rounds on. A fresh worktree has no `.csproj`,
+so the compile gate could not run there at all; and after any merge that brings new files the
+existing ones are blind. Both are now a single headless pass rather than "open the Editor once".
+**The rule: if a gate depends on a generated artifact, the thing that generates it must also deliver
+it, and must report what it delivered.**
+
+---
+
+## 28. Two decay patterns a drift test cannot see
+
+Both surfaced in this wave and neither is catchable by "every documented symbol exists":
+
+- **A deprecated shim that documents itself as deletable, still described as live tooling.** The
+  script's own header says "DEPRECATED — safe to delete" and prints a deprecation warning; a
+  subsystem document still lists it in a table of what to run and what it is for. Every symbol in
+  that claim resolves. The claim is still wrong.
+- **A baseline that encodes "this number should not drop".** The guidance said a compile-warning
+  count far below the recorded baseline means nothing was compiled — a good rule when the baseline is
+  current. Then hardening legitimately removed the warnings, and a *correct* gate now reads as blind.
+  Baselines that assert a floor rot the moment the project improves past them; they need an owner and
+  a refresh, or they teach people to distrust working gates.
+
+---
+
+## 29. A path interpolated into a regex matches things it should not
+
+A guard meant to warn "Unity is already running against the source project" was written as
+`pgrep -af "projectPath[= ]$SRC\b"`. Every prompt in the wave invoked the runner as
+`run-editmode-tests.sh .`, so `$SRC` was `.` — which, in a regex, matches any character. The guard
+fired whenever *any* Unity was running anywhere.
+
+Advisory only, so nothing broke; but it is noise on exactly the message that would matter when it is
+real, which is how a guard trains its readers to ignore it. **Interpolating a path into a pattern is
+a bug unless the path is escaped or the match is anchored** — and `.` is the single most likely value
+in a tool that takes a directory argument.
