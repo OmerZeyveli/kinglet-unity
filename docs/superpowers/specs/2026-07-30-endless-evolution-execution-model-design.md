@@ -97,10 +97,27 @@ next merge rather than the last one.
 Each track owns disjoint directories and has a full session of independent work. Verified against
 the planning test below.
 
-**Numbering is preserved, deliberately.** Each terminal already carries branch history and accumulated
-context for its own territory — terminal 2 has been in `Assets/Core/` for two rounds, terminal 3 in
-`Assets/Player/` and `Assets/Enemies/`. Renumbering would discard that for no gain, so the new work is
-assigned to whichever track already owns the ground it stands on.
+**Numbering is preserved for directory ownership, not for context.** Each terminal's branch already
+owns disjoint ground — terminal 2 in `Assets/Core/`, terminal 3 in `Assets/Player/` and
+`Assets/Enemies/` — and that ownership is what keeps merge conflicts rare. It is git state, so it
+survives anything done to the conversation.
+
+**Each terminal is cleared before this wave starts, and again after each merge.** Not compacted —
+cleared. Everything load-bearing is on disk: the branch, the commits, and each track's own
+`docs/hardening/track-*-report.md`. What lives only in conversation is the track's accumulated
+reasoning, and the evidence is that it hurts. Track 2 spent eight of nine commits on documentation in
+round 1, then produced one documentation commit in round 2 *while explicitly forbidden from writing
+any* — a groove the context carried forward. This is the same principle as fresh-implementer-per-task:
+the context that makes an agent fluent also makes it repeat itself.
+
+Compaction is worse than clearing here, because it preserves part of the groove as a lossy
+model-written summary. The report files are better memory than a compaction artifact: they were
+written deliberately, for a reader.
+
+**The condition this imposes on every prompt:** a cleared terminal no longer remembers what it already
+tried and rejected. Track 4 declined five §4.2c seams with a stated blocker for each; cleared, it
+would re-attempt them. So every prompt must name the track's own report file as required reading
+before it starts.
 
 | Track | Work | Shape |
 |---|---|---|
