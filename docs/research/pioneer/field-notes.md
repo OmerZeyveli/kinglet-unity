@@ -385,3 +385,139 @@ Behaviours seen repeatedly across eight agent-sessions, each of which needed an 
   the rest of the script then runs in the original checkout. A trial merge intended for a scratch
   worktree landed on the real integration branch. **Any script that changes directory before doing
   something destructive should verify the directory changed.**
+
+---
+
+## 16. Four agents, one working tree: the isolation that was never there
+
+A second wave was set up with a per-track branch each and a line of prompt telling every terminal to
+`git checkout -B hardening/track-N`. All four spent the wave editing the same working tree, and nobody
+— including the session coordinating them — noticed for two hours.
+
+- **A branch checked out in a worktree cannot be checked out anywhere else.** `git checkout -B` fails
+  with a one-line error. An agent reads that error, decides it is not what it was asked about, and
+  keeps working. The next commit it makes lands wherever HEAD already was. One commit here carried
+  three tracks' work — a singleton seam, an unrelated editor-tool repair, and a new spec — on a branch
+  a *fourth* terminal was live in.
+- **Setup instructions must verify arrival, not assume it.** The fix is one line the agent cannot
+  misread: `git rev-parse --show-toplevel` must equal the intended path, and the run stops if it does
+  not. This is the same failure as §15's last bullet, so treat them as one rule: **after any command
+  that is supposed to move you, assert that you moved.**
+- **Stale worktrees make `git status` lie in the scariest available direction.** Each abandoned
+  worktree's index had been built when HEAD was older, so status there showed the whole safety
+  infrastructure — CI workflow, hooks, gate scripts — as *staged deletions*. Nothing was deleted; those
+  files had never been written into those trees. But an agent running `git add -A` in one would have
+  committed the removal of every gate built that day.
+
+---
+
+## 17. A rescue that snapshots "the working tree" loses the worktrees
+
+The coordinating session had the right reflex when it found the tangle: snapshot every uncommitted
+change and every untracked file before touching anything. It snapshotted the main checkout. Six
+worktrees existed, and the recovery plan's next step was to delete them.
+
+Two held work that existed nowhere else — twelve files including the PlayMode locomotion specs, their
+rig harnesses, and the mutation verifier that proves a PlayMode test can fail at all; plus the tool
+that finally answered a two-round-old open question. **`git worktree list` belongs at the top of any
+recovery, before the first snapshot and long before the first deletion.**
+
+Two discriminators made the sorting tractable, and both are worth knowing before you need them:
+
+- **Untracked files cannot be phantom.** A file git has never seen is real work by construction. Index
+  state can lie about deletions; `ls-files --others` cannot.
+- **"Content not in the integration branch" does not mean "new".** These worktrees were two rounds old,
+  so most of their differing files were *older* versions of files the branch had since moved past. The
+  test that separates them: hash the file and look for that blob anywhere in history — walk
+  `git rev-list --all -- <path>` comparing `<commit>:<path>`. A hit means stale. No hit while the path
+  exists in the branch means someone edited it on top of current state. No hit and no path means
+  genuinely new.
+
+---
+
+## 18. Ownership can be recovered from the code even when authorship cannot
+
+Four cleared terminals were asked which files were theirs; the session died before any answered. The
+attribution still came out, from the code:
+
+- **A test belongs to whatever it compiles against.** One PlayMode spec looked like it belonged to the
+  track that owns PlayMode testing. It exercised a field the *Environment* track had just deleted and a
+  guard that track had just added, so it could only build on that track's branch. Coupling settled what
+  a mandate could not.
+- **A document change belongs to the change that made it true.** A dependency map claiming "no
+  first-party code imports Cinemachine any more" belongs with the commit that removed the import, and
+  `git show <commit> -- <file>` confirms which one in seconds.
+- **When it stays ambiguous, quarantine beats guessing.** Four recovered specs went onto a branch named
+  for what it is, with a commit message saying nothing merges it and the owner picks. They are in git —
+  so a reboot cannot take them — and nobody had to invent an author.
+
+---
+
+## 19. Splitting a mixed commit is cheap; the document both halves touched is the only hard part
+
+Redistributing a commit that carried three tracks' work took two `git checkout <commit> -- <paths>`
+and one three-way merge. The merge is the part worth knowing: when both halves edited the same document
+from the same base, `git merge-file` resolves it and **keeps both edits**, where a `git checkout` of
+either side silently discards the other.
+
+```bash
+git show $BASE:doc.md > base.md; git show HEAD:doc.md > ours.md; git show $MIXED:doc.md > theirs.md
+cp ours.md merged.md && git merge-file merged.md base.md theirs.md   # exit 0 = clean
+```
+
+---
+
+## 20. Unity in a worktree: symlink the Library, sandbox the run, carry the metas back
+
+The mechanism that makes per-track Unity runs possible is worth carrying wholesale:
+
+- Each worktree's `Library/` is a **symlink** to the owner checkout's, so `.csproj` references resolve
+  and nothing re-imports 3.7 GB per track.
+- Test runs never touch that symlink. The runner **rsyncs sources into a per-track sandbox** that owns a
+  real copy of `Library` and runs Unity there. First copy is minutes, warm runs about 35 seconds, and
+  sibling tracks run concurrently without contending for one project.
+- The trap, measured rather than suspected: **`.meta` files are minted in the sandbox, and the sandbox
+  is not the repository.** Five new scripts had their GUIDs written into `/tmp/ee-sandbox-track3` and
+  into none of the checkout. Unity could see those scripts in the sandbox and not in the repo — which is
+  how a test fixture ships invisible. Any sandboxed-Unity workflow needs an explicit copy-back step for
+  `*.meta`, or it manufactures the exact defect the project's own rules warn about.
+- A fresh worktree has **no `.csproj` at all** — they are gitignored, so `git worktree add` produces a
+  tree the compile gate cannot run in. It exits 3 rather than pretending, which is right, but it means
+  "compile gate green" is unavailable to a track until a Unity pass has emitted project files there.
+
+---
+
+## 21. Duplicate work is invisible to the agents doing it and expensive the moment it surfaces
+
+Two tracks wrote a spec for the same behaviour, one 139 lines and one 441. Two tracks wrote the same
+`TimeScaleService` blend test under two different names. Neither pair conflicted in git — different
+filenames, or files that never met — so nothing failed anywhere. The cost is not the duplicated hours;
+it is that at integration **nobody can say which one to keep** without reading both, and the person
+reading them wrote neither. A short shared "claimed work" list, appended to when work *starts* rather
+than when it finishes, is cheaper than either the duplication or the arbitration.
+
+---
+
+## 22. A blocking hook cannot tell an editor's reserialization from a hand-edit
+
+Pioneer's `block-projectsettings.sh` refused to stage `ProjectSettings/TimeManager.asset`. It was right
+to by its own lights: those files are Unity-managed. But that diff was Unity 6 itself rewriting
+`Fixed Timestep` from a float to a rational of identical value, emitted by a batchmode pass — nothing a
+hook can distinguish from someone editing YAML by hand. Left uncommitted it reappears in every worktree
+and every agent asks about it. **A hook this blunt is correct as a default and needs a recorded escape:**
+the operator decides, and the commit message states that the hook was bypassed and why, so the reasoning
+outlives the decision.
+
+The hook also matches on the command *string*, so it blocks a heredoc that merely quotes the phrase it
+guards — including the paragraph above, while it was being written. Content-blind pattern matching on
+shell commands will fire on documentation about itself.
+
+---
+
+## 23. Piping a gate into `tail` throws away its exit code
+
+Running the test suite as `run-editmode-tests.sh . 2>&1 | tail -40` reported **exit code 0** for a run
+that aborted on compiler errors, because the pipeline's status is `tail`'s. This is the same defect
+class as the compile gate that could not fail (§1, §8) and the validator that ignored its own findings —
+and it appeared here in the *invocation* rather than the script, which is the one place no amount of
+hardening inside the script can reach. Read `PIPESTATUS`, or do not pipe a gate.
