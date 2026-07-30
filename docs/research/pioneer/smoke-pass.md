@@ -454,6 +454,38 @@ narrower and still worth stating: **a real project's `docs/` is not empty**, and
 durable-artifact and code-map items will land next to whatever is already there. That is a fact about
 the general case, not a claim about this project's contents.
 
+## 10. Follow-up 2026-07-30: the surface is selectable; it was losing head to head
+
+§4 recorded that no Kinglet surface was ever selected and concluded the descriptions were not
+selectable. **That conclusion was too strong.** The operator asked the obvious question — why not
+just disable the competing plugin — and the measurement settles it.
+
+Method: a fresh URP fixture with Pioneer installed, and `enabledPlugins:
+{"superpowers@claude-plugins-official": false}` set in the **project's** `.claude/settings.json`,
+leaving the operator's global settings untouched. Confirmed the plugin was invisible to the session
+before probing.
+
+| Prompt | With the plugin | Without it |
+|---|---|---|
+| *"Let's add a double jump to the player."* | `superpowers:brainstorming` | **`/unity-feature`** |
+| *"The enemy AI keeps walking through walls, can you fix it?"* | not run | **`unity-fixer`** |
+| *"I want to check this project for performance problems."* | not run | **`unity-optimize`** |
+
+Three prompts, three correct surfaces, first try.
+
+**What this changes.** Pioneer's descriptions are good enough to be selected when uncontested. The
+failure in §4 is a head-to-head loss to a trigger-phrased description, not an inability to compete
+at all. So Wave 1b-2 is an **improvement, not a blocker**: Pioneer can be installed and used today
+with the plugin disabled at project scope.
+
+**What it does not change.** Winning by removing the competitor is weaker than winning on merit, and
+the operator's stated requirement — that nobody should have to memorise a command name — is better
+served by descriptions that state when they apply. 1b-2 still gets built.
+
+**What §4 got right, and should not be softened:** the toolkit was invisible in the configuration a
+user would actually have, since the plugin is enabled globally by default on this machine. That was
+true and it was worth finding.
+
 ## Defect list this pass hands to Wave 1b
 
 Ordered by what blocks a real project first.
