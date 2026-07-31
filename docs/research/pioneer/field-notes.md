@@ -1585,3 +1585,47 @@ What that means concretely, for anything built to run while nobody is awake:
 
 The failure mode is friendly rather than negligent, which is why it is easy to miss: every individual
 update was informative. The cost only shows up as a total, in hours of someone's evening.
+
+## 63. One refused merge silently ended a track for two hours
+
+The wave ran six tracks. Track 6 did one good unit at 00:05 — a measurement of all 25 scripts in a
+subsystem, plus a seam that closed two findings by changing the shape of the code rather than
+patching it — and then did nothing at all until 02:00, when a routine check noticed its branch had
+not moved.
+
+The cause was a name. The worktree was created on `hardening/t6-roadmap`; the merge order was written
+against `hardening/t6-interfaces`. The merge agent was handed an order naming a branch that did not
+exist, refused it, and diagnosed it exactly:
+
+> the branch named in the order does not exist … the two stated commits do exist and are the exact tip
+> of a differently named branch
+
+Everything downstream of that was correct behaviour. The agent was right to refuse. The loop was
+written to `break` on a failed merge, on the sound reasoning that piling further units on top of an
+unmerged one compounds the problem. And so a one-character class of typo cost a sixth of the wave.
+
+Three things are worth separating out, because only the first is obvious.
+
+**The typo is the least interesting part.** It was created by two commands written minutes apart, one
+of which generated the branch name and the other of which asserted it. Anything generated in one place
+and asserted in another will eventually disagree. The fix is to derive both from one expression, or to
+verify the whole set once before launch — `for b in …; do git rev-parse --verify …; done` would have
+caught all six in a second, and that check now runs before any wave starts.
+
+**The failure was invisible in the shape the run reports.** Five tracks were landing work, the log was
+busy, the aggregate numbers moved. A track that is doing nothing produces no output, and *no output is
+indistinguishable from working quietly* in a progress display that only shows events. What caught it
+was a periodic check that printed **`ahead=N` for every branch**, including the ones with nothing to
+say. A monitor built from per-track state finds a stalled track; a monitor built from a stream of
+events cannot.
+
+**The `break` was the real defect.** Stopping the loop is right when the *tree* is in a bad state —
+when continuing would build on something broken. It is wrong when the merge failed for a reason
+outside the work: a name that does not resolve, a lock, a dirty tree someone else left behind. Those
+are transient and the next unit's merge would carry both. The policy that replaced it: **a failed
+merge logs and continues; two consecutive failed merges stop the track.** One is noise, two is a wall.
+
+The general form is a scheduling rule, not a git rule. In any fan-out where a worker's output is
+gated by a shared resource, distinguish *this work is bad* from *the handoff failed*. Only the first
+should stop the worker. Conflating them converts a recoverable glitch into a silent, permanent
+outage — and the more reliable the rest of the system is, the longer it takes anyone to notice.
