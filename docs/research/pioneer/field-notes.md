@@ -997,3 +997,45 @@ happen.
 **When a comment states a policy, the mutation that tests the policy is the cheapest way to find out
 whether the code implements it.** Worth a habit: after writing a comment that says "X is a failure",
 make X happen once.
+
+---
+
+## 43. A count is not a record, and the count is what survives
+
+A wave was planned around a backlog of findings. The plan quoted the one previous audit of that
+backlog — a per-catalog table of how many findings were applied, open, or "catalog itself wrong" — and
+built its method on the third column: nine of fifty-nine findings described code that did not exist,
+so "the catalog is wrong about itself" was declared a real and common verdict and every track was told
+to expect it.
+
+The track whose audit produced that number re-derived it and **withdrew it**. Two independent
+read-only agents, each required to quote the line it read, found **zero** findings whose subject does
+not exist. The nine were wrong *sub-claims inside findings whose conclusions were sound* — mostly
+miscounted footprints. One of them miscounts the null entries in its own evidence while describing a
+defect that is entirely real and still needs fixing.
+
+The distinction is not pedantic, because the two verdicts imply opposite actions: *finding wrong*
+closes the work, *evidence wrong* keeps it open and fixes the quote. Planning from the first would
+have closed real defects.
+
+The sentence that generalises it is theirs:
+
+> The count survived my audit and the per-id verdicts did not, so **the one artifact of that audit
+> that reached this plan is the part that was wrong. A count is not a record.**
+
+That is the shape to carry:
+
+- **A summary is what survives an audit, and it is the least reliable thing the audit produced.**
+  Per-item judgements live in the agent's context and die with it unless they are written down; the
+  tally gets copied into the report, then into the next plan, then into a prompt — gaining authority
+  at every hop while losing the evidence that would let anyone check it.
+- **If a wave's plan quotes a number from a previous wave, that number is the thing to re-derive
+  first**, not the thing to build the method on.
+- **The fix is a record with one row per item and its evidence**, which is what this project then
+  built: a ledger keyed by finding id, a status per row, and a gate that fails when a row claiming
+  "applied" cites evidence that no longer resolves. `unknown` is a permitted status, so honesty about
+  what nobody has checked is cheaper than a guess.
+
+One methodological detail worth stealing: the audit that settled it re-read the **pre-fix revision**
+for findings that had since been fixed. A finding is not wrong because the code changed under it, and
+an auditor comparing an old claim against new code will report false "catalog wrong" verdicts all day.
