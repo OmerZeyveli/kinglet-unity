@@ -1376,3 +1376,82 @@ Three details worth copying wholesale:
 - **It is wired conditionally.** 36 scenes cost 55 seconds, so it runs in the push hook only when the
   push touches a scene, a prefab, or the build settings, and on demand otherwise. The rule that keeps
   gates alive: never make the common path slow enough that someone starts skipping it.
+
+## 54. Six reviewed tasks, and every defect found was in the spec rather than the work
+
+A plan was written and then executed by fresh subagents, one per task, with an independent reviewer
+after each and a whole-branch review at the end. Six implementer dispatches, six task reviews, four
+fix rounds. **Every single defect found was in the plan, not in the implementation.** The implementers
+transcribed faithfully; the reviewers caught the author.
+
+The list, because the pattern only shows at full length:
+
+| what was wrong | who caught it |
+|---|---|
+| "fourteen free layer slots" — actually thirteen | task 1's implementer, before committing |
+| "27 hooks" — actually 26; the 27th file is a sourced library | task 3's reviewer |
+| a batching rule that let a semantic judgement through as a textual one | task 4's reviewer |
+| verification greps whose expected counts were impossible | task 5's implementer |
+| a prompt block still carrying the pre-amendment version of a rule it had just changed | task 5's implementer |
+| two *more* instances of the semantic-vs-textual hole, left behind when the first was closed | the final whole-branch review |
+
+Four things generalise:
+
+- **The plan author is the least reliable source of the plan's own numbers.** Every wrong number came
+  from the author writing from memory of a file they had skimmed; every correction came from someone
+  re-deriving it from the file. The cheap fix is structural: put the derivation command in the plan
+  next to the number, so the implementer checks it as a side effect of doing the work.
+- **Fixing one instance of a class leaves the class.** A rule listed "a redundant condition deleted"
+  among behaviour-preserving edits; that was caught and removed. It also listed "a visibility
+  narrowing" and "a dead-parameter removal" — the identical defect, because all three are claims
+  about *what the code does*, not about what it says. Nobody looked, because the finding had been
+  "fixed". After closing a finding, ask what else in the same document is the same shape.
+- **The whole-branch review finds what per-task reviews structurally cannot.** Each task reviewer saw
+  one diff. Cross-document consistency, and an adversarial reading of the assembled rules, need
+  someone holding all of it at once. That review produced the only Critical in the run.
+- **An honest implementer report is worth more than a clean one.** Task 5's implementer reported two
+  disagreements with its own brief rather than smoothing them, and both were real. The dispatch had
+  told it explicitly: *if the brief and the plan disagree, the plan is correct — report it, do not
+  silently smooth it over.* Permission to contradict has to be granted in writing or you get
+  compliance instead of information.
+
+## 55. Presence is not identity, and a whole-file count proves neither
+
+A rule had to be inserted identically into four separate prompt blocks in one file. The natural check
+is `grep -c 'THE RULE' file` → 4. It proves almost nothing: four matches are equally consistent with
+two blocks having it twice and two not having it at all.
+
+Two better checks, both used in the same run:
+
+- **Per-unit isolation.** Extract each block between its own fence pair and assert each contains the
+  needle exactly once. This catches the distribution problem.
+- **Hash the shared region.** The fixer extracted the shared block from each of the four and compared
+  digests — identical, 3208 bytes. This catches what per-block needle counts still miss: four blocks
+  can each contain the needle and still have *drifted from each other* everywhere else.
+
+The general form: when a requirement is "N copies must be identical", a check that counts occurrences
+answers a different question than the one you asked. Count per unit for presence, hash for identity.
+It is the same failure as §43's "a count is not a record", one level down.
+
+## 56. Instructions that name a tool must be checked against that tool
+
+Two of the four Important findings in the final review were instructions that simply **could not be
+carried out**, and neither was detectable by reading the instruction:
+
+- Four agents were told to "run `unity-reviewer` on the diff". That agent's declared tools are
+  `Read, Glob, Grep` — no shell, so it cannot run `git diff` at all. The instruction was coherent,
+  well-motivated, and impossible. The fix was to state the mechanism: write the diff to a file, hand
+  over the path, because it *can* read a file.
+- A decision said "measure it with `PerfProbe` first, and do not skip this step". `PerfProbe` is armed
+  by dropping a file, then requires **entering play mode and playing for 60-90 seconds**, flushing on
+  a keypress. No unattended agent can do that. Under a never-wait rule, the track would have either
+  fabricated a number or filed it blocked — and the document said which neither.
+
+Both were caught only because a reviewer was told to check that every named file, agent, script and
+spec actually exists and does what the text claims. That check is cheap and it should be standing:
+**for every tool an instruction names, open its definition and confirm it can do the thing.** An
+agent's tool list, a script's usage block, and a debug utility's own documentation are all one grep
+away, and all three were wrong-by-omission here.
+
+The deeper version: the impossible instruction always *reads* fine, because it was written by
+someone reasoning about what the tool is for rather than what it can do.
