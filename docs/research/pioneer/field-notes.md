@@ -1039,3 +1039,88 @@ That is the shape to carry:
 One methodological detail worth stealing: the audit that settled it re-read the **pre-fix revision**
 for findings that had since been fixed. A finding is not wrong because the code changed under it, and
 an auditor comparing an old claim against new code will report false "catalog wrong" verdicts all day.
+
+## 44. The record was built, and the audit still landed as a paragraph
+
+§43 ends with the fix: a ledger with one row per finding and a gate over it, `unknown` permitted so
+that honesty about what nobody has checked is cheaper than a guess. It shipped. One wave later the
+ledger reported **129 ids as `unknown`** — and every one of them had been audited that same night.
+
+The audit was real work, done well: one read-only agent per catalog, each required to quote the line
+it read rather than cite it, every "cannot be pinned" verdict re-decided against today's capability.
+The output was a 129-row table with evidence, in the track's own report file. It never became 129
+ledger rows, so the gate — correctly, by its own rules — counted the whole thing as unaudited.
+
+The track that built the ledger had already written the sentence, in the never-block channel, and
+nobody acted on it before the wave ended:
+
+> The audit's deliverable is a **ledger row**, not a paragraph.
+
+What this adds to §43:
+
+- **Building the record does not migrate the work into it.** §43's lesson is that a tally is not a
+  record; this one is that a *rich, evidenced, per-item report* is not a record either, if the
+  machine-checkable file is somewhere else. The report is still a paragraph — a long one.
+- **State the deliverable as the artifact the gate reads, in the prompt, before the work starts.**
+  "Audit your six catalogs" produced a report. "Produce a ledger row per id" would have produced
+  rows. The agent optimised for the deliverable it was given, which is what you want it to do.
+- **A gate that reports coverage will tell you this happened.** That is the payoff for making
+  `unknown` a first-class status rather than a failure: the gap was one `awk` away, on a file
+  designed to be read, instead of being discovered two waves later by someone re-doing the audit.
+
+The transcription is not free, either, and the reason is a good one. The report cites `File.cs:445`
+plus a quote; the ledger's evidence grammar is deliberately line-number-free (`grep:<path>::<needle>`)
+because *a baseline keyed by a line number is a baseline nobody updates*. So the transcription is
+partly a re-verification, and each row that fails to resolve is a verdict that was wrong when written
+or has been overtaken since. Which is the point.
+
+## 45. A backlog can grow because your capability grew, and that is not scope creep
+
+The same audit returned **100 of 129 findings open** — where the previous wave's audit of a different
+subsystem had found the opposite, most of its findings already applied. Two audits, same method,
+opposite results. The reason is in the auditing track's own method section:
+
+> Every "cannot be pinned" verdict was re-decided **against today's capability**. Findings were
+> classified "report only / not automatically testable" in waves when this repository had no PlayMode
+> tier at all.
+
+The tier now existed — a real physics rig, live fixtures, a mutation harness. Findings closed as
+untestable were open again, not because anyone changed their mind about the code, but because the
+ground moved under the verdict.
+
+Three things to carry:
+
+- **"Cannot be tested" is a dated claim, and it should be stored with its date and its reason.** A
+  verdict that names the missing capability ("no PlayMode tier") can be re-decided in one grep the day
+  that capability lands. A verdict that just says "not testable" is permanent by accident.
+- **A growing backlog is not automatically a failure.** It can mean the net got finer. The number to
+  watch is not the count of open findings but whether closing one now costs less than it did.
+- **Sequencing follows from this.** Build the capability, *then* re-audit — the reverse wastes the
+  audit. Had the re-decision pass run before the rig existed, it would have re-confirmed every
+  "untestable" verdict at full cost and produced nothing.
+
+## 46. Give the risky dependency a time box, not a fallback plan
+
+A wave needed Editor work that only a live tool bridge could do, and the bridge had never been used
+in anger. The instinct is to write a fallback: if the bridge fails, do X instead. The rule that
+actually worked was smaller — **make it the first unit and put a clock on it.**
+
+> This unit is time-boxed to about 85 minutes. When the box runs out, or the bridge drops, or the
+> editor reloads mid-call, or any single entry fails twice — write down where you got to and move to
+> unit 2.
+
+Why the box beats the fallback: a fallback is a decision the agent has to make while it is invested in
+making the thing work, which is the worst moment to ask. A box is a decision already made. And the
+cost is bounded in the unit the risk lives in — an unproven dependency costs one unit, not one
+session. It is the never-wait rule (§ *file it and take the next item*) applied to a dependency
+instead of to a question.
+
+Two supporting details that mattered as much as the box:
+
+- **Smallest entry first, largest last.** The largest touched 88 scene files. Ordering it last meant
+  the agent's competence with the bridge was demonstrated on cheap work before anything expensive
+  moved, and the reviewer's biggest diff arrived from a process already proven that session.
+- **Say out loud which guard is not in force.** The repository's "agents do not edit scenes" hook
+  matches on the file-editing tools by name and structurally cannot see tool-bridge calls. So for the
+  duration of that unit the guard did not exist. Writing that into the prompt — *you are working
+  without a net, behave as though it were there* — is worth more than pretending the hook covers it.
