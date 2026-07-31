@@ -1267,3 +1267,112 @@ classifier is never asked to guess — was attempted by the agent writing this u
 That refusal was right: an agent widening its own permissions is privilege escalation whatever the
 justification. The deterministic half of the fix belongs to the human, by design, and only the retry
 policy belongs to the fleet.
+
+## 51. Every gate assumed it was the only thing running, and four of them were wrong
+
+A four-agent fleet ran its test suites in four isolated sandboxes — separate directories, separate
+result files, separate build outputs, all deliberately namespaced per track. Two gates still failed
+intermittently, and the cause was a piece of state nobody had namespaced because nobody owned it:
+**the engine's own per-user data directory.**
+
+Unity's `Application.persistentDataPath` is keyed by *company name and product name*, not by project
+path. Four sandboxed copies of the same project therefore resolve to **one** directory. A guard that
+fingerprinted that directory at setup and compared at teardown could not tell one of its own specs
+from another Unity process writing during its window.
+
+The track that found it established the cause by controlled experiment rather than by argument — same
+tree, twice:
+
+```
+concurrent PlayMode elsewhere  ->  219/219 pass, guard FAILS
+nothing else in PlayMode       ->  219/219 pass, guard passes, exit 0
+```
+
+And then wrote the sentence that makes it worth a field note:
+
+> **The false positive is the lesser problem.** The same fact means four tracks read and write one
+> another's save files in every run. Do not weaken the guard; stop the sharing.
+
+The second failure was the same defect wearing different clothes: a probe hung its timeout under
+load, was killed, and the kill surfaced as a *different* gate reporting "another process held the
+project open". Two red gates, one cause, and a reader taking them as independent would go hunting a
+defect in the wrong subsystem entirely.
+
+What to carry:
+
+- **Isolate by identity, not by path.** Sandboxing a working directory is the easy half. Anything the
+  runtime keys by *product identity* — user data dirs, registry keys, named pipes, lock files, ports,
+  OS-level caches — is shared no matter how many copies of the tree you make. Enumerate those before
+  running anything in parallel, not after it flakes.
+- **A flaky gate has two costs and the visible one is smaller.** The false positive wastes a cycle.
+  The shared state it reveals was corrupting real runs the whole time, silently. Chase the cause even
+  when the symptom is "just a flake".
+- **Under parallelism, one failure can manufacture another.** When two gates go red together, check
+  whether the second is a consequence before treating it as a second bug.
+- **Prove concurrency bugs by running the concurrency.** One experiment with and without a
+  neighbouring process beat any amount of reading, and it is two runs.
+
+## 52. A mutation harness must restore what was there, not what is in HEAD
+
+A track needed to mutation-verify a fix, found the shared harness hardcoded to the wrong test
+platform, and hand-rolled a substitute for one unit. Reasonable — except the substitute silently lost
+three properties the real harness had *by construction*, and all three were caught only because the
+track kept checking its own work:
+
+1. **It restored with `git checkout -- <file>`.** The fix under test was uncommitted, so the very
+   first restore reverted the fix itself, and every subsequent mutation would have run against
+   pre-fix code — reporting green for a harness that was measuring nothing. The line to keep:
+   **git restores to `HEAD`; a mutation harness must restore to what was there.** Save the original
+   text and put it back.
+2. **Two mutations each changed two things at once**, so neither could say which assertion caught it.
+   The real harness models an expected-failure list per mutation and reports IMPRECISE when the wrong
+   test goes red; a script that only prints failures cannot.
+3. **A decorative test survived a mutation and was scored as catching it**, because the mutation
+   reddened a *different* test in the same fixture. Only an explicit per-mutation prediction
+   distinguishes "caught" from "something went red".
+
+The generalisable point is not about mutation testing. It is that **a purpose-built tool encodes
+invariants that are invisible in its output**, so a hand-rolled substitute passes the same surface
+check while guaranteeing none of them. Before replacing a tool for one job, ask what it does that you
+would never think to do — and if you cannot answer, read its source, not its interface.
+
+The track's own resolution is the right instinct too: it did **not** patch the shared harness at the
+end of a unit, because that is tooling all four agents run inside their push hook and the change
+would land in someone else's night. It hardened its own script, filed the fix with the design
+already worked out, and left the shared change to whoever owns a tooling unit. **The right fix at the
+wrong moment is still the wrong change.**
+
+## 53. The first gate that loaded a scene found three things only running it could find
+
+An agent was given one task for a whole session: build the check that nobody had built, because two
+consecutive waves had ended with the same sentence — *no automated check in this repository loads a
+scene*. What came back is the best argument in this whole log for spending a session on one thing.
+
+The harness itself is unremarkable in description: enumerate the scenes in the build settings, load
+each, assert nothing logs an error, assert no component failed to bind. What could not have been
+written from a desk:
+
+- **Under headless batch mode, the renderer's 2D tilemap path segfaults the engine outright.** Not an
+  exception — signal 11, process gone. The only workable placement for the fix (disabling cameras)
+  turned out to be a persistent guard's late-update, because a scene can activate in a frame the test
+  coroutine does not own. The consequence is stated in the file header rather than discovered later:
+  **this gate cannot prove a scene renders.**
+- **It cannot live in the existing suite.** Loading a real scene bootstraps the real service root,
+  whose objects survive scene changes, and several existing specs open by asserting no such singleton
+  is alive. So the suite excludes the new category explicitly, and the header records that removing
+  the exclusion turns the suite red.
+- **Two real defects on the first working run**, reported rather than failed, because this gate's
+  claim is about loading and not about unloading.
+
+Three details worth copying wholesale:
+
+- **The design decisions live in the file header with their reasons** — how many frames to settle and
+  why, warnings counted but never failed, one accumulated report per scene instead of throwing at the
+  first problem. These are exactly the knobs a later reader would "tidy" into a flaky gate.
+- **The blind spot is permanent and documented.** Mutation-verifying the gate found one break it
+  cannot see (the engine silently discards the dangling reference), and that was written down as a
+  blind spot rather than quietly dropped or papered over. **A gate that states what it cannot see is
+  worth more than one that implies it sees everything.**
+- **It is wired conditionally.** 36 scenes cost 55 seconds, so it runs in the push hook only when the
+  push touches a scene, a prefab, or the build settings, and on demand otherwise. The rule that keeps
+  gates alive: never make the common path slow enough that someone starts skipping it.
