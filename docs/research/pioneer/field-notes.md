@@ -906,3 +906,94 @@ The question to ask of any gate stack is not "how many checks" but **"which of t
 ship?"** A stack can be arbitrarily thorough about sources and still be silent about the artifact.
 For Unity specifically, that means a player build; the equivalent elsewhere is whatever the user
 actually receives.
+
+---
+
+## 39. Four agents ran a full night with nobody awake, and one rule is why
+
+Every previous wave assumed an operator: relaying between sessions, answering the question a blocked
+track asks. The overnight wave removed that, and the model held — 88 commits, +10,006 lines, four
+branches merged, all gates green in the morning.
+
+The rule that carried it is one sentence: **never wait, never ask — write the block down and take the
+next item.** It came with a file to write into, and the file is what makes it real; "move on" without
+somewhere to put the thing you moved on from just loses it.
+
+The evidence that it worked is not that the file was empty. Three blocks were filed. One was resolved
+by the same track before the night ended, which is what a track does when stopping is not an option.
+One was a genuine decision only the owner can make — a serialized value that disagrees with its code
+default across 79 instances — and the track wrote it up, wrote its test to *read* the field rather
+than assume either number, and kept going. Nothing waited.
+
+Three supporting rules, each earned rather than invented:
+
+- **Run the gate yourself before merging.** `pre-push` is a *push* hook, and merging a local branch
+  into a local integration branch never fires it. Under supervision the operator and the integrator
+  caught what discipline missed; unattended, discipline is the whole mechanism, so it has to be said
+  out loud in the prompt.
+- **Two failures on the same unit and you abandon it.** Bounds the worst case: a track that burns the
+  night on one finding produces nothing.
+- **Append to your report after each unit, not at the end.** A session that dies at hour five with
+  everything in context and nothing on disk has lost the night. Thirty-four small merges, each
+  preceded by a merge from base, is what this produces — and it is also why nothing had to be
+  untangled in the morning.
+
+---
+
+## 40. "Blockers expire" is true, and the reason they expire is not the one you plan for
+
+The overnight wave was organised around an idea: the richest work available is not new, it is work
+recorded as impossible for a reason that has since stopped being true. A report said in as many words
+that PlayMode was unavailable so two state machines were out of reach; PlayMode had since arrived.
+
+The idea paid — but the track that tested it hardest reported back that the *premise* was wrong. Of
+seven recorded declines re-decided, three had expired and **only one expired because a new capability
+arrived**, which was the stated premise of the whole wave. The other two expired because the work had
+been done elsewhere in the meantime, and because an **ownership boundary moved** — a decline whose
+stated blocker was "those files belong to another track this wave", which was never technical at all.
+
+Three of the seven still held, two of them more strongly than when written.
+
+So the generalisation is not "wait for the capability, then revisit". It is: **a recorded decline
+decays for reasons unrelated to why it was recorded, so re-reading your own declines is worth a slot
+every wave regardless of what changed.** And a decline that survives re-examination is a real result
+worth writing down again — three of seven here — not a failed attempt at work.
+
+---
+
+## 41. Mutation-testing the gates found one blind to 29% of what it policed
+
+Six gates existed; two had ever been watched to fail. A night spent breaking each one on purpose
+found defects in three, and the largest was invisible by every other means:
+
+**The source-layout gate never saw 49 of 171 first-party files.** Its banned-construct checks ran
+through `git ls-files '*.cs' | ... | xargs -r grep`, and `xargs` splits on whitespace, so
+`Assets/Core/Save System/SaveManager.cs` arrived at `grep` as two paths that do not exist. Every
+missed file lived under a directory whose name contains a space: `Save System`, `DNA Forms`,
+`Input UI`, `World Level`. Three deliberate violations sailed through before the fix.
+
+**Any gate that consumes a file list must be tested against the most awkward names in the repository**,
+and in a Unity project that means directory names with spaces — Unity's own conventions produce them.
+A gate tested only against `Player.cs` is tested against the easy half.
+
+The same pass found a defect class no review catalog covered: **seven batch entry points could return
+without ever reaching `EditorApplication.Exit`**, because each wrote its log with a relative path
+outside any `try`, immediately before the exit it had already computed correctly. A tool that computes
+the right verdict and never delivers it is indistinguishable, to a shell caller, from a tool that hung.
+
+---
+
+## 42. The comment was right and the code was wrong, and only a mutation found it
+
+A gate written the day before carried a comment stating that an unparseable environment override "is a
+failure rather than a silent fallback, because the alternative is to build a platform nobody asked for
+and report success". Two lines below, the code did the silent fallback the comment disclaimed.
+
+Nothing catches this. The compile gate compiles it, the tests pass, and a reviewer reads the comment
+and believes it — the comment is more persuasive than the code precisely because it explains the
+intent. It surfaced only when someone set the variable to a deliberately wrong value to see what would
+happen.
+
+**When a comment states a policy, the mutation that tests the policy is the cheapest way to find out
+whether the code implements it.** Worth a habit: after writing a comment that says "X is a failure",
+make X happen once.
