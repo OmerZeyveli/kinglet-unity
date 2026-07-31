@@ -1455,3 +1455,133 @@ away, and all three were wrong-by-omission here.
 
 The deeper version: the impossible instruction always *reads* fine, because it was written by
 someone reasoning about what the tool is for rather than what it can do.
+
+## 57. The apparatus was the only part of the wave nobody reviewed
+
+The wave's kinglet-agent protocol said each track should run `unity-reviewer` over its own diff and
+act on the verdict. A track cannot invoke an agent at all — it *is* one, and nesting was not available
+to it. The protocol was therefore not merely awkward, it was unexecutable, and it survived **three
+separate reviews** before anyone noticed.
+
+The reason it survived is structural, not careless. Every one of those reviews was handed a diff. The
+brief that produced the diff was never in any review package, so no reviewer was ever looking at it.
+Reviewers review *work*; the instructions that generate the work sit outside the loop by construction.
+
+The fix in the wave was to move the agent invocation up a level — the track writes its own conclusion
+and produces the diff, and the integrator, who *can* dispatch agents, runs them. The fix in the method
+is smaller and more portable: **put the brief in the review package.** One reviewer per wave should be
+pointed at the plan and the prompts rather than the diff, with a single question — *can the entity
+you are addressing actually do this?*
+
+This is §56 raised one level. §56 says check the tools an instruction names. §57 says check the
+*reader* an instruction addresses. A brief written for "an agent" and executed by a subagent with a
+narrower harness is the common case, and the narrowing is invisible from inside the text.
+
+## 58. Measuring a metric by its name measures the report's vocabulary
+
+The wave ran a pre-registered A/B, and one of its four metrics was *contradictions*: how often a track
+concluded the brief, the plan, the ledger, or an earlier claim was wrong, and the source won.
+
+Scoring the treatment arm was trivial — the workflow's structured return had a `contradictions` field,
+so the number was a field lookup. Scoring the control arm meant reading two reports written by
+terminals with no schema. The obvious move is a grep, and it would have been wrong: **track 1's report
+never uses the word.** It says "seven places where the brief, the plan, a catalog or an earlier claim
+was wrong". A grep for `contradiction` scores that arm zero, and a zero in the control arm is exactly
+the direction that would have made the treatment look good.
+
+Two things follow, and the second is the more useful one:
+
+- When arms of a comparison report through different channels, the metric must be extracted the same
+  way from both, and a keyword is not the same way. Read the control arm; do not search it.
+- Better: **make the channel identical before the run.** The reason the treatment arm was cheap to
+  score is that the metric had a field. A pre-registered metric with no agreed carrier is a metric you
+  will end up estimating.
+
+The general form is the counting failure of §55 and §43 pointed at prose instead of code: a count of
+the word is not a count of the thing.
+
+## 59. Loop-until-dry needs the integration state to be right every round, not once
+
+The workflow arm stopped after three units when both of its tracks hit merge conflicts on their second
+merge. The cause was a single sentence in the prompt: *"the base is merged for you between units."*
+Nothing merged it. The direction that was automated was track→base; base→track was described as
+automatic and was not implemented anywhere.
+
+What makes this worth writing down is not the missing line — it is why it did not show up until unit
+two. A one-shot dispatch merges base at the start and finishes before any sibling lands work. The
+staleness window is zero, so the bug is invisible. A loop-until-dry track runs beside five siblings for
+hours, and its branch goes stale *inside a single unit*.
+
+**Every piece of shared state a loop touches must be re-established at the top of each iteration, not
+at the top of the loop.** Not just the merge: the ledger, the catalogs, the report file, the
+generated project files. The one-shot version of a task and the looped version have different
+correctness conditions, and a prompt that was true for the first is silently false for the second.
+
+The wave-10 form of this is one line in every track prompt — merge base first, every unit, resolve per
+finding id — plus an explicit statement that five other tracks are landing work while you run. The
+number matters. "Others are working" reads as a caveat; "five other tracks land work into the branch
+you are on" reads as a fact about this unit.
+
+## 60. A pre-registered null result is a finding, and it retires the expensive arm
+
+Two mechanisms for driving parallel work — four terminals with a human relaying between them, and one
+session driving subagents through a workflow — were run against the same wave, on adjacent tracks,
+with the reading rules written **before** the run. They came out indistinguishable: 1.2 versus 1.0
+findings closed per finding-closing unit, ~1.5 versus ~1.3 contradictions per unit.
+
+The value of that is entirely in the word *before*. Written after, "indistinguishable" is a result
+anybody can argue with, and the argument always goes the same way — whichever mechanism the arguer
+already prefers gets the benefit of the doubt, and both survive. Written before, the rule was: *if the
+arms are indistinguishable, the cheaper one wins and the other is retired.* The cheaper one is the one
+that does not require a human awake at a keyboard relaying messages between four terminals.
+
+So the null result did more work than a positive one would have. A positive result for the terminals
+would have kept both mechanisms alive; the null retired one and freed the operator's night.
+
+The transferable rule: **when you compare two ways of working, write down what a tie means before you
+run.** A tie is the most likely outcome and the one you are least prepared to act on.
+
+## 61. Parallel writers collide on the append-only files, not on the code
+
+Five waves of evidence, and the merge conflicts were almost never in source. Tracks working disjoint
+subsystems do not touch each other's code. They collide on the three documents every track is told to
+append to: the shared status ledger, the blocked-work log, and the mutation harness. Every one of
+those is append-at-the-end, which is precisely the region git cannot merge.
+
+The fix is to give each writer a file nobody else opens — `inbox/<track>-blocked.md`,
+`inbox/<track>-mutations.py` — and have exactly one integrator fold them into the shared documents
+afterward. Conflicts go to zero because there is no shared write.
+
+The part worth writing down is the **cost**, because it is not free and it is not obvious. The
+project's ledger gate accepts `operator:<n>` as evidence for a `needs-editor` row, and `<n>` resolves
+against an entry in the shared worklist. A track that may no longer write that worklist therefore
+cannot legally mark anything `needs-editor` — the evidence cannot exist yet. The row has to stay
+`open`, carrying a claim that is now slightly false, until the integrator folds the inbox in.
+
+That is the general shape: **an inbox breaks any gate whose evidence resolves against the file you
+took away.** Before splitting a shared file, enumerate what validates against it. Here the answer was
+one status and one evidence form, the cost was accepted deliberately, and it was written into the plan
+so that a track meeting a red gate would recognise it instead of fighting it.
+
+## 62. The operator's attention is a resource the harness spends
+
+The wave was designed to run unattended. It did. And the owner still spent the evening at the desk,
+because the *reporting* was not unattended — every few minutes there was a progress note, a comparison,
+a question worth answering. Nothing in the mechanism required them; the narration did. Halfway through
+they asked whether something had gone wrong, and the honest answer was that the duration was normal
+and I had converted a background process into a foreground one.
+
+An unattended run has two halves, and the harness only automates the first. If the operator has to
+watch the thing that does not need watching, the autonomy is decorative.
+
+What that means concretely, for anything built to run while nobody is awake:
+
+- **Say up front what the operator will be asked for, and when.** "Nothing until it finishes" is a
+  valid and useful answer; silence is not, because silence is indistinguishable from a hang.
+- **Batch the report.** One summary at the end beats twenty updates, unless a decision is genuinely
+  blocked on a human — and if it is, the run was not unattended in the first place.
+- **A question you could answer yourself is a question you should not ask.** The design of the wave
+  had already delegated those decisions; asking anyway takes them back.
+
+The failure mode is friendly rather than negligent, which is why it is easy to miss: every individual
+update was informative. The cost only shows up as a total, in hours of someone's evening.
