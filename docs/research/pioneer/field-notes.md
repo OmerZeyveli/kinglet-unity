@@ -1124,3 +1124,85 @@ Two supporting details that mattered as much as the box:
   matches on the file-editing tools by name and structurally cannot see tool-bridge calls. So for the
   duration of that unit the guard did not exist. Writing that into the prompt — *you are working
   without a net, behave as though it were there* — is worth more than pretending the hook covers it.
+
+## 47. A listening port is not an attached tool, and a worktree is a different project
+
+The wave in §46 was planned around a live tool bridge. The bridge was verified before the wave
+started: the server answered on its port, and the CLI's own `mcp list` printed **✔ Connected**. The
+agent that was given the work opened its session and had **no bridge tools at all**.
+
+Both checks were true and neither was the right one. The port proves *a server is listening*. The
+tool list proves *the current directory's config resolves the server*. Neither proves **this session
+attached it at start-up**, and only that last one lets an agent call anything. The agent's own note
+is the sentence to keep: *check the session's MCP config, not the port.*
+
+Two mechanisms conspired, and both are worth knowing before trusting a bridge to a fleet:
+
+- **A project-scoped `.mcp.json` needs approval.** The file was present, correct, and committed. It
+  is not loaded until someone answers the "use this MCP server?" prompt for that project, and the
+  approval lives in the user's own config keyed by directory. An unanswered prompt looks exactly like
+  a missing server.
+- **Each git worktree is a different project directory.** The fleet ran in four worktrees. Approving
+  the server in the main checkout — the directory where the verification was done — approved it in
+  none of the four places the work happened.
+
+The fix that survives both is a **user-scope registration** rather than a per-project file, because
+it needs no per-directory approval and worktrees inherit it. The general rule: **verify a dependency
+from inside the process that will use it, in the directory it will run in** — not from the operator's
+shell in the repo root.
+
+## 48. The agent found the second route to the Editor, and it was already in the repo
+
+What makes §47 a good story rather than a lost session: the agent did not stop at "MCP is
+unavailable, filing it, moving to unit 2" — which is what the prompt licensed it to do. It observed
+that a bridge is only one way to reach a Unity Editor from an agent, and that **this repository
+already drove a headless Editor on every push** — a sandbox copy plus `-executeMethod`, built for
+the test gates. Same Editor API surface, different transport.
+
+So the five Editor entries were re-routed instead of deferred, and — the part worth stealing — the
+**ordering was re-derived under the new cost function.** The plan had said smallest-first, and had
+computed "smallest" in bridge round-trips. Under batch mode the cost is different: anything needing a
+Unity pass costs minutes, anything not needing one costs seconds. The agent reordered to run the
+three no-Unity entries first and the two Unity-pass entries last, and wrote down that this *preserves
+the plan's intent* under the mechanism actually available.
+
+That is the distinction between following a plan and executing one. A plan's ordering is usually a
+proxy for a cost the plan names; when the mechanism changes, re-compute the proxy rather than
+inheriting the order.
+
+Two caveats it also recorded, both honest:
+
+- **The route does not cover everything.** Several verification steps were *"enter play mode and
+  confirm the water still ripples"*. No automated check in that repository loads a scene. The agent
+  ran every mechanical check, pasted the output, and listed the visual ones as outstanding — with the
+  line that settles how to read the result: **"an argument is not an observation."**
+- **A guard that names a tool cannot see a different tool.** The hook stopping agents from editing
+  scenes matched on the file-editing tools by name. It could not see bridge calls (§46) and it could
+  not see `-executeMethod` either. The route around it was legitimate and the hook was still blind.
+
+## 49. The worklist entries were right about the code and wrong about the tooling
+
+Executing five long-deferred Editor entries found **six errors in the entries' own instructions**, and
+four of them would have failed a gate. The pattern the agent extracted is sharper than the list:
+
+> An entry's measurements were reliable about the **code** and unreliable about the **tooling**. Every
+> wrong claim was about what a gate or the Editor would *do*, not about what the source says.
+
+The concrete shapes, all of which generalise past Unity:
+
+- **A deletion invalidates evidence that lives inside the deleted thing.** Rows proving a fix by
+  "this file does *not* contain X" all broke, because that form requires the file to exist. Six more
+  proved a claim from a GUID stored in the asset's own sidecar, which went with the asset. If your
+  record cites a file, deleting that file is a record migration, not just a deletion.
+- **"Open it in the editor and save it" is a guess about the editor.** It was written into an entry as
+  a verification step. Measured, it stripped nothing — the tool deliberately *preserves* an override
+  whose target no longer resolves. It needed a specific API call. Steps that describe editor
+  behaviour should be executed once before they are written down as steps.
+- **A dependency claim measured against a hand-written list of names is measured against the list.**
+  An entry claimed a file move had zero outbound dependencies; the file called a type the nine-name
+  list omitted — the one type the entry's own closing paragraph said must stay behind. The layer gate
+  caught it. Derive the list, do not curate it.
+
+The forward-looking version, for anyone writing work for an agent to execute later: **the parts of a
+task description that describe your tools are the parts most likely to be wrong**, because they were
+written from memory while the source claims were written from the source.
