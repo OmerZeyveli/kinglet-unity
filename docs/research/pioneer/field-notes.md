@@ -1697,3 +1697,69 @@ the plan's claims about its own subsystem against the source, before any work de
 of this wave's roadmap tracks were told to do exactly that, and both spent their first unit correcting
 the premises they had been given. That is the cheapest possible place to find those errors, and it is
 one unit out of twelve.
+
+## 66. Three measurements of the same bottleneck, and the first two were measuring the report
+
+The question was simple: what is slowing the agent fleet down? Answering it took three attempts, and
+the first two produced confident, plausible, wrong numbers.
+
+**Attempt one — keyword search over the agents' structured results.** Counting how often words like
+"PlayMode failed" or "ledger" appeared in units that had run the gate more than once. Result: a tidy
+ranking led by "PlayMode test red, 28 units". It was measuring *prose*: a unit whose summary happily
+described writing a new PlayMode spec scored as a PlayMode failure. This is §58 again, one wave later,
+committed by the person who wrote §58.
+
+**Attempt two — searching the agent transcripts for the gate's own failure messages.** More rigorous:
+the exact strings the hook prints. Result: twelve categories, each 6-10% of the total. **The
+uniformity was the tell.** Real failure causes are never evenly distributed. The agents had *read* the
+hook, so its entire message list sat in every transcript, and the search was counting the source code
+of the thing being measured.
+
+**Attempt three — the string the hook prints only when it actually refuses.** `pre-push: BLOCKED — %s`
+appears nowhere except in a real rejection. 53 events, and a distribution with a shape: compile gate
+22%, ledger 18%, batch-tool contract 20%, real test failures only 20%.
+
+Then the same trap once more, on hardware. `load average: 17.81` on eight cores reads as 223%
+oversubscription, and it was reported as such. `vmstat` said the CPU was **32-48% idle with zero
+iowait**. Load average counts uninterruptible sleep, not utilisation. The machine had headroom the
+whole time.
+
+**The general rule, and it is not "be careful".** Every one of these searched for the *name* of the
+thing instead of the thing, and each one produced a plausible answer that survived because it was
+plausible. The defence is structural:
+
+- **Prefer a signal that cannot exist unless the event happened.** `BLOCKED —` is emitted only by a
+  refusal. A word can appear for any reason.
+- **Distrust a flat distribution.** Real-world causes are lumpy. Uniformity means you are counting
+  something structural — a list, a template, a source file — rather than events.
+- **Confirm any headline number with a second, independent instrument.** Load average and `vmstat`
+  disagreed, and only one of them was measuring what the sentence claimed.
+
+## 67. The gate was 21% of a track's life, and the fleet was never CPU-bound
+
+Measured across one wave: 61 units, 134 gate runs, a gate run costing about 4.5 minutes (16 seconds of
+static checks, then ~2 min EditMode, ~2 min PlayMode, ~1 min scene-load). That is roughly 10 hours of
+gate against 46 track-hours.
+
+**So 79% of a track's life is the agent reading, deciding, and writing** — API latency, during which
+the local machine does nothing. Confirmed from the other side: with eight tracks running, the CPU was
+a third idle.
+
+Three things follow, and they invert the intuitions that produced the wave's design:
+
+- **"How many tracks fit?" is the wrong first question.** The right one is *what fraction of a track's
+  life needs the local machine*. At a 21% duty cycle, eight tracks average 1.7 concurrent gate runs —
+  the hardware was never the constraint, and the ceiling estimate of eight was a guess dressed as a
+  measurement.
+- **Adding tracks scales the part that is free** and only slowly loads the part that is not. The
+  binding constraint became *disjoint work*: 57 open findings across 15 catalogs is not enough
+  independent work for twenty tracks, whatever the hardware allows.
+- **Reducing gate runs beats reducing gate cost.** A unit closing three findings pays the same gate as
+  one closing one. Batching is a bigger lever than any per-step optimisation, because it removes whole
+  gate runs rather than shortening them.
+
+And one optimisation that looked obvious and is not: 56% of a wave's non-merge commits touch only
+`docs/`, so skipping the Unity suites on a docs-only diff seems free. It is not — `DocumentationMapSpec`
+is an **EditMode test that reads the documentation**, so a docs-only change is exactly the case that
+test exists for. The naive rule would skip the one suite that could catch the change. **Before
+narrowing a gate by input type, ask what tests exist *because of* that input type.**
