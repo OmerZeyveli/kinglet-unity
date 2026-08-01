@@ -1629,3 +1629,71 @@ The general form is a scheduling rule, not a git rule. In any fan-out where a wo
 gated by a shared resource, distinguish *this work is bad* from *the handoff failed*. Only the first
 should stop the worker. Conflating them converts a recoverable glitch into a silent, permanent
 outage — and the more reliable the rest of the system is, the longer it takes anyone to notice.
+
+## 64. Citation rot: the finding is right and the line number is wrong
+
+Six tracks ran overnight against sixteen review catalogs written months earlier, and a recurring
+finding-about-findings emerged: **the claim was intact and the citation had drifted.** Examples from
+one track in one night:
+
+- A finding cited `SFXPlayer.cs:291-295` as a scene-loaded handler. Those lines are now `OnDisable`
+  and `Start`; the handler is at `:315-319`. The substance — it only handles background music and
+  never stops the running loop — was true at both line numbers.
+- A finding cited `PlayerMovement.cs:912,919` for where a swim flag is set. It is set at `:986,993`.
+  Same mechanism, same defect, two other tracks' edits in between.
+
+The catalogs had drifted under the very work they were driving. That is not a flaw in the catalogs;
+it is what happens to any line-anchored reference in a tree six agents are editing concurrently.
+
+**The important discipline is telling the two apart.** A track that finds a citation that does not
+resolve has three possible conclusions, and they want opposite actions:
+
+1. *The citation rotted; the claim holds.* Re-derive the location, fix the citation, do the work.
+2. *The claim describes code that does not exist.* This is `catalog-wrong` — a documentation defect,
+   not open work. It is common rather than exotic: one wave found nine of fifty-nine here.
+3. *The claim was never right.* Rare, and the most expensive to establish.
+
+A track under time pressure collapses all three into "the catalog is stale, skip it", and the real
+defects go with the rot. What prevents that is requiring the re-derivation to be **shown** — the
+command or the `file:line` that settled it — which is the same rule that makes a contradiction
+report trustworthy.
+
+This repository had already reached the same conclusion from the other end: its ledger evidence
+grammar is deliberately line-number-free (`grep:<path>::<literal>` rather than `path:line`), for the
+stated reason that *a baseline keyed by a line number is a baseline nobody updates*. The catalogs
+predate that rule and still carry line numbers, which is exactly why they rot and the ledger does not.
+**When a reference must survive other people editing the file, anchor it to content, not position.**
+
+## 65. The contradiction rate scaled with the size of the plan, not the size of the work
+
+Two waves, same method, same instruction to record every time the brief, the plan, the ledger or an
+earlier claim lost an argument with the source:
+
+| | tracks | units | contradictions | per unit |
+|---|---|---|---|---|
+| wave 9 | 4 | ~20 | ~28 | ~1.4 |
+| wave 10 | 6 | 67 | 262 | **3.9** |
+
+The work was not three times harder. What changed is that wave 10's plan was **written in one sitting,
+for six tracks, by someone who had read four of the six subsystems** — and then handed to agents who
+each read theirs properly. Every extra track is another reader of the same document, and every reader
+that goes deeper than the author finds more of what the author got wrong.
+
+Two readings of that, and the second is the useful one.
+
+The comfortable reading is that the tracks were doing their job. True, and worth the instruction: the
+authorisation to contradict is the highest-yield line in the whole brief, and this is the second wave
+running where nearly every defect found lived in the instructions rather than in the work.
+
+The uncomfortable reading is that **a plan's error rate is a function of how fast it was written and
+how many subsystems it claims to cover, and it does not announce itself.** Wave 10's plan read as well
+as wave 9's. It stated the friction in a subsystem in four confident bullets; the track that read that
+subsystem properly confirmed two, contradicted one outright, and found the confirmed ones understated.
+Nothing in the writing distinguished the true bullets from the false ones.
+
+So the practical rule is not "write better plans" — it is **budget for the plan being wrong in
+proportion to its breadth.** Concretely: make the first unit of any track a measurement that checks
+the plan's claims about its own subsystem against the source, before any work depends on them. Both
+of this wave's roadmap tracks were told to do exactly that, and both spent their first unit correcting
+the premises they had been given. That is the cheapest possible place to find those errors, and it is
+one unit out of twelve.
