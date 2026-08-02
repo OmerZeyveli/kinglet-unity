@@ -68,7 +68,7 @@ After installation, your project contains:
 .claude/
   agents/          28 specialized sub-agents (coder, reviewer, verifier, scene-builder, game-designer, etc.)
   commands/        36 slash commands (/unity-workflow, /unity-prototype, /unity-doctor, etc.)
-  hooks/           25 hooks + _lib.sh (safety, quality, session, learning)
+  hooks/           26 hooks + _lib.sh (safety, quality, session, learning) — 8 of them blocking
   rules/            6 always-loaded coding standards (C# style, performance, architecture, PC/console)
   skills/          39 knowledge modules organized by category
     core/            Assembly definitions, event systems, object pooling, MCP patterns
@@ -106,6 +106,19 @@ You can then customize the generated `CLAUDE.md` to add:
 ## Setting Up unity-mcp (Optional but Recommended)
 
 The MCP bridge gives Claude direct control over the Unity Editor: creating GameObjects, building scenes, running tests, profiling performance.
+
+> **Set it up before you start a session, not during one.** Tool schemas register when the Claude Code
+> process starts. Registering the server mid-session succeeds, reports `✔ Connected`, and gives you
+> nothing — no `mcp__unityMCP__*` tools appear, and subagents you spawn afterwards inherit the same
+> empty set. The order that works is: open Unity → start the bridge → confirm the port answers →
+> *then* start the session. Unity must also stay open: the HTTP server is a child of the editor and
+> `EditorApplication.quitting` stops it.
+>
+> The failure mode is quiet rather than loud. Agents that require MCP — `unity-coder`,
+> `unity-test-runner`, `unity-fixer` — remain listed and dispatchable, start normally, and work with
+> empty hands. Nothing announces that their main capability is missing; you get a plausible report
+> about code that was never touched. If you are planning work that needs the editor, plan the session
+> around it.
 
 1. In Unity: **Window > Package Manager > Add package from git URL**
    ```

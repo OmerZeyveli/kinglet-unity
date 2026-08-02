@@ -18,6 +18,44 @@ plans into `docs/`.
 
 ---
 
+## Status — what actually works today
+
+**This is not finished, and the gap between what it installs and what it has been proven to do is
+worth reading before you adopt it.** Every claim below is checkable with the command beside it.
+
+| | State |
+|---|---|
+| **Client** | **Claude Code only.** `adapters/codex/profile.json` exists, but `src/catalog/routing.json` is empty and `python3 -m tools.kinglet_build validate` reports *0 canonical units, 0 routes, 2 adapters*. Nothing renders for Codex yet. |
+| **Host** | **linux-x64 only** (`.claude/UPSTREAM`). The shell avoids bash-4 and GNU-only constructs so a macOS pass stays possible, but that pass has not happened. Windows: nothing. |
+| **The build system** | **Scaffolded, not in use.** `src/templates/` does not exist. `.claude/` is still the hand-authored surface, pinned by a human-owned manifest in `migration/`. Adding one file there means updating five separate records — see `migration/baseline-inventory.json`'s description. |
+| **Unity MCP** | **Session-bound.** Tool schemas register when the client process starts, so Unity must be open and the bridge listening *before* you start the session, and must stay up. A session that begins without it can never acquire it — registering mid-session succeeds and changes nothing. |
+| **Verification in your project** | **None ships.** The hooks below are prompt-time guards: they refuse a tool call. The toolkit installs no tests, no gates, no CI, and no pre-push chain for your game. Build-time verification is yours to write. |
+
+### The architecture is a constraint, not a default
+
+`.claude/rules/` mandates **Model-View-System + VContainer + MessagePipe + UniTask + New Input
+System**, and the agents and commands assume it. If your project uses a different stack — singletons,
+coroutines, plain C# events — the rules are actively wrong for you and you must override them in your
+own `CLAUDE.md`. A real project doing exactly that needed a substantial "if a Kinglet rule contradicts
+this, this section wins" section to keep the agents from migrating working code.
+
+Read `.claude/rules/architecture.md` before installing. If you disagree with it, this toolkit will
+fight you.
+
+### What has actually been exercised
+
+On one Unity 6 / URP 2D project, 2026-08-02: the MCP bridge drove the editor through `execute_code`
+and closed eight parked findings; the design agents (`game-designer`, `level-designer`) produced
+design documents from a real codebase; a headless authoring tool created a complete DNA form in one
+call. The `unity-*` engineering agents, commands and skills were **not** invoked in that session —
+detailed task briefs left them nothing to decide — so their behaviour in practice is still unmeasured.
+
+Frontmatter validity, command registration and agent invocation have had no systematic pass. The test
+suite proves the installer places correct bytes; it does not prove Claude Code does anything useful
+with them.
+
+---
+
 ## What's opinionated
 
 - **PC / console only.** No mobile. Keyboard/mouse + gamepad with rebinding, no touch. Desktop and
@@ -39,9 +77,9 @@ Installed into your project's `.claude/`:
 | **Agents** | 28 | 20 engineering (`unity-coder`, `unity-reviewer`, `unity-optimizer`, …) + 8 design |
 | **Commands** | 36 | 27 `/unity-*` + 9 design/production |
 | **Skills** | 39 | Unity subsystems, gameplay patterns, genres, third-party packages |
-| **Hooks** | 25 | Safety and quality gates (5 blocking, the rest advisory) |
+| **Hooks** | 26 | Prompt-time guards (**8 blocking**, the rest advisory). 27 files — `_lib.sh` is a shared library, not a hook |
 | **Rules** | 6 | 5 spine rules + `pc-console.md` |
-| **Templates** | 5 | GDD, ADR, sprint plan, game concept, systems index |
+| **Templates** | 6 | GDD, ADR, **game decision record**, sprint plan, game concept, systems index |
 
 ### The design & production layer
 
