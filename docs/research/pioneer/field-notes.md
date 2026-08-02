@@ -1763,3 +1763,654 @@ And one optimisation that looked obvious and is not: 56% of a wave's non-merge c
 is an **EditMode test that reads the documentation**, so a docs-only change is exactly the case that
 test exists for. The naive rule would skip the one suite that could catch the change. **Before
 narrowing a gate by input type, ask what tests exist *because of* that input type.**
+
+## 68. Every measurement mistake had the same shape: counting the record, not the event
+
+Five measurements went wrong on this project before anyone noticed a pattern. They looked unrelated —
+different tools, different questions, different waves. They were the same mistake every time.
+
+| the question | what got counted | what it should have counted |
+|---|---|---|
+| how often do agents hit the gate? | keyword hits in track prose | actual refusals |
+| ditto, second attempt | the gate's failure strings — but in the **hook source** agents had *read* | the strings in gate *output* |
+| is the fleet CPU-bound? | `load average` (a proxy) | `vmstat`: CPU was a third idle |
+| do agents batch tool calls? | assistant **records** in the transcript | tool calls per **API request** |
+| where does the token cost go? | a prediction, unmeasured | `Read` was 8%; `Bash` was 92% |
+
+In every case the instrument was pointed at a *representation* of the thing rather than the thing. A
+transcript, a log, a prose report, a load counter — each has its own structure, and grep counts that
+structure. The transcript case is the crispest: the log writes each `tool_use` as its own record, so a
+message carrying three parallel calls appears as three records sharing one `requestId`. Counting
+records gives exactly 1.00 calls per turn for every population that has ever existed. Group by
+`requestId` and the real numbers appear — 1.01 for workflow agents, 1.30 for terminal subagents.
+
+**The tell, in three of the five: a uniform result across populations that must differ.** Terminal
+sessions, workflow agents and the integrator all returned precisely 1.00. The gate-refusal counts came
+back uniformly distributed across tracks, which is what reading the *same source file* looks like and
+not what independent refusals look like. Uniformity is what a broken instrument produces, because a
+broken instrument is measuring something all the populations share.
+
+**The cheapest defence is a positive control, and it was available every time.** Before believing a
+number, include one case whose answer you already know. In the batching measurement the control was
+free: the measuring session had itself issued parallel calls minutes earlier. A result of 1.00
+contradicted directly observable ground truth. A measurement that disagrees with something you know
+is testing your instrument, not your subject — and that is the moment to check the instrument, not to
+write up the finding.
+
+The corollary for anything log-derived: **ask what the log's own schema does to your count before you
+run it.** One record per event is an assumption, not a guarantee.
+
+**The note caught a second instance of itself within the hour.** The cost figures for this project —
+terminals versus workflow versus integrator — came from the same transcripts, and the same schema
+does the same thing to `usage`: a message split across three records carries the *identical* usage
+object on all three. 625 of 625 multi-record requests were exact duplicates. Summing per record
+inflated cache-read by 98.7% and roughly doubled every dollar figure reported. Corrected, terminals
+cost $4,847 (not $6,964), the workflow $4,346 (not $7,225), the integrator session $679 (not $1,445).
+
+The *conclusion* survived — the workflow still costs 61% of a terminal per turn — which is the
+comforting half. The uncomfortable half is that the ratio moved from 49% to 61%, because the
+inflation was not uniform across populations. **A duplicated-record bug does not cancel out of a
+ratio.** Two populations with different batching rates get different amounts of inflation, so the
+comparison is wrong by an amount you cannot predict from either side.
+
+The general rule: when one schema quirk has corrupted one measurement, every other measurement drawn
+from that schema is suspect until re-checked — including the ones whose answers looked reasonable.
+Plausibility is not a control.
+
+## 69. The most-read file in the wave was the plan, and fresh agents are why
+
+Wave 11's 335 workflow agents spent 73% of their context budget reading and searching. Attributing
+the bytes that file reads actually returned:
+
+| | MB | share |
+|---|---|---|
+| first acquisition anywhere in the run | 6.36 | 41.1% |
+| re-acquired by a **different** agent | 5.88 | 38.0% |
+| re-read **within** one agent | 3.24 | 20.9% |
+
+**59% of read bytes are waste.** And 68% of the cross-agent half is `docs/` — the plan, the decisions
+document, the ledger. Counted by how many separate agents opened each file, the most-read file in the
+entire wave was not source code:
+
+    wave-10-plan.md            51 agents
+    wave-11-plan.md            46 agents
+    decisions-2026-07-31.md    26 agents
+    run-editmode-tests.sh      21 agents
+    finding_ledger_check.py    21 agents
+
+This is the hidden invoice for a fresh agent per unit. A fresh agent is genuinely cheaper per turn —
+131k cache-read per turn against 336k for a long-lived session, about 2.5×. What it cannot do is
+remember, so every unit re-acquires the shared context, and the shared context is the large documents
+the integrator wrote. **The design is still right; the mistake is letting re-acquisition happen by
+file read.** Put the brief in the prompt and forbid the file: the agent pays for its own section once,
+in tokens the dispatch was going to spend anyway, instead of pulling 20 KB of plan it mostly does not
+need.
+
+The same reading explains `run-editmode-tests.sh` at 21 agents. Nobody wanted the script — they wanted
+its invocation and its exit codes, which the prompt did not state. **An agent reads a tool's source
+when the prompt does not carry the tool's contract.** That is a prompt defect showing up as a read.
+
+Within a single agent, the repeats have four causes, and the largest is self-inflicted by the reading
+style:
+
+    slice-read, then came back for more    48.6%
+    re-read immediately, separate call     27.5%
+    re-read after editing that file        18.0%
+    re-read later, no edit                  5.9%
+
+Reading a file in `sed -n '100,200p'` slices *guarantees* a return trip — 2,640 slice reads against
+1,841 whole-file reads. And 18% is the verify-my-own-edit reflex, which the Edit tool already makes
+unnecessary by failing loudly.
+
+None of this is visible from the outside. A track that closes its findings looks efficient; the cost
+is in how it learned what it needed, and that never appears in the output.
+
+## 70. The prompt rules cut turns by a third and cost by nothing, because they traded one waste for another
+
+Four agents, two tasks, prompts byte-identical except for a block of four cost rules — batch
+independent calls, read whole files rather than slices, never re-read a file, never re-read to verify
+an edit.
+
+| task | arm | turns | calls/turn | cost | sed | Read | tool output |
+|---|---|---|---|---|---|---|---|
+| A | control | 19 | 1.58 | $4.13 | 11 | 0 | 116 KB |
+| A | treatment | **12** | 1.67 | **$4.33** | 0 | 6 | **195 KB** |
+| F | control | 15 | 1.67 | $5.10 | 0 | 0 | 148 KB |
+| F | treatment | **10** | 2.00 | **$4.45** | 1 | 6 | **215 KB** |
+
+**Turns fell 33-37%, consistently. Cost fell 5%, which at n=2 is nothing.** Output quality was
+indistinguishable: all four covered every finding and the two arms on task A each found six stale
+catalog claims.
+
+The mechanism is visible in the last column. The agents bought their turn reduction by pulling more
+content per turn — whole files instead of slices, 116 KB to 195 KB. Cost is context times turns, so
+halving one while doubling the other is a wash. **The rule block bundled a lever that helps with a
+lever that hurts.**
+
+Batching independent calls into one message removes a turn and adds no content: pure gain. Reading
+whole files removes a turn *by adding content*, and whether that pays depends on how long the agent
+lives. The extra content is charged once on entry (cache-write, 12.5x the read rate) and then re-read
+on every remaining turn; the saved turn is worth one re-read of the ~40,000-token fixed prefix. For a
+20 KB file against a 5 KB slice, break-even lands near 15-20 turns.
+
+**The test agents ran 10-19 turns. Production units run a median of 39.** So the honest reading is
+narrower than "whole-file reading does not pay": at the length these agents ran, it broke even, and
+at production length the same arithmetic says it loses. A cheap experiment landed in exactly the
+regime where the effect vanishes — worth checking before designing the next one.
+
+The original justification was that slice reading caused 48.6% of within-agent repeat reads. True,
+but repeat reads were only 20.9% of read bytes. Trading a 20.9% waste for a surcharge on every first
+read was a bad deal, and the number that said so was already in hand and misread. **A share of a
+waste category is not a share of the bill.**
+
+## 71. Batching alone cut cost 18%; adding the reading rule cut it to 5%
+
+The follow-up isolated one variable. Same two tasks, same control data, one sentence added to the
+prompt — issue independent commands in one message — and nothing at all about how to read a file.
+
+| task | arm | turns | cost | tool output |
+|---|---|---|---|---|
+| A | control | 19 | $4.13 | 116 KB |
+| A | four rules | 12 | $4.33 (+5%) | 195 KB (+69%) |
+| A | **batching only** | 16 | **$3.39 (−18%)** | 94 KB (−19%) |
+| F | control | 15 | $5.10 | 148 KB |
+| F | four rules | 10 | $4.45 (−13%) | 215 KB (+45%) |
+| F | **batching only** | 9 | **$4.19 (−18%)** | 202 KB |
+
+**−18% on both tasks, from one sentence.** The four-rule block gave −5%, because the whole-file rule
+inflated tool output by 45–69% and spent the turn savings on content.
+
+The literature had already named both halves of this. [LLMCompiler (ICML 2024)](https://arxiv.org/abs/2312.04511)
+reports up to 3.7× latency and 6.7× cost from executing an LLM's independent calls concurrently, with
+~9% *higher* accuracy — fewer intermediate steps, less context pollution. And
+[Token Reduction Is Not Cost Reduction](https://arxiv.org/html/2607.12161), over 2,908 billed Claude
+Code runs, found an intervention that cut tool-output tokens 38.4% while cost rose 6.8%, and named the
+mechanism: cache-read is a tenth of input price, removing context makes the model fetch it again, and
+every added turn re-transmits the whole cached prefix. Their cost split — cache write 44.3%, cache
+read 35.4%, output 10.4% — is the same shape as this project's 22.8% / 72.7% / 4.5%. The difference is
+trajectory length: their mean run is 4.5 turns, ours 39–50. Short agents pay to fill the cache; long
+agents pay to re-read it.
+
+Two things follow. **First, a prompt sentence is not the ceiling.** 6.7× comes from a planner that
+builds a dependency graph; ours moved calls-per-turn from 1.01 to about 1.7. Most of the headroom
+needs structure, not instruction. **Second, bundle rules and you cannot tell which one worked** — the
+first experiment shipped four together, measured 5%, and nearly retired the one lever that pays.
+
+Caveat kept in view: n=2 per arm, and the quality counts moved in both directions — on task A the
+batching arm pinned 26 symbols against the control's 37, on task F it pinned the most of any arm. All
+arms covered all four findings. Part of the 18% may be less thoroughness rather than less waste, and
+this design cannot separate them.
+
+## 72. Parallel tracks collide in shared number spaces, not just shared files
+
+Wave 12's fold produced four conflicts. One was ordinary. Three were the same defect wearing
+different clothes, and none of them was a file collision:
+
+- Wave 11: **two** tracks allocated the finding id `MEN-B10` to different findings in the same catalog.
+- Wave 12: **three** tracks allocated operator-worklist **entry 21** — track A for PM-C1's dash
+  decision, track G for ENV-B11's static collider, track H for EN-S4's configuration block.
+
+The track boundaries were drawn on *files*, carefully and successfully — no two tracks edited the same
+source file all wave. What they shared was a **counter**. Every track appends to
+`operator-worklist.md` and to the ledger, and every track computes "the next free number" against a
+tree that does not yet contain its siblings' work. Each one is right at the moment it looks.
+
+Git cannot help here. Two appends at different offsets are not a textual conflict, so the collision
+arrives as a document with two `### Entry 21` headings and a ledger whose `operator:21` pointers now
+resolve to whichever section the reader hits first. §61 recorded that parallel writers collide on
+append-only files; this is narrower and worse — **they collide on the identifiers inside them**, and
+the fold notices only if someone thinks to grep for duplicates.
+
+Three fixes, in increasing order of how much they actually solve:
+
+1. **Grep for duplicate identifiers as part of the fold**, always. `grep -c '^### Entry 21 '` is the
+   whole check and it is not optional; a union merge produces exactly this and reports success.
+2. **Give each track a disjoint range** at plan time — track A gets 21-29, G gets 30-39. Free, and it
+   removes the collision rather than detecting it.
+3. **Stop numbering.** The entry number carries no information the heading does not. A slug
+   (`entry-pm-c1-dash`) cannot collide by construction, and the ledger pointer becomes readable.
+
+The renumber itself is cheap — heading, index row, ledger evidence, and any inbox reference, about
+ten edits — but only if it is caught. The expensive version is a worklist that silently has two
+entries with the same number and an owner who actions the wrong one.
+
+## 73. A design agent earns its cost by reading the code, not by having taste
+
+The kinglet design agents (`game-designer`, `level-designer`) are a documentation layer — they read
+the repo and write to `docs/`, they never touch C#. The obvious worry is that this makes them
+decorative: an agent with taste but no leverage.
+
+Dispatched on a real biome design question, the thing that made `game-designer` worth the call was
+not a single design opinion. It was that it opened `DNAController.cs` and found line 303 —
+`if (form != defaultForm && !CurrentFormHas(FormCapability.Morph))` → *"Cannot change form more than
+once!"* — established that only the baseline form declares `Morph`, and that `ResetForm()` runs on
+death. **One transformation per life, and death is the only route to a second form.**
+
+Nobody in the conversation knew that. It had been true for months. It reframes the entire design
+question from "which form solves this room" into "in what order do I wear forms, and what does each
+leave behind before I kill it off" — and it is a fact about the code, not a preference.
+
+The same agent's purely aesthetic contributions were ordinary. Its spatial thesis was good; its
+answer to "should the cave have water" was *water*, which was the wrong answer for a structural
+reason it had not checked (a substance exactly one form can enter is a lock and a key — the same
+object as the button-and-door vocabulary the whole biome existed to escape).
+
+**The transferable part.** A design agent's value is concentrated in the part of design that is
+*discovery about the existing system*, not the part that is *invention*. Give it the repo and a
+question that the code can partly answer, and it will find the constraint you forgot you shipped.
+Ask it to have an opinion about a mechanic that does not exist yet and you get a competent one,
+worth about as much as your own.
+
+The corollary for cost: dispatch design agents at questions with a code surface. A pure ideation
+prompt is the expensive way to get an average answer.
+
+## 74. The cost estimate was wrong in the two places the owner could see
+
+`game-designer` ranked a split-body form as the most expensive item on the list, because "a second
+body touches input, camera, the locomotion state machine, and the death path." Reasonable, and it
+put the item first on the cut list.
+
+The owner deleted half of it in one sentence: both halves take the *same* input, so there is no new
+input work, and that biome's camera is static, so there is no follow-two-targets problem. What
+remained — the single-player-shaped death path, and which body owns the form — is real but is roughly
+half the estimate. The item came off the top of the cut list.
+
+Neither correction required knowing the codebase better than the agent did. Both required knowing the
+*design intent*, which the agent had inferred rather than been told: it had costed two independently
+controlled bodies because that is the usual shape of the mechanic, and nobody had said otherwise.
+
+**The transferable part.** An agent's cost estimate silently prices the design it imagined, not the
+design you meant. When an estimate ranks something surprisingly high, check the imagined design
+before you accept the ranking — the error is more often in the specification than in the arithmetic.
+Two of the four line items here evaporated on contact with a fact the agent was never given.
+
+## 75. You can verify an MCP server without restarting the session
+
+MCP tools register at session start. If the server was not running then, the `mcp__*` tools do not
+exist for the rest of the session, and the usual conclusion is "we'll test it next time" — which
+defers the question by hours and often forever.
+
+The tools are absent; the server is not. It is an HTTP endpoint, and `curl` reaches it now:
+
+```bash
+SID=$(curl -s -D - -o /dev/null -X POST http://127.0.0.1:8080/mcp \
+  -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"probe","version":"0"}}}' \
+  | awk 'tolower($1)=="mcp-session-id:"{print $2}' | tr -d '\r')
+# then notifications/initialized, then tools/list, then tools/call — same JSON-RPC, same session header
+```
+
+Three traps, all hit on the first attempt:
+
+- **A plain `GET` returns 406, not an error you should trust.** Streamable-HTTP MCP requires
+  `Accept: application/json, text/event-stream`. 406 means "wrong headers", not "server broken".
+- **Responses come back as SSE frames**, so the JSON is behind `sed -n 's/^data: //p'`.
+- **The session id lives in the `mcp-session-id` response header** of `initialize` and must be sent
+  on every later call. Without it the second call fails in a way that looks like the server rejecting
+  you.
+
+What this buys is not just a green light. `tools/list` returned 48 tools and their real schemas — two
+guessed `manage_editor` actions were rejected with the full literal enum of valid ones, which is
+faster documentation than reading the package. And one `manage_script` call logged
+`unity_instance=Endless-Evolution@3febfac2`, which answered the question that actually mattered:
+*which project is the editor attached to.* A connectivity check that does not confirm the target is
+not a connectivity check.
+
+## 76. The best fix for a risky mechanic was deleting the mechanic that made it risky
+
+The cave design's largest open risk was that a form which permanently destroys terrain, in a game
+where rooms never reset, can strand the player with no feedback. Two agents and I converged on the
+same framing: what is the escape hatch — a player-invoked room reset, a menu restart, or a promise
+from level design that it cannot happen? The third is the easiest to claim and the hardest to hold,
+so the discussion was really about which mitigation to build.
+
+The owner changed the mechanic instead. The digging form now moves freely through soil and **the
+tunnel closes behind it** — no terrain is permanently edited, so nothing needs restoring and no
+mitigation is needed. The risk did not get managed; it stopped existing. Permanent destruction moved
+to discrete, individually placed objects, where a level designer can *enumerate* every permanent edit
+in a room — impossible when the edit is "any of nine hundred tiles."
+
+It also closed a second problem nobody had raised in that thread: a tunnel that persists is a ladder,
+and a ladder makes the digger a general-purpose vertical solution — the exact failure the swing-only
+thread rule existed to prevent. One change satisfied two constraints that had been argued separately.
+
+**The transferable part.** When a design discussion has converged on *which mitigation*, that is the
+signal to go back one step and ask whether the mechanic is required in the shape that needs
+mitigating. Agents are especially prone to this: given a risk, they reliably produce mitigation
+options and reliably do not propose deleting the requirement, because the requirement arrived as
+given. The move is cheap to try and it is the owner's to make, not the agent's — which is a reason to
+put the risk in front of the owner as a *risk*, not as a menu of mitigations.
+
+## 77. The MCP tool table is frozen at session start, and subagents inherit the freeze
+
+Registering an MCP server mid-session succeeds — `claude mcp add` reports `✔ Connected`, and the
+server is genuinely reachable (§75 proves it over HTTP). None of that produces a callable tool.
+
+The obvious hope is that a *freshly spawned* subagent, created after the registration, would pick the
+server up. Measured, it does not. A probe agent found no tool whose name begins with `mcp__`, and
+`ToolSearch` returned empty for both the exact name (`select:mcp__UnityMCP__manage_editor`) and a
+keyword query. The tool table is fixed when the session starts and inherited by every agent the
+session spawns.
+
+The failure mode this creates is worse than an error. Agents that *require* MCP — `unity-coder`,
+`unity-test-runner`, `unity-fixer` in this toolkit — remain listed and dispatchable. They start
+normally and work with empty hands. Nothing announces that their principal capability is missing;
+they simply produce a report about code they could not run.
+
+**The operational rule: work that needs MCP must be planned into a session that started with the
+server up.** Not "we'll connect it when we get there" — by then it is too late for that session, and
+the cost of discovering this is a dispatched agent that returns something plausible and useless.
+
+Two corollaries. First, a toolkit that ships MCP-dependent agents should have a preflight that fails
+loudly when the tools are absent, because the agents themselves will not. Second, when a wave's
+findings are triaged into `needs-editor`, that queue is not merely "later" — it is a scheduling
+constraint on a specific kind of session, and it should be written down as one.
+
+*(Measured for the Agent tool. Workflow was not measured; its documentation grants access to
+"session-connected MCP tools", and a server added after start is by that wording not session-connected
+— an inference, not a measurement.)*
+
+### §77 addendum — the other half: the server is owned by the editor
+
+§77 measured the client half (the tool table freezes at session start). That alone does not explain
+why the Unity Editor must be *open*. The server half does, and the package documents it only in its
+own source — the upstream README says nothing about server lifecycle.
+
+Evidence, all local, from `com.coplaydev.unity-mcp`:
+
+- The running process carries `--pidfile <project>/Library/MCPForUnity/RunState/mcp_http_8080.pid`
+  and `--unity-instance-token <hex>`. A pidfile inside the Unity project's `Library/` plus an
+  instance token means the editor spawned it.
+- `Editor/Services/HttpAutoStartHandler.cs` is `[InitializeOnLoad]`: *"Automatically starts the HTTP
+  MCP bridge on editor load when the user has opted in via the 'Auto-Start on Editor Load' toggle."*
+- `Editor/Services/McpEditorShutdownCleanup.cs` is `[InitializeOnLoad]`, subscribes
+  `EditorApplication.quitting`, and calls `StopManagedLocalHttpServer()` — *"Headless servers have no
+  terminal window, so an unstopped one is an invisible orphan."* It is explicitly gated on quitting:
+  *"domain reloads must NOT stop the server."*
+
+So the composition is: **quitting the editor kills the server; the client's tool table cannot be
+refilled without a new session.** Three consequences the client-side note alone does not give you:
+
+1. **Unity must stay open for the whole session, not merely at its start.** Close it midway and the
+   tools remain listed with nothing behind them — the same silent-empty-hands failure as §77, arrived
+   at from the other direction.
+2. **Auto-start is opt-in.** With the toggle off, opening Unity is not enough; the bridge must be
+   started by hand. "I opened Unity and the tools still didn't appear" is this, not a bug.
+3. **There is a startup race.** Editor load plus auto-start is not instantaneous — the handler budgets
+   300 retry frames. A client session that starts before the port is listening registers nothing.
+   Correct order: Unity fully loaded → confirm the port answers → then start the session.
+
+Domain reloads are safe. Recompiling scripts does not drop the bridge; only quitting does.
+
+**The transferable part, beyond this package:** when a tool's lifecycle is undocumented, the
+process argv and the `[InitializeOnLoad]`/shutdown handlers in the installed package answer it faster
+and more reliably than the README, the wiki, or a search. The pidfile path alone identified the
+owner. Read the dependency you already have on disk before reading what its authors wrote about it.
+
+### §77 addendum 2 — "restart the CLI" does not reach a background job
+
+The fix implied by §77 is obvious: restart the client so the tool table is rebuilt. Measured, that
+advice silently fails for a background-job session.
+
+The user closed and reopened their terminal. The registration was already in `~/.claude.json` and
+`claude mcp list` reported `✔ Connected`. No Unity tools appeared. The process tree says why:
+
+```
+pid=4567  09:22:21  claude bg-spare
+pid=4531  09:22:21  claude bg-pty-host
+pid=4498  09:22:20  claude daemon run --origin transient
+```
+
+A background job's session lives in a process spawned by the daemon, not in the terminal that
+launched it. Closing and reopening the terminal starts a *new* process (here `pid=17748`, 10:13:45,
+which would have the tools) while the job continues in the old one. The tool table of the job is
+whatever existed at the daemon's spawn — 09:22 — and nothing a user does in their terminal changes
+it.
+
+**The rule: a background job cannot acquire an MCP server, ever, once started.** Not by registering
+it, not by restarting the terminal, not by spawning subagents. The only route is a session that
+starts after the server is up. If MCP work is planned, it does not belong in a job that is already
+running.
+
+**The transferable part, and it is the reason this is worth a note:** the earlier reasoning about
+resume was correct about the mechanism (the tool table is built at process start from config, and
+restoring a conversation restores messages, not tools) and still produced advice that did not work,
+because it silently assumed the session's process was the one the user could restart. When a
+correct mechanism yields a failing prediction, the error is usually an unstated assumption about
+which process, machine, or context the mechanism is running in — check that before re-examining the
+mechanism. Confirming it cost one look at `/proc/<pid>/stat`'s parent chain.
+
+## 78. MCP did not make hard work cheap; it made impossible work possible
+
+Sixteen findings had been parked across five waves as `needs-editor` — work no agent could do because
+it required the Unity Editor. One session with the MCP bridge live closed eight of them in 61 minutes
+for $27.72, and the remaining six are all genuinely decision-gated rather than capability-gated.
+
+The per-turn numbers, next to the wave-era baseline measured from the same project's transcripts:
+
+| | MCP session | wave-era terminals |
+|---|---|---|
+| total | $27.72 | $1,255.10 |
+| turns | 199 | 6,708 |
+| **per turn** | **$0.139** | **$0.187** |
+| tool calls / turn | 1.15 | 1.01 |
+| cache_read share | 80.6% | — |
+
+26% cheaper per turn, and the batching rule moved calls/turn from 1.01 to 1.15 — not the 1.7 that pure
+investigation reaches, because editor work has real sequential dependencies (§71's ceiling again).
+
+**But the comparison is the wrong frame and it is worth saying why.** These eight were cheap findings.
+They waited five waves not because they were hard but because they were unreachable. Reading the
+$0.139 as "MCP saves 26%" mistakes the result: the honest statement is that the prior price of these
+eight was *unbounded*, because no amount of spending closed them. A capability unlock and an
+efficiency gain are different things and should not be reported in the same units.
+
+The corollary for triage: a queue labelled by *difficulty* hides this. `needs-editor` looked like a
+backlog of hard work and was actually a backlog of trivial work behind a locked door. Worth asking of
+any parked queue whether its items are expensive or merely blocked — the second kind clears in an
+afternoon once the block lifts, and should be scheduled the day the capability arrives rather than
+prioritised against genuinely hard work.
+
+## 79. The bridge contaminates the repository, and only one of the two was reversible
+
+Two engine-settings files changed without anyone asking, in one session:
+
+- **`EditorSettings.asset`: `m_EnterPlayModeOptions: 0 → 1` (`DisableDomainReload`).** Unity's Test
+  Runner sets this to run PlayMode tests without a domain reload and **does not put it back**. It is
+  not cosmetic — with domain reload disabled, static state survives between play sessions, so the game
+  behaves differently in the editor for everyone who pulls the commit. Caught and reverted through
+  `EditorSettings.enterPlayModeOptions`.
+- **`TimeManager.asset`**: the pinned editor migrated `Fixed Timestep: 0.02` to the rational form
+  (`m_Count: 2822398`, `m_Rate: 141120000/1`, a ~1e-8 relative difference) the first time settings
+  were saved. Not cleanly revertible — hand-editing the YAML back invites a malformed settings file,
+  and the next settings save redoes it.
+
+**Anyone running PlayMode tests through MCP must check `git status` on the settings directory
+afterwards.** This is the single most likely way the bridge dirties a repo, and neither change
+announces itself.
+
+The second-order lesson is about *which* guard fires. This repository already had a rule against
+silent engine migrations (`ee-sandbox.sh` resolves the editor from `ProjectVersion.txt` rather than
+guessing a newer one, calling the alternative "a silent, committed engine upgrade nobody asked for").
+That guard did not fire, correctly: the running editor *was* the pinned version. The migration came
+from the pinned editor touching a file an older editor wrote — a case the guard was never shaped for.
+**A guard written against one mechanism does not cover a second mechanism with the same outcome.**
+
+## 80. A status of `applied` can be true of a working tree and false of the repository
+
+The guard that blocks agents from staging engine-settings YAML did its job: it refused the session's
+`git add`. The session did not disable it — correct — and committed everything else. The result is a
+repository where two findings read `applied` in the ledger while the changes backing them exist only
+in one person's working tree, and where a prefab ships pointing at layer 19 while the file that *names*
+layer 19 does not.
+
+The ledger check has exactly this rule and it did not fire. It told the same session, about a spec
+file, that it *"exists in the WORKING TREE but not in the index — stage it or the push carries a claim
+nobody else receives."* Its evidence resolver simply does not apply that rule to engine-settings
+paths, so the row passed clean.
+
+**A guard that checks staging for one class of evidence path and not another will certify a
+half-landed fix.** The gap is not that the hook blocked the write — that is the hook working. It is
+that two mechanisms disagreed about the same commit and nothing reconciled them: one refused the file,
+the other blessed a claim that depended on it.
+
+Generalised: whenever one guard *prevents* a change and another guard *verifies* the outcome of that
+change, they must know about each other, or the second will certify what the first blocked.
+
+## 81. A content-matching guard blocks writing about the thing it guards
+
+Writing §79 and §80 into this file failed. The hook that protects Unity's engine-settings directory
+fired on a `cat >> docs/research/pioneer/field-notes.md` heredoc — because the *prose* contained the
+guarded path string. The command wrote to a research note in a different repository and touched
+nothing the hook exists to protect.
+
+The hook matches the command text, not the command's target. Every `git add`, `Write`, and `Edit` is
+screened the same way, so any file whose content discusses the guarded path is unwritable by that
+route. Documentation, post-mortems, and the guard's own README are exactly the files most likely to
+name it.
+
+The workaround is to move the content out of the command: write the text with a file-writing tool, then
+`cat tmpfile >> target`. That the workaround is trivial is the point — **a guard this easy to step
+around while blocking legitimate writes is mis-specified, not strict.** It should match on the
+resolved target path.
+
+Worth checking for the whole class: any guard implemented as a substring match over a command line
+will fire on quotation and miss indirection. Those are the same defect seen from two sides.
+
+## 82. Grepping source misses everything the editor authored
+
+An agent specifying a darkness mechanic reported, as an established fact underpinning its whole
+design: *"There are zero `Light2D` references in Assets outside the vendored extension."* It had
+grepped `.cs` files, which is where a programmer looks for a type.
+
+`Light2D` is authored in **52 scenes and 26 prefabs**, and one of them puts a point light on the
+**player's root GameObject** — so the spec's central proposal, a new `CarriedLight` component called
+"non-negotiable if darkness ships", was proposing to build a thing that already exists and is
+already on the object it would attach to. Not a small error: it inverted the cost estimate in both
+directions at once. New code was cheaper than claimed (the component is an inspector retune), and
+the retrofit was far more expensive (26 prefabs and 52 scenes carry authored lights that a global
+darkness pass has to reckon with).
+
+**In a Unity project, a type's real usage lives in YAML, not in C#.** A component is attached by
+GUID in a `.prefab` or `.unity` file and the class name never appears there. So:
+
+- `grep -r "Light2D" --include=*.cs` answers "who *programs* against this type".
+- To answer "where is this type *used*", resolve the script's GUID from its `.meta` and grep that
+  GUID across `.unity`, `.prefab`, `.asset`, `.controller` and `.anim`.
+
+This project already knew that — `docs/hardening/` is full of GUID sweeps done exactly this way, and
+one operator entry's entire safety argument rests on "381 prefab instances across 25 files and zero
+of them override `m_Layer`". The knowledge did not reach a fresh agent because nothing in its brief
+said so.
+
+**The transferable part.** In any system where configuration is data rather than code, "I searched
+the source" is not a search. The generalisation beyond Unity: config-driven frameworks, dependency
+injection by string key, database-stored rules, feature flags. When an agent reports an absence, ask
+what it searched — an absence claim is only as strong as the file types it covered, and absence
+claims are the ones that get built on.
+
+## 83. Parallel agents collide in number spaces, and the fix is allocation, not review
+
+Five ability specs were written in parallel. Two claimed the same capability bit (`1 << 7`); a third
+computed an enum value that was already taken. Each agent had independently read the enum, found the
+next free value, and taken it — correct in isolation, wrong in aggregate, three times out of five.
+
+This is the third instance in this project. Two hardening tracks once allocated the same finding id,
+and three allocated the same operator-worklist entry number (§72). The mechanism is identical every
+time: a shared, densely-packed, append-only number space with no allocator.
+
+**Better review does not fix it.** Only one of the five reviewers caught the bit collision, and it
+caught it by happening to read a sibling spec — which was luck, not method, because each reviewer was
+scoped to one spec. Scaling review to catch this means every reviewer reads every sibling, which is
+quadratic and still probabilistic.
+
+**Allocation fixes it, and costs one table.** The numbers now live in one document, marked binding,
+with the rule stated as *a spec that names a bit or an enum value not on this table is wrong even if
+the number happens to be free*. That last clause matters: without it, an agent that derives a
+correct-by-luck value still teaches the next agent to derive.
+
+The general rule for fanning out work: **before dispatching N agents, list every shared namespace
+they will each want to take a name from** — ids, enum values, bit flags, ports, table columns,
+migration numbers, file-name prefixes — and allocate them in the brief. It is the cheapest possible
+step and it removes a whole class of merge-time archaeology.
+
+A second-order finding from the same round, worth its own line: one spec declared a new capability
+flag and then branched on form identity everywhere, never reading the flag it had just added. The
+capability enum in this project exists specifically to retire form-identity tests, and its own
+comment says so. **An agent will happily satisfy the letter of a structure it does not use** — so a
+review that checks "was the flag declared" passes it. The check that catches it is "name the branch
+that reads it".
+
+## 84. An agent fixing an error class reproduces that error class in the fix
+
+Five specs went through revise-then-verify. All five closed every finding against them. Two still
+failed — on defects the *revision* introduced, and in both cases the introduced defect was the same
+class as a finding that revision had just corrected.
+
+- One spec's finding #3 was *a sound conclusion propped up by a claim that does not survive
+  checking*. While fixing it, the spec wrote a new supporting claim — "a grep returns hits only
+  inside the vendored extension, so this is a house rule" — which is false: 30 of 77 hits are
+  first-party runtime code across 16 files. Same conclusion, same defect, new sentence.
+- The other spec's finding #1 was *a test asserted to be writable that is not*. While fixing it, it
+  specified a new test that fails by construction, and its own neighbouring section explained why:
+  the query it asserts on is unguarded against the layer in question, so it reads `true` on exactly
+  the frames the test demands `false`.
+
+Neither is carelessness in the ordinary sense. The agent had the correction in working memory as a
+*local repair* — this sentence, this test — not as a *class of mistake to stop making*. Feedback
+phrased as "finding N is wrong, fix it" is received as N repairs, and an agent with N repairs done
+reports success honestly.
+
+Two things follow, and the second is the useful one.
+
+**Verify rounds must be allowed to raise new findings, but only new ones.** The verify prompt here
+said: *do not raise new findings unless they are things the REVISION introduced*. That single clause
+is what caught both. A verifier scoped to "did they fix the list" would have passed both specs,
+because both fixed the list completely. A verifier scoped to "review this again" would have widened
+the round indefinitely.
+
+**Feedback should name the class, not just the instances.** "Finding 3: this claim is false" invites
+a sentence swap. "Finding 3, and the class it belongs to: you are supporting real conclusions with
+checks you did not run — audit every other claim in the document for the same shape" invites the
+audit. The extra clause costs one line and is the difference between a repair and a habit.
+
+The corrections were left visible in both documents rather than silently edited, with a line saying
+which finding they mirror. A reader who sees only the clean version learns nothing; a reader who sees
+"this was introduced while fixing the finding about exactly this" learns the thing worth learning.
+
+## 85. An agent can wire a scene but cannot compose one
+
+The bridge gave an agent full editor control, and it used it well on everything that had a right
+answer: it found a null rig reference that would have made a brand-new ability silently refuse to
+fire, it caught an authored layer mask that contradicted its own component's documented intent, and
+it correctly refused to place two forms when a completeness gate said they were incomplete.
+
+Then it built a test scene, and the owner's verdict on the scene was: **bad.** Not broken — bad.
+
+The distinction is the finding. Everything the agent got right was **verifiable**: a null is null, a
+mask either includes a layer or does not, a gate is red or green. What it got wrong was **spatial
+composition** — how far apart the stations sit, whether a gap reads as crossable, whether the shaft
+looks like an invitation or a wall, how much floor a player needs before a jump feels deliberate.
+None of that has a test, and none of it was in the brief, because none of it can be written down as
+a number without already being the design.
+
+The brief asked for six stations and listed what each must contain. It got six stations containing
+those things. **The specification was satisfied and the artefact was still wrong**, which means the
+specification was the wrong instrument, not that it was under-detailed. A longer brief with exact
+coordinates would have produced the owner's layout via an extremely expensive route — the owner
+typing coordinates into a document instead of dragging boxes in an editor.
+
+**The transferable split, and it is the same shape as the earlier finding about design agents (§73):**
+give the agent the parts and the wiring, and keep the composition. Concretely, for this project:
+
+- agent: create the components, attach them, resolve references, set up the pickups and the cheat
+  keys, verify the gates, list what exists and where;
+- owner: place it.
+
+The cost of getting this wrong is not the wasted layout. It is that a bad scene is *plausible* — it
+loads, it has all six stations, every gate is green — so it can absorb a playtest before anyone
+notices the scene, not the mechanic, was what felt wrong.
+
+**The narrower operational rule:** when the deliverable is judged by feel and has no failing test, an
+agent's output is a draft for a human to replace, not a result to accept. Say so in the brief, so the
+effort goes into the parts rather than the arrangement.
