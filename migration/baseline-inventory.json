@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review.",
-  "source_commit": "58dbaa2a3a757e86e1d2417242ae3394885a16e0",
+  "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-02: game-decision-record.md added by hand to the legacy surface, because src/templates/ does not exist yet and .claude/ is still the live tree.",
+  "source_commit": "071bff191bc7b682b623ca1814792af9b41b1608",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
-    "expected_count": 147,
+    "expected_count": 148,
     "files": [
       {
         "path": ".claude/NOTICE.md",
@@ -724,6 +724,11 @@
       {
         "path": ".claude/templates/game-concept.md",
         "sha256": "8ccb0447bae6c74b7b07968d192ddb802256a827b440d870d505b3a59fefae81",
+        "git_mode": "100644"
+      },
+      {
+        "path": ".claude/templates/game-decision-record.md",
+        "sha256": "5b0fa9b11c84cdfbbb57f9b8c8052f754990fbd779c021e19d583f0ef070af0b",
         "git_mode": "100644"
       },
       {
@@ -1451,7 +1456,7 @@
     },
     "claude_templates": {
       "description": "Tracked Markdown files under .claude/templates/.",
-      "expected_count": 5,
+      "expected_count": 6,
       "files": [
         {
           "path": ".claude/templates/architecture-decision-record.md",
@@ -1461,6 +1466,11 @@
         {
           "path": ".claude/templates/game-concept.md",
           "sha256": "8ccb0447bae6c74b7b07968d192ddb802256a827b440d870d505b3a59fefae81",
+          "git_mode": "100644"
+        },
+        {
+          "path": ".claude/templates/game-decision-record.md",
+          "sha256": "5b0fa9b11c84cdfbbb57f9b8c8052f754990fbd779c021e19d583f0ef070af0b",
           "git_mode": "100644"
         },
         {

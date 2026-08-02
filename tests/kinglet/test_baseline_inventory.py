@@ -16,7 +16,7 @@ EXPECTED_COUNTS = {
     "skills": 39,
     "hooks": 26,
     "rules": 6,
-    "claude_templates": 5,
+    "claude_templates": 6,
     "code_templates": 10,
 }
 OMITTED_FROM_SEVEN_CATEGORIES = {
@@ -277,7 +277,7 @@ class BaselineInventoryTests(unittest.TestCase):
                     f"hook is not executable in checkout: {record['path']}",
                 )
 
-    def test_full_claude_tree_baseline_covers_all_147_tracked_files(self) -> None:
+    def test_full_claude_tree_baseline_covers_all_148_tracked_files(self) -> None:
         full_tree = self.baseline.get("full_claude_tree")
         self.assertIsNotNone(
             full_tree,
@@ -291,10 +291,10 @@ class BaselineInventoryTests(unittest.TestCase):
         actual_paths = [
             path for path in tracked_paths() if path.startswith(".claude/")
         ]
-        self.assertEqual(147, full_tree["expected_count"])
-        self.assertEqual(147, len(records))
+        self.assertEqual(148, full_tree["expected_count"])
+        self.assertEqual(148, len(records))
         self.assertEqual(expected_paths, sorted(expected_paths))
-        self.assertEqual(147, len(set(expected_paths)))
+        self.assertEqual(148, len(set(expected_paths)))
         self.assertTrue(OMITTED_FROM_SEVEN_CATEGORIES.issubset(expected_paths))
         self.assertEqual(
             [],
