@@ -138,13 +138,31 @@ the *behaviour* they described — the assistant proactively offering the next s
 command, and that it is better served through the surviving `unity-review`. If that reading is wrong,
 `/design-review` returns and this paragraph is the record of why it left.
 
-### The reference cascade is real work
+### The reference cascade — measured, and smaller and worse than expected
 
-`tests/test-skill-discovery.sh` enforces that every skill an agent or command names by path exists.
-Surviving agents name removed skills — `unity-prototyper` loads `character-controller`, `unity-ui-builder`
-loads `textmeshpro` and `ui-toolkit`, `unity-doctor` names a long package list. Every such reference must
-be edited out in the same change that removes the skill, or the suite fails. This is mechanical but it is
-not free, and it is the step most likely to be under-estimated.
+An earlier draft of this section claimed the cascade was large and that
+`tests/test-skill-discovery.sh` would catch it. Measured on 2026-08-03, both halves were wrong, in
+opposite directions.
+
+That test matches **path-form references only** (`.claude/skills/<name>`, at `:119`). No surviving
+surface has a path-form reference to a removed skill — the check returns empty. So the suite would
+**not** have failed.
+
+What actually exists is nine surviving surfaces naming removed skills in **bare form** — a name in a
+"Skills to load" list or in the `skills:` frontmatter key. `unity-coder` names three, `unity-reviewer`
+two, `unity-ui-builder` two, `unity-prototyper` and `unity-fixer` one each, and `unity-workflow` names
+`model-routing`. **No test catches any of them**, and an agent told to load a skill that is not there
+gets no error of any kind — it silently loads nothing.
+
+So the cleanup is smaller than feared and the gap is worse: the toolkit can ship dangling skill
+references indefinitely without a single test going red. The plan must both clean the nine and add the
+missing guard.
+
+**A pre-existing defect found while measuring this.** `unity-doctor.md:62-71` maps Unity packages to
+skill paths in the **pre-flattening nested form** — `systems/cinemachine`, `third-party/dotween`,
+`third-party/unitask`. Skills have been flat since the discovery fix; those paths have not resolved for
+some time, and the guard did not catch it for exactly the same reason. Removing those skills makes the
+mapping moot, so it is deleted rather than corrected.
 
 ---
 
