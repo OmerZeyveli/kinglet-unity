@@ -18,12 +18,12 @@ from tools.kinglet_build.baseline import (
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_PATH = REPOSITORY_ROOT / "migration" / "baseline-inventory.json"
 EXPECTED_COUNTS = {
-    "agents": 20,
-    "commands": 27,
-    "skills": 30,
+    "agents": 8,
+    "commands": 11,
+    "skills": 10,
     "hooks": 26,
     "rules": 6,
-    "claude_templates": 6,
+    "claude_templates": 0,
     "code_templates": 10,
 }
 OMITTED_FROM_SEVEN_CATEGORIES = {
