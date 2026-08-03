@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "fe34110d3343eeb44f1e9aa1a5ed848bf4d94f95",
+  "source_commit": "747037211f6fe5e54a84ea902bfeda87d7c87081",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 77,
     "files": [
       {
         "path": ".claude/NOTICE.md",
-        "sha256": "49cda408d7a4223652f76e010bf5582c85187c1c8c57757eb8a05e1d4305753f",
+        "sha256": "ecc480c54c91abc2fb3840976f9c163de4155ffdb781e3ba842bc0823630a094",
         "git_mode": "100644"
       },
       {
@@ -113,7 +113,7 @@
       },
       {
         "path": ".claude/commands/unity-workflow.md",
-        "sha256": "0d11159f352d1265a832abaea9a104122afd262081286bb4d3b975463c04e064",
+        "sha256": "00c78257e3a537a93ee287ead9ca5153f048d6832fd879b4eb35f4f4c6db8de4",
         "git_mode": "100644"
       },
       {
@@ -378,7 +378,7 @@
       },
       {
         "path": ".claude/skills/using-kinglet/SKILL.md",
-        "sha256": "858eb5f60d89a2cd5f45534c7893619b23ab7418ea038ecceb58583a80f74966",
+        "sha256": "9b3e21f86401480b1f9ceda39fb34cd06a303a17f504905719638247a980c2a4",
         "git_mode": "100644"
       },
       {
@@ -496,7 +496,7 @@
         },
         {
           "path": ".claude/commands/unity-workflow.md",
-          "sha256": "0d11159f352d1265a832abaea9a104122afd262081286bb4d3b975463c04e064",
+          "sha256": "00c78257e3a537a93ee287ead9ca5153f048d6832fd879b4eb35f4f4c6db8de4",
           "git_mode": "100644"
         }
       ]
@@ -567,7 +567,7 @@
         },
         {
           "path": ".claude/skills/using-kinglet/SKILL.md",
-          "sha256": "858eb5f60d89a2cd5f45534c7893619b23ab7418ea038ecceb58583a80f74966",
+          "sha256": "9b3e21f86401480b1f9ceda39fb34cd06a303a17f504905719638247a980c2a4",
           "git_mode": "100644"
         },
         {
