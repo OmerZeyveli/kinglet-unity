@@ -24,7 +24,7 @@ for hook_path in $(jq -r '.. | .command? // empty' "$PROJECT_ROOT/.claude/settin
         MISSING=$((MISSING + 1))
     fi
 done
-assert_eq "0" "$MISSING" "all hook paths in settings.json exist on disk"
+assert_eq "$MISSING" "0" "all hook paths in settings.json exist on disk"
 
 # ── Test 2: Every .sh in hooks/ (except _lib.sh) is in settings.json ─────
 echo ""
@@ -41,7 +41,7 @@ for hook_file in "$PROJECT_ROOT/.claude/hooks/"*.sh; do
         UNREFERENCED=$((UNREFERENCED + 1))
     fi
 done
-assert_eq "0" "$UNREFERENCED" "all hook scripts are referenced in settings.json"
+assert_eq "$UNREFERENCED" "0" "all hook scripts are referenced in settings.json"
 
 # ── Test 3: All hook scripts are executable ───────────────────────────────
 echo ""
@@ -53,7 +53,7 @@ for hook_file in "$PROJECT_ROOT/.claude/hooks/"*.sh; do
         NON_EXEC=$((NON_EXEC + 1))
     fi
 done
-assert_eq "0" "$NON_EXEC" "all hook scripts are executable"
+assert_eq "$NON_EXEC" "0" "all hook scripts are executable"
 
 # ── Test 4: Agent frontmatter has required fields ─────────────────────────
 echo ""
@@ -68,7 +68,7 @@ for file in "$PROJECT_ROOT/.claude/agents/"*.md; do
         fi
     done
 done
-assert_eq "0" "$AGENT_FAIL" "all agents have required frontmatter fields"
+assert_eq "$AGENT_FAIL" "0" "all agents have required frontmatter fields"
 
 # ── Test 5: Haiku agents are read-only ────────────────────────────────────
 echo ""
@@ -87,7 +87,7 @@ for file in "$PROJECT_ROOT/.claude/agents/"*.md; do
         done
     fi
 done
-assert_eq "0" "$HAIKU_FAIL" "haiku agents have no write/edit/bash tools"
+assert_eq "$HAIKU_FAIL" "0" "haiku agents have no write/edit/bash tools"
 
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""

@@ -49,7 +49,7 @@ while IFS= read -r file; do
 done < <(find "$PROJECT_ROOT/.claude/skills" -name "SKILL.md" 2>/dev/null)
 
 echo "--- Test: skill frontmatter ---"
-assert_eq "0" "$FRONTMATTER_FAIL" "all skills have required frontmatter (name, description)"
+assert_eq "$FRONTMATTER_FAIL" "0" "all skills have required frontmatter (name, description)"
 
 echo ""
 echo "--- Info: skill quality ---"

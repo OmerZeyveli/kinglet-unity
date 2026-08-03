@@ -45,7 +45,7 @@ if [ -n "$TOO_DEEP" ]; then
   echo "$TOO_DEEP"
   echo "--- move each to .claude/skills/<name>/SKILL.md ---"
 fi
-assert_eq "0" "$(printf '%s' "$TOO_DEEP" | grep -c . || true)" "no SKILL.md is nested below .claude/skills/<name>/"
+assert_eq "$(printf '%s' "$TOO_DEEP" | grep -c . || true)" "0" "no SKILL.md is nested below .claude/skills/<name>/"
 
 # --- 2. Nothing else lives under .claude/skills/ ---------------------------
 # A stray directory with no SKILL.md is either a half-finished skill or a
@@ -58,7 +58,7 @@ done
 if [ -n "$EMPTY_DIRS" ]; then
   echo "--- directories under .claude/skills/ with no SKILL.md ---"; printf '%s' "$EMPTY_DIRS"
 fi
-assert_eq "0" "$(printf '%s' "$EMPTY_DIRS" | grep -c . || true)" "every directory under .claude/skills/ holds a SKILL.md"
+assert_eq "$(printf '%s' "$EMPTY_DIRS" | grep -c . || true)" "0" "every directory under .claude/skills/ holds a SKILL.md"
 
 # --- 3. name: matches the directory ---------------------------------------
 # The directory is what the Skill tool is invoked by. A name: that disagrees
@@ -75,7 +75,7 @@ done
 if [ -n "$MISMATCH" ]; then
   echo "--- skills whose name: disagrees with their directory ---"; printf '%s' "$MISMATCH"
 fi
-assert_eq "0" "$(printf '%s' "$MISMATCH" | grep -c . || true)" "every skill's name: matches its directory"
+assert_eq "$(printf '%s' "$MISMATCH" | grep -c . || true)" "0" "every skill's name: matches its directory"
 
 # --- 4. description: is present and non-empty ------------------------------
 # Description is the entire selection mechanism. There is no glob matching and
@@ -91,7 +91,7 @@ done
 if [ -n "$NO_DESC" ]; then
   echo "--- skills with no description ---"; printf '%s' "$NO_DESC"
 fi
-assert_eq "0" "$(printf '%s' "$NO_DESC" | grep -c . || true)" "every skill has a non-empty description"
+assert_eq "$(printf '%s' "$NO_DESC" | grep -c . || true)" "0" "every skill has a non-empty description"
 
 # --- 5. Skills named by agents and commands exist --------------------------
 # Discovery is necessary, not sufficient: an agent still has to name the skill
@@ -122,7 +122,7 @@ done <<< "$(
 if [ -n "$BAD_REFS" ]; then
   echo "--- agent/command references to skills that do not exist ---"; printf '%s' "$BAD_REFS"
 fi
-assert_eq "0" "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "every skill named by an agent or command exists"
+assert_eq "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "0" "every skill named by an agent or command exists"
 
 # --- Summary ---------------------------------------------------------------
 echo ""

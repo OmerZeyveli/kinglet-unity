@@ -26,7 +26,7 @@ for file in "$PROJECT_ROOT/templates/"*.cs.template; do
         BRACE_FAIL=$((BRACE_FAIL + 1))
     fi
 done
-assert_eq "0" "$BRACE_FAIL" "all templates have balanced braces"
+assert_eq "$BRACE_FAIL" "0" "all templates have balanced braces"
 
 # ── Test 2: C# templates contain namespace or using ───────────────────────
 echo ""
@@ -38,7 +38,7 @@ for file in "$PROJECT_ROOT/templates/"*.cs.template; do
         STRUCT_FAIL=$((STRUCT_FAIL + 1))
     fi
 done
-assert_eq "0" "$STRUCT_FAIL" "all C# templates have namespace or using statements"
+assert_eq "$STRUCT_FAIL" "0" "all C# templates have namespace or using statements"
 
 # ── Test 3: Templates are non-empty ───────────────────────────────────────
 echo ""
@@ -51,7 +51,7 @@ for file in "$PROJECT_ROOT/templates/"*.template; do
         EMPTY_FAIL=$((EMPTY_FAIL + 1))
     fi
 done
-assert_eq "0" "$EMPTY_FAIL" "all templates are non-empty"
+assert_eq "$EMPTY_FAIL" "0" "all templates are non-empty"
 
 # ── Summary ──────────────────────────────────────────────────────────────
 echo ""

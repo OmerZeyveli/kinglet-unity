@@ -48,7 +48,7 @@ assert_absent "examples/CLAUDE.md.hyper-casual"         "hyper-casual example ab
 assert_absent "examples/CLAUDE.md.mobile-casual"        "mobile-casual example absent"
 
 # --- 2. Counts hold --------------------------------------------------------
-assert_eq "4" "$(find examples -type f | wc -l | tr -d ' ')" "4 examples (6 upstream - 2 mobile)"
+assert_eq "$(find examples -type f | wc -l | tr -d ' ')" "4" "4 examples (6 upstream - 2 mobile)"
 
 # --- 3. No mobile-only guidance in the payload -----------------------------
 # Terms that have no legitimate PC/console use. Bare "mobile" is NOT listed: a
@@ -71,7 +71,7 @@ HITS=$( { grep -rnE "$MOBILE_CS" "${SCAN_DIRS[@]}" 2>/dev/null || true
 if [ -n "$HITS" ]; then
   echo "--- mobile-only terms found in payload ---"; echo "$HITS"
 fi
-assert_eq "0" "$(printf '%s' "$HITS" | grep -c . || true)" "no mobile-only guidance in payload"
+assert_eq "$(printf '%s' "$HITS" | grep -c . || true)" "0" "no mobile-only guidance in payload"
 
 # --- 4. The harmful inversions stay fixed ----------------------------------
 # Upstream told PC/console devs never to use compute shaders or VFX Graph,
@@ -82,7 +82,7 @@ BANNED=$(grep -rniE "never use compute shaders|don't use VFX Graph|do not use VF
 if [ -n "$BANNED" ]; then
   echo "--- compute shader / VFX Graph prohibitions found ---"; echo "$BANNED"
 fi
-assert_eq "0" "$(printf '%s' "$BANNED" | grep -c . || true)" "nothing forbids compute shaders or VFX Graph"
+assert_eq "$(printf '%s' "$BANNED" | grep -c . || true)" "0" "nothing forbids compute shaders or VFX Graph"
 
 # --- 5. No skill carries the two inert Cursor keys -------------------------
 # The mobile skill's damage was attributed to alwaysApply:true + globs **/*.cs.
@@ -97,7 +97,7 @@ INERT=$(grep -rl '^alwaysApply:\|^globs:' .claude/skills/ 2>/dev/null || true)
 if [ -n "$INERT" ]; then
   echo "--- skills carrying inert Cursor frontmatter keys ---"; echo "$INERT"
 fi
-assert_eq "0" "$(printf '%s' "$INERT" | grep -c . || true)" "no skill carries alwaysApply or globs"
+assert_eq "$(printf '%s' "$INERT" | grep -c . || true)" "0" "no skill carries alwaysApply or globs"
 
 # --- Summary ---------------------------------------------------------------
 echo ""
