@@ -586,13 +586,16 @@ python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD \
     --expect-drift 0 --expect-removed 108 --expect-added 0 --dry-run
 ```
 
-Superseded text follows for reference only — 48 files removed = drift **96**. Seven files were edited, not removed; confirm with `--dry-run` whether edits register as drift in this tool before assuming 96 is complete:
+Seven surviving surfaces are **edited**, not removed, and content edits are countable drift — so
+`--expect-drift` will not be 0. Learn its real value from the same `--dry-run`; the tool reports
+drift, removals and additions separately. Then run without `--dry-run` and commit:
 
 ```bash
-python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD --expect-drift 96 --dry-run
+python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD \
+    --expect-drift <D> --expect-removed 108 --expect-added 0
+git add migration/baseline-inventory.json
+git commit -m "chore(baseline): record the surface cut"
 ```
-
-If the reported number is not 96, **stop and report it with the tool's actual output** rather than retrying with the reported number — a mismatch here means content edits also drift the baseline, which changes the prediction for every later task in this plan.
 
 Then, with the confirmed number `N`:
 
