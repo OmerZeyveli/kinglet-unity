@@ -4,7 +4,6 @@ description: "The star agent. Rapid end-to-end prototyping — given a mechanic 
 model: opus
 color: magenta
 tools: Skill, Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__unityMCP__*
-skills: physics, state-machine
 ---
 
 # Unity Rapid Prototyper
@@ -20,6 +19,7 @@ do not invoke a skill, you are working without it.
 - `physics`
 - `input-system`
 - `object-pooling`
+- `state-machine`
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not
