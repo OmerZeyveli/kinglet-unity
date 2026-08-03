@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "8709486912d401ab2e56a523f3e3ecd0120e7cb9",
+  "source_commit": "c5bd4620e1e2c55ce797d639e862acbc1f273966",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
-    "expected_count": 68,
+    "expected_count": 72,
     "files": [
       {
         "path": ".claude/NOTICE.md",
@@ -202,6 +202,11 @@
         "git_mode": "100755"
       },
       {
+        "path": ".claude/hooks/session-brief.sh",
+        "sha256": "720f72385aae4e8c122d20f03e5061a32d33e6a35330f8fa1d72d9f4b31389fa",
+        "git_mode": "100755"
+      },
+      {
         "path": ".claude/hooks/session-restore.sh",
         "sha256": "e3fffec6abc7c1cea29e9d719bd78b643401c41b1e4195facc2a6f1fc65b4757",
         "git_mode": "100755"
@@ -283,7 +288,7 @@
       },
       {
         "path": ".claude/settings.json",
-        "sha256": "a4dd471b4304103cc7f7e8d577fe9245618b51459fcc61bc28c52fc931787ec4",
+        "sha256": "3d466a02bc2f63c8474d8dad3035658104999d9310e47b29940418fcb66cc93d",
         "git_mode": "100644"
       },
       {
@@ -303,7 +308,7 @@
       },
       {
         "path": ".claude/skills/deep-interview/SKILL.md",
-        "sha256": "db73631a8655cf866c85f1703e8bc0af1d92bb6759c25e24444942c0819995bf",
+        "sha256": "98eff8c6261350a8123bb495b27df4b2b7abf31613526d74fd9fd29c1764ad81",
         "git_mode": "100644"
       },
       {
@@ -332,6 +337,11 @@
         "git_mode": "100644"
       },
       {
+        "path": ".claude/skills/systematic-debugging/SKILL.md",
+        "sha256": "c0177fa0a0a0af2909a69acb10da14677d3b0405b71a68f9febbd4663ec8c667",
+        "git_mode": "100644"
+      },
+      {
         "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
         "sha256": "e7cf36a8b1b265f5ade61d412b342047154b1fafc60dca51b7c8b9effe590f0a",
         "git_mode": "100644"
@@ -339,6 +349,16 @@
       {
         "path": ".claude/skills/urp-pipeline/SKILL.md",
         "sha256": "13fc17cd05794e7e194e3d74d891f771ef4e9248800090741ecb3d142622339d",
+        "git_mode": "100644"
+      },
+      {
+        "path": ".claude/skills/using-kinglet/SKILL.md",
+        "sha256": "6023453862f4e6ec744d0d5160abf26aa045e970d3621048a98b57a53b2ce698",
+        "git_mode": "100644"
+      },
+      {
+        "path": ".claude/skills/verification-before-completion/SKILL.md",
+        "sha256": "44ea8645db8e9ef298f969ae66122c28a2679efd76aaf45176974b013769b0de",
         "git_mode": "100644"
       },
       {
@@ -458,7 +478,7 @@
     },
     "skills": {
       "description": "Tracked SKILL.md files under .claude/skills/.",
-      "expected_count": 10,
+      "expected_count": 13,
       "files": [
         {
           "path": ".claude/skills/addressables/SKILL.md",
@@ -472,7 +492,7 @@
         },
         {
           "path": ".claude/skills/deep-interview/SKILL.md",
-          "sha256": "db73631a8655cf866c85f1703e8bc0af1d92bb6759c25e24444942c0819995bf",
+          "sha256": "98eff8c6261350a8123bb495b27df4b2b7abf31613526d74fd9fd29c1764ad81",
           "git_mode": "100644"
         },
         {
@@ -501,6 +521,11 @@
           "git_mode": "100644"
         },
         {
+          "path": ".claude/skills/systematic-debugging/SKILL.md",
+          "sha256": "c0177fa0a0a0af2909a69acb10da14677d3b0405b71a68f9febbd4663ec8c667",
+          "git_mode": "100644"
+        },
+        {
           "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
           "sha256": "e7cf36a8b1b265f5ade61d412b342047154b1fafc60dca51b7c8b9effe590f0a",
           "git_mode": "100644"
@@ -509,12 +534,22 @@
           "path": ".claude/skills/urp-pipeline/SKILL.md",
           "sha256": "13fc17cd05794e7e194e3d74d891f771ef4e9248800090741ecb3d142622339d",
           "git_mode": "100644"
+        },
+        {
+          "path": ".claude/skills/using-kinglet/SKILL.md",
+          "sha256": "6023453862f4e6ec744d0d5160abf26aa045e970d3621048a98b57a53b2ce698",
+          "git_mode": "100644"
+        },
+        {
+          "path": ".claude/skills/verification-before-completion/SKILL.md",
+          "sha256": "44ea8645db8e9ef298f969ae66122c28a2679efd76aaf45176974b013769b0de",
+          "git_mode": "100644"
         }
       ]
     },
     "hooks": {
       "description": "All tracked policy hooks under .claude/hooks/, excluding _lib.sh; every entry is executable.",
-      "expected_count": 26,
+      "expected_count": 27,
       "files": [
         {
           "path": ".claude/hooks/auto-learn.sh",
@@ -594,6 +629,11 @@
         {
           "path": ".claude/hooks/quality-gate.sh",
           "sha256": "71701943b4889aa14f85827182506a64d163fc24e1048d36bb66346ddd06dcbe",
+          "git_mode": "100755"
+        },
+        {
+          "path": ".claude/hooks/session-brief.sh",
+          "sha256": "720f72385aae4e8c122d20f03e5061a32d33e6a35330f8fa1d72d9f4b31389fa",
           "git_mode": "100755"
         },
         {
