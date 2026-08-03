@@ -174,8 +174,16 @@ while IFS= read -r cs_file; do
     [ -n "$cs_file" ] || continue
     CS_FILE_COUNT=$((CS_FILE_COUNT + 1))
     # sort -u drains its input; no early-exit reader in this pipeline.
+    #
+    # `|| true` is load-bearing, not defensive noise. grep exits 1 when it matches
+    # nothing, pipefail promotes that to the pipeline's status, the command
+    # substitution inherits it, and under `set -e` a bare assignment with a failing
+    # RHS terminates the script. The overwhelmingly common case on a real project is
+    # a .cs file matching none of the four symbols, so without this the generator
+    # dies on the first ordinary script and install.sh — which calls it with
+    # `2>/dev/null` — writes no CLAUDE.md at all and prints one warning.
     hits=$(grep -o -e 'VContainer' -e 'MessagePipe' -e 'UniTask' -e 'StartCoroutine' \
-                "$cs_file" 2>/dev/null | sort -u | tr '\n' ' ')
+                "$cs_file" 2>/dev/null | sort -u | tr '\n' ' ' || true)
     case "$hits" in *VContainer*)     VC_REFS=$((VC_REFS + 1)) ;; esac
     case "$hits" in *MessagePipe*)    MP_REFS=$((MP_REFS + 1)) ;; esac
     case "$hits" in *UniTask*)        UT_REFS=$((UT_REFS + 1)) ;; esac

@@ -109,6 +109,20 @@ public class Fader : MonoBehaviour
     private IEnumerator Fade() { yield return null; }
 }
 CS
+    # An ordinary script matching NONE of the four scanned symbols. This is the common case on a
+    # real project — most .cs files mention neither VContainer, MessagePipe, UniTask nor
+    # StartCoroutine — and it is the case the fixture did not previously contain. Its absence let
+    # a `grep | sort | tr` assignment whose grep exits 1 under `set -euo pipefail` kill the
+    # generator on every real project while the whole suite stayed green. Do not remove it, and do
+    # not add any of the four symbols to it.
+    cat > "$DIR/Assets/Scripts/Plain.cs" <<'CS'
+using UnityEngine;
+
+public class Plain : MonoBehaviour
+{
+    private void Update() { }
+}
+CS
     # Vendored code that DOES reference the stack. If detection counts this, it reports every
     # project as using VContainer, which is the failure this fixture exists to catch.
     mkdir -p "$DIR/Assets/Extensions/SomeVendor"

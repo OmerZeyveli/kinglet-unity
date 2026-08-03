@@ -44,7 +44,19 @@ echo ""
 # ── Case 1: legacy project — the stack is absent and code exists ───────────
 echo "--- Case: stack absent, first-party code present ---"
 bash "$MK" "$TMP/legacy" --variant legacy >/dev/null
-OUT_LEGACY="$(bash "$GEN" "$TMP/legacy" 2>/dev/null)"
+
+# The legacy fixture carries Plain.cs, which matches none of the four scanned symbols — the
+# common case on a real project. `set -e` + `pipefail` + a grep that exits 1 on no-match killed
+# the generator outright on such a file: rc 1, zero lines of document. install.sh calls the
+# generator with 2>/dev/null, so the field symptom was one warning and no CLAUDE.md.
+#
+# Capture rc separately from the output: `$(...)` inside `set -e` would abort this test file.
+GEN_RC=0
+OUT_LEGACY="$(bash "$GEN" "$TMP/legacy" 2>/dev/null)" || GEN_RC=$?
+assert_eq "$GEN_RC" "0" "generator survives a .cs file matching none of the scanned symbols"
+assert_has "$OUT_LEGACY" "Scanned \`Assets/\` (vendored subtrees excluded), 3 first-party C# file(s)" \
+    "the non-matching file is still counted in CS_FILE_COUNT"
+
 assert_has "$OUT_LEGACY" "Architecture stack" "legacy project emits the stack section"
 assert_has "$OUT_LEGACY" "do not bind" "legacy project says the architecture rules do not bind"
 assert_has "$OUT_LEGACY" "architecture.md" "legacy project names the rule file it is disapplying"
