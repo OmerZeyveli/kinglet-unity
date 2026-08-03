@@ -104,7 +104,7 @@ print, and the user gets a silent exit 1.
 ## Testing
 
 ```bash
-bash tests/run-tests.sh                       # 21 files, 209 assertions (counts drift — see below)
+bash tests/run-tests.sh                       # 24 files, 267 assertions (counts drift — see below)
 bash scripts/check-provenance.sh              # manifest integrity  (--online to verify upstream)
 bash tests/fixtures/mkproject.sh /tmp/p       # synthetic Unity project (--variant urp|builtin|bare|dirty)
 bash install.sh --project-dir /tmp/p --dry-run
