@@ -531,3 +531,4 @@ tests/test-workflow-plan-input.sh	original	-	-	-	original	asserts /unity-workflo
 docs/superpowers/specs/2026-08-03-surface-cut-and-process-chain-design.md	original	-	-	-	original	design spec; surface cut 103->32 + process chain
 docs/superpowers/plans/2026-08-03-surface-cut-and-process-chain.md	original	-	-	-	original	implementation plan; surface cut + process chain
 tests/test-install-prune.sh	original	-	-	-	original	an upgrade must remove what the payload dropped and must never remove a file the user edited
+docs/superpowers/specs/2026-08-03-process-layer-second-pass-design.md	original	-	-	-	original	design spec; MCP naming, process-skill depth, subagent-driven execution loop
