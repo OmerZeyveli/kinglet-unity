@@ -21,23 +21,42 @@ SHIPPED_SCRIPT_DIRS=(
     "$REPO_DIR"/tests
 )
 
-# Hooks only, for the early-exit-reader check below. scripts/ and tests/ were already swept for
-# this shape (Task 9) and are confined to short per-line/bounded-string checks (a single asmdef
-# field, one line of a .cs file) where a pipe buffer is never in play. .claude/hooks/*.sh is
-# different in kind: those scripts routinely receive an entire file's new_string or an entire Bash
-# command as one variable — exactly the size a generated PlayerControls.cs or a multi-line Bash
-# invocation produces — so the same shape there is a live fail-open bug, not a reviewed-safe one.
-HOOKS_ONLY_DIRS=(
+# install.sh and uninstall.sh sit at the repo root, not inside any of the directories above, so no
+# directory sweep ever saw them. They are the two most-run shell scripts in the product and both are
+# required to work under macOS bash 3.2 same as everything else here — omitting them was the same
+# "a check running over a set that is not the whole reality" shape this file's header already
+# describes for scripts/ and tests/, one level up. See Finding 5 in the 2026-08-03 whole-branch
+# review: install.sh:197 shipped exactly the early-exit-reader bug below, unseen, because this file
+# never looked at install.sh at all.
+ROOT_SCRIPTS=(
+    "$REPO_DIR"/install.sh
+    "$REPO_DIR"/uninstall.sh
+)
+
+# Hooks plus the two root installer scripts, for the early-exit-reader check below. scripts/ and
+# tests/ were already swept for this shape (Task 9) and are confined to short per-line/bounded-string
+# checks (a single asmdef field, one line of a .cs file) where a pipe buffer is never in play.
+# .claude/hooks/*.sh and install.sh/uninstall.sh are different in kind: those scripts routinely
+# receive an entire file's new_string, an entire Bash command, or an entire receipt's worth of
+# modified-file paths as one variable — exactly the size a generated PlayerControls.cs, a multi-line
+# Bash invocation, or a real project's edited-file list produces — so the same shape there is a live
+# fail-open bug, not a reviewed-safe one.
+PIPE_CHECK_DIRS=(
     "$REPO_DIR"/.claude/hooks
+)
+PIPE_CHECK_FILES=(
+    "$REPO_DIR"/install.sh
+    "$REPO_DIR"/uninstall.sh
 )
 
 shipped_scripts() {
-    local dirs_name="${1:-SHIPPED_SCRIPT_DIRS}"
-    local dir
+    local selection="${1:-SHIPPED_SCRIPT_DIRS}"
+    local dir f
     local -a dirs
-    case "$dirs_name" in
-        HOOKS_ONLY_DIRS) dirs=("${HOOKS_ONLY_DIRS[@]}") ;;
-        *) dirs=("${SHIPPED_SCRIPT_DIRS[@]}") ;;
+    local -a files
+    case "$selection" in
+        PIPE_CHECK_DIRS) dirs=("${PIPE_CHECK_DIRS[@]}"); files=("${PIPE_CHECK_FILES[@]}") ;;
+        *) dirs=("${SHIPPED_SCRIPT_DIRS[@]}"); files=("${ROOT_SCRIPTS[@]}") ;;
     esac
     for dir in "${dirs[@]}"; do
         [ -d "$dir" ] || continue
@@ -45,6 +64,10 @@ shipped_scripts() {
             [ -f "$f" ] || continue
             printf '%s\n' "$f"
         done
+    done
+    for f in "${files[@]}"; do
+        [ -f "$f" ] || continue
+        printf '%s\n' "$f"
     done
 }
 
@@ -103,13 +126,14 @@ grep_shipped() {
     done
 }
 
-# Same comment-aware sweep as grep_shipped, restricted to .claude/hooks/*.sh (see HOOKS_ONLY_DIRS
-# above for why the scope differs from scripts/ and tests/).
-grep_hooks_only() {
+# Same comment-aware sweep as grep_shipped, restricted to .claude/hooks/*.sh plus install.sh and
+# uninstall.sh (see PIPE_CHECK_DIRS/PIPE_CHECK_FILES above for why the scope differs from scripts/
+# and tests/).
+grep_pipe_check() {
     local self
     self="$(basename "${BASH_SOURCE[0]}")"
     local f matches line content trimmed hit
-    shipped_scripts HOOKS_ONLY_DIRS | while IFS= read -r f; do
+    shipped_scripts PIPE_CHECK_DIRS | while IFS= read -r f; do
         [ "$(basename "$f")" = "$self" ] && continue
         matches=$(grep -n "$@" "$f" 2>/dev/null || true)
         [ -z "$matches" ] && continue
@@ -171,8 +195,8 @@ assert_eq \
 # Not bash-4-vs-3.2 — this is the pipefail early-exit-reader shape (see
 # tests/test-hook-large-payload.sh and the file header above). `echo "$VAR" |
 # grep -q...` fails open the instant $VAR is large enough that grep exits
-# before draining stdin. Scoped to .claude/hooks/*.sh only: those scripts
-# receive whole-file/whole-command content, unlike the bounded per-line checks
+# before draining stdin. Scoped to .claude/hooks/*.sh plus install.sh/uninstall.sh: those scripts
+# receive whole-file/whole-command/whole-receipt content, unlike the bounded per-line checks
 # already reviewed in scripts/ and tests/ under Task 9. `-q` on its own, or
 # combined with a case/fixed/extended flag in either order (-qE/-Eq, -qi/-iq,
 # -qF/-Fq, -qx/-xq, -qiE, -qxF, ...), all count.
@@ -181,9 +205,9 @@ assert_eq \
 # pattern also matches the second `|` of a `||` logical-OR continuation (e.g.
 # `... \n    || grep -qE '...' <<< "$VAR"; then`), which is not a pipeline at all and already
 # uses the safe here-string form.
-HOOKS_ECHO_GREP_Q=$(grep_hooks_only -E '([^|]|^)\|[[:space:]]*grep([[:space:]]+-[A-Za-z]*q[A-Za-z]*)\b')
+PIPE_GREP_Q=$(grep_pipe_check -E '([^|]|^)\|[[:space:]]*grep([[:space:]]+-[A-Za-z]*q[A-Za-z]*)\b')
 
 assert_eq \
     "" \
-    "$HOOKS_ECHO_GREP_Q" \
-    "hooks avoid piping into grep -q (early-exit reader can SIGPIPE its writer under pipefail on large content)"
+    "$PIPE_GREP_Q" \
+    "hooks and install/uninstall avoid piping into grep -q (early-exit reader can SIGPIPE its writer under pipefail on large content)"

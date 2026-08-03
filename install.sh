@@ -194,7 +194,7 @@ if [ "$MODE" = ours ]; then
   fi
 fi
 
-is_modified() { printf '%s' "$MODIFIED_FILES" | grep -qxF "$1"; }
+is_modified() { grep -qxF -- "$1" <<< "$MODIFIED_FILES"; }
 
 if [ "$DRY_RUN" -eq 1 ]; then
   printf '\n%s\n' "${BOLD}Would install:${NC}"
@@ -574,7 +574,6 @@ printf '  %sCommands%s  %s\n'   "$CYAN" "$NC" "$(count_in commands '*.md')"
 printf '  %sSkills%s    %s\n'   "$CYAN" "$NC" "$(count_in skills 'SKILL.md')"
 printf '  %sHooks%s     %s\n'   "$CYAN" "$NC" "$(count_hooks)"
 printf '  %sRules%s     %s\n'   "$CYAN" "$NC" "$(count_in rules '*.md')"
-printf '  %sTemplates%s %s\n'   "$CYAN" "$NC" "$(count_in templates '*.md')"
 # The CLAUDE.md step names whichever file this run actually wrote to — not a fixed string. See
 # defect 9: telling the user to edit CLAUDE.md in the run where CLAUDE.md.generated was written
 # instead sends them to markers that live in a file the message never mentioned.
