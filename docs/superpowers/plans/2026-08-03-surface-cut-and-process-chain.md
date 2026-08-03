@@ -1047,7 +1047,32 @@ exactly as a plugin's is. Its job is the chain and the proactive
 posture. Selection is the descriptions' job (Task 4)."
 ```
 
-- [ ] **Step 10: Baseline, own commit.** Four files added plus two edited. Predict with `--dry-run` using the drift behaviour Task 2 confirmed, and stop and report on any disagreement.
+- [ ] **Step 9b: Update the five hardcoded constants that this task makes stale — before the baseline commit, not after.**
+
+Identified by the Task 2 review, which watched the same class of constant go stale twice in that task and require two follow-up commits to get back to green. This task adds three `SKILL.md` files and one hook under `.claude/`, so all five must move together:
+
+| Location | Now | Becomes |
+|---|---|---|
+| `tests/kinglet/test_baseline_inventory.py:23` | `"skills": 10` | `13` |
+| `tests/kinglet/test_baseline_inventory.py:24` | `"hooks": 26` | `27` |
+| `tests/kinglet/test_baseline_inventory.py:549` | `68` | `72` |
+| `tests/kinglet/test_baseline_inventory.py:550` | `68` | `72` |
+| `tests/kinglet/test_baseline_inventory.py:552` | `68` | `72` |
+
+**Verify each against the tree rather than trusting this table** — line numbers drift and the review read them before Task 2's fix round. `git ls-files '.claude/skills/*/SKILL.md' | wc -l`, `git ls-files '.claude/hooks/*' | wc -l`, and `git ls-files '.claude/*' | wc -l` for the full tree. If a number disagrees, report it rather than writing whatever makes the suite green.
+
+The three bare `68` literals are a structural smell the review named: one named constant would make this a one-line change and make a partial update impossible. Introducing that constant is in scope for this step if it is a clean change; if it is not, say so and update all three.
+
+`tests/kinglet/test_baseline_inventory.py` is the only file in `tests/`, `scripts/` or `tools/` that carries surface-count literals — `install.sh`, `studio-doctor.sh` and the whole bash suite derive their counts at runtime. So this table is the complete list, not a sample.
+
+- [ ] **Step 10: Baseline, own commit.** Four files added, two edited. Use the flags Task 0 added — additions are `--expect-added`, and a file recorded in both `full_claude_tree` and a category counts **twice**. Three skills plus one hook, each in two structures, predicts 8 additions; the two edits are countable drift. Learn both numbers from `--dry-run` first:
+
+```bash
+python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD \
+    --expect-drift <D> --expect-removed 0 --expect-added 8 --dry-run
+```
+
+If the tool disagrees, report its exact output rather than tuning the number — the refusal is the safety net.
 
 ---
 
