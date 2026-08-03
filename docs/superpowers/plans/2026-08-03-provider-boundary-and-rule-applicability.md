@@ -17,9 +17,11 @@
 - **Validate an argument before `shift 2`** — `shift` fails under `set -u` before the error message prints.
 - **`bash tests/run-tests.sh` must pass at every commit, with every test file present in its output.** Count the `--- test-*.sh ---` headers with ANSI stripped and compare to `ls tests/test-*.sh | wc -l`. The summary line is not evidence. Currently 22 files, 217 assertions; both drift.
 - **`scripts/check-provenance.sh` must report `provenance OK` at every commit.** A new file with no row fails as an orphan.
+- **Two test idioms coexist, and mixing them produces a silent false pass.** `tests/run-tests.sh:211` runs each file as `( source "$test_file" )` — sourced into a subshell. A file may therefore either (a) define its own assertion helpers and be runnable standalone with `bash`, as `tests/test-templates.sh` does, or (b) use the runner's helpers (`assert_contains`, `assert_eq`, `assert_file_exists`) and `$REPO_DIR`, as `tests/test-studio-doctor.sh` does — in which case **`bash <file>` is not a valid way to run it.** Measured 2026-08-03: `bash tests/test-studio-doctor.sh` exits **0 having asserted nothing**, because the helpers are undefined, `$REPO_DIR` is empty, and the file sets no `-e`. New files in this plan (Tasks 1 and 3) use idiom (a). Task 5 appends to an existing idiom-(b) file and must follow (b) and run through the runner.
 - **`scripts/generate-claude-md.sh` writes the document to STDOUT and every log line to STDERR.** The caller owns the destination file. Violating this destroyed a user's `CLAUDE.md` once; the header comment records how.
 - **`emit_marked_region` is the single producer of the marked region.** `--facts-only` and full generation must stay byte-identical inside the markers. They disagreed before `89c661c` and the documented in-place refresh silently deleted a heading every time.
-- **Editing anything under `.claude/` drifts `migration/baseline-inventory.json`** (it tracks `full_claude_tree`). Regenerate with `python3 -m tools.kinglet_build baseline-regenerate --anchor <commit> --expect-drift <n>` in a **separate** commit. Run `--dry-run` first to learn the count; it refuses if the path set changed or the count is not what you predicted, and that refusal is the point. Tasks 1, 2, 4 and 5 touch only `scripts/` and `tests/` and need no regeneration. **Task 3 does.**
+- **Editing anything under `.claude/` drifts `migration/baseline-inventory.json`.** Regenerate with `python3 -m tools.kinglet_build baseline-regenerate --anchor <commit> --expect-drift <n>` in a **separate** commit. Run `--dry-run` first to learn the count; it refuses if the path set changed or the count is not what you predicted, and that refusal is the point. Tasks 1, 2, 4 and 5 touch only `scripts/` and `tests/` and need no regeneration. **Task 3 does.**
+- **`--expect-drift` counts tracked entries, not files.** The baseline records each `.claude/` path **twice** — once under `full_claude_tree.files` and once under `categories.<kind>.files` — so a one-file change is `--expect-drift 2`, not 1. Measured 2026-08-03 on `.claude/commands/unity-workflow.md`. An earlier draft of this plan said 1, the dry-run refused, and the implementer escalated instead of adjusting the number to make it pass. That is the correct response and it is why the guard exists: had the drift been 2 for some *other* reason, raising the number would have hidden a real change. Never tune `--expect-drift` to whatever the tool reports — derive it, and if it disagrees, find out why before changing it.
 - **Provider choice must not live under `.claude/state/`.** `.gitignore` lines 44-45 ignore `.claude/state/*` except `.gitkeep`, and the platform design requires provider choice to be *"project configuration, not hidden client state"*. It is passed as a flag and re-derived on every run.
 
 ---
@@ -87,7 +89,13 @@ CS
 using VContainer;
 using Cysharp.Threading.Tasks;
 
-public class VendorThing { }
+public class VendorThing
+{
+    // The literal string "UniTask" is deliberate, not decoration: detection greps for it, and
+    // this member is what lets this file also guard the pruning of the UniTask count, not just
+    // VContainer's. Do not "clean up" this to a bare using-directive.
+    private UniTask _pending;
+}
 CS
     ;;
 ```
@@ -152,8 +160,17 @@ assert_has "$OUT_LEGACY" "architecture.md" "legacy project names the rule file i
 assert_lacks "$OUT_LEGACY" "recommended for this new project" "legacy project is not treated as greenfield"
 
 # The vendored file under Assets/Extensions/ references VContainer and UniTask. If the
-# scan counted it, this project would report the stack as present.
-assert_lacks "$OUT_LEGACY" "VContainer yes" "vendored code does not count as the project using the stack"
+# scan counted it, VC_REFS would be 1 and this row would read "yes (1 file(s))".
+#
+# Match the whole rendered row, not a loose two-word phrase. An earlier draft of this
+# plan asserted the absence of "VContainer yes", which the emitted format — pipe, space,
+# value — can never contain, so it passed whether or not detection was broken. This
+# assertion is the only guard on the vendored-file trap in the fixture; it has to be able
+# to fail.
+assert_has "$OUT_LEGACY" "| VContainer | no (0 file(s)) |" \
+    "vendored code does not count as the project using the stack"
+assert_has "$OUT_LEGACY" "| UniTask | no (0 file(s)) |" \
+    "vendored UniTask reference does not count either"
 
 # ── Case 2: urp fixture — VContainer and UniTask are in the manifest ───────
 echo ""
@@ -657,10 +674,10 @@ Task 3, deferred behind the two gates named in the design spec."
 `.claude/` changed, so `migration/baseline-inventory.json` has drifted by exactly one path.
 
 ```bash
-python3 -m tools.kinglet_build baseline-regenerate --anchor "$(git rev-parse HEAD)" --expect-drift 1 --dry-run
+python3 -m tools.kinglet_build baseline-regenerate --anchor "$(git rev-parse HEAD)" --expect-drift 2 --dry-run
 ```
 
-Expected: it reports one drifted path, `.claude/commands/unity-workflow.md`. If it reports a different count or a changed path set, **stop** — that refusal is the tool working, and it means something else changed that this plan did not account for. Report it.
+Expected: **2 changes**, both of them the same path — `.claude/commands/unity-workflow.md` is recorded once under `full_claude_tree.files` and once under `categories.commands.files`, and `--expect-drift` counts entries rather than files. If it reports a different count or a changed path set, **stop** — that refusal is the tool working, and it means something else changed that this plan did not account for. Report it, and do not raise the number until you know why.
 
 Then re-run without `--dry-run` and commit:
 
@@ -847,31 +864,56 @@ The platform design's *"if the active provider later disappears or becomes incom
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `tests/test-studio-doctor.sh`, following that file's existing assertion style:
+**Read this before writing the test.** `tests/run-tests.sh:211` runs each test file as
+`( source "$test_file" )` — a subshell, but **sourced**, not executed. So a test file may use the
+runner's helpers (`assert_contains`, `assert_not_contains`, `assert_eq`, `assert_file_exists`) and
+the runner's `$REPO_DIR` without defining either. `tests/test-studio-doctor.sh` does exactly that.
+
+Two consequences bind this task:
+
+- Use the runner's helpers and `$REPO_DIR`. Do **not** define local ones and do not introduce
+  `$PROJECT_ROOT` — that variable does not exist in this file.
+- **`bash tests/test-studio-doctor.sh` is not a valid way to run it.** Standalone, the helpers are
+  undefined, `$REPO_DIR` is empty, and the file has no `set -e` — measured on 2026-08-03, it exits
+  **0 having asserted nothing**. A verification step built on it would report a pass in both
+  directions and the TDD cycle would have no red phase at all.
+
+Append to `tests/test-studio-doctor.sh`, in that file's existing style:
 
 ```bash
 # ── A declared provider that is not installed is a WARN, not a FAIL ────────
 echo ""
 echo "--- Test: stale provider declaration ---"
-STALE_DIR="${TMPDIR:-/tmp}/kinglet-doctor-stale.$$"
-bash "$PROJECT_ROOT/tests/fixtures/mkproject.sh" "$STALE_DIR" --variant urp >/dev/null
-bash "$PROJECT_ROOT/install.sh" --project-dir "$STALE_DIR" --yes >/dev/null 2>&1
+TSD_STALE="/tmp/kinglet-doctor-stale-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_STALE" --variant urp >/dev/null
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_STALE" --yes >/dev/null 2>&1
 printf '\n### Process provider\n\nDiscovery and written planning in this project are owned by `superpowers`.\n' \
-  >> "$STALE_DIR/CLAUDE.md"
+  >> "$TSD_STALE/CLAUDE.md"
 
-DOCTOR_OUT="$(KINGLET_USER_SETTINGS=/nonexistent-on-purpose \
-  bash "$PROJECT_ROOT/scripts/studio-doctor.sh" --project-dir "$STALE_DIR" 2>&1 || true)"
-assert_has "$DOCTOR_OUT" "provider" "doctor mentions the declared provider"
-assert_has "$DOCTOR_OUT" "WARN" "a stale provider declaration warns"
-rm -rf "$STALE_DIR"
+TSD_STALE_OUT="$(KINGLET_USER_SETTINGS=/nonexistent-on-purpose \
+  bash "$TSD_DOCTOR" --project-dir "$TSD_STALE" 2>&1 || true)"
+assert_contains "$TSD_STALE_OUT" "superpowers" \
+    "doctor names the declared provider"
+assert_contains "$TSD_STALE_OUT" "not" \
+    "doctor says the declared provider is not installed"
+assert_contains "$TSD_STALE_OUT" "/unity-interview" \
+    "doctor names the built-in fallback"
+rm -rf "$TSD_STALE"
 ```
-
-If `tests/test-studio-doctor.sh` has no `assert_has`, copy the here-string version from `tests/test-rule-applicability.sh` rather than introducing a pipe into `grep -q`.
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `bash tests/test-studio-doctor.sh`
-Expected: FAIL on "doctor mentions the declared provider" — no such check exists.
+Run the file through the runner, which is the only way its helpers exist:
+
+```bash
+bash tests/run-tests.sh 2>&1 | sed 's/\x1b\[[0-9;]*m//g' \
+  | sed -n '/--- test-studio-doctor.sh ---/,/^--- test-/p'
+```
+
+Expected: the three new assertions appear as **FAIL** — `studio-doctor.sh` has no such check yet, so
+its output names no provider. If they appear as PASS before you have written any implementation,
+stop and report: it means the assertions are matching something incidental in the existing output
+rather than the check this task adds.
 
 - [ ] **Step 3: Add the check**
 
@@ -902,7 +944,7 @@ fi
 
 - [ ] **Step 4: Run to verify it passes**
 
-Run: `bash tests/test-studio-doctor.sh` — all PASS.
+Run the same runner-scoped command as Step 2 — the three new assertions now PASS.
 Then the full gate set:
 
 ```bash

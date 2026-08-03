@@ -69,6 +69,11 @@ RECEIPT_REL=".claude/state/install-receipt.tsv"
 # ── Args ─────────────────────────────────────────────────────────────────────
 PROJECT_DIR="$(pwd)"
 WITH_MCP=0; WITH_INPUT_SYSTEM=0; ASSUME_YES=0; DRY_RUN=0
+PROVIDER_CHOICE=""
+# Overridable so the test suite can point at a fixture instead of the real home
+# directory. install.sh reads nothing else from $HOME; this read is the first,
+# it is read-only, and its absence is benign.
+CLAUDE_USER_SETTINGS="${KINGLET_USER_SETTINGS:-$HOME/.claude/settings.json}"
 while [ $# -gt 0 ]; do
   case "$1" in
     # Validate before shift 2: under `set -u`, `shift 2` on a trailing flag kills the script
@@ -311,6 +316,63 @@ ok "Installed $WRITTEN file(s)$([ "$KEPT" -gt 0 ] && printf ', kept %s of yours'
 # The installer owns the destination; the generator only writes to stdout. Upstream had both
 # writing the same path, which corrupted fresh files and destroyed existing ones.
 CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
+
+# ── Process provider — detect, propose, never assume ────────────────────────
+# The platform design requires that Kinglet propose a detected provider and the
+# user approve it, and that Kinglet never copy, disable, or shadow it. Detection
+# is read-only and re-run on every install: if the provider is uninstalled later,
+# the next refresh drops the sentence, which is the correct behaviour.
+#
+# What that reasoning did NOT cover: a refresh where nothing changed except the
+# tty. PROVIDER_CHOICE was set only on the interactive branch, so `--yes` or a
+# pipe took "the safe default (no declaration)" even for a provider that is still
+# installed and that the user already approved. emit_provider_verdict lives inside
+# the marked region, so the --facts-only refresh regenerated that region without
+# the sentence and deleted it. studio-doctor.sh tells the user to "Re-run
+# install.sh to refresh the declaration" — in CI or with --yes, that revoked it.
+#
+# So read the existing declaration first. Same parse shape as studio-doctor.sh's
+# staleness check, deliberately: one grammar for one section, not two.
+EXISTING_PROVIDER=""
+if [ -f "$CLAUDE_MD" ] && grep -q '^### Process provider' "$CLAUDE_MD"; then
+  EXISTING_PROVIDER=$(awk '/^### Process provider/{f=1} f && /owned by/{
+      if (match($0, /`[^`]+`/)) print substr($0, RSTART+1, RLENGTH-2); exit }' "$CLAUDE_MD")
+fi
+
+if [ -f "$CLAUDE_USER_SETTINGS" ] \
+   && grep -q '"superpowers@claude-plugins-official"[[:space:]]*:[[:space:]]*true' "$CLAUDE_USER_SETTINGS"; then
+  if [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
+    if [ "$EXISTING_PROVIDER" = superpowers ]; then
+      # Approved before, still installed, nothing to re-decide. Carrying it
+      # forward is the conservative act here; dropping it is the change.
+      PROVIDER_CHOICE="superpowers"
+      info "Superpowers detected and already declared in CLAUDE.md — declaration carried forward."
+    else
+      # The safe default is no declaration: it changes nothing about how the
+      # project behaves today.
+      info "Superpowers detected; --yes takes the safe default (no provider declaration)."
+    fi
+  elif [ "$EXISTING_PROVIDER" = superpowers ]; then
+    echo "  Superpowers is installed and this project already declares it as its"
+    echo "  discovery and planning provider."
+    read -rp "  Keep the declaration? [Y/n]: " REPLY_PROVIDER
+    case "$REPLY_PROVIDER" in [nN]*) ;; *) PROVIDER_CHOICE="superpowers" ;; esac
+  else
+    echo "  Superpowers is installed for your user account."
+    echo "  Kinglet can record it as this project's discovery and planning provider."
+    echo "  This writes one sentence into CLAUDE.md. It does not modify Superpowers"
+    echo "  or your global settings."
+    read -rp "  Record it? [y/N]: " REPLY_PROVIDER
+    case "$REPLY_PROVIDER" in [yY]*) PROVIDER_CHOICE="superpowers" ;; esac
+  fi
+fi
+
+# Array, not the bare `${PROVIDER_CHOICE:+--provider "$PROVIDER_CHOICE"}` idiom: unquoted
+# that is subject to word splitting, and under `set -u` in bash 3.2 an empty array needs
+# the `+` guard below or expansion itself errors when PROVIDER_CHOICE was never set.
+GEN_ARGS=()
+[ -n "$PROVIDER_CHOICE" ] && GEN_ARGS+=(--provider "$PROVIDER_CHOICE")
+
 GEN="$SCRIPT_DIR/scripts/generate-claude-md.sh"
 # Tracks which branch below actually ran, so the "Next steps" summary can name the file it really
 # touched instead of assuming CLAUDE.md was (re)written. See defect 9: the installer already knows
@@ -319,7 +381,7 @@ CLAUDE_MD_BRANCH="skipped"
 if [ -f "$GEN" ]; then
   TMP_MD=$(mktemp)
   if [ ! -f "$CLAUDE_MD" ]; then
-    if bash "$GEN" "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
+    if bash "$GEN" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       mv "$TMP_MD" "$CLAUDE_MD"; ok "Generated CLAUDE.md"
       CLAUDE_MD_BRANCH="new"
     else
@@ -327,7 +389,7 @@ if [ -f "$GEN" ]; then
     fi
   elif grep -q 'kinglet:generated:begin' "$CLAUDE_MD"; then
     # Refresh only the fenced block; everything the user wrote stays byte-for-byte.
-    if bash "$GEN" --facts-only "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
+    if bash "$GEN" --facts-only ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       awk -v factsfile="$TMP_MD" '
         /kinglet:generated:begin/ { print; print ""; print "## Project Facts (auto-detected)"; print ""; while ((getline l < factsfile) > 0) print l; skip=1; next }
         /kinglet:generated:end/   { print ""; print; skip=0; next }
@@ -340,7 +402,7 @@ if [ -f "$GEN" ]; then
       rm -f "$TMP_MD"; warn "CLAUDE.md refresh failed — left as-is."
     fi
   else
-    if bash "$GEN" "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
+    if bash "$GEN" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       mv "$TMP_MD" "$PROJECT_DIR/CLAUDE.md.generated"
       warn "CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead."
       warn "Yours was not touched. Merge by hand, or add the markers to let us refresh in place."

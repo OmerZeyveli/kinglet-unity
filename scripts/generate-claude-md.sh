@@ -45,9 +45,12 @@ usage() { sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 # ---------------------------------------------------------------------------
 FACTS_ONLY=0
 PROJECT_DIR=""
+PROVIDER=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --facts-only) FACTS_ONLY=1; shift ;;
+        --provider)   [ $# -ge 2 ] || { error "--provider needs a value"; exit 2; }
+                      PROVIDER="$2"; shift 2 ;;
         -h|--help)    usage ;;
         -*)           error "Unknown option: $1"; exit 2 ;;
         *)            PROJECT_DIR="$1"; shift ;;
@@ -140,6 +143,79 @@ if [ -f "$MANIFEST" ]; then
 fi
 PKG_COUNT=$(printf '%s' "$DETECTED_PACKAGES" | grep -c . || true)
 info "Detected $PKG_COUNT package(s) of interest."
+
+# ---------------------------------------------------------------------------
+# 3b. Architecture stack — detected, never assumed
+#
+# .claude/rules/architecture.md mandates VContainer, MessagePipe, UniTask and
+# Model-View-System; unity-specifics.md bans coroutines. Measured in the only
+# real game project using this toolkit on 2026-08-03: VContainer 0 files,
+# MessagePipe 0, UniTask 1, against 130 using StartCoroutine. Asserting a stack
+# the project does not have is the largest single source of wrong guidance this
+# toolkit ships, so it is detected and declared instead.
+#
+# WHAT IS SCANNED, and why it is not the obvious thing:
+#   - Primary signal: Packages/manifest.json.
+#   - Secondary signal: Assets/ ONLY, with vendored subtrees pruned.
+# Scanning Packages/ would find the dependency's own source and report every
+# project as using it. Vendored subtrees matter for the same reason at smaller
+# scale: Endless-Evolution carries 923 third-party .cs files under
+# Assets/Extensions/. A symbol found only in vendored code is not the project
+# using it.
+#
+# One pass over the file list, testing all four symbols per file, rather than
+# four passes: on a 1000-script project the difference is four thousand grep
+# invocations against one thousand.
+# ---------------------------------------------------------------------------
+CS_FILE_COUNT=0
+VC_REFS=0; MP_REFS=0; UT_REFS=0; COROUTINE_FILES=0
+
+while IFS= read -r cs_file; do
+    [ -n "$cs_file" ] || continue
+    CS_FILE_COUNT=$((CS_FILE_COUNT + 1))
+    # sort -u drains its input; no early-exit reader in this pipeline.
+    #
+    # `|| true` is load-bearing, not defensive noise. grep exits 1 when it matches
+    # nothing, pipefail promotes that to the pipeline's status, the command
+    # substitution inherits it, and under `set -e` a bare assignment with a failing
+    # RHS terminates the script. The overwhelmingly common case on a real project is
+    # a .cs file matching none of the four symbols, so without this the generator
+    # dies on the first ordinary script and install.sh — which calls it with
+    # `2>/dev/null` — writes no CLAUDE.md at all and prints one warning.
+    hits=$(grep -o -e 'VContainer' -e 'MessagePipe' -e 'UniTask' -e 'StartCoroutine' \
+                "$cs_file" 2>/dev/null | sort -u | tr '\n' ' ' || true)
+    case "$hits" in *VContainer*)     VC_REFS=$((VC_REFS + 1)) ;; esac
+    case "$hits" in *MessagePipe*)    MP_REFS=$((MP_REFS + 1)) ;; esac
+    case "$hits" in *UniTask*)        UT_REFS=$((UT_REFS + 1)) ;; esac
+    case "$hits" in *StartCoroutine*) COROUTINE_FILES=$((COROUTINE_FILES + 1)) ;; esac
+done < <(find "$PROJECT_DIR/Assets" \
+              \( -name Extensions -o -name Plugins -o -name ThirdParty -o -name Vendor \) -prune -o \
+              -name '*.cs' -print 2>/dev/null || true)
+
+# manifest_has <package-id> — the manifest is the primary signal.
+manifest_has() {
+    [ -f "$MANIFEST" ] || return 1
+    grep -q "\"$1\"" "$MANIFEST"
+}
+
+# present <manifest-id> <ref-count> -> yes | manifest-only | no
+#
+# "manifest-only" is a real third state, not a rounding of "yes". A package
+# declared and never used means the project has not committed to it, and this
+# generator does not get to decide that for them.
+present() {
+    if manifest_has "$1"; then
+        if [ "$2" -gt 0 ]; then printf 'yes'; else printf 'manifest-only'; fi
+    elif [ "$2" -gt 0 ]; then printf 'yes'
+    else printf 'no'; fi
+}
+
+VC_PRESENT=$(present jp.hadashikick.vcontainer "$VC_REFS")
+MP_PRESENT=$(present com.cysharp.messagepipe  "$MP_REFS")
+UT_PRESENT=$(present com.cysharp.unitask      "$UT_REFS")
+
+info "Architecture stack: VContainer=$VC_PRESENT MessagePipe=$MP_PRESENT UniTask=$UT_PRESENT" \
+     "(first-party .cs: $CS_FILE_COUNT, using StartCoroutine: $COROUTINE_FILES)"
 
 # ---------------------------------------------------------------------------
 # 4. Assembly definitions
@@ -262,11 +338,130 @@ MDEOF
 # documented use, refreshing an existing CLAUDE.md in place, quietly deleted the
 # heading every time. Two code paths disagreeing about one region is the bug;
 # one function is the fix.
+# The section that stops this document asserting a stack the project does not
+# have. It states which rules bind; it never deletes or disables a rule file.
+#
+# Field note 87, 2026-08-03: twelve headless runs, architecture.md present in
+# one arm and deleted in the other. All twelve converged on the same design,
+# and one run in the DELETED arm still wrote "not .claude/rules/architecture.md
+# (no VContainer/MessagePipe here — see CLAUDE.md)". It rejected a file that was
+# not there, because CLAUDE.md named it. The bulk layer steered nothing; one
+# precedence sentence steered everything. Hence a sentence, not a deletion.
+emit_stack_verdict() {
+    echo ""
+    echo "### Architecture stack — detected, not assumed"
+    echo ""
+
+    if [ "$CS_FILE_COUNT" -eq 0 ]; then
+        # "Nothing is detected" was an overclaim: the manifest is read well before this point,
+        # and a project that already declares VContainer is not a blank slate. Say what was
+        # declared. `if`, not `manifest_has ... && x=...`: the && form returns 1 when the test
+        # fails, and under `set -e` that ends the script.
+        gf_declared=""
+        if manifest_has jp.hadashikick.vcontainer; then gf_declared="${gf_declared}VContainer, "; fi
+        if manifest_has com.cysharp.messagepipe;   then gf_declared="${gf_declared}MessagePipe, "; fi
+        if manifest_has com.cysharp.unitask;       then gf_declared="${gf_declared}UniTask, "; fi
+        gf_declared="${gf_declared%, }"
+
+        if [ -n "$gf_declared" ]; then
+            echo "No first-party C# under \`Assets/\` yet, so nothing is detected in code — but"
+            echo "\`Packages/manifest.json\` already declares **$gf_declared**. That is a"
+            echo "declaration, not a blank slate, and it is the closest thing to a decision this"
+            echo "project has made."
+        elif [ -f "$MANIFEST" ]; then
+            echo "No first-party C# under \`Assets/\` yet, and \`Packages/manifest.json\` declares none"
+            echo "of VContainer, MessagePipe or UniTask — so nothing is detected and nothing is"
+            echo "contradicted."
+        else
+            echo "No first-party C# under \`Assets/\` yet, and there is no \`Packages/manifest.json\` to"
+            echo "read — so nothing is detected and nothing is contradicted."
+        fi
+        echo ""
+        echo "The toolkit's default stack — Model-View-System with VContainer, MessagePipe and"
+        echo "UniTask — is therefore **recommended for this new project**, and every rule in"
+        echo "\`.claude/rules/\` binds. Re-run the generator once there is code; if the project goes"
+        echo "another way, this section will say so."
+        return
+    fi
+
+    echo "Scanned \`Assets/\` (vendored subtrees excluded), $CS_FILE_COUNT first-party C# file(s):"
+    echo ""
+    echo "| Dependency | Present |"
+    echo "|---|---|"
+    echo "| VContainer | $VC_PRESENT ($VC_REFS file(s)) |"
+    echo "| MessagePipe | $MP_PRESENT ($MP_REFS file(s)) |"
+    echo "| UniTask | $UT_PRESENT ($UT_REFS file(s)) |"
+    echo "| \`StartCoroutine\` | $COROUTINE_FILES file(s) |"
+    echo ""
+
+    # architecture.md rests on VContainer + MessagePipe. Either one present is
+    # enough to keep it binding; "manifest-only" is deliberately neither.
+    if [ "$VC_PRESENT" = yes ] || [ "$MP_PRESENT" = yes ]; then
+        echo "\`.claude/rules/architecture.md\` **binds in full.**"
+    elif [ "$VC_PRESENT" = manifest-only ] || [ "$MP_PRESENT" = manifest-only ]; then
+        echo "A dependency is declared in \`Packages/manifest.json\` but used in no first-party file."
+        echo "**This generator takes no side.** Decide whether \`.claude/rules/architecture.md\` binds"
+        echo "here and write the answer in the Vision half of this document, outside the markers."
+        echo ""
+        echo "Until that decision is written down: \`csharp-unity.md\`, \`performance.md\` and"
+        echo "\`serialization.md\` **bind** — they are architecture-agnostic and do not depend on the"
+        echo "answer. The Model-View-System, VContainer and MessagePipe sections of"
+        echo "\`architecture.md\` are **held in abeyance** — neither binding nor disapplied. Follow the"
+        echo "architecture the code establishes as it is written, and record it here."
+    else
+        echo "The Model-View-System, VContainer and MessagePipe sections of \`.claude/rules/architecture.md\`"
+        echo "**do not bind in this project** — they describe a stack this code does not use. Follow the"
+        echo "architecture the code actually has. The rest of that file — \`ScriptableObjects for Static"
+        echo "Data\`, \`Input System Architecture\`, \`No God Objects\`, \`Composition Over Inheritance\` —"
+        echo "is architecture-agnostic and **does** apply."
+    fi
+
+    echo ""
+    if [ "$UT_PRESENT" = yes ]; then
+        echo "The \"No Coroutines — Use UniTask\" section of \`unity-specifics.md\` **binds.**"
+    elif [ "$UT_PRESENT" = manifest-only ]; then
+        # manifest-only used to fall through to the else arm, which asserts "Neither UniTask nor
+        # StartCoroutine appears" — flatly contradicting the table row directly above it, which
+        # reads `manifest-only`. UniTask does appear; it appears in the manifest.
+        echo "UniTask is declared in \`Packages/manifest.json\` but used in no first-party file,"
+        echo "against $COROUTINE_FILES file(s) using \`StartCoroutine\`. **This generator takes no side**"
+        echo "on the \"No Coroutines — Use UniTask\" section of \`unity-specifics.md\`. Decide it with"
+        echo "the architecture question above and write the answer outside the markers."
+    elif [ "$COROUTINE_FILES" -gt 0 ]; then
+        echo "The \"No Coroutines — Use UniTask\" section of \`unity-specifics.md\` **does not bind** —"
+        echo "$COROUTINE_FILES file(s) here use \`StartCoroutine\` and UniTask is not in use."
+    else
+        echo "Neither UniTask nor \`StartCoroutine\` appears; the async guidance in \`unity-specifics.md\`"
+        echo "stands as a recommendation."
+    fi
+
+    echo ""
+    echo "\`csharp-unity.md\`, \`performance.md\`, \`serialization.md\`, \`pc-console.md\` and the rest of"
+    echo "\`unity-specifics.md\` **bind in full** regardless — they are architecture-agnostic, and"
+    echo "\`[FormerlySerializedAs]\` and \`== null\` are exactly the rules that catch silent data loss."
+}
+
+# One sentence, not a routing block. Field note 87 measured that the bulk
+# auto-loaded layer steered nothing while a single precedence sentence steered
+# everything; a block here would be paying for the part that did not work.
+emit_provider_verdict() {
+    [ -n "$PROVIDER" ] || return 0
+    [ "$PROVIDER" != none ] || return 0
+    echo ""
+    echo "### Process provider"
+    echo ""
+    echo "Discovery and written planning in this project are owned by \`$PROVIDER\`."
+    echo "\`/unity-interview\` yields to it and does not compete for the discovery stage."
+    echo "Unity implementation, Unity verification and Unity domain knowledge stay with this toolkit."
+}
+
 emit_marked_region() {
     echo ""
     echo "## Project Facts (auto-detected)"
     echo ""
     emit_facts
+    emit_stack_verdict
+    emit_provider_verdict
     echo ""
 }
 
@@ -317,13 +512,16 @@ cat <<'MDEOF'
 ## Engineering Stance (fixed — do not casually change)
 
 - **Engine / language:** Unity 6, C#.
-- **Architecture:** Model-View-System (MVS) with **VContainer** (DI), **MessagePipe** (cross-system
-  messaging — no singletons or static event buses), **UniTask** (async — no coroutines), and the
-  **New Input System** (legacy `Input.*` is blocked by a hook).
+- **Architecture:** see **Architecture stack — detected, not assumed** in the generated block above.
+  That section is measured against this project's code and it is the authority; this list is not.
+  The toolkit's default is Model-View-System with VContainer (DI), MessagePipe (cross-system
+  messaging) and UniTask (async), and it is a default, not a finding.
+- **Input:** the **New Input System**. Legacy `Input.*` is blocked by a hook, so this one is
+  enforced rather than recommended.
 - **Platform:** PC / console. No mobile code, touch input, or mobile performance budgets.
 - **Rules** live in `.claude/rules/` and are binding:
   - `architecture.md` · `csharp-unity.md` · `performance.md` · `serialization.md` ·
-    `unity-specifics.md` — the spine.
+    `unity-specifics.md` — the spine, **subject to the detected-stack section above.**
   - `pc-console.md` — the platform spec. It adds specifics on top of the spine; on any apparent
     conflict the spine wins.
 

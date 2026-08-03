@@ -79,4 +79,47 @@ assert_contains "$TSD_BROKEN_OUT" "NOTICE.md missing" \
 if [ "$TSD_BROKEN_RC" -ne 0 ]; then TSD_BROKEN_NONZERO=1; else TSD_BROKEN_NONZERO=0; fi
 assert_eq "1" "$TSD_BROKEN_NONZERO" "studio-doctor exits non-zero when a check genuinely fails"
 
+# ── A declared provider that is not installed is a WARN, not a FAIL ────────
+echo ""
+echo "--- Test: stale provider declaration ---"
+TSD_STALE="/tmp/kinglet-doctor-stale-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_STALE" --variant urp >/dev/null
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_STALE" --yes >/dev/null 2>&1
+printf '\n### Process provider\n\nDiscovery and written planning in this project are owned by `superpowers`.\n' \
+  >> "$TSD_STALE/CLAUDE.md"
+
+TSD_STALE_OUT="$(KINGLET_USER_SETTINGS=/nonexistent-on-purpose \
+  bash "$TSD_DOCTOR" --project-dir "$TSD_STALE" 2>&1 || true)"
+assert_contains "$TSD_STALE_OUT" "superpowers" \
+    "doctor names the declared provider"
+assert_contains "$TSD_STALE_OUT" "this project's process provider, but it is not" \
+    "doctor says the declared provider is not installed"
+assert_contains "$TSD_STALE_OUT" "/unity-interview" \
+    "doctor names the built-in fallback"
+rm -rf "$TSD_STALE"
+
+# ── A declared provider that IS present but disabled is still a WARN ───────
+# install.sh's own definition of "installed" (line ~327) requires the plugin key's
+# value to be `true`, not merely present. Doctor's check must agree, or a provider
+# the user has switched off would be reported as usable.
+echo ""
+echo "--- Test: declared provider present but disabled ---"
+TSD_DISABLED="/tmp/kinglet-doctor-disabled-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_DISABLED" --variant urp >/dev/null
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_DISABLED" --yes >/dev/null 2>&1
+printf '\n### Process provider\n\nDiscovery and written planning in this project are owned by `superpowers`.\n' \
+  >> "$TSD_DISABLED/CLAUDE.md"
+
+TSD_DISABLED_SETTINGS="/tmp/kinglet-doctor-disabled-settings-$$.json"
+printf '{"enabledPlugins": {"superpowers@claude-plugins-official": false}}' \
+  > "$TSD_DISABLED_SETTINGS"
+
+TSD_DISABLED_OUT="$(KINGLET_USER_SETTINGS="$TSD_DISABLED_SETTINGS" \
+  bash "$TSD_DOCTOR" --project-dir "$TSD_DISABLED" 2>&1 || true)"
+assert_contains "$TSD_DISABLED_OUT" "this project's process provider, but it is not" \
+    "doctor warns on a provider that is present but disabled (value false), not just absent"
+assert_not_contains "$TSD_DISABLED_OUT" "declared process provider 'superpowers' is installed" \
+    "doctor does not pass a disabled provider as installed"
+rm -rf "$TSD_DISABLED" "$TSD_DISABLED_SETTINGS"
+
 rm -rf "$TSD_MOCK"

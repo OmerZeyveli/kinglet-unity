@@ -147,5 +147,55 @@ assert_not_contains "$INSTALL_OUTPUT2" "Fill in the FILL: markers in CLAUDE.md â
 
 rm -rf "$MOCK_DIR2"
 
+# --- Test: an approved provider declaration survives a --yes refresh ---------
+#
+# PROVIDER_CHOICE was set only on the interactive branch, so --yes or a non-tty took
+# "the safe default (no provider declaration)" even when the provider was still installed
+# and already approved. emit_provider_verdict lives inside the marked region, so the
+# --facts-only refresh rewrote that region without the sentence and deleted it â€” and
+# studio-doctor.sh's remedy is literally "Re-run install.sh to refresh the declaration".
+#
+# The runner runs test files with stdin at /dev/null, so [ ! -t 0 ] is true here and this
+# exercises the non-tty path even without --yes. --yes is passed anyway; both are the
+# same branch.
+MOCK_DIR3="/tmp/unity-test-provider-$$"
+mkdir -p "${MOCK_DIR3}/Assets/Scripts" "${MOCK_DIR3}/ProjectSettings" "${MOCK_DIR3}/Packages"
+echo "m_EditorVersion: 6000.0.23f1" > "${MOCK_DIR3}/ProjectSettings/ProjectVersion.txt"
+printf '{\n  "dependencies": {\n    "com.unity.ugui": "1.0.0"\n  }\n}\n' > "${MOCK_DIR3}/Packages/manifest.json"
+
+# A user settings file that reports the provider as installed and enabled.
+FAKE_USER_SETTINGS="/tmp/unity-test-provider-settings-$$.json"
+printf '{"enabledPlugins": {"superpowers@claude-plugins-official": true}}' > "$FAKE_USER_SETTINGS"
+
+# The state after an install the user approved: an authentic generated document carrying
+# the declaration inside the markers. Written by the one producer of that region.
+bash "${REPO_DIR}/scripts/generate-claude-md.sh" --provider superpowers "$MOCK_DIR3" \
+    > "${MOCK_DIR3}/CLAUDE.md" 2>/dev/null
+
+KINGLET_USER_SETTINGS="$FAKE_USER_SETTINGS" \
+    bash "$INSTALL_SCRIPT" --project-dir "$MOCK_DIR3" --yes > /dev/null 2>&1 || true
+
+PROVIDER_MD3=$(cat "${MOCK_DIR3}/CLAUDE.md" 2>/dev/null || true)
+assert_contains "$PROVIDER_MD3" 'owned by `superpowers`' \
+    "an approved provider declaration survives a --yes refresh"
+assert_contains "$PROVIDER_MD3" "### Process provider" \
+    "the Process provider heading survives a --yes refresh"
+
+# Negative control: with no prior declaration, --yes must still NOT invent one. Without
+# this, the assertion above would also pass if the installer simply always declared.
+MOCK_DIR4="/tmp/unity-test-noprovider-$$"
+mkdir -p "${MOCK_DIR4}/Assets/Scripts" "${MOCK_DIR4}/ProjectSettings" "${MOCK_DIR4}/Packages"
+echo "m_EditorVersion: 6000.0.23f1" > "${MOCK_DIR4}/ProjectSettings/ProjectVersion.txt"
+printf '{\n  "dependencies": {\n    "com.unity.ugui": "1.0.0"\n  }\n}\n' > "${MOCK_DIR4}/Packages/manifest.json"
+
+KINGLET_USER_SETTINGS="$FAKE_USER_SETTINGS" \
+    bash "$INSTALL_SCRIPT" --project-dir "$MOCK_DIR4" --yes > /dev/null 2>&1 || true
+
+PROVIDER_MD4=$(cat "${MOCK_DIR4}/CLAUDE.md" 2>/dev/null || true)
+assert_not_contains "$PROVIDER_MD4" "### Process provider" \
+    "--yes still declares no provider when the project never approved one"
+
+rm -rf "$MOCK_DIR3" "$MOCK_DIR4" "$FAKE_USER_SETTINGS"
+
 # --- Cleanup ---
 rm -rf "$MOCK_DIR"
