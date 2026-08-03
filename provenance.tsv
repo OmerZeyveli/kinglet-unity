@@ -4,12 +4,6 @@
 # ecu=1.5.0 (bb28ccbd40b065b0958b02df0c03fb91c4fb7c5b)  donchitos=984023d
 # NOTE: README/LICENSE/CONTRIBUTING/CLAUDE.md/.gitignore share a path with ECU but are ours, not vendored.
 path	origin	upstream_version	upstream_path	upstream_sha256	status	note
-.claude/agents/creative-director.md	donchitos	984023d	.claude/agents/creative-director.md	00b9dc2b494b5feeefa5203fdefbd9bd9a4789a23ed2d192898b5ef84036b966	modified	reformatted-to-ecu-conventions
-.claude/agents/game-designer.md	donchitos	984023d	.claude/agents/game-designer.md	a1b4fb4f1466b69140a23f8e12d3a5eba624d2a6318da32e2b755e471d41584f	modified	reformatted-to-ecu-conventions
-.claude/agents/level-designer.md	donchitos	984023d	.claude/agents/level-designer.md	6121007acde96a808235c4290669bb5de11f1874cd1da6c9d4f0c8c7fad7ef61	modified	reformatted-to-ecu-conventions
-.claude/agents/narrative-director.md	donchitos	984023d	.claude/agents/narrative-director.md	2a1b23c70ae19182eac9c55eddfb3c98d1abca26633028281db555d0bfd101f1	modified	reformatted-to-ecu-conventions
-.claude/agents/systems-designer.md	donchitos	984023d	.claude/agents/systems-designer.md	b12973f4dce65c5add8e31fc570c4ece2b6f9855d2c89ce1645c0901a14adc17	modified	reformatted-to-ecu-conventions
-.claude/agents/technical-director.md	donchitos	984023d	.claude/agents/technical-director.md	fe98888f29067eb81ef4dd29d93c3498048628f4bcf6404a1c594f8a6343f9b2	modified	reformatted-to-ecu-conventions
 .claude/agents/unity-build-runner.md	ecu	1.5.0	.claude/agents/unity-build-runner.md	89c2088f704e832d89e8cab6170f18a6a54b20afe7e06201f33947e1266fedfe	modified	mobile-strip
 .claude/agents/unity-coder-lite.md	ecu	1.5.0	.claude/agents/unity-coder-lite.md	9edeb8ed0ed180f227f9073cec2a69a2f992e9228794ae0e5450f399f4a127d2	modified	skill-loading-wired: Skill tool + Skills-to-load block; m_ prefix corrected to _lowerCamelCase per rules/csharp-unity.md
 .claude/agents/unity-coder.md	ecu	1.5.0	.claude/agents/unity-coder.md	dcb5aedce694fb7941babd0ab678d102b641edf2621ef2ce5baa82df98177695	modified	skill-loading-wired: Skill tool + Skills-to-load block; m_ prefix corrected to _lowerCamelCase per rules/csharp-unity.md
@@ -30,17 +24,6 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/agents/unity-test-runner.md	ecu	1.5.0	.claude/agents/unity-test-runner.md	ff3c3949d6287ecbf51710574d989450aa2bb5991049406ccb435a772c619761	modified	mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4
 .claude/agents/unity-ui-builder.md	ecu	1.5.0	.claude/agents/unity-ui-builder.md	35f9e8ef53700e576fea56392eb9e8062b80cdeaeb22e97a1129cb245e2a835f	modified	mobile-strip
 .claude/agents/unity-verifier.md	ecu	1.5.0	.claude/agents/unity-verifier.md	818a0d752093a9b5e7289d27a5ac05e14a44f98e21c95f381141e22b25b48311	modified	skill-loading-wired: Skill tool + Skills-to-load block
-.claude/agents/world-builder.md	donchitos	984023d	.claude/agents/world-builder.md	9e3399c5478ea2491bfc8e42745948b7aec4c2045ecd008a318d4f72a8fad2ea	modified	reformatted-to-ecu-conventions
-.claude/agents/writer.md	donchitos	984023d	.claude/agents/writer.md	8eafe2f3cd7f2c12acc0d8f93ed93bf638a915490ed5ca5a11721f1bf60f49d7	modified	reformatted-to-ecu-conventions
-.claude/commands/brainstorm.md	donchitos	984023d	.claude/skills/brainstorm/SKILL.md	3afbcc808948bd507486d2d84787236cbac516b67d207b6b4737ab0d7f2cd9ad	modified	skill-to-ecu-command
-.claude/commands/design-review.md	donchitos	984023d	.claude/skills/design-review/SKILL.md	3f9119c2ecc3f1b8a07484f0df9e3547bb006df349d9a73c97e8a95799aadfa9	modified	skill-to-ecu-command
-.claude/commands/design-system.md	donchitos	984023d	.claude/skills/design-system/SKILL.md	eae2be7d9ae520112020420293d83fdeeebf52d3476ce5c8ffecf87aaec4e696	modified	skill-to-ecu-command
-.claude/commands/estimate.md	donchitos	984023d	.claude/skills/estimate/SKILL.md	7774e2d256a054a215cf62cc81d4d79f4d18e2154203671a39f643c0881be5fd	modified	skill-to-ecu-command
-.claude/commands/map-systems.md	donchitos	984023d	.claude/skills/map-systems/SKILL.md	a46393797f5227603d87722d8c546d61c8944182db28e00207dc5ad318aa577e	modified	skill-to-ecu-command
-.claude/commands/milestone-review.md	donchitos	984023d	.claude/skills/milestone-review/SKILL.md	736a1cffb028b96b890fd0b6b469dcdd5f948a907d5a7f0e157ccca92ac8adc7	modified	skill-to-ecu-command
-.claude/commands/retrospective.md	donchitos	984023d	.claude/skills/retrospective/SKILL.md	60f9525887c94e4cf8239de3a2078389e6d6b19dd9f10705772490650c11ffda	modified	skill-to-ecu-command
-.claude/commands/scope-check.md	donchitos	984023d	.claude/skills/scope-check/SKILL.md	f91150df11aadf32cfa64a1476c608396e12eeeba9aca03836c52299f3a0efa0	modified	skill-to-ecu-command
-.claude/commands/sprint-plan.md	donchitos	984023d	.claude/skills/sprint-plan/SKILL.md	d402a9f276f81663c8b07f6c4fd2b19a3fa9d4ee9411e3d57e6868daa095ee42	modified	skill-to-ecu-command
 .claude/commands/unity-audit.md	ecu	1.5.0	.claude/commands/unity-audit.md	bbc58f9480952ec81089b59f9541719a01e5418cb234d1ae0c76326cddfa5f4b	modified	corrects installer script path references from ./scripts/ to ./.claude/scripts/ (scripts only exist under .claude/scripts after install)
 .claude/commands/unity-build.md	ecu	1.5.0	.claude/commands/unity-build.md	93023918c4632922e10c0dfe8d9ea72627973a00c3f039b30d46c83890f18acf	modified	mobile-strip
 .claude/commands/unity-doctor.md	ecu	1.5.0	.claude/commands/unity-doctor.md	9941506af96720128c6ea13e5c35ae1b55bef4a1644c2a6fab009f8bcfbc8588	modified	mcp-config-location: Check 1 pointed at .claude/settings.json for mcpServers.unityMCP.url, which install.sh no longer writes there (Task 2 moved it to .mcp.json at the project root); corrected to match what install.sh actually writes
@@ -118,17 +101,8 @@ CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 .claude/skills/unity-instincts/SKILL.md	ecu	1.5.0	.claude/skills/core/unity-instincts/SKILL.md	bf3c30b206c659bfd6e744c9a6a49f0b31648bff019652795ab4835c9f8525a7	modified	flattened-for-discovery+inert-frontmatter-stripped
 .claude/skills/unity-mcp-patterns/SKILL.md	ecu	1.5.0	.claude/skills/core/unity-mcp-patterns/SKILL.md	d7159fe4a3084da7199ceb229bf56b4720fb0466932b35f06f0e65c3ff67d0f4	modified	mobile-strip; mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4;flattened-for-discovery+inert-frontmatter-stripped
 .claude/skills/character-controller/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/character-controller/SKILL.md	c6b5fb0beb977a67fe15d980fef6552a2d363d2a4da7287427098ee5f51c0afe	modified	flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/dialogue-system/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/dialogue-system/SKILL.md	e6aa3e268148f0d5ac57da855dc7ab6d3e4e0fead535c82fa0df7eb4cb6b61d4	modified	flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/inventory-system/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/inventory-system/SKILL.md	b59106ca73cc59237019f2e14100a0c10aad402de7c25e7f3fb3ed779760bdaa	modified	flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/procedural-generation/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/procedural-generation/SKILL.md	8672ae604cb075ad532d93031d8a181c8d11e76884a3db8b41c63cf0454b322d	modified	flattened-for-discovery+inert-frontmatter-stripped
 .claude/skills/save-system/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/save-system/SKILL.md	deab1c9d2aaf985a23d22909b57483eada07d198df4546787ff27e5924a11079	modified	flattened-for-discovery+inert-frontmatter-stripped
 .claude/skills/state-machine/SKILL.md	ecu	1.5.0	.claude/skills/gameplay/state-machine/SKILL.md	5cbf57d364ee60156eb3edd3c849338e50ac9cb2b92f6d2b64788d1ce01ab1f3	modified	flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/idle-clicker/SKILL.md	ecu	1.5.0	.claude/skills/genre/idle-clicker/SKILL.md	583c2dc751d5b37cde3584728d598e96d98835844d7b45a6775e77ef3b8c5738	modified	mobile-strip;flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/match3/SKILL.md	ecu	1.5.0	.claude/skills/genre/match3/SKILL.md	c04d5ed19b34729a0b0bb0c7569533fc1f4076da515c89831c4bf35c701dc4ee	modified	mobile-strip;flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/platformer-2d/SKILL.md	ecu	1.5.0	.claude/skills/genre/platformer-2d/SKILL.md	9b21e1e6d5e1415dfe4f25095bdb12fedf7d8737aaea3afd9bf423b15e9cd680	modified	flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/puzzle/SKILL.md	ecu	1.5.0	.claude/skills/genre/puzzle/SKILL.md	6dedef75ca34f4c7514d14f927bfe829c1c08a3677837d887a6b0fd402f19500	modified	mobile-strip;flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/rpg/SKILL.md	ecu	1.5.0	.claude/skills/genre/rpg/SKILL.md	a77c5e2f2db4e9d8035f64a91eebc0d8c9c04ac93dca15980c1890c035a3ac8f	modified	flattened-for-discovery+inert-frontmatter-stripped
-.claude/skills/topdown/SKILL.md	ecu	1.5.0	.claude/skills/genre/topdown/SKILL.md	cf1511b475c4de4336225930f7b1fd0402504c23bf7788b932a61402c0fba65e	modified	mobile-strip;flattened-for-discovery+inert-frontmatter-stripped
 .claude/skills/addressables/SKILL.md	ecu	1.5.0	.claude/skills/systems/addressables/SKILL.md	23ec75e5a6d101fddb741ca58676b0ecb4d94567c69d2ad1ca11fd18fe1c76ac	modified	flattened-for-discovery+inert-frontmatter-stripped
 .claude/skills/animation/SKILL.md	ecu	1.5.0	.claude/skills/systems/animation/SKILL.md	2314a56988e1e0e2a34bde77ad12fe34b2ed454435ad37f79755e870e085044e	modified	flattened-for-discovery+inert-frontmatter-stripped
 .claude/skills/audio/SKILL.md	ecu	1.5.0	.claude/skills/systems/audio/SKILL.md	af33d218db8399b8c0c726626105f003063eadd749ec937bab5abed50abfca63	modified	flattened-for-discovery+inert-frontmatter-stripped

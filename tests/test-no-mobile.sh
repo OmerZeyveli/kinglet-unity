@@ -48,7 +48,6 @@ assert_absent "examples/CLAUDE.md.hyper-casual"         "hyper-casual example ab
 assert_absent "examples/CLAUDE.md.mobile-casual"        "mobile-casual example absent"
 
 # --- 2. Counts hold --------------------------------------------------------
-assert_eq "$(find .claude/skills -name SKILL.md | wc -l | tr -d ' ')" "39" "39 skills (42 upstream - 3 mobile)"
 assert_eq "$(find examples -type f | wc -l | tr -d ' ')" "4" "4 examples (6 upstream - 2 mobile)"
 
 # --- 3. No mobile-only guidance in the payload -----------------------------

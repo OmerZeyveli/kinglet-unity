@@ -29,3 +29,29 @@ CHANGELOG.md	ecu	absent	ECU's release history would misrepresent ours; we start 
 .claude/skills/genre/endless-runner/SKILL.md	ecu	absent	mobile genre; globs **/Chunk*.cs, **/Obstacle*.cs
 examples/CLAUDE.md.hyper-casual	ecu	absent	mobile example
 examples/CLAUDE.md.mobile-casual	ecu	absent	mobile example
+.claude/agents/creative-director.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/agents/game-designer.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/agents/level-designer.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/agents/narrative-director.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/agents/systems-designer.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/agents/technical-director.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/agents/world-builder.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/agents/writer.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/brainstorm.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/design-review.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/design-system.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/estimate.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/map-systems.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/milestone-review.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/retrospective.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/scope-check.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/commands/sprint-plan.md	donchitos	absent	design/production track removed 2026-08-03; field note 36 measured docs/design, docs/production and docs/adr used 0 of 3 on a real project
+.claude/skills/match3/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/skills/rpg/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/skills/puzzle/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/skills/topdown/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/skills/platformer-2d/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/skills/idle-clicker/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/skills/inventory-system/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/skills/dialogue-system/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/skills/procedural-generation/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
