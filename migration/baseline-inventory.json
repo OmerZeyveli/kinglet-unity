@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "96342dc7a8687f3a3205403bb85cc1b7844edce9",
+  "source_commit": "91e0899d2abe8d3057c86204da26cde959c11a1e",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 72,
@@ -298,12 +298,12 @@
       },
       {
         "path": ".claude/skills/addressables/SKILL.md",
-        "sha256": "604fa536828e149e20887a36940152bbad86c471e561b2642f98e738db40c15c",
+        "sha256": "774f31d374a2ea598c31e3a6eee9397e1d249b6763e025bdbfc056b9ec0ec168",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/assembly-definitions/SKILL.md",
-        "sha256": "ff5b43cdc05b857d3abdc0f288072a0f42b8128ffdfaeb04bce02938a593205d",
+        "sha256": "dda651fd1f70090dae96dd240f18f8bc9270b8a57b67f379ad3046b389c1141d",
         "git_mode": "100644"
       },
       {
@@ -313,27 +313,27 @@
       },
       {
         "path": ".claude/skills/input-system/SKILL.md",
-        "sha256": "f178256c34915d1547abe1b8623be0e67fc67f41c1821c0e9c1b3fbf1e3bff1c",
+        "sha256": "eeadae5513e274a4996002d0f75fb1db0b0a885906435e054568c2bb65ced5cd",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/object-pooling/SKILL.md",
-        "sha256": "41c78ed392ee6ad84540430101c821d98f98b38d32076a562d67ee4bf537c5ae",
+        "sha256": "5cb2be53caafe3a7dc5c8ccd9da952c9cc1ea54b41f629502df7c9ad02f3047c",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/physics/SKILL.md",
-        "sha256": "78c10bb3b3ac5393915f1dc8fbddc8d9bb7fedcb6fb0d2c48c2a8a07dc1966b3",
+        "sha256": "25bb00723eb19f1767c6eebc89555bacbf3a157851a6718d73c1f6ba880d1363",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/save-system/SKILL.md",
-        "sha256": "5140b06bd056fe67ad5c133cdc841b2ea104e3b135f97353f71fedd7c1310bad",
+        "sha256": "783775dda9ad37df6fc242157ff847808a6c187d9ceae99a26a3f52170e1ffa9",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/state-machine/SKILL.md",
-        "sha256": "8e2612b38059aa80cfa075ef9a2ab74c44d3b8527add65ab85081f63a08b52a2",
+        "sha256": "c3b9a8f4bd688d0f16fdd50b2bc8a5ad85fc9b66734862edece625343810324e",
         "git_mode": "100644"
       },
       {
@@ -343,12 +343,12 @@
       },
       {
         "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
-        "sha256": "5d3e0898f77adae588ca3789d10d8b5d1cdb5ff628c2668707b511923244e236",
+        "sha256": "966100e7d79d9dfe56e04bbcbcae0f02092ae1c81ca4f0d801967b0778759ef9",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/urp-pipeline/SKILL.md",
-        "sha256": "13fc17cd05794e7e194e3d74d891f771ef4e9248800090741ecb3d142622339d",
+        "sha256": "e041692f114f14dca50abdb9527e6a1287e1f9bf78149277e4a0632228f50945",
         "git_mode": "100644"
       },
       {
@@ -482,12 +482,12 @@
       "files": [
         {
           "path": ".claude/skills/addressables/SKILL.md",
-          "sha256": "604fa536828e149e20887a36940152bbad86c471e561b2642f98e738db40c15c",
+          "sha256": "774f31d374a2ea598c31e3a6eee9397e1d249b6763e025bdbfc056b9ec0ec168",
           "git_mode": "100644"
         },
         {
           "path": ".claude/skills/assembly-definitions/SKILL.md",
-          "sha256": "ff5b43cdc05b857d3abdc0f288072a0f42b8128ffdfaeb04bce02938a593205d",
+          "sha256": "dda651fd1f70090dae96dd240f18f8bc9270b8a57b67f379ad3046b389c1141d",
           "git_mode": "100644"
         },
         {
@@ -497,27 +497,27 @@
         },
         {
           "path": ".claude/skills/input-system/SKILL.md",
-          "sha256": "f178256c34915d1547abe1b8623be0e67fc67f41c1821c0e9c1b3fbf1e3bff1c",
+          "sha256": "eeadae5513e274a4996002d0f75fb1db0b0a885906435e054568c2bb65ced5cd",
           "git_mode": "100644"
         },
         {
           "path": ".claude/skills/object-pooling/SKILL.md",
-          "sha256": "41c78ed392ee6ad84540430101c821d98f98b38d32076a562d67ee4bf537c5ae",
+          "sha256": "5cb2be53caafe3a7dc5c8ccd9da952c9cc1ea54b41f629502df7c9ad02f3047c",
           "git_mode": "100644"
         },
         {
           "path": ".claude/skills/physics/SKILL.md",
-          "sha256": "78c10bb3b3ac5393915f1dc8fbddc8d9bb7fedcb6fb0d2c48c2a8a07dc1966b3",
+          "sha256": "25bb00723eb19f1767c6eebc89555bacbf3a157851a6718d73c1f6ba880d1363",
           "git_mode": "100644"
         },
         {
           "path": ".claude/skills/save-system/SKILL.md",
-          "sha256": "5140b06bd056fe67ad5c133cdc841b2ea104e3b135f97353f71fedd7c1310bad",
+          "sha256": "783775dda9ad37df6fc242157ff847808a6c187d9ceae99a26a3f52170e1ffa9",
           "git_mode": "100644"
         },
         {
           "path": ".claude/skills/state-machine/SKILL.md",
-          "sha256": "8e2612b38059aa80cfa075ef9a2ab74c44d3b8527add65ab85081f63a08b52a2",
+          "sha256": "c3b9a8f4bd688d0f16fdd50b2bc8a5ad85fc9b66734862edece625343810324e",
           "git_mode": "100644"
         },
         {
@@ -527,12 +527,12 @@
         },
         {
           "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
-          "sha256": "5d3e0898f77adae588ca3789d10d8b5d1cdb5ff628c2668707b511923244e236",
+          "sha256": "966100e7d79d9dfe56e04bbcbcae0f02092ae1c81ca4f0d801967b0778759ef9",
           "git_mode": "100644"
         },
         {
           "path": ".claude/skills/urp-pipeline/SKILL.md",
-          "sha256": "13fc17cd05794e7e194e3d74d891f771ef4e9248800090741ecb3d142622339d",
+          "sha256": "e041692f114f14dca50abdb9527e6a1287e1f9bf78149277e4a0632228f50945",
           "git_mode": "100644"
         },
         {
