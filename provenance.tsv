@@ -532,3 +532,4 @@ docs/superpowers/specs/2026-08-03-surface-cut-and-process-chain-design.md	origin
 docs/superpowers/plans/2026-08-03-surface-cut-and-process-chain.md	original	-	-	-	original	implementation plan; surface cut + process chain
 tests/test-install-prune.sh	original	-	-	-	original	an upgrade must remove what the payload dropped and must never remove a file the user edited
 docs/superpowers/specs/2026-08-03-process-layer-second-pass-design.md	original	-	-	-	original	design spec; MCP naming, process-skill depth, subagent-driven execution loop
+docs/superpowers/plans/2026-08-03-process-layer-second-pass.md	original	-	-	-	original	implementation plan; MCP naming, skill/agent/rule depth, subagent-driven execution loop
