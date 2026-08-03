@@ -20,7 +20,8 @@
 - **Two test idioms coexist, and mixing them produces a silent false pass.** `tests/run-tests.sh:211` runs each file as `( source "$test_file" )` — sourced into a subshell. A file may therefore either (a) define its own assertion helpers and be runnable standalone with `bash`, as `tests/test-templates.sh` does, or (b) use the runner's helpers (`assert_contains`, `assert_eq`, `assert_file_exists`) and `$REPO_DIR`, as `tests/test-studio-doctor.sh` does — in which case **`bash <file>` is not a valid way to run it.** Measured 2026-08-03: `bash tests/test-studio-doctor.sh` exits **0 having asserted nothing**, because the helpers are undefined, `$REPO_DIR` is empty, and the file sets no `-e`. New files in this plan (Tasks 1 and 3) use idiom (a). Task 5 appends to an existing idiom-(b) file and must follow (b) and run through the runner.
 - **`scripts/generate-claude-md.sh` writes the document to STDOUT and every log line to STDERR.** The caller owns the destination file. Violating this destroyed a user's `CLAUDE.md` once; the header comment records how.
 - **`emit_marked_region` is the single producer of the marked region.** `--facts-only` and full generation must stay byte-identical inside the markers. They disagreed before `89c661c` and the documented in-place refresh silently deleted a heading every time.
-- **Editing anything under `.claude/` drifts `migration/baseline-inventory.json`** (it tracks `full_claude_tree`). Regenerate with `python3 -m tools.kinglet_build baseline-regenerate --anchor <commit> --expect-drift <n>` in a **separate** commit. Run `--dry-run` first to learn the count; it refuses if the path set changed or the count is not what you predicted, and that refusal is the point. Tasks 1, 2, 4 and 5 touch only `scripts/` and `tests/` and need no regeneration. **Task 3 does.**
+- **Editing anything under `.claude/` drifts `migration/baseline-inventory.json`.** Regenerate with `python3 -m tools.kinglet_build baseline-regenerate --anchor <commit> --expect-drift <n>` in a **separate** commit. Run `--dry-run` first to learn the count; it refuses if the path set changed or the count is not what you predicted, and that refusal is the point. Tasks 1, 2, 4 and 5 touch only `scripts/` and `tests/` and need no regeneration. **Task 3 does.**
+- **`--expect-drift` counts tracked entries, not files.** The baseline records each `.claude/` path **twice** — once under `full_claude_tree.files` and once under `categories.<kind>.files` — so a one-file change is `--expect-drift 2`, not 1. Measured 2026-08-03 on `.claude/commands/unity-workflow.md`. An earlier draft of this plan said 1, the dry-run refused, and the implementer escalated instead of adjusting the number to make it pass. That is the correct response and it is why the guard exists: had the drift been 2 for some *other* reason, raising the number would have hidden a real change. Never tune `--expect-drift` to whatever the tool reports — derive it, and if it disagrees, find out why before changing it.
 - **Provider choice must not live under `.claude/state/`.** `.gitignore` lines 44-45 ignore `.claude/state/*` except `.gitkeep`, and the platform design requires provider choice to be *"project configuration, not hidden client state"*. It is passed as a flag and re-derived on every run.
 
 ---
@@ -673,10 +674,10 @@ Task 3, deferred behind the two gates named in the design spec."
 `.claude/` changed, so `migration/baseline-inventory.json` has drifted by exactly one path.
 
 ```bash
-python3 -m tools.kinglet_build baseline-regenerate --anchor "$(git rev-parse HEAD)" --expect-drift 1 --dry-run
+python3 -m tools.kinglet_build baseline-regenerate --anchor "$(git rev-parse HEAD)" --expect-drift 2 --dry-run
 ```
 
-Expected: it reports one drifted path, `.claude/commands/unity-workflow.md`. If it reports a different count or a changed path set, **stop** — that refusal is the tool working, and it means something else changed that this plan did not account for. Report it.
+Expected: **2 changes**, both of them the same path — `.claude/commands/unity-workflow.md` is recorded once under `full_claude_tree.files` and once under `categories.commands.files`, and `--expect-drift` counts entries rather than files. If it reports a different count or a changed path set, **stop** — that refusal is the tool working, and it means something else changed that this plan did not account for. Report it, and do not raise the number until you know why.
 
 Then re-run without `--dry-run` and commit:
 
