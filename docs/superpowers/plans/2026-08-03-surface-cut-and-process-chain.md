@@ -57,8 +57,21 @@ The single best-measured cut. Field note §36: across 17,316 lines of documentat
 - Delete (8 agents): `.claude/agents/creative-director.md`, `game-designer.md`, `level-designer.md`, `narrative-director.md`, `systems-designer.md`, `technical-director.md`, `world-builder.md`, `writer.md`
 - Delete (9 commands): `.claude/commands/brainstorm.md`, `design-review.md`, `design-system.md`, `estimate.md`, `map-systems.md`, `milestone-review.md`, `retrospective.md`, `scope-check.md`, `sprint-plan.md`
 - Delete (9 skills): `.claude/skills/match3/`, `rpg/`, `puzzle/`, `topdown/`, `platformer-2d/`, `idle-clicker/`, `inventory-system/`, `dialogue-system/`, `procedural-generation/`
+- Modify: `tests/test-no-mobile.sh:51` — remove the hardcoded skill-count assertion (see below)
 - Modify: `provenance.tsv` (delete 26 rows), `provenance-skip.tsv` (add 26 rows)
 - Separate commit: `migration/baseline-inventory.json`
+
+**A blocking conflict, found in pre-flight and resolved by the operator.** `tests/test-no-mobile.sh:51`
+asserts `find .claude/skills -name SKILL.md | wc -l` equals `39`. Removing nine skills makes it 30 and
+the suite fails at this task's own gate.
+
+**Delete the assertion line, do not update the number.** That test's purpose is the mobile guard — the
+`assert_absent` lines above it and the banned-term sweep below it — and the total count is incidental to
+that purpose. `CLAUDE.md` states the rule directly for a different count and gives the reason: *"a
+hardcoded count goes stale the next time a test file is added or removed, which is exactly the failure
+mode this note exists to prevent, and it had gone stale twice."* The same argument applies here, and the
+cut is the third staleness event. Leave the neighbouring `assert_eq` on `find examples -type f` at `4`
+alone — examples are untouched by this wave.
 
 **Interfaces:**
 - Produces: a `.claude/` tree with 20 agents, 27 commands, 30 skills. Task 2 consumes that state.
@@ -866,6 +879,7 @@ The whole wave is a hypothesis until this runs. And `CLAUDE.md` currently descri
 - Modify: `CLAUDE.md`
 - Modify: `docs/research/pioneer/smoke-pass.md` (append a new dated section — do **not** edit §4 or §10)
 - Modify: `MERGE-NOTES.md`
+- Modify: `docs/ARCHITECTURE.md`, `docs/SKILL-CATALOG.md`, `README.md` (see Step 2b)
 
 **Interfaces:**
 - Consumes: the finished tree from Tasks 1-6.
@@ -885,6 +899,28 @@ The whole wave is a hypothesis until this runs. And `CLAUDE.md` currently descri
 - `tests/test-surface-references.sh` guards bare-name skill references, because `tests/test-skill-discovery.sh` matches path-form only — and that gap shipped nine dangling references on 2026-08-03.
 
 Do **not** write a hardcoded test-file or assertion count into `CLAUDE.md`. It has gone stale twice, and the file already says so.
+
+- [ ] **Step 2b: Refresh the three documents nothing guards.** These carry surface counts and surface names that the cut invalidates, and no test protects any of them — so they go stale silently, which is the defect class the spec exists to avoid.
+
+`docs/ARCHITECTURE.md` — line 28 reads `skills/            39 knowledge modules in 5 categories`. **Both halves are wrong**: the count, and "5 categories", which has been false since skills were flattened to `.claude/skills/<name>/SKILL.md`. Correct both. Line 65 names `unity-scout` and `unity-linter` as the Haiku agents; both are removed, and no surviving agent runs on Haiku — remove that model tier's bullet rather than renaming it to a surface that does not exist. Sweep the whole file for other removed surface names.
+
+`docs/SKILL-CATALOG.md` — line 9 reads `39 skills, one directory each at ...`. Correct the count to 13 and drop the catalog rows for removed skills. Its `## Skills That Formerly Carried alwaysApply: true` section must survive: it records that `alwaysApply` is inert, which was measured in Wave 1b-2 Task 1 and is still true. Add rows for the three skills Task 5 created.
+
+`README.md` — lines 77-78 hold a surface table (`Agents | 28`, `Commands | 36`). Update to the post-cut numbers, and check line 50's sentence about the `unity-*` surfaces not being invoked in a measured session — Task 7 Step 5 re-measures exactly that, so it must agree with the new result, not the old one.
+
+Verify no removed surface name survives in any of the three:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+for dead in unity-scout unity-linter unity-verifier unity-critic unity-migrator unity-git-master \
+            unity-security-reviewer unity-shader-dev unity-build-runner unity-network-dev \
+            unity-coder-lite unity-fixer-lite design-review sprint-plan; do
+  grep -l -- "$dead" docs/ARCHITECTURE.md docs/SKILL-CATALOG.md README.md 2>/dev/null \
+    | while read -r f; do echo "STALE: $f -> $dead"; done
+done
+```
+
+Expected: no output.
 
 - [ ] **Step 3: Record the wave in `MERGE-NOTES.md`** — what was taken, adapted, and now cut, with the evidence for each group. This is the build record; a 74-surface removal that is not in it makes the next maintainer excavate.
 
