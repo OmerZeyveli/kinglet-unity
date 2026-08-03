@@ -7,7 +7,7 @@ merely depend on them — it **contains** them. Attribution is therefore an obli
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
 is asserted on trust. The 29/72 split below is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
 $1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 29 `verbatim` and 72 `modified` rows
-with `origin=ecu` (434 further rows are `status=original`, i.e. not vendored at all).
+with `origin=ecu`.
 
 **Re-derive it before quoting it.** A single `status` flip changes the split, and this number has now
 gone stale twice — most recently one commit after it was corrected, when `docs/MODEL-ROUTING.md`
