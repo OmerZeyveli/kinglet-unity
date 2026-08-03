@@ -297,9 +297,9 @@ public class PlayerController : MonoBehaviour
     }
 
     // Movement methods called by states
-    public void ExecuteJump() { /* see character-controller skill */ }
-    public void CutJumpShort() { /* see character-controller skill */ }
-    public void ApplyHorizontalMovement() { /* see character-controller skill */ }
+    public void ExecuteJump() { /* project-specific jump logic */ }
+    public void CutJumpShort() { /* project-specific variable jump height */ }
+    public void ApplyHorizontalMovement() { /* project-specific movement */ }
 
     private void ReadInput() { /* read from Input System */ }
     private void CheckGround() { /* overlap circle check */ }

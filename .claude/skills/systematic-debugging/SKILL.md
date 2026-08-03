@@ -10,11 +10,11 @@ identity problems that reading the code does not reveal.
 
 ## Order
 
-1. **Read the real console.** `mcp__UnityMCP__read_console`. Not the code, not your recollection of
+1. **Read the real console.** `mcp__unityMCP__read_console`. Not the code, not your recollection of
    what the code does — the actual error, with its stack. If the bridge is not running, say so and
    stop rather than substituting a guess.
 2. **Reproduce, and say how.** A bug you cannot trigger is a bug you cannot confirm you fixed.
-3. **Inspect the live API before assuming it.** `mcp__UnityMCP__unity_reflect` reports what the
+3. **Inspect the live API before assuming it.** `mcp__unityMCP__unity_reflect` reports what the
    installed Unity and packages actually expose. Recalled API surface goes stale between versions.
 4. **Change one thing.** Then re-read the console. Two changes at once means you learn nothing from
    the result.

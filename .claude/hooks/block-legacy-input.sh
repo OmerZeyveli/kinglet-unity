@@ -66,7 +66,7 @@ echo "  The New Input System is mandatory (rules/unity-specifics.md). Legacy inp
 echo "  do rebinding, device switching, or action maps — all of which pc-console.md requires." >&2
 echo "" >&2
 echo "  Instead:" >&2
-echo "    - Read input in an InputView via generated PlayerControls (see skills/systems/input-system)" >&2
+echo "    - Read input in an InputView via generated PlayerControls (see the input-system skill)" >&2
 echo "    - Systems take SetMoveInput(Vector2) / Jump() — they never learn the device" >&2
 echo "" >&2
 echo "  Genuinely need both (editor-only tooling)? Guard each branch:" >&2

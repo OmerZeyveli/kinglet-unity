@@ -14,5 +14,12 @@ SKILL_FILE="${CLAUDE_PROJECT_DIR:-.}/.claude/skills/using-kinglet/SKILL.md"
 
 [ -f "$SKILL_FILE" ] || exit 0
 
-# cat, not a pipeline: nothing downstream here can exit early, and the file is small.
-cat "$SKILL_FILE"
+# awk, not a pipeline into an early-exiting reader: nothing downstream here can exit early, and the
+# file is small. Strips the YAML frontmatter (the leading `---` ... `---` block) so a session opens
+# with the skill's actual content instead of four lines of `name:`/`description:` noise.
+awk '
+    NR == 1 && $0 == "---" { infm = 1; next }
+    infm && $0 == "---" { infm = 0; next }
+    infm { next }
+    { print }
+' "$SKILL_FILE"
