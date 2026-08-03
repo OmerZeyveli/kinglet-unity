@@ -256,7 +256,7 @@ if [ -f "$CLAUDE_MD" ] && grep -q '^### Process provider' "$CLAUDE_MD"; then
         if (match($0, /`[^`]+`/)) print substr($0, RSTART+1, RLENGTH-2); exit }' "$CLAUDE_MD")
     if [ -z "$declared" ]; then
         warn "CLAUDE.md has a Process provider section but names no provider."
-    elif [ -f "$USER_SETTINGS" ] && grep -q "\"$declared@" "$USER_SETTINGS"; then
+    elif [ -f "$USER_SETTINGS" ] && grep -q "\"$declared@[^\"]*\"[[:space:]]*:[[:space:]]*true" "$USER_SETTINGS"; then
         pass "declared process provider '$declared' is installed"
     else
         warn "CLAUDE.md declares '$declared' as this project's process provider, but it is not"
