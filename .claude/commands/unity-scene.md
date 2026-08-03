@@ -1,6 +1,6 @@
 ---
 name: unity-scene
-description: "Use when the user wants a scene built or reorganized — GameObjects, hierarchy, lighting, cameras, physics layers — entirely through the editor, not by hand-writing scene files."
+description: "Use when the user wants a scene built or reorganized — GameObjects, hierarchy, lighting, cameras, physics layers — entirely through the editor, not by hand-writing scene files. Prefer `/unity-prototype` when the request is a mechanic to try out in a new, disposable scene rather than work on the existing project."
 user-invocable: true
 args: scene_description
 ---

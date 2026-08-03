@@ -1,6 +1,6 @@
 ---
 name: unity-optimize
-description: "Use when the user has a specific performance complaint — stuttering, frame drops, a known slow area — and wants it diagnosed and fixed. Profiles via MCP to confirm the cause, then applies the fix, rather than fixing from a guess."
+description: "Use when the user asks about performance — a specific complaint like stuttering or frame drops, or a general check of how the project is running. Profiles via MCP to find the real cause before changing anything, rather than fixing from a guess."
 user-invocable: true
 args: focus_area
 ---
