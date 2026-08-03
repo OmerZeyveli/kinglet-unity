@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "8fdb7f2747d3034acb1749bbffc78d84dbf1c260",
+  "source_commit": "1330a7eb345845cab95470fdbce55fdd81a5f3fb",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 72,
@@ -63,7 +63,7 @@
       },
       {
         "path": ".claude/commands/unity-doctor.md",
-        "sha256": "7c07e9e432fce54b8dff53bb1315221cd8221d864bf7a67e3ae987902b9d2f12",
+        "sha256": "7b2bd41dc83df4c230eba3d3392be81f848df226b86ef3e0fff94737dbe89c8a",
         "git_mode": "100644"
       },
       {
@@ -133,7 +133,7 @@
       },
       {
         "path": ".claude/hooks/block-legacy-input.sh",
-        "sha256": "2b6d57180a9e4e13aae026fc358b68a554aa4d3697c9f5861e63ad0424774edd",
+        "sha256": "967d254a4aafe38b05405d032f92a4c97feef3105ba4bdfcf0cde45f0086e347",
         "git_mode": "100755"
       },
       {
@@ -203,7 +203,7 @@
       },
       {
         "path": ".claude/hooks/session-brief.sh",
-        "sha256": "720f72385aae4e8c122d20f03e5061a32d33e6a35330f8fa1d72d9f4b31389fa",
+        "sha256": "5ff1ce82acc9e24dfdd43192a016b06867d79ea285cbaec022caa3916fe8622b",
         "git_mode": "100755"
       },
       {
@@ -333,12 +333,12 @@
       },
       {
         "path": ".claude/skills/state-machine/SKILL.md",
-        "sha256": "c750cd57b557b741208f367b2b135e68e68c1df7c56439b742dac3a665e5eb50",
+        "sha256": "8e2612b38059aa80cfa075ef9a2ab74c44d3b8527add65ab85081f63a08b52a2",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/systematic-debugging/SKILL.md",
-        "sha256": "c0177fa0a0a0af2909a69acb10da14677d3b0405b71a68f9febbd4663ec8c667",
+        "sha256": "ee974c4dd96897c833363687bfdf53ed83963ecade1b74488c0889fa558c2bf7",
         "git_mode": "100644"
       },
       {
@@ -358,7 +358,7 @@
       },
       {
         "path": ".claude/skills/verification-before-completion/SKILL.md",
-        "sha256": "44ea8645db8e9ef298f969ae66122c28a2679efd76aaf45176974b013769b0de",
+        "sha256": "d5e18a8cd13db70ba03329d8ab90a5cdb16a547b903d781510aaa1f5d1b65aaf",
         "git_mode": "100644"
       },
       {
@@ -421,7 +421,7 @@
       "files": [
         {
           "path": ".claude/commands/unity-doctor.md",
-          "sha256": "7c07e9e432fce54b8dff53bb1315221cd8221d864bf7a67e3ae987902b9d2f12",
+          "sha256": "7b2bd41dc83df4c230eba3d3392be81f848df226b86ef3e0fff94737dbe89c8a",
           "git_mode": "100644"
         },
         {
@@ -517,12 +517,12 @@
         },
         {
           "path": ".claude/skills/state-machine/SKILL.md",
-          "sha256": "c750cd57b557b741208f367b2b135e68e68c1df7c56439b742dac3a665e5eb50",
+          "sha256": "8e2612b38059aa80cfa075ef9a2ab74c44d3b8527add65ab85081f63a08b52a2",
           "git_mode": "100644"
         },
         {
           "path": ".claude/skills/systematic-debugging/SKILL.md",
-          "sha256": "c0177fa0a0a0af2909a69acb10da14677d3b0405b71a68f9febbd4663ec8c667",
+          "sha256": "ee974c4dd96897c833363687bfdf53ed83963ecade1b74488c0889fa558c2bf7",
           "git_mode": "100644"
         },
         {
@@ -542,7 +542,7 @@
         },
         {
           "path": ".claude/skills/verification-before-completion/SKILL.md",
-          "sha256": "44ea8645db8e9ef298f969ae66122c28a2679efd76aaf45176974b013769b0de",
+          "sha256": "d5e18a8cd13db70ba03329d8ab90a5cdb16a547b903d781510aaa1f5d1b65aaf",
           "git_mode": "100644"
         }
       ]
@@ -563,7 +563,7 @@
         },
         {
           "path": ".claude/hooks/block-legacy-input.sh",
-          "sha256": "2b6d57180a9e4e13aae026fc358b68a554aa4d3697c9f5861e63ad0424774edd",
+          "sha256": "967d254a4aafe38b05405d032f92a4c97feef3105ba4bdfcf0cde45f0086e347",
           "git_mode": "100755"
         },
         {
@@ -633,7 +633,7 @@
         },
         {
           "path": ".claude/hooks/session-brief.sh",
-          "sha256": "720f72385aae4e8c122d20f03e5061a32d33e6a35330f8fa1d72d9f4b31389fa",
+          "sha256": "5ff1ce82acc9e24dfdd43192a016b06867d79ea285cbaec022caa3916fe8622b",
           "git_mode": "100755"
         },
         {
