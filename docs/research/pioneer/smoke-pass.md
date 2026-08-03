@@ -518,3 +518,68 @@ One interactive session with the Unity Editor open, to close:
 
 Everything else in the runbook was measured. The runbook's claim that the bridge cannot be started
 without the Editor UI was wrong and has been corrected in §6.
+
+## 11. Follow-up 2026-08-03: the surface cut re-measured, competitor enabled
+
+§10 won its three prompts only with Superpowers disabled at project scope — a real result, but a
+weaker one than winning head-to-head. Between §10 and this section, a separate wave cut the surface
+pool from 103 to 32 on the criterion "a surface survives only if it does something the model cannot do
+unaided," gave every survivor a trigger-condition description (the format §4 found Superpowers using
+and Pioneer not), and added a small process-chain layer (`using-kinglet`, `systematic-debugging`,
+`verification-before-completion`). This section is the honest test of whether that raised the odds
+against the same competitor, still enabled.
+
+**Method.** Fresh URP fixture (`tests/fixtures/mkproject.sh /tmp/cut-probe --variant urp`), fresh
+install (`install.sh --project-dir /tmp/cut-probe`, no `--with-mcp`). Confirmed before probing: the
+fixture's `.claude/settings.json` carries no `enabledPlugins` key at all, and the operator's global
+`~/.claude/settings.json` has `"superpowers@claude-plugins-official": true` — the plugin is enabled at
+every scope that would apply to a real user, exactly the configuration §4 measured against and §10
+deliberately avoided. Ran the same three §10 prompts with `claude -p --model sonnet --output-format
+stream-json --verbose --disallowed-tools Edit Write NotebookEdit`, then a fourth, unrelated regression
+probe with no `--disallowed-tools` restriction.
+
+**Result — tool-call stream, one Kinglet surface per prompt, on the first try, competitor enabled:**
+
+| Prompt | First surface selected | What followed |
+|---|---|---|
+| *"Let's add a double jump to the player."* | `Skill: deep-interview` | Recognized the project has no player code yet; tried `mcp__unityMCP__manage_scene` (denied — no MCP bridge running in this harness) and reported back accurately instead of guessing. `superpowers:brainstorming` — the surface that won §4 outright — was never invoked. |
+| *"The enemy AI keeps walking through walls, can you fix it?"* | `Skill: systematic-debugging` | Explicitly reasoned "this is a solid 'cause not yet known' case, so let me route to `/unity-fix`" → `Skill: unity-fix` → `Agent: unity-fixer` (opus), which read the console via `mcp__unityMCP__read_console`, searched the codebase, and queried `mcp__unityMCP__find_gameobjects` before concluding correctly that there is no enemy AI in this near-empty fixture to fix. |
+| *"I want to check this project for performance problems."* | `Skill: unity-optimize` | → `Agent: unity-optimizer`, which activated the MCP profiling tool group, pulled `mcp__unityMCP__manage_graphics` stats, and scanned the code before reporting the scene is empty and there is nothing to profile. |
+
+Full stream: `/tmp/cut-probe.jsonl` (three `claude -p` invocations appended; distinguishable by
+`session_id`, three distinct sessions, 43/69/93 records). Raw excerpts of the first tool call per
+prompt, in order of appearance:
+
+```
+Prompt 1: Bash(find …*player*/*jump*) → Bash(find …*.cs) → Skill(deep-interview)
+          → ToolSearch(mcp__unityMCP__*) → mcp__unityMCP__manage_scene(get_hierarchy) [denied]
+Prompt 2: Skill(systematic-debugging) → Skill(unity-fix) → Agent(unity-fixer)
+          → [inside subagent] Skill(physics), Skill(unity-mcp-patterns), Skill(systematic-debugging),
+            mcp__unityMCP__read_console, Bash(find/grep), Read, mcp__unityMCP__find_gameobjects
+Prompt 3: Skill(unity-optimize) → Agent(unity-optimizer)
+          → [inside subagent] Skill(unity-mcp-patterns), Skill(object-pooling), Glob, Read,
+            mcp__unityMCP__manage_tools(activate profiling), mcp__unityMCP__manage_graphics(stats_get),
+            mcp__unityMCP__read_console, Grep, Read(scene/manifest)
+```
+
+**Regression probe (Step 6).** *"I need to rename a serialized field on a MonoBehaviour from _speed to
+_moveSpeed. What do I have to be careful about?"* — **zero tool calls**, and the answer opened with
+"This is a direct rule lookup, not a task needing a skill workflow — the answer is already fully
+specified in `.claude/rules/serialization.md`," followed by the correct `[FormerlySerializedAs]`
+guidance. No skill — not `serialization-safety` (removed 2026-08-03 for exactly this reason) and
+nothing else — was selected for a question the auto-loading rule already answers. Full stream:
+`/tmp/cut-regress.jsonl`.
+
+**Reading this against §4 and §10.** §4's finding stands unsoftened: a toolkit with one-line
+summaries loses to trigger-phrased descriptions, in the configuration a real user has by default. §10
+showed the descriptions were good enough to win once the competitor was removed from the room. This
+section is the harder claim §10 could not make: with the same competitor **enabled**, at its default
+global scope, a smaller and better-described surface pool won three prompts spanning feature work, bug
+triage, and performance — the same three §10 used — without editing the prompts to make them easier.
+Nothing here proves every future prompt resolves this way; it proves this specific, previously-losing
+match now wins on the terms §4 set.
+
+**What this does not claim.** This is three prompts against one small, mostly-empty fixture project,
+run once. It is not a statistical claim about selection rate, and it does not retest §9's real-project
+findings. If a future prompt loses to Superpowers again, that is a new, legitimate data point — not a
+reason to doubt this one.

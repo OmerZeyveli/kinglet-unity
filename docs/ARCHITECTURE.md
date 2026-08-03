@@ -21,14 +21,18 @@ This project follows the architecture established by [everything-claude-code](ht
 ```
 .claude/
   settings.json      Configuration: permissions, hook definitions
-  agents/            28 agent definitions (.md files with frontmatter)
-  commands/          36 user-invocable slash commands
-  hooks/             25 shell scripts + _lib.sh (safety, quality, session, learning)
+  agents/             8 agent definitions (.md files with frontmatter)
+  commands/          11 user-invocable slash commands
+  hooks/             27 registered shell scripts + _lib.sh (safety, quality, session, learning)
   rules/              6 always-loaded coding standards
-  skills/            39 knowledge modules in 5 categories
+  skills/            13 knowledge modules, flat — one directory per skill, no categories
   state/             Session state directory (session.json, tracking files)
   VERSION            Installed version for upgrade tracking
 ```
+
+(Counts as of the 2026-08-03 surface cut, which reduced a 103-surface pool to 32 on the criterion
+"a surface survives only if it does something the model cannot do unaided." Nothing enforces these
+exact numbers in text — cross-check against `ls .claude/agents/*.md | wc -l` etc. if they look stale.)
 
 Supporting files outside `.claude/`:
 
@@ -60,11 +64,10 @@ Agents are Markdown files in `.claude/agents/` with YAML frontmatter that contro
 
 ### Model Selection
 
-- **Opus** -- complex implementation, creative prototyping, debugging, shader writing, plan critique, verification, and the senior design/direction roles (14 agents)
-- **Sonnet** -- code review, test writing, migration, builds, git operations, security audit, lite variants, and the specialist design roles (12 agents)
-- **Haiku** -- fastest and cheapest, used for read-only exploration and quick validation (2 agents: `unity-scout`, `unity-linter`)
-
-Some commands support `--quick` (routes to sonnet-tier lite agent) and `--thorough` (routes to opus) flags. See `docs/MODEL-ROUTING.md` for the full routing table.
+- **Opus** -- complex implementation and editor control: `unity-coder`, `unity-fixer`, `unity-optimizer`, `unity-prototyper`, `unity-scene-builder`, `unity-ui-builder` (6 agents)
+- **Sonnet** -- read-only review and test execution: `unity-reviewer`, `unity-test-runner` (2 agents)
+- **Haiku** -- not used by any current agent. The two Haiku agents this section used to name were
+  removed in the 2026-08-03 surface cut, and no surviving agent runs on that tier.
 
 ### Tool Access
 
@@ -104,9 +107,9 @@ Skills are knowledge modules in `.claude/skills/`, one directory per skill:
 ```
 skills/
   assembly-definitions/SKILL.md
-  serialization-safety/SKILL.md
   input-system/SKILL.md
-  ...                              39 in total, flat
+  physics/SKILL.md
+  ...                              13 in total, flat
 ```
 
 **Flat, and it has to be.** Claude Code discovers skills at `.claude/skills/<name>/SKILL.md` and
@@ -145,7 +148,8 @@ the second, and also showed why the first probe's conclusion — "selected by de
 other skill" — was still too generous. They were not being selected at all. Nested under category
 directories, none of them was registered.
 
-Both keys are now stripped from all 39 skills, and `tests/test-no-mobile.sh` asserts they stay gone.
+Both keys are now stripped from every skill (13, after the 2026-08-03 surface cut reduced the 39
+that existed at flattening time), and `tests/test-no-mobile.sh` asserts they stay gone.
 A key that reads as a safety control but controls nothing is worse than no key: it gets believed. If
 guidance genuinely must reach every session, it belongs in `.claude/rules/`, which CLAUDE.md loads
 unconditionally — that mechanism is real, and it is where the serialization and performance rules
@@ -157,7 +161,11 @@ already live.
 
 Hooks are shell scripts in `.claude/hooks/` configured in `settings.json`. They run automatically at various lifecycle events: before/after tool invocations, before context compaction, on session start, and on session stop.
 
-All 25 hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, and utility functions. Hooks are organized into three **profile levels** -- `minimal` (5 hooks), `standard` (18 cumulative), and `strict` (25 cumulative). Set the active profile via `UNITY_HOOK_PROFILE=standard`.
+All 27 registered hooks source a shared library (`_lib.sh`, a sourced library and not itself a hook)
+that provides kill switches, profile filtering, and utility functions. Hooks are organized into three
+**profile levels** -- `minimal` (7 cumulative, including `session-brief.sh`, which declares no
+`HOOK_PROFILE_LEVEL` and always runs), `standard` (20 cumulative), and `strict` (27 cumulative, all
+of them). Set the active profile via `UNITY_HOOK_PROFILE=standard`.
 
 ### Event Types
 
@@ -176,6 +184,7 @@ All 25 hooks source a shared library (`_lib.sh`) that provides kill switches, pr
 | `block-scene-edit` | PreToolUse | Edit\|Write | minimal | Blocking |
 | `block-meta-edit` | PreToolUse | Edit\|Write | minimal | Blocking |
 | `guard-editor-runtime` | PreToolUse | Edit\|Write | minimal | Blocking |
+| `block-legacy-input` | PreToolUse | Edit\|Write | minimal | Blocking |
 | `guard-project-config` | PreToolUse | Edit\|Write | standard | Blocking |
 | `gateguard` | PreToolUse | Edit\|Write | strict | Blocking |
 | `block-projectsettings` | PreToolUse | Bash | minimal | Blocking |
@@ -193,6 +202,7 @@ All 25 hooks source a shared library (`_lib.sh`) that provides kill switches, pr
 | `instinct-capture` | PostToolUse | (all) | strict | Advisory |
 | `pre-compact` | PreCompact | (all) | minimal | Advisory |
 | `session-restore` | SessionStart | (all) | standard | Advisory |
+| `session-brief` | SessionStart | startup\|clear\|compact | always (no `HOOK_PROFILE_LEVEL`) | Advisory |
 | `stop-validate` | Stop | (all) | standard | Advisory |
 | `session-save` | Stop | (all) | standard | Advisory |
 | `auto-learn` | Stop | (all) | strict | Advisory |
@@ -213,10 +223,10 @@ Rules are Markdown files in `.claude/rules/` that are always loaded as context f
 
 | Rule | Content |
 |------|---------|
-| `csharp-unity.md` | Field naming (m_, s_, k_), explicit types, sealed by default, structure ordering |
+| `csharp-unity.md` | Field naming (`_lowerCamelCase` private, `UPPER_SNAKE_CASE` const), explicit types, sealed by default, structure ordering |
 | `performance.md` | Zero allocations in Update, cache GetComponent, NonAlloc physics, object pooling |
 | `serialization.md` | FormerlySerializedAs on renames, field exposure, Unity null checks |
-| `architecture.md` | Composition over inheritance, ScriptableObject data, event channels, no god objects |
+| `architecture.md` | Model-View-System, VContainer DI (no service locators), MessagePipe messaging (no SO event channels), UniTask (no coroutines), no god objects |
 | `unity-specifics.md` | Editor vs runtime guards, lifecycle order, threading, coroutine gotchas |
 | `pc-console.md` | PC/console addendum -- keyboard/mouse + gamepad input, rebinding, min-spec/console/high-end budgets, BC7/BC5 compression, ultrawide and focus handling |
 
@@ -273,22 +283,23 @@ File Tools         MCP Tools
 C# Source Files    Unity Editor
 ```
 
-### Five Agent Categories
+### Three Agent Categories (post-2026-08-03 cut, 8 agents total)
 
-1. **Read-Only Agents** -- read and analyze only, no file modification or MCP access
-   - `unity-reviewer`, `unity-scout`, `unity-linter`, `unity-security-reviewer`, `unity-critic`
+Read each agent's `tools:` frontmatter for ground truth; these are the three shapes it takes today.
 
-2. **Code Agents** -- write/edit C# files, may run git commands, no MCP access
-   - `unity-migrator`, `unity-git-master`
+1. **Read-Only Agent** -- read and analyze only, no file modification or MCP access
+   - `unity-reviewer` (`Skill, Read, Glob, Grep`)
 
-3. **MCP-Powered Agents** -- control Unity Editor only, no file writing
-   - `unity-scene-builder`, `unity-build-runner`, `unity-test-runner`
+2. **MCP-Powered Agent** -- controls the Unity Editor, does not write files
+   - `unity-scene-builder` (`Skill, Read, Glob, Grep, mcp__unityMCP__*`)
 
-4. **Hybrid Agents** -- both code and MCP access
-   - `unity-coder`, `unity-coder-lite`, `unity-prototyper`, `unity-fixer`, `unity-fixer-lite`, `unity-optimizer`, `unity-shader-dev`, `unity-network-dev`, `unity-ui-builder`, `unity-verifier`
+3. **Hybrid Agents** -- both code (`Write, Edit`) and MCP access
+   - `unity-coder`, `unity-fixer`, `unity-optimizer`, `unity-prototyper`, `unity-test-runner`,
+     `unity-ui-builder`
 
-5. **Design and Production Agents** (Kinglet Pioneer overlay) -- author documentation under `docs/`, no code, no MCP
-   - `game-designer`, `systems-designer`, `level-designer`, `creative-director`, `technical-director`, `narrative-director`, `world-builder`, `writer`
+The read-only-code / MCP-without-writing category and the Donchitos documentation-only
+design/production category that used to round this out to five were removed 2026-08-03; see
+`provenance-skip.tsv` for the full list of cut agent names.
 
 ---
 
@@ -412,14 +423,15 @@ Clarify → Plan → Execute → Verify
 1. **Clarify** -- interview the user about requirements, constraints, and acceptance criteria
 2. **Plan** -- analyze the project, identify subsystems, choose agents, present an implementation plan
 3. **Execute** -- route to appropriate agent(s) (coder, prototyper, UI builder, etc.)
-4. **Verify** -- invoke the `unity-verifier` agent for an automated verify-fix loop
+4. **Verify** -- perform a verify-fix loop directly in the command body (no dedicated verifier
+   agent — that agent was removed 2026-08-03; see `provenance-skip.tsv`)
 
 ### Verify-Fix Loop
 
-The `unity-verifier` agent runs a bounded loop (max 3 iterations):
+`/unity-workflow` Phase 4 runs a bounded loop (max 3 iterations) directly, without a dedicated agent:
 
 ```
-Review changes → Classify issues → Auto-fix safe issues → Run tests → Re-verify
+Invoke unity-reviewer (read-only) → Auto-fix safe issues → Run tests → Re-verify
 ```
 
 Auto-fixable issues include: missing `[FormerlySerializedAs]`, `?.` on Unity objects, uncached `GetComponent` in Update, `tag ==` instead of `CompareTag`, missing `#if UNITY_EDITOR` guards.

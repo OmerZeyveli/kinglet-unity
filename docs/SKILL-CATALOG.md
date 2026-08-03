@@ -1,17 +1,23 @@
 # Skill Catalog
 
-One-page reference for all skills in everything-claude-unity.
+One-page reference for all skills in Kinglet Pioneer.
 
 ---
 
 ## Overview
 
-39 skills, one directory each at `.claude/skills/<name>/SKILL.md`. The model selects one by reading
+13 skills, one directory each at `.claude/skills/<name>/SKILL.md`. The model selects one by reading
 its `description` and invoking it with the `Skill` tool. That is the whole mechanism — there is no
 glob matching, no preloading, and no always-apply.
 
-**Correction (2026-08-03) — the important one.** Every skill in this catalog was unreachable for the
-toolkit's entire life. They were filed under `core/`, `gameplay/`, `genre/`, `systems/` and
+The 2026-08-03 surface cut reduced the skill set from 39 (already flat, per the correction below) to
+13: a skill survives only if it does something the model cannot do unaided. Ten are ECU-origin,
+rewritten for an agent reader; three (`systematic-debugging`, `using-kinglet`,
+`verification-before-completion`) are original, written in the same wave to carry the process chain —
+see `provenance.tsv`.
+
+**Correction (2026-08-03) — the important one.** Every skill in this catalog was once unreachable for
+the toolkit's entire life. They were filed under `core/`, `gameplay/`, `genre/`, `systems/` and
 `third-party/`, inherited from everything-claude-unity, and Claude Code only discovers skills one
 level deep. Nothing was registered; the `Skill` tool could not invoke a single entry below. An
 eight-hour Endless-Evolution session on 2026-08-02 used zero skills, which read as the model
@@ -26,129 +32,57 @@ this repository reads it — and concluded the nine skills it marked were "selec
 every other skill." The mechanism was right; the conclusion was too generous. They could not be
 selected at all. That probe's own evidence says so in hindsight: the model answered the
 `commit-trailers` question only after it *searched for and read the file*, which is what you do when
-a skill is not invocable. Both `alwaysApply` and `globs` have been stripped from all 39 skills.
+a skill is not invocable. Both `alwaysApply` and `globs` have been stripped from every skill.
 
 ---
 
 ## Skills That Formerly Carried `alwaysApply: true`
 
-These twelve were marked as if they loaded unconditionally. They never did, and the key is now gone.
-They hold knowledge that should rarely be skipped, which makes them the ones most worth naming
-explicitly in an agent's **Skills to load** block — see `.claude/agents/unity-coder.md` for the shape.
-Where the content genuinely must reach every session, the right home is `.claude/rules/`.
+These were marked as if they loaded unconditionally. They never did, and the key is now gone. Where
+content genuinely must reach every session, the right home is `.claude/rules/`, not a skill —
+`alwaysApply` reads as a guarantee and controls nothing. Some of the skills originally marked this way
+were themselves cut in the 2026-08-03 surface reduction (`commit-trailers`, `model-routing`,
+`event-systems`, `scriptable-objects`); the ones that survived are listed below, alongside the current
+mechanism that replaces the dead key: naming them explicitly in an agent's **Skills to load** block —
+see `.claude/agents/unity-coder.md` for the shape.
 
 | Skill | Description |
 |-------|-------------|
-| `serialization-safety` | Unity serialization rules -- FormerlySerializedAs on renames, SerializeField vs public, SerializeReference for polymorphism, Unity null check (`== null` not `?.`). Prevents silent data loss. |
-| `unity-mcp-patterns` | How to use unity-mcp tools effectively -- `batch_execute` for speed, `read_console` for verification, resource queries for project state. |
-| `model-routing` | Heuristics for choosing the right model tier (haiku/sonnet/opus) when delegating to agents. Loaded by orchestrating commands. |
 | `assembly-definitions` | Assembly definition management -- when to create asmdefs, reference rules, Editor/Runtime/Test separation, platform filters, compilation speed optimization. |
-| `commit-trailers` | Structured commit trailers -- adds Constraint, Rejected, Scope-risk, and Not-tested metadata to commit messages. |
-| `deep-interview` | Ambiguity gating -- detects vague feature requests and forces structured requirements gathering. Prevents wasted cycles on underspecified tasks. |
-| `event-systems` | Event system patterns -- C# events, UnityEvent, SO event channels, static EventBus. When to use each, zero-allocation patterns. |
+| `unity-mcp-patterns` | Activating unity-mcp tool groups, `batch_execute` for speed, `read_console` for verification, resource queries for project state. |
 | `object-pooling` | Object pooling patterns -- Unity `ObjectPool<T>`, custom ComponentPool, warm-up strategies, return-to-pool lifecycle. |
-| `scriptable-objects` | ScriptableObject architecture patterns -- event channels, variable references, runtime sets, factory pattern, data containers. |
+| `deep-interview` | Ambiguity gating -- detects vague feature requests and forces structured requirements gathering before planning or code. |
 
 ---
 
-## Core Skills
+## Current Skills (13, flat)
 
-Fundamentals loaded across many contexts.
+No categories — Claude Code only discovers `.claude/skills/<name>/SKILL.md`, one level deep, so the
+old `core/` / `gameplay/` / `genre/` / `systems/` / `third-party/` split shown in the corrections above
+is history, not a live grouping. Loosely by subject, for a maintainer's orientation only:
 
-| Skill | Description | Glob Patterns |
-|-------|-------------|---------------|
-| `assembly-definitions` | Assembly definition management, reference rules, Editor/Runtime/Test separation | Always loaded |
-| `commit-trailers` | Structured commit trailers with architectural decision metadata | Always loaded |
-| `deep-interview` | Ambiguity gating and structured requirements gathering | Always loaded |
-| `event-systems` | Event system patterns -- C# events, UnityEvent, SO channels | Always loaded |
-| `hud-statusline` | Configures Claude Code's statusline to display Unity workflow state | On demand |
-| `learner` | Post-debugging knowledge extraction -- captures codebase-specific learnings | On demand |
-| `model-routing` | Heuristics for choosing haiku/sonnet/opus model tier | Always loaded |
-| `object-pooling` | Object pooling patterns -- Unity ObjectPool<T>, custom pools | Always loaded |
-| `scriptable-objects` | ScriptableObject architecture -- event channels, runtime sets, factories | Always loaded |
-| `serialization-safety` | FormerlySerializedAs, Unity null checks, SerializeReference | Always loaded |
-| `unity-instincts` | How the atomic instinct learning system works -- observations, distillation, confidence scoring, project vs global scope, promotion/evolution | `.claude/hooks/instinct-*.sh`, `.claude/state/instincts/**/*`, `.claude/commands/unity-instincts.md` |
-| `unity-mcp-patterns` | batch_execute, read_console, resource query patterns | Always loaded |
+| Skill | Description |
+|-------|-------------|
+| `addressables` | Addressables asset loading -- `LoadAssetAsync`, handle lifecycle, labels, remote catalogs, memory management. |
+| `assembly-definitions` | Assembly definition management -- when to create asmdefs, reference rules, Editor/Runtime/Test separation, platform filters, compilation speed. |
+| `input-system` | New Input System -- action maps, `PlayerInput` component, generated C# classes, runtime rebinding, multi-device support, input buffering. |
+| `object-pooling` | Object pooling patterns -- Unity `ObjectPool<T>`, custom `ComponentPool`, warm-up strategies, return-to-pool lifecycle. |
+| `physics` | Unity physics -- non-allocating queries, collision layers, FixedUpdate discipline, continuous collision detection, character controllers, joints. |
+| `save-system` | Save/load patterns -- `ISaveable` interface, JSON serialization, save file management, scene persistence, cloud sync prep. |
+| `state-machine` | Generic state machine patterns -- `IState` interface, `StateMachine<T>`, game state management, enemy AI states, hierarchical FSM. |
+| `unity-mcp-patterns` | Activating unity-mcp tool groups (only core is on by default), `batch_execute` for speed, `read_console` for verification, resource queries for project state. |
+| `urp-pipeline` | Universal Render Pipeline -- URP asset configuration, renderer features, 2D renderer, lighting, shadows, post-processing volumes, SRP Batcher. |
+| `deep-interview` | Ambiguity gating for vague feature requests -- e.g. "add a jump," "make an inventory system" -- before writing a plan or touching code. |
+| `systematic-debugging` | For a bug whose cause is not yet known -- read the real console, reproduce, inspect the live API, then change one thing, before proposing a fix. **(process chain, Task 5)** |
+| `using-kinglet` | Session-start orientation -- which Kinglet surface handles which situation, and that a process surface is chosen before code is written. **(process chain, Task 5)** |
+| `verification-before-completion` | What counts as evidence a code change works, before reporting it done -- a claim without evidence is not a completion. **(process chain, Task 5)** |
 
----
+### Removed in the 2026-08-03 surface cut
 
-## Gameplay Skills
-
-Game system implementations loaded by file glob matching.
-
-| Skill | Description | Glob Patterns |
-|-------|-------------|---------------|
-| `character-controller` | 2D/3D character controllers -- coyote time, input buffering, variable jump, wall slide, dash, slopes | `**/Player*.cs`, `**/Character*.cs`, `**/Movement*.cs`, `**/Controller*.cs` |
-| `dialogue-system` | Dialogue tree patterns -- SO graph, node types, typewriter effect, localization-ready | `**/Dialogue*.cs`, `**/Conversation*.cs`, `**/NPC*.cs` |
-| `inventory-system` | Inventory, equipment, crafting -- SO item definitions, slot-based inventory, UI binding | `**/Inventory*.cs`, `**/Item*.cs`, `**/Equipment*.cs`, `**/Craft*.cs` |
-| `procedural-generation` | Perlin/Simplex noise, BSP dungeons, random walk, loot tables, wave function collapse | `**/Procedural*.cs`, `**/Generate*.cs`, `**/Dungeon*.cs`, `**/Noise*.cs`, `**/Loot*.cs` |
-| `save-system` | Save/load patterns -- ISaveable interface, JSON serialization, scene persistence, cloud sync | `**/Save*.cs`, `**/Load*.cs`, `**/Persist*.cs`, `**/Serializ*.cs` |
-| `state-machine` | Generic state machine -- IState interface, StateMachine<T>, game states, enemy AI, hierarchical FSM | `**/State*.cs`, `**/FSM*.cs`, `**/*Machine*.cs` |
-
----
-
-## Genre Skills
-
-Genre-specific architecture and patterns loaded by file glob matching.
-
-| Skill | Description | Glob Patterns |
-|-------|-------------|---------------|
-| `idle-clicker` | Big number math, offline progress, prestige/rebirth, upgrade trees, automation, currency systems | `**/Idle*.cs`, `**/Clicker*.cs`, `**/Currency*.cs`, `**/Upgrade*.cs`, `**/Prestige*.cs` |
-| `match3` | Grid system, tile matching, cascade/gravity, special tiles, combo chains, level objectives | `**/Match*.cs`, `**/Grid*.cs`, `**/Tile*.cs`, `**/Board*.cs`, `**/Puzzle*.cs` |
-| `platformer-2d` | Tight controls, level design patterns, collectibles, checkpoints, hazards, boss patterns | `**/Platform*.cs`, `**/Player*.cs`, `**/Level*.cs` |
-| `puzzle` | Grid/board logic, undo system, hint system, level packs, star ratings, mouse drag-and-drop | `**/Puzzle*.cs`, `**/Board*.cs`, `**/Grid*.cs`, `**/Hint*.cs`, `**/Undo*.cs` |
-| `rpg` | Stat system (base + modifiers), level/XP, skill trees, quest system, turn-based and real-time combat | `**/RPG*.cs`, `**/Stat*.cs`, `**/Quest*.cs`, `**/Skill*.cs`, `**/Level*.cs` |
-| `topdown` | Twin-stick / mouse-aim movement, room transitions, fog of war, spawner patterns, wave systems | `**/TopDown*.cs`, `**/Room*.cs`, `**/Wave*.cs`, `**/Spawn*.cs` |
-
-> `endless-runner` and `hyper-casual` were removed — they are mobile genres, and both loaded on
-> generic globs (`**/Level*.cs`, `**/GameManager*.cs`, `**/Chunk*.cs`) that any PC game trips.
-> See `provenance-skip.tsv`.
-
----
-
-## Platform Skills
-
-_None._ Kinglet Pioneer targets PC/console only, so there is no platform-switching layer. Platform
-guidance lives in `.claude/rules/pc-console.md`, which is always in force.
-
-> Upstream shipped a `mobile` skill here. The note that used to sit in this spot said it "loaded on
-> every C# file" via `alwaysApply: true` and `globs: ["**/*.cs"]`; that is not how Claude Code works
-> and the skill auto-loaded nothing. It is removed, not disabled, and removal was still right —
-> mobile guidance in a PC/console toolkit is wrong whichever way it reaches the model. See
-> `provenance-skip.tsv`.
-
----
-
-## Systems Skills
-
-Unity subsystem knowledge loaded by file glob matching.
-
-| Skill | Description | Glob Patterns |
-|-------|-------------|---------------|
-| `addressables` | Addressables asset loading -- LoadAssetAsync, handle lifecycle, labels, remote catalogs, memory management | `**/Addressable*.cs`, `**/*Address*` |
-| `animation` | Animator controllers, layers, blend trees, state machine behaviors, root motion, animation events, Timeline | `**/*.controller`, `**/*Anim*.cs`, `**/*.anim` |
-| `audio` | AudioMixer groups, snapshots, spatial audio, audio source pooling, compression per platform | `**/*.mixer`, `**/*Audio*.cs`, `**/*Sound*.cs`, `**/*Music*.cs` |
-| `cinemachine` | Virtual cameras, FreeLook, blending, noise profiles, state-driven cameras, confiner | `**/*Cinemachine*`, `**/*Camera*.cs`, `**/*Cam*.cs` |
-| `input-system` | New Input System -- action maps, PlayerInput, generated C# classes, runtime rebinding, multi-device | `**/*.inputactions`, `**/Input*.cs`, `**/PlayerInput*` |
-| `navmesh` | NavMeshAgent configuration, NavMeshSurface, off-mesh links, dynamic obstacles, pathfinding | `**/*Nav*.cs`, `**/*Pathfind*.cs`, `**/*Agent*.cs` |
-| `physics` | Non-allocating queries, collision layers, FixedUpdate discipline, continuous collision detection, joints | `**/*Physics*.cs`, `**/*Collider*.cs`, `**/*Rigidbody*.cs`, `**/*Trigger*.cs` |
-| `shader-graph` | Custom function nodes, sub-graphs, keyword-driven variants, master stack outputs, URP effects | `**/*.shadergraph`, `**/*.shadersubgraph` |
-| `ui-toolkit` | UXML document structure, USS styling, UQuery, data binding, ListView virtualization, custom elements | `**/*.uxml`, `**/*.uss`, `**/UIDocument*` |
-| `urp-pipeline` | URP asset configuration, renderer features, 2D renderer, lighting, shadows, post-processing, SRP Batcher | `**/URP*.asset`, `**/*Renderer*.asset`, `**/*Volume*.cs` |
-
----
-
-## Third-Party Skills
-
-Integration patterns for popular Unity packages.
-
-| Skill | Description | Glob Patterns |
-|-------|-------------|---------------|
-| `dotween` | DOTween animation library -- sequence composition, tween lifecycle, easing, kill strategies. Always kill tweens in OnDestroy. | `**/DOTween*`, `**/*Tween*.cs`, `**/*Animation*.cs` |
-| `odin-inspector` | Odin Inspector and Serializer -- SerializedMonoBehaviour, validation attributes, custom drawers, editor windows | `**/Odin*`, `**/Sirenix*`, `**/*Inspector*.cs` |
-| `textmeshpro` | TextMeshPro -- font asset creation, material presets, rich text tags, dynamic font fallback, sprite assets | `**/TMP_*.cs`, `**/TextMesh*.cs`, `**/*Text*.cs`, `**/*.asset` |
-| `unitask` | UniTask zero-allocation async/await -- cancellation tokens, PlayerLoop integration, async LINQ. Replaces coroutines. | `**/UniTask*`, `**/*Async*.cs`, `**/Cysharp*` |
-| `vcontainer` | VContainer DI -- LifetimeScope hierarchy, registration patterns, constructor injection, `[Inject]` for MonoBehaviours | `**/VContainer*`, `**/*LifetimeScope*.cs`, `**/*Installer*.cs`, `**/Container*.cs` |
+Everything else that appeared in earlier drafts of this catalog — the mobile skill and mobile genres,
+the remaining gameplay/genre/systems/third-party entries, and the `alwaysApply`-marked skills not
+listed above — was cut on the same criterion: a surface survives only if it does something the model
+cannot do unaided. `provenance-skip.tsv` has the full list and the reasoning for each.
 
 ---
 
@@ -164,7 +98,8 @@ would otherwise never think of; the `Skill` tool's own listing covers the rest.
 
 Both conditions failed silently until 2026-08-03: no error, no warning, no missing file. That is why
 `tests/test-skill-discovery.sh` checks the layout, the `name:`/directory agreement, and that every
-skill an agent names actually exists.
+path-form skill reference an agent names actually exists. It matches path-form references only —
+`tests/test-surface-references.sh` (added in the same wave) guards the bare-name references it misses.
 
 Skills are additive — several can be loaded at once, and they do not conflict, each covering a
 distinct domain. Loading none is the failure mode that actually occurs.

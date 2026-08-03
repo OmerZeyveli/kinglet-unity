@@ -286,3 +286,102 @@ Mitigation is deliberate, not automatic:
 
 Re-verify against newer ECU releases before bumping the pin in `.claude/UPSTREAM`. Sync is a
 decision, and it should stay one.
+
+---
+
+# Part 3 — the 2026-08-03 surface cut
+
+The pool went from 103 surfaces (agents + commands + skills + hooks) to 32, on one criterion: **a
+surface survives only if it does something the model cannot do unaided.** Selection is a scarce
+resource — every extra agent, command, or skill is one more thing competing for the same trigger
+phrase, and a well-tuned competitor plugin (Superpowers) wins the ones that are ambiguous. `provenance-skip.tsv`
+records the removal, one row per path, `rule=absent`; `scripts/check-provenance.sh` fails if any of
+those paths ever exist again. What follows groups the ~77 dated `2026-08-03` rows by why they left,
+with the evidence for each group.
+
+## Cut: the Donchitos design/production layer (23 rows)
+
+**Taken** in Part 1 (8 agents, 9 commands, 5 templates — see "Taken from Donchitos and adapted"
+above), still shipping as of the last MERGE-NOTES update. **Cut** entirely. Evidence: a field note
+(field note 36) measured `docs/design`, `docs/production`, and `docs/adr` output on a real project and
+found all three used 0 of 3 in the session that generated them — the layer produced documents nobody
+read. `.claude/agents/game-designer.md` and its seven siblings, the nine `/brainstorm`-family
+commands, and the associated templates are now `rule=absent`. The reasoning that justified adapting
+them in the first place is kept in Part 1 above, unedited, because a build record that quietly deletes
+its own history isn't one — Part 2's rule still applies: where the two disagree, the newer decision
+wins, and this is that disagreement.
+
+## Cut: ECU specialist agents and their commands (9 + associated commands)
+
+Agents whose one job could be folded into a broader surface without losing anything a real session
+used: read-only reviewers/scouts that duplicated `unity-reviewer`'s read-only pass, a security
+reviewer with no measured invocation, a migration agent for a one-time task, a git-operations agent
+that duplicated what `Bash` already does unassisted, a shader specialist and a networking specialist
+whose domains are thin slices of what `unity-coder` already covers, and their orphaned commands.
+`provenance-skip.tsv` note: *"specialist removed 2026-08-03; surface cut to 32 on the criterion that a
+surface survives only if it does something the model cannot do unaided."*
+
+## Cut: "lite" speed variants (3 rows)
+
+`unity-coder-lite` and `unity-fixer-lite` (and one associated command) existed only to trade quality
+for speed on a cost axis. Note: *"speed variant removed 2026-08-03; twins an existing surface on a
+cost axis, doubling the selection pool with nothing to discriminate on."* Removing them halves the
+ambiguity between "coder" and "coder-lite" without losing a capability — the full agent is still
+available when speed doesn't matter, and nothing distinguished when it does.
+
+## Cut: mobile and genre-template skills (9 rows)
+
+Genre skills (`idle-clicker`, `match3`, `puzzle`, `rpg`, `topdown`, `endless-runner`,
+`hyper-casual`, and siblings) removed on the same scarcity argument, plus the two mobile-specific
+genres removed earlier for loading on globs any PC game trips. Note: *"genre template removed
+2026-08-03; the model knows these genres and selection pool size is the scarce resource"* — Sonnet and
+Opus already know what a match-3 or idle-clicker architecture looks like; the skill's marginal value
+was one more competing description, not new knowledge.
+
+## Cut: a skill that duplicated an auto-loading rule (3 rows)
+
+`serialization-safety` and its relatives are gone because `.claude/rules/serialization.md` already
+answers the question unconditionally — rules load on every session, skills only load if selected.
+Evidence: the regression probe in Task 7 Step 6 (see `docs/research/pioneer/smoke-pass.md`, dated
+section below) asked the exact serialization-rename question and got the correct answer from the rule
+with **zero tool calls** — the skill was never invoked because the rule had already answered before
+selection could happen. A surface being selected for a question a rule already answers would be a
+regression, not a win; keeping the skill risked exactly that.
+
+## Cut: orphaned surfaces (23 rows)
+
+Commands and skills whose only reason to exist was another surface that is now gone — `producer`
+skills with no surviving agent to feed, package-conditional skills for packages no example project
+uses, toolkit self-references (a command that existed to document this repo to itself), and one
+upgrade-flow skill superseded by the receipt-driven re-install from Part 2. Notes: *"orphaned
+2026-08-03; producer removed in the design/production track cut and no surviving agent/command
+produces it"* and *"removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference."*
+
+## What survived and what was added
+
+32 surfaces: 8 agents, 11 commands, 13 skills, 27 registered hooks (28 files including `_lib.sh`), 6
+rules. Every surviving surface got a trigger-condition description (Task 4) so selection has something
+concrete to match against instead of a one-line summary. Three original skills were added in the same
+wave to carry a process chain rather than remove one: `using-kinglet` (session-start orientation
+across the whole surface set), `systematic-debugging` (investigate before proposing a fix), and
+`verification-before-completion` (evidence before claiming done) — see `provenance.tsv`, `origin:
+original`. A proactive-suggestion layer was added to the command bodies so a command offers the
+logical next step rather than requiring the user to already know the chain.
+
+## The gap this plan corrected
+
+The original spec for this wave assumed `tests/test-skill-discovery.sh` would catch dangling
+references left by the cut. Measured: it matches **path-form** references only
+(`.claude/skills/<name>/SKILL.md`), and no surviving surface had one pointing at a removed skill — the
+check returned clean while nine **bare-name** references (a skill named without its path) still
+pointed at nothing. `tests/test-surface-references.sh` was added to close that gap; it is a smaller
+cleanup than the spec anticipated, but a worse blind spot, because a bare-name reference produces no
+error anywhere in the existing suite.
+
+## The measurement this whole wave is a hypothesis until
+
+Every claim above — that removing 74-odd surfaces raises the odds a Kinglet surface gets selected over
+a well-tuned competitor plugin, and that the process-chain skills don't create the regression they're
+meant to prevent — is unverified until it runs against a real `claude` session with the competitor
+enabled. That measurement is recorded in `docs/research/pioneer/smoke-pass.md`, in the dated section
+this task appended; see that file for the actual tool-call outcomes, not an assumption made here.

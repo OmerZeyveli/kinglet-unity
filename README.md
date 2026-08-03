@@ -2,19 +2,20 @@
 
 **A standalone, PC/console-focused Claude Code toolkit for Unity 6.** One repo, one installer.
 
-It gives Claude Code two layers for your Unity project: an **engineering** layer that drives the
-Unity Editor over MCP (coder, reviewer, optimizer, scene-builder agents; `/unity-*` commands; safety
-hooks; architecture rules), and a **design & production** layer that writes GDDs, ADRs, and sprint
-plans into `docs/`.
+It gives Claude Code an **engineering** layer for your Unity project: agents that drive the Unity
+Editor over MCP (coder, reviewer, optimizer, scene-builder, …), `/unity-*` commands, safety hooks,
+and architecture rules. A **design & production** layer adapted from Claude-Code-Game-Studios shipped
+earlier and was removed 2026-08-03 — a field note measured its `docs/design`, `docs/production`, and
+`docs/adr` output used 0 of 3 on a real project. See `provenance-skip.tsv` and `MERGE-NOTES.md` Part 1
+for the record of what was cut and why.
 
 > **Honest positioning:** almost none of this is written from scratch. The engineering layer is
-> [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (MIT), vendored
-> wholesale. The design layer is adapted from
-> [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) (MIT). What this
-> project adds is the merge: one installer instead of two, PC/console instead of mobile, a provenance
-> manifest so you can see exactly whose code is whose, and fixes to a handful of upstream defects —
-> including one that destroyed your `CLAUDE.md` on re-install. See [CREDITS.md](CREDITS.md) and
-> [MERGE-NOTES.md](MERGE-NOTES.md).
+> [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (MIT), vendored and
+> then rewritten for an agent reader. What this project adds is the merge: one installer, PC/console
+> instead of mobile, a provenance manifest so you can see exactly whose code is whose, a 32-surface
+> pool cut down from 103 on the criterion "does this do something the model cannot do unaided," and
+> fixes to a handful of upstream defects — including one that destroyed your `CLAUDE.md` on
+> re-install. See [CREDITS.md](CREDITS.md) and [MERGE-NOTES.md](MERGE-NOTES.md).
 
 ---
 
@@ -45,14 +46,22 @@ fight you.
 ### What has actually been exercised
 
 On one Unity 6 / URP 2D project, 2026-08-02: the MCP bridge drove the editor through `execute_code`
-and closed eight parked findings; the design agents (`game-designer`, `level-designer`) produced
-design documents from a real codebase; a headless authoring tool created a complete DNA form in one
-call. The `unity-*` engineering agents, commands and skills were **not** invoked in that session —
-detailed task briefs left them nothing to decide — so their behaviour in practice is still unmeasured.
+and closed eight parked findings; the (now-removed) Donchitos design agents produced design documents
+from a real codebase; a headless authoring tool created a complete DNA form in one call. The `unity-*`
+engineering agents, commands and skills were **not** invoked in that session — detailed task briefs
+left them nothing to decide.
 
-Frontmatter validity, command registration and agent invocation have had no systematic pass. The test
-suite proves the installer places correct bytes; it does not prove Claude Code does anything useful
-with them.
+That gap is closed as of 2026-08-03 (Task 7 of the surface-cut wave, see
+`docs/research/pioneer/smoke-pass.md`'s dated section): three of smoke-pass.md §10's prompts were
+re-run against a fresh install with the competing Superpowers plugin **enabled**, and all three
+selected a Kinglet surface — `deep-interview` for an ambiguous "add a double jump," `systematic-debugging`
+routed through `/unity-fix` → `unity-fixer` for a bug report, and `/unity-optimize` → `unity-optimizer`
+for a performance check. A fourth, unrelated regression probe (a serialization-rename question already
+answered by `.claude/rules/serialization.md`) correctly triggered zero tool calls — no skill was
+selected to answer a question a rule already answers.
+
+Frontmatter validity and command registration still have had no exhaustive systematic pass, but agent
+invocation under real-ish prompts against the live competitor is now measured, not assumed.
 
 ---
 
@@ -74,46 +83,20 @@ Installed into your project's `.claude/`:
 
 | | Count | |
 |---|---|---|
-| **Agents** | 28 | 20 engineering (`unity-coder`, `unity-reviewer`, `unity-optimizer`, …) + 8 design |
-| **Commands** | 36 | 27 `/unity-*` + 9 design/production |
-| **Skills** | 39 | Unity subsystems, gameplay patterns, genres, third-party packages |
-| **Hooks** | 26 | Prompt-time guards (**8 blocking**, the rest advisory). 27 files — `_lib.sh` is a shared library, not a hook |
+| **Agents** | 8 | ECU-origin `unity-*` implementers: `unity-coder`, `unity-reviewer`, `unity-optimizer`, `unity-fixer`, `unity-prototyper`, `unity-scene-builder`, `unity-test-runner`, `unity-ui-builder` |
+| **Commands** | 11 | All `/unity-*` — see `.claude/commands/` |
+| **Skills** | 13 | Unity subsystems and cross-cutting process skills, flat at `.claude/skills/<name>/SKILL.md` |
+| **Hooks** | 27 registered | Prompt-time guards (some blocking, the rest advisory). 28 files on disk — `_lib.sh` is a shared library, not a hook |
 | **Rules** | 6 | 5 spine rules + `pc-console.md` |
-| **Templates** | 6 | GDD, ADR, **game decision record**, sprint plan, game concept, systems index |
+| **Templates** | 10 | C# templates for the MVS pattern (`Model`, `View`, `System`, `LifetimeScope`, `Message`, tests, …) at the repo-level `templates/`. `.claude/templates/` (design-doc templates) is empty — that layer was removed 2026-08-03. |
 
-### The design & production layer
+### The design & production layer — removed
 
-These 8 agents are a **documentation layer** — they write design docs to `docs/`. They do not write
-C# or drive the editor; the engineering agents own that.
-
-| Agent | Role |
-|-------|------|
-| `game-designer` | Core loops, systems, progression, balance |
-| `systems-designer` | Formulas, interaction matrices, economy/loot tuning |
-| `level-designer` | Spatial layouts, encounters, pacing |
-| `narrative-director`\* | Story architecture, world direction, dialogue strategy |
-| `writer`\* | Dialogue, lore, item text, barks |
-| `world-builder`\* | Factions, history, geography, lore consistency |
-| `creative-director` | Vision keeper / senior design reviewer (verdict role) |
-| `technical-director` | Architecture authority / feasibility reviewer (writes ADRs) |
-
-\* The narrative trio is optional — delete those three files from `.claude/agents/` if your game
-isn't story-driven. Harmless to leave.
-
-| Command | What it does |
-|---------|--------------|
-| `/brainstorm` | Guided concept ideation → `docs/design/game-concept.md` |
-| `/map-systems` | Decompose concept into systems + dependencies → `docs/design/systems-index.md` |
-| `/design-system` | Section-by-section GDD authoring for one system |
-| `/design-review` | Review a GDD for completeness/consistency/implementability |
-| `/sprint-plan` | Plan/update/report a sprint → `docs/production/sprints/` |
-| `/scope-check` | Detect and quantify scope creep (read-only) |
-| `/milestone-review` | Milestone go/no-go review |
-| `/estimate` | Structured effort estimate with confidence |
-| `/retrospective` | Sprint/milestone retrospective with action items |
-
-Design and production documents are written into a `docs/` tree in **your Unity project**, created on
-demand, outside `Assets/` so Unity doesn't import them.
+An earlier build adapted 8 agents, 9 commands, and 5 GDD/ADR/sprint templates from
+Claude-Code-Game-Studios as a documentation-only layer (no MCP tools, wrote only to `docs/`). It was
+cut in the 2026-08-03 surface reduction: a field note measured its output directories used 0 of 3 on
+a real project. `provenance-skip.tsv` records every path as `rule=absent`, and `MERGE-NOTES.md` Part 1
+keeps the original adaptation reasoning for history. None of those agents or commands ship today.
 
 ---
 
@@ -161,14 +144,14 @@ guessing.
 ## A typical flow
 
 ```
-/brainstorm                         → docs/design/game-concept.md
-/design-review docs/design/game-concept.md
-/map-systems                        → docs/design/systems-index.md
-/design-system player-controller    → docs/design/player-controller.md
-/design-review docs/design/player-controller.md
-/unity-feature                      → implements the approved GDD in the editor via MCP
-/sprint-plan new                    → docs/production/sprints/sprint-1.md
-/scope-check sprint-1   ·   /retrospective sprint-1
+/unity-init                         → fills the generated CLAUDE.md's FILL: markers once, post-install
+/unity-workflow "add a dash ability"  → Clarify → Plan → Execute → Verify, for a multi-step feature
+/unity-feature "add a double jump"  → one scoped addition, no plan phase — routes to unity-coder
+/unity-fix "enemy walks through walls" → reads console output, verifies the fix via MCP
+/unity-review                       → Unity-aware review before considering changes done
+/unity-test                         → writes and runs EditMode/PlayMode tests via MCP
+/unity-optimize                     → profiles via MCP before changing anything
+/unity-doctor                       → checks the install and MCP bridge before you trust them
 ```
 
 ---
@@ -178,9 +161,10 @@ guessing.
 Because this repo contains other people's code, it tracks whose:
 
 - **`provenance.tsv`** — one row per file: origin (`ecu` / `donchitos` / `original`), upstream
-  version and path, upstream checksum, and whether we modified it. Currently 201 rows: 158 from ECU
-  (120 byte-identical, 38 modified by the mobile strip and the upstream fixes), 22 adapted from
-  Donchitos, 21 original.
+  version and path, upstream checksum, and whether we modified it. Currently 526 rows: 101 from ECU
+  (30 verbatim, 71 modified — nearly every surviving ECU surface has been rewritten for an agent
+  reader), 425 original, 0 from Donchitos (that layer was removed 2026-08-03; `provenance-skip.tsv`
+  keeps the record).
 - **`provenance-skip.tsv`** — what we deliberately did *not* vendor, and why. This is what stops a
   future upstream sync from quietly reintroducing the mobile content.
 - **`scripts/check-provenance.sh`** — validates the manifest in both directions: no rows without
@@ -190,8 +174,11 @@ Because this repo contains other people's code, it tracks whose:
   **`.claude/NOTICE.md`**, which carries the upstream MIT notices as their licenses require.
 
 Vendoring trades one risk for another. The old overlay broke whenever ECU moved a file; that risk is
-gone. The new one is staleness — upstream fixes no longer reach us on their own. `provenance.tsv` is
-what makes a future diff against a newer ECU tractable rather than archaeological.
+gone. The new one is staleness — upstream fixes no longer reach us on their own, and with 71 of 101
+ECU-origin files now `modified`, a future `--online` diff against a newer ECU verifies little. The
+offline half of `provenance.tsv` — no rows without files, no files without rows, every `rule=absent`
+path stays absent — is what still carries weight; see `CLAUDE.md`'s provenance section for the full
+reasoning.
 
 ---
 

@@ -15,8 +15,12 @@ It is assembled from other people's work, and that is the central fact about mai
 - **everything-claude-unity (ECU)** — MIT, **vendored** at v1.5.0 (`bb28ccb`). The engineering layer:
   `unity-*` agents and commands, skills, hooks, the five spine rules, `settings.json`, plus the
   repo's `scripts/`, `tests/`, `docs/`, `examples/`, `templates/`.
-- **Claude-Code-Game-Studios (Donchitos)** — MIT, **adapted** at `984023d`. The design/production
-  layer: 8 agents, 9 commands, 5 templates. Each carries an inline attribution comment.
+- **Claude-Code-Game-Studios (Donchitos)** — MIT, **adapted** at `984023d`, then **removed 2026-08-03**.
+  The design/production layer (8 agents, 9 commands, 5 templates) was cut in the surface-reduction
+  wave: a field note measured `docs/design`, `docs/production`, and `docs/adr` used 0 of 3 on a real
+  project. `provenance-skip.tsv` records every path as `rule=absent`; `MERGE-NOTES.md` Part 1 keeps
+  the adaptation reasoning for history. The 8 agents shipped today are all ECU-origin `unity-*`
+  implementers, not this layer.
 - **CoplayDev unity-mcp** — not vendored. `.mcp.json` points at it on `localhost:8080`.
 
 ## The provenance contract
@@ -25,8 +29,13 @@ It is assembled from other people's work, and that is the central fact about mai
 version and path, the upstream checksum, status (`verbatim` / `modified` / `original`), and a note.
 
 **If you change a vendored file, flip its `status` to `modified` and say why in the `note` column.**
-This is not bookkeeping for its own sake — it is the only thing that makes a future diff against a
-newer ECU tractable rather than archaeological. `scripts/check-provenance.sh` enforces it:
+Kinglet's surfaces are no longer vendored copies. `origin` records where a file came from and is a
+standing MIT obligation; `status` is now `modified` or `original` for nearly every row, because the
+surfaces have been rewritten for an agent reader. `--online` therefore verifies little and the
+diff-tractability it once provided has been deliberately traded away. **The offline half is what
+matters now**: no rows without files, no files without rows, and every `rule=absent` path stays
+absent. That is what keeps a removed surface from silently returning. `scripts/check-provenance.sh`
+enforces it:
 
 - no rows without files, no files without rows (a new file with no row fails as an orphan);
 - every `status=verbatim` file must still match its recorded `upstream_sha256`;
@@ -57,6 +66,11 @@ never exist here; `rule=ours-wins` means upstream has the path and we ship our o
   directory, `description:` must be non-empty (it is the entire selection mechanism), and no skill
   may carry `alwaysApply` or `globs` — both are inert Cursor keys that get read as guarantees.
   Every skill an agent or command names by path must exist.
+- **The surface pool is 32 by design.** A surface — agent, command, skill, or hook — survives the
+  2026-08-03 cut only if it does something the model cannot do unaided. `tests/test-surface-references.sh`
+  guards bare-name skill references (a skill named without its `.claude/skills/<name>/SKILL.md`
+  path); `tests/test-skill-discovery.sh` only matches path-form references and misses those entirely
+  — that gap shipped nine dangling bare-name references on 2026-08-03 before the guard existed.
 
 ## Conventions
 
@@ -64,16 +78,20 @@ Payload files live in `.claude/`. There is no `overlay/` — it was dissolved; p
 directory-as-provenance.
 
 - **Agents** (`.claude/agents/<name>.md`): frontmatter `name`, `description`, `model`, `color`,
-  `tools`. The 8 design agents are a documentation layer — do **not** give them `mcp__unityMCP__*`
-  tools or have them write C#. They write to `docs/`.
+  `tools`. All 8 current agents are ECU-origin `unity-*` implementers with `mcp__unityMCP__*` tools
+  that write C# and wire it into the scene — the Donchitos design/production agents that used to be
+  documentation-only (no MCP tools, wrote to `docs/` instead) were removed 2026-08-03; see
+  `provenance-skip.tsv` and `MERGE-NOTES.md`.
 - **Commands** (`.claude/commands/<name>.md`): frontmatter `name`, `description`, `user-invocable`,
   `args`. Model/agent routing goes in the body.
 - **Skills** (`.claude/skills/<name>/SKILL.md`): frontmatter `name` and `description`, nothing else.
   Flat — see above. An agent that should use a skill needs `Skill` in its `tools:` *and* a
   **Skills to load** block naming it; neither alone is enough, and nothing loads a skill implicitly.
 - **Rules** (`.claude/rules/<name>.md`) and **templates** (`.claude/templates/<name>.md`): plain
-  Markdown, no frontmatter.
-- Donchitos-derived files keep their inline `<!-- Adapted from ... -->` comment.
+  Markdown, no frontmatter. `.claude/templates/` is currently empty — the design/production layer
+  that populated it was removed 2026-08-03.
+- No file in the current tree carries a Donchitos `<!-- Adapted from ... -->` comment; that layer
+  is gone (see `provenance-skip.tsv`). If one is reintroduced, keep the comment convention.
 
 Precedence: the five spine rules bind. `pc-console.md` adds platform specifics on top; it does not
 override them.
@@ -104,7 +122,7 @@ print, and the user gets a silent exit 1.
 ## Testing
 
 ```bash
-bash tests/run-tests.sh                       # 24 files, 267 assertions (counts drift — see below)
+bash tests/run-tests.sh                       # file/assertion counts drift — don't hardcode them here
 bash scripts/check-provenance.sh              # manifest integrity  (--online to verify upstream)
 bash tests/fixtures/mkproject.sh /tmp/p       # synthetic Unity project (--variant urp|builtin|bare|dirty)
 bash install.sh --project-dir /tmp/p --dry-run
