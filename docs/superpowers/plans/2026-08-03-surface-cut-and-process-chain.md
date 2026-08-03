@@ -398,8 +398,51 @@ git commit -m "chore(baseline): record the design/production track removal"
 - Delete (16 commands): `.claude/commands/unity-skillify.md`, `unity-skill-stocktake.md`, `unity-instincts.md`, `unity-learn.md`, `unity-sessions.md`, `unity-session-save.md`, `unity-session-resume.md`, `unity-team.md`, `unity-ralph.md`, `unity-audit.md`, `unity-interview.md`, `unity-build.md`, `unity-migrate.md`, `unity-network.md`, `unity-shader.md`, `unity-profile.md`
 - Delete (20 skills): `.claude/skills/serialization-safety/`, `event-systems/`, `scriptable-objects/`, `commit-trailers/`, `hud-statusline/`, `learner/`, `navmesh/`, `character-controller/`, `cinemachine/`, `dotween/`, `odin-inspector/`, `shader-graph/`, `textmeshpro/`, `ui-toolkit/`, `unitask/`, `vcontainer/`, `animation/`, `audio/`, `unity-instincts/`, `model-routing/`
 - Modify (7 survivors, reference cleanup): `.claude/agents/unity-coder.md`, `unity-prototyper.md`, `unity-fixer.md`, `unity-ui-builder.md`, `unity-reviewer.md`, `.claude/commands/unity-workflow.md`, `.claude/commands/unity-doctor.md`
+- Delete (6 orphaned templates): `.claude/templates/game-concept.md`, `systems-index.md`, `sprint-plan.md`, `architecture-decision-record.md`, `game-design-document.md`, `game-decision-record.md` — see "The emitters outside `.claude/`" below
+- Modify (emitters): `scripts/generate-claude-md.sh`, `install.sh`, `CREDITS.md`, `MCP-SETUP.md`
 - Modify: `provenance.tsv`, `provenance-skip.tsv`
 - Separate commit: `migration/baseline-inventory.json`
+
+**The emitters outside `.claude/` — added after the Task 1 review, and the most serious gap in this plan.**
+
+This plan scoped the cut to `.claude/agents`, `.claude/commands` and `.claude/skills`, and never asked what points *at* those surfaces from outside that tree. The answer is that the toolkit's own installer does, and it writes those references **into every project it installs**:
+
+- `scripts/generate-claude-md.sh:541-553` emits, into the generated `CLAUDE.md`, a "Where things go" block naming `docs/design/`, `docs/adr/` and `docs/production/` — the three directories field note §36 measured at zero use out of three — and a "How to work" section naming `/brainstorm`, `/map-systems`, `/design-system`, `/design-review`, `/sprint-plan`, `/estimate`, `/scope-check`, `/milestone-review`, `/retrospective` and five removed agents.
+- `install.sh:600` ends the install with *"try /brainstorm, or /unity-audit for a health check"*. Both are removed — `/brainstorm` in Task 1, `/unity-audit` in this task.
+- `CREDITS.md` and `MCP-SETUP.md` also name removed surfaces.
+
+This is worse than stale documentation. The generated `CLAUDE.md` is **project instructions the model reads every session**, so a Kinglet-installed project would instruct the model to run commands that do not exist and to file work in directories nothing consumes. That is the exact defect class the smoke pass found three times and that this wave's spec exists to close.
+
+**The reason Task 1's checks missed it** is worth carrying forward: its Step 1 and Step 6 grep only **path-form** references (`.claude/skills/<name>`) and only under `.claude/agents` and `.claude/commands`. That check structurally cannot see `/brainstorm`, cannot see a bare agent name, and never looks at `scripts/`, `install.sh` or `.claude/templates/` at all. Task 1's report saying "no dangling references" was true of the check it ran and false of the tree.
+
+**The six templates are orphaned by the same omission.** Every one of `.claude/templates/*.md` had its producer removed in Task 1 — `/brainstorm`, `/map-systems`, `/design-system`, `/design-review`, `/sprint-plan`, and `technical-director`. Verified after Task 1: all six report zero producers among the surviving agents and commands. A template no surviving surface produces is dead payload, which is the same criterion that removed the surfaces themselves, so they go with them. Their `claude_templates` category count drops from 6 to 0.
+
+- [ ] **Step 2b: Fix the emitters.**
+
+`scripts/generate-claude-md.sh` — rewrite the "Where things go" and "How to work" sections so they name only surviving surfaces and directories. The design-track workflow chain is gone; what replaces it is the chain Task 5 builds (`deep-interview` → `/unity-workflow` → `/unity-review`). Keep the section short: this text lands in every user's `CLAUDE.md` and field note §87 measured that a precedence sentence naming a file changes behaviour while bulk changes none.
+
+`install.sh:600` — the "Next steps" line must name surviving surfaces. `/unity-init` is the honest first step after an install, and `/unity-doctor` replaces `/unity-audit` as the health check.
+
+`CREDITS.md` and `MCP-SETUP.md` — sweep for removed surface names and correct them. `CREDITS.md`'s MIT attribution to ECU and Donchitos is a standing obligation and does **not** change; only surface names do.
+
+- [ ] **Step 2c: Verify nothing outside `.claude/` still names a removed surface.** This is the check Task 1 lacked — bare names, whole tree, excluding the git directory and the provenance manifests, which record removals on purpose.
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+for dead in brainstorm design-review design-system map-systems sprint-plan estimate scope-check \
+            milestone-review retrospective unity-audit unity-team unity-ralph unity-skillify \
+            unity-instincts unity-learn unity-interview unity-build unity-migrate unity-network \
+            unity-shader unity-profile unity-scout unity-linter unity-critic unity-verifier \
+            unity-migrator unity-git-master unity-network-dev unity-security-reviewer \
+            unity-shader-dev unity-build-runner unity-coder-lite unity-fixer-lite \
+            creative-director game-designer level-designer narrative-director systems-designer \
+            technical-director world-builder; do
+  git grep -l -- "$dead" -- ':!provenance.tsv' ':!provenance-skip.tsv' ':!docs/' ':!.superpowers/' \
+    2>/dev/null | while read -r f; do echo "STALE: $f -> $dead"; done
+done
+```
+
+Expected: no output. `docs/` is excluded because Task 7 owns it; `provenance*.tsv` because recording what was removed is their job. Anything else that appears is a real emitter and must be fixed here, not deferred.
 
 **Interfaces:**
 - Consumes: Task 1's tree (20 agents, 27 commands, 30 skills).
@@ -421,7 +464,7 @@ git commit -m "chore(baseline): record the design/production track removal"
 
 **A pre-existing defect this task must not paper over.** `unity-doctor.md:62-71` maps Unity packages to skill paths using the **pre-flattening nested form** — `systems/cinemachine`, `third-party/dotween`, `third-party/unitask`. Skills have been flat at `.claude/skills/<name>/SKILL.md` since 2026-08-03; those paths have not resolved for some time and no test caught it, because the guard only matches paths beginning `.claude/skills/`. Removing the skills makes the mapping moot, so the fix here is to delete the mapping table, not to correct it to paths that are about to stop existing. Record this in the commit message — it is a finding, not just a cleanup.
 
-- [ ] **Step 1: Delete the 48 files.**
+- [ ] **Step 1: Delete the 48 surface files.** (The six orphaned templates go in Step 2b's commit alongside the emitter fixes, so the surface removal stays reviewable on its own.)
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -474,7 +517,7 @@ git rm -q -r .claude/skills/serialization-safety .claude/skills/event-systems \
 
 **Leave `unity-workflow.md:51` and `unity-optimize.md` alone** — those are prose about Unity subsystems, not skill references.
 
-- [ ] **Step 3: Move 48 provenance rows to the skip manifest**, same mechanics as Task 1 Step 3. Notes by group, verbatim:
+- [ ] **Step 3: Move 54 provenance rows to the skip manifest** (48 surfaces + the 6 orphaned templates), same mechanics as Task 1 Step 3. Notes by group, verbatim:
 
 - 3 speed variants (`unity-coder-lite`, `unity-fixer-lite`, `unity-linter`): `speed variant removed 2026-08-03; twins an existing surface on a cost axis, doubling the selection pool with nothing to discriminate on`
 - 9 specialists: `specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided`
@@ -536,7 +579,14 @@ caught it, for the same reason. Table deleted rather than corrected,
 since the skills it points at are removed here."
 ```
 
-- [ ] **Step 8: Baseline, own commit.** 48 files removed = drift **96**. Seven files were edited, not removed; confirm with `--dry-run` whether edits register as drift in this tool before assuming 96 is complete:
+- [ ] **Step 8: Baseline, own commit.** 54 files removed. Templates are recorded in `full_claude_tree` and in `categories.claude_templates`, agents/commands/skills likewise, so the expected removal count is **108** — but confirm with `--dry-run` before writing, and if the tool disagrees, report its output rather than tuning the number. Use the flags Task 0 added:
+
+```bash
+python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD \
+    --expect-drift 0 --expect-removed 108 --expect-added 0 --dry-run
+```
+
+Superseded text follows for reference only — 48 files removed = drift **96**. Seven files were edited, not removed; confirm with `--dry-run` whether edits register as drift in this tool before assuming 96 is complete:
 
 ```bash
 python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD --expect-drift 96 --dry-run
