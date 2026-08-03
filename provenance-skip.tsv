@@ -55,3 +55,51 @@ examples/CLAUDE.md.mobile-casual	ecu	absent	mobile example
 .claude/skills/inventory-system/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
 .claude/skills/dialogue-system/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
 .claude/skills/procedural-generation/SKILL.md	ecu	absent	genre template removed 2026-08-03; the model knows these genres and selection pool size is the scarce resource
+.claude/agents/unity-build-runner.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/agents/unity-coder-lite.md	ecu	absent	speed variant removed 2026-08-03; twins an existing surface on a cost axis, doubling the selection pool with nothing to discriminate on
+.claude/agents/unity-critic.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/agents/unity-fixer-lite.md	ecu	absent	speed variant removed 2026-08-03; twins an existing surface on a cost axis, doubling the selection pool with nothing to discriminate on
+.claude/agents/unity-git-master.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/agents/unity-linter.md	ecu	absent	speed variant removed 2026-08-03; twins an existing surface on a cost axis, doubling the selection pool with nothing to discriminate on
+.claude/agents/unity-migrator.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/agents/unity-network-dev.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/agents/unity-scout.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/agents/unity-security-reviewer.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/agents/unity-shader-dev.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/agents/unity-verifier.md	ecu	absent	specialist removed 2026-08-03; surface cut to 32 on the criterion that a surface survives only if it does something the model cannot do unaided
+.claude/commands/unity-audit.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-build.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-instincts.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-interview.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-learn.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-migrate.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-network.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-profile.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-ralph.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-session-resume.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-session-save.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-sessions.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-shader.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-skill-stocktake.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-skillify.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/commands/unity-team.md	ecu	absent	removed 2026-08-03 with its agent, or as toolkit self-reference; see the surface cut design
+.claude/skills/animation/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/audio/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/character-controller/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/cinemachine/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/commit-trailers/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/dotween/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/event-systems/SKILL.md	ecu	absent	duplicates an auto-loading rule; the serialization probe answered from .claude/rules/serialization.md and the skill was never invoked
+.claude/skills/hud-statusline/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/learner/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/model-routing/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/navmesh/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/odin-inspector/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/scriptable-objects/SKILL.md	ecu	absent	duplicates an auto-loading rule; the serialization probe answered from .claude/rules/serialization.md and the skill was never invoked
+.claude/skills/serialization-safety/SKILL.md	ecu	absent	duplicates an auto-loading rule; the serialization probe answered from .claude/rules/serialization.md and the skill was never invoked
+.claude/skills/shader-graph/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/textmeshpro/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/ui-toolkit/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/unitask/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/unity-instincts/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/skills/vcontainer/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference

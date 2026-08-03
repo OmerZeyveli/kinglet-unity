@@ -50,29 +50,6 @@ Run a comprehensive diagnostic check on the everything-claude-unity installation
 6. Search for test assembly definitions (`*Tests*.asmdef`) → **WARNING** if none, suggest `/unity-test`
 7. All present → **PASS**
 
-## Check 5: Skill/Package Alignment
-
-1. Read `Packages/manifest.json` to detect installed Unity packages
-2. Cross-reference with available skills in `.claude/skills/`:
-
-| Package | Expected Skill |
-|---------|---------------|
-| `com.unity.inputsystem` | `systems/input-system` |
-| `com.unity.addressables` | `systems/addressables` |
-| `com.unity.cinemachine` | `systems/cinemachine` |
-| `com.unity.render-pipelines.universal` | `systems/urp-pipeline` |
-| `com.unity.textmeshpro` | `third-party/textmeshpro` |
-| `com.unity.timeline` | — (no skill yet) |
-
-3. Also check for third-party packages in `Assets/`:
-   - `DOTween` → `third-party/dotween`
-   - `UniTask` → `third-party/unitask`
-   - `VContainer` → `third-party/vcontainer`
-   - `Odin` → `third-party/odin-inspector`
-
-4. Report packages without matching skills → **WARNING** (capability gap)
-5. All aligned → **PASS**
-
 ## Output Format
 
 Present a summary report:
@@ -84,9 +61,8 @@ MCP Server:        PASS  (Unity 2022.3.20f1, StandaloneWindows64)
 .claude/ Integrity: PASS  (17 commands, 14 agents, 9 hooks, 35 skills, 5 rules)
 Hook Registration:  PASS  (all hooks registered correctly)
 Project Structure:  WARNING — no test assembly definitions found
-Skill Alignment:    WARNING — DOTween detected but no matching skill loaded
 
-Overall: 2 warnings, 0 errors
+Overall: 1 warning, 0 errors
 ```
 
 For each WARNING or ERROR, include the actionable fix immediately after the line.

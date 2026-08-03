@@ -4,7 +4,7 @@ description: "The star agent. Rapid end-to-end prototyping — given a mechanic 
 model: opus
 color: magenta
 tools: Skill, Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__unityMCP__*
-skills: character-controller, physics, state-machine
+skills: physics, state-machine
 ---
 
 # Unity Rapid Prototyper
@@ -17,7 +17,6 @@ Load these with the `Skill` tool before you start. They are not in your context 
 default, and nothing loads them for you — no glob matching, no always-apply. If you
 do not invoke a skill, you are working without it.
 
-- `character-controller`
 - `physics`
 - `input-system`
 - `object-pooling`

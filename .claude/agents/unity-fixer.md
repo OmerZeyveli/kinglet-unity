@@ -21,7 +21,6 @@ Load these with the `Skill` tool before you start. They are not in your context 
 default, and nothing loads them for you — no glob matching, no always-apply. If you
 do not invoke a skill, you are working without it.
 
-- `serialization-safety`
 - `physics`
 - `unity-mcp-patterns`
 

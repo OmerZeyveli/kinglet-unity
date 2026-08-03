@@ -17,9 +17,6 @@ default, and nothing loads them for you — no glob matching, no always-apply. I
 do not invoke a skill, you are working without it.
 
 - `assembly-definitions`
-- `serialization-safety`
-- `scriptable-objects`
-- `event-systems`
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not
