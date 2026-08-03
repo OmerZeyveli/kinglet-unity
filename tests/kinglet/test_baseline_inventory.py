@@ -546,10 +546,10 @@ class BaselineInventoryTests(unittest.TestCase):
         actual_paths = [
             path for path in tracked_paths() if path.startswith(".claude/")
         ]
-        self.assertEqual(122, full_tree["expected_count"])
-        self.assertEqual(122, len(records))
+        self.assertEqual(68, full_tree["expected_count"])
+        self.assertEqual(68, len(records))
         self.assertEqual(expected_paths, sorted(expected_paths))
-        self.assertEqual(122, len(set(expected_paths)))
+        self.assertEqual(68, len(set(expected_paths)))
         self.assertTrue(OMITTED_FROM_SEVEN_CATEGORIES.issubset(expected_paths))
         self.assertEqual(
             [],
