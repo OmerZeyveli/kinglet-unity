@@ -114,95 +114,286 @@ class BaselineInventoryTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
 
-    def _baseline_with_extra_record(self, path: str) -> dict:
-        """Return a deep copy of the real baseline with a fake record for `path`.
+    # --- regeneration_plan / apply_regeneration fixture -------------------
+    #
+    # Task 0 findings, Important-1: the original four tests deep-copied the
+    # real migration/baseline-inventory.json and checked it against the real
+    # HEAD tree. That makes them joint assertions over three things — the
+    # tool, the current contents of that JSON, and the HEAD tree — and they
+    # go red every time a real removal/addition wave leaves the baseline
+    # deliberately out of sync, which is precisely when this tool is used.
+    #
+    # Instead, build an isolated one-commit git repository with a small,
+    # fully controlled `.claude` + `templates` tree, and a baseline document
+    # that records only some of it. regeneration_plan and apply_regeneration
+    # are then exercised entirely against this fixture — never against
+    # REPOSITORY_ROOT or the real baseline — so these tests stay green
+    # regardless of what the real baseline or the real tree currently say.
+    #
+    # The fixture also carries the case Important-2 requires: a tracked
+    # path outside `.claude/` (`templates/two.template`, category
+    # `code_templates`) that the baseline does not record, so the addition
+    # scan is proven to see paths the old `.claude/`-only scan missed.
 
-        The record is appended to both `full_claude_tree.files` and the
-        matching `categories.<kind>.files`, both lists are re-sorted by
-        path, and both `expected_count` fields are incremented. `path`
-        must not exist in the working tree, so the record reads as a
-        removal once checked against the anchor.
+    _RECORDED_AGENT_PATHS = (".claude/agents/alpha.md", ".claude/agents/gamma.md")
+    _UNRECORDED_AGENT_PATH = ".claude/agents/beta.md"  # sorts between alpha and gamma
+    _PHANTOM_AGENT_PATH = ".claude/agents/does-not-exist.md"
+    _RECORDED_TEMPLATE_PATHS = ("templates/one.template", "templates/three.template")
+    _UNRECORDED_TEMPLATE_PATH = "templates/two.template"  # sorts between one and three
+
+    def _make_regeneration_fixture(
+        self, directory: str, *, include_unrecorded_additions: bool = False
+    ) -> tuple[Path, str, dict]:
+        """Build an isolated one-commit repo and a baseline that records it.
+
+        By default the tree contains exactly the recorded paths, so the
+        baseline is clean at the anchor — the shape removal tests need,
+        since `regeneration_plan` unconditionally refuses any unrecorded
+        `.claude`/tracked path unless `expected_added` is also given.
+        `include_unrecorded_additions=True` adds the two paths this
+        fixture also carries but keeps out of the baseline, for tests that
+        exercise the addition side.
         """
-        baseline = copy.deepcopy(self.baseline)
-        record = {
-            "path": path,
-            "sha256": "0" * 64,
-            "git_mode": "100644",
+        root = Path(directory) / "repository"
+        root.mkdir()
+        self.git(root, "init", "-q")
+        self.git(root, "config", "user.name", "Kinglet Test")
+        self.git(root, "config", "user.email", "kinglet@example.invalid")
+
+        all_paths = list(self._RECORDED_AGENT_PATHS) + list(self._RECORDED_TEMPLATE_PATHS)
+        if include_unrecorded_additions:
+            all_paths += [self._UNRECORDED_AGENT_PATH, self._UNRECORDED_TEMPLATE_PATH]
+        for path in all_paths:
+            target = root / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(f"fixture content for {path}\n", encoding="utf-8")
+
+        self.git(root, "add", ".")
+        self.git(root, "commit", "-q", "-m", "fixture tree")
+        anchor = self.git(root, "rev-parse", "HEAD")
+
+        def record(path: str) -> dict:
+            return {
+                "path": path,
+                "sha256": hashlib.sha256((root / path).read_bytes()).hexdigest(),
+                "git_mode": "100644",
+            }
+
+        agent_records = sorted(
+            (record(path) for path in self._RECORDED_AGENT_PATHS),
+            key=lambda item: item["path"],
+        )
+        template_records = sorted(
+            (record(path) for path in self._RECORDED_TEMPLATE_PATHS),
+            key=lambda item: item["path"],
+        )
+
+        baseline = {
+            "full_claude_tree": {
+                "expected_count": len(agent_records),
+                "files": [dict(item) for item in agent_records],
+            },
+            "categories": {
+                "agents": {
+                    "expected_count": len(agent_records),
+                    "files": [dict(item) for item in agent_records],
+                },
+                "code_templates": {
+                    "expected_count": len(template_records),
+                    "files": [dict(item) for item in template_records],
+                },
+            },
         }
+        return root, anchor, baseline
+
+    def _with_phantom_removal(self, baseline: dict) -> dict:
+        """Add an unrecorded-at-anchor record for `_PHANTOM_AGENT_PATH`.
+
+        Appended to both `full_claude_tree.files` and `categories.agents`,
+        both lists re-sorted, both `expected_count` incremented — the same
+        doubling `regeneration_plan`'s Global Constraints already state for
+        drift, so one absent phantom path produces two removals.
+        """
+        baseline = copy.deepcopy(baseline)
+        record = {"path": self._PHANTOM_AGENT_PATH, "sha256": "0" * 64, "git_mode": "100644"}
 
         full_tree = baseline["full_claude_tree"]
         full_tree["files"].append(record)
         full_tree["files"].sort(key=lambda item: item["path"])
         full_tree["expected_count"] += 1
 
-        category = None
-        for candidate, category_data in baseline["categories"].items():
-            if path.startswith(f".claude/{candidate}/"):
-                category = candidate
-                break
-        self.assertIsNotNone(category, f"no category owns {path}")
-
-        category_data = baseline["categories"][category]
-        category_data["files"].append(dict(record))
-        category_data["files"].sort(key=lambda item: item["path"])
-        category_data["expected_count"] += 1
+        agents = baseline["categories"]["agents"]
+        agents["files"].append(dict(record))
+        agents["files"].sort(key=lambda item: item["path"])
+        agents["expected_count"] += 1
 
         return baseline
 
     def test_removal_is_refused_when_no_expect_removed_flag_is_given(self) -> None:
         """The default must not change: a path-set change stays a hard refusal."""
-        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
-        plan = regeneration_plan(REPOSITORY_ROOT, "HEAD", baseline)
-        self.assertFalse(plan.approved)
-        self.assertTrue(
-            any("path missing at anchor" in refusal for refusal in plan.refusals),
-            plan.refusals,
-        )
-        self.assertEqual((), plan.removals)
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory)
+            baseline = self._with_phantom_removal(baseline)
+            plan = regeneration_plan(root, anchor, baseline)
+            self.assertFalse(plan.approved)
+            self.assertTrue(
+                any(
+                    f"path missing at anchor: {self._PHANTOM_AGENT_PATH}" in refusal
+                    for refusal in plan.refusals
+                ),
+                plan.refusals,
+            )
+            self.assertEqual((), plan.removals)
 
     def test_removal_is_counted_when_expect_removed_matches(self) -> None:
-        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
-        plan = regeneration_plan(
-            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=2
-        )
-        self.assertTrue(plan.approved, plan.refusals)
-        self.assertEqual(
-            {".claude/agents/does-not-exist.md"},
-            {removal.path for removal in plan.removals},
-        )
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory)
+            baseline = self._with_phantom_removal(baseline)
+            plan = regeneration_plan(root, anchor, baseline, expected_removed=2)
+            self.assertTrue(plan.approved, plan.refusals)
+            self.assertEqual(
+                {self._PHANTOM_AGENT_PATH},
+                {removal.path for removal in plan.removals},
+            )
+            self.assertEqual(
+                {"full_claude_tree", "categories.agents"},
+                {removal.structure for removal in plan.removals},
+            )
 
     def test_removal_count_mismatch_still_refuses(self) -> None:
-        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
-        plan = regeneration_plan(
-            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=99
-        )
-        self.assertFalse(plan.approved)
-        self.assertTrue(
-            any("expected removed 99" in refusal for refusal in plan.refusals),
-            plan.refusals,
-        )
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory)
+            baseline = self._with_phantom_removal(baseline)
+            plan = regeneration_plan(root, anchor, baseline, expected_removed=99)
+            self.assertFalse(plan.approved)
+            self.assertTrue(
+                any("expected removed 99" in refusal for refusal in plan.refusals),
+                plan.refusals,
+            )
 
     def test_apply_regeneration_drops_the_record_and_decrements_expected_count(
         self,
     ) -> None:
-        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
-        before_full = baseline["full_claude_tree"]["expected_count"]
-        before_agents = baseline["categories"]["agents"]["expected_count"]
-        plan = regeneration_plan(
-            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=2
-        )
-        applied = apply_regeneration(baseline, plan)
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory)
+            baseline = self._with_phantom_removal(baseline)
+            before_full = baseline["full_claude_tree"]["expected_count"]
+            before_agents = baseline["categories"]["agents"]["expected_count"]
+            plan = regeneration_plan(root, anchor, baseline, expected_removed=2)
+            applied = apply_regeneration(baseline, plan)
 
-        full_paths = [r["path"] for r in applied["full_claude_tree"]["files"]]
-        agent_paths = [r["path"] for r in applied["categories"]["agents"]["files"]]
-        self.assertNotIn(".claude/agents/does-not-exist.md", full_paths)
-        self.assertNotIn(".claude/agents/does-not-exist.md", agent_paths)
-        self.assertEqual(before_full - 1, applied["full_claude_tree"]["expected_count"])
-        self.assertEqual(
-            before_agents - 1, applied["categories"]["agents"]["expected_count"]
-        )
-        self.assertEqual(sorted(full_paths), full_paths)
-        self.assertEqual(sorted(agent_paths), agent_paths)
+            full_paths = [r["path"] for r in applied["full_claude_tree"]["files"]]
+            agent_paths = [r["path"] for r in applied["categories"]["agents"]["files"]]
+            self.assertNotIn(self._PHANTOM_AGENT_PATH, full_paths)
+            self.assertNotIn(self._PHANTOM_AGENT_PATH, agent_paths)
+            self.assertEqual(before_full - 1, applied["full_claude_tree"]["expected_count"])
+            self.assertEqual(
+                before_agents - 1, applied["categories"]["agents"]["expected_count"]
+            )
+            self.assertEqual(sorted(full_paths), full_paths)
+            self.assertEqual(sorted(agent_paths), agent_paths)
+
+    def test_addition_is_refused_when_no_expect_added_flag_is_given(self) -> None:
+        """Covers both the `.claude` and non-`.claude` default refusal strings."""
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory, include_unrecorded_additions=True)
+            plan = regeneration_plan(root, anchor, baseline)
+            self.assertFalse(plan.approved)
+            self.assertIn(
+                f"unrecorded .claude path at anchor: {self._UNRECORDED_AGENT_PATH}",
+                plan.refusals,
+            )
+            self.assertIn(
+                f"unrecorded path at anchor: {self._UNRECORDED_TEMPLATE_PATH}",
+                plan.refusals,
+            )
+            self.assertEqual((), plan.additions)
+
+    def test_addition_is_counted_when_expect_added_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory, include_unrecorded_additions=True)
+            plan = regeneration_plan(root, anchor, baseline, expected_added=3)
+            self.assertTrue(plan.approved, plan.refusals)
+            self.assertEqual(
+                {self._UNRECORDED_AGENT_PATH, self._UNRECORDED_TEMPLATE_PATH},
+                {addition.path for addition in plan.additions},
+            )
+            self.assertEqual(
+                {
+                    ("full_claude_tree", self._UNRECORDED_AGENT_PATH),
+                    ("categories.agents", self._UNRECORDED_AGENT_PATH),
+                    ("categories.code_templates", self._UNRECORDED_TEMPLATE_PATH),
+                },
+                {(addition.structure, addition.path) for addition in plan.additions},
+            )
+
+    def test_addition_count_mismatch_still_refuses(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory, include_unrecorded_additions=True)
+            plan = regeneration_plan(root, anchor, baseline, expected_added=99)
+            self.assertFalse(plan.approved)
+            self.assertTrue(
+                any("expected added 99" in refusal for refusal in plan.refusals),
+                plan.refusals,
+            )
+
+    def test_addition_scan_covers_tracked_paths_outside_claude(self) -> None:
+        """Important-2: a new templates/ (code_templates) path must be seen."""
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory, include_unrecorded_additions=True)
+            plan = regeneration_plan(root, anchor, baseline, expected_added=3)
+            self.assertTrue(plan.approved, plan.refusals)
+            template_additions = [
+                addition
+                for addition in plan.additions
+                if addition.path == self._UNRECORDED_TEMPLATE_PATH
+            ]
+            self.assertEqual(1, len(template_additions))
+            self.assertEqual("categories.code_templates", template_additions[0].structure)
+
+    def test_apply_regeneration_inserts_the_record_and_increments_expected_count(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root, anchor, baseline = self._make_regeneration_fixture(directory, include_unrecorded_additions=True)
+            before_full = baseline["full_claude_tree"]["expected_count"]
+            before_agents = baseline["categories"]["agents"]["expected_count"]
+            before_templates = baseline["categories"]["code_templates"]["expected_count"]
+            plan = regeneration_plan(root, anchor, baseline, expected_added=3)
+            applied = apply_regeneration(baseline, plan)
+
+            full_paths = [r["path"] for r in applied["full_claude_tree"]["files"]]
+            agent_paths = [r["path"] for r in applied["categories"]["agents"]["files"]]
+            template_paths = [
+                r["path"] for r in applied["categories"]["code_templates"]["files"]
+            ]
+
+            self.assertIn(self._UNRECORDED_AGENT_PATH, full_paths)
+            self.assertIn(self._UNRECORDED_AGENT_PATH, agent_paths)
+            self.assertIn(self._UNRECORDED_TEMPLATE_PATH, template_paths)
+            self.assertNotIn(self._UNRECORDED_TEMPLATE_PATH, full_paths)
+
+            self.assertEqual(before_full + 1, applied["full_claude_tree"]["expected_count"])
+            self.assertEqual(
+                before_agents + 1, applied["categories"]["agents"]["expected_count"]
+            )
+            self.assertEqual(
+                before_templates + 1,
+                applied["categories"]["code_templates"]["expected_count"],
+            )
+
+            self.assertEqual(sorted(full_paths), full_paths)
+            self.assertEqual(sorted(agent_paths), agent_paths)
+            self.assertEqual(sorted(template_paths), template_paths)
+            # the unrecorded agent path sorts strictly between the two
+            # already-recorded ones — this proves sorted-position insertion,
+            # not append-at-end.
+            self.assertEqual(
+                list(self._RECORDED_AGENT_PATHS[:1])
+                + [self._UNRECORDED_AGENT_PATH]
+                + list(self._RECORDED_AGENT_PATHS[1:]),
+                agent_paths,
+            )
 
     def test_inventory_counts_match_the_expected_counts_constant(self) -> None:
         categories = self.baseline["categories"]

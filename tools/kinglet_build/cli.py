@@ -95,13 +95,21 @@ def _parser() -> _ArgumentParser:
         "--expect-removed",
         type=int,
         dest="expect_removed",
-        help="the number of recorded paths the caller expects to be gone at the anchor",
+        help=(
+            "the number of recorded paths the caller expects to be gone at "
+            "the anchor; a categorised file counts twice, once per "
+            "structure (full_claude_tree and its category)"
+        ),
     )
     regenerate.add_argument(
         "--expect-added",
         type=int,
         dest="expect_added",
-        help="the number of unrecorded .claude paths the caller expects at the anchor",
+        help=(
+            "the number of unrecorded tracked paths the caller expects at "
+            "the anchor; a categorised file counts twice, once per "
+            "structure (full_claude_tree and its category)"
+        ),
     )
     regenerate.add_argument(
         "--repo-root",

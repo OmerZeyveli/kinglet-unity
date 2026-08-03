@@ -322,18 +322,39 @@ def regeneration_plan(
 
     additions: list[BaselineAddition] = []
     recorded_full_tree_paths = {record["path"] for record in full_tree_records}
+    recorded_category_paths: dict[str, set[str]] = {
+        category_name: {
+            record["path"]
+            for record in (categories[category_name] or {}).get("files") or []
+        }
+        for category_name in categories
+    }
     for path in sorted(entries):
         mode, object_type, object_id = entries[path]
         if object_type != "blob":
             continue
-        if not path.startswith(".claude/"):
+        category = _category_for_path(path)
+        # In scope for the addition scan: either it lives under the fully
+        # enumerated .claude tree, or it maps to a category the baseline
+        # tracks outside .claude/ (code_templates, under templates/).
+        # Hardcoding ".claude/" alone misses those — see Important-2.
+        if not path.startswith(".claude/") and category is None:
             continue
-        if path not in recorded_full_tree_paths:
-            if expected_added is not None:
-                actual_sha256 = blob_sha256(object_id)
-                if actual_sha256 is None:
-                    refusals.append(f"path missing at anchor: {path}")
-                    continue
+        recorded = path in recorded_full_tree_paths or (
+            category is not None
+            and path in recorded_category_paths.get(category, set())
+        )
+        if recorded:
+            continue
+        if expected_added is not None:
+            actual_sha256 = blob_sha256(object_id)
+            if actual_sha256 is None:
+                refusals.append(f"addition blob cannot be read at anchor: {path}")
+                continue
+            # full_claude_tree only ever enumerates the .claude tree — a new
+            # templates/ path (code_templates) is recorded in its category
+            # only, never in full_claude_tree.
+            if path.startswith(".claude/"):
                 additions.append(
                     BaselineAddition(
                         path=path,
@@ -342,18 +363,19 @@ def regeneration_plan(
                         git_mode=mode,
                     )
                 )
-                category = _category_for_path(path)
-                if category is not None:
-                    additions.append(
-                        BaselineAddition(
-                            path=path,
-                            structure=f"categories.{category}",
-                            sha256=actual_sha256,
-                            git_mode=mode,
-                        )
+            if category is not None:
+                additions.append(
+                    BaselineAddition(
+                        path=path,
+                        structure=f"categories.{category}",
+                        sha256=actual_sha256,
+                        git_mode=mode,
                     )
-            else:
-                refusals.append(f"unrecorded .claude path at anchor: {path}")
+                )
+        elif path.startswith(".claude/"):
+            refusals.append(f"unrecorded .claude path at anchor: {path}")
+        else:
+            refusals.append(f"unrecorded path at anchor: {path}")
 
     changes.sort(key=lambda change: (change.structure, change.path))
     removals.sort(key=lambda removal: (removal.structure, removal.path))
@@ -409,11 +431,23 @@ def apply_regeneration(baseline: Mapping, plan: RegenerationPlan) -> dict:
         if structure_name == "full_claude_tree":
             return document["full_claude_tree"]
         category_name = structure_name.split(".", 1)[1]
-        return document["categories"][category_name]
+        category_container = (document.get("categories") or {}).get(category_name)
+        if category_container is None:
+            raise ValueError(
+                "apply_regeneration: baseline has no category to receive an "
+                f"addition: {category_name}"
+            )
+        return category_container
 
     for structure_name in touched_structures:
         container = structure_container(structure_name)
         records: list[dict] = container["files"]
+        # Invariant on the way in, not the way out: a record list that
+        # arrives unsorted is a real bug in the baseline document, and this
+        # is where it would first become visible.
+        assert records == sorted(records, key=lambda record: record["path"]), (
+            f"baseline structure arrived unsorted: {structure_name}"
+        )
         changes_by_path = changes_by_structure.get(structure_name, {})
         removed_paths = removals_by_structure.get(structure_name, set())
 
@@ -438,11 +472,9 @@ def apply_regeneration(baseline: Mapping, plan: RegenerationPlan) -> dict:
             )
 
         updated_records.sort(key=lambda record: record["path"])
-        assert updated_records == sorted(updated_records, key=lambda r: r["path"])
 
         container["files"] = updated_records
         container["expected_count"] = len(updated_records)
-        assert container["expected_count"] == len(container["files"])
 
     document["source_commit"] = plan.anchor
     return document
