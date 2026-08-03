@@ -79,4 +79,23 @@ assert_contains "$TSD_BROKEN_OUT" "NOTICE.md missing" \
 if [ "$TSD_BROKEN_RC" -ne 0 ]; then TSD_BROKEN_NONZERO=1; else TSD_BROKEN_NONZERO=0; fi
 assert_eq "1" "$TSD_BROKEN_NONZERO" "studio-doctor exits non-zero when a check genuinely fails"
 
+# ── A declared provider that is not installed is a WARN, not a FAIL ────────
+echo ""
+echo "--- Test: stale provider declaration ---"
+TSD_STALE="/tmp/kinglet-doctor-stale-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_STALE" --variant urp >/dev/null
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_STALE" --yes >/dev/null 2>&1
+printf '\n### Process provider\n\nDiscovery and written planning in this project are owned by `superpowers`.\n' \
+  >> "$TSD_STALE/CLAUDE.md"
+
+TSD_STALE_OUT="$(KINGLET_USER_SETTINGS=/nonexistent-on-purpose \
+  bash "$TSD_DOCTOR" --project-dir "$TSD_STALE" 2>&1 || true)"
+assert_contains "$TSD_STALE_OUT" "superpowers" \
+    "doctor names the declared provider"
+assert_contains "$TSD_STALE_OUT" "not" \
+    "doctor says the declared provider is not installed"
+assert_contains "$TSD_STALE_OUT" "/unity-interview" \
+    "doctor names the built-in fallback"
+rm -rf "$TSD_STALE"
+
 rm -rf "$TSD_MOCK"

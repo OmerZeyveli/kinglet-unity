@@ -245,6 +245,27 @@ if [ -d "$CLAUDE_DIR" ]; then
   fi
 fi
 
+# ── Declared process provider still installed? ─────────────────────────────
+# A declaration that is no longer true is a warning, not a failure: the project
+# still works, and doctor's job here is to offer the built-in provider as an
+# explicit fallback rather than to block.
+CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
+USER_SETTINGS="${KINGLET_USER_SETTINGS:-$HOME/.claude/settings.json}"
+if [ -f "$CLAUDE_MD" ] && grep -q '^### Process provider' "$CLAUDE_MD"; then
+    declared=$(awk '/^### Process provider/{f=1} f && /owned by/{
+        if (match($0, /`[^`]+`/)) print substr($0, RSTART+1, RLENGTH-2); exit }' "$CLAUDE_MD")
+    if [ -z "$declared" ]; then
+        warn "CLAUDE.md has a Process provider section but names no provider."
+    elif [ -f "$USER_SETTINGS" ] && grep -q "\"$declared@" "$USER_SETTINGS"; then
+        pass "declared process provider '$declared' is installed"
+    else
+        warn "CLAUDE.md declares '$declared' as this project's process provider, but it is not"
+        warn "  installed for this user. Kinglet's built-in discovery surface (/unity-interview)"
+        warn "  is the fallback. Re-run install.sh to refresh the declaration, or delete the"
+        warn "  'Process provider' section from CLAUDE.md."
+    fi
+fi
+
 # ── Summary ──────────────────────────────────────────────────────────────────
 printf '\n%s\n' "${BOLD}$PASS_C passed · $WARN_C warning(s) · $FAIL_C failure(s)${NC}"
 [ "$FAIL_C" -gt 0 ] && exit 1
