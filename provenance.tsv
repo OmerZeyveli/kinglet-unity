@@ -11,25 +11,25 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/agents/systems-designer.md	donchitos	984023d	.claude/agents/systems-designer.md	b12973f4dce65c5add8e31fc570c4ece2b6f9855d2c89ce1645c0901a14adc17	modified	reformatted-to-ecu-conventions
 .claude/agents/technical-director.md	donchitos	984023d	.claude/agents/technical-director.md	fe98888f29067eb81ef4dd29d93c3498048628f4bcf6404a1c594f8a6343f9b2	modified	reformatted-to-ecu-conventions
 .claude/agents/unity-build-runner.md	ecu	1.5.0	.claude/agents/unity-build-runner.md	89c2088f704e832d89e8cab6170f18a6a54b20afe7e06201f33947e1266fedfe	modified	mobile-strip
-.claude/agents/unity-coder-lite.md	ecu	1.5.0	.claude/agents/unity-coder-lite.md	9edeb8ed0ed180f227f9073cec2a69a2f992e9228794ae0e5450f399f4a127d2	verbatim	-
-.claude/agents/unity-coder.md	ecu	1.5.0	.claude/agents/unity-coder.md	dcb5aedce694fb7941babd0ab678d102b641edf2621ef2ce5baa82df98177695	verbatim	-
+.claude/agents/unity-coder-lite.md	ecu	1.5.0	.claude/agents/unity-coder-lite.md	9edeb8ed0ed180f227f9073cec2a69a2f992e9228794ae0e5450f399f4a127d2	modified	skill-loading-wired: Skill tool + Skills-to-load block; m_ prefix corrected to _lowerCamelCase per rules/csharp-unity.md
+.claude/agents/unity-coder.md	ecu	1.5.0	.claude/agents/unity-coder.md	dcb5aedce694fb7941babd0ab678d102b641edf2621ef2ce5baa82df98177695	modified	skill-loading-wired: Skill tool + Skills-to-load block; m_ prefix corrected to _lowerCamelCase per rules/csharp-unity.md
 .claude/agents/unity-critic.md	ecu	1.5.0	.claude/agents/unity-critic.md	5dbfbc1547d4a44791f0b701ece488d8b3fb01c4c9ad2b726f1064aa129e937a	modified	mobile-strip
-.claude/agents/unity-fixer-lite.md	ecu	1.5.0	.claude/agents/unity-fixer-lite.md	9e3b6112f39d7e86411166ffa5f564f649d2e4c5249027662102b639ef473bc4	verbatim	-
+.claude/agents/unity-fixer-lite.md	ecu	1.5.0	.claude/agents/unity-fixer-lite.md	9e3b6112f39d7e86411166ffa5f564f649d2e4c5249027662102b639ef473bc4	modified	skill-loading-wired: Skill tool + Skills-to-load block
 .claude/agents/unity-fixer.md	ecu	1.5.0	.claude/agents/unity-fixer.md	7578bff73a812bb2f4244b14246201be1f5d25aa2908b82cacb46111d6ead378	modified	mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4
 .claude/agents/unity-git-master.md	ecu	1.5.0	.claude/agents/unity-git-master.md	25dd3e3fdfd5402d06b920809eed8166de716e4af70dd0df9edb3e7b6077d5d2	modified	mobile-strip
 .claude/agents/unity-linter.md	ecu	1.5.0	.claude/agents/unity-linter.md	a03dba62790624871c05b2978fe6e1badf27e48b50cd30e7a1667cf624b36bce	modified	mobile-strip
-.claude/agents/unity-migrator.md	ecu	1.5.0	.claude/agents/unity-migrator.md	499c36972c73021b3b25f651f5d423662967437a714703769c0667ccde495928	verbatim	-
-.claude/agents/unity-network-dev.md	ecu	1.5.0	.claude/agents/unity-network-dev.md	d3d989a38b5019f248e24092f04d8c1c392a9240b1b33f6cbb38b50dde3f1cc4	verbatim	-
+.claude/agents/unity-migrator.md	ecu	1.5.0	.claude/agents/unity-migrator.md	499c36972c73021b3b25f651f5d423662967437a714703769c0667ccde495928	modified	skill-loading-wired: Skill tool + Skills-to-load block
+.claude/agents/unity-network-dev.md	ecu	1.5.0	.claude/agents/unity-network-dev.md	d3d989a38b5019f248e24092f04d8c1c392a9240b1b33f6cbb38b50dde3f1cc4	modified	skill-loading-wired: Skill tool + Skills-to-load block
 .claude/agents/unity-optimizer.md	ecu	1.5.0	.claude/agents/unity-optimizer.md	5a0da0b10b56935c7405c7ce989eb8a900fc6e645a8472280e7df5c0a4bc27d5	modified	mobile-strip; mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4; corrects installer script path references from ./scripts/ to ./.claude/scripts/ (scripts only exist under .claude/scripts after install)
 .claude/agents/unity-prototyper.md	ecu	1.5.0	.claude/agents/unity-prototyper.md	0d4fd59ee9a5260ee2a592b80af793343dc5394bc1207bcd755dbabd193f8115	modified	mobile-strip
 .claude/agents/unity-reviewer.md	ecu	1.5.0	.claude/agents/unity-reviewer.md	7f83e615daa8b3bc31c43006bc99f6a282ae36ed82721964dda833c8a22669f2	modified	mobile-strip
-.claude/agents/unity-scene-builder.md	ecu	1.5.0	.claude/agents/unity-scene-builder.md	fac0c0e1c8f4fa7e158573d2764d4cf8e73326103a2c88d46aa9cf28f7583588	verbatim	-
+.claude/agents/unity-scene-builder.md	ecu	1.5.0	.claude/agents/unity-scene-builder.md	fac0c0e1c8f4fa7e158573d2764d4cf8e73326103a2c88d46aa9cf28f7583588	modified	skill-loading-wired: Skill tool + Skills-to-load block
 .claude/agents/unity-scout.md	ecu	1.5.0	.claude/agents/unity-scout.md	af8419f2b018f166fd0b51e902aa1a12d08e4d9b9120bf3e2cbebb407f21e191	verbatim	-
 .claude/agents/unity-security-reviewer.md	ecu	1.5.0	.claude/agents/unity-security-reviewer.md	76831dc6c0b287410a96f8d0dfd4d778413a5a45caa631cce39ec66943ff3304	modified	mobile-strip
 .claude/agents/unity-shader-dev.md	ecu	1.5.0	.claude/agents/unity-shader-dev.md	dfe66923f13cf9f169f406a208333ae8b9fba6f0bd65e45be06eae41df054b4e	modified	mobile-strip
 .claude/agents/unity-test-runner.md	ecu	1.5.0	.claude/agents/unity-test-runner.md	ff3c3949d6287ecbf51710574d989450aa2bb5991049406ccb435a772c619761	modified	mcp-tool-groups: upstream never documented that only the core group is exposed by default; verified against MCP for Unity 10.1.0 / server 3.4.4
 .claude/agents/unity-ui-builder.md	ecu	1.5.0	.claude/agents/unity-ui-builder.md	35f9e8ef53700e576fea56392eb9e8062b80cdeaeb22e97a1129cb245e2a835f	modified	mobile-strip
-.claude/agents/unity-verifier.md	ecu	1.5.0	.claude/agents/unity-verifier.md	818a0d752093a9b5e7289d27a5ac05e14a44f98e21c95f381141e22b25b48311	verbatim	-
+.claude/agents/unity-verifier.md	ecu	1.5.0	.claude/agents/unity-verifier.md	818a0d752093a9b5e7289d27a5ac05e14a44f98e21c95f381141e22b25b48311	modified	skill-loading-wired: Skill tool + Skills-to-load block
 .claude/agents/world-builder.md	donchitos	984023d	.claude/agents/world-builder.md	9e3399c5478ea2491bfc8e42745948b7aec4c2045ecd008a318d4f72a8fad2ea	modified	reformatted-to-ecu-conventions
 .claude/agents/writer.md	donchitos	984023d	.claude/agents/writer.md	8eafe2f3cd7f2c12acc0d8f93ed93bf638a915490ed5ca5a11721f1bf60f49d7	modified	reformatted-to-ecu-conventions
 .claude/commands/brainstorm.md	donchitos	984023d	.claude/skills/brainstorm/SKILL.md	3afbcc808948bd507486d2d84787236cbac516b67d207b6b4737ab0d7f2cd9ad	modified	skill-to-ecu-command
@@ -47,9 +47,9 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/commands/unity-feature.md	ecu	1.5.0	.claude/commands/unity-feature.md	b90e90bee6f79efc42a4a206d1da869d349b0ca4a10740e257626361e8a30ee2	verbatim	-
 .claude/commands/unity-fix.md	ecu	1.5.0	.claude/commands/unity-fix.md	93509f96278a765492e4cfc6c5ad465c765c2382709e136c5a6f1d04509293b1	verbatim	-
 .claude/commands/unity-init.md	ecu	1.5.0	.claude/commands/unity-init.md	f12a6810e7ca56fdfb9cfff531fa9ae610da64535edf5a0e02d175b6243d8bb7	verbatim	-
-.claude/commands/unity-instincts.md	ecu	1.5.0	.claude/commands/unity-instincts.md	91e5bacfa25bab0c2fe1bee87bdb69a5dd6ddcc0b4fb9ed25cee64922a7bd6c4	verbatim	-
+.claude/commands/unity-instincts.md	ecu	1.5.0	.claude/commands/unity-instincts.md	91e5bacfa25bab0c2fe1bee87bdb69a5dd6ddcc0b4fb9ed25cee64922a7bd6c4	modified	skill paths flattened to .claude/skills/<name>/
 .claude/commands/unity-interview.md	ecu	1.5.0	.claude/commands/unity-interview.md	022876bd67112fa87808fcb56872d35d448ae6ac249aebb8778845dd928a6bdb	modified	mobile-strip
-.claude/commands/unity-learn.md	ecu	1.5.0	.claude/commands/unity-learn.md	7ec4b1791d321d05e58449178eedf03fb8e9295494ab5d1b4b96ff539548950e	verbatim	-
+.claude/commands/unity-learn.md	ecu	1.5.0	.claude/commands/unity-learn.md	7ec4b1791d321d05e58449178eedf03fb8e9295494ab5d1b4b96ff539548950e	modified	skill paths flattened to .claude/skills/<name>/
 .claude/commands/unity-migrate.md	ecu	1.5.0	.claude/commands/unity-migrate.md	bc66c34bc991031cf9ddbbfea07858da3739dffdd772dde3d5928d64df01cd9e	verbatim	-
 .claude/commands/unity-network.md	ecu	1.5.0	.claude/commands/unity-network.md	59b0d72edb8a453712ad45a317dd9515e7a0d4474f7df2268024b6f55e640b82	verbatim	-
 .claude/commands/unity-optimize.md	ecu	1.5.0	.claude/commands/unity-optimize.md	b50cd8a2e4645800d249518dec32ad17961da42943b118baa41197028ef6e09d	modified	mobile-strip; corrects installer script path references from ./scripts/ to ./.claude/scripts/ (scripts only exist under .claude/scripts after install)
@@ -62,7 +62,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/commands/unity-session-save.md	ecu	1.5.0	.claude/commands/unity-session-save.md	5272521300e9812a0296a80b4ffdb0e13be233c00c748289a793f9ec0e8190a4	verbatim	-
 .claude/commands/unity-sessions.md	ecu	1.5.0	.claude/commands/unity-sessions.md	698613ac90dc2fef7fec530fcef6eed6810d7a42fc417ff5a4550a00c60575d0	verbatim	-
 .claude/commands/unity-shader.md	ecu	1.5.0	.claude/commands/unity-shader.md	40d28b7030d0db7a9aca3abca50ed42c3ce4716552fe6245f4dfdfc1f5fa094f	modified	mobile-strip
-.claude/commands/unity-skillify.md	ecu	1.5.0	.claude/commands/unity-skillify.md	2e68f812411f297710848abe7129352112feabdd054e0576b10a8ef49e15b7f8	verbatim	-
+.claude/commands/unity-skillify.md	ecu	1.5.0	.claude/commands/unity-skillify.md	2e68f812411f297710848abe7129352112feabdd054e0576b10a8ef49e15b7f8	modified	skill paths flattened to .claude/skills/<name>/
 .claude/commands/unity-skill-stocktake.md	ecu	1.5.0	.claude/commands/unity-skill-stocktake.md	e224149f9d5df3586f3d35ffcd55c8e39af3c0ed59912b2ef00a5e3194a83439	modified	mobile-strip
 .claude/commands/unity-team.md	ecu	1.5.0	.claude/commands/unity-team.md	91cf687430751c36f2e600916c6b955033c813a6f800f42edb36a47dd0add027	verbatim	-
 .claude/commands/unity-test.md	ecu	1.5.0	.claude/commands/unity-test.md	e0506c46598807898b7d35ea37e25847eac6e1b680558c3e1e698698e0c684aa	verbatim	-
@@ -591,6 +591,7 @@ tests/kinglet/test_baseline_regenerator.py	original	-	-	-	original	gates-the-bas
 docs/research/pioneer/smoke-pass.md	original	-	-	-	original	pioneer-smoke-pass-record-2026-07-29
 docs/superpowers/plans/2026-07-29-kinglet-pioneer-wave-1b1-make-it-work.md	original	-	-	-	original	pioneer-wave-1b1-make-it-work-implementation-plan
 tests/test-assert-helpers-under-load.sh	original	-	-	-	original	regression-test-for-the-assert-contains-sigpipe-under-pipefail-race
+tests/test-skill-discovery.sh	original	-	-	-	original	proves skills are where Claude Code can find them; nothing else checked discovery
 docs/superpowers/plans/2026-07-30-kinglet-pioneer-wave-1b2-make-it-findable.md	original	-	-	-	original	pioneer-wave-1b2-make-it-findable-implementation-plan
 docs/superpowers/plans/2026-07-30-endless-evolution-parallel-hardening.md	original	-	-	-	original	endless-evolution-parallel-hardening-plan-8-units
 docs/superpowers/specs/2026-07-30-surface-trigger-rules.md	original	-	-	-	original	task-2-of-wave-1b2-differentiation-rules-for-colliding-command-agent-descriptions-before-task-3-rewrites-them
