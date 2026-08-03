@@ -2414,3 +2414,64 @@ notices the scene, not the mechanic, was what felt wrong.
 **The narrower operational rule:** when the deliverable is judged by feel and has no failing test, an
 agent's output is a draft for a human to replace, not a result to accept. Say so in the brief, so the
 effort goes into the parts rather than the arrangement.
+
+---
+
+## 86. A feature can be absent for its entire life and report as "unused"
+
+Kinglet shipped 39 skills. An eight-hour Endless-Evolution session on 2026-08-02 invoked zero of
+them — 216 tool calls, no skill, no agent, no command. The session before it, four hours, the same.
+The obvious reading was a model-behaviour problem: the skills are there, nothing points the model at
+them, so it never picks one. That reading survived two separate conversations because it explained
+the data perfectly.
+
+It was wrong. The skills were never registered. Claude Code discovers `.claude/skills/<name>/SKILL.md`
+and nothing deeper; all 39 lived at `.claude/skills/<category>/<name>/SKILL.md`, inherited from
+everything-claude-unity. The `Skill` tool could not name one of them. There was nothing to decline.
+
+**Measured rather than reasoned about**, which is the only reason it was found. Two probe skills in an
+empty directory, one flat and one nested, and a headless session asked to list its own skills:
+
+```
+.claude/skills/flatprobe/SKILL.md            -> listed
+.claude/skills/category/nestedprobe/SKILL.md -> not listed
+```
+
+Four transferable pieces.
+
+**Absence and disuse produce identical telemetry.** "The feature was available and went unused" and
+"the feature was never available" look the same from the outside: zero invocations. Any metric that
+counts *uses* cannot distinguish them. Before concluding that people or models are not using
+something, establish that they *could* — and establish it by observing the system, not by reading the
+tree. A directory listing shows the files exist. It does not show they are loaded.
+
+**A tidier structure can cost the whole feature.** Categories were the natural thing to do with 39
+files; they made the tree readable and the catalog easy to write. They also made the feature
+non-functional, silently, in a way that produced no error, no warning, and no missing file. Any time
+a layout is chosen for human readability, ask which consumer reads it — if a tool does, its
+conventions are not negotiable and are worth verifying rather than assuming.
+
+**Half-right findings are stickier than wrong ones.** A probe on 2026-07-30 had already found
+`alwaysApply: true` inert and corrected the documentation honestly — and then concluded the skills
+were "selected by description like every other skill." That conclusion was too generous by exactly
+one step, and because the correction was visibly rigorous, it closed the question. The evidence for
+the truth was sitting inside it: the model answered the test question only after it *searched for and
+read the skill file*, which is what you do when a skill is not invocable. The report described the
+observation correctly and drew the comfortable inference. **When a finding has to explain away an
+awkward detail, the detail is usually the finding.**
+
+**Reachable is not the same as discoverable, and both are needed.** Fixing the layout was necessary
+and not sufficient. None of the 28 agents had `Skill` in its `tools:` frontmatter, so none could load
+a skill even once registered; and `unity-coder` told itself to "note this for the orchestrating
+command," where no command loads skills. Three independent failures, each alone fatal, all invisible.
+A capability chain fails at its weakest link and reports nothing about which link that was — so
+verify the chain end to end, in the deployed configuration:
+
+```
+install into a fixture project -> headless session invokes serialization-safety -> INVOKED: yes
+                               -> subagent unity-linter invokes it              -> SKILL_OK
+```
+
+Two probes, four minutes, and they are the only evidence that any of the day's edits did anything.
+The 217-assertion suite passing proves the bytes are in the right place. It cannot prove the feature
+exists.
