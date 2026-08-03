@@ -45,9 +45,12 @@ usage() { sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 # ---------------------------------------------------------------------------
 FACTS_ONLY=0
 PROJECT_DIR=""
+PROVIDER=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --facts-only) FACTS_ONLY=1; shift ;;
+        --provider)   [ $# -ge 2 ] || { error "--provider needs a value"; exit 2; }
+                      PROVIDER="$2"; shift 2 ;;
         -h|--help)    usage ;;
         -*)           error "Unknown option: $1"; exit 2 ;;
         *)            PROJECT_DIR="$1"; shift ;;
@@ -393,12 +396,27 @@ emit_stack_verdict() {
     echo "\`[FormerlySerializedAs]\` and \`== null\` are exactly the rules that catch silent data loss."
 }
 
+# One sentence, not a routing block. Field note 87 measured that the bulk
+# auto-loaded layer steered nothing while a single precedence sentence steered
+# everything; a block here would be paying for the part that did not work.
+emit_provider_verdict() {
+    [ -n "$PROVIDER" ] || return 0
+    [ "$PROVIDER" != none ] || return 0
+    echo ""
+    echo "### Process provider"
+    echo ""
+    echo "Discovery and written planning in this project are owned by \`$PROVIDER\`."
+    echo "\`/unity-interview\` yields to it and does not compete for the discovery stage."
+    echo "Unity implementation, Unity verification and Unity domain knowledge stay with this toolkit."
+}
+
 emit_marked_region() {
     echo ""
     echo "## Project Facts (auto-detected)"
     echo ""
     emit_facts
     emit_stack_verdict
+    emit_provider_verdict
     echo ""
 }
 

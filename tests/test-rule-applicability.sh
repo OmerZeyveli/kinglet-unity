@@ -107,6 +107,18 @@ assert_lacks "$OUT_LEGACY" "Model-View-System (MVS) with **VContainer**" \
 assert_has "$OUT_LEGACY" "Architecture stack — detected, not assumed" \
     "Engineering Stance points at the detected section"
 
+# ── Case 7: provider declaration ──────────────────────────────────────────
+echo ""
+echo "--- Case: provider declaration ---"
+OUT_PROV="$(bash "$GEN" --provider superpowers "$TMP/legacy" 2>/dev/null)"
+assert_has "$OUT_PROV" "owned by \`superpowers\`" "declared provider is named"
+assert_has "$OUT_PROV" "/unity-interview" "the surface that yields is named"
+assert_lacks "$OUT_LEGACY" "owned by" "no provider flag means no sentence"
+
+# The sentence lives inside the markers, so a --facts-only refresh must carry it.
+FACTS_PROV="$(bash "$GEN" --facts-only --provider superpowers "$TMP/legacy" 2>/dev/null)"
+assert_has "$FACTS_PROV" "owned by \`superpowers\`" "--facts-only carries the provider sentence"
+
 echo ""
 echo "=== Rule Applicability: $TESTS_PASSED/$TESTS_RUN passed, $TESTS_FAILED failed ==="
 [ "$TESTS_FAILED" -eq 0 ]
