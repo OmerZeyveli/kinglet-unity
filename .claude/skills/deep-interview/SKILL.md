@@ -94,3 +94,10 @@ Ask the user to confirm the summary before proceeding to implementation.
 - Performance: 1 (split-screen implies rendering budget concern)
 - Integration: 2 (PlayerController, Input System explicitly named)
 - Acceptance: 1 (implied: both players can play simultaneously)
+
+## Handoff
+
+- **Gate passes** (requirements are clear enough): hand off to `/unity-workflow` for anything
+  needing a plan, or `/unity-feature` for one scoped addition. Say which and why.
+- **Gate fails** (still ambiguous): ask the specific questions the score identified, and **stop**.
+  Do not proceed on an assumption and do not answer your own question.

@@ -154,6 +154,16 @@
             "timeout": 5000
           }
         ]
+      },
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session-brief.sh",
+            "timeout": 5000
+          }
+        ]
       }
     ],
     "Stop": [

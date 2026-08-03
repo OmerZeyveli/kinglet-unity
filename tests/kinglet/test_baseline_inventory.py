@@ -20,12 +20,13 @@ BASELINE_PATH = REPOSITORY_ROOT / "migration" / "baseline-inventory.json"
 EXPECTED_COUNTS = {
     "agents": 8,
     "commands": 11,
-    "skills": 10,
-    "hooks": 26,
+    "skills": 13,
+    "hooks": 27,
     "rules": 6,
     "claude_templates": 0,
     "code_templates": 10,
 }
+FULL_CLAUDE_TREE_COUNT = 72
 OMITTED_FROM_SEVEN_CATEGORIES = {
     ".claude/NOTICE.md",
     ".claude/UPSTREAM",
@@ -546,10 +547,10 @@ class BaselineInventoryTests(unittest.TestCase):
         actual_paths = [
             path for path in tracked_paths() if path.startswith(".claude/")
         ]
-        self.assertEqual(68, full_tree["expected_count"])
-        self.assertEqual(68, len(records))
+        self.assertEqual(FULL_CLAUDE_TREE_COUNT, full_tree["expected_count"])
+        self.assertEqual(FULL_CLAUDE_TREE_COUNT, len(records))
         self.assertEqual(expected_paths, sorted(expected_paths))
-        self.assertEqual(68, len(set(expected_paths)))
+        self.assertEqual(FULL_CLAUDE_TREE_COUNT, len(set(expected_paths)))
         self.assertTrue(OMITTED_FROM_SEVEN_CATEGORIES.issubset(expected_paths))
         self.assertEqual(
             [],
