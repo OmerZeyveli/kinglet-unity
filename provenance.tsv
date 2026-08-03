@@ -600,3 +600,4 @@ docs/research/pioneer/field-notes.md	original	-	-	-	original	lessons-from-runnin
 .claude/templates/game-decision-record.md	original	-	-	-	original	GDR template; design counterpart to the donchitos ADR template
 docs/superpowers/specs/2026-08-02-agent-context-and-verification-design.md	original	-	-	-	original	design spec; agent context + verification approach
 docs/superpowers/specs/2026-08-03-provider-boundary-and-rule-applicability-design.md	original	-	-	-	original	design spec; provider boundary + rule applicability detection
+docs/superpowers/plans/2026-08-03-provider-boundary-and-rule-applicability.md	original	-	-	-	original	implementation plan; provider boundary + rule applicability detection
