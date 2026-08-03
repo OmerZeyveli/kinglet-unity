@@ -449,13 +449,16 @@ cat <<'MDEOF'
 ## Engineering Stance (fixed — do not casually change)
 
 - **Engine / language:** Unity 6, C#.
-- **Architecture:** Model-View-System (MVS) with **VContainer** (DI), **MessagePipe** (cross-system
-  messaging — no singletons or static event buses), **UniTask** (async — no coroutines), and the
-  **New Input System** (legacy `Input.*` is blocked by a hook).
+- **Architecture:** see **Architecture stack — detected, not assumed** in the generated block above.
+  That section is measured against this project's code and it is the authority; this list is not.
+  The toolkit's default is Model-View-System with VContainer (DI), MessagePipe (cross-system
+  messaging) and UniTask (async), and it is a default, not a finding.
+- **Input:** the **New Input System**. Legacy `Input.*` is blocked by a hook, so this one is
+  enforced rather than recommended.
 - **Platform:** PC / console. No mobile code, touch input, or mobile performance budgets.
 - **Rules** live in `.claude/rules/` and are binding:
   - `architecture.md` · `csharp-unity.md` · `performance.md` · `serialization.md` ·
-    `unity-specifics.md` — the spine.
+    `unity-specifics.md` — the spine, **subject to the detected-stack section above.**
   - `pc-console.md` — the platform spec. It adds specifics on top of the spine; on any apparent
     conflict the spine wins.
 

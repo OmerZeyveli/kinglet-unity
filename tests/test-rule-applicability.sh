@@ -96,6 +96,17 @@ ERRTXT="$(bash "$GEN" "$TMP/legacy" 2>&1 >/dev/null)"
 assert_has "$ERRTXT" "[INFO]" "info lines go to stderr"
 assert_lacks "$OUT_LEGACY" "[INFO]" "info lines are absent from stdout"
 
+# ── Case 6: the static tail does not contradict the detected section ───────
+# The Engineering Stance block is emitted once, outside the markers, and never
+# refreshed. If it asserts the stack unconditionally it will permanently
+# contradict the section Task 1 emits.
+echo ""
+echo "--- Case: static Engineering Stance defers to detection ---"
+assert_lacks "$OUT_LEGACY" "Model-View-System (MVS) with **VContainer**" \
+    "Engineering Stance does not assert the stack unconditionally"
+assert_has "$OUT_LEGACY" "Architecture stack — detected, not assumed" \
+    "Engineering Stance points at the detected section"
+
 echo ""
 echo "=== Rule Applicability: $TESTS_PASSED/$TESTS_RUN passed, $TESTS_FAILED failed ==="
 [ "$TESTS_FAILED" -eq 0 ]
