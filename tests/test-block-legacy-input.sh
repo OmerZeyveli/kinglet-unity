@@ -33,8 +33,8 @@ verdict() {  # $1 = file path, $2 = file content
   printf '%s' "$rc"
 }
 
-assert_eq "$([ -f "$HOOK" ] && echo yes || echo no)" "yes" "block-legacy-input.sh exists"
-assert_eq "$([ -x "$HOOK" ] && echo yes || echo no)" "yes" "block-legacy-input.sh is executable"
+assert_eq "yes" "$([ -f "$HOOK" ] && echo yes || echo no)" "block-legacy-input.sh exists"
+assert_eq "yes" "$([ -x "$HOOK" ] && echo yes || echo no)" "block-legacy-input.sh is executable"
 
 # --- it must fire on the real thing ----------------------------------------
 VIOLATION='using UnityEngine;
@@ -43,10 +43,10 @@ public class Player : MonoBehaviour {
         if (Input.GetKeyDown(KeyCode.F1)) ChangeForm();
     }
 }'
-assert_eq "$(verdict /proj/Assets/Player/Scripts/Player.cs "$VIOLATION")" "2" "blocks unguarded Input.GetKeyDown in first-party code"
+assert_eq "2" "$(verdict /proj/Assets/Player/Scripts/Player.cs "$VIOLATION")" "blocks unguarded Input.GetKeyDown in first-party code"
 
 for api in 'Input.GetAxis("Horizontal")' 'Input.GetButtonDown("Jump")' 'Input.mousePosition' 'Input.touchCount'; do
-  assert_eq "$(verdict /proj/Assets/Scripts/A.cs "void Update(){ var x = $api; }")" "2" "blocks $api"
+  assert_eq "2" "$(verdict /proj/Assets/Scripts/A.cs "void Update(){ var x = $api; }")" "blocks $api"
 done
 
 # --- and it must NOT fire on these -----------------------------------------
@@ -66,23 +66,23 @@ static bool F9Pressed() {
     return false;
 }
 #endif'
-assert_eq "$(verdict /proj/Assets/Core/Debug/PerfProbe.cs "$DUAL")" "0" "allows a correctly-guarded ENABLE_INPUT_SYSTEM/ENABLE_LEGACY dual path"
+assert_eq "0" "$(verdict /proj/Assets/Core/Debug/PerfProbe.cs "$DUAL")" "allows a correctly-guarded ENABLE_INPUT_SYSTEM/ENABLE_LEGACY dual path"
 
 # Vendored code. Feel/MoreMountains alone ships 16 files using legacy input into
 # Assets/Extensions/. They must never be edited, so blocking them teaches you to
 # ignore the hook.
 for p in /proj/Assets/Extensions/Feel/MMInput.cs /proj/Assets/Plugins/Thing/X.cs /proj/Assets/PlayerPrefsEditor/Y.cs; do
-  assert_eq "$(verdict "$p" "void U(){ if(Input.GetKey(KeyCode.A)) {} }")" "0" "ignores vendored code: ${p#/proj/Assets/}"
+  assert_eq "0" "$(verdict "$p" "void U(){ if(Input.GetKey(KeyCode.A)) {} }")" "ignores vendored code: ${p#/proj/Assets/}"
 done
 
 # Clean code and non-C# files.
-assert_eq "$(verdict /proj/Assets/Scripts/Clean.cs 'void Update(){ _controls.Player.Move.ReadValue<Vector2>(); }')" "0" "allows New Input System code"
-assert_eq "$(verdict /proj/Assets/Scripts/notes.md 'Input.GetKey is banned')" "0" "ignores non-C# files"
+assert_eq "0" "$(verdict /proj/Assets/Scripts/Clean.cs 'void Update(){ _controls.Player.Move.ReadValue<Vector2>(); }')" "allows New Input System code"
+assert_eq "0" "$(verdict /proj/Assets/Scripts/notes.md 'Input.GetKey is banned')" "ignores non-C# files"
 # `_playerInput` / `inputAction` must not trip a naive /Input\./ match.
-assert_eq "$(verdict /proj/Assets/Scripts/View.cs 'private PlayerInput _playerInput; void A(){ _playerInput.enabled = true; }')" "0" "does not false-positive on PlayerInput members"
+assert_eq "0" "$(verdict /proj/Assets/Scripts/View.cs 'private PlayerInput _playerInput; void A(){ _playerInput.enabled = true; }')" "does not false-positive on PlayerInput members"
 
 # --- the claim the rules make must stay true -------------------------------
-assert_eq "$(grep -c 'block-legacy-input.sh' "$PROJECT_ROOT/.claude/settings.json" || true)" "1" "hook is wired into settings.json"
+assert_eq "1" "$(grep -c 'block-legacy-input.sh' "$PROJECT_ROOT/.claude/settings.json" || true)" "hook is wired into settings.json"
 
 echo ""
 echo "test-block-legacy-input: $TESTS_PASSED/$TESTS_RUN passed"

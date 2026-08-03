@@ -78,8 +78,8 @@ if [ -n "$BAD" ]; then
     printf '%s declares mcp__%s__ but install.sh writes %s\n' "${src#$REPO_DIR/}" "$tok" "$SHIPPED_SERVER"
   done
 fi
-assert_eq "$(printf '%s' "$BAD" | grep -c . || true)" "0" \
+assert_eq "0" "$(printf '%s' "$BAD" | grep -c . || true)" \
   "no shipped file names an MCP server install.sh does not write"
 
-assert_eq "$([ -n "$SHIPPED_SERVER" ] && echo found || echo missing)" "found" \
+assert_eq "found" "$([ -n "$SHIPPED_SERVER" ] && echo found || echo missing)" \
   "install.sh's .mcp.json heredoc still declares a server name this test can read"

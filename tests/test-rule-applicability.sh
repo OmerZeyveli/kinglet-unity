@@ -53,7 +53,7 @@ bash "$MK" "$TMP/legacy" --variant legacy >/dev/null
 # Capture rc separately from the output: `$(...)` inside `set -e` would abort this test file.
 GEN_RC=0
 OUT_LEGACY="$(bash "$GEN" "$TMP/legacy" 2>/dev/null)" || GEN_RC=$?
-assert_eq "$GEN_RC" "0" "generator survives a .cs file matching none of the scanned symbols"
+assert_eq "0" "$GEN_RC" "generator survives a .cs file matching none of the scanned symbols"
 assert_has "$OUT_LEGACY" "Scanned \`Assets/\` (vendored subtrees excluded), 3 first-party C# file(s)" \
     "the non-matching file is still counted in CS_FILE_COUNT"
 

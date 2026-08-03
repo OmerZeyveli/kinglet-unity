@@ -49,26 +49,26 @@ printf 'a line the user added\n' >> "$DROPPED_EDITED"
 
 bash "$REPO_DIR/install.sh" --project-dir "$PRUNE_DIR" >/dev/null 2>&1
 
-assert_eq "$([ -e "$DROPPED_CLEAN" ] && echo present || echo removed)" "removed" \
+assert_eq "removed" "$([ -e "$DROPPED_CLEAN" ] && echo present || echo removed)" \
   "an untouched file the payload no longer ships is removed on upgrade"
 
-assert_eq "$([ -e "$DROPPED_EDITED" ] && echo present || echo removed)" "present" \
+assert_eq "present" "$([ -e "$DROPPED_EDITED" ] && echo present || echo removed)" \
   "a file the user edited is never removed, even when the payload drops it"
 
-assert_eq "$(grep -c 'a line the user added' "$DROPPED_EDITED" 2>/dev/null || echo 0)" "1" \
+assert_eq "1" "$(grep -c 'a line the user added' "$DROPPED_EDITED" 2>/dev/null || echo 0)" \
   "the user's edit to a dropped file survives intact"
 
 # The receipt must stop claiming a file that is gone, or the next run reports it as an orphan again.
-assert_eq "$(cut -f1 "$RECEIPT" | grep -cxF '.claude/agents/gone-untouched.md' || true)" "0" \
+assert_eq "0" "$(cut -f1 "$RECEIPT" | grep -cxF '.claude/agents/gone-untouched.md' || true)" \
   "the receipt no longer lists the removed file"
 
 # A skill directory emptied by the cut still reads as a skill to anything listing the tree.
-assert_eq "$(find "$PRUNE_DIR/.claude" -mindepth 1 -type d -empty 2>/dev/null | grep -c . || true)" "0" \
+assert_eq "0" "$(find "$PRUNE_DIR/.claude" -mindepth 1 -type d -empty 2>/dev/null | grep -c . || true)" \
   "no empty directory is left behind by a removal"
 
 # Nothing outside .claude/ is in scope. The receipt also records .mcp.json and MCP-SETUP.md, and an
 # over-broad prune would delete a user's MCP configuration.
-assert_eq "$([ -f "$PRUNE_DIR/.claude/settings.json" ] && echo present || echo gone)" "present" \
+assert_eq "present" "$([ -f "$PRUNE_DIR/.claude/settings.json" ] && echo present || echo gone)" \
   "files still in the payload are untouched by the prune"
 
 # A refresh must be idempotent. install.sh used to print the "## Project Facts" heading itself and
@@ -77,10 +77,10 @@ assert_eq "$([ -f "$PRUNE_DIR/.claude/settings.json" ] && echo present || echo g
 # so every re-install added another empty heading. A real project was found carrying two.
 #
 # Two installs have already run above, so any duplication is present by now.
-assert_eq "$(grep -c 'Project Facts (auto-detected)' "$PRUNE_DIR/CLAUDE.md" 2>/dev/null || echo 0)" "1" \
+assert_eq "1" "$(grep -c 'Project Facts (auto-detected)' "$PRUNE_DIR/CLAUDE.md" 2>/dev/null || echo 0)" \
   "re-installing does not duplicate the generated heading"
 
-assert_eq "$(grep -c 'kinglet:generated:begin' "$PRUNE_DIR/CLAUDE.md" 2>/dev/null || echo 0)" "1" \
+assert_eq "1" "$(grep -c 'kinglet:generated:begin' "$PRUNE_DIR/CLAUDE.md" 2>/dev/null || echo 0)" \
   "re-installing does not duplicate the generated-region markers"
 
 # A kept edit must stay kept, upgrade after upgrade.
@@ -96,7 +96,7 @@ bash "$REPO_DIR/install.sh" --project-dir "$PRUNE_DIR" >/dev/null 2>&1
 bash "$REPO_DIR/install.sh" --project-dir "$PRUNE_DIR" >/dev/null 2>&1
 bash "$REPO_DIR/install.sh" --project-dir "$PRUNE_DIR" >/dev/null 2>&1
 
-assert_eq "$(grep -c 'a line the user added' "$STICKY" 2>/dev/null || echo 0)" "1" \
+assert_eq "1" "$(grep -c 'a line the user added' "$STICKY" 2>/dev/null || echo 0)" \
   "an edit kept by one upgrade is still kept three upgrades later"
 
 rm -rf "$PRUNE_DIR"

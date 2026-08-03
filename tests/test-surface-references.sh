@@ -89,7 +89,7 @@ BAD_REFS=$(
 if [ -n "$BAD_REFS" ]; then
   printf '%s\n' "$BAD_REFS"
 fi
-assert_eq "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "0" \
+assert_eq "0" "$(printf '%s' "$BAD_REFS" | grep -c . || true)" \
   "no agent or command names a skill that does not exist"
 
 # A skill's body can name a `/unity-*` command (e.g. using-kinglet's chain table, deep-interview's
@@ -129,7 +129,7 @@ BAD_CMD_REFS=$(
 if [ -n "$BAD_CMD_REFS" ]; then
   printf '%s\n' "$BAD_CMD_REFS"
 fi
-assert_eq "$(printf '%s' "$BAD_CMD_REFS" | grep -c . || true)" "0" \
+assert_eq "0" "$(printf '%s' "$BAD_CMD_REFS" | grep -c . || true)" \
   "no skill body names a /unity-* command that does not exist"
 
 # An untracked file under .claude/ is live for Claude Code and invisible to check-provenance.sh
@@ -142,5 +142,5 @@ if [ -n "$UNTRACKED_PAYLOAD" ]; then
     printf 'untracked payload file: %s\n' "$path"
   done <<< "$UNTRACKED_PAYLOAD"
 fi
-assert_eq "$(printf '%s' "$UNTRACKED_PAYLOAD" | grep -c . || true)" "0" \
+assert_eq "0" "$(printf '%s' "$UNTRACKED_PAYLOAD" | grep -c . || true)" \
   "no untracked file under .claude/ (invisible to provenance and baseline, but live for the model)"

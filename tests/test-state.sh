@@ -110,7 +110,7 @@ if [ -f "$SAVE_HOOK" ]; then
 
         # Check schema_version
         SCHEMA_VER=$(jq -r '.schema_version' "$TEST_STATE_DIR/session.json" 2>/dev/null)
-        assert_eq "$SCHEMA_VER" "1" "session.json has schema_version 1"
+        assert_eq "1" "$SCHEMA_VER" "session.json has schema_version 1"
 
         # Check saved_at exists
         SAVED_AT=$(jq -r '.saved_at' "$TEST_STATE_DIR/session.json" 2>/dev/null)
@@ -122,13 +122,13 @@ if [ -f "$SAVE_HOOK" ]; then
 
         # Check plan and verification fields exist
         HAS_PLAN=$(jq 'has("plan")' "$TEST_STATE_DIR/session.json" 2>/dev/null)
-        assert_eq "$HAS_PLAN" "true" "session.json has plan field"
+        assert_eq "true" "$HAS_PLAN" "session.json has plan field"
 
         HAS_VERIFY=$(jq 'has("verification")' "$TEST_STATE_DIR/session.json" 2>/dev/null)
-        assert_eq "$HAS_VERIFY" "true" "session.json has verification field"
+        assert_eq "true" "$HAS_VERIFY" "session.json has verification field"
 
         HAS_AGENT=$(jq 'has("agent_context")' "$TEST_STATE_DIR/session.json" 2>/dev/null)
-        assert_eq "$HAS_AGENT" "true" "session.json has agent_context field"
+        assert_eq "true" "$HAS_AGENT" "session.json has agent_context field"
     else
         assert_eq "0" "1" "session-save creates session.json file"
     fi

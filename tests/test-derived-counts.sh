@@ -58,12 +58,12 @@ done <<< "$DC_QUOTING_FILES"
 if [ -n "$DC_BAD" ]; then
   printf '%s' "$DC_BAD"
 fi
-assert_eq "$(printf '%s' "$DC_BAD" | grep -c . || true)" "0" \
+assert_eq "0" "$(printf '%s' "$DC_BAD" | grep -c . || true)" \
   "every provenance count quoted in prose matches provenance.tsv"
 
 # If the phrasing in either file changes, the greps above stop matching and this test passes while
 # checking nothing — the vacuity failure this repository has shipped before. So assert the greps
 # still find something to check.
 DC_FOUND=$(grep -hoE '[0-9]+ verbatim, [0-9]+ modified' "$REPO_DIR/CREDITS.md" "$REPO_DIR/README.md" 2>/dev/null | grep -c . || true)
-assert_eq "$([ "$DC_FOUND" -ge 2 ] && echo enough || echo "only-$DC_FOUND")" "enough" \
+assert_eq "enough" "$([ "$DC_FOUND" -ge 2 ] && echo enough || echo "only-$DC_FOUND")" \
   "both prose files still state the split in the form this test can read"
