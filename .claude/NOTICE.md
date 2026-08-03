@@ -105,3 +105,20 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## 3. Superpowers — influence, not a license obligation
+
+Not vendored, not adapted — no license text follows. Named here because `CREDITS.md` in the toolkit
+repository opens "nothing here is asserted on trust," and three files there named Superpowers only as
+the competitor `unity-workflow`'s dispatch loop measures itself against. What was taken: the chain
+design (skills that name the next skill), the execution loop
+(`subagent-driven-implementation`, adapted from Superpowers' `subagent-driven-development`), and two
+skill names, `systematic-debugging` and `verification-before-completion`. What was not taken is the
+text — measured similarity of our three skills against their Superpowers counterparts is 0.120,
+0.183, and 0.156, with nothing shared beyond YAML frontmatter and one heading.
+
+MIT covers expression, and the measured similarity says the expression is ours. `provenance.tsv`'s
+`origin=original` on those three skills is correct and does not change; this section does not assert
+a license obligation and no license text for Superpowers is reproduced — nothing here is vendored or
+derived at the expression level, so a license block would misstate what happened, not clarify it.
+See the toolkit repository's `CREDITS.md` for the full section.

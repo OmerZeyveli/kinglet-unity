@@ -7,7 +7,7 @@ merely depend on them — it **contains** them. Attribution is therefore an obli
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
 is asserted on trust. The 29/72 split below is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
 $1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 29 `verbatim` and 72 `modified` rows
-with `origin=ecu` (425 further rows are `status=original`, i.e. not vendored at all).
+with `origin=ecu` (434 further rows are `status=original`, i.e. not vendored at all).
 
 **Re-derive it before quoting it.** A single `status` flip changes the split, and this number has now
 gone stale twice — most recently one commit after it was corrected, when `docs/MODEL-ROUTING.md`
@@ -149,6 +149,33 @@ open-source bridge needs no API key (that is Coplay's separate commercial produc
 --with-mcp` will add the package to your `Packages/manifest.json`.
 
 ---
+
+## 4. Superpowers — influence, not a license obligation
+
+- **Repository:** https://github.com/obra/superpowers (Jesse Vincent)
+- **License:** MIT
+
+Three files in this repo name Superpowers, and until now all three called it only the competitor
+`unity-workflow`'s dispatch loop measures itself against. That is an incomplete record by this
+document's own opening standard. What was taken: the chain design (skills that name the next skill
+so a process surface is chosen before code is written), the execution loop
+(`subagent-driven-implementation`, adapted from Superpowers' `subagent-driven-development`), and two
+skill names, `systematic-debugging` and `verification-before-completion`.
+
+**What was not taken is the text.** Measured similarity of our three skills against their Superpowers
+counterparts: 0.120, 0.183, and 0.156 — nothing shared beyond YAML frontmatter and one heading. The
+wording, the Unity-specific rules layered on top (no parallel implementers against one Editor,
+console-clean as a completion gate, manual Editor steps as a first-class task outcome), and the
+prose throughout are ours.
+
+**This is not a license obligation.** MIT covers expression, and the measured similarity says the
+expression is ours — `provenance.tsv`'s `origin=original` on `.claude/skills/systematic-debugging/`,
+`.claude/skills/verification-before-completion/`, and `.claude/skills/subagent-driven-implementation/`
+is correct and does not change. This section exists because this document opens with "nothing here
+is asserted on trust," and a credits file that names the project whose architecture we adopted only
+as the thing we beat did not meet that standard. No license text is reproduced here — nothing is
+vendored and nothing is derived at the expression level, so a license block for code we do not ship
+would make this file less accurate, not more.
 
 ## Everything else
 

@@ -52,7 +52,7 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/hooks/warn-platform-defines.sh	ecu	1.5.0	.claude/hooks/warn-platform-defines.sh	814923cb311f4dfd4dfd2c0e107e72ee4bac2d79cbba791378a8d03d618a19df	modified	mobile-strip; hardens echo|grep -q pipe against pipefail SIGPIPE fail-open on large content (here-string)
 .claude/hooks/warn-serialization.sh	ecu	1.5.0	.claude/hooks/warn-serialization.sh	748bc66fcb1bf8a1e53c773a24e4d1e1a96537c73fb1f1d45b6226d8ae47120d	modified	hardens echo|grep -q pipe against pipefail SIGPIPE fail-open on large content (here-string)
 CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
-.claude/NOTICE.md	original	-	-	-	original	-
+.claude/NOTICE.md	original	-	-	-	original	task-6-process-layer-2: added §3 crediting Superpowers as an influence (chain design, execution loop, two skill names) — not a license obligation, no license text reproduced; see CREDITS.md (2026-08-04)
 .claude/rules/architecture.md	ecu	1.5.0	.claude/rules/architecture.md	36aac42cb968d1b6cf09eb874bdd0649453094ed89b5c4583952dd163d432714	verbatim	-
 .claude/rules/csharp-unity.md	ecu	1.5.0	.claude/rules/csharp-unity.md	713eb2c97c39d1c791325bd749f87aed92895ee0c94464c4eb72e7dd167fa986	verbatim	-
 .claude/rules/pc-console.md	original	-	-	-	original	-
@@ -78,7 +78,7 @@ CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 .claude/UPSTREAM	original	-	-	-	original	-
 .claude/VERSION	original	-	-	-	original	-
 CONTRIBUTING.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
-CREDITS.md	original	-	-	-	original	-
+CREDITS.md	original	-	-	-	original	task-6-process-layer-2: added §4 crediting Superpowers as an influence — chain design, execution loop, two skill names taken; measured text similarity 0.120/0.183/0.156 against counterparts; not a license obligation, no license text reproduced (2026-08-04)
 docs/AGENT-GUIDE.md	ecu	1.5.0	docs/AGENT-GUIDE.md	138ac65721897705a730ff29f5cd2ea26e2aa9c783dc63457e52c02afe29d80b	modified	mobile-strip
 docs/ARCHITECTURE.md	ecu	1.5.0	docs/ARCHITECTURE.md	3ff6cb5efbab6cecdeb4d05f235b568f3615356bf51e58fbea167d45eecdaf06	modified	mobile-strip; removed stale mcpServers key from the Settings.json Structure code sample; settings.json never carries MCP config, .mcp.json does; surface-cut-doc-correction (2026-08-03, Task 7): corrected component-overview counts (8 agents/11 commands/13 skills/27 hooks), removed dead unity-scout/unity-linter/unity-verifier/unity-migrator/unity-git-master/unity-build-runner references, rewrote Model Selection/Five Agent Categories/Verify-Fix Loop/Hook Summary/Rules table sections to match the post-cut tree
 docs/GETTING-STARTED.md	ecu	1.5.0	docs/GETTING-STARTED.md	5c86accc13f26624068cb3ec4a0df1c18b910175cbe242e8f9a554b0773f26de	modified	mobile-strip
