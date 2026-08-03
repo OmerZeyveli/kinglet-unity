@@ -199,9 +199,18 @@ sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 # On upgrade, find files the user edited so we can leave them alone.
 MODIFIED_FILES=""
 if [ "$MODE" = ours ]; then
-  while IFS=$'\t' read -r rel recorded _mode _origin; do
+  while IFS=$'\t' read -r rel recorded _mode origin; do
     case "$rel" in ''|\#*) continue ;; esac
     [ -f "$PROJECT_DIR/$rel" ] || continue
+    # `user-modified` is sticky. When a previous run kept your edit, it recorded the file as it then
+    # stood — so on the next run the checksum matches the receipt and a sha-only test concludes the
+    # file is untouched and overwrites it. Your edit survived exactly one upgrade and then vanished,
+    # silently. Measured twice on the same file in one day. The origin column was already written
+    # for this; it was just never read.
+    if [ "$origin" = user-modified ]; then
+      MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+      continue
+    fi
     actual=$(sha_of "$PROJECT_DIR/$rel")
     [ "$actual" = "$recorded" ] || MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
   done < <(grep -v '^#' "$RECEIPT" 2>/dev/null | tail -n +2 || true)

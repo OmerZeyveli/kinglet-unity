@@ -83,4 +83,20 @@ assert_eq "$(grep -c 'Project Facts (auto-detected)' "$PRUNE_DIR/CLAUDE.md" 2>/d
 assert_eq "$(grep -c 'kinglet:generated:begin' "$PRUNE_DIR/CLAUDE.md" 2>/dev/null || echo 0)" "1" \
   "re-installing does not duplicate the generated-region markers"
 
+# A kept edit must stay kept, upgrade after upgrade.
+#
+# When a run keeps your edit it records the file as it then stands. A sha-only test therefore finds
+# the checksum matching the receipt on the NEXT run, concludes the file is untouched, and overwrites
+# it. The edit survived exactly one upgrade and then vanished with no message. Measured twice on the
+# same file in one day, on a real project, hours apart — the second time while verifying the fix for
+# the first. Two installs are not enough to catch it; the third is where it died.
+STICKY="$PRUNE_DIR/.claude/hooks/block-scene-edit.sh"
+printf '\n# a line the user added\n' >> "$STICKY"
+bash "$REPO_DIR/install.sh" --project-dir "$PRUNE_DIR" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$PRUNE_DIR" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$PRUNE_DIR" >/dev/null 2>&1
+
+assert_eq "$(grep -c 'a line the user added' "$STICKY" 2>/dev/null || echo 0)" "1" \
+  "an edit kept by one upgrade is still kept three upgrades later"
+
 rm -rf "$PRUNE_DIR"
