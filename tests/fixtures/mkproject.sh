@@ -68,6 +68,28 @@ case "$VARIANT" in
   }
 }
 JSON
+    if [ "$VARIANT" = urp ]; then
+      # First-party VContainer use. Without a single .cs file the urp fixture had CS_FILE_COUNT 0,
+      # so the generator took the greenfield early exit and the manifest was never consulted —
+      # manifest_has(), present(), the `manifest-only` third state and the "binds in full" branch
+      # all had zero coverage while the urp test case looked like it was testing them.
+      #
+      # This yields exactly the interesting mix: VContainer `yes` (manifest + source), UniTask
+      # `manifest-only` (manifest, no source), MessagePipe `no`. Do not add UniTask or MessagePipe
+      # usage here — the `manifest-only` state has no other fixture.
+      cat > "$DIR/Assets/Scripts/GameLifetimeScope.cs" <<'CS'
+using VContainer;
+using VContainer.Unity;
+
+public sealed class GameLifetimeScope : LifetimeScope
+{
+    protected override void Configure(IContainerBuilder builder)
+    {
+        builder.Register<object>(Lifetime.Singleton);
+    }
+}
+CS
+    fi
     ;;
   builtin)
     cat > "$DIR/Packages/manifest.json" <<'JSON'

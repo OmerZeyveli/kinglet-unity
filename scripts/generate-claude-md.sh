@@ -353,9 +353,32 @@ emit_stack_verdict() {
     echo ""
 
     if [ "$CS_FILE_COUNT" -eq 0 ]; then
-        echo "No first-party C# found under \`Assets/\` yet, so nothing is detected and nothing is"
-        echo "contradicted. The toolkit's default stack — Model-View-System with VContainer,"
-        echo "MessagePipe and UniTask — is **recommended for this new project**, and every rule in"
+        # "Nothing is detected" was an overclaim: the manifest is read well before this point,
+        # and a project that already declares VContainer is not a blank slate. Say what was
+        # declared. `if`, not `manifest_has ... && x=...`: the && form returns 1 when the test
+        # fails, and under `set -e` that ends the script.
+        gf_declared=""
+        if manifest_has jp.hadashikick.vcontainer; then gf_declared="${gf_declared}VContainer, "; fi
+        if manifest_has com.cysharp.messagepipe;   then gf_declared="${gf_declared}MessagePipe, "; fi
+        if manifest_has com.cysharp.unitask;       then gf_declared="${gf_declared}UniTask, "; fi
+        gf_declared="${gf_declared%, }"
+
+        if [ -n "$gf_declared" ]; then
+            echo "No first-party C# under \`Assets/\` yet, so nothing is detected in code — but"
+            echo "\`Packages/manifest.json\` already declares **$gf_declared**. That is a"
+            echo "declaration, not a blank slate, and it is the closest thing to a decision this"
+            echo "project has made."
+        elif [ -f "$MANIFEST" ]; then
+            echo "No first-party C# under \`Assets/\` yet, and \`Packages/manifest.json\` declares none"
+            echo "of VContainer, MessagePipe or UniTask — so nothing is detected and nothing is"
+            echo "contradicted."
+        else
+            echo "No first-party C# under \`Assets/\` yet, and there is no \`Packages/manifest.json\` to"
+            echo "read — so nothing is detected and nothing is contradicted."
+        fi
+        echo ""
+        echo "The toolkit's default stack — Model-View-System with VContainer, MessagePipe and"
+        echo "UniTask — is therefore **recommended for this new project**, and every rule in"
         echo "\`.claude/rules/\` binds. Re-run the generator once there is code; if the project goes"
         echo "another way, this section will say so."
         return
@@ -379,6 +402,12 @@ emit_stack_verdict() {
         echo "A dependency is declared in \`Packages/manifest.json\` but used in no first-party file."
         echo "**This generator takes no side.** Decide whether \`.claude/rules/architecture.md\` binds"
         echo "here and write the answer in the Vision half of this document, outside the markers."
+        echo ""
+        echo "Until that decision is written down: \`csharp-unity.md\`, \`performance.md\` and"
+        echo "\`serialization.md\` **bind** — they are architecture-agnostic and do not depend on the"
+        echo "answer. The Model-View-System, VContainer and MessagePipe sections of"
+        echo "\`architecture.md\` are **held in abeyance** — neither binding nor disapplied. Follow the"
+        echo "architecture the code establishes as it is written, and record it here."
     else
         echo "The Model-View-System, VContainer and MessagePipe sections of \`.claude/rules/architecture.md\`"
         echo "**do not bind in this project** — they describe a stack this code does not use. Follow the"
@@ -390,6 +419,14 @@ emit_stack_verdict() {
     echo ""
     if [ "$UT_PRESENT" = yes ]; then
         echo "The \"No Coroutines — Use UniTask\" section of \`unity-specifics.md\` **binds.**"
+    elif [ "$UT_PRESENT" = manifest-only ]; then
+        # manifest-only used to fall through to the else arm, which asserts "Neither UniTask nor
+        # StartCoroutine appears" — flatly contradicting the table row directly above it, which
+        # reads `manifest-only`. UniTask does appear; it appears in the manifest.
+        echo "UniTask is declared in \`Packages/manifest.json\` but used in no first-party file,"
+        echo "against $COROUTINE_FILES file(s) using \`StartCoroutine\`. **This generator takes no side**"
+        echo "on the \"No Coroutines — Use UniTask\" section of \`unity-specifics.md\`. Decide it with"
+        echo "the architecture question above and write the answer outside the markers."
     elif [ "$COROUTINE_FILES" -gt 0 ]; then
         echo "The \"No Coroutines — Use UniTask\" section of \`unity-specifics.md\` **does not bind** —"
         echo "$COROUTINE_FILES file(s) here use \`StartCoroutine\` and UniTask is not in use."

@@ -75,13 +75,59 @@ assert_has "$OUT_LEGACY" "| VContainer | no (0 file(s)) |" \
 assert_has "$OUT_LEGACY" "| UniTask | no (0 file(s)) |" \
     "vendored UniTask reference does not count either"
 
-# ── Case 2: urp fixture — VContainer and UniTask are in the manifest ───────
+# ── Case 2: urp fixture — VContainer in manifest AND source, UniTask manifest-only ──
+#
+# This case previously asserted only "Architecture stack" is present and "do not bind" is
+# absent, against a fixture with zero .cs files. CS_FILE_COUNT was 0, emit_stack_verdict
+# returned at the greenfield early exit, and the output was byte-identical to Case 3's. The
+# manifest was never consulted: manifest_has(), present(), the `manifest-only` third state and
+# the "binds in full" branch all had zero coverage. Deleting the body of present() and
+# returning a constant would not have turned this suite red.
+#
+# The fixture now carries GameLifetimeScope.cs. Assert the rendered rows, the way Case 1 does.
 echo ""
-echo "--- Case: stack present in the manifest ---"
+echo "--- Case: stack present in the manifest and in source ---"
 bash "$MK" "$TMP/urp" --variant urp >/dev/null
 OUT_URP="$(bash "$GEN" "$TMP/urp" 2>/dev/null)"
 assert_has "$OUT_URP" "Architecture stack" "urp project emits the stack section"
 assert_lacks "$OUT_URP" "do not bind" "urp project does not disapply the architecture rules"
+assert_lacks "$OUT_URP" "recommended for this new project" "urp project is not treated as greenfield"
+
+assert_has "$OUT_URP" "| VContainer | yes (1 file(s)) |" \
+    "manifest + first-party use renders as yes with the file count"
+assert_has "$OUT_URP" "| UniTask | manifest-only (0 file(s)) |" \
+    "declared-but-unused renders as the manifest-only third state"
+assert_has "$OUT_URP" "| MessagePipe | no (0 file(s)) |" \
+    "neither declared nor used renders as no"
+assert_has "$OUT_URP" '`.claude/rules/architecture.md` **binds in full.**' \
+    "VContainer in use makes architecture.md bind in full"
+
+# Finding 4: manifest-only UniTask used to fall into the else arm asserting that neither
+# UniTask nor StartCoroutine appears — contradicting the table row printed just above it.
+assert_has "$OUT_URP" "UniTask is declared in \`Packages/manifest.json\` but used in no first-party file," \
+    "manifest-only UniTask gets its own async arm"
+assert_lacks "$OUT_URP" "Neither UniTask nor" \
+    "manifest-only UniTask is never described as absent"
+
+# ── Case 2b: architecture in the manifest only — the third state, end to end ──
+# VContainer declared, used nowhere. The generator must take no side AND say what binds
+# meanwhile, rather than leaving the reader between two documents that defer to each other.
+echo ""
+echo "--- Case: architecture declared but unused ---"
+cp -R "$TMP/urp" "$TMP/manifest-only"
+rm -f "$TMP/manifest-only/Assets/Scripts/GameLifetimeScope.cs"
+cat > "$TMP/manifest-only/Assets/Scripts/Plain.cs" <<'CS'
+using UnityEngine;
+public class Plain : MonoBehaviour { private void Update() { } }
+CS
+OUT_MO="$(bash "$GEN" "$TMP/manifest-only" 2>/dev/null)"
+assert_has "$OUT_MO" "| VContainer | manifest-only (0 file(s)) |" \
+    "declared-but-unused VContainer renders as manifest-only"
+assert_has "$OUT_MO" "**This generator takes no side.**" "manifest-only architecture takes no side"
+assert_has "$OUT_MO" "**held in abeyance**" \
+    "manifest-only says what happens to the MVS/DI sections meanwhile"
+assert_has "$OUT_MO" "\`serialization.md\` **bind**" \
+    "manifest-only names the architecture-agnostic rules that bind meanwhile"
 
 # ── Case 3: bare fixture — no scripts at all ──────────────────────────────
 echo ""
@@ -90,6 +136,25 @@ bash "$MK" "$TMP/bare" --variant bare >/dev/null
 OUT_BARE="$(bash "$GEN" "$TMP/bare" 2>/dev/null)"
 assert_has "$OUT_BARE" "recommended for this new project" "greenfield says recommended, not detected"
 assert_lacks "$OUT_BARE" "do not bind" "greenfield does not disapply anything"
+assert_has "$OUT_BARE" "there is no \`Packages/manifest.json\` to" \
+    "greenfield with no manifest says so rather than claiming a blank slate"
+
+# ── Case 3b: greenfield with a manifest that already declares the stack ────
+# Finding 5a: "nothing is detected and nothing is contradicted" was an overclaim. The manifest
+# is read long before this point, and a project declaring VContainer is not a blank slate.
+echo ""
+echo "--- Case: greenfield with declarations in the manifest ---"
+cp -R "$TMP/urp" "$TMP/greenfield-declared"
+rm -f "$TMP/greenfield-declared/Assets/Scripts/GameLifetimeScope.cs"
+OUT_GFD="$(bash "$GEN" "$TMP/greenfield-declared" 2>/dev/null)"
+assert_has "$OUT_GFD" "recommended for this new project" "still greenfield with no code"
+assert_has "$OUT_GFD" "already declares **VContainer, UniTask**" \
+    "greenfield names what the manifest already declares"
+# The needle stops at "nothing is" on purpose: the emitted text wraps between "is" and
+# "contradicted", so the full sentence as one string can never match and the assertion could
+# never fail. That is the exact defect this review wave was called to fix.
+assert_lacks "$OUT_GFD" "nothing is detected and nothing is" \
+    "greenfield with declarations does not claim a blank slate"
 
 # ── Case 4: --facts-only and full generation agree inside the markers ──────
 # This is the regression fixed in 89c661c. The new section lives inside the
