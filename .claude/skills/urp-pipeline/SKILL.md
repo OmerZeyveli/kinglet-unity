@@ -5,6 +5,16 @@ description: "Universal Render Pipeline — URP asset configuration, renderer fe
 
 # Universal Render Pipeline (URP)
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+## Boundary with the rules
+
+`.claude/rules/pc-console.md` binds what is affordable on PC/console — compute shaders and VFX Graph
+are fully available, MSAA/HDR/higher shadow-cascade counts/real-time shadows are budgeted rather than
+avoided, Forward+ is the default rendering path. This skill carries URP asset configuration and
+renderer-feature mechanics on top of that budget. Where this skill and `pc-console.md` disagree, the
+rule wins and this skill is what is out of date.
+
 ## URP Pipeline Asset Configuration
 
 The URP Pipeline Asset controls global rendering settings. Create via Assets > Create > Rendering > URP Asset (with Universal Renderer).
@@ -344,6 +354,12 @@ public class CameraStackManager : MonoBehaviour
 - Overlay cameras render on top in stack order
 - Each overlay camera adds a full render pass (expensive)
 - Use sparingly; prefer single camera with layers when possible
+
+## Pitfalls
+
+| Mistake | Why it is tempting | What it costs | Source |
+|---|---|---|---|
+| Adding a Renderer Feature to the wrong Universal Renderer Data asset | A project commonly has more than one renderer asset (e.g. a default and a quality-tier variant), and the Inspector for the feature looks the same regardless of which asset it was added to | A camera renders through whichever renderer asset its `UniversalAdditionalCameraData` points at (by index into the Pipeline Asset's renderer list). A feature added to a renderer asset no camera uses executes for no camera — no error, no console warning, just an effect that "doesn't show up." The feature lives in a `.asset` file, not in source, so a `grep` over `.cs` will not find the misconfiguration either | Unity's documented URP renderer architecture (Renderer Features are per-Renderer-Data-asset, cameras select a renderer by index); the "grep misses editor-authored state" pattern is §82 in `sourced-incidents.md` |
 
 ## Render Pass Events
 

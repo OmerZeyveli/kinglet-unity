@@ -5,6 +5,16 @@ description: "Generic state machine patterns — IState interface, StateMachine<
 
 # State Machine Patterns
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+## Boundary with the rules
+
+No rule in `.claude/rules/` covers state machine design. `architecture.md` binds MVS, VContainer, and
+MessagePipe — a `StateMachine<T>` and its states still have to live inside that shape (e.g. a state
+that mutates a Model directly rather than through a System is an MVS violation the rules would catch
+elsewhere), but which state pattern to use, when to go hierarchical, and how to shape `IState` are not
+addressed by any rule. It is yours to judge.
+
 A generic, reusable finite state machine for Unity. Covers player states, enemy AI, game flow (menu/gameplay/pause), hierarchical FSMs, and ScriptableObject-driven states for designer configuration.
 
 ## IState Interface

@@ -5,6 +5,16 @@ description: "Save/load patterns — ISaveable interface, JSON serialization, sa
 
 # Save/Load System
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+## Boundary with the rules
+
+`.claude/rules/serialization.md` binds `[FormerlySerializedAs]` on any renamed serialized field and
+the Unity `== null` check for destroyed-object detection. This skill carries save-file format, slot
+management, scene persistence, and version migration on top of that binding — a save-data class is
+still Unity-serialized data and the rename rule applies to it the same as any other field. Where this
+skill and `serialization.md` disagree, the rule wins and this skill is what is out of date.
+
 Patterns for persisting game state to disk: an ISaveable interface for components that need persistence, a central SaveManager that orchestrates capture and restore, JSON serialization, save slot management, and preparation for cloud sync.
 
 ## ISaveable Interface

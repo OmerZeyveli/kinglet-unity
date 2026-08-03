@@ -5,6 +5,15 @@ description: "Object pooling patterns — Unity ObjectPool<T>, custom ComponentP
 
 # Object Pooling
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+## Boundary with the rules
+
+`.claude/rules/performance.md` binds "pool frequently instantiated objects" and the zero-allocation
+rule for `Update`/`FixedUpdate`/`LateUpdate`. This skill carries the implementations — `ObjectPool<T>`,
+warm-up strategy, sizing, the generic pool manager. Where this skill and `performance.md` disagree,
+the rule wins and this skill is what is out of date.
+
 Every `Instantiate()` allocates memory. Every `Destroy()` triggers GC. Pool objects you create and destroy frequently: projectiles, particles, enemies, pickups, audio sources.
 
 ## Unity Built-In ObjectPool<T> (2021+)
@@ -166,6 +175,12 @@ public sealed class PoolManager : MonoBehaviour
     }
 }
 ```
+
+## Pitfalls
+
+| Mistake | Why it is tempting | What it costs | Source |
+|---|---|---|---|
+| Returning an object to the pool without resetting its state | `SetActive(false)` looks like a clean reset — the object is invisible and stops ticking, so it feels done | Fields not explicitly cleared (velocity, damage-over-time timers, target references, animation state, particle-emission flags) carry over into the next `Get()`. The bug shows up on the *next* spawn, not the release, which makes it read as a new, unrelated defect | This skill's own "Return-to-Pool Lifecycle" section above: "objects must reset their state when returned to pool" — the pitfall is skipping that step and trusting `SetActive(false)` alone to cover it |
 
 ## Cached WaitForSeconds
 

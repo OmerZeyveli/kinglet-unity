@@ -5,6 +5,18 @@ description: "New Input System — action maps, PlayerInput component, generated
 
 # Unity New Input System
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+## Boundary with the rules
+
+The `unity-specifics.md` rule (in `.claude/rules`) binds the New Input System as mandatory (legacy
+`Input.*` is blocked by a hook) and the Enable/Disable lifecycle — enable in `OnEnable`, disable in
+`OnDisable`, every `+=` matched by a `-=`. `.claude/rules/architecture.md` binds the InputView pattern: InputView
+is the only class that owns `PlayerControls`, and Systems are input-agnostic (`SetMoveInput(Vector2)`,
+`Jump()`, never the device). This skill carries action map structure, the PlayerInput component modes,
+runtime rebinding, input buffering, and device detection. Where this skill and either rule disagree,
+the rule wins and this skill is what is out of date.
+
 ## Input Action Asset Setup
 
 Create an Input Action Asset: Assets > Create > Input Actions. This is the central configuration for all input bindings.
@@ -378,6 +390,12 @@ public class DeviceDetector : MonoBehaviour
     }
 }
 ```
+
+## Pitfalls
+
+| Mistake | Why it is tempting | What it costs | Source |
+|---|---|---|---|
+| Enabling the action map in `Awake` instead of `OnEnable` | `Awake` runs once and feels like the natural place to set the object up — "enable it as soon as it exists" | The subscription/enable pairing that `OnDisable` tears down never gets rebuilt on the next `OnEnable`. After the object is disabled once (a menu opens, the object is pooled, the GameObject is deactivated) and re-enabled, the action map is never re-`Enable()`d — input silently stops, with no error and no console warning | The `unity-specifics.md` rule (in `.claude/rules`): "Missing Enable = zero input received. Missing Disable = ghost callbacks, leaks" |
 
 ## Multiplayer Input (PlayerInputManager)
 

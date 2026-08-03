@@ -5,6 +5,16 @@ description: "Unity physics — non-allocating queries, collision layers, FixedU
 
 # Physics System
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+## Boundary with the rules
+
+`.claude/rules/performance.md` binds non-allocating queries (`RaycastNonAlloc`, `OverlapSphereNonAlloc`,
+`SphereCastNonAlloc` with pre-allocated buffers) and FixedUpdate placement for physics work. This skill
+carries the API detail — layer setup, collision detection modes, collision-vs-trigger callbacks, joints,
+2D equivalents. Where this skill and `performance.md` disagree, the rule wins and this skill is what is
+out of date.
+
 ## FixedUpdate Discipline
 
 All physics code goes in `FixedUpdate`. Input reading happens in `InputView.Update` (see architecture rules) and is forwarded to the System, which applies forces in `FixedUpdate` from the cached value.
@@ -116,6 +126,12 @@ Physics.SyncTransforms(); // Now raycasts see the new position
 | `Physics.OverlapSphereNonAlloc` | `Physics2D.OverlapCircleNonAlloc` |
 | `OnCollisionEnter(Collision)` | `OnCollisionEnter2D(Collision2D)` |
 | `OnTriggerEnter(Collider)` | `OnTriggerEnter2D(Collider2D)` |
+
+## Pitfalls
+
+| Mistake | Why it is tempting | What it costs | Source |
+|---|---|---|---|
+| Trusting a `RaycastNonAlloc`/`OverlapSphereNonAlloc` result count without checking it against the buffer's length | The non-allocating call looks like a drop-in replacement for the allocating one — same parameters, just faster | A full buffer does not grow and does not report overflow. The returned hit count caps at the buffer's `Length`; any hits beyond that are silently dropped, not reported as an error. A `RaycastHit[16]` in a dense scene can under-report hits with no warning, and the bug only appears once the scene gets crowded enough to fill the buffer | `.claude/rules/performance.md`: "Pre-allocate result arrays" — the buffer is fixed-size by design, which is exactly what makes the silent truncation possible if the cap is never checked |
 
 ## Joints
 

@@ -5,6 +5,15 @@ description: "Addressables asset loading — LoadAssetAsync, handle lifecycle, l
 
 # Unity Addressables
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+## Boundary with the rules
+
+No rule in `.claude/rules/` covers Addressables. `performance.md` binds zero allocations in
+`Update`/`FixedUpdate`/`LateUpdate`, and an `await` resuming inside one of those methods is still
+bound by it, but handle lifecycle, group/label strategy, and catalog updates are not addressed by any
+rule. It is yours to judge.
+
 ## Setup
 
 1. Install via Package Manager: `com.unity.addressables`

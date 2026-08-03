@@ -5,6 +5,14 @@ description: "Use before making several unity-mcp tool calls in a row, or when a
 
 # Unity MCP Patterns
 
+*Written against Unity 6000.0 and MCP for Unity 10.1.0 (server 3.4.4), current as of 2026-08-04.*
+
+## Boundary with the rules
+
+No rule in `.claude/rules/` covers unity-mcp usage — the rules govern the C# and architecture the
+tools produce, not the tool calls themselves. Tool-group activation, batching, and which tool to reach
+for are not addressed by any rule. It is yours to judge.
+
 The unity-mcp server gives Claude Code direct control over the Unity Editor. These patterns ensure you use it efficiently and safely.
 
 ## Rule 1: batch_execute for Everything

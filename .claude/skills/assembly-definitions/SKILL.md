@@ -5,6 +5,17 @@ description: "Assembly definition management — when to create asmdefs, referen
 
 # Assembly Definitions
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+## Boundary with the rules
+
+`.claude/rules/architecture.md` binds dependency direction — Views → Systems → Models, Models depend
+on nothing, cross-system communication goes through MessagePipe rather than direct references. This
+skill carries asmdef mechanics: JSON structure, platform filters, Editor/Test assembly separation,
+compilation order. An asmdef reference graph that reverses the bound direction is a bug in the asmdef,
+not a case this skill can override. Where this skill and `architecture.md` disagree, the rule wins and
+this skill is what is out of date.
+
 Assembly definitions (`.asmdef`) split your project into separate compilation units. Without them, Unity recompiles ALL scripts on every change. With them, only the changed assembly and its dependents recompile.
 
 ## When to Create an Asmdef
