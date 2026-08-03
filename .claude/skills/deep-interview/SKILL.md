@@ -95,6 +95,16 @@ Ask the user to confirm the summary before proceeding to implementation.
 - Integration: 2 (PlayerController, Input System explicitly named)
 - Acceptance: 1 (implied: both players can play simultaneously)
 
+## The thought that means you are about to treat vague as clear
+
+| Thought | Reality | Source |
+|---|---|---|
+| "They said what they want" | A want is not an acceptance criterion. "Add multiplayer" states a want; it does not say whether success is two players on one screen or matchmaking across regions. | The Ambiguity Score's own Acceptance Criteria dimension, and the scoring examples above |
+| "I can infer which file/system this means" | Inferring is guessing with extra steps. Name the inference out loud and let them correct it — a silent guess that's wrong costs a rework cycle; a stated guess that's wrong costs one sentence. | This wave itself — the operator twice had to say "read what I wrote first" and "we already decided this, go read the plans" after being asked questions whose answers were already written down |
+| "Asking is slower than doing" | It is slower than doing it right once, and faster than doing it twice. This project has the second case on record. | Same as above — the re-asked questions cost a correction round each; a brief that was followed exactly still produced findings, and they clustered where the brief had been vague |
+| "The request has a code block, so it is specific" | A code block establishes syntax, not scope. Specificity is about the *outcome* — what done looks like — not about whether the input contains a snippet. | The Ambiguity Score's five dimensions, none of which is "contains code" |
+| "The brief didn't say, so it must not matter" | A brief that leaves a decision implicit does not remove the decision — it moves it to whoever reads the brief, silently, and they may move it somewhere the author didn't intend. | This wave — every task brief followed exactly still produced findings, clustered where the brief had been vague |
+
 ## Handoff
 
 - **Gate passes** (requirements are clear enough): hand off to `/unity-workflow` for anything
