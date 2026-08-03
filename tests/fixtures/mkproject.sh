@@ -6,17 +6,18 @@
 # the installer scans is plain text, so a directory with the right shape exercises it fully.
 #
 # Usage:
-#   ./tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty]
+#   ./tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy]
 #
 #   urp      (default) URP + Input System + UniTask + VContainer, one asmdef, one scene
 #   builtin  Built-in pipeline, minimal packages
 #   bare     No Packages/, no .gitignore, no scenes — the "nothing to detect" path
 #   dirty    urp + a pre-existing CLAUDE.md and .claude/, for the upgrade/guard paths
+#   legacy   URP, no VContainer/MessagePipe/UniTask, coroutine-using scripts — the "does not bind" path
 #
 set -euo pipefail
 
 DIR="${1:-}"; shift || true
-[ -n "$DIR" ] || { echo "usage: mkproject.sh <dir> [--variant urp|builtin|bare|dirty]" >&2; exit 2; }
+[ -n "$DIR" ] || { echo "usage: mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy]" >&2; exit 2; }
 
 VARIANT=urp
 while [ $# -gt 0 ]; do
@@ -76,6 +77,47 @@ JSON
   }
 }
 JSON
+    ;;
+  legacy)
+    cat > "$DIR/Packages/manifest.json" <<'JSON'
+{
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.3",
+    "com.unity.inputsystem": "1.8.2"
+  }
+}
+JSON
+    # First-party code that uses coroutines and none of the mandated stack. Two files, because
+    # a single file cannot distinguish "counted once" from "counted per match".
+    cat > "$DIR/Assets/Scripts/Spawner.cs" <<'CS'
+using System.Collections;
+using UnityEngine;
+
+public class Spawner : MonoBehaviour
+{
+    private void Start() { StartCoroutine(SpawnLoop()); }
+    private IEnumerator SpawnLoop() { yield return new WaitForSeconds(1f); }
+}
+CS
+    cat > "$DIR/Assets/Scripts/Fader.cs" <<'CS'
+using System.Collections;
+using UnityEngine;
+
+public class Fader : MonoBehaviour
+{
+    private void OnEnable() { StartCoroutine(Fade()); }
+    private IEnumerator Fade() { yield return null; }
+}
+CS
+    # Vendored code that DOES reference the stack. If detection counts this, it reports every
+    # project as using VContainer, which is the failure this fixture exists to catch.
+    mkdir -p "$DIR/Assets/Extensions/SomeVendor"
+    cat > "$DIR/Assets/Extensions/SomeVendor/VendorThing.cs" <<'CS'
+using VContainer;
+using Cysharp.Threading.Tasks;
+
+public class VendorThing { }
+CS
     ;;
   bare) ;;
   *) echo "err: unknown variant $VARIANT" >&2; exit 2 ;;
