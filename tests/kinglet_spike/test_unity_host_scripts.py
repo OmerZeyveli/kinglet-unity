@@ -464,13 +464,33 @@ class SweepBehaviour(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
 
     def test_a_directory_containing_the_repository_is_refused(self):
-        result = self._check(str(REPO))
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("repository", result.stderr)
-        parent = REPO.parent
-        result = self._check(str(parent))
-        self.assertEqual(result.returncode, 2)
-        self.assertIn("repository", result.stderr)
+        """The refusal is the assertion; which guard fires depends on the checkout path.
+
+        sweep-workspace.sh refuses for two reasons, checked in order: the path is too
+        shallow to be a run directory (fewer than 3 components), or it contains this
+        repository. Which one fires for REPO.parent therefore depends on how deep the
+        checkout happens to sit.
+
+        This test used to assert "repository" outright. In the main checkout
+        (/home/riive/Documents/Github/kinglet-unity) that holds. In a git worktree under
+        /tmp it does not — depth 2 trips the shallow guard first — so the test failed
+        deterministically in every worktree while passing standalone, and read as a flake.
+
+        That mattered more than a wrong assertion usually does: this repository's own
+        review process verifies guards by reintroducing a defect in a scratch worktree and
+        watching the suite fail. A test that always fails there trains the reader to skim
+        past failures in exactly the run where they are the signal.
+
+        So: assert the refusal, and assert the reason is one the script documents.
+        """
+        for target in (str(REPO), str(REPO.parent)):
+            with self.subTest(target=target):
+                result = self._check(target)
+                self.assertEqual(result.returncode, 2)
+                self.assertTrue(
+                    "repository" in result.stderr or "too shallow" in result.stderr,
+                    f"refused for an undocumented reason: {result.stderr!r}",
+                )
 
     def test_a_nonexistent_directory_is_refused(self):
         result = self._check("/nonexistent/deep/workspace")

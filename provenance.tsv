@@ -482,7 +482,7 @@ docs/research/platform-spike/evidence/unity/execution/20260728T132858Z-unity-pro
 docs/research/platform-spike/reports/unity-execution.json	original	-	-	-	original	kinglet-00u-task8-unity-execution-report-json
 docs/research/platform-spike/reports/unity-execution.md	original	-	-	-	original	kinglet-00u-task8-unity-execution-report-md
 spikes/platform/unity/run-host.sh	original	-	-	-	original	kinglet-00u-task8-native-host-entry-point-posix
-tests/kinglet_spike/test_unity_host_scripts.py	original	-	-	-	original	kinglet-00u-task8-host-script-and-observations-tests
+tests/kinglet_spike/test_unity_host_scripts.py	original	-	-	-	original	kinglet-00u-task8-host-script-and-observations-tests; w2-t4-followup: the containing-repository test asserted WHICH guard fired, which depends on checkout depth — it failed in every git worktree and read as a flake
 tools/kinglet_spike/unity/host_probes.py	original	-	-	-	original	kinglet-00u-task8-native-route-probe-runner
 tools/kinglet_spike/unity/results.py	original	-	-	-	original	kinglet-00u-task8-unity-observations-to-evidence
 spikes/platform/unity/sweep-workspace.sh	original	-	-	-	original	kinglet-00u-task8-scoped-orphan-sweep
