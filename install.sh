@@ -320,15 +320,43 @@ CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
 # ── Process provider — detect, propose, never assume ────────────────────────
 # The platform design requires that Kinglet propose a detected provider and the
 # user approve it, and that Kinglet never copy, disable, or shadow it. Detection
-# is read-only and re-run on every install, so no choice is persisted: if the
-# provider is uninstalled later, the next refresh drops the sentence, which is
-# the correct behaviour.
+# is read-only and re-run on every install: if the provider is uninstalled later,
+# the next refresh drops the sentence, which is the correct behaviour.
+#
+# What that reasoning did NOT cover: a refresh where nothing changed except the
+# tty. PROVIDER_CHOICE was set only on the interactive branch, so `--yes` or a
+# pipe took "the safe default (no declaration)" even for a provider that is still
+# installed and that the user already approved. emit_provider_verdict lives inside
+# the marked region, so the --facts-only refresh regenerated that region without
+# the sentence and deleted it. studio-doctor.sh tells the user to "Re-run
+# install.sh to refresh the declaration" — in CI or with --yes, that revoked it.
+#
+# So read the existing declaration first. Same parse shape as studio-doctor.sh's
+# staleness check, deliberately: one grammar for one section, not two.
+EXISTING_PROVIDER=""
+if [ -f "$CLAUDE_MD" ] && grep -q '^### Process provider' "$CLAUDE_MD"; then
+  EXISTING_PROVIDER=$(awk '/^### Process provider/{f=1} f && /owned by/{
+      if (match($0, /`[^`]+`/)) print substr($0, RSTART+1, RLENGTH-2); exit }' "$CLAUDE_MD")
+fi
+
 if [ -f "$CLAUDE_USER_SETTINGS" ] \
    && grep -q '"superpowers@claude-plugins-official"[[:space:]]*:[[:space:]]*true' "$CLAUDE_USER_SETTINGS"; then
   if [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
-    # The safe default is no declaration: it changes nothing about how the
-    # project behaves today.
-    info "Superpowers detected; --yes takes the safe default (no provider declaration)."
+    if [ "$EXISTING_PROVIDER" = superpowers ]; then
+      # Approved before, still installed, nothing to re-decide. Carrying it
+      # forward is the conservative act here; dropping it is the change.
+      PROVIDER_CHOICE="superpowers"
+      info "Superpowers detected and already declared in CLAUDE.md — declaration carried forward."
+    else
+      # The safe default is no declaration: it changes nothing about how the
+      # project behaves today.
+      info "Superpowers detected; --yes takes the safe default (no provider declaration)."
+    fi
+  elif [ "$EXISTING_PROVIDER" = superpowers ]; then
+    echo "  Superpowers is installed and this project already declares it as its"
+    echo "  discovery and planning provider."
+    read -rp "  Keep the declaration? [Y/n]: " REPLY_PROVIDER
+    case "$REPLY_PROVIDER" in [nN]*) ;; *) PROVIDER_CHOICE="superpowers" ;; esac
   else
     echo "  Superpowers is installed for your user account."
     echo "  Kinglet can record it as this project's discovery and planning provider."
