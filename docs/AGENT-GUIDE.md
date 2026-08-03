@@ -4,47 +4,28 @@ How to use, customize, and create agents for everything-claude-unity.
 
 ---
 
-## All 28 Agents at a Glance
+## All 8 Agents at a Glance
 
-### Engineering agents (ECU)
-
-| Agent | Model | Description |
-|-------|-------|-------------|
-| `unity-coder` | opus | Implements gameplay systems, components, and managers with correct asmdef placement |
-| `unity-coder-lite` | sonnet | Lightweight coding agent for simpler implementation tasks |
-| `unity-prototyper` | opus | End-to-end rapid prototyping -- one prompt to playable prototype |
-| `unity-scene-builder` | opus | Builds scenes from natural language descriptions entirely via MCP |
-| `unity-fixer` | opus | Diagnoses and fixes bugs using console errors and live API inspection |
-| `unity-fixer-lite` | sonnet | Lightweight bug fixing for straightforward issues |
-| `unity-optimizer` | opus | Profiles performance and fixes CPU/GPU bottlenecks, GC spikes, draw calls |
-| `unity-shader-dev` | opus | Creates HLSL/ShaderLab shaders, ShaderGraph nodes, compute shaders |
-| `unity-network-dev` | opus | Implements multiplayer networking (Netcode, Mirror, Photon, Fish-Net) |
-| `unity-ui-builder` | opus | Builds UI with UGUI Canvas or UI Toolkit, handles gamepad focus navigation and responsive layouts from 16:9 to ultrawide |
-| `unity-reviewer` | sonnet | Reviews code for correctness, performance, serialization safety, and Unity pitfalls |
-| `unity-test-runner` | sonnet | Writes and runs EditMode/PlayMode tests, reports results |
-| `unity-build-runner` | sonnet | Configures builds, platform switching, player settings, Addressables |
-| `unity-migrator` | sonnet | Handles Unity version upgrades, render pipeline migration, deprecated API updates |
-| `unity-verifier` | opus | Automated verify-fix loop -- reviews changes, classifies issues, auto-fixes safe issues |
-| `unity-scout` | haiku | Fast codebase exploration -- scans project structure, finds files, maps dependencies |
-| `unity-linter` | haiku | Quick validation pass -- checks code against Unity rules without deep reasoning |
-| `unity-security-reviewer` | sonnet | Security audit -- PlayerPrefs secrets, hardcoded keys, insecure network calls, debug builds |
-| `unity-git-master` | sonnet | Unity-aware git operations -- LFS, merge strategies, .meta hygiene, .gitattributes |
-| `unity-critic` | opus | Challenges implementation plans -- identifies risks, missed edge cases, over-engineering |
-
-### Design and production agents (Kinglet Pioneer overlay)
-
-These author documentation under `docs/` -- design docs, ADRs, sprint plans. They never write C# or drive the editor.
+Every agent in this toolkit is an ECU-origin `unity-*` implementer with `mcp__unityMCP__*` tools that
+writes C# and drives the editor. An earlier design/production layer (`game-designer`,
+`systems-designer`, `level-designer`, `creative-director`, `technical-director`, `narrative-director`,
+`world-builder`, `writer` — documentation-only, no MCP tools) and a second engineering tier
+(`unity-coder-lite`, `unity-fixer-lite`, `unity-shader-dev`, `unity-network-dev`, `unity-build-runner`,
+`unity-migrator`, `unity-verifier`, `unity-scout`, `unity-linter`, `unity-security-reviewer`,
+`unity-git-master`, `unity-critic`) existed in earlier builds of this toolkit and were removed in the
+2026-08-03 surface cut — a surface survives only if it does something the model cannot do unaided, and
+none of these passed that test. See `provenance-skip.tsv` and `MERGE-NOTES.md`.
 
 | Agent | Model | Description |
 |-------|-------|-------------|
-| `game-designer` | opus | Designs the mechanical and systems layer -- core loops, progression, combat, economy, player-facing rules |
-| `systems-designer` | sonnet | Detailed subsystem designs -- combat formulas, progression curves, crafting recipes, economy/loot tuning |
-| `level-designer` | sonnet | Spatial layouts, encounter design, pacing plans, environmental storytelling |
-| `creative-director` | opus | Vision keeper and senior creative reviewer -- resolves pillar conflicts, arbitrates scope cuts, gives verdicts |
-| `technical-director` | opus | Senior technical reviewer -- architecture decisions, technology evaluation, performance strategy, feasibility verdicts, ADRs |
-| `narrative-director` | opus | Story architecture, world-building direction, character design, dialogue strategy (optional -- narrative-heavy games) |
-| `world-builder` | sonnet | Deep world lore -- factions, cultures, history, geography, ecology (optional -- narrative-heavy games) |
-| `writer` | sonnet | Dialogue, lore entries, item descriptions, in-game text, under narrative-director direction (optional) |
+| `unity-coder` | opus | Feature work that touches existing architecture — new Model/System/View split, VContainer registration, cross-system messaging. Invoked by `/unity-feature`. |
+| `unity-fixer` | opus | A bug whose cause isn't obvious yet — investigates across execution order, coroutine lifecycle, destroyed-object access, live API behavior. Invoked by `/unity-fix`. |
+| `unity-optimizer` | opus | Profiles and fixes CPU/GPU bottlenecks, GC spikes, draw-call issues, shader variant bloat via the MCP profiler. Invoked by `/unity-optimize`. |
+| `unity-prototyper` | opus | Builds a new, disposable test scene end-to-end from a mechanic description — scripts, physics, camera, wiring — via MCP. Invoked by `/unity-prototype`. |
+| `unity-reviewer` | sonnet | Read-only review of C# changes for Unity-specific correctness, performance, and serialization pitfalls. Invoked by `/unity-review`. |
+| `unity-scene-builder` | opus | Builds or reorganizes a scene from a natural-language description via MCP. Does not write C#. Invoked by `/unity-scene`. |
+| `unity-test-runner` | sonnet | Writes and executes EditMode/PlayMode tests, reports results via MCP `run_tests`. Invoked by `/unity-test`. |
+| `unity-ui-builder` | opus | Builds a UI screen — UGUI Canvas or UI Toolkit, gamepad focus navigation, responsive layout. Invoked by `/unity-ui`. |
 
 ---
 
@@ -55,10 +36,8 @@ What do you need?
 |
 +-- Write new gameplay code?
 |     +-- From scratch with a scene? ---------> unity-prototyper
-|     +-- Just the C# scripts? ---------------> unity-coder
-|     +-- Multiplayer/networking? -------------> unity-network-dev
+|     +-- Adding to existing architecture? ---> unity-coder
 |     +-- UI screens? -------------------------> unity-ui-builder
-|     +-- Shaders? ----------------------------> unity-shader-dev
 |
 +-- Build or modify a scene?
 |     +-- Scene layout from description? ------> unity-scene-builder
@@ -68,118 +47,13 @@ What do you need?
 |     +-- Performance issue? ------------------> unity-optimizer
 |     +-- Code review? ------------------------> unity-reviewer
 |
-+-- Test or build?
-|     +-- Write and run tests? ----------------> unity-test-runner
-|     +-- Build for a platform? ---------------> unity-build-runner
-|
-+-- Upgrade or migrate?
-|     +-- Unity version, pipeline, APIs? ------> unity-migrator
-|
-+-- Explore or validate?
-|     +-- Find files, map dependencies? -------> unity-scout
-|     +-- Quick lint pass on code? ------------> unity-linter
-|     +-- Security audit? ---------------------> unity-security-reviewer
-|
-+-- Git operations?
-|     +-- LFS, .gitattributes, .meta hygiene? -> unity-git-master
-|
-+-- Challenge a plan?
-|     +-- Find risks before execution? --------> unity-critic
-|
-+-- Design or plan the game itself (docs, not code)?
-      +-- Mechanics, loops, progression? ------> game-designer
-      +-- One subsystem in precise detail? ----> systems-designer
-      +-- Level layout and pacing? ------------> level-designer
-      +-- Vision or scope verdict? ------------> creative-director
-      +-- Architecture or feasibility verdict? -> technical-director
-      +-- Story, lore, or in-game text? -------> narrative-director, world-builder, writer
++-- Test?
+      +-- Write and run tests? ----------------> unity-test-runner
 ```
 
----
-
-### unity-scout (haiku)
-
-Fast, read-only codebase explorer. Scans project structure, finds relevant files, maps dependencies, and reports findings.
-
-**When to Use:**
-- You need to find where something lives in the codebase quickly
-- You want a project overview (script count, scene list, package inventory)
-- You need to trace symbol usage or dependency chains
-- Another agent needs codebase context before starting work
-
-**When NOT to Use:**
-- You need deep analysis or reasoning about code quality (use `unity-reviewer`)
-- You need to modify files (scout is read-only)
-- The task requires understanding subtle Unity behavior (haiku may miss nuance)
-
----
-
-### unity-linter (haiku)
-
-Fast validation pass that checks Unity C# code against the project's rules and reports violations. Read-only -- never modifies files.
-
-**When to Use:**
-- Quick pre-commit sanity check on changed files
-- Scanning a batch of files for common Unity pitfalls
-- Validating that generated code follows project conventions
-- You want speed over depth -- a fast pass before deeper review
-
-**When NOT to Use:**
-- You need fixes applied automatically (use `unity-fixer` or `unity-reviewer` with write access)
-- You need architectural analysis (use `unity-critic`)
-- The code has complex, context-dependent issues that require deep reasoning
-
----
-
-### unity-security-reviewer (sonnet)
-
-Security auditor for Unity projects. Reviews code for vulnerabilities, data exposure, and insecure practices. Strictly read-only.
-
-**When to Use:**
-- Before releasing a build -- audit for hardcoded secrets, insecure saves, debug code
-- Reviewing network code for TLS issues, certificate pinning, insecure URLs
-- Checking PlayerPrefs usage for sensitive data exposure
-- Auditing deserialization patterns for code execution risks
-
-**When NOT to Use:**
-- General code review (use `unity-reviewer`)
-- Performance optimization (use `unity-optimizer`)
-- You need the issues fixed, not just reported (pair with `unity-fixer` for remediation)
-
----
-
-### unity-git-master (sonnet)
-
-Unity-specialized git operations agent. Handles LFS configuration, merge strategies for binary assets, .meta file hygiene, branch naming, and .gitattributes maintenance.
-
-**When to Use:**
-- Setting up Git LFS for a new Unity project
-- Configuring `.gitattributes` with Unity merge strategies
-- Validating `.meta` file integrity (orphaned metas, missing metas, duplicate GUIDs)
-- Resolving Unity-specific merge conflicts (`.unity`, `.prefab`, `.meta` files)
-- Cleaning up branches or enforcing naming conventions
-
-**When NOT to Use:**
-- General git operations that are not Unity-specific
-- You need to modify C# code (git-master only runs git commands)
-- Complex rebasing or history rewriting (do this manually)
-
----
-
-### unity-critic (opus)
-
-Senior Unity architect that challenges implementation plans before execution. Identifies risks, missed edge cases, over-engineering, and Unity-specific gotchas. Used by `/unity-workflow` in the Plan phase.
-
-**When to Use:**
-- Before executing a complex implementation plan -- get a second opinion
-- You suspect a design has hidden Unity lifecycle issues (execution order, domain reload, destruction mid-async)
-- You want to catch over-engineering before it happens
-- Validating that a plan handles edge cases (scene transitions, disabled objects, re-entrant calls)
-
-**When NOT to Use:**
-- You need code written or modified (critic is read-only)
-- The task is simple enough that review is overhead
-- You need a code review of existing code (use `unity-reviewer`)
+Each agent is invoked by exactly one command of the same shape (`unity-coder` ↔ `/unity-feature`,
+`unity-fixer` ↔ `/unity-fix`, etc.) — see `docs/MODEL-ROUTING.md`. Most users go through the command,
+not the agent name.
 
 ---
 

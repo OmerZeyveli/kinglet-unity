@@ -34,11 +34,12 @@ MyGame.Systems      — audio, save, store/DLC, analytics, settings
 - `S_Game` — single scene (main game + all UI overlays)
 
 ## Skills to Load
-- `idle-clicker` — big numbers, offline progress, prestige, upgrade trees
+
+Load with the `Skill` tool by name — nothing loads them for you. Only current skill names are listed
+below; the genre-specific skills this example used to name (`idle-clicker`, `ui-toolkit`, `audio`,
+`dotween`) were cut in the 2026-08-03 surface reduction and no longer exist.
+
 - `save-system` — auto-save on every purchase, offline time tracking
-- `ui-toolkit` — upgrade lists, currency displays, animated counters
-- `audio` — satisfying click sounds, milestone fanfares
-- `dotween` — number counter animations, UI transitions
 
 ## Rules
 Follow all rules in `.claude/rules/`. Platform guidance — PC/console performance budgets, input and

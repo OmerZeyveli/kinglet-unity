@@ -35,13 +35,14 @@ MyGame.Editor       — level editor tools
 - `S_Game` — gameplay board (level config loaded as data)
 
 ## Skills to Load
-- `match3` — grid system, matching, cascades, special tiles
+
+Load with the `Skill` tool by name — nothing loads them for you. Only current skill names are listed
+below; the genre-specific skills this example used to name (`match3`, `audio`, `ui-toolkit`,
+`dotween`) were cut in the 2026-08-03 surface reduction and no longer exist.
+
 - `object-pooling` — pool all tiles and effects
 - `state-machine` — game states, board states
 - `save-system` — level progress, stars, currencies
-- `audio` — tile pop sounds, combo chains
-- `ui-toolkit` — level select grid, shop UI
-- `dotween` — smooth tile animations
 
 ## Rules
 Follow all rules in `.claude/rules/`. Platform guidance — PC/console performance budgets, input and

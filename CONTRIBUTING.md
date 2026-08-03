@@ -69,8 +69,8 @@ Match the existing frontmatter exactly:
   that always applies loads on every C# file regardless of relevance, which is exactly the upstream
   bug the mobile strip fixed. `tests/test-no-mobile.sh` asserts this.
 - **Rules** (`.claude/rules/<name>.md`): plain Markdown, **no frontmatter**.
-- **Templates** (`.claude/templates/<name>.md`): plain Markdown; use bracketed `[placeholders]`.
-  (Repo-root `templates/` is a different thing — C# code templates the agents scaffold from.)
+- `.claude/templates/` is not a current authoring surface — the directory does not exist. Repo-root
+  `templates/` is a different thing — C# code templates the agents scaffold from — and is unaffected.
 - Adapted-from-Donchitos files keep their inline `<!-- Adapted from … -->` provenance comment.
 - Write outputs to the project's `docs/` tree (`docs/design`, `docs/adr`, `docs/production`).
 

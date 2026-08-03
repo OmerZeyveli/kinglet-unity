@@ -53,10 +53,10 @@ chmod +x your-unity-project/.claude/hooks/*.sh
 3. Try your first command:
 
 ```
-/unity-audit
+/unity-doctor
 ```
 
-This runs a full project health check: meta file integrity, missing references, assembly definition graph, and code quality scan. It is a safe, read-only operation and a good way to verify everything is working.
+This runs a full diagnostic: MCP server connectivity, `.claude/` directory integrity, hook registration, and Unity project structure. It is a safe, read-only operation and a good way to verify everything is working.
 
 ---
 
@@ -156,16 +156,14 @@ See [MCP-SETUP.md](MCP-SETUP.md) for detailed setup and troubleshooting.
 |---------|-------------|
 | `/unity-doctor` | Diagnostic health check — verify MCP, hooks, project structure are all working |
 | `/unity-init` | Scans your project and generates a tailored CLAUDE.md |
-| `/unity-audit` | Full project health check (meta files, missing refs, code quality) |
 | `/unity-review` | Reviews your C# code for Unity-specific issues |
 | `/unity-prototype "description"` | Creates a playable prototype from a text description |
 | `/unity-workflow "description"` | Full pipeline: clarify requirements → plan → execute → verify |
 | `/unity-fix` | Diagnoses and fixes bugs using console errors |
 | `/unity-scene "description"` | Builds a scene from a natural language description |
-| `/unity-build` | Configures and triggers a build |
 | `/unity-test` | Writes and runs EditMode/PlayMode tests |
 
-Start with `/unity-init`, then `/unity-audit` to get a baseline. From there, try `/unity-review` on existing code or `/unity-prototype` to see the full pipeline in action.
+Start with `/unity-init`, then `/unity-doctor` to get a baseline. From there, try `/unity-review` on existing code or `/unity-prototype` to see the full pipeline in action.
 
 ---
 

@@ -524,10 +524,14 @@ without the Editor UI was wrong and has been corrected in §6.
 §10 won its three prompts only with Superpowers disabled at project scope — a real result, but a
 weaker one than winning head-to-head. Between §10 and this section, a separate wave cut the surface
 pool from 103 to 32 on the criterion "a surface survives only if it does something the model cannot do
-unaided," gave every survivor a trigger-condition description (the format §4 found Superpowers using
-and Pioneer not), and added a small process-chain layer (`using-kinglet`, `systematic-debugging`,
-`verification-before-completion`). This section is the honest test of whether that raised the odds
-against the same competitor, still enabled.
+unaided," gave trigger-condition descriptions (the format §4 found Superpowers using and Pioneer not)
+to the 8 agents and 11 commands it was scoped to transcribe, and added a small process-chain layer
+(`using-kinglet`, `systematic-debugging`, `verification-before-completion`). It did not touch every
+skill: 8 of the 13 skills — `addressables`, `assembly-definitions`, `input-system`, `object-pooling`,
+`physics`, `save-system`, `state-machine`, `urp-pipeline` — still carry what-it-does descriptions
+rather than trigger conditions, so the honest count of surfaces with a trigger-condition description
+is 24 of 32, not all of them. This section is the honest test of whether the transcription that did
+happen raised the odds against the same competitor, still enabled.
 
 **Method.** Fresh URP fixture (`tests/fixtures/mkproject.sh /tmp/cut-probe --variant urp`), fresh
 install (`install.sh --project-dir /tmp/cut-probe`, no `--with-mcp`). Confirmed before probing: the
@@ -575,9 +579,18 @@ summaries loses to trigger-phrased descriptions, in the configuration a real use
 showed the descriptions were good enough to win once the competitor was removed from the room. This
 section is the harder claim §10 could not make: with the same competitor **enabled**, at its default
 global scope, a smaller and better-described surface pool won three prompts spanning feature work, bug
-triage, and performance — the same three §10 used — without editing the prompts to make them easier.
-Nothing here proves every future prompt resolves this way; it proves this specific, previously-losing
-match now wins on the terms §4 set.
+triage, and performance, using the same three prompts §10 used, without editing them to make them
+easier. Nothing here proves every future prompt resolves this way; it proves this specific,
+previously-losing match now wins on the terms §4 set.
+
+This is not the same *outcome* as §10 on prompt 1, and that should be stated rather than left for a
+reader to notice by diffing tables. §10 resolved *"Let's add a double jump to the player"* to
+`/unity-feature`; here it resolves to `Skill: deep-interview`. The mechanism is Decision 4: the
+`deep-interview` skill's rewritten description now gives `'add a jump'` as its worked example of when
+to load it, so a prompt that phrase-matches the example routes there first — the ambiguity gate firing
+exactly as designed, not a drift in what §10 measured. It is a different, and arguably better, result
+(the request is genuinely underspecified — no player code exists yet — so clarifying before building
+is the correct move), not the same one under a different label.
 
 **What this does not claim.** This is three prompts against one small, mostly-empty fixture project,
 run once. It is not a statistical claim about selection rate, and it does not retest §9's real-project

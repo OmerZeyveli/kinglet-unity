@@ -40,15 +40,14 @@ MyRPG.Editor        — quest editor, stat balancer, loot table editor
 - `S_Boss_XX` — boss arenas
 
 ## Skills to Load
-- `rpg` — stat system, quests, skill trees, combat
-- `inventory-system` — items, equipment, crafting
-- `dialogue-system` — NPC conversations
+
+Load with the `Skill` tool by name — nothing loads them for you. Only current skill names are listed
+below; the genre-specific skills this example used to name (`rpg`, `inventory-system`,
+`dialogue-system`, `procedural-generation`, `character-controller`, `navmesh`, `ui-toolkit`) were cut
+in the 2026-08-03 surface reduction and no longer exist.
+
 - `save-system` — full game state persistence
 - `state-machine` — game states, enemy AI, ability states
-- `procedural-generation` — dungeon generation, loot tables
-- `character-controller` — top-down movement (WASD + mouse aim / gamepad twin-stick)
-- `navmesh` — enemy pathfinding
-- `ui-toolkit` — complex UI screens (ultrawide anchoring, gamepad focus navigation)
 - `addressables` — asset loading, DLC and post-launch content
 
 ## Rules

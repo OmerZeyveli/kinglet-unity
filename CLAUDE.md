@@ -66,8 +66,11 @@ never exist here; `rule=ours-wins` means upstream has the path and we ship our o
   directory, `description:` must be non-empty (it is the entire selection mechanism), and no skill
   may carry `alwaysApply` or `globs` — both are inert Cursor keys that get read as guarantees.
   Every skill an agent or command names by path must exist.
-- **The surface pool is 32 by design.** A surface — agent, command, skill, or hook — survives the
-  2026-08-03 cut only if it does something the model cannot do unaided. `tests/test-surface-references.sh`
+- **The surface pool is 32 by design.** A surface — agent, command, or skill — survives the
+  2026-08-03 cut only if it does something the model cannot do unaided. That criterion was applied to
+  agents, commands, and skills; hooks were out of scope for this wave. All 27 hooks survived
+  untouched, and applying the same test to them is an open question for the next pass, not a settled
+  one. `tests/test-surface-references.sh`
   guards bare-name skill references (a skill named without its `.claude/skills/<name>/SKILL.md`
   path); `tests/test-skill-discovery.sh` only matches path-form references and misses those entirely
   — that gap shipped nine dangling bare-name references on 2026-08-03 before the guard existed.
@@ -87,9 +90,10 @@ directory-as-provenance.
 - **Skills** (`.claude/skills/<name>/SKILL.md`): frontmatter `name` and `description`, nothing else.
   Flat — see above. An agent that should use a skill needs `Skill` in its `tools:` *and* a
   **Skills to load** block naming it; neither alone is enough, and nothing loads a skill implicitly.
-- **Rules** (`.claude/rules/<name>.md`) and **templates** (`.claude/templates/<name>.md`): plain
-  Markdown, no frontmatter. `.claude/templates/` is currently empty — the design/production layer
-  that populated it was removed 2026-08-03.
+- **Rules** (`.claude/rules/<name>.md`): plain Markdown, no frontmatter. `.claude/templates/` is not
+  a current authoring surface — the design/production layer that populated it was removed
+  2026-08-03, and the directory itself no longer exists. The repo-root `templates/` (C# scaffolds:
+  `Model.cs.template`, `System.cs.template`, etc.) is unrelated and still present.
 - No file in the current tree carries a Donchitos `<!-- Adapted from ... -->` comment; that layer
   is gone (see `provenance-skip.tsv`). If one is reintroduced, keep the comment convention.
 

@@ -31,11 +31,13 @@ MyGame.Editor       — custom inspectors, level tools
 - `S_Level_01` through `S_Level_XX` — game levels (additive loaded)
 
 ## Skills to Load
-- `character-controller` — coyote time, input buffer, wall jump
-- `platformer-2d` — level design patterns, boss patterns
+
+Load with the `Skill` tool by name — nothing loads them for you. Only current skill names are listed
+below; the genre-specific skills this example used to name (`character-controller`, `platformer-2d`,
+`animation`) were cut in the 2026-08-03 surface reduction and no longer exist.
+
 - `state-machine` — player and enemy states
 - `physics` — 2D colliders, layers, one-way platforms
-- `animation` — Animator controllers, blend trees
 - `save-system` — checkpoint persistence
 - `input-system` — keyboard/mouse and gamepad action maps, runtime rebinding, device switching
 

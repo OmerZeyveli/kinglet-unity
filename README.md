@@ -88,7 +88,7 @@ Installed into your project's `.claude/`:
 | **Skills** | 13 | Unity subsystems and cross-cutting process skills, flat at `.claude/skills/<name>/SKILL.md` |
 | **Hooks** | 27 registered | Prompt-time guards (some blocking, the rest advisory). 28 files on disk — `_lib.sh` is a shared library, not a hook |
 | **Rules** | 6 | 5 spine rules + `pc-console.md` |
-| **Templates** | 10 | C# templates for the MVS pattern (`Model`, `View`, `System`, `LifetimeScope`, `Message`, tests, …) at the repo-level `templates/`. `.claude/templates/` (design-doc templates) is empty — that layer was removed 2026-08-03. |
+| **Templates** | 10 | C# templates for the MVS pattern (`Model`, `View`, `System`, `LifetimeScope`, `Message`, tests, …) at the repo-level `templates/`. `.claude/templates/` (design-doc templates) does not exist — that layer was removed 2026-08-03. |
 
 ### The design & production layer — removed
 

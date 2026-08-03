@@ -385,3 +385,20 @@ a well-tuned competitor plugin, and that the process-chain skills don't create t
 meant to prevent — is unverified until it runs against a real `claude` session with the competitor
 enabled. That measurement is recorded in `docs/research/pioneer/smoke-pass.md`, in the dated section
 this task appended; see that file for the actual tool-call outcomes, not an assumption made here.
+
+## Two history items, left as-is rather than rewriting 37 commits
+
+Both surfaced in the final whole-branch review of this wave. Fixing either means rewriting published
+history; both are benign in direction, so neither was fixed.
+
+- **A bisect-red range: `2b543f2..f6d517b`.** `2b543f2` (`chore(baseline): record the surface cut`)
+  regenerated `migration/baseline-inventory.json` but left `tests/kinglet/test_baseline_inventory.py`'s
+  hardcoded `EXPECTED_COUNTS` and `full_claude_tree` constants asserting the pre-cut numbers, so the
+  suite fails at that commit and still fails at `f6d517b` (which fixed only `EXPECTED_COUNTS`, not the
+  second constant). Green resumes at `ab49fc3`. A `git bisect` that walks through this range will land
+  on a red commit that is not the cause of whatever it's looking for — know this range going in.
+- **Provenance rows flipped one commit early.** `509bb9a` marked
+  `unity-feature.md`/`unity-fix.md`/`unity-init.md`/`unity-prototype.md` as `status=modified` in
+  `provenance.tsv`; the edits those rows describe didn't land until the next commit, `bbad983`. The
+  manifest under-claims fidelity for one commit rather than over-claiming it, which is the safe
+  direction for this kind of drift.
