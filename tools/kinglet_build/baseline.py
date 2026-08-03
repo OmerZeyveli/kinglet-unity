@@ -116,14 +116,88 @@ class BaselineChange:
 
 
 @dataclass(frozen=True)
+class BaselineRemoval:
+    path: str
+    structure: str  # "full_claude_tree" or "categories.<name>"
+
+
+@dataclass(frozen=True)
+class BaselineAddition:
+    path: str
+    structure: str
+    sha256: str
+    git_mode: str
+
+
+@dataclass(frozen=True)
 class RegenerationPlan:
     anchor: str
     changes: tuple[BaselineChange, ...]
     refusals: tuple[str, ...]
+    removals: tuple[BaselineRemoval, ...] = ()
+    additions: tuple[BaselineAddition, ...] = ()
 
     @property
     def approved(self) -> bool:
         return not self.refusals
+
+
+def category_paths(category: str, paths: Sequence[str]) -> list[str]:
+    """Return the sorted subset of `paths` belonging to `category`.
+
+    This is the single definition of the seven-category mapping used by
+    both the regeneration planner (for additions) and the baseline
+    inventory tests (for the legacy per-category drift check). Keeping
+    one definition means the two never drift apart.
+    """
+    if category == "agents":
+        selected = [path for path in paths if path.startswith(".claude/agents/")]
+    elif category == "commands":
+        selected = [path for path in paths if path.startswith(".claude/commands/")]
+    elif category == "skills":
+        selected = [
+            path
+            for path in paths
+            if path.startswith(".claude/skills/") and path.endswith("/SKILL.md")
+        ]
+    elif category == "hooks":
+        selected = [
+            path
+            for path in paths
+            if path.startswith(".claude/hooks/")
+            and path != ".claude/hooks/_lib.sh"
+        ]
+    elif category == "rules":
+        selected = [path for path in paths if path.startswith(".claude/rules/")]
+    elif category == "claude_templates":
+        selected = [
+            path
+            for path in paths
+            if path.startswith(".claude/templates/") and path.endswith(".md")
+        ]
+    elif category == "code_templates":
+        selected = [path for path in paths if path.startswith("templates/")]
+    else:
+        raise ValueError(f"unknown inventory category: {category}")
+    return sorted(selected)
+
+
+_KNOWN_CATEGORIES = (
+    "agents",
+    "commands",
+    "skills",
+    "hooks",
+    "rules",
+    "claude_templates",
+    "code_templates",
+)
+
+
+def _category_for_path(path: str) -> str | None:
+    for category in _KNOWN_CATEGORIES:
+        if category_paths(category, [path]):
+            return category
+    return None
 
 
 def _structure_records(
@@ -140,6 +214,8 @@ def regeneration_plan(
     baseline: Mapping,
     *,
     expected_drift: int | None = None,
+    expected_removed: int | None = None,
+    expected_added: int | None = None,
 ) -> RegenerationPlan:
     """Read Git and the baseline document and return a regeneration decision.
 
@@ -211,11 +287,15 @@ def regeneration_plan(
 
     refusals: list[str] = []
     changes: list[BaselineChange] = []
+    removals: list[BaselineRemoval] = []
     for structure_name, record in to_check:
         path = record["path"]
         entry = entries.get(path)
         if entry is None:
-            refusals.append(f"path missing at anchor: {path}")
+            if expected_removed is not None:
+                removals.append(BaselineRemoval(path=path, structure=structure_name))
+            else:
+                refusals.append(f"path missing at anchor: {path}")
             continue
         mode, object_type, object_id = entry
         if object_type != "blob":
@@ -223,7 +303,10 @@ def regeneration_plan(
             continue
         actual_sha256 = blob_sha256(object_id)
         if actual_sha256 is None:
-            refusals.append(f"path missing at anchor: {path}")
+            if expected_removed is not None:
+                removals.append(BaselineRemoval(path=path, structure=structure_name))
+            else:
+                refusals.append(f"path missing at anchor: {path}")
             continue
         if actual_sha256 != record["sha256"] or mode != record["git_mode"]:
             changes.append(
@@ -237,25 +320,58 @@ def regeneration_plan(
                 )
             )
 
+    additions: list[BaselineAddition] = []
     recorded_full_tree_paths = {record["path"] for record in full_tree_records}
     for path in sorted(entries):
-        mode, object_type, _object_id = entries[path]
+        mode, object_type, object_id = entries[path]
         if object_type != "blob":
             continue
         if not path.startswith(".claude/"):
             continue
         if path not in recorded_full_tree_paths:
-            refusals.append(f"unrecorded .claude path at anchor: {path}")
+            if expected_added is not None:
+                actual_sha256 = blob_sha256(object_id)
+                if actual_sha256 is None:
+                    refusals.append(f"path missing at anchor: {path}")
+                    continue
+                additions.append(
+                    BaselineAddition(
+                        path=path,
+                        structure="full_claude_tree",
+                        sha256=actual_sha256,
+                        git_mode=mode,
+                    )
+                )
+                category = _category_for_path(path)
+                if category is not None:
+                    additions.append(
+                        BaselineAddition(
+                            path=path,
+                            structure=f"categories.{category}",
+                            sha256=actual_sha256,
+                            git_mode=mode,
+                        )
+                    )
+            else:
+                refusals.append(f"unrecorded .claude path at anchor: {path}")
 
     changes.sort(key=lambda change: (change.structure, change.path))
+    removals.sort(key=lambda removal: (removal.structure, removal.path))
+    additions.sort(key=lambda addition: (addition.structure, addition.path))
 
     if expected_drift is not None and expected_drift != len(changes):
         refusals.append(f"expected drift {expected_drift}, found {len(changes)}")
+    if expected_removed is not None and expected_removed != len(removals):
+        refusals.append(f"expected removed {expected_removed}, found {len(removals)}")
+    if expected_added is not None and expected_added != len(additions):
+        refusals.append(f"expected added {expected_added}, found {len(additions)}")
 
     return RegenerationPlan(
         anchor=commit,
         changes=tuple(changes),
         refusals=tuple(refusals),
+        removals=tuple(removals),
+        additions=tuple(additions),
     )
 
 
@@ -272,37 +388,73 @@ def apply_regeneration(baseline: Mapping, plan: RegenerationPlan) -> dict:
         )
 
     document = copy.deepcopy(dict(baseline))
+
     changes_by_structure: dict[str, dict[str, BaselineChange]] = {}
     for change in plan.changes:
         changes_by_structure.setdefault(change.structure, {})[change.path] = change
 
-    def apply_to_records(records: list[dict], changes_by_path: dict[str, BaselineChange]) -> None:
+    removals_by_structure: dict[str, set[str]] = {}
+    for removal in plan.removals:
+        removals_by_structure.setdefault(removal.structure, set()).add(removal.path)
+
+    additions_by_structure: dict[str, list[BaselineAddition]] = {}
+    for addition in plan.additions:
+        additions_by_structure.setdefault(addition.structure, []).append(addition)
+
+    touched_structures = (
+        set(changes_by_structure) | set(removals_by_structure) | set(additions_by_structure)
+    )
+
+    def structure_container(structure_name: str) -> dict:
+        if structure_name == "full_claude_tree":
+            return document["full_claude_tree"]
+        category_name = structure_name.split(".", 1)[1]
+        return document["categories"][category_name]
+
+    for structure_name in touched_structures:
+        container = structure_container(structure_name)
+        records: list[dict] = container["files"]
+        changes_by_path = changes_by_structure.get(structure_name, {})
+        removed_paths = removals_by_structure.get(structure_name, set())
+
+        updated_records: list[dict] = []
         for record in records:
+            if record["path"] in removed_paths:
+                continue
             change = changes_by_path.get(record["path"])
             if change is not None:
+                record = dict(record)
                 record["sha256"] = change.new_sha256
                 record["git_mode"] = change.new_git_mode
+            updated_records.append(record)
 
-    full_tree_changes = changes_by_structure.get("full_claude_tree")
-    if full_tree_changes:
-        apply_to_records(document["full_claude_tree"]["files"], full_tree_changes)
+        for addition in additions_by_structure.get(structure_name, []):
+            updated_records.append(
+                {
+                    "path": addition.path,
+                    "sha256": addition.sha256,
+                    "git_mode": addition.git_mode,
+                }
+            )
 
-    for structure_name, changes_by_path in changes_by_structure.items():
-        if structure_name == "full_claude_tree":
-            continue
-        category_name = structure_name.split(".", 1)[1]
-        apply_to_records(
-            document["categories"][category_name]["files"], changes_by_path
-        )
+        updated_records.sort(key=lambda record: record["path"])
+        assert updated_records == sorted(updated_records, key=lambda r: r["path"])
+
+        container["files"] = updated_records
+        container["expected_count"] = len(updated_records)
+        assert container["expected_count"] == len(container["files"])
 
     document["source_commit"] = plan.anchor
     return document
 
 
 __all__ = [
+    "BaselineAddition",
     "BaselineChange",
+    "BaselineRemoval",
     "RegenerationPlan",
     "apply_regeneration",
+    "category_paths",
     "regeneration_plan",
     "source_commit_errors",
 ]

@@ -92,6 +92,18 @@ def _parser() -> _ArgumentParser:
         help="the number of drifted records the caller expects to find",
     )
     regenerate.add_argument(
+        "--expect-removed",
+        type=int,
+        dest="expect_removed",
+        help="the number of recorded paths the caller expects to be gone at the anchor",
+    )
+    regenerate.add_argument(
+        "--expect-added",
+        type=int,
+        dest="expect_added",
+        help="the number of unrecorded .claude paths the caller expects at the anchor",
+    )
+    regenerate.add_argument(
         "--repo-root",
         type=Path,
         dest="repo_root",
@@ -231,6 +243,8 @@ def _baseline_regenerate(
     anchor: str,
     expect_drift: int,
     *,
+    expect_removed: int | None,
+    expect_added: int | None,
     dry_run: bool,
 ) -> int:
     inventory_path = repository_root.joinpath(*_BASELINE_INVENTORY_RELATIVE)
@@ -241,6 +255,8 @@ def _baseline_regenerate(
         anchor,
         baseline,
         expected_drift=expect_drift,
+        expected_removed=expect_removed,
+        expected_added=expect_added,
     )
 
     if not plan.approved:
@@ -249,7 +265,10 @@ def _baseline_regenerate(
         return _EXIT_VALIDATION
 
     updated = apply_regeneration(baseline, plan)
-    print(f"{len(plan.changes)} change(s) at anchor {plan.anchor}.")
+    print(
+        f"{len(plan.changes)} change(s), {len(plan.removals)} removal(s), "
+        f"{len(plan.additions)} addition(s) at anchor {plan.anchor}."
+    )
     if dry_run:
         return 0
 
@@ -289,6 +308,8 @@ def main(
                 target_root,
                 arguments.anchor,
                 arguments.expect_drift,
+                expect_removed=arguments.expect_removed,
+                expect_added=arguments.expect_added,
                 dry_run=arguments.dry_run,
             )
         except OSError as error:

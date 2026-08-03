@@ -1,3 +1,4 @@
+import copy
 import hashlib
 import importlib.util
 import json
@@ -7,13 +8,19 @@ import subprocess
 import tempfile
 import unittest
 
+from tools.kinglet_build.baseline import (
+    apply_regeneration,
+    category_paths,
+    regeneration_plan,
+)
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_PATH = REPOSITORY_ROOT / "migration" / "baseline-inventory.json"
 EXPECTED_COUNTS = {
-    "agents": 28,
-    "commands": 36,
-    "skills": 39,
+    "agents": 20,
+    "commands": 27,
+    "skills": 30,
     "hooks": 26,
     "rules": 6,
     "claude_templates": 6,
@@ -50,39 +57,6 @@ def tracked_modes() -> dict[str, str]:
         metadata, path = record.split("\t", 1)
         modes[path] = metadata.split()[0]
     return modes
-
-
-def category_paths(category: str, paths: list[str]) -> list[str]:
-    if category == "agents":
-        selected = [path for path in paths if path.startswith(".claude/agents/")]
-    elif category == "commands":
-        selected = [path for path in paths if path.startswith(".claude/commands/")]
-    elif category == "skills":
-        selected = [
-            path
-            for path in paths
-            if path.startswith(".claude/skills/") and path.endswith("/SKILL.md")
-        ]
-    elif category == "hooks":
-        selected = [
-            path
-            for path in paths
-            if path.startswith(".claude/hooks/")
-            and path != ".claude/hooks/_lib.sh"
-        ]
-    elif category == "rules":
-        selected = [path for path in paths if path.startswith(".claude/rules/")]
-    elif category == "claude_templates":
-        selected = [
-            path
-            for path in paths
-            if path.startswith(".claude/templates/") and path.endswith(".md")
-        ]
-    elif category == "code_templates":
-        selected = [path for path in paths if path.startswith("templates/")]
-    else:
-        raise AssertionError(f"unknown inventory category: {category}")
-    return sorted(selected)
 
 
 def source_commit_errors(
@@ -140,7 +114,97 @@ class BaselineInventoryTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
 
-    def test_inventory_counts_are_exact_28_36_39_26_6_5_10(self) -> None:
+    def _baseline_with_extra_record(self, path: str) -> dict:
+        """Return a deep copy of the real baseline with a fake record for `path`.
+
+        The record is appended to both `full_claude_tree.files` and the
+        matching `categories.<kind>.files`, both lists are re-sorted by
+        path, and both `expected_count` fields are incremented. `path`
+        must not exist in the working tree, so the record reads as a
+        removal once checked against the anchor.
+        """
+        baseline = copy.deepcopy(self.baseline)
+        record = {
+            "path": path,
+            "sha256": "0" * 64,
+            "git_mode": "100644",
+        }
+
+        full_tree = baseline["full_claude_tree"]
+        full_tree["files"].append(record)
+        full_tree["files"].sort(key=lambda item: item["path"])
+        full_tree["expected_count"] += 1
+
+        category = None
+        for candidate, category_data in baseline["categories"].items():
+            if path.startswith(f".claude/{candidate}/"):
+                category = candidate
+                break
+        self.assertIsNotNone(category, f"no category owns {path}")
+
+        category_data = baseline["categories"][category]
+        category_data["files"].append(dict(record))
+        category_data["files"].sort(key=lambda item: item["path"])
+        category_data["expected_count"] += 1
+
+        return baseline
+
+    def test_removal_is_refused_when_no_expect_removed_flag_is_given(self) -> None:
+        """The default must not change: a path-set change stays a hard refusal."""
+        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
+        plan = regeneration_plan(REPOSITORY_ROOT, "HEAD", baseline)
+        self.assertFalse(plan.approved)
+        self.assertTrue(
+            any("path missing at anchor" in refusal for refusal in plan.refusals),
+            plan.refusals,
+        )
+        self.assertEqual((), plan.removals)
+
+    def test_removal_is_counted_when_expect_removed_matches(self) -> None:
+        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
+        plan = regeneration_plan(
+            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=2
+        )
+        self.assertTrue(plan.approved, plan.refusals)
+        self.assertEqual(
+            {".claude/agents/does-not-exist.md"},
+            {removal.path for removal in plan.removals},
+        )
+
+    def test_removal_count_mismatch_still_refuses(self) -> None:
+        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
+        plan = regeneration_plan(
+            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=99
+        )
+        self.assertFalse(plan.approved)
+        self.assertTrue(
+            any("expected removed 99" in refusal for refusal in plan.refusals),
+            plan.refusals,
+        )
+
+    def test_apply_regeneration_drops_the_record_and_decrements_expected_count(
+        self,
+    ) -> None:
+        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
+        before_full = baseline["full_claude_tree"]["expected_count"]
+        before_agents = baseline["categories"]["agents"]["expected_count"]
+        plan = regeneration_plan(
+            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=2
+        )
+        applied = apply_regeneration(baseline, plan)
+
+        full_paths = [r["path"] for r in applied["full_claude_tree"]["files"]]
+        agent_paths = [r["path"] for r in applied["categories"]["agents"]["files"]]
+        self.assertNotIn(".claude/agents/does-not-exist.md", full_paths)
+        self.assertNotIn(".claude/agents/does-not-exist.md", agent_paths)
+        self.assertEqual(before_full - 1, applied["full_claude_tree"]["expected_count"])
+        self.assertEqual(
+            before_agents - 1, applied["categories"]["agents"]["expected_count"]
+        )
+        self.assertEqual(sorted(full_paths), full_paths)
+        self.assertEqual(sorted(agent_paths), agent_paths)
+
+    def test_inventory_counts_match_the_expected_counts_constant(self) -> None:
         categories = self.baseline["categories"]
         self.assertEqual(set(EXPECTED_COUNTS), set(categories))
         for category, expected_count in EXPECTED_COUNTS.items():
@@ -277,7 +341,7 @@ class BaselineInventoryTests(unittest.TestCase):
                     f"hook is not executable in checkout: {record['path']}",
                 )
 
-    def test_full_claude_tree_baseline_covers_all_148_tracked_files(self) -> None:
+    def test_full_claude_tree_baseline_covers_every_tracked_claude_file(self) -> None:
         full_tree = self.baseline.get("full_claude_tree")
         self.assertIsNotNone(
             full_tree,
@@ -291,10 +355,10 @@ class BaselineInventoryTests(unittest.TestCase):
         actual_paths = [
             path for path in tracked_paths() if path.startswith(".claude/")
         ]
-        self.assertEqual(148, full_tree["expected_count"])
-        self.assertEqual(148, len(records))
+        self.assertEqual(122, full_tree["expected_count"])
+        self.assertEqual(122, len(records))
         self.assertEqual(expected_paths, sorted(expected_paths))
-        self.assertEqual(148, len(set(expected_paths)))
+        self.assertEqual(122, len(set(expected_paths)))
         self.assertTrue(OMITTED_FROM_SEVEN_CATEGORIES.issubset(expected_paths))
         self.assertEqual(
             [],
