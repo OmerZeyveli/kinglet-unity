@@ -538,9 +538,7 @@ cat <<'MDEOF'
 ## How to work
 
 - **Feature work:** the `deep-interview` skill clarifies requirements, `/unity-workflow` plans,
-  executes and verifies, `/unity-review` reviews the result. `/unity-feature`, `/unity-prototype`,
-  `/unity-fix`, `/unity-scene`, `/unity-ui`, `/unity-test` and `/unity-optimize` cover narrower jobs
-  directly.
+  executes and verifies, `/unity-review` reviews the result.
 - **MCP:** the CoplayDev Unity MCP bridge must be running for editor control — see `MCP-SETUP.md`.
   Verify with "What's in the current scene?"
 

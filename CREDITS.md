@@ -9,8 +9,8 @@ is asserted on trust.
 
 | Project | Relationship | In this repo? |
 |---------|--------------|---------------|
-| [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (XeldarAlz) | **Vendored** at v1.5.0 — the engineering layer | **Yes** — 158 files (120 verbatim, 38 modified) |
-| [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) (Donchitos) | **Adapted** at `984023d` — the design/production layer | **Yes** — 22 files, each attributed inline |
+| [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (XeldarAlz) | **Vendored** at v1.5.0 — the engineering layer | **Yes** — 101 files (34 verbatim, 67 modified) |
+| [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) (Donchitos) | **Adapted** at `984023d` — the design/production layer, removed 2026-08-03 | **No** — 0 files; see §2 for why the notice is retained anyway |
 | [unity-mcp](https://github.com/CoplayDev/unity-mcp) (CoplayDev) | **Targeted** — the MCP editor bridge | No — install it yourself |
 
 `.claude/NOTICE.md` carries these notices into every project the installer touches, because the
@@ -73,27 +73,32 @@ SOFTWARE.
 
 ---
 
-## 2. Claude-Code-Game-Studios ("Donchitos") — adapted (attribution required)
+## 2. Claude-Code-Game-Studios ("Donchitos") — adapted historically, removed 2026-08-03
 
 - **Repository:** https://github.com/Donchitos/Claude-Code-Game-Studios
 - **Copyright:** Copyright (c) 2026 Donchitos
 - **Pinned at:** commit `984023d` (2026-05-13)
 - **License:** MIT
 
-The design and production layer is **adapted** from Donchitos: the agents `game-designer`,
-`systems-designer`, `level-designer`, `narrative-director`, `writer`, `world-builder`,
-`creative-director`, `technical-director`; the commands `brainstorm`, `design-review`, `map-systems`,
-`design-system`, `sprint-plan`, `scope-check`, `milestone-review`, `estimate`, `retrospective`; and
-the templates `game-design-document`, `architecture-decision-record`, `sprint-plan`, `game-concept`,
-`systems-index`.
+The design and production layer **was adapted** from Donchitos: a set of design/production agents,
+commands and templates, listed by name in `provenance-skip.tsv` (`origin=donchitos`,
+`rule=absent`) rather than repeated here — a name enumerated in this document is one more place
+that goes stale the next time the set changes, which is exactly the defect this section exists to
+avoid.
 
-Each adapted file carries an inline `<!-- Adapted from Claude-Code-Game-Studios (Donchitos), MIT -->`
-comment. Upstream, the commands are "skills" at `.claude/skills/<name>/SKILL.md` and the templates
-live under `.claude/docs/templates/`; `provenance.tsv` records the original path for each.
+**All of it was removed on 2026-08-03** (see the surface-cut design in
+`docs/superpowers/specs/`) — zero `origin=donchitos` rows remain in `provenance.tsv`, and no
+Claude-Code-Game-Studios content ships in this toolkit today. This section and its license text
+below are retained because the work was derived from Donchitos historically; that is a standing
+obligation regardless of whether the derived files still exist. Upstream, the commands were
+"skills" at `.claude/skills/<name>/SKILL.md` and the templates lived under
+`.claude/docs/templates/`; `provenance-skip.tsv` records the original path and removal reason for
+each.
 
 Donchitos's files were reformatted to this toolkit's conventions, scoped to Unity 6 / PC-console, and
-trimmed of the heavy multi-gate production pipeline. This is a thin slice of a much larger project —
-roughly 8 of its 49 agents and 9 of its 73 commands. See `MERGE-NOTES.md` for the full delta.
+trimmed of the heavy multi-gate production pipeline — a thin slice of a much larger project, roughly
+8 of its 49 agents and 9 of its 73 commands, before that slice was itself removed. See
+`MERGE-NOTES.md` for the full delta.
 
 ```
 MIT License

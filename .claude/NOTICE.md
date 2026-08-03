@@ -21,17 +21,16 @@ verifiable; you just verify them against the source rather than a snapshot.
 | Project | Role | Files |
 |---|---|---|
 | [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) | vendored at v1.5.0 (`bb28ccb`); mobile content removed, some files modified | agents `unity-*`, commands `unity-*`, skills, hooks, 5 rules, `settings.json` |
-| [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) | adapted at `984023d`; reformatted to this toolkit's conventions | 8 design agents, 9 design commands, 5 templates |
+| [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) | adapted at `984023d`, removed 2026-08-03; no Claude-Code-Game-Studios content ships in this toolkit today | 0 files |
 
 Files not attributable to either are original to Kinglet Pioneer, MIT, Copyright (c) 2026
 OmerZeyveli. **The manifest is the list**, not this paragraph — every row with `origin=original` in the
-toolkit's `provenance.tsv`, linked above. At the time of writing that is six files:
+toolkit's `provenance.tsv`, linked above. At the time of writing that is five files:
 
 | File | What it is |
 |---|---|
 | `rules/pc-console.md` | the platform spec; the only rule not vendored |
 | `hooks/block-legacy-input.sh` | blocks the legacy Input Manager API. Three rule files had claimed for a long time that a hook enforced this. None did — not here, not in ECU v1.5.0. This is that hook. |
-| `templates/game-decision-record.md` | the design counterpart to the ADR |
 | `NOTICE.md` | this file |
 | `VERSION`, `UPSTREAM` | which toolkit build this is, and what it pins |
 
@@ -78,8 +77,10 @@ SOFTWARE.
 
 ## 2. Claude-Code-Game-Studios
 
-Reproduced verbatim from Claude-Code-Game-Studios' `LICENSE` at `984023d`. Each adapted file also
-carries an inline `<!-- Adapted from Claude-Code-Game-Studios (Donchitos), MIT -->` comment.
+The design and production layer was adapted from Claude-Code-Game-Studios at `984023d` and was
+removed on 2026-08-03, so no Claude-Code-Game-Studios content ships in this toolkit today. This
+notice is retained because the work was derived from it historically. Its license text is
+reproduced verbatim from Claude-Code-Game-Studios' `LICENSE` at `984023d`.
 
 ```
 MIT License

@@ -58,7 +58,7 @@ Present a summary report:
 === Unity Doctor Report ===
 
 MCP Server:        PASS  (Unity 2022.3.20f1, StandaloneWindows64)
-.claude/ Integrity: PASS  (17 commands, 14 agents, 9 hooks, 35 skills, 5 rules)
+.claude/ Integrity: PASS  (11 commands, 8 agents, 26 hooks, 10 skills, 6 rules)
 Hook Registration:  PASS  (all hooks registered correctly)
 Project Structure:  WARNING — no test assembly definitions found
 
