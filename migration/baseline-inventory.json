@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "2cb27b5bb145a671c4d462419e0db401c1c4291c",
+  "source_commit": "140c8b0974bafa14d755d0dd768b0ddef4810a7a",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 77,
@@ -258,32 +258,32 @@
       },
       {
         "path": ".claude/rules/architecture.md",
-        "sha256": "36aac42cb968d1b6cf09eb874bdd0649453094ed89b5c4583952dd163d432714",
+        "sha256": "10bcd384af02dd3fc73b9b05d88a57f6fb6713d70e4e3413fb340ec8e7bb38f0",
         "git_mode": "100644"
       },
       {
         "path": ".claude/rules/csharp-unity.md",
-        "sha256": "713eb2c97c39d1c791325bd749f87aed92895ee0c94464c4eb72e7dd167fa986",
+        "sha256": "66aa0b85828d1cb4e9d4318090e307f8ccbb1619bd76ea006b1905794e6b0238",
         "git_mode": "100644"
       },
       {
         "path": ".claude/rules/pc-console.md",
-        "sha256": "bfaba7400e8b611096486159999f3813eced328993e45af49761a4eb95162458",
+        "sha256": "58875fb52af3f6987381d901e5b1280ec2dcb283f97ff2bfe56bd8390c79d4ef",
         "git_mode": "100644"
       },
       {
         "path": ".claude/rules/performance.md",
-        "sha256": "757676620b64b53761f27499a6939693a27612d153d004f90b04407aa246a2ca",
+        "sha256": "771972b963431363e8b550740d415a486d1c743a9d6b11bcbafd4c93890df1fa",
         "git_mode": "100644"
       },
       {
         "path": ".claude/rules/serialization.md",
-        "sha256": "64d2bf49758afc495e3898225dc0d31282f66a09eecf0c1a7a9074c376ca4ae9",
+        "sha256": "87f4854fb6f24b483bfe4b6d03161366d3a881e0ff7155d2e9f101cb78b7a4bc",
         "git_mode": "100644"
       },
       {
         "path": ".claude/rules/unity-specifics.md",
-        "sha256": "1c93ba08a78bd9e1163dbad92b75d6c198e8d6beb54fb24458d3d446b61aca34",
+        "sha256": "c100c8f6b1b44adb31f5e7035fc38f59be329f84493366191656c54a57853cae",
         "git_mode": "100644"
       },
       {
@@ -724,32 +724,32 @@
       "files": [
         {
           "path": ".claude/rules/architecture.md",
-          "sha256": "36aac42cb968d1b6cf09eb874bdd0649453094ed89b5c4583952dd163d432714",
+          "sha256": "10bcd384af02dd3fc73b9b05d88a57f6fb6713d70e4e3413fb340ec8e7bb38f0",
           "git_mode": "100644"
         },
         {
           "path": ".claude/rules/csharp-unity.md",
-          "sha256": "713eb2c97c39d1c791325bd749f87aed92895ee0c94464c4eb72e7dd167fa986",
+          "sha256": "66aa0b85828d1cb4e9d4318090e307f8ccbb1619bd76ea006b1905794e6b0238",
           "git_mode": "100644"
         },
         {
           "path": ".claude/rules/pc-console.md",
-          "sha256": "bfaba7400e8b611096486159999f3813eced328993e45af49761a4eb95162458",
+          "sha256": "58875fb52af3f6987381d901e5b1280ec2dcb283f97ff2bfe56bd8390c79d4ef",
           "git_mode": "100644"
         },
         {
           "path": ".claude/rules/performance.md",
-          "sha256": "757676620b64b53761f27499a6939693a27612d153d004f90b04407aa246a2ca",
+          "sha256": "771972b963431363e8b550740d415a486d1c743a9d6b11bcbafd4c93890df1fa",
           "git_mode": "100644"
         },
         {
           "path": ".claude/rules/serialization.md",
-          "sha256": "64d2bf49758afc495e3898225dc0d31282f66a09eecf0c1a7a9074c376ca4ae9",
+          "sha256": "87f4854fb6f24b483bfe4b6d03161366d3a881e0ff7155d2e9f101cb78b7a4bc",
           "git_mode": "100644"
         },
         {
           "path": ".claude/rules/unity-specifics.md",
-          "sha256": "1c93ba08a78bd9e1163dbad92b75d6c198e8d6beb54fb24458d3d446b61aca34",
+          "sha256": "c100c8f6b1b44adb31f5e7035fc38f59be329f84493366191656c54a57853cae",
           "git_mode": "100644"
         }
       ]
