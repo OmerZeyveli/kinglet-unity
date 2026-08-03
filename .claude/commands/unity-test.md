@@ -1,6 +1,6 @@
 ---
 name: unity-test
-description: "Writes missing tests and runs them via MCP. Identifies untested code, creates EditMode/PlayMode tests, executes via run_tests, reports results."
+description: "Use when the user wants tests written or run — for a specific area if named, otherwise for the most critical untested code paths. Writes EditMode/PlayMode tests and executes them via MCP, reporting real results rather than assuming coverage."
 user-invocable: true
 args: scope
 ---

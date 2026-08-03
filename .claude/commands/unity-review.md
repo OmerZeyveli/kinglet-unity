@@ -1,6 +1,6 @@
 ---
 name: unity-review
-description: "Full Unity-aware code review — checks serialization safety, performance, architecture, and Unity-specific pitfalls."
+description: "Use after C# code changes are written and before they're considered done, when the user asks for a code review or a check before merging/committing. Runs a Unity-aware review — serialization safety, performance, architecture."
 user-invocable: true
 args: scope
 ---

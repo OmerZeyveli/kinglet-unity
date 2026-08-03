@@ -1,6 +1,6 @@
 ---
 name: unity-workflow
-description: "Full development pipeline — clarify requirements, plan implementation, execute with agents, verify with review + tests."
+description: "Use when the user wants a feature taken all the way through — clarified, planned, implemented and verified — rather than a single step, or when they hand over a written plan to execute. Prefer `/unity-feature` when the request is one scoped addition that needs no plan."
 user-invocable: true
 args: feature-description-or-plan-path
 ---

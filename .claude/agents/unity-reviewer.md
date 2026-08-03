@@ -1,6 +1,6 @@
 ---
 name: unity-reviewer
-description: "Reviews Unity C# code for correctness, performance, serialization safety, architecture patterns, and Unity-specific pitfalls. Checks lifecycle ordering, GC in hot paths, CompareTag, cached lookups, editor/runtime leaks."
+description: "Use after C# code changes are written and before they're considered done — checks for Unity-specific correctness, performance, and serialization pitfalls a general code reviewer would miss (lifecycle ordering, GC in hot paths, `CompareTag`, cached lookups, editor/runtime leaks). Read-only: reports issues with file:line references, does not fix them. Invoked by `/unity-review`; also selectable directly when a dispatching agent needs a standard-depth review of written code."
 model: sonnet
 color: yellow
 tools: Skill, Read, Glob, Grep

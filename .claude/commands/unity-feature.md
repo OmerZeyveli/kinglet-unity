@@ -1,6 +1,6 @@
 ---
 name: unity-feature
-description: "Plans and implements a Unity feature — identifies subsystems, loads skills, writes code, sets up scene elements via MCP."
+description: "Use when the user wants to add or extend a feature in the existing Unity project — a new mechanic, system, or component that plugs into scripts and scenes that already exist. Routes to the architectural implementer, which writes the C# and wires it into the scene."
 user-invocable: true
 args: feature_description
 ---

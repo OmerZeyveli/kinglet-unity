@@ -1,6 +1,6 @@
 ---
 name: unity-optimize
-description: "Profile and optimize performance — uses MCP profiler for frame timing, memory, rendering stats. Identifies bottlenecks and applies fixes."
+description: "Use when the user has a specific performance complaint — stuttering, frame drops, a known slow area — and wants it diagnosed and fixed. Profiles via MCP to confirm the cause, then applies the fix, rather than fixing from a guess."
 user-invocable: true
 args: focus_area
 ---

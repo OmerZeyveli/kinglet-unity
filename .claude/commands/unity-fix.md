@@ -1,6 +1,6 @@
 ---
 name: unity-fix
-description: "Diagnoses and fixes a Unity bug — reads console errors, checks common causes, applies targeted fix, verifies via MCP."
+description: "Use when the user reports a bug, error, crash, or something not working in Unity — before proposing a fix from memory. Reads the actual console output and verifies the fix via MCP rather than guessing."
 user-invocable: true
 args: bug_description
 ---

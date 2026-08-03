@@ -1,6 +1,6 @@
 ---
 name: unity-init
-description: "Scans a Unity project and generates a tailored CLAUDE.md with detected configuration, packages, render pipeline, and recommended skills."
+description: "Use once per project, right after Kinglet is installed — when `CLAUDE.md` still has unfilled `FILL:` markers, or when the user asks to set up or initialise the toolkit for this Unity project."
 user-invocable: true
 ---
 

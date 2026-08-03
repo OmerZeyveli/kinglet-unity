@@ -1,6 +1,6 @@
 ---
 name: unity-ui
-description: "Build UI screens — writes code + sets up visual hierarchy via MCP. Supports UGUI Canvas and UI Toolkit."
+description: "Use when the user wants a UI screen built — menu, HUD, settings panel, inventory screen. Writes the backing code and sets up the visual hierarchy via MCP; supports both UGUI Canvas and UI Toolkit."
 user-invocable: true
 args: screen_description
 ---

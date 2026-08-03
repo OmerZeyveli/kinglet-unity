@@ -1,6 +1,6 @@
 ---
 name: unity-test-runner
-description: "Writes EditMode and PlayMode tests, executes them via MCP run_tests, reports results. Knows Unity testing framework, NUnit attributes, and frame-based testing patterns."
+description: "Use to write and execute Unity EditMode/PlayMode tests and report results via MCP `run_tests` — knows NUnit attributes and frame-based test patterns. Invoked by `/unity-test`; also selectable directly when a dispatching agent needs tests written for code it just changed."
 model: sonnet
 color: white
 tools: Skill, Read, Write, Edit, Glob, Grep, mcp__unityMCP__*

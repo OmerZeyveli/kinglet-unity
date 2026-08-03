@@ -1,6 +1,6 @@
 ---
 name: unity-prototype
-description: "The killer feature. One prompt to playable prototype — writes scripts, builds scene via MCP, sets up physics/camera, wires everything together."
+description: "Use when the user wants to go from a mechanic description straight to something playable — a new, self-contained test scene built from scratch to try an idea, not an addition to the existing project. The one-prompt path from idea to hit-play-and-test-it."
 user-invocable: true
 args: mechanic_description
 ---

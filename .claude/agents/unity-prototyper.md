@@ -1,6 +1,6 @@
 ---
 name: unity-prototyper
-description: "The star agent. Rapid end-to-end prototyping — given a mechanic description, writes C# scripts, builds the test scene via MCP, sets up physics/colliders/camera, wires everything together. One prompt to playable prototype."
+description: "Use to build a new, disposable test scene end-to-end from a mechanic description — scripts, physics/colliders/camera, and wiring, all via MCP, with no dependency on the project's existing scenes or architecture. Invoked by `/unity-prototype`; also selectable directly when a dispatching agent needs a throwaway playable scene to validate a mechanic, rather than an addition to the real project (use `unity-coder` for that)."
 model: opus
 color: magenta
 tools: Skill, Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__unityMCP__*

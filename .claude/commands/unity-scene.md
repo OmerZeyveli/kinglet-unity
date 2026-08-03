@@ -1,6 +1,6 @@
 ---
 name: unity-scene
-description: "Build or modify a Unity scene entirely via MCP — GameObjects, hierarchy, lighting, cameras, physics layers."
+description: "Use when the user wants a scene built or reorganized — GameObjects, hierarchy, lighting, cameras, physics layers — entirely through the editor, not by hand-writing scene files."
 user-invocable: true
 args: scene_description
 ---

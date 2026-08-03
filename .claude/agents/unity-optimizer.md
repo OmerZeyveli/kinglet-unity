@@ -1,6 +1,6 @@
 ---
 name: unity-optimizer
-description: "Profiles and optimizes Unity performance. Uses MCP profiler for frame timing, memory snapshots, rendering stats. Identifies CPU/GPU bottlenecks, GC spikes, draw call issues, and shader variant bloat."
+description: "Use to profile and fix Unity performance issues — CPU/GPU bottlenecks, GC spikes, draw-call issues, shader variant bloat — using the MCP profiler for real frame data rather than guessing. Invoked by `/unity-optimize`; also selectable directly when a dispatching agent needs profiler-backed performance work of either kind."
 model: opus
 color: orange
 tools: Skill, Read, Write, Edit, Glob, Grep, mcp__unityMCP__*

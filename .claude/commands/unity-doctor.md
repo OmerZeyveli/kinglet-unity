@@ -1,6 +1,6 @@
 ---
 name: unity-doctor
-description: "Diagnostic health check — verifies MCP connectivity, .claude/ integrity, Unity project structure, and hook registration."
+description: "Use when the user asks whether the setup is correct, reports that Kinglet or the Unity MCP bridge is not working, or wants to check the install before trusting it on a new machine. Reports what is wrong rather than changing anything."
 user-invocable: true
 ---
 
