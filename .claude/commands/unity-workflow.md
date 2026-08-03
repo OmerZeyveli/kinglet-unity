@@ -78,6 +78,26 @@ Based on confirmed requirements:
 
 Present the plan to the user and wait for approval before executing.
 
+Once the plan is approved, offer both ways to run it — state the trade-off, do not assert a
+recommendation:
+
+```markdown
+Plan complete. Two ways to execute it:
+
+1. **Subagent-driven** — a fresh implementer per task, a review after each, a bounded fix loop, and
+   one whole-branch review at the end. Slower per task and it catches what a single pass does not:
+   run on this toolkit's own repository, the reviews found six defects the implementing task could
+   not see, including an installer that overwrote user files.
+2. **Inline** — execute here, in this session, with checkpoints. Fewer moving parts, no dispatch
+   overhead, and the same context that wrote the plan writes the code. Right for a small plan or one
+   task.
+
+Which?
+```
+
+**Option 1** loads the `subagent-driven-implementation` skill and runs its loop against the approved
+plan. **Option 2** continues to Phase 3 below, unchanged.
+
 ## Phase 3: Execute
 
 Follow the approved plan:
