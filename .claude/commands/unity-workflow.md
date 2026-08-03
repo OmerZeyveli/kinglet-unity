@@ -2,7 +2,7 @@
 name: unity-workflow
 description: "Full development pipeline — clarify requirements, plan implementation, execute with agents, verify with review + tests."
 user-invocable: true
-args: feature_description
+args: feature-description-or-plan-path
 ---
 
 # /unity-workflow — Full Development Pipeline
@@ -12,6 +12,36 @@ Orchestrate a complete development workflow for: **$ARGUMENTS**
 This command runs a 4-phase pipeline: **Clarify → Plan → Execute → Verify**. Each phase requires explicit user confirmation before proceeding to the next.
 
 ## Phase 1: Clarify
+
+### Phase 1a: Adopt an existing plan, if there is one
+
+Before interviewing anyone, look for work that has already been scoped. `$ARGUMENTS` may be a
+path to a written plan or spec rather than a feature description.
+
+Search in this order and stop at the first hit:
+
+1. `$ARGUMENTS` itself, if it resolves to a readable file
+2. `docs/features/<slug>/plan.md`
+3. `docs/superpowers/plans/*<slug>*.md` — a process provider's output is as legitimate an input
+   as a design document
+4. `docs/design/<system>.md`
+
+**Found:** skip the interview. Carry the plan's **Acceptance Criteria**, and its
+**Game Feel → Feel Acceptance Criteria** if present, into the Requirements Summary **verbatim**.
+Verbatim matters: a paraphrase is a silent design change. Record which file was adopted, by path,
+in the Requirements Summary, so a later session can tell where the requirements came from.
+
+**Found, but it has no acceptance criteria:** adopt what is there and state plainly what was
+missing. Never invent the criteria the plan would have contained.
+
+**More than one match:** list them and ask. Never silently take the newest.
+
+**`$ARGUMENTS` names a file that cannot be read:** **Hard stop.** Say the path and the reason, and
+stop. Do not fall back to interviewing as though nothing was asked for — a silent degradation into
+conversation is invisible to the user and is exactly how requirements stopped surviving sessions
+in the first place.
+
+**Nothing found:** say so in one line, then run the interview below.
 
 Interview the user to build a complete requirements picture. Ask about:
 
