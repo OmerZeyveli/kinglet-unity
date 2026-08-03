@@ -2475,3 +2475,57 @@ install into a fixture project -> headless session invokes serialization-safety 
 Two probes, four minutes, and they are the only evidence that any of the day's edits did anything.
 The 217-assertion suite passing proves the bytes are in the right place. It cannot prove the feature
 exists.
+
+---
+
+## 87. The auto-loaded rule that is 68% wrong changes nothing, measured
+
+Endless-Evolution auto-loads six rule files every session. One of them, `architecture.md`, mandates
+Model-View-System, VContainer, MessagePipe and UniTask. The project uses **none** of them: zero files
+reference VContainer or MessagePipe or UniTask, against 271 files using coroutines and 363
+MonoBehaviours. By section, 68% of that file is inapplicable here, and it is the largest of the six
+at 15.4 KB — a third of the whole rules budget, loaded unconditionally, mostly wrong.
+
+That is a strong-looking case, and I made it. Then I tested it, and it is not a case at all.
+
+**The experiment.** Two directories holding EE's `CLAUDE.md`, `AGENTS.md` and `.claude/rules/`,
+identical except that B has no `architecture.md`. No `Assets/`, no tools — the model answers from
+instructions alone, which is the condition that *maximises* a rule file's influence. Two prompts,
+three trials each, six runs per prompt. The second prompt was chosen to be maximally tempting: a
+greenfield subsystem reacting to events from all over the game, which is the textbook case for a
+message bus and a DI container.
+
+**Every one of the twelve runs produced the same design.** MonoBehaviour, `Time.time` timestamp
+cooldowns, static C# events, ScriptableObject definitions, a singleton on the bootstrap prefab,
+coroutine-debounced saves. Not one recommended VContainer, MessagePipe, UniTask or an MVS split, in
+either condition.
+
+Three things worth carrying:
+
+**A contradiction resolved in the project file is resolved, not merely noted.** EE's `CLAUDE.md` says
+"if a Kinglet rule contradicts what's above, this section wins," names the four diverging concepts,
+and states that the rest still applies in full. That sentence does the whole job. The precedence
+declaration is not documentation of an intent — it is the mechanism, and it works.
+
+**The clincher is what condition B did.** With `architecture.md` deleted, one run still opened with
+"Follow this project's architecture, **not `.claude/rules/architecture.md`**." It rejected a file that
+was not there, because `CLAUDE.md` names it. The override is carried entirely by the override; the
+rule's presence is not load-bearing in either direction. Removing it would not change a single
+answer — it would only stop paying for it.
+
+**Size is not influence, and I had used size as a proxy for harm.** "15.4 KB, 68% inapplicable,
+loaded every session" is a real measurement that predicts nothing about output. The cost is input
+tokens, which is a budget question; the concern I actually raised was correctness, which is a
+behaviour question, and the two do not follow from each other. I reached for the file that was
+easiest to *count*.
+
+So the recommendation reverses: **leave it.** The measured harm is zero, and the 31% that does apply
+here — `ScriptableObjects for Static Data`, `Input System Architecture`, `No God Objects`,
+`Composition Over Inheritance` — is cited by the answers themselves. Cutting the file to save
+context would trade a real 4.9 KB of used guidance for a hypothetical saving on 10.5 KB the model
+demonstrably ignores.
+
+**The general form:** before optimising away context that looks wrong, run the cheap A/B. Six
+headless runs and twenty minutes turned a confident architectural argument into a negative result.
+The negative result is the more valuable outcome — it retires the question instead of trading one
+guess for another.
