@@ -599,3 +599,4 @@ docs/superpowers/plans/2026-07-30-endless-evolution-four-tracks.md	original	-	-	
 docs/research/pioneer/field-notes.md	original	-	-	-	original	lessons-from-running-pioneer-on-a-real-project
 .claude/templates/game-decision-record.md	original	-	-	-	original	GDR template; design counterpart to the donchitos ADR template
 docs/superpowers/specs/2026-08-02-agent-context-and-verification-design.md	original	-	-	-	original	design spec; agent context + verification approach
+docs/superpowers/specs/2026-08-03-provider-boundary-and-rule-applicability-design.md	original	-	-	-	original	design spec; provider boundary + rule applicability detection
