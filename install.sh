@@ -380,6 +380,30 @@ if [ "$ORPHAN_KEPT_COUNT" -gt 0 ]; then
   printf '%s' "$ORPHANS_KEPT" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done
 fi
 
+# A kept settings.json is the one file whose staleness is silent and total.
+#
+# settings.json is the most-edited file in the payload — it is where you disable a plugin or widen a
+# permission — so on any real project it is "yours" and we keep it, correctly. But it is also the
+# only place a hook is registered. A payload that ships a NEW hook therefore lands the script on disk
+# and registers nothing: the hook never fires, and nothing reports that. Measured on a real project,
+# where the hook carrying the whole process chain arrived unregistered and silent.
+#
+# Merging someone's JSON is not something an installer should do unasked, so this reports instead.
+if is_modified ".claude/settings.json" && [ -f "$CLAUDE_DIR/settings.json" ]; then
+  UNREG=""
+  while IFS= read -r h; do
+    [ -n "$h" ] || continue
+    grep -qF -- "$h" "$CLAUDE_DIR/settings.json" || UNREG="${UNREG}${h}"$'\n'
+  done < <(grep -oE '\.claude/hooks/[a-z_-]+\.sh' "$SCRIPT_DIR/.claude/settings.json" | sort -u)
+  UNREG_COUNT=$(printf '%s' "$UNREG" | grep -c . || true)
+  if [ "$UNREG_COUNT" -gt 0 ]; then
+    warn "Your settings.json was kept, so $UNREG_COUNT hook(s) this version ships are NOT registered:"
+    printf '%s' "$UNREG" | while IFS= read -r h; do [ -n "$h" ] && printf '       %s\n' "$h"; done
+    warn "They are on disk but will never fire. Add them to \"hooks\" in .claude/settings.json,"
+    warn "or diff yours against $SCRIPT_DIR/.claude/settings.json."
+  fi
+fi
+
 ok "Installed $WRITTEN file(s)$([ "$KEPT" -gt 0 ] && printf ', kept %s of yours' "$KEPT")."
 
 # ── Step 6: CLAUDE.md ────────────────────────────────────────────────────────
