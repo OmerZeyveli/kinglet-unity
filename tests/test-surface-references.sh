@@ -97,8 +97,15 @@ assert_eq "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "0" \
 # direction — a command/agent naming a skill — so a skill naming a deleted command is invisible.
 # Same shape, opposite direction: collect every `/unity-*` token in every skill body, report the
 # ones with no matching .claude/commands/<name>.md.
+#
+# Scoped to `.claude/skills/*/SKILL.md` until `subagent-driven-implementation` shipped the first
+# skill directory in this repo with siblings beside SKILL.md (its four dispatch templates). Those
+# siblings name commands too and nothing was scanning them — the same "scanned set is not the whole
+# reality" shape this repo's own final-reviewer-prompt now names as a category worth looking for.
+# Widened to every .md under .claude/skills/, not just SKILL.md, so a future skill's sibling files
+# are covered without another manual widening.
 BAD_CMD_REFS=$(
-  for f in "$REPO_DIR"/.claude/skills/*/SKILL.md; do
+  for f in "$REPO_DIR"/.claude/skills/*/*.md; do
     [ -f "$f" ] || continue
     # A command reference is `/unity-x`. A PATH containing the same characters is not — and
     # `.claude/rules/unity-specifics.md` contains `/unity-specifics`, so naming a rule file in prose
