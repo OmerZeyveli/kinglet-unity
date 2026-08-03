@@ -417,7 +417,18 @@ emit_stack_verdict() {
     fi
 
     echo ""
-    if [ "$UT_PRESENT" = yes ]; then
+    if [ "$UT_PRESENT" = yes ] && [ "$COROUTINE_FILES" -gt 0 ]; then
+        # Both signals present. Deciding on UniTask alone got this wrong on the first real
+        # project it met: 492 first-party files, ONE naming UniTask — a documentation spec
+        # that mentions the word — against 38 genuinely using StartCoroutine. The output said
+        # the no-coroutines rule binds, which is the opposite of what that code does.
+        # A single reference does not outvote a pattern, and this generator does not get to
+        # decide which one the project meant.
+        echo "Mixed: $UT_REFS file(s) name UniTask and $COROUTINE_FILES use \`StartCoroutine\`."
+        echo "**This generator takes no side** on the \"No Coroutines — Use UniTask\" section of"
+        echo "\`unity-specifics.md\`. Decide it and write the answer outside the markers — and note"
+        echo "that a lone UniTask reference is often a mention rather than a use."
+    elif [ "$UT_PRESENT" = yes ]; then
         echo "The \"No Coroutines — Use UniTask\" section of \`unity-specifics.md\` **binds.**"
     elif [ "$UT_PRESENT" = manifest-only ]; then
         # manifest-only used to fall through to the else arm, which asserts "Neither UniTask nor

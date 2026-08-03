@@ -196,6 +196,29 @@ assert_lacks "$OUT_LEGACY" "owned by" "no provider flag means no sentence"
 FACTS_PROV="$(bash "$GEN" --facts-only --provider superpowers "$TMP/legacy" 2>/dev/null)"
 assert_has "$FACTS_PROV" "owned by \`superpowers\`" "--facts-only carries the provider sentence"
 
+# ── Case 8: UniTask named AND coroutines used — neither side wins ─────────
+#
+# Found by running the shipped generator against a real 492-file project: ONE file named
+# UniTask (a documentation spec that mentions the word in an assertion string) against 38
+# genuinely using StartCoroutine, and the output declared the no-coroutines rule BINDING —
+# the opposite of what that code does. The branch tested UT_PRESENT alone and never
+# consulted COROUTINE_FILES. No fixture had both signals at once, so five reviews and a
+# green suite all missed it.
+echo ""
+echo "--- Case: UniTask named and coroutines used — takes no side ---"
+bash "$MK" "$TMP/async-mixed" --variant async-mixed >/dev/null
+OUT_AM="$(bash "$GEN" "$TMP/async-mixed" 2>/dev/null)"
+assert_has "$OUT_AM" "| UniTask | yes (1 file(s)) |" \
+    "the lone UniTask reference is still counted and shown"
+assert_has "$OUT_AM" "Mixed: 1 file(s) name UniTask and 2 use \`StartCoroutine\`." \
+    "both signals are reported with their counts"
+assert_has "$OUT_AM" "**This generator takes no side** on the \"No Coroutines" \
+    "neither side is declared the winner"
+assert_lacks "$OUT_AM" "\`unity-specifics.md\` **binds.**" \
+    "one reference does not make the no-coroutines rule bind"
+assert_lacks "$OUT_AM" "UniTask is not in use" \
+    "and it is not declared absent either"
+
 echo ""
 echo "=== Rule Applicability: $TESTS_PASSED/$TESTS_RUN passed, $TESTS_FAILED failed ==="
 [ "$TESTS_FAILED" -eq 0 ]

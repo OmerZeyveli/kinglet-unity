@@ -6,18 +6,19 @@
 # the installer scans is plain text, so a directory with the right shape exercises it fully.
 #
 # Usage:
-#   ./tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy]
+#   ./tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed]
 #
 #   urp      (default) URP + Input System + UniTask + VContainer, one asmdef, one scene
 #   builtin  Built-in pipeline, minimal packages
 #   bare     No Packages/, no .gitignore, no scenes — the "nothing to detect" path
 #   dirty    urp + a pre-existing CLAUDE.md and .claude/, for the upgrade/guard paths
 #   legacy   URP, no VContainer/MessagePipe/UniTask, coroutine-using scripts — the "does not bind" path
+#   async-mixed  UniTask named once (in a doc spec) against two coroutine users — the "takes no side" path
 #
 set -euo pipefail
 
 DIR="${1:-}"; shift || true
-[ -n "$DIR" ] || { echo "usage: mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy]" >&2; exit 2; }
+[ -n "$DIR" ] || { echo "usage: mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed]" >&2; exit 2; }
 
 VARIANT=urp
 while [ $# -gt 0 ]; do
@@ -158,6 +159,48 @@ public class VendorThing
     // this member is what lets this file also guard the pruning of the UniTask count, not just
     // VContainer's. Do not "clean up" this to a bare using-directive.
     private UniTask _pending;
+}
+CS
+    ;;
+  async-mixed)
+    cat > "$DIR/Packages/manifest.json" <<'JSON'
+{
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.3",
+    "com.cysharp.unitask": "2.5.0"
+  }
+}
+JSON
+    # One file NAMES UniTask without using it — a documentation spec, which is exactly the
+    # shape that misled the generator on the first real project it met — against two that
+    # genuinely use coroutines. A single reference must not outvote a pattern.
+    cat > "$DIR/Assets/Scripts/DocMapSpec.cs" <<'CS'
+using NUnit.Framework;
+
+public class DocMapSpec
+{
+    // Mentions UniTask in an assertion string; does not use it.
+    [Test] public void DocsNameTheAsyncLibrary() { Assert.IsTrue("UniTask".Length > 0); }
+}
+CS
+    cat > "$DIR/Assets/Scripts/Blinker.cs" <<'CS'
+using System.Collections;
+using UnityEngine;
+
+public class Blinker : MonoBehaviour
+{
+    private void Start() { StartCoroutine(Blink()); }
+    private IEnumerator Blink() { yield return new WaitForSeconds(0.2f); }
+}
+CS
+    cat > "$DIR/Assets/Scripts/Pulser.cs" <<'CS'
+using System.Collections;
+using UnityEngine;
+
+public class Pulser : MonoBehaviour
+{
+    private void OnEnable() { StartCoroutine(Pulse()); }
+    private IEnumerator Pulse() { yield return null; }
 }
 CS
     ;;
