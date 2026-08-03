@@ -176,6 +176,24 @@ PAYLOAD_FILES=$(cd "$SCRIPT_DIR/.claude" && find . -type f ! -path './state/*' |
 PAYLOAD_COUNT=$(printf '%s\n' "$PAYLOAD_FILES" | grep -c . || true)
 info "Payload: $PAYLOAD_COUNT files"
 
+# Every .claude path this run will own, in receipt form. Built here rather than derived twice,
+# because the dry run and the real run must answer the same question: what belongs afterwards?
+# Keep this in step with the two write loops below (the payload loop and the scripts/tests groups)
+# — a path written but missing here would be deleted as an orphan the run after it appears.
+NEW_PATHS=$(
+  printf '%s\n' "$PAYLOAD_FILES" | sed 's|^|.claude/|'
+  for group in scripts tests; do
+    [ -d "$SCRIPT_DIR/$group" ] || continue
+    for f in "$SCRIPT_DIR/$group"/*.sh; do
+      [ -f "$f" ] || continue
+      b=$(basename "$f")
+      [ "$b" = "check-provenance.sh" ] && continue
+      printf '.claude/%s/%s\n' "$group" "$b"
+    done
+  done
+)
+NEW_PATHS=$(printf '%s\n' "$NEW_PATHS" | sort -u)
+
 sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 
 # On upgrade, find files the user edited so we can leave them alone.
@@ -196,10 +214,43 @@ fi
 
 is_modified() { grep -qxF -- "$1" <<< "$MODIFIED_FILES"; }
 
+# Surfaces the previous install owns and this payload no longer contains.
+#
+# The installer used to only ever add. The 2026-08-03 surface cut removed 74 files, and installing
+# over an older install left every one of them on disk and selectable — 114 orphans against a real
+# project — so the cut was invisible in the only place it matters. An upgrade that leaves a deleted
+# agent reachable is worse than no upgrade: the model still sees it.
+#
+# Anything the user edited is never removed. A file whose checksum drifted is theirs, whatever the
+# payload now says, and deleting it is the failure mode this installer just finished fixing on the
+# other side.
+ORPHANS=""; ORPHANS_KEPT=""
+if [ "$MODE" = ours ]; then
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    case "$rel" in .claude/state/*) continue ;; esac
+    [ -e "$PROJECT_DIR/$rel" ] || continue
+    if is_modified "$rel"; then
+      ORPHANS_KEPT="${ORPHANS_KEPT}${rel}"$'\n'
+    else
+      ORPHANS="${ORPHANS}${rel}"$'\n'
+    fi
+  done < <(comm -23 \
+      <(grep -v '^#' "$RECEIPT" 2>/dev/null | tail -n +2 | cut -f1 | grep '^\.claude/' | sort -u) \
+      <(printf '%s\n' "$NEW_PATHS"))
+fi
+ORPHAN_COUNT=$(printf '%s' "$ORPHANS" | grep -c . || true)
+ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
+
 if [ "$DRY_RUN" -eq 1 ]; then
   printf '\n%s\n' "${BOLD}Would install:${NC}"
   printf '  %s files into %s\n' "$PAYLOAD_COUNT" "$CLAUDE_DIR"
   printf '  scripts/ and tests/ into .claude/\n'
+  if [ "$ORPHAN_COUNT" -gt 0 ]; then
+    printf '  remove %s file(s) this payload no longer ships:\n' "$ORPHAN_COUNT"
+    printf '%s' "$ORPHANS" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done
+  fi
+  [ "$ORPHAN_KEPT_COUNT" -gt 0 ] && printf '  keep %s removed-from-payload file(s) you edited\n' "$ORPHAN_KEPT_COUNT"
   # MODIFIED_FILES is always set; KEPT/MOD_COUNT are not defined until Step 5 and would be an
   # unbound-variable death under `set -u`.
   DRY_MOD=$(printf '%s' "$MODIFIED_FILES" | grep -c . || true)
@@ -310,6 +361,25 @@ for group in scripts tests; do
     WRITTEN=$((WRITTEN + 1))
   done
 done
+
+# Remove what the previous install owned and this payload dropped. Computed before any write, so a
+# path this run creates can never appear here. Files the user edited were filtered out already.
+REMOVED=0
+if [ "$ORPHAN_COUNT" -gt 0 ]; then
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    rm -f "$PROJECT_DIR/$rel" && REMOVED=$((REMOVED + 1))
+  done <<< "$ORPHANS"
+  # Skill directories are one level and hold a single SKILL.md; once that is gone the directory is
+  # an empty shell that still reads as a skill to anyone listing the tree.
+  find "$CLAUDE_DIR" -mindepth 1 -type d -empty -delete 2>/dev/null || true
+  ok "Removed $REMOVED file(s) no longer in the payload."
+fi
+if [ "$ORPHAN_KEPT_COUNT" -gt 0 ]; then
+  warn "$ORPHAN_KEPT_COUNT file(s) dropped from the payload have your edits — left in place:"
+  printf '%s' "$ORPHANS_KEPT" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done
+fi
+
 ok "Installed $WRITTEN file(s)$([ "$KEPT" -gt 0 ] && printf ', kept %s of yours' "$KEPT")."
 
 # ── Step 6: CLAUDE.md ────────────────────────────────────────────────────────

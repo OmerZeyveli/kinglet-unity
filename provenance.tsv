@@ -110,7 +110,7 @@ examples/CLAUDE.md.rpg	ecu	1.5.0	examples/CLAUDE.md.rpg	06ee9968fd08c22f512b41c7
 .gitattributes	original	-	-	-	original	-
 .github/workflows/ci.yml	ecu	1.5.0	.github/workflows/ci.yml	3b79e9f884b55ed5fe70d1b5cdb241e2300d68da660335cf92de07bf7a5e38df	modified	ci-adapted: dropped .claude-plugin + benchmarks steps (not vendored); added provenance, full-history checkout, fixture install, macOS leg, cross-platform Kinglet suite, warning-level script ShellCheck, Linux validate/check gates, spike contract JSON verification, deterministic spike report regeneration; extended shellcheck to spikes/**/*.sh
 .gitignore	original	-	-	-	original	root-path-collides-with-ecu-but-ours
-install.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours
+install.sh	original	-	-	-	original	root-path-collides-with-ecu-but-ours; prune-on-upgrade: remove payload-dropped files, never user-edited ones (the cut left 114 orphans on a real project)
 LICENSE	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 MCP-SETUP.md	original	-	-	-	original	corrected against a live bridge: port is a machine-local EditorPref we cannot see; Unity official MCP shares no tool names
 MERGE-NOTES.md	original	-	-	-	original	surface-cut-doc-correction (2026-08-03, Task 7): appended a new section recording what Task 7 corrected and the re-measurement
@@ -530,3 +530,4 @@ tests/test-rule-applicability.sh	original	-	-	-	original	asserts the generated C
 tests/test-workflow-plan-input.sh	original	-	-	-	original	asserts /unity-workflow accepts a written plan as input
 docs/superpowers/specs/2026-08-03-surface-cut-and-process-chain-design.md	original	-	-	-	original	design spec; surface cut 103->32 + process chain
 docs/superpowers/plans/2026-08-03-surface-cut-and-process-chain.md	original	-	-	-	original	implementation plan; surface cut + process chain
+tests/test-install-prune.sh	original	-	-	-	original	an upgrade must remove what the payload dropped and must never remove a file the user edited
