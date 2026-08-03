@@ -16,8 +16,23 @@ are verifiable rather than asserted.
 | [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) | vendored at v1.5.0 (`bb28ccb`); mobile content removed, some files modified | agents `unity-*`, commands `unity-*`, skills, hooks, 5 rules, `settings.json` |
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) | adapted at `984023d`; reformatted to this toolkit's conventions | 8 design agents, 9 design commands, 5 templates |
 
-Files not attributable to either — `rules/pc-console.md`, this notice, and the manifest — are
-original to Kinglet Pioneer, MIT, Copyright (c) 2026 OmerZeyveli.
+Files not attributable to either are original to Kinglet Pioneer, MIT, Copyright (c) 2026
+OmerZeyveli. **The manifest is the list**, not this paragraph — every row with `origin=original` in
+`provenance.tsv`. At the time of writing that is six files:
+
+| File | What it is |
+|---|---|
+| `rules/pc-console.md` | the platform spec; the only rule not vendored |
+| `hooks/block-legacy-input.sh` | blocks the legacy Input Manager API. Three rule files had claimed for a long time that a hook enforced this. None did — not here, not in ECU v1.5.0. This is that hook. |
+| `templates/game-decision-record.md` | the design counterpart to the ADR |
+| `NOTICE.md` | this file |
+| `VERSION`, `UPSTREAM` | which toolkit build this is, and what it pins |
+
+This paragraph used to name three of them and stop, which meant three original files travelled with
+no stated copyright holder at all — in the document whose whole job is to state copyright holders.
+It was found by someone reading this file and reporting back what it said. If you add an original
+file under `.claude/`, add its manifest row; that is what makes it attributable, and this table is a
+convenience that follows from it.
 
 The [CoplayDev Unity MCP bridge](https://github.com/CoplayDev/unity-mcp) is **not** included here.
 `.mcp.json` merely points at it on `localhost`; install it yourself via Package Manager.
