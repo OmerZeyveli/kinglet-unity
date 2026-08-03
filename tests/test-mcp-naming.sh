@@ -34,11 +34,34 @@ SHIPPED_SERVER=$(awk -F'"' '/^ *"[A-Za-z]*MCP": \{/ {print $2; exit}' "$REPO_DIR
 # adapters/ and tests/kinglet/ are excluded on purpose: they belong to the platform-spike's own role
 # schema, which is a different data model that ships into no project. They are named here so the
 # exclusion is a decision rather than an oversight.
+# Match where the name is USED, not where it is mentioned.
+#
+# The first version of this guard matched the string anywhere in a file's content. It caught the
+# incident being documented: a skill citing the two casings to explain what went wrong tripped a
+# guard about casing. Field note §81 has already ruled on this whole class — "a guard this easy to
+# step around while blocking legitimate writes is mis-specified, not strict; it should match on the
+# resolved target" — and notes that any substring match over text will fire on quotation.
+#
+# So: in Markdown only the frontmatter `tools:` line is load-bearing, because that is a permission
+# grant. Prose naming the string is documentation and this repository must stay able to write its
+# own history. In shell, every line except a comment is load-bearing, because a case pattern or a
+# comparison against the wrong name silently stops matching — which is exactly how
+# .claude/hooks/build-analyze.sh stopped recognising builds.
+#
+# adapters/ and tests/kinglet/ are excluded: they are the platform spike's own role schema, a
+# different data model that ships into no project. Named here so the exclusion is a decision.
 BAD=$(
   for f in $(cd "$REPO_DIR" && git ls-files '.claude/*' 'scripts/*' install.sh uninstall.sh); do
     [ -f "$REPO_DIR/$f" ] || continue
-    awk -v file="$f" -v want="$SHIPPED_SERVER" '
+    case "$f" in
+      *.md) SCAN_MODE=frontmatter ;;
+      *)    SCAN_MODE=noncomment ;;
+    esac
+    awk -v file="$f" -v want="$SHIPPED_SERVER" -v mode="$SCAN_MODE" '
+      /^---/ { fm++ }
       {
+        if (mode == "frontmatter" && !(fm == 1 && $0 ~ /^tools:/)) next
+        if (mode == "noncomment"  && $0 ~ /^[[:space:]]*#/) next
         line = $0
         while (match(line, /mcp__[A-Za-z0-9_]+__/)) {
           tok = substr(line, RSTART + 5, RLENGTH - 7)
