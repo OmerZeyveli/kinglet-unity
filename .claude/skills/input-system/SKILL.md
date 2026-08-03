@@ -9,7 +9,7 @@ description: "New Input System — action maps, PlayerInput component, generated
 
 ## Boundary with the rules
 
-The `unity-specifics.md` rule (in `.claude/rules`) binds the New Input System as mandatory (legacy
+`.claude/rules/unity-specifics.md` binds the New Input System as mandatory (legacy
 `Input.*` is blocked by a hook) and the Enable/Disable lifecycle — enable in `OnEnable`, disable in
 `OnDisable`, every `+=` matched by a `-=`. `.claude/rules/architecture.md` binds the InputView pattern: InputView
 is the only class that owns `PlayerControls`, and Systems are input-agnostic (`SetMoveInput(Vector2)`,
@@ -395,7 +395,7 @@ public class DeviceDetector : MonoBehaviour
 
 | Mistake | Why it is tempting | What it costs | Source |
 |---|---|---|---|
-| Enabling the action map in `Awake` instead of `OnEnable` | `Awake` runs once and feels like the natural place to set the object up — "enable it as soon as it exists" | The subscription/enable pairing that `OnDisable` tears down never gets rebuilt on the next `OnEnable`. After the object is disabled once (a menu opens, the object is pooled, the GameObject is deactivated) and re-enabled, the action map is never re-`Enable()`d — input silently stops, with no error and no console warning | The `unity-specifics.md` rule (in `.claude/rules`): "Missing Enable = zero input received. Missing Disable = ghost callbacks, leaks" |
+| Enabling the action map in `Awake` instead of `OnEnable` | `Awake` runs once and feels like the natural place to set the object up — "enable it as soon as it exists" | The subscription/enable pairing that `OnDisable` tears down never gets rebuilt on the next `OnEnable`. After the object is disabled once (a menu opens, the object is pooled, the GameObject is deactivated) and re-enabled, the action map is never re-`Enable()`d — input silently stops, with no error and no console warning | `.claude/rules/unity-specifics.md`: "Missing Enable = zero input received. Missing Disable = ghost callbacks, leaks" |
 
 ## Multiplayer Input (PlayerInputManager)
 

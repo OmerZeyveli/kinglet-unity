@@ -100,7 +100,16 @@ assert_eq "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "0" \
 BAD_CMD_REFS=$(
   for f in "$REPO_DIR"/.claude/skills/*/SKILL.md; do
     [ -f "$f" ] || continue
-    grep -oE '/unity-[A-Za-z0-9_-]+' "$f" | sort -u | while IFS= read -r cmd; do
+    # A command reference is `/unity-x`. A PATH containing the same characters is not — and
+    # `.claude/rules/unity-specifics.md` contains `/unity-specifics`, so naming a rule file in prose
+    # used to fail this check. `.claude/skills/unity-mcp-patterns/` had the same latent trap.
+    #
+    # Third instance in this wave of one shape: a substring match that fires on a mention. Field
+    # note 81 rules on the class — a guard that blocks legitimate writing is mis-specified, not
+    # strict. So require the slash to begin a token: preceded by start-of-line or by something that
+    # is not a path character, then strip that guard character back off.
+    grep -oE '(^|[^A-Za-z0-9_/.-])/unity-[A-Za-z0-9_-]+' "$f" \
+      | sed 's|^[^/]*||' | sort -u | while IFS= read -r cmd; do
       [ -n "$cmd" ] || continue
       name="${cmd#/}"
       if [ ! -f "$REPO_DIR/.claude/commands/$name.md" ]; then
