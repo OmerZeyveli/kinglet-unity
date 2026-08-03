@@ -4,7 +4,6 @@ description: "Profiles and optimizes Unity performance. Uses MCP profiler for fr
 model: opus
 color: orange
 tools: Skill, Read, Write, Edit, Glob, Grep, mcp__unityMCP__*
-skills: performance
 ---
 
 # Unity Performance Optimizer
