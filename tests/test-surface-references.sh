@@ -7,35 +7,75 @@
 # and on 2026-08-03 nine surviving surfaces carried exactly that after a cut. An agent told to
 # load a skill that is not there gets no error of any kind — it just silently loads nothing.
 #
+# Both reference forms are scoped to the section that actually means "load a skill":
+#   - the YAML frontmatter `skills:` key (inline `skills: a, b` or a block sequence with
+#     `skills:` alone on its line followed by indented `- name` items), matched only between
+#     the file's opening `---` and closing `---`;
+#   - a list item under a "## Skills to load" body heading, backticked or bare, matched only
+#     between that heading and the next `##` heading.
+# Scoping both rules this way means a stray `- ` list item elsewhere in the file (a tools list,
+# a prose example, a fenced code block) can never be mistaken for a skill reference, and a bare
+# (unbackticked) name is caught rather than silently passed — nothing in this repo enforces the
+# backtick convention, so a check that only matched backticked names was a style assumption
+# dressed up as coverage.
+#
 # Runner-provided: uses the runner's assert_eq and $REPO_DIR. Run through tests/run-tests.sh.
 
 echo "--- surface references ---"
 
-SKILL_NAMES=$(ls -1 "$REPO_DIR/.claude/skills" 2>/dev/null | sort)
-
-# Collect every bare name that appears either in a `skills:` frontmatter value or as a
-# backticked list item in a "Skills to load" block, then report the ones with no directory.
+# Collect every bare name that appears either in a `skills:` frontmatter value (inline or YAML
+# block sequence) or as a list item — backticked or bare — inside a "Skills to load" body block,
+# then report the ones with no matching skill directory.
 BAD_REFS=$(
   for f in "$REPO_DIR"/.claude/agents/*.md "$REPO_DIR"/.claude/commands/*.md; do
     [ -f "$f" ] || continue
     awk -v file="$f" '
-      # `skills: a, b, c` in frontmatter
-      /^skills:[[:space:]]/ {
-        line = $0
-        sub(/^skills:[[:space:]]*/, "", line)
-        n = split(line, parts, /[[:space:]]*,[[:space:]]*/)
-        for (i = 1; i <= n; i++) {
-          gsub(/^[[:space:]]+|[[:space:]]+$/, "", parts[i])
-          if (parts[i] != "") print file "\t" parts[i]
+      BEGIN { in_front = 0; in_seq = 0; in_load = 0 }
+
+      NR == 1 && $0 == "---" { in_front = 1; next }
+      in_front && $0 == "---" { in_front = 0; in_seq = 0; next }
+
+      in_front {
+        # inline form: `skills: a, b, c` — a value on the same line
+        if ($0 ~ /^skills:[[:space:]]*[^[:space:]]/) {
+          in_seq = 0
+          line = $0
+          sub(/^skills:[[:space:]]*/, "", line)
+          n = split(line, parts, /[[:space:]]*,[[:space:]]*/)
+          for (i = 1; i <= n; i++) {
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", parts[i])
+            if (parts[i] != "") print file "\t" parts[i]
+          }
+          next
         }
+        # YAML block-sequence form: bare `skills:` opens a run of indented `- name` items
+        if ($0 ~ /^skills:[[:space:]]*$/) {
+          in_seq = 1
+          next
+        }
+        if (in_seq) {
+          if ($0 ~ /^[[:space:]]+-[[:space:]]*/) {
+            line = $0
+            sub(/^[[:space:]]+-[[:space:]]*/, "", line)
+            gsub(/^["\x27]|["\x27][[:space:]]*$/, "", line)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+            if (line != "") print file "\t" line
+            next
+          }
+          in_seq = 0
+        }
+        next
       }
-      # a backticked bare name on its own list line: "- `name`"
-      /^[[:space:]]*-[[:space:]]*`[A-Za-z0-9_-]+`[[:space:]]*$/ {
+
+      # body: only inside the "Skills to load" section
+      /^## Skills to load/ { in_load = 1; next }
+      in_load && /^##/ { in_load = 0 }
+      in_load && match($0, /^[[:space:]]*-[[:space:]]*`?[A-Za-z0-9_-]+`?[[:space:]]*$/) {
         line = $0
-        if (match(line, /`[A-Za-z0-9_-]+`/)) {
-          name = substr(line, RSTART + 1, RLENGTH - 2)
-          if (name != "") print file "\t" name
-        }
+        sub(/^[[:space:]]*-[[:space:]]*/, "", line)
+        gsub(/[[:space:]]+$/, "", line)
+        gsub(/`/, "", line)
+        if (line != "") print file "\t" line
       }
     ' "$f"
   done | sort -u | while IFS="$(printf '\t')" read -r src name; do
@@ -57,7 +97,10 @@ assert_eq "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "0" \
 UNTRACKED_PAYLOAD=$(cd "$REPO_DIR" && git ls-files --others --exclude-standard -- .claude 2>/dev/null || true)
 
 if [ -n "$UNTRACKED_PAYLOAD" ]; then
-  printf 'untracked payload file: %s\n' $UNTRACKED_PAYLOAD
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    printf 'untracked payload file: %s\n' "$path"
+  done <<< "$UNTRACKED_PAYLOAD"
 fi
 assert_eq "$(printf '%s' "$UNTRACKED_PAYLOAD" | grep -c . || true)" "0" \
   "no untracked file under .claude/ (invisible to provenance and baseline, but live for the model)"
