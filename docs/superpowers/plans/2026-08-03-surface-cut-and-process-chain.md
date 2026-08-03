@@ -49,6 +49,216 @@
 
 ---
 
+### Task 0: Teach the baseline regenerator to accept a deliberate path-set change
+
+**Added mid-execution.** Task 1 shipped its content commit (`ad42902`) and then hit a hard stop: `python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD --expect-drift 52 --dry-run` exits 2 with 52 `path missing at anchor` refusals and `expected drift 52, found 0`. This is not a wrong-number case. Reading `tools/kinglet_build/baseline.py`, `regeneration_plan` sorts every path into one of three outcomes:
+
+- present at anchor with a different `sha256`/`git_mode` → a countable `BaselineChange`;
+- **recorded but missing at anchor → an unconditional refusal** (`:218`, `:226`), never countable;
+- **present under `.claude/` but not recorded → an unconditional refusal** (`unrecorded .claude path at anchor`).
+
+So no `--expect-drift` value can describe a removal or an addition. The module docstring states this is deliberate — the plan gate "makes the *path set* of the baseline immutable without a deliberate act" — but the tool provides no way to *perform* that deliberate act. Tasks 1 and 2 remove 74 files and Task 5 adds 4; all three are blocked.
+
+`apply_regeneration` has the matching gap: it only rewrites `sha256`/`git_mode` on records that already exist. It cannot drop a record or insert one, and it never touches the `expected_count` fields.
+
+**The fix is the missing door, not a bypass.** `--expect-drift` makes a content change deliberate by forcing the caller to name the count. This task adds the same mechanism for the path set: `--expect-removed` and `--expect-added`. **Absent both flags, behaviour is byte-for-byte what it is today** — a path-set change is still a hard refusal. That default is itself a test.
+
+**Files:**
+- Modify: `tools/kinglet_build/baseline.py`
+- Modify: `tools/kinglet_build/cli.py`
+- Modify: `tests/kinglet/test_baseline_inventory.py`
+- Modify: `migration/baseline-inventory.json` (its own commit, at the end — clears Task 1's outstanding removal)
+- Modify: `provenance.tsv` (status/note for the edited tracked files, if they carry rows)
+
+**Interfaces:**
+- Produces: `regeneration_plan(repo_root, commit, baseline, expected_drift=None, expected_removed=None, expected_added=None) -> RegenerationPlan`, where `RegenerationPlan` gains `removals: tuple[BaselineRemoval, ...]` and `additions: tuple[BaselineAddition, ...]` beside its existing `changes`. CLI gains `--expect-removed N` and `--expect-added N`. Tasks 1, 2 and 5 consume this.
+
+**A correction to the option this task was chosen from.** The choice offered to the operator said the tests would read their expected counts from the JSON. **Do not do that.** Today the test asserts four independent things agree: a hardcoded constant, the JSON's `expected_count`, `len(records)`, and the actual git tree. Reading the constant from the JSON deletes the only independent witness and turns the guard into a tautology. The constants stay hardcoded. What changes is that the **test names** stop encoding them, because a name is what goes stale silently — `CLAUDE.md` records that exact failure twice.
+
+- [ ] **Step 1: Write the failing tests first.** Add to `tests/kinglet/test_baseline_inventory.py`. These use the real `regeneration_plan` against a synthetic baseline document, so they need no git anchor beyond `HEAD`.
+
+```python
+    def test_removal_is_refused_when_no_expect_removed_flag_is_given(self) -> None:
+        """The default must not change: a path-set change stays a hard refusal."""
+        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
+        plan = regeneration_plan(REPOSITORY_ROOT, "HEAD", baseline)
+        self.assertFalse(plan.approved)
+        self.assertTrue(
+            any("path missing at anchor" in refusal for refusal in plan.refusals),
+            plan.refusals,
+        )
+        self.assertEqual((), plan.removals)
+
+    def test_removal_is_counted_when_expect_removed_matches(self) -> None:
+        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
+        plan = regeneration_plan(
+            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=2
+        )
+        self.assertTrue(plan.approved, plan.refusals)
+        self.assertEqual(
+            {".claude/agents/does-not-exist.md"},
+            {removal.path for removal in plan.removals},
+        )
+
+    def test_removal_count_mismatch_still_refuses(self) -> None:
+        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
+        plan = regeneration_plan(
+            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=99
+        )
+        self.assertFalse(plan.approved)
+        self.assertTrue(
+            any("expected removed 99" in refusal for refusal in plan.refusals),
+            plan.refusals,
+        )
+
+    def test_apply_regeneration_drops_the_record_and_decrements_expected_count(
+        self,
+    ) -> None:
+        baseline = self._baseline_with_extra_record(".claude/agents/does-not-exist.md")
+        before_full = baseline["full_claude_tree"]["expected_count"]
+        before_agents = baseline["categories"]["agents"]["expected_count"]
+        plan = regeneration_plan(
+            REPOSITORY_ROOT, "HEAD", baseline, expected_removed=2
+        )
+        applied = apply_regeneration(baseline, plan)
+
+        full_paths = [r["path"] for r in applied["full_claude_tree"]["files"]]
+        agent_paths = [r["path"] for r in applied["categories"]["agents"]["files"]]
+        self.assertNotIn(".claude/agents/does-not-exist.md", full_paths)
+        self.assertNotIn(".claude/agents/does-not-exist.md", agent_paths)
+        self.assertEqual(before_full - 1, applied["full_claude_tree"]["expected_count"])
+        self.assertEqual(
+            before_agents - 1, applied["categories"]["agents"]["expected_count"]
+        )
+        self.assertEqual(sorted(full_paths), full_paths)
+        self.assertEqual(sorted(agent_paths), agent_paths)
+```
+
+`_baseline_with_extra_record(path)` is a helper this task also writes: it deep-copies the real baseline document, appends a record for `path` with a fake but well-formed `sha256` (64 hex chars) and `git_mode` `100644` to **both** `full_claude_tree.files` and the matching `categories.<kind>.files`, re-sorts both lists by path, and increments both `expected_count` fields. The record is for a path that does not exist in the tree, which is what makes it read as a removal.
+
+**Note the count in the second and third tests is 2, not 1.** The helper adds one record to `full_claude_tree` and one to `categories.agents`, and `regeneration_plan` walks both structures — so one absent file produces two removals, the same doubling the plan's Global Constraints already state for drift.
+
+- [ ] **Step 2: Run them and watch them fail.**
+
+Run: `python3 -m unittest tests.kinglet.test_baseline_inventory -v 2>&1 | tail -20`
+Expected: the four new tests fail — `regeneration_plan() got an unexpected keyword argument 'expected_removed'` for three of them, and `AttributeError: 'RegenerationPlan' object has no attribute 'removals'` for the first. A test that passes here is testing nothing; stop and fix the test before writing the implementation.
+
+- [ ] **Step 3: Implement removals in `baseline.py`.**
+
+Add beside `BaselineChange`:
+
+```python
+@dataclass(frozen=True)
+class BaselineRemoval:
+    path: str
+    structure: str  # "full_claude_tree" or "categories.<name>"
+
+
+@dataclass(frozen=True)
+class BaselineAddition:
+    path: str
+    structure: str
+    sha256: str
+    git_mode: str
+```
+
+Give `RegenerationPlan` the two new tuple fields, defaulting to `()` so existing constructions keep working. Then in `regeneration_plan`, change the two `path missing at anchor` sites so they append a `BaselineRemoval` when `expected_removed is not None`, and keep the refusal otherwise. Add the count gate beside the existing drift gate:
+
+```python
+    if expected_drift is not None and expected_drift != len(changes):
+        refusals.append(f"expected drift {expected_drift}, found {len(changes)}")
+    if expected_removed is not None and expected_removed != len(removals):
+        refusals.append(f"expected removed {expected_removed}, found {len(removals)}")
+    if expected_added is not None and expected_added != len(additions):
+        refusals.append(f"expected added {expected_added}, found {len(additions)}")
+```
+
+- [ ] **Step 4: Implement additions in `baseline.py`.** The `unrecorded .claude path at anchor` loop becomes a `BaselineAddition` when `expected_added is not None`, carrying the anchor's real `sha256` and mode. An addition must be recorded in `full_claude_tree` **and** in its category — so it needs the path→category mapping.
+
+**Do not invent that mapping.** `tests/kinglet/test_baseline_inventory.py` already implements it as `category_paths(category, tracked)`, and the baseline also has a set of paths deliberately in `full_claude_tree` but in no category (`OMITTED_FROM_SEVEN_CATEGORIES` in the same file). Lift that categorisation into `tools/kinglet_build/baseline.py` as a module-level function and have the test import it from there, so one definition serves both. A path that maps to no category gets a `full_claude_tree` addition only.
+
+- [ ] **Step 5: Implement removal and addition in `apply_regeneration`.** It must drop removed records from each structure they appear in, insert added records in sorted position, and update `expected_count` on every structure it touched. Assert the invariant the tests check: `files` stays sorted by `path` and `expected_count == len(files)`.
+
+- [ ] **Step 6: Run the new tests to green.**
+
+Run: `python3 -m unittest tests.kinglet.test_baseline_inventory -v 2>&1 | tail -20`
+Expected: the four new tests pass. The 30 pre-existing failures from Task 1's removal are still there — Step 9 clears them.
+
+- [ ] **Step 7: Add the CLI flags in `cli.py`,** beside `--expect-drift` and with the same shape (`type=int`, **not** `required`, so omitting them preserves today's behaviour), and pass them through to `regeneration_plan`.
+
+```python
+    regenerate.add_argument(
+        "--expect-removed",
+        type=int,
+        dest="expect_removed",
+        help="the number of recorded paths the caller expects to be gone at the anchor",
+    )
+    regenerate.add_argument(
+        "--expect-added",
+        type=int,
+        dest="expect_added",
+        help="the number of unrecorded .claude paths the caller expects at the anchor",
+    )
+```
+
+- [ ] **Step 8: Rename the two tests whose names encode counts.** Their assertions and constants stay exactly as they are — only the names change, because a count in a name goes stale silently while a count in an assertion fails loudly.
+
+- `test_inventory_counts_are_exact_28_36_39_26_6_5_10` → `test_inventory_counts_match_the_expected_counts_constant`
+- `test_full_claude_tree_baseline_covers_all_148_tracked_files` → `test_full_claude_tree_baseline_covers_every_tracked_claude_file`
+
+Then update `EXPECTED_COUNTS` and the `148` literals to the values that hold after Task 1's removal: agents `20`, commands `27`, skills `30`, hooks `26`, rules `6`, claude_templates `6`, code_templates `10`, and full tree `122`. **Verify each against the tree rather than trusting this list** — `git ls-files '.claude/agents/*.md' | wc -l` and the equivalents — and if any disagrees, report the discrepancy instead of writing the number that makes the test pass.
+
+- [ ] **Step 9: Clear Task 1's outstanding baseline.** This is what proves the new flags work on the real case.
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD \
+    --expect-drift 0 --expect-removed 52 --expect-added 0 --dry-run
+```
+
+Expected: an approved plan with 52 removals. If it refuses, read the refusal — it is telling you the change set is not what this plan predicted, and that is information to report, not a number to tune. Then run without `--dry-run`.
+
+- [ ] **Step 10: Full suite green.**
+
+```bash
+bash tests/run-tests.sh > /tmp/t0.log 2>&1; echo "exit=$?"
+tail -3 /tmp/t0.log
+grep -c -- '--- test-' /tmp/t0.log; ls tests/test-*.sh | wc -l
+bash scripts/check-provenance.sh
+```
+
+Expected: `exit=0`, zero failures, header count equal to the file count, `provenance OK`. The suite takes about 2m25s — use a timeout above 150000ms.
+
+- [ ] **Step 11: Commit in two commits** — the tool and tests first, the regenerated baseline second, so the baseline change is reviewable on its own.
+
+```bash
+git add tools/kinglet_build/baseline.py tools/kinglet_build/cli.py tests/kinglet/test_baseline_inventory.py provenance.tsv
+git commit -m "feat(baseline): let a deliberate path-set change be named, not just refused
+
+regeneration_plan sorted every path into countable content drift or an
+unconditional refusal, and a removal or addition could only ever be the
+latter. The docstring says the path set is immutable 'without a
+deliberate act' — but there was no way to perform that act, so the
+2026-08-03 skill flattening was applied by hand.
+
+--expect-removed and --expect-added do for the path set what
+--expect-drift does for content. Absent both, behaviour is unchanged
+and a path-set change is still a hard refusal; that default has its own
+test.
+
+Two test names encoded their counts and are renamed. The counts stay
+hardcoded as assertions: they are the independent witness against the
+JSON, and reading them from the JSON would make the guard a tautology."
+
+git add migration/baseline-inventory.json
+git commit -m "chore(baseline): record the design/production track removal
+
+52 removals (26 files, each tracked in full_claude_tree and its
+category). First use of --expect-removed."
+```
+
+---
+
 ### Task 1: Remove the design/production track
 
 The single best-measured cut. Field note §36: across 17,316 lines of documentation on the only real project this toolkit has met, `docs/design/`, `docs/production/` and `docs/adr/` were used **zero times out of three**. Removing the eight design agents strands nine genre skills by itself — one chain through two layers.
@@ -159,9 +369,11 @@ Removing the design agents strands the genre skills by itself.
 Refs: docs/superpowers/specs/2026-08-03-surface-cut-and-process-chain-design.md"
 ```
 
-- [ ] **Step 8: Learn the baseline drift, then regenerate in its own commit.**
-
-26 files removed, each tracked in two places, so the expected drift is **52**.
+- [ ] **Step 8: SUPERSEDED by Task 0.** This step originally said to regenerate the baseline with
+`--expect-drift 52`. The tool refuses a path-set change by design and no `--expect-drift` value can
+express a removal — see Task 0, which adds `--expect-removed` and clears this task's outstanding 52
+removals at its Step 9. Task 1 ends at Step 7 plus Step 9's verification. Do not attempt the
+regeneration here.
 
 ```bash
 python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD --expect-drift 52 --dry-run
