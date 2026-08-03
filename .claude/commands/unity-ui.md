@@ -30,3 +30,9 @@ Use the `unity-ui-builder` agent to:
 - Avoid Layout Groups in scroll views
 
 Report the screen structure, scripts created, and how to test.
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+Offer `/unity-review` — UI code is where Canvas rebuild and raycast-target faults land.

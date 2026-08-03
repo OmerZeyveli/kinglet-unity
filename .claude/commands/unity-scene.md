@@ -38,3 +38,9 @@ _Dynamic/     — parent for runtime-spawned objects
 ```
 
 Report the complete scene structure when done.
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+Offer `/unity-prototype` or `/unity-feature` depending on whether the scene is throwaway.

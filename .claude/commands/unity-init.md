@@ -41,3 +41,9 @@ Scan this Unity project and generate a tailored CLAUDE.md configuration.
 ## Output
 
 Present the results in a clear summary table showing what was detected and which skills are recommended.
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+Offer `/unity-doctor` to confirm the install, and name the `FILL:` markers still unfilled in `CLAUDE.md`.

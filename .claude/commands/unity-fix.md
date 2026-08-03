@@ -38,3 +38,9 @@ Use the selected fixer agent to:
    - If it was a build issue, suggest triggering a build via MCP (`manage_build`) to verify
 
 5. **Explain** what caused the bug and how the fix prevents recurrence.
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+Offer `/unity-test` to pin the bug so it cannot come back. State the reproduction that no longer reproduces.

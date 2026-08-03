@@ -66,3 +66,9 @@ Overall: 1 warning, 0 errors
 ```
 
 For each WARNING or ERROR, include the actionable fix immediately after the line.
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+If anything is wrong, offer the specific fix. Report; do not change anything on your own.

@@ -61,3 +61,9 @@ Suggest: "Prototype ready! Want me to run a quick verification pass?"
 - Everything tweakable — SerializeField with Headers
 - Single scene — no multi-scene for prototypes
 - No UI — use Debug.Log and Gizmos for feedback
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+Offer `/unity-feature` to move the mechanic into the real project, once the prototype proves it.

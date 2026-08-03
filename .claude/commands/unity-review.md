@@ -59,3 +59,9 @@ Use the `unity-reviewer` agent to check:
 
 Present findings grouped by severity with specific file:line references and suggested fixes.
 End with a summary: X critical, Y performance, Z suggestions.
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+If findings were reported, offer to fix them. Do not fix them unasked.

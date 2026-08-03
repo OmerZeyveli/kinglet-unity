@@ -149,3 +149,9 @@ Present a complete summary to the user:
 - **Prefer existing patterns** — match the project's established conventions
 - **Minimal viable implementation** — don't overbuild on the first pass
 - **Verify everything** — the verify phase is not optional
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+Already verifies in Phase 4. Offer `/unity-test` if no test was written, and say plainly what still needs a human.

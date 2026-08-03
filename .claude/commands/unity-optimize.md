@@ -50,3 +50,9 @@ settings. See the `unity-optimizer` agent for the full table.
 | Frame time | 16.6ms (60fps @ 1080p low) | 16.6ms (60fps) | 8.3ms (120fps) |
 | VRAM | < 2GB | fixed — tune to the box | < 8GB |
 | GC alloc/frame | 0 bytes | 0 bytes | 0 bytes |
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+Offer a second profile pass to confirm the gain is real, with before/after frames.

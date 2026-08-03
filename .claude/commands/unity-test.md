@@ -57,3 +57,9 @@ Present results:
 2. **Input processing** — movement calculation, ability activation
 3. **Data systems** — save/load, serialization, configuration
 4. **Edge cases** — zero health, empty inventory, null references
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+If any test fails, report the output and stop — do not offer anything else until it is green.

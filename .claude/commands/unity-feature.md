@@ -61,3 +61,9 @@ After implementation, offer to run a verify-fix loop:
 - Report remaining items that require human judgment
 
 Suggest: "Would you like me to run a verification pass on the changes?"
+
+## Suggest next
+
+When this command finishes, name the next step and offer it. Do not take it.
+
+Offer `/unity-review` on the code just written; offer `/unity-test` if the feature has behaviour worth pinning.
