@@ -708,6 +708,34 @@ grep -c -- '--- test-' /tmp/t3.log; ls tests/test-*.sh | wc -l
 
 Expected: the guard's section passes, exit 0, and the header count matches the file count — the new file must appear.
 
+- [ ] **Step 3b: Close the untracked-file blind spot, in the same test file.**
+
+Measured 2026-08-03, prompted by an operator report of the identical bug shape in another repo. A well-formed skill directory created under `.claude/skills/` **and not `git add`ed** is invisible to every gate this repo has:
+
+- `scripts/check-provenance.sh:74` enumerates with `git ls-files`, so the orphan check never sees it — it reported `provenance OK` with the file present;
+- `baseline-regenerate` reads the tree with `ls-tree -r` against a commit, so it is blind by construction — it reported `0 addition(s)`;
+- `tests/test-skill-discovery.sh` walks the filesystem and *does* see it, but only checks that `name:` matches the directory and `description:` is non-empty — a well-formed skill passes.
+
+Meanwhile Claude Code loads it: the probe skill appeared in the session's available-skills list while all three gates called the tree clean. So the file is functionally live and completely unguarded. Task 5 adds four files under `.claude/`, which is exactly when a forgotten `git add` would land.
+
+Add this to `tests/test-surface-references.sh`:
+
+```bash
+# An untracked file under .claude/ is live for Claude Code and invisible to check-provenance.sh
+# (git ls-files) and to baseline-regenerate (ls-tree against a commit). Nothing else asserts this.
+UNTRACKED_PAYLOAD=$(cd "$REPO_DIR" && git ls-files --others --exclude-standard -- .claude 2>/dev/null || true)
+
+if [ -n "$UNTRACKED_PAYLOAD" ]; then
+  printf 'untracked payload file: %s\n' $UNTRACKED_PAYLOAD
+fi
+assert_eq "$(printf '%s' "$UNTRACKED_PAYLOAD" | grep -c . || true)" "0" \
+  "no untracked file under .claude/ (invisible to provenance and baseline, but live for the model)"
+```
+
+`--exclude-standard` honours `.gitignore`, so a deliberately ignored path does not trip it. `grep -c` drains its input, so there is no SIGPIPE risk here.
+
+**Watch this one fail too**, the same way Step 2 does: create an untracked file under `.claude/`, confirm the guard names it, then remove it.
+
 - [ ] **Step 4: Add its provenance row and commit.**
 
 The row is tab-separated: `tests/test-surface-references.sh`, `original`, `-`, `-`, `-`, `original`, `guards bare-name skill references; test-skill-discovery.sh matches path-form only`. Match the placeholder convention used by existing `origin=original` rows:
