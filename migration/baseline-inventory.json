@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "b19d3d0c9034a2f8b02a6670c7c769f4276ce2a1",
+  "source_commit": "a48cbae2bc0f5cfc6b3a36afdb29ad5ed0be48e2",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
-    "expected_count": 148,
+    "expected_count": 122,
     "files": [
       {
         "path": ".claude/NOTICE.md",
@@ -19,36 +19,6 @@
       {
         "path": ".claude/VERSION",
         "sha256": "33bc14078f2fd2547bff74abf8ad5442c454c620225d3ca5afedb5448fcd5b77",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/agents/creative-director.md",
-        "sha256": "10f3e7e737f02b428b097cc25a5818a68c14ace17af8ceac21dfaf00aaac0d0d",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/agents/game-designer.md",
-        "sha256": "916a9bc04a4dfa6720a15d86f64efcfe6daa11e7c318a8528befa3fa4cc8caef",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/agents/level-designer.md",
-        "sha256": "468615a33193ec56f379a6f93ceec1a37928608a47236217f5e8c8cc632b0c77",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/agents/narrative-director.md",
-        "sha256": "ee3638df9a9bbaeffaa007d6a0d950a0f59c6c18b128f7d16c275f52407c86d8",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/agents/systems-designer.md",
-        "sha256": "6bb29b09024a5b4b9fe97e5505b3296e1d468af46ca1cdac94e25acad1e44f65",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/agents/technical-director.md",
-        "sha256": "50dbd687089a412de4b2a0f91035bc6570cced48d6af24a0a2651c1e08b1b334",
         "git_mode": "100644"
       },
       {
@@ -149,61 +119,6 @@
       {
         "path": ".claude/agents/unity-verifier.md",
         "sha256": "f2756afdf33a4a304219d6bc9b5bc0380b6d28e7658f6603a39a8c43f0a8eb61",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/agents/world-builder.md",
-        "sha256": "a553c530043b0dc9be63e7bebcd436d08bbfb9d815d123d8f8be026bc4817eb0",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/agents/writer.md",
-        "sha256": "a27ebf5e69c3e653f95160092647340f138f57a61672df22547cb7c8d44a41e8",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/brainstorm.md",
-        "sha256": "07cf75ec627904298b337b345b96d1be3f004ae090a3631da0d74c9198febce8",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/design-review.md",
-        "sha256": "93e1ed237ff2f0d333030b3c313c1d1b4665df400ba15b30d4881c9831ee8738",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/design-system.md",
-        "sha256": "8825576a92d8e5d534699b223638e62774691e3782d758bc6bae691489e25b8d",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/estimate.md",
-        "sha256": "333b4cad0da445ef39e4ab5a45c982216ff7d570fd9abee01f36ad5899ba4e53",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/map-systems.md",
-        "sha256": "b53eb59a89cb22e97c951ba0454be45babd036b702688241e8240cc3d2905798",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/milestone-review.md",
-        "sha256": "98f881a90d1a20c9ec3a8241b8a6ad07b109879bdabd7284d5d6aef735325b16",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/retrospective.md",
-        "sha256": "cada9afdb18eb579974fd31a1545ac04a36c667c71d0adac1cf34f701dc8fd97",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/scope-check.md",
-        "sha256": "639c56b6594a6b9c0803d636bd1692f5b6f23954f7905d40630494a987229084",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/commands/sprint-plan.md",
-        "sha256": "d8d1600c07d98c8c8d7c4a5d3d20a1f872893aa848194b27287528043214b2ae",
         "git_mode": "100644"
       },
       {
@@ -557,11 +472,6 @@
         "git_mode": "100644"
       },
       {
-        "path": ".claude/skills/dialogue-system/SKILL.md",
-        "sha256": "47866b73032dd043ce8929c4e9c2b78f223cdfdd11276eb1dd32285b8e9cd6eb",
-        "git_mode": "100644"
-      },
-      {
         "path": ".claude/skills/dotween/SKILL.md",
         "sha256": "4522627048c0d4a7fae7039f7e5a66fbec3de33a0911c5de9085937b4eb591b4",
         "git_mode": "100644"
@@ -577,28 +487,13 @@
         "git_mode": "100644"
       },
       {
-        "path": ".claude/skills/idle-clicker/SKILL.md",
-        "sha256": "9f04b582ff41e3ab8d30d4d44212644dad8e52abbb6ad4f580369aba3fc89aa3",
-        "git_mode": "100644"
-      },
-      {
         "path": ".claude/skills/input-system/SKILL.md",
         "sha256": "f178256c34915d1547abe1b8623be0e67fc67f41c1821c0e9c1b3fbf1e3bff1c",
         "git_mode": "100644"
       },
       {
-        "path": ".claude/skills/inventory-system/SKILL.md",
-        "sha256": "15fe5e826e89a49ec138cd93a3f8a2167a632270527d07239e58adbd9e31d949",
-        "git_mode": "100644"
-      },
-      {
         "path": ".claude/skills/learner/SKILL.md",
         "sha256": "e608303c013f9619269d0dd44b605dd256c4e1de3fb30238ba64af9fe12c377e",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/skills/match3/SKILL.md",
-        "sha256": "cfd2f88f35ea60d875666bb58f69150d1022710f850a831a2dd7732b654c99af",
         "git_mode": "100644"
       },
       {
@@ -624,26 +519,6 @@
       {
         "path": ".claude/skills/physics/SKILL.md",
         "sha256": "78c10bb3b3ac5393915f1dc8fbddc8d9bb7fedcb6fb0d2c48c2a8a07dc1966b3",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/skills/platformer-2d/SKILL.md",
-        "sha256": "328e10b51274d5fa791726a2369a46353c17c8e0092eada8335781707f9e43bd",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/skills/procedural-generation/SKILL.md",
-        "sha256": "5aa77dec803a6a780907011b3d0eea44f37e81aedb42b418733dcf8038d0c50b",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/skills/puzzle/SKILL.md",
-        "sha256": "24b12ce785aaf503375be5d69d103222fc817d4c1d4c11395f3d12cd9ed986a5",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/skills/rpg/SKILL.md",
-        "sha256": "fb2dc613548eebf1982ddaf03f49d15581aa0d10fadb779920bddf3d964e893a",
         "git_mode": "100644"
       },
       {
@@ -674,11 +549,6 @@
       {
         "path": ".claude/skills/textmeshpro/SKILL.md",
         "sha256": "c1a5e2572f71436e5bbac2058efc955be0cb1329b449bb55ba81f08d8b16fbd7",
-        "git_mode": "100644"
-      },
-      {
-        "path": ".claude/skills/topdown/SKILL.md",
-        "sha256": "50366dd3a8b233c15748d6cf2606f5217f83e17b94a57b38a5f2d7e8a829fd80",
         "git_mode": "100644"
       },
       {
@@ -751,38 +621,8 @@
   "categories": {
     "agents": {
       "description": "All tracked files under .claude/agents/.",
-      "expected_count": 28,
+      "expected_count": 20,
       "files": [
-        {
-          "path": ".claude/agents/creative-director.md",
-          "sha256": "10f3e7e737f02b428b097cc25a5818a68c14ace17af8ceac21dfaf00aaac0d0d",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/agents/game-designer.md",
-          "sha256": "916a9bc04a4dfa6720a15d86f64efcfe6daa11e7c318a8528befa3fa4cc8caef",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/agents/level-designer.md",
-          "sha256": "468615a33193ec56f379a6f93ceec1a37928608a47236217f5e8c8cc632b0c77",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/agents/narrative-director.md",
-          "sha256": "ee3638df9a9bbaeffaa007d6a0d950a0f59c6c18b128f7d16c275f52407c86d8",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/agents/systems-designer.md",
-          "sha256": "6bb29b09024a5b4b9fe97e5505b3296e1d468af46ca1cdac94e25acad1e44f65",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/agents/technical-director.md",
-          "sha256": "50dbd687089a412de4b2a0f91035bc6570cced48d6af24a0a2651c1e08b1b334",
-          "git_mode": "100644"
-        },
         {
           "path": ".claude/agents/unity-build-runner.md",
           "sha256": "9cf16cd7418ffbc9aa3c4315b27854da7edd38cd075dc199bb4079ce357d1075",
@@ -882,68 +722,13 @@
           "path": ".claude/agents/unity-verifier.md",
           "sha256": "f2756afdf33a4a304219d6bc9b5bc0380b6d28e7658f6603a39a8c43f0a8eb61",
           "git_mode": "100644"
-        },
-        {
-          "path": ".claude/agents/world-builder.md",
-          "sha256": "a553c530043b0dc9be63e7bebcd436d08bbfb9d815d123d8f8be026bc4817eb0",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/agents/writer.md",
-          "sha256": "a27ebf5e69c3e653f95160092647340f138f57a61672df22547cb7c8d44a41e8",
-          "git_mode": "100644"
         }
       ]
     },
     "commands": {
       "description": "All tracked files under .claude/commands/.",
-      "expected_count": 36,
+      "expected_count": 27,
       "files": [
-        {
-          "path": ".claude/commands/brainstorm.md",
-          "sha256": "07cf75ec627904298b337b345b96d1be3f004ae090a3631da0d74c9198febce8",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/commands/design-review.md",
-          "sha256": "93e1ed237ff2f0d333030b3c313c1d1b4665df400ba15b30d4881c9831ee8738",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/commands/design-system.md",
-          "sha256": "8825576a92d8e5d534699b223638e62774691e3782d758bc6bae691489e25b8d",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/commands/estimate.md",
-          "sha256": "333b4cad0da445ef39e4ab5a45c982216ff7d570fd9abee01f36ad5899ba4e53",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/commands/map-systems.md",
-          "sha256": "b53eb59a89cb22e97c951ba0454be45babd036b702688241e8240cc3d2905798",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/commands/milestone-review.md",
-          "sha256": "98f881a90d1a20c9ec3a8241b8a6ad07b109879bdabd7284d5d6aef735325b16",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/commands/retrospective.md",
-          "sha256": "cada9afdb18eb579974fd31a1545ac04a36c667c71d0adac1cf34f701dc8fd97",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/commands/scope-check.md",
-          "sha256": "639c56b6594a6b9c0803d636bd1692f5b6f23954f7905d40630494a987229084",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/commands/sprint-plan.md",
-          "sha256": "d8d1600c07d98c8c8d7c4a5d3d20a1f872893aa848194b27287528043214b2ae",
-          "git_mode": "100644"
-        },
         {
           "path": ".claude/commands/unity-audit.md",
           "sha256": "a3dae1544dde9d6b5a6648bb7dcff898050aff529b15e6e0033f0f671bad88ca",
@@ -1083,7 +868,7 @@
     },
     "skills": {
       "description": "Tracked SKILL.md files under .claude/skills/.",
-      "expected_count": 39,
+      "expected_count": 30,
       "files": [
         {
           "path": ".claude/skills/addressables/SKILL.md",
@@ -1126,11 +911,6 @@
           "git_mode": "100644"
         },
         {
-          "path": ".claude/skills/dialogue-system/SKILL.md",
-          "sha256": "47866b73032dd043ce8929c4e9c2b78f223cdfdd11276eb1dd32285b8e9cd6eb",
-          "git_mode": "100644"
-        },
-        {
           "path": ".claude/skills/dotween/SKILL.md",
           "sha256": "4522627048c0d4a7fae7039f7e5a66fbec3de33a0911c5de9085937b4eb591b4",
           "git_mode": "100644"
@@ -1146,28 +926,13 @@
           "git_mode": "100644"
         },
         {
-          "path": ".claude/skills/idle-clicker/SKILL.md",
-          "sha256": "9f04b582ff41e3ab8d30d4d44212644dad8e52abbb6ad4f580369aba3fc89aa3",
-          "git_mode": "100644"
-        },
-        {
           "path": ".claude/skills/input-system/SKILL.md",
           "sha256": "f178256c34915d1547abe1b8623be0e67fc67f41c1821c0e9c1b3fbf1e3bff1c",
           "git_mode": "100644"
         },
         {
-          "path": ".claude/skills/inventory-system/SKILL.md",
-          "sha256": "15fe5e826e89a49ec138cd93a3f8a2167a632270527d07239e58adbd9e31d949",
-          "git_mode": "100644"
-        },
-        {
           "path": ".claude/skills/learner/SKILL.md",
           "sha256": "e608303c013f9619269d0dd44b605dd256c4e1de3fb30238ba64af9fe12c377e",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/skills/match3/SKILL.md",
-          "sha256": "cfd2f88f35ea60d875666bb58f69150d1022710f850a831a2dd7732b654c99af",
           "git_mode": "100644"
         },
         {
@@ -1193,26 +958,6 @@
         {
           "path": ".claude/skills/physics/SKILL.md",
           "sha256": "78c10bb3b3ac5393915f1dc8fbddc8d9bb7fedcb6fb0d2c48c2a8a07dc1966b3",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/skills/platformer-2d/SKILL.md",
-          "sha256": "328e10b51274d5fa791726a2369a46353c17c8e0092eada8335781707f9e43bd",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/skills/procedural-generation/SKILL.md",
-          "sha256": "5aa77dec803a6a780907011b3d0eea44f37e81aedb42b418733dcf8038d0c50b",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/skills/puzzle/SKILL.md",
-          "sha256": "24b12ce785aaf503375be5d69d103222fc817d4c1d4c11395f3d12cd9ed986a5",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/skills/rpg/SKILL.md",
-          "sha256": "fb2dc613548eebf1982ddaf03f49d15581aa0d10fadb779920bddf3d964e893a",
           "git_mode": "100644"
         },
         {
@@ -1243,11 +988,6 @@
         {
           "path": ".claude/skills/textmeshpro/SKILL.md",
           "sha256": "c1a5e2572f71436e5bbac2058efc955be0cb1329b449bb55ba81f08d8b16fbd7",
-          "git_mode": "100644"
-        },
-        {
-          "path": ".claude/skills/topdown/SKILL.md",
-          "sha256": "50366dd3a8b233c15748d6cf2606f5217f83e17b94a57b38a5f2d7e8a829fd80",
           "git_mode": "100644"
         },
         {
