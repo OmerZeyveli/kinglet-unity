@@ -603,3 +603,5 @@ docs/superpowers/specs/2026-08-03-provider-boundary-and-rule-applicability-desig
 docs/superpowers/plans/2026-08-03-provider-boundary-and-rule-applicability.md	original	-	-	-	original	implementation plan; provider boundary + rule applicability detection
 tests/test-rule-applicability.sh	original	-	-	-	original	asserts the generated CLAUDE.md declares which rules bind rather than assuming
 tests/test-workflow-plan-input.sh	original	-	-	-	original	asserts /unity-workflow accepts a written plan as input
+docs/superpowers/specs/2026-08-03-surface-cut-and-process-chain-design.md	original	-	-	-	original	design spec; surface cut 103->32 + process chain
+docs/superpowers/plans/2026-08-03-surface-cut-and-process-chain.md	original	-	-	-	original	implementation plan; surface cut + process chain
