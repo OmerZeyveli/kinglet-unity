@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "3b7ef0e78403b41f0e5c87ad06f2718dcdf9ed9e",
+  "source_commit": "fe34110d3343eeb44f1e9aa1a5ed848bf4d94f95",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
-    "expected_count": 72,
+    "expected_count": 77,
     "files": [
       {
         "path": ".claude/NOTICE.md",
@@ -337,6 +337,31 @@
         "git_mode": "100644"
       },
       {
+        "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
+        "sha256": "a077c4849b79aa5b04e08b741626052659b94e65cf849a45b59f38e82533e692",
+        "git_mode": "100644"
+      },
+      {
+        "path": ".claude/skills/subagent-driven-implementation/final-reviewer-prompt.md",
+        "sha256": "0477719fa1348a58041675cde0236275f3aab47e2de52e3034f58edae55b39fc",
+        "git_mode": "100644"
+      },
+      {
+        "path": ".claude/skills/subagent-driven-implementation/implementer-prompt.md",
+        "sha256": "ac60fd8e0f909b748932842e1cea7a8a4a452dd6be74d01c88b0f6ff286d8d53",
+        "git_mode": "100644"
+      },
+      {
+        "path": ".claude/skills/subagent-driven-implementation/re-review-prompt.md",
+        "sha256": "281921b6374f7285f0e83ff0cbafcc5936911498eb43d62f39a80d8d64749283",
+        "git_mode": "100644"
+      },
+      {
+        "path": ".claude/skills/subagent-driven-implementation/task-reviewer-prompt.md",
+        "sha256": "c6037a40deea0bdc66eb88f54355ea1caa8aa60bf88e64c010acbf854c563b3a",
+        "git_mode": "100644"
+      },
+      {
         "path": ".claude/skills/systematic-debugging/SKILL.md",
         "sha256": "aac0419a6b1121e1b57fffac2d21b8a4bfdd9dc1423863faeb00d9f27c1f2211",
         "git_mode": "100644"
@@ -478,7 +503,7 @@
     },
     "skills": {
       "description": "Tracked SKILL.md files under .claude/skills/.",
-      "expected_count": 13,
+      "expected_count": 14,
       "files": [
         {
           "path": ".claude/skills/addressables/SKILL.md",
@@ -518,6 +543,11 @@
         {
           "path": ".claude/skills/state-machine/SKILL.md",
           "sha256": "c3b9a8f4bd688d0f16fdd50b2bc8a5ad85fc9b66734862edece625343810324e",
+          "git_mode": "100644"
+        },
+        {
+          "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
+          "sha256": "a077c4849b79aa5b04e08b741626052659b94e65cf849a45b59f38e82533e692",
           "git_mode": "100644"
         },
         {
