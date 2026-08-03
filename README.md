@@ -162,7 +162,7 @@ Because this repo contains other people's code, it tracks whose:
 
 - **`provenance.tsv`** — one row per file: origin (`ecu` / `donchitos` / `original`), upstream
   version and path, upstream checksum, and whether we modified it. Currently 526 rows: 101 from ECU
-  (30 verbatim, 71 modified — nearly every surviving ECU surface has been rewritten for an agent
+  (29 verbatim, 72 modified — nearly every surviving ECU surface has been rewritten for an agent
   reader), 425 original, 0 from Donchitos (that layer was removed 2026-08-03; `provenance-skip.tsv`
   keeps the record).
 - **`provenance-skip.tsv`** — what we deliberately did *not* vendor, and why. This is what stops a
