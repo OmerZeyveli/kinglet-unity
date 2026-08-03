@@ -92,6 +92,30 @@ fi
 assert_eq "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "0" \
   "no agent or command names a skill that does not exist"
 
+# A skill's body can name a `/unity-*` command (e.g. using-kinglet's chain table, deep-interview's
+# handoff) with nothing checking the name is real. test-skill-discovery.sh only checks the reverse
+# direction — a command/agent naming a skill — so a skill naming a deleted command is invisible.
+# Same shape, opposite direction: collect every `/unity-*` token in every skill body, report the
+# ones with no matching .claude/commands/<name>.md.
+BAD_CMD_REFS=$(
+  for f in "$REPO_DIR"/.claude/skills/*/SKILL.md; do
+    [ -f "$f" ] || continue
+    grep -oE '/unity-[A-Za-z0-9_-]+' "$f" | sort -u | while IFS= read -r cmd; do
+      [ -n "$cmd" ] || continue
+      name="${cmd#/}"
+      if [ ! -f "$REPO_DIR/.claude/commands/$name.md" ]; then
+        printf '%s names missing command: %s\n' "${f#$REPO_DIR/}" "$cmd"
+      fi
+    done
+  done | sort -u
+)
+
+if [ -n "$BAD_CMD_REFS" ]; then
+  printf '%s\n' "$BAD_CMD_REFS"
+fi
+assert_eq "$(printf '%s' "$BAD_CMD_REFS" | grep -c . || true)" "0" \
+  "no skill body names a /unity-* command that does not exist"
+
 # An untracked file under .claude/ is live for Claude Code and invisible to check-provenance.sh
 # (git ls-files) and to baseline-regenerate (ls-tree against a commit). Nothing else asserts this.
 UNTRACKED_PAYLOAD=$(cd "$REPO_DIR" && git ls-files --others --exclude-standard -- .claude 2>/dev/null || true)

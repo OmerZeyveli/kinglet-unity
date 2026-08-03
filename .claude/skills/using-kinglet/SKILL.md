@@ -16,6 +16,7 @@ detected from the project's own code, not assumed. Read it before asserting that
 
 | Situation | Surface |
 |---|---|
+| Kinglet was just installed and `CLAUDE.md` still has unfilled `FILL:` markers | `/unity-init` |
 | The request is vague and has no file, type, or acceptance criterion | `deep-interview` — ask, do not guess |
 | A feature, taken end to end, or an existing written plan to execute | `/unity-workflow` |
 | One scoped addition to code that already exists | `/unity-feature` |

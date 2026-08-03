@@ -1,6 +1,6 @@
 ---
 name: unity-mcp-patterns
-description: "How to use unity-mcp tools effectively — activating tool groups (only core is on by default), batch_execute for speed, read_console for verification, resource queries for project state."
+description: "Use before making several unity-mcp tool calls in a row, or when a tool call fails because its group isn't active — covers activating tool groups (only core is on by default), batch_execute for speed, read_console for verification, resource queries for project state."
 ---
 
 # Unity MCP Patterns

@@ -1,6 +1,6 @@
 ---
 name: deep-interview
-description: "Ambiguity gating — detects vague feature requests and forces structured requirements gathering with scoring across scope, platform, performance, integration, and acceptance criteria. Prevents wasted cycles on underspecified tasks."
+description: "Use before starting any feature work when the request is vague or underspecified — e.g. 'add a jump', 'make an inventory system' — before writing a plan or touching code."
 ---
 
 # Deep Interview — Ambiguity Gating

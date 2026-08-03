@@ -566,7 +566,7 @@ ok "Receipt written: $RECEIPT_REL ($((RECEIPT_ROWS - 1)) files)"
 # shipping 25 / 27 / 42, because the numbers were typed into an echo.
 count_in() { find "$CLAUDE_DIR/$1" -name "$2" 2>/dev/null | wc -l | tr -d ' '; }
 # Hooks are counted from settings.json, not from *.sh on disk: hooks/ also holds _lib.sh, a sourced
-# library that is not itself a hook. 26 files, 25 hooks.
+# library that is not itself a hook, so the file count and the hook count are never the same number.
 count_hooks() { grep -oE '\.claude/hooks/[a-z_-]+\.sh' "$CLAUDE_DIR/settings.json" 2>/dev/null | sort -u | wc -l | tr -d ' '; }
 printf '\n%s\n' "${BOLD}${GREEN}Installation complete.${NC}"
 printf '  %sAgents%s    %s\n'   "$CYAN" "$NC" "$(count_in agents '*.md')"
