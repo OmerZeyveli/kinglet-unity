@@ -173,28 +173,31 @@ SCENE_COUNT=$(printf '%s' "$SCENE_LIST" | grep -c . || true)
 info "Found $SCENE_COUNT scene(s) in build settings."
 
 # ---------------------------------------------------------------------------
-# 6. Skills worth loading, by real catalog path
+# 6. Skills worth loading, by name
 #
 # Upstream suggested names like `unity-input-system` and `unity-general` that
-# match nothing in .claude/skills/ — the paths below are the real ones.
+# match nothing in .claude/skills/ — the names below are the real ones. They are
+# bare names, not paths: skills live one level deep at .claude/skills/<name>/,
+# because that is the only place Claude Code discovers them, and the name is
+# what the Skill tool is invoked with.
 # ---------------------------------------------------------------------------
 suggest_skills() {
     local out=""
     while IFS= read -r pkg; do
         [ -n "$pkg" ] || continue
         case "$pkg" in
-            "Input System")            out="${out}systems/input-system"$'\n' ;;
-            "Addressables")            out="${out}systems/addressables"$'\n' ;;
-            "UniTask")                 out="${out}third-party/unitask"$'\n' ;;
-            "DOTween")                 out="${out}third-party/dotween"$'\n' ;;
-            "TextMeshPro")             out="${out}third-party/textmeshpro"$'\n' ;;
-            "Cinemachine")             out="${out}systems/cinemachine"$'\n' ;;
-            "AI Navigation")           out="${out}systems/navmesh"$'\n' ;;
-            "VContainer")              out="${out}third-party/vcontainer"$'\n' ;;
+            "Input System")            out="${out}input-system"$'\n' ;;
+            "Addressables")            out="${out}addressables"$'\n' ;;
+            "UniTask")                 out="${out}unitask"$'\n' ;;
+            "DOTween")                 out="${out}dotween"$'\n' ;;
+            "TextMeshPro")             out="${out}textmeshpro"$'\n' ;;
+            "Cinemachine")             out="${out}cinemachine"$'\n' ;;
+            "AI Navigation")           out="${out}navmesh"$'\n' ;;
+            "VContainer")              out="${out}vcontainer"$'\n' ;;
         esac
     done <<< "$DETECTED_PACKAGES"
     case "$RENDER_PIPELINE" in
-        *URP*) out="${out}systems/urp-pipeline"$'\n' ;;
+        *URP*) out="${out}urp-pipeline"$'\n' ;;
     esac
     printf '%s' "$out" | sort -u
 }
@@ -245,14 +248,30 @@ MDEOF
 
     if [ -n "$SUGGESTED_SKILLS" ]; then
         echo ""
-        echo "**Skills matching this project**"
+        echo "**Skills matching this project** — load with the \`Skill\` tool by name."
+        echo "Nothing loads them for you: no glob matching, no always-apply. A skill you do not"
+        echo "invoke is a skill you do not have."
         echo ""
-        printf '%s\n' "$SUGGESTED_SKILLS" | while IFS= read -r s; do [ -n "$s" ] && echo "- \`.claude/skills/$s/\`"; done
+        printf '%s\n' "$SUGGESTED_SKILLS" | while IFS= read -r s; do [ -n "$s" ] && echo "- \`$s\`"; done
     fi
 }
 
-if [ "$FACTS_ONLY" -eq 1 ]; then
+# Exactly what sits between the generated:begin/end markers, and the only
+# producer of it. --facts-only used to call emit_facts directly, which left out
+# the "## Project Facts" heading and the blank lines around it — so the
+# documented use, refreshing an existing CLAUDE.md in place, quietly deleted the
+# heading every time. Two code paths disagreeing about one region is the bug;
+# one function is the fix.
+emit_marked_region() {
+    echo ""
+    echo "## Project Facts (auto-detected)"
+    echo ""
     emit_facts
+    echo ""
+}
+
+if [ "$FACTS_ONLY" -eq 1 ]; then
+    emit_marked_region
     info "Emitted facts block only."
     exit 0
 fi
@@ -288,11 +307,7 @@ cat <<'MDEOF'
 MDEOF
 
 echo "<!-- kinglet:generated:begin — content between these markers is rewritten on re-install. Everything outside is yours. -->"
-echo ""
-echo "## Project Facts (auto-detected)"
-echo ""
-emit_facts
-echo ""
+emit_marked_region
 echo "<!-- kinglet:generated:end -->"
 
 cat <<'MDEOF'
