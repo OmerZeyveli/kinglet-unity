@@ -116,7 +116,13 @@ CS
 using VContainer;
 using Cysharp.Threading.Tasks;
 
-public class VendorThing { }
+public class VendorThing
+{
+    // The literal string "UniTask" is deliberate, not decoration: detection greps for it, and
+    // this member is what lets this file also guard the pruning of the UniTask count, not just
+    // VContainer's. Do not "clean up" this to a bare using-directive.
+    private UniTask _pending;
+}
 CS
     ;;
   bare) ;;
