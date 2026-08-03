@@ -30,14 +30,18 @@ range once the session that remembers "started" is gone.
 **Per task, in plan order:**
 
 1. **Dispatch one implementer.** `unity-coder` via the `Agent` tool, using `implementer-prompt.md` as
-   the shape of the dispatch. One implementer. Never two, and never this task's implementer running
+   the shape of the dispatch — **unless the task is not Unity work.** A Unity project's plan routinely
+   contains build scripts, CI, editor tooling and documentation, and routing those to an agent that
+   writes C# and drives the Editor measures the dispatch rather than the task. Use a general
+   implementer for them, and record the choice in the ledger so the run stays readable. One implementer. Never two, and never this task's implementer running
    while another task's is still active — see the Unity-specific rules below.
 2. **Handle the report.** The implementer returns one of four statuses — see `implementer-prompt.md`
    for what each means and what you do with it. Do not read the implementer's tool-call transcript to
    second-guess a DONE; the report is the contract, and if the report is wrong that is what review is
    for.
 3. **Review.** Dispatch `unity-reviewer` with `task-reviewer-prompt.md`, pointing it at the brief, the
-   report, and the diff as three file paths — never pasted inline. It returns a spec verdict and a
+   report, and the diff as three file paths — never pasted inline. The same exception applies: a
+   non-Unity task gets a general reviewer. It returns a spec verdict and a
    quality verdict with findings by severity.
 4. **Fix loop, if the review is not clean.** Bounded at five rounds. Rounds 1–3 resume the original
    implementer — its context is intact and it wrote the code under discussion. Rounds 4–5 dispatch a
@@ -46,11 +50,22 @@ range once the session that remembers "started" is gone.
    a new one with fresh eyes and a stronger model is a different attempt, not a fourth try at the same
    one. Each round's review uses `re-review-prompt.md`, not the full task-reviewer prompt — it is
    scoped to the open findings, not a re-review of everything.
-5. **At the cap, adjudicate — do not keep dispatching.** A sixth round is not "one more try", it is
+5. **If the implementer reports the brief itself is wrong, stop and re-brief — do not review it.**
+   A review compares the work against the brief, so a false premise passes review and ships. Measured
+   on this loop's first real run: a brief said "make every call site agree with the helper", and
+   seven files turned out to define their own helper with the opposite contract under the same name.
+   The implementer changed 49 call sites on that premise, caught it by probing a failure, and reverted
+   29. Had it not probed, the review would have seen a tidy consistent diff and approved it.
+
+   A brief carries the controller's authority, which makes it the more dangerous of the two documents
+   to be wrong. When an implementer says the premise does not hold, that is not a fix-loop finding —
+   it is a new task, and the ledger records the old brief as withdrawn rather than completed.
+
+6. **At the cap, adjudicate — do not keep dispatching.** A sixth round is not "one more try", it is
    the controller declining to make a decision. Either park the finding in the ledger with a ruling
    (why it is safe to carry forward, and to whom) or stop the loop entirely if the finding is load-
    bearing — a security gate, a data-loss path, anything the plan cannot be shipped without.
-6. **Complete.** Mark the ledger item done with its commit range (first commit of the task through
+7. **Complete.** Mark the ledger item done with its commit range (first commit of the task through
    its last, inclusive — the range the whole-branch review will diff). Record every deferred Minor
    finding and every parked finding with its ruling. Record scene and prefab state if the task touched
    either — see below.

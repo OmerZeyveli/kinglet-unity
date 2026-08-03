@@ -2529,3 +2529,69 @@ demonstrably ignores.
 headless runs and twenty minutes turned a confident architectural argument into a negative result.
 The negative result is the more valuable outcome — it retires the question instead of trading one
 guess for another.
+
+## 88. The execution loop's first real run, and the three things it got wrong
+
+The `subagent-driven-implementation` skill shipped on 2026-08-04 describing a loop this repository
+had run by hand seven times the day before. Writing it down is not the same as knowing it works, so
+it was run once, for real, on a task chosen from the carried-findings list.
+
+The intended subject — a hook printing a pre-flattening skill path — had already been fixed by an
+earlier task in the same wave, which is its own small lesson about picking trial subjects from a list
+written before the wave started. The replacement was measured rather than guessed: `assert_eq` in
+`tests/run-tests.sh` declares `(expected, actual)`, and across 141 call sites, 58 passed the
+expectation first and 33 passed it second. A third of the suite appeared to print its two failure
+labels backwards — and this wave read those labels constantly, six times reintroducing a defect in a
+worktree specifically to watch a guard name it.
+
+### What the run got wrong, in the order it mattered
+
+**1. The brief's premise was false, and the loop has no step for that.** The task was framed as "make
+every call site agree with the helper." There is no single helper. Seven test files define their own
+unconditional local `assert_eq()` that shadows the exported one for the rest of their subshell, and
+its message reads `expected '$2', got '$1'` — **the opposite contract, under the same name, in the
+same suite.** The 58/33 split was not sloppiness; it was two conventions.
+
+The implementer's first pass swapped 49 call sites on the brief's premise, then caught the error by
+probing a failure in a scratch worktree and reverted 29 of them. Net standing change: 20 call sites in
+the 5 files that genuinely use the runner's helper.
+
+That recovery is the loop working. But the skill says what to do when a *review* finds a problem and
+nothing about when the **brief** turns out to be wrong — and a brief written by the controller carries
+more authority than one written by a reviewer, so it is the more dangerous of the two to be wrong.
+The Task 4 implementer had already flagged the adjacent rule ("at the cap, adjudicate") as stating
+what not to do without a sharp test. This is the same softness reached from the other side.
+
+**2. Both roles are hardcoded to Unity agents, and a Unity project's plan is not all Unity.** The
+skill names `unity-coder` as the implementer and `unity-reviewer` as the reviewer. This trial was bash
+in a repository that is not a Unity project, so both were the wrong fit and the deviation had to be
+recorded before the run started. That is not a quirk of the toolkit's own repository: a real Unity
+project's plan routinely contains build scripts, CI, editor tooling and documentation tasks, and the
+loop currently routes all of them to an agent that writes C# and drives the Editor over MCP.
+
+**3. Picking the trial subject from a list is how you measure the wrong thing.** The carried-findings
+list was written before the wave and the wave had already closed the entry. Choosing the subject from
+a fresh measurement — counting the actual call sites — produced both a real task and a finding the
+list did not contain.
+
+### What it got right, and why that is the part to keep
+
+The instruction that saved the run was *"verify by making a failure happen, not by reading the diff."*
+The implementer broke the checked condition in a throwaway worktree and read the printed labels. A
+diff review would have shown 49 tidy, consistent-looking swaps and approved them.
+
+Six times in two days, that same method has been the thing that distinguished a guard that works from
+a guard that reports success. It is the single most load-bearing sentence in the skill and it should
+be the last thing anyone trims.
+
+### Parked, with a ruling
+
+Two `assert_eq` contracts under one name is a real defect and it is not fixed. It is not load-bearing:
+the suite is green, every assertion compares the right two values, and only the *labels* in seven
+files read against the runner's convention. Fixing it means changing seven function definitions and
+re-inverting the call sites that currently match them — a change whose own failure mode is the one
+that just bit this trial. It belongs in a wave with room to probe it, not at the end of one.
+
+Recorded here rather than in a ledger that gets deleted, because the next person to touch a test
+helper in this repository needs to know that `assert_eq` means two different things depending on
+which file they are in.
