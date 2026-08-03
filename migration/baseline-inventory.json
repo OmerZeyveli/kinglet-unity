@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "124326d94085d6d236742aa53009d89303c3949d",
+  "source_commit": "86db3fd410bd4f122cbe01ae31087d7a6ab3de90",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 72,
@@ -308,7 +308,7 @@
       },
       {
         "path": ".claude/skills/deep-interview/SKILL.md",
-        "sha256": "a4a5c111751c4d5919c341191f03cf2728029a84794de33fe19ef8401dc729bc",
+        "sha256": "c3b634c084b329d5cd336664239edab201d0dd697f947250b3e14ef67f3f76d3",
         "git_mode": "100644"
       },
       {
@@ -338,7 +338,7 @@
       },
       {
         "path": ".claude/skills/systematic-debugging/SKILL.md",
-        "sha256": "c2aa7ee9c36e3cc5711de9d49844713fb3052a79291b3ff7d32de96631971607",
+        "sha256": "aac0419a6b1121e1b57fffac2d21b8a4bfdd9dc1423863faeb00d9f27c1f2211",
         "git_mode": "100644"
       },
       {
@@ -353,12 +353,12 @@
       },
       {
         "path": ".claude/skills/using-kinglet/SKILL.md",
-        "sha256": "b33d6f5801c75cd847cd6a00397ed6097c9dc1c1978a5e6f1ba4413f7c695998",
+        "sha256": "858eb5f60d89a2cd5f45534c7893619b23ab7418ea038ecceb58583a80f74966",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/verification-before-completion/SKILL.md",
-        "sha256": "c318cdb394060bb43e4c1190f42f08778164e687ddebac6f98bcf53e6b10fd43",
+        "sha256": "1e100baf319bc1882490368a071ae5649d208cf09bb7c7b77e0a1bc3e112630d",
         "git_mode": "100644"
       },
       {
@@ -492,7 +492,7 @@
         },
         {
           "path": ".claude/skills/deep-interview/SKILL.md",
-          "sha256": "a4a5c111751c4d5919c341191f03cf2728029a84794de33fe19ef8401dc729bc",
+          "sha256": "c3b634c084b329d5cd336664239edab201d0dd697f947250b3e14ef67f3f76d3",
           "git_mode": "100644"
         },
         {
@@ -522,7 +522,7 @@
         },
         {
           "path": ".claude/skills/systematic-debugging/SKILL.md",
-          "sha256": "c2aa7ee9c36e3cc5711de9d49844713fb3052a79291b3ff7d32de96631971607",
+          "sha256": "aac0419a6b1121e1b57fffac2d21b8a4bfdd9dc1423863faeb00d9f27c1f2211",
           "git_mode": "100644"
         },
         {
@@ -537,12 +537,12 @@
         },
         {
           "path": ".claude/skills/using-kinglet/SKILL.md",
-          "sha256": "b33d6f5801c75cd847cd6a00397ed6097c9dc1c1978a5e6f1ba4413f7c695998",
+          "sha256": "858eb5f60d89a2cd5f45534c7893619b23ab7418ea038ecceb58583a80f74966",
           "git_mode": "100644"
         },
         {
           "path": ".claude/skills/verification-before-completion/SKILL.md",
-          "sha256": "c318cdb394060bb43e4c1190f42f08778164e687ddebac6f98bcf53e6b10fd43",
+          "sha256": "1e100baf319bc1882490368a071ae5649d208cf09bb7c7b77e0a1bc3e112630d",
           "git_mode": "100644"
         }
       ]
