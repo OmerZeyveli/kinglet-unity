@@ -151,6 +151,16 @@ Report to user:
 - **Single scene** — no multi-scene for prototypes
 - **No UI** — Debug.Log for state, gizmos for visualization (OnDrawGizmos)
 
+## Finishing
+
+A file that fails to compile is still written successfully — the write itself does not fail. Run
+`read_console` after your last write, not just after the step you believe finishes the prototype;
+that is part of finishing, not an optional check.
+
+If the mechanic depends on a manual Editor step you cannot perform yourself — a sprite atlas, a
+lightmap bake, an import setting — stop and say so explicitly. Do not write code that assumes the
+asset exists.
+
 ## What NOT To Do
 
 - Don't build production architecture — this is a prototype
@@ -158,3 +168,11 @@ Report to user:
 - Don't add save/load, menus, or polish
 - Don't optimize — if it runs, it's fine for now
 - Don't edit scene files directly — always use MCP tools
+
+## What you return
+
+- **Status** — playable, partially built, or blocked (and on what).
+- **What changed** — scripts and scene, with paths.
+- **What was verified, and how** — `read_console` output after the last write; how to hit-play and
+  test it (which keys/buttons).
+- **What still needs a human** — any manual Editor step, or anything left unverified.

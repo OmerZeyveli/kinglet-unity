@@ -23,6 +23,8 @@ do not invoke a skill, you are working without it.
 
 - `physics`
 - `unity-mcp-patterns`
+- `systematic-debugging`
+- `verification-before-completion`
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not
@@ -83,9 +85,27 @@ In order of likelihood:
 3. Check console via MCP — verify error is gone
 4. If the fix involves serialization changes, always add `[FormerlySerializedAs]`
 
+## Finishing
+
+A file that fails to compile is still written successfully — the write itself does not fail. Run
+`read_console` after your last edit, not just after the fix you believe closes the bug; that is part
+of finishing, not an optional check.
+
+If the fix depends on a manual Editor step you cannot perform yourself — a sprite atlas, a lightmap
+bake, an import setting — stop and say so explicitly. Do not write a fix that assumes the asset
+exists.
+
 ## What NOT To Do
 
 - Don't suppress errors with try/catch unless it's a genuine expected exception
 - Don't add null checks everywhere — find WHY it's null
 - Don't change execution order as a band-aid — fix the dependency
 - Don't edit scene/prefab files directly — use MCP tools
+
+## What you return
+
+- **Status** — fixed, could not reproduce, or blocked (and on what).
+- **What changed** — files touched, with paths, and the root cause identified.
+- **What was verified, and how** — the reproduction from `systematic-debugging`, re-checked; console
+  output after the fix.
+- **What still needs a human** — any manual Editor step, or any symptom that persisted.

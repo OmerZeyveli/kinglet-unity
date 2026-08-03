@@ -109,9 +109,27 @@ ALWAYS use `batch_execute` for multiple operations — it's 10-100x faster than 
 - Keep hierarchy depth under 5 levels (deep hierarchies slow Unity)
 - Empty parent objects for organization are fine — they have negligible cost
 
+## Finishing
+
+Scene construction can leave broken references that only show up on load or play — check
+`read_console` after your last MCP write, not just after the step you believe finishes the scene;
+that is part of finishing, not an optional check.
+
+If the scene depends on a manual Editor step you cannot perform yourself — a lightmap bake, an
+occlusion-culling pass, an asset that must exist first — stop and say so explicitly. Do not wire a
+scene to an asset that doesn't exist yet.
+
 ## What NOT To Do
 
 - Never edit `.unity` files as text — always use MCP tools
 - Never create scenes without a camera
 - Never leave GameObjects at world origin unless intentional
 - Never create deeply nested hierarchies (>5 levels)
+
+## What you return
+
+- **Status** — built, partially built, or blocked (and on what).
+- **What changed** — scene(s) and hierarchy, with paths.
+- **What was verified, and how** — `read_console` output and `manage_scene` validate results after
+  the last write.
+- **What still needs a human** — any manual Editor step, or any missing reference.

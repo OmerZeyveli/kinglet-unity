@@ -87,3 +87,11 @@ X critical, Y performance, Z suggestions
 ```
 
 Be specific — show the problematic code and the fix. Don't just say "cache this" — show the cached version.
+
+## What you return
+
+- **Status** — clean, or issues found (with a severity count).
+- **What was reviewed** — files and paths covered.
+- **What was verified, and how** — the checklist categories actually checked against the diff.
+- **What still needs a human** — this review does not fix anything; every finding needs a driving
+  agent (`unity-coder` or `unity-fixer`) to act on it.

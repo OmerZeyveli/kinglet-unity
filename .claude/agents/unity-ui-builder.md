@@ -175,6 +175,16 @@ Every screen MUST be fully operable with a gamepad — no mouse-only paths:
 - **Pool list items** in scroll views — don't instantiate/destroy
 - **Minimize Canvas.BuildBatch** — batch similar materials, avoid overlapping canvases
 
+## Finishing
+
+A file that fails to compile is still written successfully — the write itself does not fail. Run
+`read_console` after your last write, not just after the step you believe finishes the screen; that
+is part of finishing, not an optional check.
+
+If the screen depends on a manual Editor step you cannot perform yourself — a sprite atlas, a font
+asset import, a texture compression setting — stop and say so explicitly. Do not write code that
+assumes the asset exists.
+
 ## What NOT To Do
 
 - Never use `Find` to get UI references — use `[SerializeField]`
@@ -185,3 +195,11 @@ Every screen MUST be fully operable with a gamepad — no mouse-only paths:
 - Never leave focus invisible or unset — a gamepad user with no focus indicator is stuck
 - Never anchor HUD elements to the screen centre and assume 16:9 — check 21:9 and 32:9
 - Never author UI art at 1080p only — it goes soft at 4K
+
+## What you return
+
+- **Status** — built, partially built, or blocked (and on what).
+- **What changed** — scripts and UI hierarchy, with paths.
+- **What was verified, and how** — `read_console` output after the last write; gamepad-only
+  navigation and focus visibility checked.
+- **What still needs a human** — any manual Editor step, or anything left unverified.

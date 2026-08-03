@@ -24,6 +24,7 @@ do not invoke a skill, you are working without it.
 - `physics`
 - `urp-pipeline`
 - `addressables`
+- `verification-before-completion`
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not
@@ -155,3 +156,11 @@ Build size has no meaningful ceiling on PC/console storefronts — optimise load
 - Don't assume shipped performance from Editor profiling — always profile a real build
 - Don't tune only to your dev machine — min-spec is what decides who can play
 - Don't let higher desktop headroom excuse skipping batching — it is still free frame time
+
+## What you return
+
+- **Status** — improved, no bottleneck found, or blocked (and on what).
+- **What changed** — files touched, with paths, and which optimization was applied.
+- **What was verified, and how** — profiler frames before and after, via `manage_profiler` /
+  `manage_graphics`. "It is faster" without both frames is not a completion.
+- **What still needs a human** — any manual Editor asset work (atlas, LOD, bake) the fix assumes.

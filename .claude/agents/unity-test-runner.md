@@ -22,6 +22,7 @@ default, and nothing loads them for you — no glob matching, no always-apply. I
 do not invoke a skill, you are working without it.
 
 - `assembly-definitions`
+- `verification-before-completion`
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not
@@ -152,3 +153,11 @@ public IEnumerator Rigidbody_WithGravity_FallsDown()
 - Don't make tests depend on other tests' execution order
 - Don't leave GameObjects alive after tests (clean up in TearDown)
 - Don't use PlayMode tests when EditMode would suffice
+
+## What you return
+
+- **Status** — all passed, some failed, or blocked (and on what).
+- **What changed** — test files written or modified, with paths.
+- **What was verified, and how** — `run_tests` output: passed/failed/skipped counts. A new test
+  watched fail before the fix, then pass after — not assumed.
+- **What still needs a human** — any coverage gap left, or any test that could not be run.

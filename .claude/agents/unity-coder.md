@@ -17,6 +17,7 @@ default, and nothing loads them for you — no glob matching, no always-apply. I
 do not invoke a skill, you are working without it.
 
 - `assembly-definitions`
+- `verification-before-completion`
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not
@@ -61,6 +62,16 @@ Follow all rules in `.claude/rules/`:
 
 Always prefer `batch_execute` over individual MCP calls — it's 10-100x faster.
 
+## Finishing
+
+A file that fails to compile is still written successfully — the write itself does not fail. Run
+`read_console` after your last write, not just after the change you believe is complete; that is
+part of finishing, not an optional check.
+
+If the feature depends on a manual Editor step you cannot perform yourself — a sprite atlas, a
+lightmap bake, an import setting — stop and say so explicitly. Do not write code that assumes the
+asset exists.
+
 ## What NOT To Do
 
 - Never edit `.unity`, `.prefab`, or `.meta` files directly
@@ -69,3 +80,11 @@ Always prefer `batch_execute` over individual MCP calls — it's 10-100x faster.
 - Never use `?.` on Unity objects
 - Never use LINQ in gameplay code
 - Never create singletons without explicit justification
+
+## What you return
+
+- **Status** — done, partially done, or blocked (and on what).
+- **What changed** — scripts and scenes touched, with paths.
+- **What was verified, and how** — `read_console` output after the last write, scene/component
+  configuration confirmed via MCP.
+- **What still needs a human** — any manual Editor step, or anything left unverified.
