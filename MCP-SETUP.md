@@ -10,7 +10,7 @@ that is what `install.sh` writes for you:
 ```json
 {
   "mcpServers": {
-    "unityMCP": {
+    "UnityMCP": {
       "type": "http",
       "url": "http://localhost:8080/mcp"
     }
@@ -18,7 +18,7 @@ that is what `install.sh` writes for you:
 }
 ```
 
-If `.mcp.json` already exists and has no `unityMCP` entry, the installer will not touch it — merging
+If `.mcp.json` already exists and has no `unityMCP`/`UnityMCP` entry, the installer will not touch it — merging
 JSON by script is how a hand-written config gets destroyed. It prints the block above for you to add
 yourself. Either way, you do not need to write this by hand on a fresh install; you only need to
 install the Unity-side package, start the bridge, and approve the server (next section).
@@ -96,24 +96,35 @@ you got used to depend on the day you installed. `./install.sh --with-mcp` pins 
 
 Keep the Unity Editor open while you work — the MCP tools talk to the live Editor.
 
-### Auto-Setup empties the `.mcp.json` this toolkit ships
+### Auto-Setup's registration is the one this toolkit targets
 
-Measured 2026-07-30. Before Auto-Setup, `.mcp.json` holds Pioneer's project-scoped entry. After it,
-that file reads `{"mcpServers": {}}` — the wizard **removed** the entry and registered its own server
-under `~/.claude.json` as *Local config (private to you in this project)*, at `127.0.0.1` rather than
-`localhost`.
+Measured 2026-07-30, and still true: before Auto-Setup, `.mcp.json` holds Pioneer's project-scoped
+entry. After it, that file reads `{"mcpServers": {}}` — the wizard **removes** the entry and
+registers its own server under `~/.claude.json` as *Local config (private to you in this project)*,
+at `127.0.0.1` rather than `localhost`, named **`UnityMCP`** (capital U).
 
-Both work. The difference is who else gets it: the project-scoped file is in git and every clone
-picks it up; the wizard's registration is private to one machine and one user, and a teammate cloning
-the repo sees nothing.
+That capitalization is not cosmetic. Claude Code matches a `tools:` glob against the registered
+server name by exact string, and every `unity-*` agent in this toolkit declares
+`mcp__UnityMCP__*`. `install.sh` writes the same spelling into `.mcp.json` for the same reason —
+see `provenance.tsv` and `tests/test-mcp-naming.sh`, which fails the build if the two ever disagree
+again.
 
-Restoring `.mcp.json` while the wizard's entry exists gives you **two connected servers pointing at
-the same bridge**, which means duplicate tool sets in every session. Pick one:
+**Run Auto-Setup. It is the supported path — do not undo it.** An earlier version of this file told
+you to restore `.mcp.json` and run `claude mcp remove UnityMCP -s local` to drop "the wizard's
+private duplicate." That advice was wrong: it produces a Claude Code session where every `unity-*`
+agent silently has no MCP tools, because a previous version of this toolkit spelled the server
+`unityMCP` (lowercase) while Auto-Setup has always registered `UnityMCP`. Rather than ask every user
+to fight the wizard's spelling on every fresh setup, **the toolkit conceded the name** — agents and
+`install.sh` now both spell it `UnityMCP`, matching what Auto-Setup actually writes. If you ran the
+old advice and removed the wizard's registration, re-run Auto-Setup to put it back.
+
+A project whose `.mcp.json` still has an old lowercase `unityMCP` entry from before this fix keeps
+working with no edits required: Auto-Setup empties `.mcp.json` regardless of what is in it and
+registers its own copy under `~/.claude.json`, and it is that registration — not the stale key
+sitting in `.mcp.json` — that the agents actually call.
 
 ```bash
-git checkout .mcp.json                 # keep the versioned, team-visible registration
-claude mcp remove UnityMCP -s local    # and drop the wizard's private duplicate
-claude mcp list                        # expect exactly one, Connected
+claude mcp list                        # expect UnityMCP, Connected
 ```
 
 ### One-time approval, every fresh install
@@ -123,13 +134,13 @@ one-time interactive approval before Claude Code will call their tools:
 
 ```
 $ claude mcp list
-unityMCP: http://localhost:8080/mcp (HTTP) - ⏸ Pending approval (run `claude` to approve)
+UnityMCP: http://localhost:8080/mcp (HTTP) - ⏸ Pending approval (run `claude` to approve)
 ```
 
 Run `claude` interactively in the project and approve it when prompted. This is a required manual
 step, not a bug — do it once per project/checkout.
 
-**Adding `enabledMcpjsonServers: ["unityMCP"]` to `.claude/settings.json` did NOT clear this in the
+**Adding `enabledMcpjsonServers: ["UnityMCP"]` to `.claude/settings.json` did NOT clear this in the
 version tested.** Do not rely on it to skip the approval; nothing verified here bypasses it. If you
 find a way that reliably does, update this file and say how you confirmed it.
 

@@ -298,11 +298,11 @@ if [ "$DRY_RUN" -eq 1 ]; then
   fi
   [ -n "$BACKUP_DIR" ] && printf '  backup: %s\n' "$(basename "$BACKUP_DIR")"
   if [ ! -f "$PROJECT_DIR/.mcp.json" ]; then
-    printf '  .mcp.json (new — unityMCP -> http://localhost:8080/mcp)\n'
-  elif grep -q '"unityMCP"' "$PROJECT_DIR/.mcp.json" 2>/dev/null; then
-    printf '  .mcp.json already has unityMCP — would leave alone\n'
+    printf '  .mcp.json (new — UnityMCP -> http://localhost:8080/mcp)\n'
+  elif grep -Eq '"(unityMCP|UnityMCP)"' "$PROJECT_DIR/.mcp.json" 2>/dev/null; then
+    printf '  .mcp.json already has a unityMCP/UnityMCP entry — would leave alone\n'
   else
-    printf '  .mcp.json exists without unityMCP — would print the block, not rewrite\n'
+    printf '  .mcp.json exists without unityMCP/UnityMCP — would print the block, not rewrite\n'
   fi
   printf '\nDry run complete — nothing written.\n'
   exit 0
@@ -622,21 +622,21 @@ if [ ! -f "$MCP_JSON" ]; then
   cat > "$MCP_JSON" <<'MCPJSON'
 {
   "mcpServers": {
-    "unityMCP": {
+    "UnityMCP": {
       "type": "http",
       "url": "http://localhost:8080/mcp"
     }
   }
 }
 MCPJSON
-  ok "Wrote .mcp.json (unityMCP → http://localhost:8080/mcp)"
+  ok "Wrote .mcp.json (UnityMCP → http://localhost:8080/mcp)"
   MCP_JSON_RECEIPT_LINE=$(printf '.mcp.json\t%s\t644\ttoolkit' "$(sha_of "$MCP_JSON")")
-elif grep -q '"unityMCP"' "$MCP_JSON" 2>/dev/null; then
-  ok ".mcp.json already has unityMCP — left alone."
+elif grep -Eq '"(unityMCP|UnityMCP)"' "$MCP_JSON" 2>/dev/null; then
+  ok ".mcp.json already has a unityMCP/UnityMCP entry — left alone."
 else
-  warn ".mcp.json exists without a unityMCP entry — not rewriting it. Add this under \"mcpServers\":"
+  warn ".mcp.json exists without a UnityMCP entry — not rewriting it. Add this under \"mcpServers\":"
   warn ''
-  warn '    "unityMCP": {'
+  warn '    "UnityMCP": {'
   warn '      "type": "http",'
   warn '      "url": "http://localhost:8080/mcp"'
   warn '    }'

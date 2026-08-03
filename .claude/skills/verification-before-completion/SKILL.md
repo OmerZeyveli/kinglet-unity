@@ -14,7 +14,7 @@ times, while the tests were read every time.
 
 | Claim | Evidence |
 |---|---|
-| "It compiles" | `mcp__unityMCP__read_console` shows no errors after a refresh |
+| "It compiles" | the unity-mcp `read_console` tool shows no errors after a refresh |
 | "It works" | A test that fails without the change and passes with it, run via `/unity-test` |
 | "The bug is fixed" | The reproduction from `systematic-debugging` no longer reproduces |
 | "It is faster" | Profiler frames before and after, via `/unity-optimize` |

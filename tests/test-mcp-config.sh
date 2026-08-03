@@ -20,7 +20,7 @@ bash "${REPO_DIR}/install.sh" --project-dir "$TMC_MOCK" > /dev/null 2>&1 || true
 assert_file_exists "${TMC_MOCK}/.mcp.json" "install writes .mcp.json at the project root"
 
 TMC_JSON=$(cat "${TMC_MOCK}/.mcp.json" 2>/dev/null || echo "")
-assert_contains "$TMC_JSON" "unityMCP" ".mcp.json names the unityMCP server"
+assert_contains "$TMC_JSON" "UnityMCP" ".mcp.json names the UnityMCP server"
 assert_contains "$TMC_JSON" "localhost:8080/mcp" ".mcp.json carries the bridge URL"
 
 # The inert key must be gone, or a reader will believe it does something.
@@ -67,7 +67,7 @@ assert_eq "0" "$TMC_UNINSTALL_REMOVED" "uninstall removes an unchanged .mcp.json
 
 rm -rf "$TMC_MOCK/.claude"
 bash "${REPO_DIR}/install.sh" --project-dir "$TMC_MOCK" --yes > /dev/null 2>&1 || true
-printf '{"mcpServers":{"unityMCP":{"type":"http","url":"http://localhost:8080/mcp"},"extra":{"type":"http","url":"http://localhost:1/mcp"}}}\n' \
+printf '{"mcpServers":{"UnityMCP":{"type":"http","url":"http://localhost:8080/mcp"},"extra":{"type":"http","url":"http://localhost:1/mcp"}}}\n' \
     > "${TMC_MOCK}/.mcp.json"
 bash "${REPO_DIR}/uninstall.sh" --project-dir "$TMC_MOCK" --yes --no-backup > /dev/null 2>&1 || true
 assert_file_exists "${TMC_MOCK}/.mcp.json" "uninstall leaves a user-modified .mcp.json in place"

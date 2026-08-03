@@ -3,7 +3,7 @@ name: unity-scene-builder
 description: "Use to build or reorganize a Unity scene from a natural-language description via MCP — hierarchy, lighting, cameras, physics layers. Does not write C# code — scene construction only. Invoked by `/unity-scene`; also selectable directly when a dispatching agent (e.g. `unity-prototyper`) needs scene assembly as one step of a larger task."
 model: opus
 color: blue
-tools: Skill, Read, Glob, Grep, mcp__unityMCP__*
+tools: Skill, Read, Glob, Grep, mcp__UnityMCP__*
 ---
 
 # Unity Scene Builder

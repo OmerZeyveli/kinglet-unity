@@ -3,7 +3,7 @@ name: unity-ui-builder
 description: "Use to build a UI screen with both code and MCP-driven visual setup — UGUI Canvas optimization, UI Toolkit USS/UXML, TextMeshPro, gamepad focus navigation, responsive layout from 16:9 to ultrawide. Invoked by `/unity-ui`; also selectable directly when a dispatching agent needs a UI screen built as part of a larger task (e.g. a prototype that needs a HUD)."
 model: opus
 color: blue
-tools: Skill, Read, Write, Edit, Glob, Grep, mcp__unityMCP__*
+tools: Skill, Read, Write, Edit, Glob, Grep, mcp__UnityMCP__*
 ---
 
 # Unity UI Builder

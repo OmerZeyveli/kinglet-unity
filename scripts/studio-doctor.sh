@@ -87,11 +87,15 @@ read_mcp_url() {
   for f in "$CLAUDE_DIR/settings.local.json" "$PROJECT_DIR/.mcp.json" "$CLAUDE_DIR/settings.json"; do
     [ -f "$f" ] || continue
     if command -v jq >/dev/null 2>&1; then
-      url=$(jq -r '.mcpServers.unityMCP.url // empty' "$f" 2>/dev/null || true)
+      # UnityMCP (capital U) is what install.sh writes and what CoplayDev's Auto-Setup registers —
+      # see provenance.tsv and tests/test-mcp-naming.sh. unityMCP (lowercase) is read as a fallback
+      # so an older project's untouched .mcp.json still gets checked instead of reporting missing.
+      url=$(jq -r '.mcpServers.UnityMCP.url // .mcpServers.unityMCP.url // empty' "$f" 2>/dev/null || true)
     elif [ -n "$PY" ]; then
       url=$("$PY" -c 'import json,sys
 try:
-    print(json.load(open(sys.argv[1])).get("mcpServers",{}).get("unityMCP",{}).get("url",""))
+    servers = json.load(open(sys.argv[1])).get("mcpServers",{})
+    print(servers.get("UnityMCP",{}).get("url","") or servers.get("unityMCP",{}).get("url",""))
 except Exception: pass' "$f" 2>/dev/null || true)
     fi
     if [ -n "$url" ]; then
@@ -109,7 +113,7 @@ except Exception: pass' "$f" 2>/dev/null || true)
 
 MCP_URL=$(read_mcp_url)
 if [ -z "$MCP_URL" ]; then
-  warn "No mcpServers.unityMCP.url in settings — skipped the bridge check."
+  warn "No mcpServers.UnityMCP.url in settings — skipped the bridge check."
 elif ! command -v curl >/dev/null 2>&1; then
   warn "curl not found — skipped the bridge check."
 else
@@ -129,7 +133,7 @@ else
     # Something is listening, but it is not an MCP server. Say so — do not call it a bridge.
     fail "$MCP_URL is serving something that is NOT an MCP server."
     printf '     %s\n' "first bytes: $(printf '%s' "$MCP_RESP" | tr -d '\n' | cut -c1-70)"
-    printf '     %s\n' "Another service holds that port. Point unityMCP at a free one in .claude/settings.local.json."
+    printf '     %s\n' "Another service holds that port. Point UnityMCP at a free one in .claude/settings.local.json."
   fi
 fi
 
@@ -146,13 +150,21 @@ if [ ! -f "$MCP_JSON" ]; then
   fail "No .mcp.json at project root — run install.sh."
 else
   MCP_CONFIGURED=""
+  MCP_CONFIGURED_KEY=""
   if command -v jq >/dev/null 2>&1; then
-    MCP_CONFIGURED=$(jq -r '.mcpServers.unityMCP.url // empty' "$MCP_JSON" 2>/dev/null || true)
+    MCP_CONFIGURED=$(jq -r '.mcpServers.UnityMCP.url // .mcpServers.unityMCP.url // empty' "$MCP_JSON" 2>/dev/null || true)
+    MCP_CONFIGURED_KEY=$(jq -r 'if .mcpServers.UnityMCP then "UnityMCP" elif .mcpServers.unityMCP then "unityMCP" else empty end' "$MCP_JSON" 2>/dev/null || true)
   elif [ -n "$PY" ]; then
     MCP_CONFIGURED=$("$PY" -c 'import json,sys
 try:
-    d = json.load(open(sys.argv[1]))
-    print(d.get("mcpServers", {}).get("unityMCP", {}).get("url", ""))
+    servers = json.load(open(sys.argv[1])).get("mcpServers", {})
+    print(servers.get("UnityMCP", {}).get("url", "") or servers.get("unityMCP", {}).get("url", ""))
+except Exception:
+    pass' "$MCP_JSON" 2>/dev/null || true)
+    MCP_CONFIGURED_KEY=$("$PY" -c 'import json,sys
+try:
+    servers = json.load(open(sys.argv[1])).get("mcpServers", {})
+    print("UnityMCP" if "UnityMCP" in servers else ("unityMCP" if "unityMCP" in servers else ""))
 except Exception:
     pass' "$MCP_JSON" 2>/dev/null || true)
   fi
@@ -161,12 +173,12 @@ except Exception:
     # different one from settings.local.json is two lines contradicting each other about the same
     # fact — the reader has to guess which is live.
     if [ -n "$MCP_URL" ] && [ "$MCP_URL" != "$MCP_CONFIGURED" ]; then
-      pass ".mcp.json: unityMCP → $MCP_CONFIGURED (overridden by settings.local.json → $MCP_URL)"
+      pass ".mcp.json: ${MCP_CONFIGURED_KEY} → $MCP_CONFIGURED (overridden by settings.local.json → $MCP_URL)"
     else
-      pass ".mcp.json: mcpServers.unityMCP → $MCP_CONFIGURED"
+      pass ".mcp.json: mcpServers.${MCP_CONFIGURED_KEY} → $MCP_CONFIGURED"
     fi
   elif command -v jq >/dev/null 2>&1 || [ -n "$PY" ]; then
-    fail ".mcp.json has no mcpServers.unityMCP.url — MCP tools will not work."
+    fail ".mcp.json has no mcpServers.UnityMCP.url — MCP tools will not work."
   else
     warn "Neither jq nor python available — could not parse .mcp.json."
   fi

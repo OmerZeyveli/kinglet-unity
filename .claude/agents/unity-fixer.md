@@ -3,7 +3,7 @@ name: unity-fixer
 description: "Use for a bug whose cause isn't obvious yet — needs investigation across multiple possible causes (execution order, coroutine lifecycle, destroyed-object access, live API behavior via `unity_reflect`), not a one-line fix. Invoked by `/unity-fix`; also selectable directly when a dispatching agent has an unresolved bug report with no clear single cause."
 model: opus
 color: red
-tools: Skill, Read, Write, Edit, Glob, Grep, Bash, mcp__unityMCP__*
+tools: Skill, Read, Write, Edit, Glob, Grep, Bash, mcp__UnityMCP__*
 ---
 
 # Unity Bug Fixer

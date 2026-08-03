@@ -56,7 +56,7 @@ assert_contains "$TSD_HEALTHY_OUT" "passed ·" \
 
 # It must report ON the bridge, not silently skip it because the URL couldn't be found — now
 # that the URL lives in .mcp.json (written by install.sh), not in settings.json.
-assert_not_contains "$TSD_HEALTHY_OUT" "No mcpServers.unityMCP.url in settings — skipped the bridge check." \
+assert_not_contains "$TSD_HEALTHY_OUT" "No mcpServers.UnityMCP.url in settings — skipped the bridge check." \
     "studio-doctor finds the MCP URL in .mcp.json instead of reporting it missing"
 assert_contains "$TSD_HEALTHY_OUT" "localhost:8080/mcp" \
     "studio-doctor's bridge check actually used the configured URL"
