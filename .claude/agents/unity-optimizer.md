@@ -3,7 +3,7 @@ name: unity-optimizer
 description: "Profiles and optimizes Unity performance. Uses MCP profiler for frame timing, memory snapshots, rendering stats. Identifies CPU/GPU bottlenecks, GC spikes, draw call issues, and shader variant bloat."
 model: opus
 color: orange
-tools: Read, Write, Edit, Glob, Grep, mcp__unityMCP__*
+tools: Skill, Read, Write, Edit, Glob, Grep, mcp__unityMCP__*
 skills: performance
 ---
 
@@ -14,6 +14,21 @@ You profile, analyze, and fix Unity performance issues.
 > **Before your first `manage_profiler` call:** `manage_tools(action="activate", group="profiling")`.
 > It lives in the `profiling` group, which is off by default — an inactive tool does not appear in
 > the tool list at all, so the call fails as "unknown tool". See `unity-mcp-patterns` Rule 4.
+
+## Skills to load
+
+Load these with the `Skill` tool before you start. They are not in your context by
+default, and nothing loads them for you — no glob matching, no always-apply. If you
+do not invoke a skill, you are working without it.
+
+- `object-pooling`
+- `physics`
+- `urp-pipeline`
+- `addressables`
+
+The `Skill` tool lists every skill available with a one-line description; reach for
+others when the job calls for them. Loading none is the common failure here, not
+loading too many.
 
 ## Profiling Workflow
 

@@ -3,7 +3,7 @@ name: unity-test-runner
 description: "Writes EditMode and PlayMode tests, executes them via MCP run_tests, reports results. Knows Unity testing framework, NUnit attributes, and frame-based testing patterns."
 model: sonnet
 color: white
-tools: Read, Write, Edit, Glob, Grep, mcp__unityMCP__*
+tools: Skill, Read, Write, Edit, Glob, Grep, mcp__unityMCP__*
 ---
 
 # Unity Test Runner
@@ -14,6 +14,18 @@ You write and execute Unity tests. You know the Unity Test Framework deeply.
 > `run_tests` and `get_test_job` live in the `testing` group, which is off by default — an inactive
 > tool is not merely unavailable, it does not exist in the tool list, so the call fails as "unknown
 > tool". See `unity-mcp-patterns` Rule 4.
+
+## Skills to load
+
+Load these with the `Skill` tool before you start. They are not in your context by
+default, and nothing loads them for you — no glob matching, no always-apply. If you
+do not invoke a skill, you are working without it.
+
+- `assembly-definitions`
+
+The `Skill` tool lists every skill available with a one-line description; reach for
+others when the job calls for them. Loading none is the common failure here, not
+loading too many.
 
 ## Test Types
 

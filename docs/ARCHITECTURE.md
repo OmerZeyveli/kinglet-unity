@@ -56,7 +56,7 @@ Agents are Markdown files in `.claude/agents/` with YAML frontmatter that contro
 | `model` | Which Claude model to use | `opus`, `sonnet`, `haiku` |
 | `color` | Terminal display color | `green`, `blue`, `yellow` |
 | `tools` | Allowed tool access list | `Read, Write, Edit, Glob, Grep, Bash, mcp__unityMCP__*` |
-| `skills` | Skills to preload | Listed in the agent body or loaded by commands |
+| `tools` must include `Skill` | Lets the agent load skills at all | Without it the **Skills to load** block in the body is unactionable |
 
 ### Model Selection
 
@@ -99,40 +99,57 @@ User: /unity-prototype "2D platformer with wall jumping"
 
 ## How Skills Work
 
-Skills are knowledge modules in `.claude/skills/`, organized into categories:
+Skills are knowledge modules in `.claude/skills/`, one directory per skill:
 
 ```
 skills/
-  core/              Fundamentals: assembly defs, events, pooling, MCP patterns
-  gameplay/          Game systems: character controller, inventory, dialogue, save
-  genre/             Genre patterns: RPG, platformer, top-down, match-3, puzzle, idle
-  systems/           Unity subsystems: Input System, Cinemachine, Addressables
-  third-party/       Third-party: DOTween, UniTask, VContainer
+  assembly-definitions/SKILL.md
+  serialization-safety/SKILL.md
+  input-system/SKILL.md
+  ...                              39 in total, flat
 ```
 
-There is no `platform/` category. This toolkit targets PC and console only, so platform guidance is
-a rule (`.claude/rules/pc-console.md`, always loaded) rather than a skill switched on per file.
+**Flat, and it has to be.** Claude Code discovers skills at `.claude/skills/<name>/SKILL.md` and
+nowhere else. Until 2026-08-03 these 39 skills were filed under `core/`, `gameplay/`, `genre/`,
+`systems/` and `third-party/`, inherited from everything-claude-unity — which meant none of them
+were ever registered, and the `Skill` tool could not invoke a single one. The categories were a
+tidier tree in exchange for the whole feature. They now live in each skill's `description`, which
+is what selection actually reads.
+
+The measurement, in an empty project: `.claude/skills/flatprobe/SKILL.md` is listed;
+`.claude/skills/category/nestedprobe/SKILL.md` is not. `tests/test-skill-discovery.sh` holds the
+line.
+
+There is no `platform/` category and never will be. This toolkit targets PC and console only, so
+platform guidance is a rule (`.claude/rules/pc-console.md`, always loaded) rather than a skill.
 
 ### Discovery
 
-Claude Code discovers skills via glob patterns. Agents reference skills by category path, and the system loads matching `.md` files.
+Claude Code registers every `.claude/skills/<name>/SKILL.md` and offers it to the model as an
+invocable skill, described by its `description` frontmatter. That description is the entire
+selection mechanism.
 
-### Always-Apply Skills
+There is no glob matching. The `globs:` key that 28 of these skills carried is a Cursor rule
+convention that rode in with the vendored frontmatter; nothing in Claude Code reads it, and it has
+been removed. Neither is there any preloading — an agent that does not invoke a skill does not have
+it. That is why the agents now name the skills they need in a **Skills to load** block and are
+granted the `Skill` tool to load them.
 
-Nine `core/` skills (including `unity-mcp-patterns` and `serialization-safety`) carry `alwaysApply: true`
-in frontmatter. **As of a 2026-07-30 behavioural probe (`.superpowers/sdd/2026-07-30-alwaysapply-finding.md`),
-this key is inert in Claude Code: nothing in this repository's hooks, `settings.json`, or `install.sh`
-reads it or injects skill content unconditionally.** A skill is selected the same way any Claude Code
-skill is — the model reads its `description` frontmatter and decides whether to invoke it — regardless
-of `alwaysApply`. Two probes confirmed this: a serialization-rename question was answered correctly with
-zero tool calls, citing `.claude/rules/serialization.md` (which genuinely does auto-load) instead of the
-`serialization-safety` skill; a commit-trailers question — answerable only from the `commit-trailers`
-skill, since that content has no counterpart in `.claude/rules/` — was answered correctly only after the
-model actively `grep`/`Read` the skill file itself, not through automatic loading.
+### The two frontmatter keys that did nothing
 
-The key is kept in frontmatter because it is vendored from upstream ECU and may carry meaning in another
-tool; it is not removed here. Do not rely on it for correctness-critical knowledge reaching the model —
-that guarantee does not exist today.
+Until 2026-08-03, twelve skills carried `alwaysApply: true` and twenty-eight carried `globs`. Neither
+key has ever had an effect in Claude Code — both are Cursor rule conventions inherited with the
+vendored everything-claude-unity frontmatter. A 2026-07-30 probe established the first
+(`.superpowers/sdd/2026-07-30-alwaysapply-finding.md`); the discovery probe on 2026-08-03 established
+the second, and also showed why the first probe's conclusion — "selected by description like every
+other skill" — was still too generous. They were not being selected at all. Nested under category
+directories, none of them was registered.
+
+Both keys are now stripped from all 39 skills, and `tests/test-no-mobile.sh` asserts they stay gone.
+A key that reads as a safety control but controls nothing is worse than no key: it gets believed. If
+guidance genuinely must reach every session, it belongs in `.claude/rules/`, which CLAUDE.md loads
+unconditionally — that mechanism is real, and it is where the serialization and performance rules
+already live.
 
 ---
 
@@ -307,7 +324,7 @@ This structure follows Claude Code's discovery conventions:
 
 - **agents/** -- auto-discovered by name when referenced by commands or the user
 - **commands/** -- auto-discovered and exposed as `/slash-commands`
-- **skills/** -- discovered via glob patterns, loaded on demand
+- **skills/** -- registered one level deep (`skills/<name>/SKILL.md`), selected by description, invoked with the `Skill` tool
 - **hooks/** -- referenced by path in `settings.json`, executed by Claude Code runtime
 - **rules/** -- all files in this directory are loaded as context automatically
 - **state/** -- runtime session state (session.json, tracking files), git-ignored

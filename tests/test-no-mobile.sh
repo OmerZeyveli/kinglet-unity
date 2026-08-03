@@ -7,9 +7,15 @@
 # upstream sync silently reinstates it — the strip is a one-time edit, but the
 # constraint is permanent.
 #
-# Upstream's mobile skill was NOT inert: it shipped alwaysApply:true with
-# globs ["**/*.cs"], so it loaded on every C# file in the project. That is why
-# this is enforced rather than trusted.
+# The original rationale here — "the mobile skill shipped alwaysApply:true with
+# globs ["**/*.cs"], so it loaded on every C# file" — is wrong, and the record
+# should say so. Probes on 2026-07-30 and 2026-08-03 found nothing in Claude
+# Code reads either key; both are Cursor rule conventions that arrived with the
+# vendored frontmatter. The mobile skill was never auto-loading anything.
+#
+# Deleting it was still right, and this test still earns its keep: mobile
+# guidance in a PC/console toolkit is wrong guidance whether it loads by itself
+# or a model picks it off the shelf. Only the mechanism was misdescribed.
 # ============================================================================
 
 set -euo pipefail
@@ -28,10 +34,16 @@ assert_absent() {
 cd "$PROJECT_ROOT"
 
 # --- 1. Deleted mobile payload stays deleted -------------------------------
-assert_absent ".claude/skills/platform/mobile/SKILL.md" "mobile skill absent"
+# Both layouts. Upstream keeps skills at skills/<category>/<name>/; we flattened to
+# skills/<name>/ on 2026-08-03 because Claude Code only discovers the flat form. A
+# re-vendor could reinstate mobile at either path, so both stay asserted absent.
+assert_absent ".claude/skills/platform/mobile/SKILL.md" "mobile skill absent (upstream path)"
+assert_absent ".claude/skills/mobile"                   "mobile skill absent (flat path)"
 assert_absent ".claude/skills/platform"                 "platform/ category absent (mobile was its only entry)"
-assert_absent ".claude/skills/genre/hyper-casual"       "hyper-casual genre absent"
-assert_absent ".claude/skills/genre/endless-runner"     "endless-runner genre absent"
+assert_absent ".claude/skills/genre/hyper-casual"       "hyper-casual genre absent (upstream path)"
+assert_absent ".claude/skills/hyper-casual"             "hyper-casual genre absent (flat path)"
+assert_absent ".claude/skills/genre/endless-runner"     "endless-runner genre absent (upstream path)"
+assert_absent ".claude/skills/endless-runner"           "endless-runner genre absent (flat path)"
 assert_absent "examples/CLAUDE.md.hyper-casual"         "hyper-casual example absent"
 assert_absent "examples/CLAUDE.md.mobile-casual"        "mobile-casual example absent"
 
@@ -73,14 +85,20 @@ if [ -n "$BANNED" ]; then
 fi
 assert_eq "$(printf '%s' "$BANNED" | grep -c . || true)" "0" "nothing forbids compute shaders or VFX Graph"
 
-# --- 5. No skill silently applies to every file ----------------------------
-# The mobile skill's real damage came from alwaysApply:true + globs **/*.cs.
-# Any future skill doing that deserves a second look, so surface it here.
-ALWAYS=$(grep -rl 'alwaysApply: true' .claude/skills/ 2>/dev/null | grep -v '/core/' || true)
-if [ -n "$ALWAYS" ]; then
-  echo "--- non-core skills with alwaysApply:true ---"; echo "$ALWAYS"
+# --- 5. No skill carries the two inert Cursor keys -------------------------
+# The mobile skill's damage was attributed to alwaysApply:true + globs **/*.cs.
+# That story cannot be right in Claude Code: a 2026-07-30 probe found nothing
+# reads alwaysApply, and a 2026-08-03 probe found nothing reads globs either —
+# both are Cursor rule conventions that rode in with the vendored frontmatter.
+# They are stripped from all 39 skills. The assertion is that they stay gone:
+# a key that looks like a safety control but controls nothing is worse than no
+# key, because it is read as a guarantee. Real always-on guidance goes in
+# .claude/rules/, which CLAUDE.md loads for every session.
+INERT=$(grep -rl '^alwaysApply:\|^globs:' .claude/skills/ 2>/dev/null || true)
+if [ -n "$INERT" ]; then
+  echo "--- skills carrying inert Cursor frontmatter keys ---"; echo "$INERT"
 fi
-assert_eq "$(printf '%s' "$ALWAYS" | grep -c . || true)" "0" "no non-core skill uses alwaysApply:true"
+assert_eq "$(printf '%s' "$INERT" | grep -c . || true)" "0" "no skill carries alwaysApply or globs"
 
 # --- Summary ---------------------------------------------------------------
 echo ""

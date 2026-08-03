@@ -6,28 +6,36 @@ One-page reference for all skills in everything-claude-unity.
 
 ## Overview
 
-39 skills organized into 5 categories. Skills are loaded on-demand based on file glob patterns, or — for the rest — by the model choosing to invoke them based on their `description` frontmatter, the same as any other skill.
+39 skills, one directory each at `.claude/skills/<name>/SKILL.md`. The model selects one by reading
+its `description` and invoking it with the `Skill` tool. That is the whole mechanism — there is no
+glob matching, no preloading, and no always-apply.
 
-**Correction (2026-07-30):** the table below was previously titled "Always-Loaded Skills" on the claim
-that `alwaysApply: true` makes these nine load unconditionally, for every agent, every session. A
-behavioural probe found no code anywhere in this repository — no hook, no `settings.json` entry, no
-`install.sh` step — that reads `alwaysApply` or injects a skill's content without the model choosing to
-invoke it. Two test prompts confirmed the key has no observable effect: one answerable from
-`.claude/rules/serialization.md` was answered correctly with zero tool calls (the rule auto-loads, the
-`serialization-safety` skill below was never invoked); one answerable only from the `commit-trailers`
-skill below was answered correctly only after the model actively searched for and read the skill file —
-i.e. exactly like any other on-demand skill, not "always loaded." See
-`.superpowers/sdd/2026-07-30-alwaysapply-finding.md` for the full trace. These nine skills are selected
-by description like every other skill in this catalog; `alwaysApply: true` is inert metadata retained
-from the vendored upstream frontmatter.
+**Correction (2026-08-03) — the important one.** Every skill in this catalog was unreachable for the
+toolkit's entire life. They were filed under `core/`, `gameplay/`, `genre/`, `systems/` and
+`third-party/`, inherited from everything-claude-unity, and Claude Code only discovers skills one
+level deep. Nothing was registered; the `Skill` tool could not invoke a single entry below. An
+eight-hour Endless-Evolution session on 2026-08-02 used zero skills, which read as the model
+declining them and was not.
+
+The measurement, in an empty project: `.claude/skills/flatprobe/SKILL.md` is listed in the session's
+skill inventory; `.claude/skills/category/nestedprobe/SKILL.md` is not. The layout is now flat and
+`tests/test-skill-discovery.sh` keeps it that way.
+
+**Correction (2026-07-30), superseded in part.** A probe found `alwaysApply: true` inert — nothing in
+this repository reads it — and concluded the nine skills it marked were "selected by description like
+every other skill." The mechanism was right; the conclusion was too generous. They could not be
+selected at all. That probe's own evidence says so in hindsight: the model answered the
+`commit-trailers` question only after it *searched for and read the file*, which is what you do when
+a skill is not invocable. Both `alwaysApply` and `globs` have been stripped from all 39 skills.
 
 ---
 
-## Skills Marked `alwaysApply: true` (not verified to load unconditionally — see correction above)
+## Skills That Formerly Carried `alwaysApply: true`
 
-These skills carry `alwaysApply: true` in frontmatter. They contain critical knowledge that should never
-be skipped, but — per the correction above — reaching the model depends on the same description-based
-selection as any other skill, not on this key.
+These twelve were marked as if they loaded unconditionally. They never did, and the key is now gone.
+They hold knowledge that should rarely be skipped, which makes them the ones most worth naming
+explicitly in an agent's **Skills to load** block — see `.claude/agents/unity-coder.md` for the shape.
+Where the content genuinely must reach every session, the right home is `.claude/rules/`.
 
 | Skill | Description |
 |-------|-------------|
@@ -103,8 +111,11 @@ Genre-specific architecture and patterns loaded by file glob matching.
 _None._ Kinglet Pioneer targets PC/console only, so there is no platform-switching layer. Platform
 guidance lives in `.claude/rules/pc-console.md`, which is always in force.
 
-> Upstream shipped a `mobile` skill here with `alwaysApply: true` and `globs: ["**/*.cs"]` — it
-> loaded on every C# file. It is removed, not disabled. See `provenance-skip.tsv`.
+> Upstream shipped a `mobile` skill here. The note that used to sit in this spot said it "loaded on
+> every C# file" via `alwaysApply: true` and `globs: ["**/*.cs"]`; that is not how Claude Code works
+> and the skill auto-loaded nothing. It is removed, not disabled, and removal was still right —
+> mobile guidance in a PC/console toolkit is wrong whichever way it reaches the model. See
+> `provenance-skip.tsv`.
 
 ---
 
@@ -143,14 +154,20 @@ Integration patterns for popular Unity packages.
 
 ## How Skills Are Loaded
 
-1. **`alwaysApply: true` skills are not verified to load unconditionally.** No mechanism reading this
-   key was found in this repository (see the correction above and
-   `.superpowers/sdd/2026-07-30-alwaysapply-finding.md`). Treat these nine as selected the same way as
-   any other skill, by the model reading their `description` frontmatter.
-2. **Glob-matched skills** are loaded when the agent works with files matching the skill's `globs` patterns.
-3. **Agent-referenced skills** can be explicitly loaded by agents or commands that reference them by name.
+One way, and only one: the model invokes the `Skill` tool with the skill's name.
 
-Skills are additive -- multiple skills can be loaded simultaneously. They do not conflict because each covers a distinct domain.
+Two things have to be true for that to happen. The skill must be **discoverable** — flat at
+`.claude/skills/<name>/SKILL.md`, or it is not registered and the tool cannot name it. And it must be
+**reachable** — the agent needs `Skill` in its `tools:` frontmatter, and something has to prompt it to
+load that particular skill. The agents carry a **Skills to load** block naming the two to four they
+would otherwise never think of; the `Skill` tool's own listing covers the rest.
+
+Both conditions failed silently until 2026-08-03: no error, no warning, no missing file. That is why
+`tests/test-skill-discovery.sh` checks the layout, the `name:`/directory agreement, and that every
+skill an agent names actually exists.
+
+Skills are additive — several can be loaded at once, and they do not conflict, each covering a
+distinct domain. Loading none is the failure mode that actually occurs.
 
 ---
 
@@ -159,18 +176,23 @@ Skills are additive -- multiple skills can be loaded simultaneously. They do not
 Create a new directory and `SKILL.md` file:
 
 ```
-.claude/skills/<category>/<skill-name>/SKILL.md
+.claude/skills/<skill-name>/SKILL.md
 ```
 
-Frontmatter:
+One level. A `SKILL.md` nested any deeper is invisible to Claude Code and will never load —
+`tests/test-skill-discovery.sh` fails if one appears.
+
+Frontmatter — these two keys and nothing else:
 
 ```yaml
 ---
 name: skill-name
 description: "When to load this skill -- be specific about the use case"
-alwaysApply: false
-globs: ["**/Pattern*.cs", "**/Match*.cs"]
 ---
 ```
+
+`name` must equal the directory name. `description` is the entire selection mechanism: it is what the
+model reads when deciding whether this skill is relevant, so write it as *when to reach for this*, not
+as a title. Do not add `alwaysApply` or `globs` — they do nothing here, and the test rejects them.
 
 The Markdown body contains the skill's knowledge: patterns, code examples, rules, and anti-patterns. Keep skills focused on one domain. If a skill grows beyond 200 lines, consider splitting it.

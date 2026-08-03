@@ -70,7 +70,7 @@ After installation, your project contains:
   commands/        36 slash commands (/unity-workflow, /unity-prototype, /unity-doctor, etc.)
   hooks/           26 hooks + _lib.sh (safety, quality, session, learning) — 8 of them blocking
   rules/            6 always-loaded coding standards (C# style, performance, architecture, PC/console)
-  skills/          39 knowledge modules organized by category
+  skills/          39 knowledge modules, one directory each (flat — see below)
     core/            Assembly definitions, event systems, object pooling, MCP patterns
     gameplay/        Character controllers, inventory, dialogue, save systems
     genre/           Genre-specific patterns (RPG, platformer, top-down, match-3, puzzle, idle)
@@ -79,8 +79,14 @@ After installation, your project contains:
   settings.json    Permissions, hook definitions
 ```
 
+Skills are flat on purpose: Claude Code discovers `.claude/skills/<name>/SKILL.md` and nothing
+deeper, so a tidy `category/name/` tree makes every skill invisible. They are loaded by the model
+invoking the `Skill` tool, never automatically — the agents that need one name it in a
+**Skills to load** block.
+
 There is no `platform/` category. This toolkit targets PC and console only, and that guidance lives
-in `.claude/rules/pc-console.md`, which is always loaded rather than switched on per file.
+in `.claude/rules/pc-console.md`, which really is always loaded — rules are the mechanism for
+anything that must reach every session.
 
 ---
 

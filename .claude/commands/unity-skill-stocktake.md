@@ -13,7 +13,8 @@ Scan `.claude/skills/` and `.claude/agents/` for hygiene issues. This is a read-
 
 ### 1. Enumerate entries
 
-- Skills: `.claude/skills/**/SKILL.md` (recursive; categorized by parent directory).
+- Skills: `.claude/skills/*/SKILL.md` — one level, no category directories. Claude Code discovers
+  skills only at that depth, so a nested SKILL.md is not a skill; report any as a defect.
 - Agents: `.claude/agents/*.md`.
 - Commands: `.claude/commands/*.md` (for cross-reference when checking whether skills are referenced).
 

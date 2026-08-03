@@ -42,12 +42,21 @@ never exist here; `rule=ours-wins` means upstream has the path and we ship our o
 
 ## What is enforced, not requested
 
-- **No mobile.** `tests/test-no-mobile.sh`. The mobile skill was not inert upstream — it shipped
-  `alwaysApply: true` with `globs: ["**/*.cs"]`, so it loaded on every C# file. It is deleted, along
-  with the mobile genres and examples. Reintroducing any of it fails the suite.
+- **No mobile.** `tests/test-no-mobile.sh`. The rationale used to read "the mobile skill shipped
+  `alwaysApply: true` with `globs: ["**/*.cs"]`, so it loaded on every C# file." That is false —
+  neither key does anything in Claude Code — and the deletion is right anyway: mobile guidance in a
+  PC/console toolkit is wrong guidance however it reaches the model. It is deleted along with the
+  mobile genres and examples, at both the upstream and the flat path. Reintroducing any of it fails
+  the suite.
 - **Compute shaders and VFX Graph are available.** Upstream forbade them (correctly, for mobile GPUs).
   The test asserts nothing in the tree forbids them again.
-- **No non-core skill may use `alwaysApply: true`.** That is how the mobile skill did its damage.
+- **Skills stay flat and stay clean.** `tests/test-skill-discovery.sh`. Every skill sits at
+  `.claude/skills/<name>/SKILL.md` — one level, because that is the only depth Claude Code
+  discovers. Nesting them under categories, which is how they arrived from ECU and how they sat
+  until 2026-08-03, makes all 39 invisible with no error of any kind. `name:` must match the
+  directory, `description:` must be non-empty (it is the entire selection mechanism), and no skill
+  may carry `alwaysApply` or `globs` — both are inert Cursor keys that get read as guarantees.
+  Every skill an agent or command names by path must exist.
 
 ## Conventions
 
@@ -59,8 +68,9 @@ directory-as-provenance.
   tools or have them write C#. They write to `docs/`.
 - **Commands** (`.claude/commands/<name>.md`): frontmatter `name`, `description`, `user-invocable`,
   `args`. Model/agent routing goes in the body.
-- **Skills** (`.claude/skills/<category>/<name>/SKILL.md`): frontmatter `name`, `description`,
-  `globs`. `alwaysApply` is for `core/` only.
+- **Skills** (`.claude/skills/<name>/SKILL.md`): frontmatter `name` and `description`, nothing else.
+  Flat — see above. An agent that should use a skill needs `Skill` in its `tools:` *and* a
+  **Skills to load** block naming it; neither alone is enough, and nothing loads a skill implicitly.
 - **Rules** (`.claude/rules/<name>.md`) and **templates** (`.claude/templates/<name>.md`): plain
   Markdown, no frontmatter.
 - Donchitos-derived files keep their inline `<!-- Adapted from ... -->` comment.

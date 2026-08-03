@@ -93,7 +93,7 @@ Evolved from instincts: <list of instinct ids>
 ```
 
 4. Output the draft to stdout; do NOT write it. Tell the user:
-   > Draft skill at `.claude/skills/core/learned-<domain>-patterns/SKILL.md` — review before installing.
+   > Draft skill at `.claude/skills/learned-<domain>-patterns/SKILL.md` — review before installing.
 
 ### `promote <instinct-id> [--force]`
 

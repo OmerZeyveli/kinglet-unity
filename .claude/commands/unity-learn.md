@@ -110,8 +110,8 @@ globs: ["[relevant file patterns]"]
 4. **Output** the draft to stdout with instructions:
    ```
    Draft skill generated. To install:
-     1. Create directory: .claude/skills/core/[skill-name]/
-     2. Save the above content to: .claude/skills/core/[skill-name]/SKILL.md
+     1. Create directory: .claude/skills/[skill-name]/
+     2. Save the above content to: .claude/skills/[skill-name]/SKILL.md
      3. Review and refine the content before use
    ```
 

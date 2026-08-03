@@ -55,9 +55,9 @@ Content sections:
 
 If `--install` flag:
 1. Determine category (core/gameplay/systems/platform/genre/third-party) based on topic
-2. Create directory `.claude/skills/[category]/[name]/`
+2. Create directory `.claude/skills/[name]/`
 3. Write SKILL.md there
-4. Report: "Skill installed at .claude/skills/[category]/[name]/SKILL.md"
+4. Report: "Skill installed at .claude/skills/[name]/SKILL.md"
 
 If no `--install` flag:
 1. Output the complete SKILL.md content
