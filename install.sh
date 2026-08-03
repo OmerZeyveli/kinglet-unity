@@ -272,30 +272,33 @@ done <<< "$PAYLOAD_FILES"
 mkdir -p "$CLAUDE_DIR/state"
 chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 
-# Ship the provenance rows for the files we just installed. NOTICE.md cites this, and a licence
-# notice you cannot check against anything is just a claim.
-if [ -f "$SCRIPT_DIR/provenance.tsv" ]; then
-  {
-    printf '# Provenance for the files installed under .claude/ — the evidence behind NOTICE.md.\n'
-    printf '# The full manifest (tests, docs, repo tooling) lives in the kinglet-unity repo.\n'
-    # awk reads the file directly and exits after the line it wants. `grep ... | head -1` would
-    # SIGPIPE the grep when head closes the pipe, and pipefail turns that into a 141 that set -e
-    # acts on — the installer would die here having written half a payload.
-    awk '/^# ecu=/ {print; exit}' "$SCRIPT_DIR/provenance.tsv"
-    awk '!/^#/ {print; exit}' "$SCRIPT_DIR/provenance.tsv"
-    grep -v '^#' "$SCRIPT_DIR/provenance.tsv" | tail -n +2 | grep '^\.claude/' || true
-  } > "$CLAUDE_DIR/provenance.tsv"
-  printf '.claude/provenance.tsv\t%s\t644\ttoolkit\n' "$(sha_of "$CLAUDE_DIR/provenance.tsv")" >> "$RECEIPT_TMP"
-  WRITTEN=$((WRITTEN + 1))
-fi
+# The per-file provenance manifest is NOT shipped into user projects. It used to be, as
+# .claude/provenance.tsv — 30 KB of maintenance evidence that nothing in a game project reads.
+# Its actual job is to make a future ECU bump diffable rather than archaeological, and that bump
+# happens in the kinglet-unity repository, not in the project the toolkit was installed into.
+#
+# It also rotted twice in two days once installed: the copy went stale the moment the toolkit's own
+# manifest changed, and both times a reader believed it. A stale attribution manifest is worse than
+# a link to a live one.
+#
+# The MIT obligation is unaffected and still met. The licence requires the copyright and permission
+# notices to travel with the copies, which they do — .claude/NOTICE.md ships, carries both upstream
+# licence texts in full, and points at the manifest in the repository for the per-file detail.
 
 # Validation scripts and the test suite ship alongside the payload.
+#
+# check-provenance.sh is the exception: it validates the toolkit's own manifest, which is not
+# shipped into projects (see the note above NOTICE.md). Installing it would put a check in every
+# project that can only ever report `err provenance.tsv not found` and exit 1 — a permanently
+# failing check trains people to ignore checks, which costs more than the script is worth here.
+# It stays in the kinglet-unity repository, where its input is.
 for group in scripts tests; do
   [ -d "$SCRIPT_DIR/$group" ] || continue
   mkdir -p "$CLAUDE_DIR/$group"
   for f in "$SCRIPT_DIR/$group"/*.sh; do
     [ -f "$f" ] || continue
     b=$(basename "$f")
+    [ "$b" = "check-provenance.sh" ] && continue
     cp "$f" "$CLAUDE_DIR/$group/$b"
     chmod +x "$CLAUDE_DIR/$group/$b"
     printf '.claude/%s/%s\t%s\t%s\ttoolkit\n' "$group" "$b" "$(sha_of "$CLAUDE_DIR/$group/$b")" "755" >> "$RECEIPT_TMP"

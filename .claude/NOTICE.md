@@ -8,8 +8,15 @@ ships into your project rather than staying in the toolkit repo.
 You do not need to do anything with this file. Keep it alongside `.claude/` and the obligation stays
 satisfied.
 
-`.claude/provenance.tsv` records which specific file came from which upstream, so the claims below
-are verifiable rather than asserted.
+The per-file record — which upstream each file came from, at which commit, verbatim or modified,
+with its checksum — lives in the toolkit repository as `provenance.tsv`, not here:
+
+> https://github.com/OmerZeyveli/kinglet-unity/blob/main/provenance.tsv
+
+It is deliberately not copied into installed projects. A copy goes stale the moment the toolkit's
+own manifest changes, and a stale attribution record is worse than a link to a live one — that is
+not hypothetical, it happened twice in two days and was believed both times. The claims below stay
+verifiable; you just verify them against the source rather than a snapshot.
 
 | Project | Role | Files |
 |---|---|---|
@@ -17,8 +24,8 @@ are verifiable rather than asserted.
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) | adapted at `984023d`; reformatted to this toolkit's conventions | 8 design agents, 9 design commands, 5 templates |
 
 Files not attributable to either are original to Kinglet Pioneer, MIT, Copyright (c) 2026
-OmerZeyveli. **The manifest is the list**, not this paragraph — every row with `origin=original` in
-`provenance.tsv`. At the time of writing that is six files:
+OmerZeyveli. **The manifest is the list**, not this paragraph — every row with `origin=original` in the
+toolkit's `provenance.tsv`, linked above. At the time of writing that is six files:
 
 | File | What it is |
 |---|---|
