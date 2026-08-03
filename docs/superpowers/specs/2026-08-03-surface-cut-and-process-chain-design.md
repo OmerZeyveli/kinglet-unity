@@ -62,10 +62,25 @@ survive.
 | `save-system` | In use on a real project; reached by an EE probe. |
 | `urp-pipeline` | Rendering specifics `pc-console.md` refers to but does not carry. |
 | `object-pooling` | Loaded by three kept agents; `performance.md` gives it one line. |
-| `state-machine` | Loaded by kept agents; no rule coverage. |
+| `state-machine` | No rule coverage. **The "loaded by kept agents" half of this justification was false when written** — see the correction below. |
 | `deep-interview` | The ambiguity gate — see Decision 4, where it is rewritten as a chain link. |
 
 **Added (3 new process skills)** — see Decision 4.
+
+**A correction to this table, found during execution.** The `state-machine` row claimed the skill was
+"loaded by kept agents". It was not loaded by anything. The only reference to it anywhere in the
+surviving surface set was a `skills:` frontmatter key on `unity-prototyper.md` — a key that is not in
+`CLAUDE.md`'s documented agent schema and that no code in this repo reads, so it could never have
+loaded the skill. No body "Skills to load" block named it.
+
+The error came from building the dependency map in one direction only: the survey walked the skills
+that **exist** and asked which surfaces name them. A reference that cannot resolve is invisible to
+that scan, and so is a reference that resolves through an inert key. The guard added in the plan's
+Task 3 closes the opposite direction, and found this on its first run.
+
+`state-machine` stays, on the surviving half of its justification — no rule covers it, the content is
+real, and an agent was plainly meant to have it. The fix is to wire it into `unity-prototyper`'s body
+block where it will actually load, not to keep a row that describes a mechanism that never worked.
 
 **Removed (29),** in three groups:
 
