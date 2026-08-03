@@ -484,8 +484,14 @@ if [ -f "$GEN" ]; then
   elif grep -q 'kinglet:generated:begin' "$CLAUDE_MD"; then
     # Refresh only the fenced block; everything the user wrote stays byte-for-byte.
     if bash "$GEN" --facts-only ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
+      # The generator owns every byte between the markers, heading included. This used to print the
+      # "## Project Facts" heading here as well, from the era when --facts-only emitted only the
+      # table. That was corrected in generate-claude-md.sh — on one side. The result was a second,
+      # empty heading appearing on every refresh, compounding once per install; a real project was
+      # found carrying two. Two producers for one region is the bug the generator's own comment
+      # warns about, so this side prints nothing of its own.
       awk -v factsfile="$TMP_MD" '
-        /kinglet:generated:begin/ { print; print ""; print "## Project Facts (auto-detected)"; print ""; while ((getline l < factsfile) > 0) print l; skip=1; next }
+        /kinglet:generated:begin/ { print; while ((getline l < factsfile) > 0) print l; skip=1; next }
         /kinglet:generated:end/   { print ""; print; skip=0; next }
         !skip { print }
       ' "$CLAUDE_MD" > "$TMP_MD.merged" && mv "$TMP_MD.merged" "$CLAUDE_MD"

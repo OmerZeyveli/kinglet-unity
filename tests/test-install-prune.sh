@@ -71,4 +71,16 @@ assert_eq "$(find "$PRUNE_DIR/.claude" -mindepth 1 -type d -empty 2>/dev/null | 
 assert_eq "$([ -f "$PRUNE_DIR/.claude/settings.json" ] && echo present || echo gone)" "present" \
   "files still in the payload are untouched by the prune"
 
+# A refresh must be idempotent. install.sh used to print the "## Project Facts" heading itself and
+# then insert --facts-only's output, which prints that heading too — one region, two producers. The
+# generator's own comment warns about exactly this and the fix had been applied on one side only,
+# so every re-install added another empty heading. A real project was found carrying two.
+#
+# Two installs have already run above, so any duplication is present by now.
+assert_eq "$(grep -c 'Project Facts (auto-detected)' "$PRUNE_DIR/CLAUDE.md" 2>/dev/null || echo 0)" "1" \
+  "re-installing does not duplicate the generated heading"
+
+assert_eq "$(grep -c 'kinglet:generated:begin' "$PRUNE_DIR/CLAUDE.md" 2>/dev/null || echo 0)" "1" \
+  "re-installing does not duplicate the generated-region markers"
+
 rm -rf "$PRUNE_DIR"
