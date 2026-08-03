@@ -513,6 +513,7 @@ docs/research/pioneer/smoke-pass.md	original	-	-	-	original	pioneer-smoke-pass-r
 docs/superpowers/plans/2026-07-29-kinglet-pioneer-wave-1b1-make-it-work.md	original	-	-	-	original	pioneer-wave-1b1-make-it-work-implementation-plan
 tests/test-assert-helpers-under-load.sh	original	-	-	-	original	regression-test-for-the-assert-contains-sigpipe-under-pipefail-race
 tests/test-skill-discovery.sh	original	-	-	-	original	proves skills are where Claude Code can find them; nothing else checked discovery
+tests/test-surface-references.sh	original	-	-	-	original	guards bare-name skill references; test-skill-discovery.sh matches path-form only
 docs/superpowers/plans/2026-07-30-kinglet-pioneer-wave-1b2-make-it-findable.md	original	-	-	-	original	pioneer-wave-1b2-make-it-findable-implementation-plan
 docs/superpowers/plans/2026-07-30-endless-evolution-parallel-hardening.md	original	-	-	-	original	endless-evolution-parallel-hardening-plan-8-units
 docs/superpowers/specs/2026-07-30-surface-trigger-rules.md	original	-	-	-	original	task-2-of-wave-1b2-differentiation-rules-for-colliding-command-agent-descriptions-before-task-3-rewrites-them
