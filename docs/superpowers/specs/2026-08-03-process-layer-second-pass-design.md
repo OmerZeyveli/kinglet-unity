@@ -103,6 +103,19 @@ different artifact from one written from intuition, and this repo can afford the
 | `systematic-debugging` | The ways a fix gets proposed before a cause is found, and the Unity-specific traps that make a wrong cause look right. |
 | `verification-before-completion` | The ways "done" gets claimed without evidence. This is where the wave's own incidents concentrate. |
 
+**Extended to the other three layers, at the operator's request.** The pattern above is not specific
+to process skills, and each layer turned out to have its own version of the same gap. Measured before
+scoping, not assumed:
+
+| Layer | The gap, measured |
+|---|---|
+| **9 knowledge skills** | Not thin — 128 to 724 lines, 10 to 32 code blocks each. But four (`input-system` at 414 lines, `object-pooling`, `physics`, `urp-pipeline`) contain **no** warning or pitfall section at all; only one of nine names a Unity version, so nothing says when it goes stale; and **none says which part of its subject a rule already binds.** That last one has a precedent: the cut removed `serialization-safety` precisely because it duplicated `serialization.md`. The survivors were kept because rules cover them only *partly* — and none of them says which part, so a skill can drift into contradicting a rule that outranks it with nothing to flag it. |
+| **8 agents** | All eight already carry limits and a `Skills to load` block, so the process-skill gap does not apply. The real one, from this wave's final review: **no agent's block names `systematic-debugging` or `verification-before-completion`.** The chain therefore holds only when a human enters through a command; a dispatching model that selects an agent directly — the path §1 of the trigger rules exists to support — gets an implementer with no method and no definition of done. None of them states what it returns, either, so callers parse prose. |
+| **6 rules** | The layer that measurably works: they auto-load, they bind, and a probe answered from `serialization.md` with zero tool calls. Two gaps. `architecture.md` reads as unconditional while a real project has zero VContainer files and had to write its own `AGENTS.md` section to neutralise it — the generated `CLAUDE.md` block now says so, but **no non-Claude-Code client ever sees that block.** And none of the six is dated, so nothing says when a binding rule goes stale. |
+
+The rules are amended, not weakened. An unconditional rule that says where to check its own
+applicability is stronger than a hedged one.
+
 ---
 
 ## Decision 3 — Ship the execution loop as a Kinglet surface
