@@ -1,5 +1,14 @@
 # Architecture Rules
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
+This file assumes the VContainer + MessagePipe + UniTask stack described below. Whether that stack
+binds in a given project is not asserted here — it is detected at install time and stated in that
+project's generated `CLAUDE.md`, under "Architecture stack — detected, not assumed." Where this file
+and that generated block disagree, the generated block is newer and reflects the project as it
+actually stands. This does not soften the rules that follow: they bind wherever the stack applies,
+and the generated block is where a reader who opens this file directly finds out whether it does.
+
 ## Model-View-System (MVS) Pattern
 
 All features follow a strict three-layer separation:

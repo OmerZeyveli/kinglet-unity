@@ -1,5 +1,7 @@
 # C# Style — Unity Conventions
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
 ## Field Declarations
 
 - `[SerializeField] private` for inspector-exposed fields — never public

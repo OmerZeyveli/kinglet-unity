@@ -1,5 +1,7 @@
 # Serialization Rules
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
 ## CRITICAL: FormerlySerializedAs
 
 When renaming ANY serialized field, you MUST add `[FormerlySerializedAs]`:

@@ -1,5 +1,7 @@
 # Performance Rules
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
 ## The Golden Rule
 
 **Zero heap allocations in Update, FixedUpdate, and LateUpdate.**

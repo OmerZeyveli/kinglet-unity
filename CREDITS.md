@@ -6,7 +6,7 @@ merely depend on them — it **contains** them. Attribution is therefore an obli
 `provenance.tsv` at the repo root records, for every tracked file, which upstream it came from,
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
 is asserted on trust. The 29/72 split below is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
-$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 29 `verbatim` and 72 `modified` rows
+$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 76 `modified` rows
 with `origin=ecu`.
 
 **Re-derive it before quoting it.** A single `status` flip changes the split, and this number has now
@@ -15,7 +15,7 @@ moved from `verbatim` to `modified`. Nothing asserts it, so nothing will tell yo
 
 | Project | Relationship | In this repo? |
 |---------|--------------|---------------|
-| [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (XeldarAlz) | **Vendored** at v1.5.0 — the engineering layer | **Yes** — 101 files (29 verbatim, 72 modified) |
+| [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (XeldarAlz) | **Vendored** at v1.5.0 — the engineering layer | **Yes** — 101 files (25 verbatim, 76 modified) |
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) (Donchitos) | **Adapted** at `984023d` — the design/production layer, removed 2026-08-03 | **No** — 0 files; see §2 for why the notice is retained anyway |
 | [unity-mcp](https://github.com/CoplayDev/unity-mcp) (CoplayDev) | **Targeted** — the MCP editor bridge | No — install it yourself |
 

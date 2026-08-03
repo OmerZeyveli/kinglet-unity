@@ -1,5 +1,7 @@
 # Unity-Specific Rules
 
+*Written against Unity 6000.0, current as of 2026-08-04.*
+
 ## Editor vs Runtime
 
 ```csharp
