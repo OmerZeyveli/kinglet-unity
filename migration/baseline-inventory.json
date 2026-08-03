@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "18a9c21f502cc808ebb6be503cd897a6b808f7b6",
+  "source_commit": "8fdb7f2747d3034acb1749bbffc78d84dbf1c260",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 72,
@@ -63,57 +63,57 @@
       },
       {
         "path": ".claude/commands/unity-doctor.md",
-        "sha256": "e684e14edffc87b3a5823d2165c6c8ad33fd804740ec4bb87d7811a40e3e36cf",
+        "sha256": "7c07e9e432fce54b8dff53bb1315221cd8221d864bf7a67e3ae987902b9d2f12",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-feature.md",
-        "sha256": "42dcfa2645edf301d8db3f1f133b06aa9cdea2b0c380426e32c3e39551a6ecfc",
+        "sha256": "6ccb199ec63d1645674baef7e042cbf4966f87dcd8fefa10f596f9aa7f9bfd39",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-fix.md",
-        "sha256": "764087961ceaa1f0145b66cbad2b8648c133f46d0d9d53a1801145bc15608810",
+        "sha256": "9fbad8e460b76caf40a5777244e197d5c8172eb147a2a24483d552c3e94f70d8",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-init.md",
-        "sha256": "2e57c3981837672167e0d298e7f714be796c0ae7818894287c6d104404e1aae0",
+        "sha256": "d6cbf33abc39d9e69d303ca470e160f909f35c8398305a0069efafd590f6f0f6",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-optimize.md",
-        "sha256": "7955cd62430f8d53db4ceeb49ec5606e10ddbf05222c0248cb7e796d259cdb71",
+        "sha256": "f0e1f3ce74986e18a320e76e763cbc7fcc6125f3e3e79d53fd6ffe25c2f68809",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-prototype.md",
-        "sha256": "4fefb3f255106d38fb2d95868aa1cbecf99861982d2d5d496fa11dc709a856a5",
+        "sha256": "cd0a7fd3796b7d818f61e8f0902b83432a68c9dec1ca708a3d287ab9e4aaa60b",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-review.md",
-        "sha256": "bba598c4cd2d92f329e17e00a9a7f3f51b8b253ee50c0e2b154bd8e8c7b6b840",
+        "sha256": "7095ea26ac0af39568765462082c0cdbfb7fa4266da30cc21a9400967767a9de",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-scene.md",
-        "sha256": "4d6da949e823c6325c00f8f94a8f832ec15993b3d716906577aac7c0f2f88963",
+        "sha256": "cff128ae8300d130510f037217a6d91d4c0ac1d1171bd158ebe485eb71049a5f",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-test.md",
-        "sha256": "693b15bfdcd6dcd82f92e69c4aaa7abb3e7c6c48155844d825966059e7c0ba12",
+        "sha256": "42ba670a97ba3860e3aa3d52abf7eef7013f8a6e661298049395454a7c6ec750",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-ui.md",
-        "sha256": "e5ef8ddaea15adf40f14e0d867c139591fcf272c910e12195ec10c7cff8a963a",
+        "sha256": "097a4ac2c8d16c449b81e58e1f0274f633f919f53ae0f620ba0ddb7745b3b939",
         "git_mode": "100644"
       },
       {
         "path": ".claude/commands/unity-workflow.md",
-        "sha256": "3c7bcb73cd9adec40cf3660cffc39adb8168bd6e1f8085ed25bed07cac262b18",
+        "sha256": "0d11159f352d1265a832abaea9a104122afd262081286bb4d3b975463c04e064",
         "git_mode": "100644"
       },
       {
@@ -421,57 +421,57 @@
       "files": [
         {
           "path": ".claude/commands/unity-doctor.md",
-          "sha256": "e684e14edffc87b3a5823d2165c6c8ad33fd804740ec4bb87d7811a40e3e36cf",
+          "sha256": "7c07e9e432fce54b8dff53bb1315221cd8221d864bf7a67e3ae987902b9d2f12",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-feature.md",
-          "sha256": "42dcfa2645edf301d8db3f1f133b06aa9cdea2b0c380426e32c3e39551a6ecfc",
+          "sha256": "6ccb199ec63d1645674baef7e042cbf4966f87dcd8fefa10f596f9aa7f9bfd39",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-fix.md",
-          "sha256": "764087961ceaa1f0145b66cbad2b8648c133f46d0d9d53a1801145bc15608810",
+          "sha256": "9fbad8e460b76caf40a5777244e197d5c8172eb147a2a24483d552c3e94f70d8",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-init.md",
-          "sha256": "2e57c3981837672167e0d298e7f714be796c0ae7818894287c6d104404e1aae0",
+          "sha256": "d6cbf33abc39d9e69d303ca470e160f909f35c8398305a0069efafd590f6f0f6",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-optimize.md",
-          "sha256": "7955cd62430f8d53db4ceeb49ec5606e10ddbf05222c0248cb7e796d259cdb71",
+          "sha256": "f0e1f3ce74986e18a320e76e763cbc7fcc6125f3e3e79d53fd6ffe25c2f68809",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-prototype.md",
-          "sha256": "4fefb3f255106d38fb2d95868aa1cbecf99861982d2d5d496fa11dc709a856a5",
+          "sha256": "cd0a7fd3796b7d818f61e8f0902b83432a68c9dec1ca708a3d287ab9e4aaa60b",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-review.md",
-          "sha256": "bba598c4cd2d92f329e17e00a9a7f3f51b8b253ee50c0e2b154bd8e8c7b6b840",
+          "sha256": "7095ea26ac0af39568765462082c0cdbfb7fa4266da30cc21a9400967767a9de",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-scene.md",
-          "sha256": "4d6da949e823c6325c00f8f94a8f832ec15993b3d716906577aac7c0f2f88963",
+          "sha256": "cff128ae8300d130510f037217a6d91d4c0ac1d1171bd158ebe485eb71049a5f",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-test.md",
-          "sha256": "693b15bfdcd6dcd82f92e69c4aaa7abb3e7c6c48155844d825966059e7c0ba12",
+          "sha256": "42ba670a97ba3860e3aa3d52abf7eef7013f8a6e661298049395454a7c6ec750",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-ui.md",
-          "sha256": "e5ef8ddaea15adf40f14e0d867c139591fcf272c910e12195ec10c7cff8a963a",
+          "sha256": "097a4ac2c8d16c449b81e58e1f0274f633f919f53ae0f620ba0ddb7745b3b939",
           "git_mode": "100644"
         },
         {
           "path": ".claude/commands/unity-workflow.md",
-          "sha256": "3c7bcb73cd9adec40cf3660cffc39adb8168bd6e1f8085ed25bed07cac262b18",
+          "sha256": "0d11159f352d1265a832abaea9a104122afd262081286bb4d3b975463c04e064",
           "git_mode": "100644"
         }
       ]
