@@ -103,3 +103,9 @@ examples/CLAUDE.md.mobile-casual	ecu	absent	mobile example
 .claude/skills/unitask/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
 .claude/skills/unity-instincts/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
 .claude/skills/vcontainer/SKILL.md	ecu	absent	removed 2026-08-03; orphaned, package-conditional, or toolkit self-reference
+.claude/templates/architecture-decision-record.md	donchitos	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it
+.claude/templates/game-concept.md	donchitos	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it
+.claude/templates/game-decision-record.md	original	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it
+.claude/templates/game-design-document.md	donchitos	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it
+.claude/templates/sprint-plan.md	donchitos	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it
+.claude/templates/systems-index.md	donchitos	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it

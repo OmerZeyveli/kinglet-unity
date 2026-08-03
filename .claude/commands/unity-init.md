@@ -36,7 +36,7 @@ Scan this Unity project and generate a tailored CLAUDE.md configuration.
 7. **Report** what was detected and configured. Suggest next steps:
    - Review and customize the generated CLAUDE.md
    - Install unity-mcp if not already present
-   - Try `/unity-audit` for a full project health check
+   - Try `/unity-doctor` for a full project health check
 
 ## Output
 

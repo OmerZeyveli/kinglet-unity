@@ -48,9 +48,9 @@ Tell the user:
 
 ## Step 6: Auto-Verify (Optional)
 
-After the prototype is complete, offer to run the `unity-verifier` agent:
-- Quick review of all prototype scripts for critical issues
-- Auto-fix serialization safety, null checks, and performance pitfalls
+After the prototype is complete, offer to run a quick verify-fix pass:
+- Invoke the `unity-reviewer` agent for a quick review of all prototype scripts for critical issues
+- Apply fixes directly for serialization safety, null checks, and performance pitfalls
 - Skip architecture concerns (prototypes prioritize speed over structure)
 
 Suggest: "Prototype ready! Want me to run a quick verification pass?"

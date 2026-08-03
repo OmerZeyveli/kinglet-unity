@@ -264,12 +264,6 @@ suggest_skills() {
         case "$pkg" in
             "Input System")            out="${out}input-system"$'\n' ;;
             "Addressables")            out="${out}addressables"$'\n' ;;
-            "UniTask")                 out="${out}unitask"$'\n' ;;
-            "DOTween")                 out="${out}dotween"$'\n' ;;
-            "TextMeshPro")             out="${out}textmeshpro"$'\n' ;;
-            "Cinemachine")             out="${out}cinemachine"$'\n' ;;
-            "AI Navigation")           out="${out}navmesh"$'\n' ;;
-            "VContainer")              out="${out}vcontainer"$'\n' ;;
         esac
     done <<< "$DETECTED_PACKAGES"
     case "$RENDER_PIPELINE" in
@@ -462,7 +456,7 @@ emit_provider_verdict() {
     echo "### Process provider"
     echo ""
     echo "Discovery and written planning in this project are owned by \`$PROVIDER\`."
-    echo "\`/unity-interview\` yields to it and does not compete for the discovery stage."
+    echo "The \`deep-interview\` skill yields to it and does not compete for the discovery stage."
     echo "Unity implementation, Unity verification and Unity domain knowledge stay with this toolkit."
 }
 
@@ -538,21 +532,15 @@ cat <<'MDEOF'
 
 ## Where things go
 
-- **Design docs** (GDDs, concept, systems index): `docs/design/`
-- **Architecture decisions** (ADRs): `docs/adr/`
-- **Production** (sprints, milestones, retrospectives): `docs/production/`
 - **Game code:** `Assets/Scripts/`. Tuning data lives in ScriptableObjects / external config —
   never hardcoded.
 
 ## How to work
 
-- **Design & production** (documentation layer — no editor/code):
-  `/brainstorm` → `/map-systems` → `/design-system` → `/design-review`; plan with `/sprint-plan`,
-  `/estimate`, `/scope-check`, `/milestone-review`, `/retrospective`. Agents: `game-designer`,
-  `systems-designer`, `level-designer`, `creative-director`, `technical-director` (+ optional
-  `narrative-director`, `writer`, `world-builder`).
-- **Implementation** (drives the Unity Editor via MCP): `/unity-feature`, `/unity-prototype`,
-  `/unity-scene`, `/unity-test`, `/unity-review`, and the rest of the `/unity-*` commands.
+- **Feature work:** the `deep-interview` skill clarifies requirements, `/unity-workflow` plans,
+  executes and verifies, `/unity-review` reviews the result. `/unity-feature`, `/unity-prototype`,
+  `/unity-fix`, `/unity-scene`, `/unity-ui`, `/unity-test` and `/unity-optimize` cover narrower jobs
+  directly.
 - **MCP:** the CoplayDev Unity MCP bridge must be running for editor control — see `MCP-SETUP.md`.
   Verify with "What's in the current scene?"
 

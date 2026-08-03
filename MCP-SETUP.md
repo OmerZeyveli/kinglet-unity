@@ -23,10 +23,8 @@ JSON by script is how a hand-written config gets destroyed. It prints the block 
 yourself. Either way, you do not need to write this by hand on a fresh install; you only need to
 install the Unity-side package, start the bridge, and approve the server (next section).
 
-> The `unity-*` agents (coder, scene-builder, prototyper, build-runner, …) are what drive the Editor
-> through MCP. The design/production layer — `/brainstorm`, `/map-systems`, `game-designer`,
-> `technical-director`, and friends — is a **documentation layer** and calls no MCP tools at all. It
-> works fine with the bridge offline.
+> The `unity-*` agents (coder, scene-builder, prototyper, fixer, …) are what drive the Editor
+> through MCP.
 
 **Version:** the toolkit pins `com.coplaydev.unity-mcp` at `v10.1.0`, commit
 `c14de1e6dc01ab42d2bb358730cff954bce0ce6b`. That is what `--with-mcp` installs and what

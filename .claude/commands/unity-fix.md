@@ -11,9 +11,7 @@ Fix the issue described by the user: **$ARGUMENTS**
 
 ## Agent Routing
 
-- Default: use `unity-fixer` agent (opus — deep investigation)
-- If `$ARGUMENTS` contains `--quick`: use `unity-fixer-lite` agent (sonnet — for obvious fixes)
-- Strip the `--quick` flag from arguments before passing to the agent
+- Use the `unity-fixer` agent (opus — deep investigation).
 
 ## Workflow
 
@@ -37,6 +35,6 @@ Use the selected fixer agent to:
 4. **Verify:**
    - Check console via `read_console` — error should be gone
    - If it was a serialization issue, warn about data that may need re-configuration
-   - If it was a build issue, suggest running `/unity-build` to verify
+   - If it was a build issue, suggest triggering a build via MCP (`manage_build`) to verify
 
 5. **Explain** what caused the bug and how the fix prevents recurrence.

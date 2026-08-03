@@ -597,7 +597,7 @@ cat <<EOF
 Next steps:
   1. Install the Unity MCP bridge — see MCP-SETUP.md (Window > MCP for Unity > Auto-Setup).
   2. $CLAUDE_MD_STEP
-  3. Run 'claude' in your project and try /brainstorm, or /unity-audit for a health check.
+  3. Run 'claude' in your project and try /unity-init, or /unity-doctor for a health check.
   4. Health check any time: ./.claude/scripts/studio-doctor.sh --project-dir "$PROJECT_DIR"
 EOF
 exit 0

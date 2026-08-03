@@ -260,8 +260,8 @@ if [ -f "$CLAUDE_MD" ] && grep -q '^### Process provider' "$CLAUDE_MD"; then
         pass "declared process provider '$declared' is installed"
     else
         warn "CLAUDE.md declares '$declared' as this project's process provider, but it is not"
-        warn "  installed for this user. Kinglet's built-in discovery surface (/unity-interview)"
-        warn "  is the fallback. Re-run install.sh to refresh the declaration, or delete the"
+        warn "  installed for this user. Kinglet's built-in discovery surface (the \`deep-interview\`"
+        warn "  skill) is the fallback. Re-run install.sh to refresh the declaration, or delete the"
         warn "  'Process provider' section from CLAUDE.md."
     fi
 fi

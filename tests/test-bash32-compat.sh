@@ -2,9 +2,9 @@
 # Regression gate for scripts that run under macOS's system Bash 3.2.
 #
 # This used to scan only .claude/hooks/*.sh. install.sh also copies scripts/ and tests/ into the
-# user's .claude/ verbatim (see the "for group in scripts tests" loop), and
-# .claude/commands/unity-build.md invokes analyze-build-size.sh by name — so those two directories
-# are exactly as much "payload that must run on bash 3.2" as the hooks are. A sweep of only hooks/
+# user's .claude/ verbatim (see the "for group in scripts tests" loop), and commands invoke scripts
+# like analyze-build-size.sh by name — so those two directories are exactly as much "payload that
+# must run on bash 3.2" as the hooks are. A sweep of only hooks/
 # reads as though it covers the class of shipped scripts while covering one directory of it; five
 # files under scripts/ used `declare -A` and this gate never saw them.
 #

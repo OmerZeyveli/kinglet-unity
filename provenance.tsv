@@ -50,12 +50,6 @@ path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/hooks/warn-filename.sh	ecu	1.5.0	.claude/hooks/warn-filename.sh	d9373fb21d3c652dcce22fa9e32ce130834701df02156e25587330c4cccab961	modified	hardens echo|grep -q pipe against pipefail SIGPIPE fail-open on large content (here-string)
 .claude/hooks/warn-platform-defines.sh	ecu	1.5.0	.claude/hooks/warn-platform-defines.sh	814923cb311f4dfd4dfd2c0e107e72ee4bac2d79cbba791378a8d03d618a19df	modified	mobile-strip; hardens echo|grep -q pipe against pipefail SIGPIPE fail-open on large content (here-string)
 .claude/hooks/warn-serialization.sh	ecu	1.5.0	.claude/hooks/warn-serialization.sh	748bc66fcb1bf8a1e53c773a24e4d1e1a96537c73fb1f1d45b6226d8ae47120d	modified	hardens echo|grep -q pipe against pipefail SIGPIPE fail-open on large content (here-string)
-.claude/templates/architecture-decision-record.md	donchitos	984023d	.claude/docs/templates/architecture-decision-record.md	a73f51a1d24a579e0c3ccf49fa916a9d1ab73f2b53286d9d134a1887e5794888	modified	repathed-to-docs-tree
-.claude/templates/game-concept.md	donchitos	984023d	.claude/docs/templates/game-concept.md	fa94f05c71decac7183be449c87767acd99db822f05701121f45f5a5e2251156	modified	repathed-to-docs-tree
-.claude/templates/game-decision-record.md	original	-	-	-	original	GDR template; design counterpart to the donchitos ADR template
-.claude/templates/game-design-document.md	donchitos	984023d	.claude/docs/templates/game-design-document.md	c7a3665d1a47d25c4224bb9d19dc15a0e609594d8ed8841347822fd9d1b0aaec	modified	repathed-to-docs-tree
-.claude/templates/sprint-plan.md	donchitos	984023d	.claude/docs/templates/sprint-plan.md	4e5f640fe11ba5467e457f248fbf2e4d53f45a62a75ccf123e554c701042950f	modified	repathed-to-docs-tree
-.claude/templates/systems-index.md	donchitos	984023d	.claude/docs/templates/systems-index.md	3c474f75f71d12c3175b7be58013f58f615f316ba8fa8533ebb94197c85634c1	modified	repathed-to-docs-tree
 CLAUDE.md	original	-	-	-	original	root-path-collides-with-ecu-but-ours
 .claude/NOTICE.md	original	-	-	-	original	-
 .claude/rules/architecture.md	ecu	1.5.0	.claude/rules/architecture.md	36aac42cb968d1b6cf09eb874bdd0649453094ed89b5c4583952dd163d432714	verbatim	-

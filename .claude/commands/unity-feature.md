@@ -11,9 +11,7 @@ Plan and implement the feature described by the user: **$ARGUMENTS**
 
 ## Agent Routing
 
-- Default: use `unity-coder` agent (opus — full architectural reasoning)
-- If `$ARGUMENTS` contains `--quick`: use `unity-coder-lite` agent (sonnet — faster, for simple additions)
-- Strip the `--quick` flag from arguments before passing to the agent
+- Use the `unity-coder` agent (opus — full architectural reasoning) for implementation.
 
 ## Phase 1: Plan
 
@@ -55,10 +53,11 @@ Plan and implement the feature described by the user: **$ARGUMENTS**
 
 ## Phase 4: Auto-Verify (Optional)
 
-After implementation, offer to run the `unity-verifier` agent for a verify-fix loop:
-- Reviews all changed files for serialization safety, performance, and Unity-specific pitfalls
-- Auto-fixes safe issues (missing FormerlySerializedAs, CompareTag, cached GetComponent, etc.)
-- Re-verifies up to 3 iterations until clean
-- Reports remaining items that require human judgment
+After implementation, offer to run a verify-fix loop:
+- Invoke the `unity-reviewer` agent (read-only) against all changed files for serialization safety,
+  performance, and Unity-specific pitfalls
+- Apply safe fixes directly (missing `FormerlySerializedAs`, `CompareTag`, cached `GetComponent`, etc.)
+- Re-review up to 3 iterations until clean
+- Report remaining items that require human judgment
 
 Suggest: "Would you like me to run a verification pass on the changes?"

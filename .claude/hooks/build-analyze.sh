@@ -27,7 +27,7 @@ STDERR=$(echo "$INPUT" | jq -r '.tool_output.stderr // empty')
 # Only analyze build-related commands
 IS_BUILD=false
 case "$COMMAND" in
-    *Unity*-buildTarget*|*-executeMethod*Build*|*BuildPipeline*|*unity-build*|*mcp__unityMCP__manage_build*)
+    *Unity*-buildTarget*|*-executeMethod*Build*|*BuildPipeline*|*mcp__unityMCP__manage_build*)
         IS_BUILD=true
         ;;
 esac
@@ -83,7 +83,7 @@ fi
 # --- Check for deprecated API usage ---
 DEPRECATED=$(echo "$COMBINED" | grep -ci 'obsolete' || true)
 if [ "$DEPRECATED" -gt 0 ]; then
-    WARNINGS="${WARNINGS}  $DEPRECATED deprecated API warning(s). Run /unity-migrate to update.\n"
+    WARNINGS="${WARNINGS}  $DEPRECATED deprecated API warning(s). Update the deprecated calls.\n"
 fi
 
 if [ -n "$WARNINGS" ]; then
