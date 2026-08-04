@@ -25,6 +25,7 @@ do not invoke a skill, you are working without it.
 
 - `unity-mcp-patterns`
 - `urp-pipeline`
+- `verification-before-completion`
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not

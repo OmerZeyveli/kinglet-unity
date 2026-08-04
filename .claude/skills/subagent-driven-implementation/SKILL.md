@@ -27,6 +27,38 @@ path. Add one open item per task in the plan, in order. Record the base commit t
 from — the whole-branch review needs a range to diff against, and "since we started" is not a
 range once the session that remembers "started" is gone.
 
+Then open two sections the ledger keeps for the whole run:
+
+- **Standing facts for every dispatch.** What every implementer needs and no brief will contain:
+  which architecture actually binds here (`CLAUDE.md`'s generated block, and any project instruction
+  that overrides a rule), the gate and suite commands, and the one-implementer rule. A fresh
+  subagent inherits none of the controller's reading of the project — state it, every time, or the
+  first implementer rediscovers it and the third one does not.
+- **Interfaces produced so far.** What each completed task actually shipped, in the form the next
+  task must call it by. A brief written before a task ran guesses; this section is what really
+  happened. On a measured run it carried a real trap — one pair of types exposed *properties* while
+  the sibling type the brief compared them to used public *fields*, so "same as X" would have been
+  wrong.
+
+Both grow during the run. **When a task discovers a repository constraint that reddens the suite
+from a distance — a documentation spec, a naming collision, a gate that scopes itself to tracked
+files — it goes in Standing facts immediately, not in that task's closing notes.** Measured: one
+project's first implementer lost a suite run to a rule requiring every new runtime script to be
+named by some subsystem document, and no brief had mentioned it. Written down once, it cost the
+remaining eleven tasks nothing.
+
+**When to write each brief.** Write the first stage's briefs up front, and write every later brief
+**just before its task is dispatched**. A brief written against a signature that does not exist yet
+is a brief that gets withdrawn — and by step 5 below, a withdrawn brief costs a whole task. Waiting
+also lets the brief carry what the Interfaces section learned in the meantime. A task whose brief is
+not written yet is marked *(brief pending)* in the ledger, which is a state, not an omission.
+
+**Cite by name, not by line number.** In dispatches and re-review prompts, name the test, the method
+or the symbol — `SkinRulesSpec.ClampsAtZero`, not `SkinRulesSpec.cs:410-423`. Line numbers passed
+from a report into a dispatch go stale between the two, and a stale citation that gets repeated is
+how a document starts describing a file that no longer exists. Measured: a controller forwarded a
+range citing lines 410–423 of a 378-line file.
+
 **Per task, in plan order:**
 
 1. **Dispatch one implementer.** `unity-coder` via the `Agent` tool, using `implementer-prompt.md` as

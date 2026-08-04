@@ -144,3 +144,48 @@ if [ -n "$UNTRACKED_PAYLOAD" ]; then
 fi
 assert_eq "0" "$(printf '%s' "$UNTRACKED_PAYLOAD" | grep -c . || true)" \
   "no untracked file under .claude/ (invisible to provenance and baseline, but live for the model)"
+
+# ============================================================================
+# Every implementing agent must be told what counts as done.
+#
+# `verification-before-completion` is the only skill that is a precondition for *every* agent's
+# job rather than for a subsystem: an agent that does not know what counts as evidence reports
+# "done" from a compile. The 2026-08-03 second-pass review found no agent naming it, and the fix
+# landed on four of eight — `unity-prototyper`, `unity-scene-builder`, `unity-ui-builder` and
+# `unity-reviewer` were missed, in the same "applied on one side only" shape as the duplicate
+# `## Project Facts` heading.
+#
+# The block is not decorative. Measured 2026-08-04 across 33 dispatched subagents on a real
+# project: all 12 `unity-coder` implementers loaded both skills their block named, and seven of
+# them reached past the block for a third. Agents obey this list, so what is on it matters — the
+# same run had `unity-reviewer` mandating `object-pooling` and nothing else, and seven reviewers
+# dutifully loaded a pooling guide to review save-schema and ScriptableObject code.
+MISSING_VERIFY=""
+for f in "$REPO_DIR"/.claude/agents/*.md; do
+  [ -f "$f" ] || continue
+  block=$(awk '/^## Skills to load/,/^The `Skill` tool lists/' "$f")
+  if ! grep -qF -- 'verification-before-completion' <<< "$block"; then
+    MISSING_VERIFY="${MISSING_VERIFY}${f#$REPO_DIR/} has no verification-before-completion in its Skills to load block"$'\n'
+  fi
+done
+
+if [ -n "$MISSING_VERIFY" ]; then
+  printf '%s' "$MISSING_VERIFY"
+fi
+assert_eq "0" "$(printf '%s' "$MISSING_VERIFY" | grep -c . || true)" \
+  "every agent's Skills to load block names verification-before-completion"
+
+# Anti-vacuity: the awk range above returns empty for a file whose block was renamed, and an empty
+# block would then fail loudly rather than silently — but a renamed *trailer* makes every block
+# empty at once, which fails eight times and reads as a real regression. Assert the shape holds.
+BLOCKLESS=""
+for f in "$REPO_DIR"/.claude/agents/*.md; do
+  [ -f "$f" ] || continue
+  n=$(awk '/^## Skills to load/,/^The `Skill` tool lists/' "$f" | grep -c '^- `' || true)
+  [ "$n" -ge 1 ] || BLOCKLESS="${BLOCKLESS}${f#$REPO_DIR/} has no readable Skills to load block"$'\n'
+done
+if [ -n "$BLOCKLESS" ]; then
+  printf '%s' "$BLOCKLESS"
+fi
+assert_eq "0" "$(printf '%s' "$BLOCKLESS" | grep -c . || true)" \
+  "every agent still has a Skills to load block this guard can read"

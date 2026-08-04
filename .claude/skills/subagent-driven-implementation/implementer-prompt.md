@@ -10,15 +10,22 @@ it in per task, do not paste this file verbatim.
 2. **The brief.** Introduce it as "read this first — your requirements, exact values verbatim":
    `<path to this task's brief>`. The brief is authoritative. If the dispatch prose and the brief
    disagree, the brief wins and say so.
-3. **Interfaces the brief cannot know.** What earlier tasks in this plan actually produced — a file
+3. **The standing facts**, copied from the ledger section of that name. Which architecture actually
+   binds in this project, the gate and suite commands, and every repository constraint earlier tasks
+   discovered the hard way. A fresh subagent inherits none of the controller's context — not the
+   generated block it read, not the rule a project instruction overrides, not the documentation spec
+   that reddens the suite from three directories away. Measured on a real run: an implementer lost a
+   suite run to a constraint no brief mentioned, and once it was standing, the remaining eleven tasks
+   never met it again.
+4. **Interfaces the brief cannot know.** What earlier tasks in this plan actually produced — a file
    path that moved, a function signature that came out different from the brief's guess, a decision
    an earlier implementer made that this task depends on. The brief was written before those tasks
    ran; state what changed since.
-4. **The controller's resolution of any ambiguity it noticed.** If the brief leaves a decision
+5. **The controller's resolution of any ambiguity it noticed.** If the brief leaves a decision
    implicit, do not pass the ambiguity through unresolved — a brief that leaves a decision implicit
    does not remove the decision, it moves it to whoever reads the brief next, silently. Resolve it and
    say what you decided and why, in one or two lines.
-5. **The report-file path and the report contract** (below). State the exact path the implementer
+6. **The report-file path and the report contract** (below). State the exact path the implementer
    must write its report to, and that the report is what the controller reads — not the transcript.
 
 ## What the dispatch must NOT contain

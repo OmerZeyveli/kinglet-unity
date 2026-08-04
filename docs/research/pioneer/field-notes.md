@@ -2595,3 +2595,94 @@ that just bit this trial. It belongs in a wave with room to probe it, not at the
 Recorded here rather than in a ledger that gets deleted, because the next person to touch a test
 helper in this repository needs to know that `assert_eq` means two different things depending on
 which file they are in.
+
+## 89. The loop's first run on a real game, and what 33 subagents proved about the Skills block
+
+§88 recorded the execution loop's first run — on this repository, on its own toolkit. On 2026-08-04
+it ran on a real Unity game: the skin system in Endless Evolution, twelve tasks (T01–T09 plus three
+opened mid-run), 47 commits, EditMode 1242/1242 and PlayMode 741/741 at the end. Thirty-three
+subagents were dispatched. Their transcripts are on disk, so the questions this note answers are
+counted rather than argued.
+
+### The Skills-to-load block is obeyed. That is the finding, and it is the problem.
+
+| Agent | n | Skills it loaded |
+|---|---|---|
+| `unity-coder` | 12 | `assembly-definitions` 12/12, `verification-before-completion` 12/12, `object-pooling` 7 (self-selected) |
+| `unity-reviewer` | 17 | `object-pooling` 7 — and nothing else, ever |
+| `general-purpose` | 4 | none |
+
+**Every implementer loaded both skills its block named, without exception**, and seven reached past
+the block for a third. This is the first hard evidence that the block works: the mechanism this
+toolkit relies on — an explicit list plus `Skill` in `tools:`, with nothing loading implicitly —
+does what it claims.
+
+Which makes the second row expensive. `unity-reviewer`'s block named exactly one skill,
+`object-pooling`, so seven reviewers loaded a pooling guide before reviewing ScriptableObject
+authoring, a save schema and a time-trial rule — and the other ten, reading a mandate that plainly
+did not fit, loaded nothing at all. **No reviewer in the entire run ever loaded
+`verification-before-completion`**, the skill that tells it what the implementer's evidence is worth.
+
+The 2026-08-03 second pass had already found the gap — "no agent's block names
+`systematic-debugging` or `verification-before-completion`" — and the fix reached four agents of
+eight. `unity-prototyper`, `unity-scene-builder`, `unity-ui-builder` and `unity-reviewer` were
+missed. Same shape as the duplicate `## Project Facts` heading: the argument was made once and
+applied on one side only. `tests/test-surface-references.sh` now asserts all eight.
+
+The general lesson is narrower than "put more skills in the block": **agents follow the block
+literally, so a mandate that does not fit the job is not ignored — it is either obeyed at a cost or
+it teaches the agent that the block is advisory.** Both outcomes are worse than an empty list.
+
+### A unity-mcp success flag is not a written value
+
+Authoring twelve ScriptableObjects, `manage_scriptable_object` **rejected** the array-resize patch —
+`Unsupported SerializedPropertyType: ArraySize` — and then reported **success on all twelve element
+writes into that same array.** Nothing logged, `read_console` clean. The implementer distrusted the
+flags, read the `.asset` back from disk, and only then knew the state.
+
+Same shape as a `.cs` file that fails to compile: the write succeeds, the outcome does not, and only
+a second look distinguishes them. Now Rule 7b of `unity-mcp-patterns` and a row in
+`verification-before-completion`.
+
+### What the controller had to invent, which means the skill should have supplied it
+
+The ledger grew two sections the skill never asked for, and both earned their place:
+
+- **Standing facts for every dispatch.** A fresh subagent inherits none of the controller's reading
+  of the project. The controller wrote out, every time, that this project uses singleton services and
+  hand-rolled FSMs with no VContainer/MessagePipe/UniTask and that coroutines are the async primitive
+  — because `CLAUDE.md`'s generated block is a thing the *controller* read, not a thing the
+  implementer inherits. The first implementer also lost a suite run to a repository rule requiring
+  every new runtime script to be named by some subsystem document; once that was standing, the
+  remaining eleven tasks never met it again.
+- **Interfaces produced so far.** It caught a real trap: two new types exposed *properties* while the
+  sibling type the brief compared them to used public *fields*, so a brief saying "same as
+  `LevelGraph`" would have been wrong.
+
+Both are now in the skill's Setup, and the standing facts are item 3 of the implementer dispatch.
+
+Two smaller ones, also adopted: write later-stage briefs **just before dispatch** (a brief written
+against a signature that does not exist yet is a brief that gets withdrawn, and by the skill's own
+step 5 a withdrawn brief costs a whole task), and **cite by test name, not line number** — a
+controller forwarded a citation to lines 410–423 of a 378-line file.
+
+### The reviewer's blindness is load-bearing, and the controller worked it out unaided
+
+`unity-reviewer` has no Bash and no MCP — only `Read`, `Glob`, `Grep`, `Skill`. The controller
+described this as a design that shapes the loop rather than a gap: the reviewer cannot drive the
+Editor, so it must read the code, and must mark `⚠️ Cannot verify from diff` for what it cannot
+confirm. It also explains why the controller states gate and suite results in every review dispatch
+— the reviewer cannot run them, and if it could it would burn two minutes per task re-running a
+suite the dispatch could state in one line. It twice reached for a `general-purpose` reviewer
+instead, for findings that needed an *experiment* rather than a reading. The prompt already said all
+of this; that a fresh controller re-derived it from the tool list is evidence the constraint is
+legible in the design, not only in the prose.
+
+### Still open: the chain names behaviour that then happens without the chain
+
+The controller again did not invoke `deep-interview`, and again performed the interview — two rounds
+of questions, decisions written to a design document. `using-kinglet` is injected every session and
+its table describes each process skill well enough that a capable model executes the behaviour
+without loading the file. The outcome is right and the escape-hatch sections nobody loads are the
+Wave-2 investment that has now gone unread twice. §87 is the neighbouring measurement; this is not
+settled, and it wants a probe rather than another edit.

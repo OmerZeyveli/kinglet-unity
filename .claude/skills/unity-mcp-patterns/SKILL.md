@@ -142,6 +142,29 @@ If an MCP operation fails:
 3. Retry the operation
 4. If the error persists, fall back to writing an Editor script
 
+## Rule 7b: A success flag is not a written value — read it back
+
+**A unity-mcp call reporting success tells you the call was accepted. It does not tell you the
+value landed.** The two come apart, and when they do nothing is logged and `read_console` is clean.
+
+Measured on a real project, 2026-08-04, authoring a ScriptableObject array through
+`manage_scriptable_object`:
+
+- the resize patch on `_skins.Array.size` was **rejected** — `Unsupported SerializedPropertyType:
+  ArraySize`;
+- the twelve `_skins.Array.data[i]` element writes that followed each reported **success**.
+
+Twelve successes into an array whose size the same batch had just failed to set. The implementer
+did not trust the flags, read the `.asset` back from disk, and only then knew the real state.
+
+**So:** after any MCP write to an asset, prefab or scene, verify by reading the result — the file
+from disk, a `git diff`, or a separate query for the value you just set. Component counts and
+reference counts before and after are a cheap version of this for prefab edits. Reserve the trust
+you would otherwise put in the flag for the read-back.
+
+This is the same failure shape as writing a `.cs` file that does not compile: the write succeeds,
+the outcome does not, and only a second look distinguishes them.
+
 ## Rule 8: MCP vs File Editing
 
 | Operation | Use MCP | Use File Edit |
