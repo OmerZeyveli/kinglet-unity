@@ -5,6 +5,13 @@ description: "Save/load patterns — ISaveable interface, JSON serialization, sa
 
 # Save/Load System
 
+> **The examples below are written in this toolkit's default stack** (VContainer registration,
+> `UniTask` for async). Whether that stack binds in *this* project is stated in `CLAUDE.md`'s
+> generated block, detected from the code. Where it does not bind, take the **structure** from
+> this skill and express it in the architecture the project actually has — do not introduce
+> VContainer, MessagePipe or UniTask to a project that does not already use them, and do not
+> conclude the skill is inapplicable.
+
 *Written against Unity 6000.0, current as of 2026-08-04.*
 
 ## Boundary with the rules

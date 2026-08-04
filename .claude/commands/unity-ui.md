@@ -7,6 +7,13 @@ args: screen_description
 
 # /unity-ui — Build a UI Screen
 
+> **Architecture stack — read before you write or refuse.** Which parts of
+> `.claude/rules/architecture.md` bind here is stated in `CLAUDE.md`'s generated block, detected
+> from this project's own code rather than assumed. A project with no VContainer is **not** a
+> project where this surface does not apply — it is a project where you follow the architecture
+> the code actually has. Refusing on stack grounds without reading that block is how a measured
+> session locked itself out of every MCP-driven agent it had.
+
 Build a UI screen based on: **$ARGUMENTS**
 
 ## Workflow

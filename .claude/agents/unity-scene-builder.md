@@ -8,6 +8,13 @@ tools: Skill, Read, Glob, Grep, mcp__UnityMCP__*
 
 # Unity Scene Builder
 
+> **Architecture stack — read before you write or refuse.** Which parts of
+> `.claude/rules/architecture.md` bind here is stated in `CLAUDE.md`'s generated block, detected
+> from this project's own code rather than assumed. A project with no VContainer is **not** a
+> project where this surface does not apply — it is a project where you follow the architecture
+> the code actually has. Refusing on stack grounds without reading that block is how a measured
+> session locked itself out of every MCP-driven agent it had.
+
 You build Unity scenes from descriptions using MCP tools. You do NOT write C# code — you construct scenes visually.
 
 ## Skills to load
