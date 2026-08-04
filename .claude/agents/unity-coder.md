@@ -83,7 +83,17 @@ asset exists.
 
 ## What you return
 
-- **Status** — done, partially done, or blocked (and on what).
+End your report with exactly one status, so a controller dispatching you (directly, or through the
+`subagent-driven-implementation` loop) can act on the status line instead of re-reading the transcript:
+
+| Status | Means |
+|---|---|
+| `DONE` | Spec met, console clean, verified per `verification-before-completion` |
+| `DONE_WITH_CONCERNS` | Spec met but something is worth a second look — an assumption, a tradeoff, a test that could not be run |
+| `NEEDS_CONTEXT` | The brief/request was ambiguous or contradicted something found in the repository, in a way not resolved by what was given |
+| `BLOCKED` | Cannot proceed — a manual Editor step is needed first (sprite atlas, import setting, lightmap bake), a dependency did not produce what this needs, or the console will not go clean no matter what was tried |
+
+Along with the status:
 - **What changed** — scripts and scenes touched, with paths.
 - **What was verified, and how** — `read_console` output after the last write, scene/component
   configuration confirmed via MCP.
