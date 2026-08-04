@@ -172,7 +172,9 @@ using UnityEngine.SceneManagement;
 public sealed class SaveManager
 {
     private readonly int _maxSaveSlots;
-    private readonly float _sessionStartTime;
+    // Not readonly: RestoreState reassigns it when a save is loaded, so the session clock
+    // continues from the saved playtime rather than from process start.
+    private float _sessionStartTime;
 
     public event Action OnSaveCompleted;
     public event Action OnLoadCompleted;
