@@ -11,10 +11,14 @@
 # SHIPPED_SERVER is derived from install.sh's own heredoc, never hardcoded —
 # the defect this guards against was two files disagreeing about one string,
 # and a hardcoded expectation here would just be a third file to go stale.
-# The second assertion exists because the derivation can silently break: if
-# install.sh's heredoc is ever reformatted so the awk stops matching,
-# SHIPPED_SERVER goes empty and the first assertion would pass against every
-# agent while checking nothing.
+# The second assertion exists because the derivation can break: if install.sh's heredoc is ever
+# reformatted so the awk stops matching, SHIPPED_SERVER goes empty and the first assertion fails
+# loudly against every real `mcp__...__` token in the scan (empty `want` matches nothing, so
+# `tok != want` is true everywhere) — not silently. That failure is real but its message is noise: a
+# wall of "declares mcp__X__ but install.sh writes " with no server name, for every file in scope,
+# which reads like every agent drifted at once rather than like the derivation broke. The second
+# assertion exists to name the actual cause directly instead of leaving it to be inferred from that
+# noise.
 # ============================================================================
 
 echo "--- mcp naming ---"

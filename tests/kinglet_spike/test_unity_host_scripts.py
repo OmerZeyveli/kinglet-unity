@@ -487,10 +487,25 @@ class SweepBehaviour(unittest.TestCase):
             with self.subTest(target=target):
                 result = self._check(target)
                 self.assertEqual(result.returncode, 2)
-                self.assertTrue(
-                    "repository" in result.stderr or "too shallow" in result.stderr,
-                    f"refused for an undocumented reason: {result.stderr!r}",
-                )
+                # sweep-workspace.sh's own depth check: DEPTH is the count of "/" characters in
+                # the resolved path (SEPARATORS="${WS//[!\/]/}"; DEPTH="${#SEPARATORS}"), and
+                # MIN_DEPTH is 3. Below that, the shallow guard fires before the containment
+                # rule is ever consulted -- so gate the assertion on the same measurement rather
+                # than accepting either branch, which let the containment guard go unexercised
+                # in any checkout shallower than 3 path components (e.g. a worktree under /tmp).
+                depth = target.count("/")
+                if depth >= 3:
+                    self.assertIn(
+                        "repository",
+                        result.stderr,
+                        f"expected the containment guard at depth {depth}: {result.stderr!r}",
+                    )
+                else:
+                    self.assertIn(
+                        "too shallow",
+                        result.stderr,
+                        f"expected the shallow guard at depth {depth}: {result.stderr!r}",
+                    )
 
     def test_a_nonexistent_directory_is_refused(self):
         result = self._check("/nonexistent/deep/workspace")

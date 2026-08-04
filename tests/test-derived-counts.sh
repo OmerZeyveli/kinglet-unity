@@ -34,11 +34,16 @@ DC_ORIGINAL=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $6 == "original"' "$REPO
 DC_QUOTING_FILES="CREDITS.md
 README.md"
 
-# "<n> verbatim, <m> modified" — the phrase both files use.
+# Two phrasings quote the same split: "<n> verbatim, <m> modified" (both files' tables) and
+# "<n>/<m> split" (CREDITS.md's prose). Finding 1 of the 2026-08-03 second-pass review was a stale
+# number in the SECOND form sitting beside a guard that only read the first — the file had one
+# correct comma-form occurrence and one stale slash-form occurrence, and the guard called it clean.
+# Checking both forms, per file, is what stops that recurring.
 DC_BAD=""
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
   [ -f "$REPO_DIR/$rel" ] || continue
+
   while IFS= read -r claim; do
     [ -n "$claim" ] || continue
     claimed_v=$(printf '%s' "$claim" | awk '{print $1}')
@@ -47,6 +52,15 @@ while IFS= read -r rel; do
       DC_BAD="${DC_BAD}${rel} claims ${claimed_v} verbatim, ${claimed_m} modified — provenance.tsv has ${DC_VERBATIM} and ${DC_MODIFIED}"$'\n'
     fi
   done <<< "$(grep -oE '[0-9]+ verbatim, [0-9]+ modified' "$REPO_DIR/$rel" || true)"
+
+  while IFS= read -r claim; do
+    [ -n "$claim" ] || continue
+    claimed_v=$(printf '%s' "$claim" | awk -F'/' '{print $1}')
+    claimed_m=$(printf '%s' "$claim" | awk -F'/' '{print $2}' | awk '{print $1}')
+    if [ "$claimed_v" != "$DC_VERBATIM" ] || [ "$claimed_m" != "$DC_MODIFIED" ]; then
+      DC_BAD="${DC_BAD}${rel} claims ${claimed_v}/${claimed_m} split — provenance.tsv has ${DC_VERBATIM}/${DC_MODIFIED}"$'\n'
+    fi
+  done <<< "$(grep -oE '[0-9]+/[0-9]+ split' "$REPO_DIR/$rel" || true)"
 done <<< "$DC_QUOTING_FILES"
 
 # The original-row count is deliberately NOT quoted in prose any more, and so is not checked here.
@@ -61,9 +75,23 @@ fi
 assert_eq "0" "$(printf '%s' "$DC_BAD" | grep -c . || true)" \
   "every provenance count quoted in prose matches provenance.tsv"
 
-# If the phrasing in either file changes, the greps above stop matching and this test passes while
-# checking nothing — the vacuity failure this repository has shipped before. So assert the greps
-# still find something to check.
-DC_FOUND=$(grep -hoE '[0-9]+ verbatim, [0-9]+ modified' "$REPO_DIR/CREDITS.md" "$REPO_DIR/README.md" 2>/dev/null | grep -c . || true)
-assert_eq "enough" "$([ "$DC_FOUND" -ge 2 ] && echo enough || echo "only-$DC_FOUND")" \
-  "both prose files still state the split in the form this test can read"
+# If the phrasing in a file changes, the greps above stop matching THAT FILE and this test passes
+# while checking nothing for it — the vacuity failure finding 8 of the 2026-08-03 second-pass review
+# found here: a combined threshold across both files let README.md lose its occurrence entirely while
+# CREDITS.md's second occurrence kept the combined count above the bar. Count per file, and require
+# every file this guard claims to cover to still state the split in a form it can read.
+DC_VACUOUS=""
+while IFS= read -r rel; do
+  [ -n "$rel" ] || continue
+  [ -f "$REPO_DIR/$rel" ] || continue
+  dc_file_found=$(grep -hocE '[0-9]+ verbatim, [0-9]+ modified|[0-9]+/[0-9]+ split' "$REPO_DIR/$rel" 2>/dev/null || true)
+  [ -n "$dc_file_found" ] || dc_file_found=0
+  if [ "$dc_file_found" -lt 1 ]; then
+    DC_VACUOUS="${DC_VACUOUS}${rel} states the split in no form this guard can read"$'\n'
+  fi
+done <<< "$DC_QUOTING_FILES"
+if [ -n "$DC_VACUOUS" ]; then
+  printf '%s' "$DC_VACUOUS"
+fi
+assert_eq "0" "$(printf '%s' "$DC_VACUOUS" | grep -c . || true)" \
+  "every prose file this guard covers still states the split in a form it can read"
