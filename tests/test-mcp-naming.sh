@@ -52,19 +52,31 @@ SHIPPED_SERVER=$(awk -F'"' '/^ *"[A-Za-z]*MCP": \{/ {print $2; exit}' "$REPO_DIR
 # comparison against the wrong name silently stops matching — which is exactly how
 # .claude/hooks/build-analyze.sh stopped recognising builds.
 #
+# docs/ is in scope: docs/AGENT-GUIDE.md ships copy-paste `tools:` templates and
+# docs/GETTING-STARTED.md ships a .mcp.json snippet — the two files most likely to REINTRODUCE
+# the defect were the two the first version of this guard could not see. docs/research/ and
+# docs/superpowers/ are excluded: they are dated records of what was true when written, and a
+# guard that forbids describing a past state stops the repository writing its own history
+# (field note 81).
+#
 # adapters/ and tests/kinglet/ are excluded: they are the platform spike's own role schema, a
 # different data model that ships into no project. Named here so the exclusion is a decision.
 BAD=$(
-  for f in $(cd "$REPO_DIR" && git ls-files '.claude/*' 'scripts/*' install.sh uninstall.sh); do
+  for f in $(cd "$REPO_DIR" && git ls-files '.claude/*' 'scripts/*' 'docs/*' install.sh uninstall.sh \
+                 CLAUDE.md CONTRIBUTING.md README.md MCP-SETUP.md \
+                 ':!docs/research/*' ':!docs/superpowers/*'); do
     [ -f "$REPO_DIR/$f" ] || continue
     case "$f" in
-      *.md) SCAN_MODE=frontmatter ;;
+      *.md) SCAN_MODE=toolsline ;;
       *)    SCAN_MODE=noncomment ;;
     esac
     awk -v file="$f" -v want="$SHIPPED_SERVER" -v mode="$SCAN_MODE" '
       /^---/ { fm++ }
       {
-        if (mode == "frontmatter" && !(fm == 1 && $0 ~ /^tools:/)) next
+        # A `tools:` line is a use wherever it appears: in frontmatter it is a permission grant,
+        # and inside a fenced block it is a template someone copies into one. docs/AGENT-GUIDE.md
+        # ships two of the latter. Prose naming the tool inline stays exempt — that is a mention.
+        if (mode == "toolsline" && $0 !~ /^[[:space:]]*tools:/) next
         if (mode == "noncomment"  && $0 ~ /^[[:space:]]*#/) next
         line = $0
         while (match(line, /mcp__[A-Za-z0-9_]+__/)) {
