@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "38c0accbe12921d9e06599f30a26574ecad870b0",
+  "source_commit": "bd6d06d38177e601584caef51c869a2689315afb",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 77,
@@ -38,17 +38,17 @@
       },
       {
         "path": ".claude/agents/unity-prototyper.md",
-        "sha256": "3f5406cb17737078d1ac4f69b1b335db183c144d712a6278122194b29e41a633",
+        "sha256": "e466bcd31aa2f2b006ac7eef9357c24d301092a22b3c7305858cc8ede08abc50",
         "git_mode": "100644"
       },
       {
         "path": ".claude/agents/unity-reviewer.md",
-        "sha256": "edf4960096c822b60d9d491108ee062b81e92523008e22362185d7e587d21165",
+        "sha256": "0814d2093d6e928da96556fa238e38946ec0c41d7e6117cec6e625e45a25b7fa",
         "git_mode": "100644"
       },
       {
         "path": ".claude/agents/unity-scene-builder.md",
-        "sha256": "4cf1205b4ad24180e8bbb55e2aadf8c77a40b6c3325f2e2b16ba5c751b259399",
+        "sha256": "cea2fc5132853e5f230c5416cd6f4ee0408bbe9208b95ec800cc1bd4d158dd38",
         "git_mode": "100644"
       },
       {
@@ -58,7 +58,7 @@
       },
       {
         "path": ".claude/agents/unity-ui-builder.md",
-        "sha256": "6aafd0827235bcdd52760bbb3d47f78ef2ca8854d4fb86307434781a1360fa45",
+        "sha256": "bc9facdb43506861a8c0e911e163f6c03b377cc3c245ec9cde1da0be5317992e",
         "git_mode": "100644"
       },
       {
@@ -338,7 +338,7 @@
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
-        "sha256": "e00eab51f36e5f106e565270d6a23de6eccf47a9b9387613b940dfdf06f9e8a5",
+        "sha256": "0e32d40ee173afa7e2442a845a315ac283cce352ecd6af0d1e7345b8dbd1cef1",
         "git_mode": "100644"
       },
       {
@@ -348,7 +348,7 @@
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/implementer-prompt.md",
-        "sha256": "ac60fd8e0f909b748932842e1cea7a8a4a452dd6be74d01c88b0f6ff286d8d53",
+        "sha256": "d8ef03e9a519cb04b79d3bf26f7389b7c87455d2dd6c7ec893301c669db88529",
         "git_mode": "100644"
       },
       {
@@ -368,7 +368,7 @@
       },
       {
         "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
-        "sha256": "966100e7d79d9dfe56e04bbcbcae0f02092ae1c81ca4f0d801967b0778759ef9",
+        "sha256": "4e076050ad81ffe29782a2504563866d206932753f1c17ceab24147a3487a653",
         "git_mode": "100644"
       },
       {
@@ -383,7 +383,7 @@
       },
       {
         "path": ".claude/skills/verification-before-completion/SKILL.md",
-        "sha256": "a24f8d6c3fa07dad409866549f35487d1c69f8b8c25894eacddd4889a1fc15e9",
+        "sha256": "4a946fcd485e3b86ea313ce0637d31156550f27cb267c17ebd82477caff21773",
         "git_mode": "100644"
       },
       {
@@ -415,17 +415,17 @@
         },
         {
           "path": ".claude/agents/unity-prototyper.md",
-          "sha256": "3f5406cb17737078d1ac4f69b1b335db183c144d712a6278122194b29e41a633",
+          "sha256": "e466bcd31aa2f2b006ac7eef9357c24d301092a22b3c7305858cc8ede08abc50",
           "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-reviewer.md",
-          "sha256": "edf4960096c822b60d9d491108ee062b81e92523008e22362185d7e587d21165",
+          "sha256": "0814d2093d6e928da96556fa238e38946ec0c41d7e6117cec6e625e45a25b7fa",
           "git_mode": "100644"
         },
         {
           "path": ".claude/agents/unity-scene-builder.md",
-          "sha256": "4cf1205b4ad24180e8bbb55e2aadf8c77a40b6c3325f2e2b16ba5c751b259399",
+          "sha256": "cea2fc5132853e5f230c5416cd6f4ee0408bbe9208b95ec800cc1bd4d158dd38",
           "git_mode": "100644"
         },
         {
@@ -435,7 +435,7 @@
         },
         {
           "path": ".claude/agents/unity-ui-builder.md",
-          "sha256": "6aafd0827235bcdd52760bbb3d47f78ef2ca8854d4fb86307434781a1360fa45",
+          "sha256": "bc9facdb43506861a8c0e911e163f6c03b377cc3c245ec9cde1da0be5317992e",
           "git_mode": "100644"
         }
       ]
@@ -547,7 +547,7 @@
         },
         {
           "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
-          "sha256": "e00eab51f36e5f106e565270d6a23de6eccf47a9b9387613b940dfdf06f9e8a5",
+          "sha256": "0e32d40ee173afa7e2442a845a315ac283cce352ecd6af0d1e7345b8dbd1cef1",
           "git_mode": "100644"
         },
         {
@@ -557,7 +557,7 @@
         },
         {
           "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
-          "sha256": "966100e7d79d9dfe56e04bbcbcae0f02092ae1c81ca4f0d801967b0778759ef9",
+          "sha256": "4e076050ad81ffe29782a2504563866d206932753f1c17ceab24147a3487a653",
           "git_mode": "100644"
         },
         {
@@ -572,7 +572,7 @@
         },
         {
           "path": ".claude/skills/verification-before-completion/SKILL.md",
-          "sha256": "a24f8d6c3fa07dad409866549f35487d1c69f8b8c25894eacddd4889a1fc15e9",
+          "sha256": "4a946fcd485e3b86ea313ce0637d31156550f27cb267c17ebd82477caff21773",
           "git_mode": "100644"
         }
       ]
