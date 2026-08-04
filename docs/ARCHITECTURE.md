@@ -25,14 +25,16 @@ This project follows the architecture established by [everything-claude-code](ht
   commands/          11 user-invocable slash commands
   hooks/             27 registered shell scripts + _lib.sh (safety, quality, session, learning)
   rules/              6 always-loaded coding standards
-  skills/            13 knowledge modules, flat — one directory per skill, no categories
+  skills/            14 knowledge modules, flat — one directory per skill, no categories
   state/             Session state directory (session.json, tracking files)
   VERSION            Installed version for upgrade tracking
 ```
 
-(Counts as of the 2026-08-03 surface cut, which reduced a 103-surface pool to 32 on the criterion
-"a surface survives only if it does something the model cannot do unaided." Nothing enforces these
-exact numbers in text — cross-check against `ls .claude/agents/*.md | wc -l` etc. if they look stale.)
+(Agent/command/hook/rule counts are as of the 2026-08-03 surface cut, which reduced a 103-surface pool
+to 32 on the criterion "a surface survives only if it does something the model cannot do unaided." The
+skill count moved to 14 afterward, in the `process-layer-2` wave that added `subagent-driven-implementation`
+— see `docs/SKILL-CATALOG.md`. Nothing enforces these exact numbers in text — cross-check against
+`ls .claude/agents/*.md | wc -l` etc. if they look stale.)
 
 Supporting files outside `.claude/`:
 
@@ -59,7 +61,7 @@ Agents are Markdown files in `.claude/agents/` with YAML frontmatter that contro
 | `description` | One-line summary shown in agent selection | `"Implements Unity features..."` |
 | `model` | Which Claude model to use | `opus`, `sonnet`, `haiku` |
 | `color` | Terminal display color | `green`, `blue`, `yellow` |
-| `tools` | Allowed tool access list | `Read, Write, Edit, Glob, Grep, Bash, mcp__unityMCP__*` |
+| `tools` | Allowed tool access list | `Read, Write, Edit, Glob, Grep, Bash, mcp__UnityMCP__*` |
 | `tools` must include `Skill` | Lets the agent load skills at all | Without it the **Skills to load** block in the body is unactionable |
 
 ### Model Selection
@@ -74,7 +76,7 @@ Agents are Markdown files in `.claude/agents/` with YAML frontmatter that contro
 Agents only have access to the tools listed in their frontmatter. This enforces boundaries:
 
 - `unity-reviewer` has `Read, Glob, Grep` only -- it cannot modify files.
-- `unity-scene-builder` has `Read, Glob, Grep, mcp__unityMCP__*` -- it controls the editor but does not write code.
+- `unity-scene-builder` has `Read, Glob, Grep, mcp__UnityMCP__*` -- it controls the editor but does not write code.
 - `unity-coder` has full access including `Write, Edit, Bash` and MCP tools.
 
 ---
@@ -95,7 +97,7 @@ Example flow for `/unity-prototype`:
 User: /unity-prototype "2D platformer with wall jumping"
   -> Command: unity-prototype.md (decomposes the task)
     -> Agent: unity-prototyper (writes scripts, builds scene via MCP)
-      -> Tools: Write (C# files), mcp__unityMCP__* (scene setup)
+      -> Tools: Write (C# files), mcp__UnityMCP__* (scene setup)
 ```
 
 ---
@@ -277,7 +279,7 @@ Agent (specialized executor)   <- .claude/agents/
   |                  |
   v                  v
 File Tools         MCP Tools
-(Read/Write/Edit)  (mcp__unityMCP__*)
+(Read/Write/Edit)  (mcp__UnityMCP__*)
   |                  |
   v                  v
 C# Source Files    Unity Editor
@@ -291,7 +293,7 @@ Read each agent's `tools:` frontmatter for ground truth; these are the three sha
    - `unity-reviewer` (`Skill, Read, Glob, Grep`)
 
 2. **MCP-Powered Agent** -- controls the Unity Editor, does not write files
-   - `unity-scene-builder` (`Skill, Read, Glob, Grep, mcp__unityMCP__*`)
+   - `unity-scene-builder` (`Skill, Read, Glob, Grep, mcp__UnityMCP__*`)
 
 3. **Hybrid Agents** -- both code (`Write, Edit`) and MCP access
    - `unity-coder`, `unity-fixer`, `unity-optimizer`, `unity-prototyper`, `unity-test-runner`,

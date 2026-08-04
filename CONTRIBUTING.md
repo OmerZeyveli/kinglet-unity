@@ -61,7 +61,7 @@ Match the existing frontmatter exactly:
 
 - **Agents** (`.claude/agents/<name>.md`): frontmatter `name`, `description`, `model`, `color`,
   `tools`. Design/production agents are a documentation layer — **do not** give them
-  `mcp__unityMCP__*` tools or have them write C#. That's the `unity-*` agents' job.
+  `mcp__UnityMCP__*` tools or have them write C#. That's the `unity-*` agents' job.
 - **Commands** (`.claude/commands/<name>.md`): frontmatter `name`, `description`, `user-invocable`,
   `args`. Put model/agent routing in the body (like `unity-review`).
 - **Skills** (`.claude/skills/<category>/<name>/SKILL.md`): frontmatter `name`, `description`, and

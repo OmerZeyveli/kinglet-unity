@@ -16,7 +16,7 @@ Run a comprehensive diagnostic check on the everything-claude-unity installation
    - Is the unity-mcp package installed in Unity?
    - Is the Unity Editor running and the project open?
    - Is the MCP server running on the expected port?
-   - Check `.mcp.json` (project root) → `mcpServers.unityMCP.url`
+   - Check `.mcp.json` (project root) → `mcpServers.UnityMCP.url`
 
 ## Check 2: .claude/ Directory Integrity
 

@@ -81,7 +81,7 @@ Payload files live in `.claude/`. There is no `overlay/` — it was dissolved; p
 directory-as-provenance.
 
 - **Agents** (`.claude/agents/<name>.md`): frontmatter `name`, `description`, `model`, `color`,
-  `tools`. All 8 current agents are ECU-origin `unity-*` implementers with `mcp__unityMCP__*` tools
+  `tools`. All 8 current agents are ECU-origin `unity-*` implementers with `mcp__UnityMCP__*` tools
   that write C# and wire it into the scene — the Donchitos design/production agents that used to be
   documentation-only (no MCP tools, wrote to `docs/` instead) were removed 2026-08-03; see
   `provenance-skip.tsv` and `MERGE-NOTES.md`.

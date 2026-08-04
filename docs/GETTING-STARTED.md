@@ -115,7 +115,7 @@ The MCP bridge gives Claude direct control over the Unity Editor: creating GameO
 
 > **Set it up before you start a session, not during one.** Tool schemas register when the Claude Code
 > process starts. Registering the server mid-session succeeds, reports `✔ Connected`, and gives you
-> nothing — no `mcp__unityMCP__*` tools appear, and subagents you spawn afterwards inherit the same
+> nothing — no `mcp__UnityMCP__*` tools appear, and subagents you spawn afterwards inherit the same
 > empty set. The order that works is: open Unity → start the bridge → confirm the port answers →
 > *then* start the session. Unity must also stay open: the HTTP server is a child of the editor and
 > `EditorApplication.quitting` stops it.
@@ -138,7 +138,7 @@ The MCP bridge gives Claude direct control over the Unity Editor: creating GameO
 4. The `.mcp.json` is already configured to connect:
    ```json
    "mcpServers": {
-     "unityMCP": {
+     "UnityMCP": {
        "url": "http://localhost:8080/mcp"
      }
    }

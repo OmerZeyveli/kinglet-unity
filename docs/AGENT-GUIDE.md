@@ -6,7 +6,7 @@ How to use, customize, and create agents for everything-claude-unity.
 
 ## All 8 Agents at a Glance
 
-Every agent in this toolkit is an ECU-origin `unity-*` implementer with `mcp__unityMCP__*` tools that
+Every agent in this toolkit is an ECU-origin `unity-*` implementer with `mcp__UnityMCP__*` tools that
 writes C# and drives the editor. An earlier design/production layer (`game-designer`,
 `systems-designer`, `level-designer`, `creative-director`, `technical-director`, `narrative-director`,
 `world-builder`, `writer` — documentation-only, no MCP tools) and a second engineering tier
@@ -78,7 +78,7 @@ name: unity-coder                    # Unique identifier
 description: "Implements features"   # One-line summary
 model: opus                          # opus | sonnet | haiku
 color: green                         # Terminal display color
-tools: Read, Write, Edit, Glob, Grep, Bash, mcp__unityMCP__*
+tools: Read, Write, Edit, Glob, Grep, Bash, mcp__UnityMCP__*
 ---
 ```
 
@@ -98,7 +98,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash, mcp__unityMCP__*
 **tools** -- Comma-separated list of allowed tools. Common values:
 - `Read, Glob, Grep` -- read-only access (reviewers, analyzers)
 - `Read, Write, Edit, Glob, Grep, Bash` -- full code access
-- `mcp__unityMCP__*` -- all unity-mcp tools (wildcard)
+- `mcp__UnityMCP__*` -- all unity-mcp tools (wildcard)
 - `Agent` -- ability to spawn sub-agents
 
 ---
@@ -132,7 +132,7 @@ To remove MCP access from an agent (if you do not use unity-mcp):
 
 ```yaml
 # Before
-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__unityMCP__*
+tools: Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__UnityMCP__*
 
 # After
 tools: Read, Write, Edit, Glob, Grep, Bash, Agent

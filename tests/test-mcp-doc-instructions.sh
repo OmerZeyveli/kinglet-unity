@@ -138,7 +138,17 @@ assert_eq "caught" "$TMDI_CROSSLINE_CAUGHT" \
     "the pattern now catches a reference split across a line break, like NOTICE.md's was"
 
 # --- Positive controls: the fixed instructions now name the real location ---
-TMDI_DOCTOR_LINE=$(grep -n "mcpServers.unityMCP.url" "${REPO_DIR}/.claude/commands/unity-doctor.md" || true)
+#
+# The expected server spelling is derived from install.sh's own heredoc, never hardcoded — the
+# same reasoning tests/test-mcp-naming.sh already applies. A hardcoded literal here would itself be
+# a stale-casing incident waiting to happen: finding 4 of the 2026-08-03 second-pass review was
+# exactly this guard holding the old lowercase "unityMCP" in place as a positive control, so fixing
+# unity-doctor.md's casing made the assertion's input empty and failed the test.
+TMDI_SHIPPED_SERVER=$(awk -F'"' '/^ *"[A-Za-z]*MCP": \{/ {print $2; exit}' "$REPO_DIR/install.sh")
+assert_eq "1" "$([ -n "$TMDI_SHIPPED_SERVER" ] && echo 1 || echo 0)" \
+    "the MCP server name derivation from install.sh still yields a non-empty string"
+
+TMDI_DOCTOR_LINE=$(grep -n "mcpServers\.${TMDI_SHIPPED_SERVER}\.url" "${REPO_DIR}/.claude/commands/unity-doctor.md" || true)
 assert_contains "$TMDI_DOCTOR_LINE" ".mcp.json" \
     "unity-doctor.md's MCP connectivity check now names .mcp.json, not settings.json"
 
