@@ -99,4 +99,20 @@ bash "$REPO_DIR/install.sh" --project-dir "$PRUNE_DIR" >/dev/null 2>&1
 assert_eq "1" "$(grep -c 'a line the user added' "$STICKY" 2>/dev/null || echo 0)" \
   "an edit kept by one upgrade is still kept three upgrades later"
 
+# The test suite must not ship into a project.
+#
+# check-provenance.sh was excluded from the payload because a check that can only fail in the
+# environment it ships to trains people to ignore checks. Measured 2026-08-04, that argument had been
+# applied to one script and not to the class: the shipped suite gives 143 failures out of 229
+# assertions in a real installed project, and always has — run-tests.sh resolves REPO_DIR to the
+# parent of tests/, which is `.claude/` there rather than a repo root, and twelve of the files
+# reference install.sh, provenance.tsv, tests/fixtures/ or the baseline, none of which ship.
+#
+# scripts/studio-doctor.sh is what a project actually needs and it does ship.
+assert_eq "absent" "$([ -d "$PRUNE_DIR/.claude/tests" ] && echo present || echo absent)" \
+  "the test suite does not ship into an installed project"
+
+assert_eq "present" "$([ -f "$PRUNE_DIR/.claude/scripts/studio-doctor.sh" ] && echo present || echo absent)" \
+  "the project-facing health check does ship"
+
 rm -rf "$PRUNE_DIR"

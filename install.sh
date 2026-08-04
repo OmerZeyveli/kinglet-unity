@@ -182,7 +182,7 @@ info "Payload: $PAYLOAD_COUNT files"
 # — a path written but missing here would be deleted as an orphan the run after it appears.
 NEW_PATHS=$(
   printf '%s\n' "$PAYLOAD_FILES" | sed 's|^|.claude/|'
-  for group in scripts tests; do
+  for group in scripts; do
     [ -d "$SCRIPT_DIR/$group" ] || continue
     for f in "$SCRIPT_DIR/$group"/*.sh; do
       [ -f "$f" ] || continue
@@ -350,14 +350,33 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 # notices to travel with the copies, which they do — .claude/NOTICE.md ships, carries both upstream
 # licence texts in full, and points at the manifest in the repository for the per-file detail.
 
-# Validation scripts and the test suite ship alongside the payload.
+# Validation scripts ship alongside the payload. The test suite does not.
 #
-# check-provenance.sh is the exception: it validates the toolkit's own manifest, which is not
-# shipped into projects (see the note above NOTICE.md). Installing it would put a check in every
-# project that can only ever report `err provenance.tsv not found` and exit 1 — a permanently
-# failing check trains people to ignore checks, which costs more than the script is worth here.
-# It stays in the kinglet-unity repository, where its input is.
-for group in scripts tests; do
+# check-provenance.sh was excluded first, with this reasoning: it validates the toolkit's own
+# manifest, which is not shipped, so installing it would put a check in every project that can only
+# ever report `err provenance.tsv not found` and exit 1 — and a permanently failing check trains
+# people to ignore checks, which costs more than the script is worth.
+#
+# Measured 2026-08-04: that argument was applied to one script and not to the class it describes.
+# Running the shipped suite in a real installed project gives **143 failures out of 229 assertions**,
+# and it always has. Two independent causes:
+#
+#   1. run-tests.sh computes REPO_DIR as the parent of tests/. In this repository that is the repo
+#      root; in an installed project it is `.claude/`, so every path is off by one level and the
+#      tests look for `.claude/.claude/hooks/...`.
+#   2. Twelve of the twenty-eight test files reference install.sh, provenance.tsv, tests/fixtures/,
+#      migration/baseline-inventory.json or tools.kinglet_build — none of which ship. Those cannot
+#      pass in a project whatever REPO_DIR says.
+#
+# The suite validates the toolkit, not the project. What a user actually needs is
+# scripts/studio-doctor.sh, which does ship, runs correctly against an installed layout, and checks
+# the things that matter there: the install verified against its receipt, every hook named by
+# settings.json present, the MCP bridge configured, the Input System package present.
+#
+# So: scripts/ ships, tests/ does not. An installed project that already has .claude/tests/ from an
+# earlier version gets it removed by the payload-prune above, which is the behaviour that exists for
+# exactly this.
+for group in scripts; do
   [ -d "$SCRIPT_DIR/$group" ] || continue
   mkdir -p "$CLAUDE_DIR/$group"
   for f in "$SCRIPT_DIR/$group"/*.sh; do
