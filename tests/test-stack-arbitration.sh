@@ -12,9 +12,18 @@
 # block, correctly concluded the stack does not bind, and then ruled out `/unity-workflow` and
 # `/unity-feature` on the grounds that they "generate code with MVS/VContainer assumptions".
 # `/unity-feature` names none of the four; `/unity-workflow` names VContainer once, in a
-# sentence about when to escalate. Neither claim was checked against the files. The cost was
-# not a wrong edit — it was that the seven MCP-driven agents lost their entry point in the one
-# project where driving the Editor is the whole value proposition.
+# sentence about when to escalate. Neither claim was checked against the files.
+#
+# What the refusal actually cost, measured the next day rather than predicted: nothing. The
+# same session went on to dispatch `unity-coder` twelve times and `unity-reviewer` seventeen
+# through `subagent-driven-implementation`, which reaches the agents without going through a
+# command at all. The MCP capability was never lost. An earlier draft of this comment asserted
+# it was — a prediction stated as a consequence, which is the error class this file exists to
+# catch, committed inside the file that catches it.
+#
+# The guard is still right, and for the reason that survives: a surface was ruled out on a
+# belief about its contents that reading it would have refuted, and nothing in the surface
+# pointed at the block that adjudicates the question. Next time the fallback path may not exist.
 #
 # The fix is not "name the stack less". It is that every surface which names it also names the
 # block that adjudicates it, so a reader who is about to refuse has somewhere to look first.
