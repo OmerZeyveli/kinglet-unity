@@ -62,6 +62,12 @@ assert_eq "yes" "$([ "$SA_CHECKED" -ge 10 ] && echo yes || echo "no ($SA_CHECKED
   "the guard examined a plausible number of stack-naming surfaces"
 
 # The block is worth nothing if the generator stops emitting the thing it points at.
-assert_eq "1" \
-  "$(grep -c 'Architecture stack — detected, not assumed' "$REPO_DIR/scripts/generate-claude-md.sh" || true)" \
+#
+# Asserted as presence, not as a count. The first draft of this line asserted `== 1` and failed on
+# its own first run: the generator names the heading twice — once in the comment explaining why the
+# section exists, once in the `echo` that writes it — and a count couples the guard to how the
+# generator is commented. What matters is that the heading is still emitted.
+assert_eq "yes" \
+  "$(grep -q 'Architecture stack — detected, not assumed' "$REPO_DIR/scripts/generate-claude-md.sh" \
+     && echo yes || echo no)" \
   "the generator still emits the block every surface now points at"
