@@ -368,6 +368,14 @@ across the whole surface set), `systematic-debugging` (investigate before propos
 original`. A proactive-suggestion layer was added to the command bodies so a command offers the
 logical next step rather than requiring the user to already know the chain.
 
+**A fourteenth skill, added afterward.** `subagent-driven-implementation` (adapted from Superpowers'
+`subagent-driven-development`) shipped in the `process-layer-2` wave that built the execution loop
+(`implementer-prompt.md`, `task-reviewer-prompt.md`, `re-review-prompt.md`) it documents. It is
+`/unity-workflow`'s alternative to inline execution. Current count: 33 surfaces — 8 agents, 11
+commands, 14 skills — the same 27 registered hooks and 6 rules unchanged. `docs/SKILL-CATALOG.md`,
+`README.md`, and `docs/ARCHITECTURE.md` carry the updated skill count; this section is left at its
+original 13/32 above because it is a record of what Task 4's cut produced, not a running total.
+
 ## The gap this plan corrected
 
 The original spec for this wave assumed `tests/test-skill-discovery.sh` would catch dangling

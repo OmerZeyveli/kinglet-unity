@@ -85,7 +85,7 @@ Installed into your project's `.claude/`:
 |---|---|---|
 | **Agents** | 8 | ECU-origin `unity-*` implementers: `unity-coder`, `unity-reviewer`, `unity-optimizer`, `unity-fixer`, `unity-prototyper`, `unity-scene-builder`, `unity-test-runner`, `unity-ui-builder` |
 | **Commands** | 11 | All `/unity-*` — see `.claude/commands/` |
-| **Skills** | 13 | Unity subsystems and cross-cutting process skills, flat at `.claude/skills/<name>/SKILL.md` |
+| **Skills** | 14 | Unity subsystems and cross-cutting process skills, flat at `.claude/skills/<name>/SKILL.md` |
 | **Hooks** | 27 registered | Prompt-time guards (some blocking, the rest advisory). 28 files on disk — `_lib.sh` is a shared library, not a hook |
 | **Rules** | 6 | 5 spine rules + `pc-console.md` |
 | **Templates** | 10 | C# templates for the MVS pattern (`Model`, `View`, `System`, `LifetimeScope`, `Message`, tests, …) at the repo-level `templates/`. `.claude/templates/` (design-doc templates) does not exist — that layer was removed 2026-08-03. |
@@ -161,9 +161,9 @@ guessing.
 Because this repo contains other people's code, it tracks whose:
 
 - **`provenance.tsv`** — one row per file: origin (`ecu` / `donchitos` / `original`), upstream
-  version and path, upstream checksum, and whether we modified it. Currently 526 rows: 101 from ECU
+  version and path, upstream checksum, and whether we modified it. Currently 536 rows: 101 from ECU
   (25 verbatim, 76 modified — nearly every surviving ECU surface has been rewritten for an agent
-  reader), 425 original, 0 from Donchitos (that layer was removed 2026-08-03; `provenance-skip.tsv`
+  reader), 0 from Donchitos (that layer was removed 2026-08-03; `provenance-skip.tsv`
   keeps the record).
 - **`provenance-skip.tsv`** — what we deliberately did *not* vendor, and why. This is what stops a
   future upstream sync from quietly reintroducing the mobile content.

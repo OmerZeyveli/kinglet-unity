@@ -11,9 +11,10 @@ description: "Universal Render Pipeline — URP asset configuration, renderer fe
 
 `.claude/rules/pc-console.md` binds what is affordable on PC/console — compute shaders and VFX Graph
 are fully available, MSAA/HDR/higher shadow-cascade counts/real-time shadows are budgeted rather than
-avoided, Forward+ is the default rendering path. This skill carries URP asset configuration and
-renderer-feature mechanics on top of that budget. Where this skill and `pc-console.md` disagree, the
-rule wins and this skill is what is out of date.
+avoided. This skill carries URP asset configuration and renderer-feature mechanics on top of that
+budget, including this skill's own opinion (not `pc-console.md`'s) that Forward+ is the default
+rendering path — see below. Where this skill and `pc-console.md` disagree, the rule wins and this
+skill is what is out of date.
 
 ## URP Pipeline Asset Configuration
 

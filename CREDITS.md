@@ -5,7 +5,7 @@ merely depend on them — it **contains** them. Attribution is therefore an obli
 
 `provenance.tsv` at the repo root records, for every tracked file, which upstream it came from,
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
-is asserted on trust. The 29/72 split below is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
+is asserted on trust. The 25/76 split below is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
 $1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 76 `modified` rows
 with `origin=ecu`.
 

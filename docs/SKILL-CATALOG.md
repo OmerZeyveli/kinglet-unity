@@ -6,7 +6,7 @@ One-page reference for all skills in Kinglet Pioneer.
 
 ## Overview
 
-13 skills, one directory each at `.claude/skills/<name>/SKILL.md`. The model selects one by reading
+14 skills, one directory each at `.claude/skills/<name>/SKILL.md`. The model selects one by reading
 its `description` and invoking it with the `Skill` tool. That is the whole mechanism — there is no
 glob matching, no preloading, and no always-apply.
 
@@ -14,7 +14,8 @@ The 2026-08-03 surface cut reduced the skill set from 39 (already flat, per the 
 13: a skill survives only if it does something the model cannot do unaided. Ten are ECU-origin,
 rewritten for an agent reader; three (`systematic-debugging`, `using-kinglet`,
 `verification-before-completion`) are original, written in the same wave to carry the process chain —
-see `provenance.tsv`.
+see `provenance.tsv`. A fourteenth, `subagent-driven-implementation`, was added afterward in the same
+wave that built the execution loop it documents — see below.
 
 **Correction (2026-08-03) — the important one.** Every skill in this catalog was once unreachable for
 the toolkit's entire life. They were filed under `core/`, `gameplay/`, `genre/`, `systems/` and
@@ -55,7 +56,7 @@ see `.claude/agents/unity-coder.md` for the shape.
 
 ---
 
-## Current Skills (13, flat)
+## Current Skills (14, flat)
 
 No categories — Claude Code only discovers `.claude/skills/<name>/SKILL.md`, one level deep, so the
 old `core/` / `gameplay/` / `genre/` / `systems/` / `third-party/` split shown in the corrections above
@@ -76,6 +77,7 @@ is history, not a live grouping. Loosely by subject, for a maintainer's orientat
 | `systematic-debugging` | For a bug whose cause is not yet known -- read the real console, reproduce, inspect the live API, then change one thing, before proposing a fix. **(process chain, Task 5)** |
 | `using-kinglet` | Session-start orientation -- which Kinglet surface handles which situation, and that a process surface is chosen before code is written. **(process chain, Task 5)** |
 | `verification-before-completion` | What counts as evidence a code change works, before reporting it done -- a claim without evidence is not a completion. **(process chain, Task 5)** |
+| `subagent-driven-implementation` | Executes a written plan task by task, a fresh implementer per task with a review gate before the next one starts -- offered by `/unity-workflow` as an alternative to inline execution. |
 
 ### Removed in the 2026-08-03 surface cut
 
