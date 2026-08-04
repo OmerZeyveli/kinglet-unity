@@ -110,7 +110,8 @@ SOFTWARE.
 
 Not vendored, not adapted — no license text follows. Named here because `CREDITS.md` in the toolkit
 repository opens "nothing here is asserted on trust," and three files there named Superpowers only as
-the competitor `unity-workflow`'s dispatch loop measures itself against. What was taken: the chain
+the competitor `unity-workflow`'s dispatch loop measures itself against, which was an incomplete
+record by that document's own standard. What was taken: the chain
 design (skills that name the next skill), the execution loop
 (`subagent-driven-implementation`, adapted from Superpowers' `subagent-driven-development`), and two
 skill names, `systematic-debugging` and `verification-before-completion`. What was not taken is the

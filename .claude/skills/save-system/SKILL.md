@@ -12,8 +12,14 @@ description: "Save/load patterns — ISaveable interface, JSON serialization, sa
 `.claude/rules/serialization.md` binds `[FormerlySerializedAs]` on any renamed serialized field and
 the Unity `== null` check for destroyed-object detection. This skill carries save-file format, slot
 management, scene persistence, and version migration on top of that binding — a save-data class is
-still Unity-serialized data and the rename rule applies to it the same as any other field. Where this
-skill and `serialization.md` disagree, the rule wins and this skill is what is out of date.
+still Unity-serialized data and the rename rule applies to it the same as any other field. Two more
+rules also bind here and previously went uncited: `architecture.md` §No Singletons (VContainer
+registration replaces every `static Instance` pattern) and `unity-specifics.md` §No Coroutines (UniTask
+replaces `StartCoroutine`/`IEnumerator`/`yield return` entirely). `SaveManager` below is written to
+those two rules — a plain C# class registered `Lifetime.Singleton` in a `LifetimeScope`, injected
+into the Views that call it, with the scene-load wait expressed as `UniTask` — not the
+`MonoBehaviour Instance` + coroutine shape this pattern carries in most Unity tutorials. Where this
+skill and any of the three rules disagree, the rule wins and this skill is what is out of date.
 
 Patterns for persisting game state to disk: an ISaveable interface for components that need persistence, a central SaveManager that orchestrates capture and restore, JSON serialization, save slot management, and preparation for cloud sync.
 
@@ -149,33 +155,31 @@ Using `Dictionary<string, string>` where values are JSON strings (rather than `D
 
 The central orchestrator. Finds all ISaveable components, serializes their state, and writes to disk.
 
+Plain C# System, not a `MonoBehaviour` singleton — registered once as `Lifetime.Singleton` in a
+`LifetimeScope` and injected into whatever View or System needs it. No `static Instance`, no
+`DontDestroyOnLoad`: a `Lifetime.Singleton` registration in the root scope already survives scene
+loads the same way, without the null-check-in-Awake dance a `static Instance` needs.
+
 ```csharp
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-public class SaveManager : MonoBehaviour
+public sealed class SaveManager
 {
-    public static SaveManager Instance { get; private set; }
-
-    [SerializeField] private int maxSaveSlots = 3;
-
-    private float _sessionStartTime;
+    private readonly int _maxSaveSlots;
+    private readonly float _sessionStartTime;
 
     public event Action OnSaveCompleted;
     public event Action OnLoadCompleted;
 
-    private void Awake()
+    public SaveManager(int maxSaveSlots = 3)
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
+        _maxSaveSlots = maxSaveSlots;
         _sessionStartTime = Time.time;
     }
 
@@ -254,17 +258,17 @@ public class SaveManager : MonoBehaviour
 
     // --- Load ---
 
-    public void Load(int slot)
+    public UniTask LoadAsync(int slot, CancellationToken token = default)
     {
-        LoadFromFile(GetSaveFilePath(slot));
+        return LoadFromFileAsync(GetSaveFilePath(slot), token);
     }
 
-    public void LoadAutoSave()
+    public UniTask LoadAutoSaveAsync(CancellationToken token = default)
     {
-        LoadFromFile(GetAutoSaveFilePath());
+        return LoadFromFileAsync(GetAutoSaveFilePath(), token);
     }
 
-    private void LoadFromFile(string path)
+    private async UniTask LoadFromFileAsync(string path, CancellationToken token)
     {
         if (!File.Exists(path))
         {
@@ -290,7 +294,7 @@ public class SaveManager : MonoBehaviour
         // Load the correct scene, then restore state
         if (SceneManager.GetActiveScene().name != saveData.sceneName)
         {
-            StartCoroutine(LoadSceneThenRestore(saveData));
+            await LoadSceneThenRestoreAsync(saveData, token);
         }
         else
         {
@@ -298,13 +302,12 @@ public class SaveManager : MonoBehaviour
         }
     }
 
-    private System.Collections.IEnumerator LoadSceneThenRestore(SaveData saveData)
+    private async UniTask LoadSceneThenRestoreAsync(SaveData saveData, CancellationToken token)
     {
-        var asyncLoad = SceneManager.LoadSceneAsync(saveData.sceneName);
-        yield return asyncLoad;
+        await SceneManager.LoadSceneAsync(saveData.sceneName).ToUniTask(cancellationToken: token);
 
         // Wait one frame for scene objects to initialize
-        yield return null;
+        await UniTask.Yield(token);
 
         RestoreState(saveData);
     }
@@ -380,6 +383,17 @@ public class SaveManager : MonoBehaviour
 }
 ```
 
+Registered once, in the scope that should own it for the session (usually `RootLifetimeScope` — save
+data outlives any single scene):
+
+```csharp
+protected override void Configure(IContainerBuilder builder)
+{
+    builder.Register<SaveManager>(Lifetime.Singleton);
+    builder.Register<AutoSaveSystem>(Lifetime.Singleton);
+}
+```
+
 ### Alternative: ISaveable with JSON String
 
 If you prefer to avoid the `object` cast pattern, have `RestoreState` accept a JSON string directly:
@@ -441,12 +455,21 @@ This avoids boxing and unboxing, making the type contract clearer.
 using UnityEngine;
 using TMPro;
 
-public class SaveSlotUI : MonoBehaviour
+// View — SaveManager is injected, never reached through a static Instance.
+public sealed class SaveSlotUI : MonoBehaviour
 {
-    [SerializeField] private int slotIndex;
-    [SerializeField] private TextMeshProUGUI slotInfoText;
-    [SerializeField] private GameObject emptyLabel;
-    [SerializeField] private GameObject dataPanel;
+    [SerializeField] private int _slotIndex;
+    [SerializeField] private TextMeshProUGUI _slotInfoText;
+    [SerializeField] private GameObject _emptyLabel;
+    [SerializeField] private GameObject _dataPanel;
+
+    private SaveManager _saveManager;
+
+    [Inject]
+    public void Construct(SaveManager saveManager)
+    {
+        _saveManager = saveManager;
+    }
 
     private void OnEnable()
     {
@@ -455,24 +478,24 @@ public class SaveSlotUI : MonoBehaviour
 
     public void RefreshDisplay()
     {
-        bool exists = SaveManager.Instance.SaveExists(slotIndex);
-        emptyLabel.SetActive(!exists);
-        dataPanel.SetActive(exists);
+        bool exists = _saveManager.SaveExists(_slotIndex);
+        _emptyLabel.SetActive(!exists);
+        _dataPanel.SetActive(exists);
 
         if (exists)
         {
-            var metadata = SaveManager.Instance.GetSaveMetadata(slotIndex);
+            var metadata = _saveManager.GetSaveMetadata(_slotIndex);
             if (metadata != null)
             {
                 var time = System.DateTime.Parse(metadata.timestamp);
-                slotInfoText.text = $"{metadata.sceneName}\n{time:yyyy-MM-dd HH:mm}";
+                _slotInfoText.text = $"{metadata.sceneName}\n{time:yyyy-MM-dd HH:mm}";
             }
         }
     }
 
-    public void OnSaveClicked() => SaveManager.Instance.Save(slotIndex);
-    public void OnLoadClicked() => SaveManager.Instance.Load(slotIndex);
-    public void OnDeleteClicked() => SaveManager.Instance.DeleteSave(slotIndex);
+    public void OnSaveClicked() => _saveManager.Save(_slotIndex);
+    public void OnLoadClicked() => _saveManager.LoadAsync(_slotIndex, this.GetCancellationTokenOnDestroy()).Forget();
+    public void OnDeleteClicked() => _saveManager.DeleteSave(_slotIndex);
 }
 ```
 
@@ -483,20 +506,29 @@ public class SaveSlotUI : MonoBehaviour
 Trigger auto-save on meaningful events rather than a fixed timer. This avoids saving in the middle of combat or dialogue.
 
 ```csharp
-public class AutoSaveManager : MonoBehaviour
+// System — owns the auto-save cadence, calls the injected SaveManager. Not a MonoBehaviour: nothing
+// here needs a scene presence, and a plain class registered Lifetime.Singleton is the whole pattern.
+public sealed class AutoSaveSystem
 {
-    [SerializeField] private float minTimeBetweenAutoSaves = 60f;
+    private readonly SaveManager _saveManager;
+    private readonly float _minTimeBetweenAutoSaves;
 
     private float _lastAutoSaveTime;
+
+    public AutoSaveSystem(SaveManager saveManager, float minTimeBetweenAutoSaves = 60f)
+    {
+        _saveManager = saveManager;
+        _minTimeBetweenAutoSaves = minTimeBetweenAutoSaves;
+    }
 
     /// <summary>
     /// Call from checkpoint triggers, level transitions, etc.
     /// </summary>
     public void TriggerAutoSave()
     {
-        if (Time.time - _lastAutoSaveTime < minTimeBetweenAutoSaves) return;
+        if (Time.time - _lastAutoSaveTime < _minTimeBetweenAutoSaves) return;
 
-        SaveManager.Instance.AutoSave();
+        _saveManager.AutoSave();
         _lastAutoSaveTime = Time.time;
     }
 }

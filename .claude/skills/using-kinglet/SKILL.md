@@ -32,7 +32,7 @@ A question that the rules already answer needs no surface. Answer it.
 
 `deep-interview`, `systematic-debugging`, and `verification-before-completion` each carry a
 "the thought that means you are about to skip this" section — read it when the situation feels
-like an exception, because that feeling is what it names (field note §87).
+like an exception, because that feeling is what it names.
 
 ## Offer the next step
 

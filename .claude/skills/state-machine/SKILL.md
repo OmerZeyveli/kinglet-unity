@@ -13,7 +13,10 @@ No rule in `.claude/rules/` covers state machine design. `architecture.md` binds
 MessagePipe — a `StateMachine<T>` and its states still have to live inside that shape (e.g. a state
 that mutates a Model directly rather than through a System is an MVS violation the rules would catch
 elsewhere), but which state pattern to use, when to go hierarchical, and how to shape `IState` are not
-addressed by any rule. It is yours to judge.
+addressed by any rule. It is yours to judge. One binding that IS addressed: `architecture.md` §No
+Singletons forbids exactly the `MonoBehaviour` + `static Instance` shape a game-flow owner is usually
+written in, so the Game State Management example below owns its `StateMachine<T>` as a VContainer-
+registered System instead.
 
 A generic, reusable finite state machine for Unity. Covers player states, enemy AI, game flow (menu/gameplay/pause), hierarchical FSMs, and ScriptableObject-driven states for designer configuration.
 
@@ -331,34 +334,34 @@ MainMenu → Loading → Gameplay → Pause → GameOver
                        +----------+  (resume)
 ```
 
+Named `GameFlowSystem`, not `GameManager`, deliberately — `architecture.md`'s own §No Singletons names
+`GameManager : MonoBehaviour` with `static Instance` as its BAD example. This is the same job (own the
+high-level state machine, expose it to whatever needs to trigger a transition) done the way that
+section's GOOD example does it: a plain C# System, registered `Lifetime.Singleton`, ticked via a
+VContainer entry point instead of its own `Update`.
+
 ```csharp
-public class GameManager : MonoBehaviour
+using VContainer.Unity;
+
+public sealed class GameFlowSystem : IStartable, ITickable
 {
-    public static GameManager Instance { get; private set; }
+    private readonly StateMachine<GameFlowSystem> _stateMachine;
 
-    private StateMachine<GameManager> _stateMachine;
-
-    private void Awake()
+    public GameFlowSystem()
     {
-        Instance = this;
-        DontDestroyOnLoad(gameObject);
-
-        _stateMachine = new StateMachine<GameManager>(this);
+        _stateMachine = new StateMachine<GameFlowSystem>(this);
         _stateMachine.AddState(new MainMenuState(this, _stateMachine));
         _stateMachine.AddState(new LoadingState(this, _stateMachine));
         _stateMachine.AddState(new GameplayState(this, _stateMachine));
         _stateMachine.AddState(new PauseState(this, _stateMachine));
         _stateMachine.AddState(new GameOverState(this, _stateMachine));
-
-        _stateMachine.ChangeState<MainMenuState>();
     }
 
-    private void Update()
-    {
-        _stateMachine.Update();
-    }
+    public void Start() => _stateMachine.ChangeState<MainMenuState>();
 
-    // Convenience methods for external callers
+    public void Tick() => _stateMachine.Update();
+
+    // Convenience methods for external callers (Views, via constructor/Construct injection)
     public void StartGame() => _stateMachine.ChangeState<LoadingState>();
     public void PauseGame() => _stateMachine.ChangeState<PauseState>();
     public void ResumeGame() => _stateMachine.RevertToPreviousState();
@@ -367,15 +370,26 @@ public class GameManager : MonoBehaviour
 }
 ```
 
+```csharp
+protected override void Configure(IContainerBuilder builder)
+{
+    builder.RegisterEntryPoint<GameFlowSystem>(Lifetime.Singleton).AsSelf();
+}
+```
+
+`GameFlowSystem` is registered once in `RootLifetimeScope` — game flow spans scenes by construction
+(a `Lifetime.Singleton` registration in the root scope), so nothing here needs `DontDestroyOnLoad` or
+a manual duplicate-instance guard.
+
 ### Pause State Example
 
 ```csharp
 public class PauseState : IState
 {
-    private GameManager _owner;
-    private StateMachine<GameManager> _sm;
+    private GameFlowSystem _owner;
+    private StateMachine<GameFlowSystem> _sm;
 
-    public PauseState(GameManager owner, StateMachine<GameManager> sm)
+    public PauseState(GameFlowSystem owner, StateMachine<GameFlowSystem> sm)
     {
         _owner = owner;
         _sm = sm;

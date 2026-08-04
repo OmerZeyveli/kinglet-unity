@@ -379,8 +379,10 @@ if [ "$ORPHAN_COUNT" -gt 0 ]; then
     [ -n "$rel" ] || continue
     rm -f "$PROJECT_DIR/$rel" && REMOVED=$((REMOVED + 1))
   done <<< "$ORPHANS"
-  # Skill directories are one level and hold a single SKILL.md; once that is gone the directory is
-  # an empty shell that still reads as a skill to anyone listing the tree.
+  # Skill directories are one level deep, but not always a single file — subagent-driven-implementation
+  # ships four sibling prompt templates alongside SKILL.md. Either way, once every file this run
+  # tracked is gone the directory is an empty shell that still reads as a skill to anyone listing the
+  # tree.
   find "$CLAUDE_DIR" -mindepth 1 -type d -empty -delete 2>/dev/null || true
   ok "Removed $REMOVED file(s) no longer in the payload."
 fi
