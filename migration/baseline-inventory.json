@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "4fb44935952ec3e07f917cf2442d3c5f922074e2",
+  "source_commit": "dfa868433376c7327443d2b9a8411f8b69d0cef1",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
-    "expected_count": 78,
+    "expected_count": 79,
     "files": [
       {
         "path": ".claude/NOTICE.md",
@@ -338,7 +338,7 @@
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
-        "sha256": "0e32d40ee173afa7e2442a845a315ac283cce352ecd6af0d1e7345b8dbd1cef1",
+        "sha256": "cb97db0bb9dd20957a54630bc54b93ed1168dbd9d15a308aa3bc881aca4a783a",
         "git_mode": "100644"
       },
       {
@@ -374,6 +374,11 @@
       {
         "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
         "sha256": "4e076050ad81ffe29782a2504563866d206932753f1c17ceab24147a3487a653",
+        "git_mode": "100644"
+      },
+      {
+        "path": ".claude/skills/unity-planning/SKILL.md",
+        "sha256": "74add9df0e826ab79f11d965734f9277073c2354eb43e2ef48759767ff45fc52",
         "git_mode": "100644"
       },
       {
@@ -508,7 +513,7 @@
     },
     "skills": {
       "description": "Tracked SKILL.md files under .claude/skills/.",
-      "expected_count": 15,
+      "expected_count": 16,
       "files": [
         {
           "path": ".claude/skills/addressables/SKILL.md",
@@ -552,7 +557,7 @@
         },
         {
           "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
-          "sha256": "0e32d40ee173afa7e2442a845a315ac283cce352ecd6af0d1e7345b8dbd1cef1",
+          "sha256": "cb97db0bb9dd20957a54630bc54b93ed1168dbd9d15a308aa3bc881aca4a783a",
           "git_mode": "100644"
         },
         {
@@ -568,6 +573,11 @@
         {
           "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
           "sha256": "4e076050ad81ffe29782a2504563866d206932753f1c17ceab24147a3487a653",
+          "git_mode": "100644"
+        },
+        {
+          "path": ".claude/skills/unity-planning/SKILL.md",
+          "sha256": "74add9df0e826ab79f11d965734f9277073c2354eb43e2ef48759767ff45fc52",
           "git_mode": "100644"
         },
         {
