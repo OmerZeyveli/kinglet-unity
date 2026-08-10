@@ -11,12 +11,20 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Task 1 is done and closed**, commits `0b67c49..a7c0d7f`, after four fix rounds. Nothing is
-currently dispatched. **Task 2 (`unity-execution`) is next.**
+**Tasks 1 and 2 are done and closed.** Nothing is currently dispatched. **Task 3 (`unity-planning`)
+is next**, and its brief transcribes `/unity-workflow` Phase 1a — **sweep that text against
+`45eada9` before recording it as original**, because Task 2 got exactly that wrong.
 
-Suite is at **303 passing**, `provenance OK`, 94 `rule=absent` enforced. Reports:
-`.superpowers/sdd/2026-08-10-process-chain/task-1-report.md` (rounds 0–3) and
-`task-1-round4-report.md` (round 4, fresh implementer).
+Suite is at **327 passing**, `provenance OK`, 94 `rule=absent` enforced, 542 manifest rows.
+Reports under `.superpowers/sdd/2026-08-10-process-chain/`: `task-1-report.md` (rounds 0–3),
+`task-1-round4-report.md`, `task-2-report.md` (task + 2 fix rounds).
+
+**The cut-criterion gate on `unity-execution` was answered "ship it"**, and the argument is on the
+record: the Deslop Pass's two restraining rules — a scope boundary and a default — are what an
+unaided cleanup lacks, and folding into `subagent-driven-implementation` would force that skill's
+`description:` generic, weakening selection for both branches. Review upheld the conclusion and
+corrected the reasoning: the load-bearing content is **ECU's, transplanted**, not Kinglet's. The
+surface still earns its place — the criterion asks what a surface *does*, not who wrote the words.
 
 Read, before dispatching Task 2, in this order: *Standing facts*, *Interfaces produced so far*, and
 *Ask the shape question early* — the last is why Task 1 cost four rounds and is the cheapest thing
@@ -67,6 +75,49 @@ Copy this section into every dispatch. A fresh subagent inherits none of it.
 - **Every new tracked file needs a `provenance.tsv` row** or `check-provenance.sh` fails it as an
   orphan. A row whose file does not exist fails as a ghost.
 - **Never hardcode a derived count** in `CLAUDE.md`, a test, or prose. Counts have gone stale twice.
+- **Adding a vendored row has two gate-breaking side effects the plan does not mention. Both recur in
+  Tasks 3 and 4.** Reported by Task 2's implementer; verified by the controller only to the extent
+  that Task 2's suite is green with the fixes in place.
+  1. **`tests/test-derived-counts.sh` reddens.** `CREDITS.md` and `README.md` quoted an
+     **ECU-scoped** vendored split in phrasing the guard reads as **repo-wide** — the two were equal
+     only while ECU was the only upstream, and `origin=superpowers` ends that. Expect to update the
+     wording, not the number.
+  2. **`baseline-regenerate` updates `migration/baseline-inventory.json` but not
+     `tests/kinglet/test_baseline_inventory.py`'s hand-maintained constants** — three assertions go
+     red while the tool prints success. Fold the constants into the baseline commit; they are one
+     logical change with the JSON.
+- **Before recording transcribed text as original, sweep every line against the vendor commit.**
+  Task 2 asserted the Deslop Pass was Kinglet-original; it is **ECU v1.5.0 verbatim**, and so are the
+  Final Summary, the `max 3 iterations` bound and two verify-loop steps — 32 content lines in three
+  blocks. The brief said it, the implementer expanded it, and neither asked. `check-provenance.sh`
+  cannot catch this: one origin per row is the schema, so the `note` column is the only place a
+  second upstream can live.
+
+  The method, and it is one command rather than a judgement: dump the vendor commit
+  (`git show 45eada9:<path>`) and test each non-blank line with `grep -qxF`. It turned two rounds of
+  clause-guessing into a measured fact. **Tasks 3 and 4 both transcribe from
+  `.claude/commands/unity-workflow.md` and the provenance of what they carry is unknown until swept.**
+
+  Record a second upstream in this fixed, greppable form:
+  `carries verbatim ecu 1.5.0 text from <path>: <what>`. It is convention, not enforced — nothing in
+  `tests/` or `scripts/` reads it.
+
+- **Do not write a causal claim about a shell option, runner semantic or tool flag you have not
+  executed in this session.** Two mechanism claims were corrected in Task 2, both wrong, and neither
+  was a knowledge failure — both generalised from a *neighbouring* fact with a shell one keystroke
+  away, and both landed in a **comment**, the cheapest place to write one and the least likely to be
+  challenged because nothing executes a comment.
+
+  The implementer's own trigger, worth reusing verbatim: *"Am I naming a shell option, runner
+  semantic, or tool flag whose behaviour I have not executed in this session?"* And its remedy,
+  applied rather than proposed: **paste the probe transcript into the comment as its evidence** — you
+  cannot cite a transcript you never ran without noticing you are inventing one, and it makes the
+  omission greppable.
+
+- **The plan's "add the provenance row, then regenerate the baseline" ordering is circular** and Task
+  2 worked around it: the test reads `git ls-files` while the regenerator reads `git ls-tree`, so
+  neither can be satisfied first in the working tree. Use the repo's established pattern —
+  **commit, regenerate, commit** — rather than trying to satisfy both before the first commit.
 - **Baseline regenerator:** `python3 -m tools.kinglet_build baseline-regenerate --anchor … ` — the
   entry point is the **package**; `python3 -m tools.kinglet_build.cli` silently no-ops with exit 0.
   Run `--dry-run` first, **use the tool's numbers rather than the plan's estimate**, and report a
@@ -112,6 +163,19 @@ State these in later dispatches rather than letting a brief guess.
 - **`.claude/skills/unity-brainstorming/visual-companion.md` is already a `rule=absent` path.** It is
   trivially satisfied until Task 4 creates that directory, and becomes a live prohibition at that
   point. Task 4 needs to do nothing about it; the row prohibits the file, not the directory.
+**From Task 2** (commits `4fb4493`, `68a5b77`; review in flight at the time of writing):
+
+- **`.claude/skills/unity-execution/SKILL.md` exists.** It is the inline branch of the fork. Task 3's
+  `unity-planning` names it by that path; do not invent a different one.
+- **It already names `unity-brainstorming` and `unity-planning` by path** in its Handoff section —
+  forward references to Tasks 4 and 3. No guard is red on them today, which is itself worth noting:
+  **nothing currently catches a dangling forward reference**, and Task 8's step 2 is where that gets
+  checked.
+- **The Deslop Pass now lives there, transcribed verbatim** — five categories, two restraining rules.
+  Its guard in `tests/test-surface-references.sh` matches **capital-D** `Do not touch code that
+  existed before`. The plan's own needle was lowercase, which would have made the guard pass against
+  a paraphrase and fail against the verbatim transcription the plan required.
+
 - **`tests/test-provenance-origins.sh` exists and is self-contained** — own helpers, own
   `set -euo pipefail`, valid to run standalone. Tasks 5 and 7 extend it. It uses
   `${BASH_SOURCE[0]}`, not `$0`: inside `( source "$file" )` a test file sees the *sourcing* shell's
@@ -123,7 +187,7 @@ State these in later dispatches rather than letting a brief guess.
 | # | Task | Status | Commits | Notes |
 |---|---|---|---|---|
 | 1 | Provenance accepts a `superpowers` origin; two refusals recorded | **done** | `0b67c49..a7c0d7f` | 4 fix rounds. Spec ✅, Quality Approved, 0 Critical. Rounds 1–3 with the original implementer, round 4 with a fresh one per the loop's rule; round 4 found the guard's **shape** was wrong, which retroactively explains rounds 2–3 as symptom-patching |
-| 2 | `unity-execution` — inline branch, Deslop Pass, cut-criterion gate | **pending** | — | carries an explicit stop-and-escalate gate |
+| 2 | `unity-execution` — inline branch, Deslop Pass, cut-criterion gate | **done** | `4fb4493..04e1d96` | 2 fix rounds. Spec ✅, 1 Critical + 2 Important + 3 Minor, all ADDRESSED. **The cut-criterion gate was answered "ship it" with a concrete defence** — see below |
 | 3 | `unity-planning` — plan-writing as a skill, carrying the fork | **pending** | — | |
 | 4 | `unity-brainstorming` — rename + the design half | **pending** | — | path-set change: rename = removal + addition |
 | 5 | Delete the two sequencer commands, repair 22 references | **pending** | — | `generate-claude-md.sh` ships names into user projects |
@@ -191,6 +255,54 @@ maintenance, which is exactly the property round 3 lacked, one contradicts a com
 it, and `run-tests.sh` separately flags a file that exits non-zero without reporting.
 
 ## Deferred and parked findings
+
+### Six from Task 2, deferred with rulings
+
+1. **Nine unguarded ECU-verbatim lines in `unity-execution/SKILL.md`** — `Deslop rules:`,
+   `Present a complete summary to the user:`, five Final Summary sample bullets, two fences. Re-review
+   demonstrated the two-edit path end to end: delete them, run the **mandatory** `baseline-regenerate`,
+   and the suite reads `327 passed, exit 0` — the total does not even move, because no assertion was
+   removed, only content no assertion named.
+
+   **Deferred deliberately.** The guard covers every load-bearing instruction: five categories with
+   their bodies, all five rules, the max-3 bound, all seven summary headings. What is exposed is
+   template scaffolding, and the two-edit path runs through a regeneration that is itself reviewed.
+   **The method to close it is recorded below and is the transferable part.**
+
+2. **`tests/` sits outside every checksum and nothing asserts the suite total.** The baseline covers
+   only `.claude/` and `templates/`; `CLAUDE.md` forbids hardcoding the total. So shortening a
+   needle list is silent — measured: blanking one needle takes the file from 29 passes to 28 with no
+   failure. Structural and pre-existing; belongs in the hooks pass, not here.
+
+3. **The `carries verbatim ecu …` note form is unenforced** — convention only. Worth a guard if it is
+   to be relied on, since Tasks 3 and 4 are told to follow it.
+
+4. **`SKILL.md:49`** — the verify loop's `unity-reviewer` step is the only one of four with no needle.
+   Kinglet-rewritten, so not an ECU-loss vector, but it is the step that makes the loop a review.
+
+5. **`CREDITS.md` now contradicts itself internally**, not merely upstream: §4 still says Superpowers
+   is *"influence, not a license obligation… nothing is vendored"* while the same commit records the
+   first adapted `origin=superpowers` row. **Task 7 must be given this sharper version** — it is
+   scheduled to fix the staleness, not the self-contradiction.
+
+6. **Nothing catches a dangling forward reference.** `unity-execution` names `unity-brainstorming` and
+   `unity-planning` by path; neither exists yet. `test-skill-discovery.sh` scans only
+   `.claude/agents` and `.claude/commands`; `test-surface-references.sh` scans skill bodies only for
+   `/unity-*` **command** references. If Tasks 3 and 4 never landed, **the suite would stay green and
+   a user would be handed two paths resolving to nothing, with no error of any kind** — the exact
+   silent-load failure that guard exists for, in the one direction it does not cover. Task 8 step 2
+   is where this gets checked; consider whether it should become a permanent guard.
+
+### The method that found what the deletion proof could not
+
+Task 2's implementer proved its guard by deleting each guarded string and confirming the matching
+assertion failed. That proves **soundness** — every needle is load-bearing, none satisfied by other
+text — and re-review reproduced it independently.
+
+It cannot prove **completeness**, because its input set is the guard's own list: it can never notice a
+line that has no needle. The reverse sweep is what finds those — **delete every line of the file in
+turn and ask which deletions are silent.** That is how the nine unguarded lines surfaced, and it is
+the cheaper habit to carry into Tasks 3–8.
 
 ### Three from Task 1, deferred with rulings — none blocks the wave
 
