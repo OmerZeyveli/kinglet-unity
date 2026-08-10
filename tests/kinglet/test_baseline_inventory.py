@@ -20,13 +20,13 @@ BASELINE_PATH = REPOSITORY_ROOT / "migration" / "baseline-inventory.json"
 EXPECTED_COUNTS = {
     "agents": 8,
     "commands": 11,
-    "skills": 14,
+    "skills": 15,
     "hooks": 27,
     "rules": 6,
     "claude_templates": 0,
     "code_templates": 10,
 }
-FULL_CLAUDE_TREE_COUNT = 77
+FULL_CLAUDE_TREE_COUNT = 78
 OMITTED_FROM_SEVEN_CATEGORIES = {
     ".claude/NOTICE.md",
     ".claude/UPSTREAM",

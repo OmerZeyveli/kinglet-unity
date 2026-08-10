@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "bd6d06d38177e601584caef51c869a2689315afb",
+  "source_commit": "4fb44935952ec3e07f917cf2442d3c5f922074e2",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
-    "expected_count": 77,
+    "expected_count": 78,
     "files": [
       {
         "path": ".claude/NOTICE.md",
@@ -367,6 +367,11 @@
         "git_mode": "100644"
       },
       {
+        "path": ".claude/skills/unity-execution/SKILL.md",
+        "sha256": "e77f52511725e0b28462770e0884704c6dc287f5a40d1045e67d0ad2fc83aacc",
+        "git_mode": "100644"
+      },
+      {
         "path": ".claude/skills/unity-mcp-patterns/SKILL.md",
         "sha256": "4e076050ad81ffe29782a2504563866d206932753f1c17ceab24147a3487a653",
         "git_mode": "100644"
@@ -503,7 +508,7 @@
     },
     "skills": {
       "description": "Tracked SKILL.md files under .claude/skills/.",
-      "expected_count": 14,
+      "expected_count": 15,
       "files": [
         {
           "path": ".claude/skills/addressables/SKILL.md",
@@ -553,6 +558,11 @@
         {
           "path": ".claude/skills/systematic-debugging/SKILL.md",
           "sha256": "00848d8743687cf1001242224e44407dbb128b99d592007d68fa520257ac4fe8",
+          "git_mode": "100644"
+        },
+        {
+          "path": ".claude/skills/unity-execution/SKILL.md",
+          "sha256": "e77f52511725e0b28462770e0884704c6dc287f5a40d1045e67d0ad2fc83aacc",
           "git_mode": "100644"
         },
         {
