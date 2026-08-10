@@ -1,6 +1,6 @@
 ---
 name: unity-planning
-description: "Use after a design decision exists — from unity-brainstorming or a written spec — to turn it into a task-by-task implementation plan with its own test cycle per task. Writes the plan to docs/features/<slug>/plan.md and chooses how it will be executed."
+description: "Use after a design decision exists — from unity-brainstorming, a written spec, or a plan path handed over to be adopted — to turn it into a task-by-task implementation plan with its own test cycle per task. Writes the plan to docs/features/<slug>/plan.md. Handed a plan path, come here first even though the plan is already written: this is where the execution mode is chosen and recorded, and going straight to an executor skips that choice."
 ---
 
 # Writing the Plan
@@ -93,10 +93,6 @@ public void SetMoveInput_WithRightVector_MovesPositiveX() { }
 
 Steps use checkbox (`- [ ]`) syntax so an executor can track them.
 
-**Global constraints, once.** Give the plan a `## Global Constraints` section holding the spec's
-project-wide requirements — version floors, dependency limits, naming rules, platform targets — one
-line each, values copied verbatim from the spec. Every task's requirements implicitly include it.
-
 **No placeholders.** These are plan failures, not shortcuts. Never write them:
 
 - "TBD", "TODO", "implement later", "fill in details"
@@ -135,17 +131,39 @@ that compiles for nobody else. Say so in the step that creates the file.
 Save it to `docs/features/<slug>/plan.md` — beside the `design.md` this came from, and where the
 ledger will land. One directory holds what was decided, what was planned and where the work stopped.
 
-Include this line verbatim under the title:
+**Every plan starts with this header, in this order:**
 
-```
+````markdown
+# [Feature Name] Implementation Plan
+
 **For agentic workers:** REQUIRED SUB-SKILL — execute this plan task by task with
 `subagent-driven-implementation` (recommended) or `unity-execution` (inline). Do not
 implement directly from this file.
-```
 
-It is fixed text and a guard tests the same string, so do not improve the wording. It is also the
-quietest device in this chain and the most effective one: the plan file names its own next skill, so
-a session handed nothing but a path is routed correctly without consulting any table.
+**Goal:** [one sentence describing what this builds]
+
+**Architecture:** [2-3 sentences on the approach, in Model/View/System terms, naming which
+rules bind by reference to `CLAUDE.md`'s generated block — that is detected per project, not
+assumed]
+
+**Tech Stack:** [the packages and libraries this depends on]
+
+## Global Constraints
+
+[The spec's project-wide requirements — version floors, dependency limits, naming and copy
+rules, platform targets — one line each, values copied **verbatim** from the spec. Every
+task's requirements implicitly include this section, so it is written once here rather than
+repeated per task.]
+
+---
+````
+
+The handoff line is fixed text, character for character, and
+`tests/test-workflow-plan-input.sh` compares the whole block against a literal — reword it and the
+suite goes red. That is deliberate: it is the quietest device in this chain and the most effective
+one, because the plan file names its own required next skill, so a session handed nothing but a path
+is routed correctly without consulting any table. A paraphrase still reads fine to a human and stops
+being a match for anything.
 
 Commit the plan. An uncommitted artifact is lost at the next checkout, which is the failure this
 whole chain exists to repair. Commit **the plan path only** — never `git add -A`, because in a Unity
@@ -174,5 +192,16 @@ a recorded decision is not reopened. On a fresh run, state both routes and choos
 1. **Subagent-driven** — a fresh implementer per task, a review after each, a bounded fix loop, and
    one whole-branch review at the end. Loads `.claude/skills/subagent-driven-implementation/SKILL.md`.
 2. **Inline** — execute here with checkpoints. Loads `.claude/skills/unity-execution/SKILL.md`.
+
+**Then write the choice down, before the first task starts.** The ledger's second line is:
+
+```
+**Execution mode:** subagent-driven
+```
+
+— or `inline`. That line is the whole of what "do not ask" reads, and a rule that reads a field
+nobody writes is a rule that asks every time. Both branches below create the ledger and both write
+this line; a resuming controller that finds it proceeds in that mode without reopening the question,
+and one that finds a ledger without it knows the run predates the field and asks once.
 
 Invoke no other skill. One of those two is the next step.

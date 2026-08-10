@@ -11,7 +11,13 @@ few small ones, and the context that wrote the plan is the right context to writ
 substantial task, or when a single task is large enough that its own context would crowd out the
 review of it.
 
-**If the ledger already records a mode, do not ask** — a recorded decision is not reopened.
+**If the ledger already records a mode, do not ask** — a recorded decision is not reopened. This
+branch keeps no per-task ledger, but it still writes the one line that rule reads: create
+`docs/features/<slug>/ledger.md` (or `<plan-slug>-ledger.md` beside a plan that lives elsewhere) with
+the plan's path on line one and `**Execution mode:** inline` on line two, before starting. Two lines,
+written once. Without them, "do not ask" reads a field nobody wrote, and a session resuming a
+half-finished inline run asks the question again — which after `/unity-workflow` is gone is the only
+way back into that run.
 
 The two branches differ in where the review comes from, not in whether there is one. The subagent
 loop gets a fresh reader per task. This branch does not, which is why the verify loop and the

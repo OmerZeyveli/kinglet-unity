@@ -22,16 +22,20 @@ built on Kinglet's own surfaces and carries rules a generic loop does not need.
 
 ## The loop
 
-**Setup.** Create a ledger file. The ledger is `docs/features/<slug>/ledger.md`, beside the
-`design.md` and `plan.md` this work came from. One directory holds what was decided, what was
-planned, and where the work stopped; a later session opens it and reads the three in order. When the
-plan itself lives somewhere else — a provider's plan under `docs/superpowers/plans/`, for instance —
-the ledger goes beside that plan as `<plan-slug>-ledger.md`, because the pairing with the plan is
-what makes it findable.
+**Setup.** Create a ledger file. **A ledger lives beside its plan** — the pairing is what makes it
+findable, and every address below is that one rule applied. A plan written by `unity-planning` sits
+at `docs/features/<slug>/plan.md`, so its ledger is `docs/features/<slug>/ledger.md`: the third file
+beside the `design.md` and `plan.md` this work came from, so one directory holds what was decided,
+what was planned, and where the work stopped, and a later session opens it and reads the three in
+order. A plan that lives anywhere else — a provider's plan under `docs/superpowers/plans/`, say —
+takes `<plan-slug>-ledger.md` next to it, by the same rule.
 
-Line one is the plan's path. Add one open item per task in the plan, in order. Record the base commit
-the branch started from — the whole-branch review needs a range to diff against, and "since we
-started" is not a range once the session that remembers "started" is gone.
+Line one is the plan's path. **Line two is the execution mode**, written exactly as
+`**Execution mode:** subagent-driven`, because this run took that branch of `unity-planning`'s fork.
+It is what makes the choice survive the session that made it: a controller resuming this ledger reads
+that line and does not reopen the decision. Add one open item per task in the plan, in order. Record
+the base commit the branch started from — the whole-branch review needs a range to diff against, and
+"since we started" is not a range once the session that remembers "started" is gone.
 
 Then open two sections the ledger keeps for the whole run:
 
