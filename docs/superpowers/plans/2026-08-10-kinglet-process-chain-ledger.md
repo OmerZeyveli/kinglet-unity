@@ -11,14 +11,16 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Task 1 is in fix round 2 of 5.** Its review came back **Spec ✅ / Quality Approved**, zero Critical,
-with 1 Important and 5 Minor. The controller took all six in one round rather than deferring the
-Minors: every one is in the two files the task touched and five are in the silent-failure family.
-Nothing else is dispatched. Tasks 2–8 are pending.
+**Task 1 is done and closed**, commits `0b67c49..a7c0d7f`, after four fix rounds. Nothing is
+currently dispatched. **Task 2 (`unity-execution`) is next.**
 
-Task 1's commit is `61e0dcb` (amended from `70fdeb4` before any push, self-disclosed). The round-2
-fix will amend again or add a commit — read the report at
-`.superpowers/sdd/2026-08-10-process-chain/task-1-report.md` for which.
+Suite is at **303 passing**, `provenance OK`, 94 `rule=absent` enforced. Reports:
+`.superpowers/sdd/2026-08-10-process-chain/task-1-report.md` (rounds 0–3) and
+`task-1-round4-report.md` (round 4, fresh implementer).
+
+Read, before dispatching Task 2, in this order: *Standing facts*, *Interfaces produced so far*, and
+*Ask the shape question early* — the last is why Task 1 cost four rounds and is the cheapest thing
+here to reuse.
 
 ## Controller decisions, made at setup
 
@@ -77,6 +79,17 @@ Copy this section into every dispatch. A fresh subagent inherits none of it.
 - **One implementer at a time.** The Unity rationale does not apply here, but the shared working tree
   does: this repo has already had a controller's untracked probe file mistaken for a concurrent
   agent's leftovers.
+- **Strip ANSI before counting suite headers.** `bash tests/run-tests.sh` **colours** the
+  `--- test-*.sh ---` header, so the escape sequence sits between the line start and the text and
+  `grep -c '^--- test-.*\.sh ---'` on raw output returns **0** on a completely healthy suite.
+  Measured in Task 1 round 4; confirmed by the controller (raw 0, stripped 30, files 30). Use
+  `sed 's/\x1b\[[0-9;]*m//g'` first.
+
+  **This is worse than a broken check.** The count exists to catch the runner dying and reporting
+  green — which has happened here, with 7 of 8 files never running. The unstripped form returns the
+  exact signal of that catastrophe on every healthy run, so anyone following the instruction
+  literally either panics or "fixes" something that was never wrong. `CLAUDE.md` carries the same
+  wording; **Task 8 Step 0 now corrects it there**, and the plan's own Task 8 Step 3 has been fixed.
 
 ## Interfaces produced so far
 
@@ -109,7 +122,7 @@ State these in later dispatches rather than letting a brief guess.
 
 | # | Task | Status | Commits | Notes |
 |---|---|---|---|---|
-| 1 | Provenance accepts a `superpowers` origin; two refusals recorded | **fix round 2/5** | `61e0dcb` (+ fix) | Spec ✅, Approved, 0 Critical. Two controller errors in the brief, both caught by the implementer and corrected in flight — see below |
+| 1 | Provenance accepts a `superpowers` origin; two refusals recorded | **done** | `0b67c49..a7c0d7f` | 4 fix rounds. Spec ✅, Quality Approved, 0 Critical. Rounds 1–3 with the original implementer, round 4 with a fresh one per the loop's rule; round 4 found the guard's **shape** was wrong, which retroactively explains rounds 2–3 as symptom-patching |
 | 2 | `unity-execution` — inline branch, Deslop Pass, cut-criterion gate | **pending** | — | carries an explicit stop-and-escalate gate |
 | 3 | `unity-planning` — plan-writing as a skill, carrying the fork | **pending** | — | |
 | 4 | `unity-brainstorming` — rename + the design half | **pending** | — | path-set change: rename = removal + addition |
@@ -118,7 +131,104 @@ State these in later dispatches rather than letting a brief guess.
 | 7 | Licence facts — NOTICE gains MIT text, stale claims go | **pending** | — | NOTICE ships into user projects |
 | 8 | Whole-wave verification | **pending** | — | |
 
+## Loop rule added mid-run — the controller does not commit while a round is open
+
+Learned the hard way in Task 1 round 3, and the root cause was the controller's, not the
+implementer's.
+
+The controller committed the ledger onto the branch while the implementer was mid-round. The
+implementer's `git commit --amend` then amended **the controller's commit**, producing a commit that
+carried the ledger's contents under the implementer's message. Its pre-amend check was
+`git branch -r --contains HEAD`, which answers *"is this pushed"* — not *"is HEAD still mine"*, which
+is the question `--amend` actually depends on. Two rounds of that check working is what stopped it
+being read.
+
+It caught the mistake itself, because `git status` came back clean when it expected the controller's
+ledger to be dirty. Repaired properly: tagged `rescue-479fd28`, reset, re-applied its own change,
+amended its own commit, cherry-picked the ledger commit back with its original message, authorship
+and date. Verified by the controller: `git diff --stat rescue-479fd28 HEAD` empty, `87d995d` carries
+the ledger author and touches only the ledger, `0b67c49` touches only the implementer's four files.
+
+**Two rules follow, both binding for Tasks 2–8:**
+
+1. **The controller writes to the ledger during a round but commits it only after the round closes.**
+   A round is open from dispatch until the re-review's verdict.
+2. **An implementer that amends re-verifies HEAD is its own commit first** — by hash recorded at
+   creation, not by `branch -r --contains`. If it is not, add a commit instead of amending.
+
+The transferable half is smaller than the incident: **a check that has passed twice stops being
+read.** Both of Task 1's controller errors and this one share that shape.
+
+## Ask the shape question early — Task 1 cost four rounds for not asking it
+
+Rounds 2, 3 and 4 were **one defect at increasing depth**: a copy of `check-provenance.sh`'s
+extraction expression lived inside the test, and each round added machinery to keep the copy honest.
+Round 4's fresh implementer was the first to ask whether the guard was the right shape at all, and
+the answer was no — what `--online` depends on is a property of `provenance.tsv`, not of the
+checker's code, and asserting the property directly deletes the copy rather than policing it.
+
+The evidence was measured, and it is the part worth carrying: an **honest two-line refactor** of the
+checker reds the round-3 design and leaves round 4 green. So the old construction issued a false
+positive on ordinary maintenance, whose only resolution was hand-syncing the copy — which re-armed
+the very defect round 2 had closed. **The construction manufactured the pressure that produced its
+own worst failure.** Re-review reproduced this independently, and found a second instance (changing
+the checker's quote style from `'^# ecu='` to `"^# ecu="` reds round 3, not round 4).
+
+**For Tasks 2–8:** when a review's finding is the same *class* as the one before it, stop patching and
+ask whether the construction is right. Two rounds of the same class is the signal, not four.
+
+## Task 1's residual, recorded rather than resolved
+
+The requirement the controller set — *no single edit may make the file stop detecting the target
+regression while it still exits 0* — **does not hold literally.** Re-review found three single-line
+edits to the shared observation path of assertions 5b/5c that blind both and exit 0.
+
+Accepted, with its reasoning, because the distinction is real: those edits **blind the observation of
+primary data**, which every test ever written is vulnerable to. The round-2/3/4 class was different in
+kind — the observation stayed honest-looking while the thing observed was an unpinned copy that had
+drifted from its subject. There is no copy left to drift. None of the three is reachable by honest
+maintenance, which is exactly the property round 3 lacked, one contradicts a comment two lines below
+it, and `run-tests.sh` separately flags a file that exits non-zero without reporting.
+
 ## Deferred and parked findings
+
+### Three from Task 1, deferred with rulings — none blocks the wave
+
+1. **Share one ECU lookup between checker and test.** Re-review agrees this is the real fix and gave a
+   better reason than the implementer's: with a shared function, blinding it (`| head -1`) changes
+   `--online`'s *actual* behaviour too, so the test's green would be truthful about a changed subject
+   rather than blind to an unchanged one. It retires assertion 5a. **Note when doing it that the
+   count assertion must stay local** — it catches the before/duplicate pin shapes a value check
+   cannot see. Deferred because it edits `scripts/check-provenance.sh`, the repo's most load-bearing
+   gate, which is a different risk profile than a test file and deserves its own review.
+
+2. **`check-provenance.sh` dies where it claims to warn.** With no `# ecu=` header line,
+   `ECU_COMMIT=$(grep -m1 … | sed …)` exits 1, pipefail propagates, and `set -e` kills the script *at
+   the assignment* — its own `warn … skipping --online` branch is unreachable for that input.
+   Measured in isolation. **Both** the round-3 and round-4 diagnostics describe it as "warn and skip",
+   so both are wrong on that clause. One-line fix (`|| true` on the grep), same file as item 1, so do
+   them together.
+
+3. **One-line hardening for 5a's surviving OR hazard.** `grep -qF` still means "any one line of the
+   key matches", which is what lets the self-reported two-line-key attack defeat 5a and 5b (5c catches
+   it alone). Replacing it with pure-bash substring containment —
+   `[ "${haystack#*"$ecu_key"}" != "$haystack" ]`, bash 3.2-safe — cannot be satisfied by a multi-line
+   key, moving that attack from "caught by one assertion" to "caught by two". Deferred rather than
+   taken as a fifth round: the re-reviewer, after four rounds of finding real defects, said it would
+   not open one, and "one more one-line improvement" is precisely the scope creep that turns three
+   rounds into six. Pair it with item 1.
+
+### `bash-gate.sh` classifies on the whole command string, including prose
+
+Appending the round-3 report section was blocked as `git-reset-hard` because the rollback command
+appeared **in the prose being written**, not in a command being executed. The gate cannot distinguish
+a documented command from an invoked one.
+
+The reason this is worth a row rather than a shrug: the available workaround is to reword the
+documentation until the gate stops matching — which trains quieting a guard by editing prose around
+it. That is the opposite of what a guard is for, and it is a habit that transfers.
+
+Out of scope for this wave. Recorded so it is not rediscovered as a novelty.
 
 ### Carried to Task 7/8 — the Superpowers pin is a record, not an enforced fact
 

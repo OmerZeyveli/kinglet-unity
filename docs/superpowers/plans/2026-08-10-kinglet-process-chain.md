@@ -863,6 +863,10 @@ git commit -m "chore(baseline): record the NOTICE rewrite"
 - Consumes: everything.
 - Produces: the wave's own evidence.
 
+- [ ] **Step 0: Fix `CLAUDE.md`'s header-count instruction**
+
+It says to *"confirm the number of `--- test-*.sh ---` headers in the output equals `ls tests/test-*.sh | wc -l`"*. Followed literally with an anchored grep, that returns **0** on a healthy suite, because the runner colours the header and the escape sequence sits before the text. The instruction exists to catch the runner dying and reporting green; as written it reports that death on every run. Add the ANSI strip to the sentence. Measured in Task 1 round 4.
+
 - [ ] **Step 1: Correct the stale pool sentence**
 
 `CLAUDE.md` says *"The surface pool is 32 by design"*; the real count was already 33 before this wave and is 33 after it (8 agents + 9 commands + 16 skills). Correct the number **and** state the criterion rather than only the count, so the sentence does not rot again:
@@ -888,12 +892,14 @@ Expected: no output. A bare-name reference (a skill named without its path) is w
 
 ```bash
 bash tests/run-tests.sh 2>&1 | tee /tmp/chain-suite.log
-grep -c '^--- test-.*\.sh ---' /tmp/chain-suite.log
+sed 's/\x1b\[[0-9;]*m//g' /tmp/chain-suite.log | grep -c '^--- test-.*\.sh ---'
 ls tests/test-*.sh | wc -l
 bash scripts/check-provenance.sh
 ```
 
 The two numbers must be equal. They have silently disagreed before, and the suite reported green while 7 of 8 files never ran.
+
+**Strip ANSI first — this is not optional and this plan got it wrong until Task 1 round 4 measured it.** The runner colours the header, so the escape sequence sits between the line start and the text: `grep -c '^--- test-.*\.sh ---'` on raw output returns **0** on a perfectly healthy suite. Zero is indistinguishable from the catastrophe the count exists to detect, so the unstripped form does not merely fail to check — it reports the failure it was written to catch, every single time. `CLAUDE.md`'s wording carries the same trap; Task 8 Step 1 should fix it there too.
 
 - [ ] **Step 4: Install into a fixture and read what shipped**
 
