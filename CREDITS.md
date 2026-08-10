@@ -5,8 +5,8 @@ merely depend on them — it **contains** them. Attribution is therefore an obli
 
 `provenance.tsv` at the repo root records, for every tracked file, which upstream it came from,
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
-is asserted on trust. The manifest's 25/77 split is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
-$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 77 `modified` rows
+is asserted on trust. The manifest's 25/78 split is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
+$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 78 `modified` rows
 across the whole manifest. The table below states each upstream's own footprint instead, in wording
 that cannot be mistaken for this repo-wide number — see the next paragraph for why that matters.
 
