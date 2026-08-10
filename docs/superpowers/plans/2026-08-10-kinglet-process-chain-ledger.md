@@ -11,21 +11,22 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1, 2 and 3 are done and closed.** Nothing is currently dispatched. **Task 4
-(`unity-brainstorming`) is next** — the rename plus the design half. It is the first task whose path
-set changes (a rename is a removal *plus* an addition, each counted twice), and the 2026-08-03 ledger
-records that a path-set change was an unconditional refusal by the regenerator until it was taught
-otherwise: **confirm it handles a rename before trusting the flags.**
+**Tasks 1–4 are done and closed. The chain exists end to end.**
 
-Suite is at **356 passing**, `provenance OK`, 543 manifest rows, 94 `rule=absent` enforced.
+`unity-brainstorming` → `unity-planning` → the fork → `subagent-driven-implementation` or
+`unity-execution`, with the execution mode written and read at five ends and every path reference
+resolving. Nothing is currently dispatched.
+
+**Task 5 is next** — delete `/unity-workflow` and `/unity-feature` and repair every reference. It is
+the largest blast radius of the wave and the plan has been widened twice since it was written:
+`deep-interview` is now a **third dead name** to sweep for, `scripts/studio-doctor.sh` joined the file
+list, and Step 4's proof command was rewritten because the original **passed by examining nothing**
+(`--project-dir` is not a flag this script has; it exited 2, wrote zero bytes, and the grep printed
+`clean` against an empty file).
+
+Suite is at **401 passing**, `provenance OK`, 543 manifest rows, 94 `rule=absent` enforced.
 Reports under `.superpowers/sdd/2026-08-10-process-chain/`: `task-1-report.md` (rounds 0–3),
-`task-1-round4-report.md`, `task-2-report.md`, `task-3-report.md` (task + 2 fix rounds each).
-
-**The chain now exists end to end except its entry point.** `unity-planning` → the fork →
-`subagent-driven-implementation` or `unity-execution`, with the execution mode written and read at
-five ends. Task 4 supplies `unity-brainstorming`, which two surfaces already name by path — and
-**nothing in the suite catches a dangling skill→skill path reference**, so their silence is not
-confirmation that Task 4 landed.
+`task-1-round4-report.md`, `task-2-report.md`, `task-3-report.md`, `task-4-report.md`.
 
 **The cut-criterion gate on `unity-execution` was answered "ship it"**, and the argument is on the
 record: the Deslop Pass's two restraining rules — a scope boundary and a default — are what an
@@ -94,6 +95,26 @@ Copy this section into every dispatch. A fresh subagent inherits none of it.
      `tests/kinglet/test_baseline_inventory.py`'s hand-maintained constants** — three assertions go
      red while the tool prints success. Fold the constants into the baseline commit; they are one
      logical change with the JSON.
+- **A check that fires on everything distinguishes nothing.** The controller deleted a skill's closing
+  frontmatter fence, saw two failures, and concluded the fence was guarded. It was not: both failures
+  came from `tests/kinglet/test_baseline_inventory.py`'s **sha256 tripwires**, which fire for any byte
+  change to any tracked `.claude/**` file and know nothing about frontmatter — deleting a random prose
+  line produces the same two. Committing the change and regenerating the baseline the way the normal
+  workflow does gives `402 passed, exit 0`.
+
+  **Before reading a red as evidence, ask whether the red is about the thing you changed.** A hash
+  tripwire is reset by the very workflow every task in this plan performs.
+
+- **A guard that skips is a guard that goes quiet where nobody is watching.** Task 4's ECU-derivation
+  block skipped when the vendor blob was unreachable. In a `git clone --depth 1` the figure was set to
+  `99 of ECU's 69` in **both** the manifest and `MERGE-NOTES.md`: `FAILCOUNT 0`, and
+  `check-provenance.sh` still printed `provenance OK`. Ruled: **fail, do not skip** — a shallow
+  checkout is not a supported test environment anywhere else in this suite.
+
+- **Documenting a trap is not protection against it.** Task 4's implementer wrote a two-line
+  `assert_contains` needle — the `grep -F` alternatives trap — **six lines below the comment
+  documenting that trap in the same file**. Its own words, worth keeping.
+
 - **Guard what `provenance.tsv` claims — that is the criterion, not "does this read as important".**
   Derived in Task 3's re-review and it unifies the two most expensive defects of this wave: Task 2's
   Critical (a note calling ECU text Kinglet's) and Task 3's Spec ❌ (a note listing a header the file
@@ -235,7 +256,7 @@ State these in later dispatches rather than letting a brief guess.
 | 1 | Provenance accepts a `superpowers` origin; two refusals recorded | **done** | `0b67c49..a7c0d7f` | 4 fix rounds. Spec ✅, Quality Approved, 0 Critical. Rounds 1–3 with the original implementer, round 4 with a fresh one per the loop's rule; round 4 found the guard's **shape** was wrong, which retroactively explains rounds 2–3 as symptom-patching |
 | 2 | `unity-execution` — inline branch, Deslop Pass, cut-criterion gate | **done** | `4fb4493..04e1d96` | 2 fix rounds. Spec ✅, 1 Critical + 2 Important + 3 Minor, all ADDRESSED. **The cut-criterion gate was answered "ship it" with a concrete defence** — see below |
 | 3 | `unity-planning` — plan-writing as a skill, carrying the fork | **done** | `dfa8684..5e81a49` | 2 fix rounds. Spec ❌→✅ (the `writing-plans` document header was missing), 4 Important + 7 Minor, all ADDRESSED. **The fork's write half did not exist** — see below |
-| 4 | `unity-brainstorming` — rename + the design half | **pending** | — | path-set change: rename = removal + addition |
+| 4 | `unity-brainstorming` — rename + the design half | **done** | `dd7f434..f648047` | 2 fix rounds. Spec ✅, 5 Important + 5 Minor, all ADDRESSED. **32 of ECU's 69 substantive lines survive**, measured, so D10's `origin=ecu` ruling holds. Reverse-sweep escapes 153/176 → **66/153, zero in any ECU or manifest-named section** |
 | 5 | Delete the two sequencer commands, repair 22 references | **pending** | — | `generate-claude-md.sh` ships names into user projects |
 | 6 | `using-kinglet` becomes a mandate | **pending** | — | |
 | 7 | Licence facts — NOTICE gains MIT text, stale claims go | **pending** | — | NOTICE ships into user projects |
@@ -301,6 +322,30 @@ maintenance, which is exactly the property round 3 lacked, one contradicts a com
 it, and `run-tests.sh` separately flags a file that exits non-zero without reporting.
 
 ## Deferred and parked findings
+
+### Five from Task 4, deferred with rulings
+
+1. **The closing `---` frontmatter fence is unguarded across all 16 skills**, and belongs in
+   `tests/test-skill-discovery.sh`, not in one skill's guard. Measured: deleting it produces **zero
+   failures for 15 of 16** once the baseline is regenerated the way the workflow does; the sixteenth
+   is caught incidentally, because the description extractor reads into the body and trips an
+   unrelated assertion. The **opening** fence is caught everywhere, since `name:` extraction depends
+   on it. Fixing it in one skill would be the "applied on one side only" shape this repo keeps finding.
+2. **Load-bearing sentences inside surfaces the manifest names are still unguarded** — the
+   `/unity-prototype` exemption's limiting clause, the Handoff's stop instruction, the whole
+   Build/Tweak table, and the vague-as-clear table's header row. The blocks the row names *verbatim*
+   are all guarded; these are sentences inside blocks it names by description.
+3. **The field-6 assertion's comment states an inverted rationale.** It says flipping to `verbatim`
+   "would skip the checksum comparison"; measured, `verbatim` **triggers** it and
+   `check-provenance.sh` fails with `status=verbatim but the file differs`. The assertion is right;
+   the reason written beside it is wrong.
+4. **`ub_section` uses `/^#{1,3} /`, the only ERE interval expression in `tests/` or `scripts/`.**
+   Simulated against an awk without interval support the suite goes **red**, not silently wrong, so
+   the failure direction is safe. Confirm during the planned macOS pass.
+5. **The old `deep-interview` path has no `provenance-skip.tsv` row.** Its absence is guarded instead
+   by an `assert_eq` in `test-surface-references.sh`. That works, and the plan did not ask for a row,
+   but `CLAUDE.md` designates `rule=absent` as *"what keeps a removed surface from silently
+   returning"* — Task 8 should say yes or no deliberately.
 
 ### Task 5 must do these — they are not optional cleanups
 

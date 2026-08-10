@@ -564,7 +564,10 @@ Twenty-two files name one or both. The landmine is `scripts/generate-claude-md.s
 - Modify: `scripts/generate-claude-md.sh`
 - Modify: `.claude/agents/unity-coder.md`, `.claude/commands/unity-prototype.md`, `.claude/commands/unity-scene.md`, `.claude/skills/subagent-driven-implementation/SKILL.md`
 - Modify: `docs/ARCHITECTURE.md`, `docs/GETTING-STARTED.md`, `docs/SKILL-CATALOG.md`, `docs/AGENT-GUIDE.md`, `README.md`, `MERGE-NOTES.md`, `CREDITS.md`, `.claude/NOTICE.md`
+- Modify: `scripts/studio-doctor.sh` — **added after Task 4**, which found a `deep-interview` reference here belonging to no task's file list
 - Modify: `tests/test-stack-arbitration.sh`
+
+**Task 4 widened this task's subject.** The rename left seven live `deep-interview` references, and a backticked name inside a Markdown table is invisible to both reference guards, so **nothing goes red**. Two of them are load-bearing: `scripts/generate-claude-md.sh:459` **ships into every user's `CLAUDE.md`**, and `scripts/studio-doctor.sh:275` was in no task's list at all. Both are pinned by test assertions that require a lockstep edit. Treat `deep-interview` as a third dead name throughout this task, everywhere `/unity-workflow` and `/unity-feature` appear below.
 - Test: `tests/test-provenance-origins.sh` (extend), plus the whole suite
 
 **Interfaces:**
@@ -598,8 +601,13 @@ while IFS= read -r f; do
   case "$f" in *NOTICE.md) continue ;; esac   # history section, see Step 6
   if grep -qF -- '/unity-workflow' <<< "$body"; then fail "names deleted /unity-workflow: $f"; fi
   if grep -qF -- '/unity-feature' <<< "$body"; then fail "names deleted /unity-feature: $f"; fi
+  # Task 4's rename left this one behind in shipped payload and in scripts/, and a
+  # backticked name in a Markdown table is invisible to both existing reference guards.
+  if grep -qF -- 'deep-interview' <<< "$body"; then fail "names renamed deep-interview: $f"; fi
 done <<< "$payload"
 ```
+
+Note that `$payload` above is `git ls-files '.claude/*' 'scripts/generate-claude-md.sh'`. **Widen it to all of `scripts/`** — `scripts/studio-doctor.sh` carries a `deep-interview` reference and the narrower glob is exactly why no task owned it.
 
 Note the `<<<` here-strings throughout: `grep -q` exits on first match without draining stdin, and a pipe here would produce an intermittent failure that looks like a flake.
 
@@ -630,11 +638,19 @@ This file writes into user projects. Find every emitted mention of the two comma
 
 ```bash
 bash tests/fixtures/mkproject.sh /tmp/chain-fixture --variant urp
-bash scripts/generate-claude-md.sh --project-dir /tmp/chain-fixture > /tmp/chain-claude.md
-grep -n 'unity-workflow\|unity-feature' /tmp/chain-claude.md || echo "clean"
+bash scripts/generate-claude-md.sh /tmp/chain-fixture > /tmp/chain-claude.md
+bash scripts/generate-claude-md.sh --provider superpowers /tmp/chain-fixture > /tmp/chain-claude-provider.md
+test -s /tmp/chain-claude.md && test -s /tmp/chain-claude-provider.md || echo "EMPTY OUTPUT — the proof below is worthless"
+grep -n 'unity-workflow\|unity-feature\|deep-interview' /tmp/chain-claude.md /tmp/chain-claude-provider.md || echo "clean"
 ```
 
-Expected: `clean`. If the script takes different flags, read its usage rather than guessing.
+Expected: `clean`, and both files non-empty.
+
+**This command was wrong in two ways until Task 4's review measured it, and the first way is the instructive one.** `--project-dir` is not a flag this script has: it exits **2** with `Unknown option` and writes **zero bytes**, after which `grep … || echo "clean"` obligingly prints `clean` against an empty file. **A proof that passes because it examined nothing.** Hence the `test -s` line — a proof step must fail when it had nothing to inspect.
+
+The second way: even with the correct positional form, the plain run reaches only the `/unity-workflow` mention at `:540`. The `deep-interview` reference at `:459` lives inside `emit_provider_verdict()` and is emitted **only under `--provider`** — measured: positional run yields one hit, `--provider superpowers` yields two. One invocation cannot cover this file.
+
+**`deep-interview` is in that pattern because Task 4 found it there and the original two-name grep would have missed it.** `scripts/generate-claude-md.sh:459` names the old skill in text that reaches every installed project's `CLAUDE.md` — the same defect class the 2026-08-03 wave had to fix as a Critical. The reference is pinned by a test assertion, so the script and its test move together or the suite reddens.
 
 - [ ] **Step 5: Repair the payload references**
 
@@ -766,6 +782,8 @@ Use exactly these five rows, which are this toolkit's own measured rationalizati
 - [ ] **Step 6: Rewrite the chain table**
 
 Replace the deleted commands' rows and strip the descriptive parentheticals — a row names a surface, it does not summarise it, and the summary is what made loading unnecessary. Concretely: `deep-interview — ask, do not guess` becomes `unity-brainstorming`. Rows for `/unity-workflow` and `/unity-feature` are replaced by the chain's own entry point. Keep every row for a surviving router unchanged.
+
+**Two `deep-interview` references live in this file and Task 4 measured that the guard below cannot catch the second one.** The table row is line ~20; a second mention sits at **line ~33**, in the sentence about which skills carry a "the thought that means you are about to skip this" section. Step 1's assertion is satisfied by the table row alone, so fixing only the row leaves the file green with a dead name still in it. Fix both, and make the guard name the file rather than the token.
 
 - [ ] **Step 7: Gates, provenance note, baseline, commit**
 
