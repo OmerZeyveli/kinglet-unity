@@ -38,6 +38,13 @@ Two situations look like exemptions and are not. Something **broken** goes to
 **resumed run** already carries its decisions in its ledger, so there is nothing there to re-decide;
 for a task the ledger does not cover, there is.
 
+**One real exemption, and it is a decision rather than an oversight.** A **throwaway scene built to
+try an idea** — disposable, not an addition the project comes to depend on — goes to
+`/unity-prototype`, which runs its own open-ended Clarify instead of this round. That is the
+build/tweak question one level up: nothing downstream inherits an undesigned decision, because
+nothing downstream keeps the scene. The moment its result is wanted in the real project, it is a
+build and it comes back here first.
+
 ## Checklist
 
 You MUST create a task for each of these items and complete them in order:
@@ -53,6 +60,12 @@ You MUST create a task for each of these items and complete them in order:
 7. **Self-review the written file** — placeholders, contradictions, ambiguity, scope
 8. **Ask the user to review the file** — the file, not the conversation
 9. **Hand off to `unity-planning`** — see Handoff
+
+**At depth 1, items 5 and 8 are one approval, not two.** The design is three sentences, item 5's own
+scaling collapses it to a single section, and asking again for a review of the written file makes a
+human approve the same three sentences twice. That is the cost that makes people stop running the
+round at all. Present it, write it, ask once. Nothing above is waived by this: `design.md` is still
+written, still presented, and still approved.
 
 ## Ambiguity Score
 
@@ -74,6 +87,11 @@ Rate the request across 5 dimensions. Each scores 0–2:
 
 **Threshold: total score >= 6 out of 10 to proceed.**
 
+That line is ECU's, kept, and "proceed" is now defined: it means **proceed to presenting the
+design**, never proceed past it. The threshold divides the same two states it always divided; what
+changed is what lies on the far side. Below 6 nothing routes around the round, and at or above 6
+nothing skips the artifact.
+
 ### What the score decides
 
 The score sets the depth of the round, not whether the round happens. Below 6, ask up to three
@@ -90,7 +108,8 @@ When the score is below threshold:
 1. **Present the current scores** — show the user which dimensions are weak
 2. **Ask targeted questions** — max 3 questions per round, focused on the lowest-scoring dimensions
 3. **Re-score after each round** — update scores based on answers
-4. **Proceed when threshold is met** — or when the user explicitly opts out
+4. **Proceed when threshold is met** — to presenting the design. There is no opt-out. "Just do it"
+   is answered by the depth-1 round: three sentences, one approval, and the file still written.
 
 **One question per message.** Three per round is the budget, not the message size: a message
 carrying three questions gets one answer, usually to the last of them. Prefer multiple choice where
@@ -169,8 +188,13 @@ they want changes, make them, re-read, and ask again.
 ## Handoff
 
 The terminal state is `.claude/skills/unity-planning/SKILL.md`. Invoke no other skill. Do **not**
-invoke `/unity-prototype`, `unity-coder`, or any MCP agent — the gate above is still holding when
-this section is reached.
+invoke `/unity-prototype`, `unity-coder`, or any MCP agent — the HARD-GATE at the top of this file is
+still in force here. It lifts on an approved design, not on reaching this section.
 
-If the gate did not pass — requirements still unclear after a round — ask the specific questions the
-score identified and **stop**. Do not proceed on an assumption and do not answer your own question.
+`/unity-prototype` is exempt from the round entirely, per the boundary section above — but that
+choice is made *before* the round starts and cannot be taken from inside it. Arriving here means the
+round happened, so the exemption is spent.
+
+If the round did not reach an approved design — requirements still unclear after asking — ask the
+specific questions the score identified and **stop**. Do not proceed on an assumption and do not
+answer your own question.

@@ -301,17 +301,37 @@ UE_FINAL_SUMMARY
 # ============================================================================
 # `unity-brainstorming` is the chain's entry point, and `provenance.tsv` makes claims about it.
 #
-# The manifest row says the file (a) kept ECU's Ambiguity Score — which is the entire basis for its
-# `origin=ecu` — and (b) gained a category trigger, an MCP-write HARD-GATE, the design half, and a
-# closed handoff, adapted from Superpowers. `check-provenance.sh` never reads the `note` column, so
-# without assertions here every one of those claims is a sentence nobody can falsify. That is the
-# criterion Task 3 derived and this block applies it: whatever the note says the file carries,
-# something fails if that content leaves.
+# The manifest row and its MERGE-NOTES.md section say the file (a) kept ECU's Ambiguity Score, which
+# is the entire basis for `origin=ecu`, and (b) gained a category trigger, an MCP-write HARD-GATE,
+# the design half and a closed handoff, adapted from Superpowers. `check-provenance.sh` never reads
+# the `note` column, so without assertions here every one of those claims is a sentence nobody can
+# falsify.
 #
-# Two of the claims are asserted as WHOLE BLOCKS with `assert_eq`, not with `assert_contains`.
-# `assert_contains` is `grep -F`, and a multi-line pattern given to `grep -F` is a set of
-# alternatives: any ONE line matching satisfies it, so a four-line gate could lose three lines and
-# stay green. Run, not reasoned — this is the exact transcript:
+# ROUND 1 REVIEW rebuilt this block. The first version satisfied the letter of that criterion and
+# failed it in practice, in three measured ways, each of which the current shape exists to close:
+#
+#   1. `assert_contains "$UB_ROW" "ecu"` against the whole tab-joined row was VACUOUS: the note
+#      inside that row contains the literal `origin=ecu rests on`, so the needle matched the text it
+#      existed to guard. Reproduced before fixing — field 2 flipped to `superpowers`, this file
+#      sourced through the runner's helpers: 59 assertions ran, 0 failed, and
+#      "unity-brainstorming's row still records its ECU lineage (D10)" printed PASS. Field 2 is now
+#      extracted and compared on its own.
+#
+#   2. Single-line needles let whole sections vanish. A reverse sweep deleting one line at a time
+#      found 153 of 176 lines leaving the file green, including all of `## Interview Protocol`, all
+#      of `## Scoring Examples` and the 0-2 score table — three of the five things MERGE-NOTES.md
+#      names as ECU's surviving contribution. Deleting just those two sections drops the survivor
+#      count from 33/69 to 14/69 with the suite green. So the four ECU blocks the manifest names are
+#      now compared WHOLE, with assert_eq.
+#
+#   3. A needle satisfied by a duplicate elsewhere in the file cannot detect the loss of either
+#      copy. `Propose 2–3 approaches` appears in the checklist and again in its own section;
+#      `docs/features/<slug>/design.md` likewise. Both are now anchored to the section that must
+#      contain them, which is also what makes deleting `## Checklist` fail.
+#
+# `assert_eq` rather than `assert_contains` for every block, because `assert_contains` is `grep -F`
+# and a multi-line pattern given to `grep -F` is a set of ALTERNATIVES — any one line matching
+# satisfies the whole needle. Run, not reasoned; this is the exact transcript:
 #
 #   $ printf 'no MCP write call is made\n' > g-hay
 #   $ printf 'no MCP write call is made\nAND SO IS THIS SECOND LINE\n' > g-needle
@@ -320,12 +340,43 @@ UE_FINAL_SUMMARY
 #   exit=0
 #
 # The haystack does not contain the second line at all, and the two-line needle still matched.
-# `assert_eq` compares character for character and has no such hole.
 UB_SKILL="$REPO_DIR/.claude/skills/unity-brainstorming/SKILL.md"
 assert_file_exists "$UB_SKILL" \
   "unity-brainstorming exists — the chain has an entry point"
 
 brainstorm="$(cat "$UB_SKILL" 2>/dev/null || true)"
+
+# Section extractor: everything strictly between a `## `/`### ` heading and the next heading of the
+# same-or-shallower depth. Anchoring each claim to its own section is what makes a deleted heading
+# fail — an unanchored needle is satisfied by any surviving copy of the text elsewhere in the file.
+ub_section() {
+  awk -v want="$1" '
+    $0 == want { f = 1; next }
+    f && /^#{1,3} / { exit }
+    f { print }
+  ' "$UB_SKILL" 2>/dev/null || true
+}
+
+# Leading- and trailing-blank-line trim, so a block comparison is not hostage to the blank line a
+# Markdown heading is always followed by, nor to the spacing before the next one.
+ub_trim() {
+  awk '
+    { lines[NR] = $0 }
+    END {
+      first = 1; last = NR
+      while (first <= last && lines[first] ~ /^[[:space:]]*$/) first++
+      while (last >= first && lines[last] ~ /^[[:space:]]*$/) last--
+      for (i = first; i <= last; i++) print lines[i]
+    }'
+}
+
+# The first paragraph of a section: from the heading, past the blank line under it, to the next blank
+# line. `### Dimensions` is followed in the same section by the threshold line and its gloss, so a
+# whole-section comparison there would assert three unrelated things as one block and fail for the
+# wrong reason whenever any of them is edited.
+ub_first_para() {
+  ub_section "$1" | awk 'started && /^[[:space:]]*$/ { exit } /[^[:space:]]/ { started = 1 } started'
+}
 
 # --- D2: the trigger is a category of work, not a judgment about the request -----------------
 # The description IS the selection mechanism — there is no glob and no always-apply — so this
@@ -346,9 +397,8 @@ assert_eq "$UB_DESC_EXPECTED" "$UB_DESC_ACTUAL" \
 
 # --- D3: the gate covers MCP writes, not only code -------------------------------------------
 # The Unity-specific half of the adaptation, and the reason the Superpowers text could not be
-# imported unchanged. Whole-block again: the line naming MCP is the one a summariser keeps, and
-# the three around it — the dispatch ban, the irreversibility reason, and the no-exceptions
-# sentence — are the ones it drops.
+# imported unchanged. The line naming MCP is the one a summariser keeps; the three around it — the
+# dispatch ban, the irreversibility reason, and the no-exceptions sentence — are the ones it drops.
 UB_GATE_EXPECTED='Until a design has been presented and approved: no implementer agent is dispatched, no `.cs` is
 written, and **no MCP write call is made** — scene, prefab and ScriptableObject included. A single
 MCP call mutates state that no test can restore. This applies to every request regardless of
@@ -357,10 +407,153 @@ UB_GATE_ACTUAL="$(awk '/^<HARD-GATE>$/ {f=1; next} f && /^<\/HARD-GATE>$/ {exit}
 assert_eq "$UB_GATE_EXPECTED" "$UB_GATE_ACTUAL" \
   "unity-brainstorming's HARD-GATE is D3's text, character for character"
 
+# ============================================================================
+# The four ECU blocks `provenance.tsv:71` and its MERGE-NOTES.md section name by name.
+#
+# The note says ECU's Ambiguity Score is what survives and that this is what `origin=ecu` rests on;
+# MERGE-NOTES.md enumerates five things — the 0-2 scale, the five dimensions, the >= 6 threshold,
+# the interview protocol and the two scoring examples. Two of the five were guarded before this
+# round and three were not. All five are below, three of them as whole blocks.
+UB_SCORE_TABLE_EXPECTED='| Score | Meaning |
+|-------|---------|
+| 0 | Unspecified — no information provided |
+| 1 | Partial — vague or implied |
+| 2 | Clear — explicitly stated or obvious from context |'
+UB_SCORE_TABLE_ACTUAL="$(awk '/^\| Score \| Meaning \|$/ {f=1} f && /^[[:space:]]*$/ {exit} f' "$UB_SKILL" 2>/dev/null || true)"
+assert_eq "$UB_SCORE_TABLE_EXPECTED" "$UB_SCORE_TABLE_ACTUAL" \
+  "ECU's 0-2 score table survives whole (MERGE-NOTES names it; nothing guarded it before round 1)"
+
+UB_DIMENSIONS_EXPECTED='1. **Scope** — What exactly is being built? What are its boundaries? What is NOT included?
+2. **Platform** — Target platform, Unity version, render pipeline, input method?
+3. **Performance** — FPS target, memory budget, draw call limits, target device tier?
+4. **Integration** — What existing systems does this touch? Dependencies? Data flow?
+5. **Acceptance Criteria** — How do we know it'"'"'s done? What should we test? What does success look like?'
+UB_DIMENSIONS_ACTUAL="$(ub_first_para '### Dimensions')"
+assert_eq "$UB_DIMENSIONS_EXPECTED" "$UB_DIMENSIONS_ACTUAL" \
+  "ECU's five dimensions survive whole, and under their own heading"
+
+# The threshold line, plus the sentence that reconciles it. ECU wrote ">= 6 ... to proceed", which is
+# verbatim the score's OLD gate job; D2 gives the score a new one. Round 1 found all three statements
+# in the file disagreeing, so the gloss is asserted beside the line it glosses — losing it puts the
+# contradiction straight back.
+assert_contains "$brainstorm" '**Threshold: total score >= 6 out of 10 to proceed.**' \
+  "ECU's threshold line survives"
+
+# The gloss, compared WHOLE. The first version of this assertion was a two-line `assert_contains`
+# needle — which is the alternatives trap this file's own header comment documents, committed six
+# lines below the comment. The deletion harness caught it: removing the middle line of the gloss left
+# the other line matching and the suite green. Written down rather than quietly fixed, because the
+# lesson is that knowing about the trap is not the same as not falling into it, and `assert_eq` is
+# the only form that cannot.
+UB_GLOSS_EXPECTED='That line is ECU'"'"'s, kept, and "proceed" is now defined: it means **proceed to presenting the
+design**, never proceed past it. The threshold divides the same two states it always divided; what
+changed is what lies on the far side. Below 6 nothing routes around the round, and at or above 6
+nothing skips the artifact.'
+UB_GLOSS_ACTUAL="$(awk '/^That line is ECU/ {f=1} f && /^[[:space:]]*$/ {exit} f' "$UB_SKILL" 2>/dev/null || true)"
+assert_eq "$UB_GLOSS_EXPECTED" "$UB_GLOSS_ACTUAL" \
+  "'proceed' is defined whole, so the retained ECU wording cannot be read as the old gate job"
+
+# The Interview Protocol. Steps 1-3 are ECU verbatim; step 4 is NOT, and deliberately so — ECU's
+# ended with an explicit-opt-out clause that was the `--skip-interview` exemption in other clothes
+# and contradicted the Handoff. Asserting 1-3 as a block and 4 separately is what keeps the note's
+# claim precise: the note may not say "the interview protocol survives verbatim" while this passes.
+UB_PROTOCOL_123_EXPECTED='1. **Present the current scores** — show the user which dimensions are weak
+2. **Ask targeted questions** — max 3 questions per round, focused on the lowest-scoring dimensions
+3. **Re-score after each round** — update scores based on answers'
+UB_PROTOCOL_123_ACTUAL="$(awk '/^1\. \*\*Present the current scores\*\*/ {f=1} f && /^4\./ {exit} f' "$UB_SKILL" 2>/dev/null | ub_trim)"
+assert_eq "$UB_PROTOCOL_123_EXPECTED" "$UB_PROTOCOL_123_ACTUAL" \
+  "ECU's interview protocol steps 1-3 survive whole"
+assert_contains "$brainstorm" '4. **Proceed when threshold is met** — to presenting the design. There is no opt-out.' \
+  "step 4 is reconciled, not retained: proceeding means proceeding to the design"
+
+UB_EXAMPLES_EXPECTED='**Vague (score 3/10):** "Add multiplayer to my game"
+- Scope: 1 (multiplayer is broad — co-op? competitive? matchmaking?)
+- Platform: 0 (unspecified)
+- Performance: 0 (unspecified)
+- Integration: 1 (implies networking but no specifics)
+- Acceptance: 1 (implied: "it works")
+
+**Clear enough (score 7/10):** "Add 2-player local co-op split-screen for the existing PlayerController using the new Input System"
+- Scope: 2 (2-player local co-op split-screen)
+- Platform: 1 (implies desktop from split-screen, but not explicit)
+- Performance: 1 (split-screen implies rendering budget concern)
+- Integration: 2 (PlayerController, Input System explicitly named)
+- Acceptance: 1 (implied: both players can play simultaneously)
+
+Both of these are builds. The second scores 7 and still gets a design — one round, a short file.'
+UB_EXAMPLES_ACTUAL="$(ub_section '## Scoring Examples' | ub_trim)"
+assert_eq "$UB_EXAMPLES_EXPECTED" "$UB_EXAMPLES_ACTUAL" \
+  "ECU's two scoring examples survive whole, under their own heading"
+
+# ============================================================================
+# D2: depth scales the round, never the artifact.
+#
+# The plan's needle here was the bare `design.md is still written`, which cannot match the plan's own
+# fixed body text: that text writes it as `` `design.md` is still written ``, and assert_contains is
+# `grep -F`, so the backticks are two characters that must be there. Caught by running the suite
+# against a faithful transcription of the plan's block.
+#
+# Compared whole, because round 1 measured the punchline — "and only one of them is allowed" —
+# deleting green while the two lines above it were guarded.
+# D2's own sentence — the score's new job — which the reverse sweep found escaping: the paragraph
+# could be deleted entire and only the paragraph BELOW it was guarded, leaving the file with a
+# threshold, a gloss on the threshold, and nothing saying what the score now decides.
+UB_SCORE_JOB_EXPECTED='The score sets the depth of the round, not whether the round happens. Below 6, ask up to three
+questions and re-score. At or above 6, one confirming round is enough.'
+UB_SCORE_JOB_ACTUAL="$(ub_first_para '### What the score decides')"
+assert_eq "$UB_SCORE_JOB_EXPECTED" "$UB_SCORE_JOB_ACTUAL" \
+  "D2's rule — the score sets depth, not whether the round happens — is stated whole"
+
+UB_DEPTH_EXPECTED='**Depth scales the round, never the artifact.** At depth 1 the design may be three sentences, but
+`design.md` is still written, still presented, and still approved. "Short design" and "no design"
+are different outcomes and only one of them is allowed.'
+UB_DEPTH_ACTUAL="$(awk '/^\*\*Depth scales the round, never the artifact\.\*\*/ {f=1} f && /^[[:space:]]*$/ {exit} f' "$UB_SKILL" 2>/dev/null || true)"
+assert_eq "$UB_DEPTH_EXPECTED" "$UB_DEPTH_ACTUAL" \
+  "the depth rule is D2's text whole, punchline included"
+
+# --- The checklist, anchored so its deletion is not covered by a duplicate elsewhere -----------
+# Every item here restates something the body also says. That is fine for a reader and fatal for an
+# unanchored guard: round 1 measured `## Checklist` deleting entirely with the suite green, because
+# the checklist's own needles were satisfied by the sections it summarises.
+UB_CHECKLIST="$(ub_section '## Checklist')"
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$UB_CHECKLIST" "$needle" \
+    "the checklist carries its step: ${needle%% —*}"
+done <<'UB_CHECKLIST_ITEMS'
+You MUST create a task for each of these items and complete them in order
+4. **Propose 2–3 approaches**
+6. **Write `docs/features/<slug>/design.md`**
+9. **Hand off to `unity-planning`**
+UB_CHECKLIST_ITEMS
+
+# The depth-1 collapse: two human approvals of the same three sentences is the cost that makes people
+# stop running the round, and the sentence that prevents it is one a summariser drops first.
+assert_contains "$UB_CHECKLIST" '**At depth 1, items 5 and 8 are one approval, not two.**' \
+  "at depth 1 the two approvals collapse into one"
+
+# --- The design half the row claims the file gained, anchored to its own section ---------------
+UB_DESIGN="$(ub_section '## What `design.md` carries')"
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$UB_DESIGN" "$needle" \
+    "the design-content spec carries: $needle"
+done <<'UB_DESIGN_HALF'
+docs/features/<slug>/design.md
+**Approaches considered**
+Model/View/System terms
+Architecture stack — detected, not assumed
+**Acceptance criteria**
+**Operator steps**
+Never `git add -A`
+UB_DESIGN_HALF
+
+# The 2-3 approaches section, anchored, because the checklist carries the same phrase.
+assert_contains "$(ub_section '## Exploring approaches')" 'Propose 2–3 approaches with their trade-offs' \
+  "the approaches section exists and is not merely the checklist line"
+
 # --- D4: the handoff is closed and names the forbidden alternatives ---------------------------
-# Anchored to the Handoff section. Unanchored against the whole file, `unity-planning` is satisfied
-# by any passing mention and the prohibition could be deleted outright with this still green.
-UB_HANDOFF="$(awk '/^## Handoff/ {f=1; next} f && /^## / {exit} f' "$UB_SKILL" 2>/dev/null || true)"
+UB_HANDOFF="$(ub_section '## Handoff')"
 assert_contains "$UB_HANDOFF" ".claude/skills/unity-planning/SKILL.md" \
   "the handoff names its terminal state by path"
 assert_contains "$UB_HANDOFF" "Invoke no other skill" \
@@ -375,61 +568,25 @@ unity-coder
 any MCP agent
 UB_FORBIDDEN
 
-# --- D2: depth scales the round, never the artifact -------------------------------------------
-# The plan's needle here was the bare `design.md is still written`, which cannot match the plan's own
-# fixed body text: that text writes it as `` `design.md` is still written ``, and assert_contains is
-# `grep -F` — a literal, so the backticks are two characters that must be there. Caught by running
-# the suite against a faithful transcription of the plan's own block. The needle carries the
-# backticks; the body text is the plan's, unchanged.
-#
-# Three needles rather than one, because the claim has three separable halves and losing any of them
-# reopens "no design": the bold lead states the rule, the middle clause states what survives depth 1,
-# and the last line is the one that names the failure mode by name.
-while IFS= read -r needle; do
-  [ -n "$needle" ] || continue
-  assert_contains "$brainstorm" "$needle" \
-    "depth scales the round, never the artifact: $needle"
-done <<'UB_DEPTH'
-**Depth scales the round, never the artifact.**
-`design.md` is still written, still presented, and still approved.
-"Short design" and "no design"
-UB_DEPTH
-
-# --- The provenance claim that `origin=ecu` rests on ------------------------------------------
-# D10 rules that this file stays `origin=ecu` because ECU's Ambiguity Score survives the rewrite.
-# That is a claim about file content, made in a column no checker reads. If the score is ever
-# summarised away, the row becomes a falsehood and — without these — nothing says so.
-while IFS= read -r needle; do
-  [ -n "$needle" ] || continue
-  assert_contains "$brainstorm" "$needle" \
-    "unity-brainstorming keeps ECU's Ambiguity Score: ${needle%% —*}"
-done <<'UB_AMBIGUITY_SCORE'
-## Ambiguity Score
-Rate the request across 5 dimensions. Each scores 0–2:
-1. **Scope** — What exactly is being built? What are its boundaries? What is NOT included?
-2. **Platform** — Target platform, Unity version, render pipeline, input method?
-3. **Performance** — FPS target, memory budget, draw call limits, target device tier?
-4. **Integration** — What existing systems does this touch? Dependencies? Data flow?
-5. **Acceptance Criteria** — How do we know it's done? What should we test? What does success look like?
-**Threshold: total score >= 6 out of 10 to proceed.**
-UB_AMBIGUITY_SCORE
-
-# --- The design half the row claims the file gained -------------------------------------------
-while IFS= read -r needle; do
-  [ -n "$needle" ] || continue
-  assert_contains "$brainstorm" "$needle" \
-    "unity-brainstorming carries the design half: $needle"
-done <<'UB_DESIGN_HALF'
-docs/features/<slug>/design.md
-Propose 2–3 approaches
-Operator steps
-Never `git add -A`
-UB_DESIGN_HALF
+# --- D7's exemption, which existed in the spec and nowhere in the payload ----------------------
+# D7 records /unity-prototype as *deliberately* exempt — it runs its own open-ended Clarify. The
+# description's category ("a new mechanic ... scene") covers exactly that command's job and the
+# Handoff forbids it, so without this the wave would ship a command whose only route the chain
+# closes. Both halves are asserted: the exemption, and the sentence keeping it from becoming an
+# escape hatch usable from inside the round.
+UB_BOUNDARY="$(ub_section '## The category, and its boundary')"
+assert_contains "$UB_BOUNDARY" '**One real exemption, and it is a decision rather than an oversight.**' \
+  "D7's /unity-prototype exemption is stated in the payload, not only in the spec"
+assert_contains "$UB_BOUNDARY" '/unity-prototype' \
+  "and it names the command it routes to"
+assert_contains "$UB_HANDOFF" 'cannot be taken from inside it' \
+  "the exemption is a pre-round choice, so it cannot be used to escape a round already started"
 
 # --- The exemption list is removed, not reworded ----------------------------------------------
 # D2 removes it: a list of exemptions is a list of ways to talk yourself out of the round. Asserted
-# by absence because the replacement (a category trigger plus a build/tweak pair) reads perfectly
-# well beside a surviving exemption section, so a positive assertion cannot detect one.
+# by absence because the replacement reads perfectly well beside a surviving exemption section, so a
+# positive assertion cannot detect one. The last needle is round 1's finding — ECU's protocol step 4
+# carried the `--skip-interview` exemption in prose, and the first three needles did not see it.
 while IFS= read -r needle; do
   [ -n "$needle" ] || continue
   assert_not_contains "$brainstorm" "$needle" \
@@ -438,6 +595,7 @@ done <<'UB_GONE'
 ## When to Activate
 ## Exemptions
 --skip-interview
+or when the user explicitly opts out
 UB_GONE
 
 # The old name must be gone from the tree, not merely unused. There is no assert_file_absent in the
@@ -447,15 +605,41 @@ if [ -e "$REPO_DIR/.claude/skills/deep-interview/SKILL.md" ]; then UB_OLD_STATE=
 assert_eq "absent" "$UB_OLD_STATE" \
   "the deep-interview path is gone from the tree, not merely unreferenced"
 
-# --- The manifest row itself ------------------------------------------------------------------
-# The note was collapsed to a summary plus a pointer into MERGE-NOTES.md, so the pointer is now
-# load-bearing: a renamed section there would silently orphan the file's whole history. Nothing
-# else in the suite reads a provenance note, so nothing else could catch it.
+# ============================================================================
+# The manifest row itself.
+#
+# Field 2 is EXTRACTED and compared, not searched for in the joined row. Searching was round 1's
+# vacuity: the note's own text contains `origin=ecu rests on`, so the needle matched the claim
+# rather than the field, and flipping field 2 to `superpowers` left 59 assertions passing and 0
+# failing. `check-provenance.sh` accepts `superpowers` as an origin too (Task 1 made it legal), so
+# nothing else in the repository would have caught it.
 UB_ROW="$(awk -F'\t' '$1 == ".claude/skills/unity-brainstorming/SKILL.md"' "$REPO_DIR/provenance.tsv" 2>/dev/null || true)"
+UB_ROW_ORIGIN="$(awk -F'\t' '$1 == ".claude/skills/unity-brainstorming/SKILL.md" { print $2 }' "$REPO_DIR/provenance.tsv" 2>/dev/null || true)"
+UB_ROW_STATUS="$(awk -F'\t' '$1 == ".claude/skills/unity-brainstorming/SKILL.md" { print $6 }' "$REPO_DIR/provenance.tsv" 2>/dev/null || true)"
+assert_eq "ecu" "$UB_ROW_ORIGIN" \
+  "unity-brainstorming's row records origin=ecu in FIELD 2 (D10) — not merely somewhere in its note"
+assert_eq "modified" "$UB_ROW_STATUS" \
+  "and status=modified in field 6, so no checksum comparison is silently skipped"
+
+# The note was collapsed to a summary plus a pointer into MERGE-NOTES.md, so the pointer is now
+# load-bearing: a renamed section there would silently orphan the file's whole history. Nothing else
+# in the suite reads a provenance note, so nothing else could catch it.
 UB_MERGE_SECTION='## unity-brainstorming (was deep-interview): the full note history'
-assert_contains "$UB_ROW" "ecu" \
-  "unity-brainstorming's row still records its ECU lineage (D10)"
 assert_contains "$UB_ROW" "$UB_MERGE_SECTION" \
   "the collapsed note points at a MERGE-NOTES.md section by its exact heading"
 assert_contains "$(cat "$REPO_DIR/MERGE-NOTES.md" 2>/dev/null || true)" "$UB_MERGE_SECTION" \
   "that MERGE-NOTES.md section exists — the pointer resolves"
+
+# Straight apostrophes. This row was the only one in provenance.tsv using curly ones, which makes it
+# unsearchable by the obvious grep and inconsistent with 542 neighbours.
+assert_not_contains "$UB_ROW" "’" \
+  "the note uses straight apostrophes, like every other row"
+
+# The "thought that means you are about to treat vague as clear" table. MERGE-NOTES.md clause 5 says
+# the 2026-08-10 rewrite keeps both rows, and the reverse sweep found both deleting green. Two rows
+# are two lines, so the block form is exact: it catches a deleted row AND a hollowed-out one.
+UB_VAGUE_TABLE_EXPECTED='| "They said what they want" | A want is not an acceptance criterion. "Add multiplayer" states a want; it does not say whether success is two players on one screen or matchmaking across regions. | The Ambiguity Score'"'"'s own Acceptance Criteria dimension, and the scoring examples above |
+| "The request has a code block, so it is specific" | A code block establishes syntax, not scope. Specificity is about the *outcome* — what done looks like — not about whether the input contains a snippet. | The Ambiguity Score'"'"'s five dimensions, none of which is "contains code" |'
+UB_VAGUE_TABLE_ACTUAL="$(awk '/^\| "They said what they want" \|/ {f=1} f && !/^\| / {exit} f' "$UB_SKILL" 2>/dev/null || true)"
+assert_eq "$UB_VAGUE_TABLE_EXPECTED" "$UB_VAGUE_TABLE_ACTUAL" \
+  "both rows of the vague-as-clear table survive, bodies included"

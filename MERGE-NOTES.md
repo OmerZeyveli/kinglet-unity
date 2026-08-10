@@ -419,13 +419,28 @@ readability question with an explicit trigger — *"may need a rethink if anothe
 The 2026-08-10 process-chain wave was the trigger. The note now carries one summary clause plus a
 pointer here; the prose history it used to carry is below, unchanged in substance.
 
-The file is `origin=ecu` and stays so. ECU 1.5.0's Ambiguity Score — the 0–2 scale, the five
-dimensions, the >= 6 threshold, the interview protocol and the two scoring examples — survives the
-2026-08-10 rewrite: 33 of the original's 69 substantive lines are still there verbatim, measured by
-testing each line of the current file against `git show 45eada9:.claude/skills/core/deep-interview/SKILL.md`
-with `grep -qxF`. The Superpowers adaptation is recorded in the note and discharged in `CREDITS.md`
-and `.claude/NOTICE.md`, which is where licence obligations belong; the schema has one origin column
-and the lineage begins at ECU.
+The file is `origin=ecu` and stays so. ECU 1.5.0's Ambiguity Score survives the 2026-08-10 rewrite:
+the 0–2 scale, the five dimensions, the `>= 6` threshold, the interview protocol's first three steps
+and both scoring examples — **32 of ECU's 69 substantive lines**, verbatim.
+
+One ECU line was deliberately not kept. Its interview protocol's fourth step ended by allowing the
+user to opt out explicitly, which was the deleted `--skip-interview` exemption in other clothes and
+contradicted the Handoff in the same file: an opt-out permitted at one heading and forbidden at
+another. The step's stem survives and now proceeds *to* presenting the design rather than past it.
+That is the whole of the difference between 33 and 32.
+
+Both halves are checked rather than asserted. Each named block is compared **whole** in
+`tests/test-surface-references.sh` — the 0–2 table, the dimensions, protocol steps 1–3 and both
+scoring examples — because a per-line needle lets a whole section vanish green (measured: 153 of 176
+lines could be deleted one at a time with the suite green, and dropping just `## Interview Protocol`
+and `## Scoring Examples` took the survivor count from 33 to 14). The **number** is re-derived in
+`tests/test-derived-counts.sh` and compared against the figure quoted here and in `provenance.tsv`,
+so it cannot go stale the way the five-row claim in clause 5 below did. The derivation is a line-by-
+line comparison against `git show 45eada9:.claude/skills/core/deep-interview/SKILL.md`.
+
+The Superpowers adaptation is recorded in the note and discharged in `CREDITS.md` and
+`.claude/NOTICE.md`, which is where licence obligations belong; the schema has one origin column and
+the lineage begins at ECU.
 
 Clause by clause, oldest first:
 

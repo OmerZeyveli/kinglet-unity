@@ -95,3 +95,78 @@ if [ -n "$DC_VACUOUS" ]; then
 fi
 assert_eq "0" "$(printf '%s' "$DC_VACUOUS" | grep -c . || true)" \
   "every prose file this guard covers still states the split in a form it can read"
+
+# ============================================================================
+# The second derived number in this repository: how much of ECU survives in `unity-brainstorming`.
+#
+# `provenance.tsv:71` rules `origin=ecu` for a file that was rewritten on 2026-08-10, and its stated
+# reason is a quantity — "32 of ECU's 69 substantive lines surviving verbatim, which is what
+# origin=ecu rests on". MERGE-NOTES.md repeats the figure.
+#
+# The note column was collapsed in that same change on the argument that "a number in free text is a
+# number nothing checks" — the row's previous note claimed a five-row table the file had had two rows
+# of since `e994779`. Writing a NEW unchecked number while making that argument is the same defect
+# with a fresh date on it, which is why this block exists: the figure is re-derived from the vendored
+# original and compared against every place that quotes it.
+#
+# Derivation: for each substantive line of ECU 1.5.0's file (non-blank, and not a `---` frontmatter
+# fence, which is punctuation rather than content), does that exact line still appear in the current
+# skill? One awk pass rather than a grep per line — 69 subprocesses inside a test that runs on every
+# commit is a cost with no benefit.
+echo "--- derived counts: ECU survival in unity-brainstorming ---"
+
+DCE_SKILL="$REPO_DIR/.claude/skills/unity-brainstorming/SKILL.md"
+# The commit that vendored ECU v1.5.0 verbatim. Not the upstream pin in provenance.tsv's header —
+# that names ECU's own repository, which is only reachable with --online. This is ours.
+DCE_ANCHOR="45eada9"
+DCE_UPSTREAM_PATH=".claude/skills/core/deep-interview/SKILL.md"
+
+DCE_ORIGINAL="$(git -C "$REPO_DIR" show "${DCE_ANCHOR}:${DCE_UPSTREAM_PATH}" 2>/dev/null || true)"
+
+if [ -z "$DCE_ORIGINAL" ] || [ ! -f "$DCE_SKILL" ]; then
+  # A shallow clone has no $DCE_ANCHOR and cannot derive anything. Skipping is honest and visible in
+  # the runner's output; failing would red the suite for a checkout depth rather than for a defect.
+  skip_test "ECU survival not derivable here (no blob ${DCE_ANCHOR}:${DCE_UPSTREAM_PATH} — shallow clone?)"
+else
+  DCE_DERIVED="$(printf '%s\n' "$DCE_ORIGINAL" | awk '
+    NR == FNR { if ($0 ~ /[^[:space:]]/) cur[$0] = 1; next }
+    $0 ~ /[^[:space:]]/ && $0 != "---" { total++; if ($0 in cur) kept++ }
+    END { printf "%d of ECU'"'"'s %d substantive lines", kept + 0, total + 0 }
+  ' "$DCE_SKILL" -)"
+
+  # Every file that quotes it. A file added to this list without the phrase fails the vacuity check
+  # below rather than passing silently — the finding-8 shape this file already carries once.
+  DCE_QUOTING_FILES="provenance.tsv
+MERGE-NOTES.md"
+
+  DCE_BAD=""
+  DCE_VACUOUS=""
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    [ -f "$REPO_DIR/$rel" ] || continue
+    dce_found=0
+    while IFS= read -r claim; do
+      [ -n "$claim" ] || continue
+      dce_found=$((dce_found + 1))
+      if [ "$claim" != "$DCE_DERIVED" ]; then
+        DCE_BAD="${DCE_BAD}${rel} claims '${claim}' — derivation says '${DCE_DERIVED}'"$'\n'
+      fi
+    done <<< "$(grep -oE "[0-9]+ of ECU's [0-9]+ substantive lines" "$REPO_DIR/$rel" || true)"
+    if [ "$dce_found" -lt 1 ]; then
+      DCE_VACUOUS="${DCE_VACUOUS}${rel} states the ECU survival in no form this guard can read"$'\n'
+    fi
+  done <<< "$DCE_QUOTING_FILES"
+
+  if [ -n "$DCE_BAD" ]; then
+    printf '%s' "$DCE_BAD"
+    printf '     %s\n' "Re-derive it, then update every file above in the same commit."
+  fi
+  assert_eq "0" "$(printf '%s' "$DCE_BAD" | grep -c . || true)" \
+    "every quoted ECU-survival figure matches the line-by-line derivation ($DCE_DERIVED)"
+
+  if [ -n "$DCE_VACUOUS" ]; then
+    printf '%s' "$DCE_VACUOUS"
+  fi
+  assert_eq "0" "$(printf '%s' "$DCE_VACUOUS" | grep -c . || true)" \
+    "every file this guard covers still states the ECU survival in a form it can read"
+fi
