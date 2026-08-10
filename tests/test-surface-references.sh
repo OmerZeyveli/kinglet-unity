@@ -209,13 +209,22 @@ assert_eq "0" "$(printf '%s' "$BLOCKLESS" | grep -c . || true)" \
 # Each needle below was proved load-bearing by deleting exactly that text from a scratch copy of the
 # skill and confirming the assertion fails: none of them is satisfied by any other part of the file.
 #
-# Read the file defensively. `assert_file_exists` turns a missing skill into one counted, named
-# assertion instead of a raw `cat:` on stderr followed by seven identical "not found" failures, and
-# `|| true` keeps `$deslop` a defined empty string under the runner's inherited `nounset`. (The
-# runner does `set +e` immediately before sourcing each file — see tests/run-tests.sh — so errexit
-# is OFF here and an unguarded `cat` would not have aborted the rest of this file. An earlier
-# version of this comment claimed it would. It does not, and CLAUDE.md is the record for those
-# semantics.)
+# `assert_file_exists` is the load-bearing half: it turns a missing skill into ONE counted, named
+# assertion instead of a raw `cat:` on stderr followed by twenty-three identical "not found"
+# failures that say nothing about the actual cause.
+#
+# `2>/dev/null || true` is belt-and-braces and nothing more. It is NOT required by any shell option
+# here — under the flags the runner actually gives a sourced file the assignment happens either way
+# and execution continues. Measured rather than reasoned, because two earlier versions of this
+# comment asserted a mechanism instead of testing one (first that errexit would abort the file, then
+# that nounset needed the guard; both false):
+#
+#   $ bash -c 'set -uo pipefail; set +e; v="$(cat /nonexistent 2>/dev/null)"; echo "rc=$? len=${#v}"'
+#   rc=1 len=0          # ... and the next command still runs, and "$v" still expands under -u
+#
+# The runner does `set +e` immediately before `( source "$test_file" )`, so errexit is OFF in here
+# and only nounset and pipefail are inherited. CLAUDE.md is the canonical record for those
+# semantics; if this comment and that file ever disagree, that file wins and this one is the bug.
 UE_SKILL="$REPO_DIR/.claude/skills/unity-execution/SKILL.md"
 assert_file_exists "$UE_SKILL" \
   "unity-execution exists — the inline branch of the execution fork has a home"
