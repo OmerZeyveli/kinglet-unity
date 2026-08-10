@@ -410,3 +410,50 @@ history; both are benign in direction, so neither was fixed.
   `provenance.tsv`; the edits those rows describe didn't land until the next commit, `bbad983`. The
   manifest under-claims fidelity for one commit rather than over-claiming it, which is the safe
   direction for this kind of drift.
+
+## unity-brainstorming (was deep-interview): the full note history
+
+`provenance.tsv`'s `note` column is free text that `scripts/check-provenance.sh` never reads. This
+row's note had accumulated five unrelated historical clauses, and the 2026-08-03 ledger deferred the
+readability question with an explicit trigger — *"may need a rethink if another wave adds a fifth."*
+The 2026-08-10 process-chain wave was the trigger. The note now carries one summary clause plus a
+pointer here; the prose history it used to carry is below, unchanged in substance.
+
+The file is `origin=ecu` and stays so. ECU 1.5.0's Ambiguity Score — the 0–2 scale, the five
+dimensions, the >= 6 threshold, the interview protocol and the two scoring examples — survives the
+2026-08-10 rewrite: 33 of the original's 69 substantive lines are still there verbatim, measured by
+testing each line of the current file against `git show 45eada9:.claude/skills/core/deep-interview/SKILL.md`
+with `grep -qxF`. The Superpowers adaptation is recorded in the note and discharged in `CREDITS.md`
+and `.claude/NOTICE.md`, which is where licence obligations belong; the schema has one origin column
+and the lineage begins at ECU.
+
+Clause by clause, oldest first:
+
+1. **`mobile-strip`** — the initial vendoring removed ECU's mobile-targeted guidance from this file
+   along with every other, per `tests/test-no-mobile.sh`. The one surviving trace was the question-style
+   example, which asked "Is this for mobile (touch input, limited GPU) or desktop?"; it was rewritten
+   to a keyboard/gamepad and min-spec-60fps question.
+2. **`flattened-for-discovery+inert-frontmatter-stripped`** — moved from
+   `.claude/skills/core/deep-interview/SKILL.md` to the flat path Claude Code actually scans, and
+   `alwaysApply: true` was deleted from the frontmatter as an inert Cursor key.
+3. **`task-5-process-chain`** — appended a Handoff section routing a passed gate to `/unity-workflow`
+   or `/unity-feature` and a failed gate to stop and ask. Both of those commands are deleted in the
+   2026-08-10 wave and the handoff now names `unity-planning` and forbids the alternatives.
+4. **`task-5-r1-finding-1`** — the description was rewritten into the trigger-condition form from
+   `docs/superpowers/plans/2026-07-30-kinglet-pioneer-wave-1b2-make-it-findable.md:70`. It is the
+   chain's entry point and it stated what it did rather than when it applied, so it could not be
+   selected from a vague request. That form was superseded on 2026-08-10 by the category trigger:
+   the surface no longer decides whether the request is vague enough to warrant it.
+5. **`task-2-process-layer-2`** — added "the thought that means you are about to treat vague as
+   clear", sourced from that wave's own record (repeatedly re-asked questions; briefs followed
+   exactly still producing findings clustered where the brief was vague). The note still says "five
+   rows" and the file has carried two since `e994779` ("cut unsourced citations"), which dropped
+   *"I can infer which file/system this means"*, *"Asking is slower than doing"* and *"The brief
+   didn't say, so it must not matter"* for citing sources that could not be produced. The two that
+   survive are measured and the 2026-08-10 rewrite keeps both. That drift — a note asserting a count
+   the file stopped matching two commits later — is a second argument for collapsing this column: a
+   number in free text is a number nothing checks.
+6. **`2026-08-10 process chain`** — the rename and the rewrite the current note summarises.
+
+The claims this file makes about its own content are asserted in `tests/test-surface-references.sh`,
+which is what stops the summary above becoming another sentence nobody can falsify.

@@ -297,3 +297,165 @@ done <<'UE_FINAL_SUMMARY'
 - [compilation status, test pass/fail counts]
 - [any inspector assignments, scene references, etc.]
 UE_FINAL_SUMMARY
+
+# ============================================================================
+# `unity-brainstorming` is the chain's entry point, and `provenance.tsv` makes claims about it.
+#
+# The manifest row says the file (a) kept ECU's Ambiguity Score — which is the entire basis for its
+# `origin=ecu` — and (b) gained a category trigger, an MCP-write HARD-GATE, the design half, and a
+# closed handoff, adapted from Superpowers. `check-provenance.sh` never reads the `note` column, so
+# without assertions here every one of those claims is a sentence nobody can falsify. That is the
+# criterion Task 3 derived and this block applies it: whatever the note says the file carries,
+# something fails if that content leaves.
+#
+# Two of the claims are asserted as WHOLE BLOCKS with `assert_eq`, not with `assert_contains`.
+# `assert_contains` is `grep -F`, and a multi-line pattern given to `grep -F` is a set of
+# alternatives: any ONE line matching satisfies it, so a four-line gate could lose three lines and
+# stay green. Run, not reasoned — this is the exact transcript:
+#
+#   $ printf 'no MCP write call is made\n' > g-hay
+#   $ printf 'no MCP write call is made\nAND SO IS THIS SECOND LINE\n' > g-needle
+#   $ grep -qF -- "$(cat g-needle)" g-hay && echo "MATCHED (only line 1 present)"; echo "exit=$?"
+#   MATCHED (only line 1 present)
+#   exit=0
+#
+# The haystack does not contain the second line at all, and the two-line needle still matched.
+# `assert_eq` compares character for character and has no such hole.
+UB_SKILL="$REPO_DIR/.claude/skills/unity-brainstorming/SKILL.md"
+assert_file_exists "$UB_SKILL" \
+  "unity-brainstorming exists — the chain has an entry point"
+
+brainstorm="$(cat "$UB_SKILL" 2>/dev/null || true)"
+
+# --- D2: the trigger is a category of work, not a judgment about the request -----------------
+# The description IS the selection mechanism — there is no glob and no always-apply — so this
+# string is the single most load-bearing text in the payload. Compared whole: asserting the
+# fragment "You MUST use this before building anything" leaves the clause that names the category
+# ("a new mechanic, system, component, scene, or UI screen"), the clause that names the forbidden
+# actions, and the tweak exclusion all free to be reworded into a judgment again.
+UB_DESC_EXPECTED='You MUST use this before building anything in this Unity project — a new mechanic, system, component, scene, or UI screen — and before writing a plan, touching C#, or mutating the scene. Explores intent, constraints and approaches, then writes the design decision to a file. Not for a tweak to something that already works.'
+UB_DESC_ACTUAL="$(awk 'NR==1 && /^---$/ {f=1; next}
+                      f && /^---$/ {exit}
+                      f && /^description:/ {
+                        sub(/^description:[[:space:]]*/, "")
+                        sub(/^"/, ""); sub(/"$/, "")
+                        print; exit
+                      }' "$UB_SKILL" 2>/dev/null || true)"
+assert_eq "$UB_DESC_EXPECTED" "$UB_DESC_ACTUAL" \
+  "unity-brainstorming's description is D2's fixed trigger text, character for character"
+
+# --- D3: the gate covers MCP writes, not only code -------------------------------------------
+# The Unity-specific half of the adaptation, and the reason the Superpowers text could not be
+# imported unchanged. Whole-block again: the line naming MCP is the one a summariser keeps, and
+# the three around it — the dispatch ban, the irreversibility reason, and the no-exceptions
+# sentence — are the ones it drops.
+UB_GATE_EXPECTED='Until a design has been presented and approved: no implementer agent is dispatched, no `.cs` is
+written, and **no MCP write call is made** — scene, prefab and ScriptableObject included. A single
+MCP call mutates state that no test can restore. This applies to every request regardless of
+perceived simplicity.'
+UB_GATE_ACTUAL="$(awk '/^<HARD-GATE>$/ {f=1; next} f && /^<\/HARD-GATE>$/ {exit} f' "$UB_SKILL" 2>/dev/null || true)"
+assert_eq "$UB_GATE_EXPECTED" "$UB_GATE_ACTUAL" \
+  "unity-brainstorming's HARD-GATE is D3's text, character for character"
+
+# --- D4: the handoff is closed and names the forbidden alternatives ---------------------------
+# Anchored to the Handoff section. Unanchored against the whole file, `unity-planning` is satisfied
+# by any passing mention and the prohibition could be deleted outright with this still green.
+UB_HANDOFF="$(awk '/^## Handoff/ {f=1; next} f && /^## / {exit} f' "$UB_SKILL" 2>/dev/null || true)"
+assert_contains "$UB_HANDOFF" ".claude/skills/unity-planning/SKILL.md" \
+  "the handoff names its terminal state by path"
+assert_contains "$UB_HANDOFF" "Invoke no other skill" \
+  "the handoff is closed, not merely a recommendation"
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$UB_HANDOFF" "$needle" \
+    "the handoff names the forbidden alternative this repo actually ships: $needle"
+done <<'UB_FORBIDDEN'
+/unity-prototype
+unity-coder
+any MCP agent
+UB_FORBIDDEN
+
+# --- D2: depth scales the round, never the artifact -------------------------------------------
+# The plan's needle here was the bare `design.md is still written`, which cannot match the plan's own
+# fixed body text: that text writes it as `` `design.md` is still written ``, and assert_contains is
+# `grep -F` — a literal, so the backticks are two characters that must be there. Caught by running
+# the suite against a faithful transcription of the plan's own block. The needle carries the
+# backticks; the body text is the plan's, unchanged.
+#
+# Three needles rather than one, because the claim has three separable halves and losing any of them
+# reopens "no design": the bold lead states the rule, the middle clause states what survives depth 1,
+# and the last line is the one that names the failure mode by name.
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$brainstorm" "$needle" \
+    "depth scales the round, never the artifact: $needle"
+done <<'UB_DEPTH'
+**Depth scales the round, never the artifact.**
+`design.md` is still written, still presented, and still approved.
+"Short design" and "no design"
+UB_DEPTH
+
+# --- The provenance claim that `origin=ecu` rests on ------------------------------------------
+# D10 rules that this file stays `origin=ecu` because ECU's Ambiguity Score survives the rewrite.
+# That is a claim about file content, made in a column no checker reads. If the score is ever
+# summarised away, the row becomes a falsehood and — without these — nothing says so.
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$brainstorm" "$needle" \
+    "unity-brainstorming keeps ECU's Ambiguity Score: ${needle%% —*}"
+done <<'UB_AMBIGUITY_SCORE'
+## Ambiguity Score
+Rate the request across 5 dimensions. Each scores 0–2:
+1. **Scope** — What exactly is being built? What are its boundaries? What is NOT included?
+2. **Platform** — Target platform, Unity version, render pipeline, input method?
+3. **Performance** — FPS target, memory budget, draw call limits, target device tier?
+4. **Integration** — What existing systems does this touch? Dependencies? Data flow?
+5. **Acceptance Criteria** — How do we know it's done? What should we test? What does success look like?
+**Threshold: total score >= 6 out of 10 to proceed.**
+UB_AMBIGUITY_SCORE
+
+# --- The design half the row claims the file gained -------------------------------------------
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$brainstorm" "$needle" \
+    "unity-brainstorming carries the design half: $needle"
+done <<'UB_DESIGN_HALF'
+docs/features/<slug>/design.md
+Propose 2–3 approaches
+Operator steps
+Never `git add -A`
+UB_DESIGN_HALF
+
+# --- The exemption list is removed, not reworded ----------------------------------------------
+# D2 removes it: a list of exemptions is a list of ways to talk yourself out of the round. Asserted
+# by absence because the replacement (a category trigger plus a build/tweak pair) reads perfectly
+# well beside a surviving exemption section, so a positive assertion cannot detect one.
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_not_contains "$brainstorm" "$needle" \
+    "the exemption list is gone from unity-brainstorming: $needle"
+done <<'UB_GONE'
+## When to Activate
+## Exemptions
+--skip-interview
+UB_GONE
+
+# The old name must be gone from the tree, not merely unused. There is no assert_file_absent in the
+# runner; this is the file-existence idiom the rest of this file uses, inverted.
+UB_OLD_STATE="absent"
+if [ -e "$REPO_DIR/.claude/skills/deep-interview/SKILL.md" ]; then UB_OLD_STATE="present"; fi
+assert_eq "absent" "$UB_OLD_STATE" \
+  "the deep-interview path is gone from the tree, not merely unreferenced"
+
+# --- The manifest row itself ------------------------------------------------------------------
+# The note was collapsed to a summary plus a pointer into MERGE-NOTES.md, so the pointer is now
+# load-bearing: a renamed section there would silently orphan the file's whole history. Nothing
+# else in the suite reads a provenance note, so nothing else could catch it.
+UB_ROW="$(awk -F'\t' '$1 == ".claude/skills/unity-brainstorming/SKILL.md"' "$REPO_DIR/provenance.tsv" 2>/dev/null || true)"
+UB_MERGE_SECTION='## unity-brainstorming (was deep-interview): the full note history'
+assert_contains "$UB_ROW" "ecu" \
+  "unity-brainstorming's row still records its ECU lineage (D10)"
+assert_contains "$UB_ROW" "$UB_MERGE_SECTION" \
+  "the collapsed note points at a MERGE-NOTES.md section by its exact heading"
+assert_contains "$(cat "$REPO_DIR/MERGE-NOTES.md" 2>/dev/null || true)" "$UB_MERGE_SECTION" \
+  "that MERGE-NOTES.md section exists — the pointer resolves"
