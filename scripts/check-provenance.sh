@@ -100,7 +100,7 @@ fi
 # ── 5. Field sanity ──────────────────────────────────────────────────────────
 BADFIELD=0
 while IFS=$'\t' read -r path origin _uver _upath _usha status _note; do
-  case "$origin" in ecu|donchitos|original) ;; *) fail "bad origin '$origin': $path"; BADFIELD=$((BADFIELD + 1)) ;; esac
+  case "$origin" in ecu|donchitos|superpowers|original) ;; *) fail "bad origin '$origin': $path"; BADFIELD=$((BADFIELD + 1)) ;; esac
   case "$status" in verbatim|modified|original) ;; *) fail "bad status '$status': $path"; BADFIELD=$((BADFIELD + 1)) ;; esac
   # An 'original' file cannot have an upstream, and a vendored file must have one.
   if [ "$origin" = original ] && [ "$status" != original ]; then

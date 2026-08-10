@@ -1,7 +1,13 @@
 # Kinglet Pioneer provenance manifest
 # Evidence behind CREDITS.md. One row per tracked file. Validated by scripts/check-provenance.sh.
-# origin: ecu|donchitos|original   status: verbatim|modified|original
+# origin: ecu|donchitos|superpowers|original   status: verbatim|modified|original
 # ecu=1.5.0 (bb28ccbd40b065b0958b02df0c03fb91c4fb7c5b)  donchitos=984023d
+# superpowers=6.2.0 (3dcbd5c4b48e02263fbf4a3c01e3fe4f81d584d9)
+# Keep that pin on its own line. --online reads the ECU commit with `grep -m1 '^# ecu=' | sed
+# 's/.*(\([0-9a-f]\{40\}\)).*/\1/'`, and that leading `.*` is greedy: a second 40-hex parenthesis on
+# the ecu= line wins, so --online clones ECU and tries to check out a Superpowers SHA that is not in
+# that clone — git errors and the script dies under set -e. Measured. Guarded in
+# tests/test-provenance-origins.sh, which nothing else would catch: no test runs --online.
 # NOTE: README/LICENSE/CONTRIBUTING/CLAUDE.md/.gitignore share a path with ECU but are ours, not vendored.
 path	origin	upstream_version	upstream_path	upstream_sha256	status	note
 .claude/agents/unity-coder.md	ecu	1.5.0	.claude/agents/unity-coder.md	dcb5aedce694fb7941babd0ab678d102b641edf2621ef2ce5baa82df98177695	modified	skill-loading-wired: Skill tool + Skills-to-load block; m_ prefix corrected to _lowerCamelCase per rules/csharp-unity.md; surface-cut-cleanup: removed serialization-safety/scriptable-objects/event-systems from Skills to load (2026-08-03); trigger-condition description transcribed from the 2026-07-30 surface-trigger-rules spec; task-1-process-layer-2: mcp__unityMCP__* -> mcp__UnityMCP__* -- the live registered server is UnityMCP (capital U, verified against ~/.claude.json and CoplayDev Auto-Setup); the prior final-fix-2026-08-03 casing correction on this file was itself wrong, reverted; task-8-process-layer-2: added verification-before-completion to Skills to load; added Finishing section (read_console after last write, manual-Editor-step block) and a What you return report contract
@@ -544,3 +550,4 @@ docs/superpowers/plans/2026-08-10-kinglet-process-chain.md	original	-	-	-	origin
 tests/test-derived-counts.sh	original	-	-	-	original	a number quoted in prose must match what it is derived from; the provenance split went stale three times in two days, once one commit after being corrected; assert-eq-argument-order: swapped call-site argument order to match run-tests.sh's declared assert_eq(expected, actual) contract, so FAIL output prints the right label
 tests/test-stack-arbitration.sh	original	-	-	-	original	a surface that names VContainer/MessagePipe/LifetimeScope/UniTask must point at CLAUDE.md's generated block; measured 2026-08-04 a session ruled out /unity-feature and /unity-workflow on stack grounds without opening either file, losing every MCP-driven agent its entry point
 docs/superpowers/plans/2026-08-10-kinglet-process-chain-ledger.md	original	-	-	-	original	execution ledger for the process-chain plan; tracked rather than gitignored per spec D8 — design, plan and ledger in one place
+tests/test-provenance-origins.sh	original	-	-	-	original	guards the superpowers origin value and the two recorded refusals (using-git-worktrees, visual-companion)
