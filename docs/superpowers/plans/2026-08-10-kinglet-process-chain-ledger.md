@@ -11,13 +11,21 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1 and 2 are done and closed.** Nothing is currently dispatched. **Task 3 (`unity-planning`)
-is next**, and its brief transcribes `/unity-workflow` Phase 1a — **sweep that text against
-`45eada9` before recording it as original**, because Task 2 got exactly that wrong.
+**Tasks 1, 2 and 3 are done and closed.** Nothing is currently dispatched. **Task 4
+(`unity-brainstorming`) is next** — the rename plus the design half. It is the first task whose path
+set changes (a rename is a removal *plus* an addition, each counted twice), and the 2026-08-03 ledger
+records that a path-set change was an unconditional refusal by the regenerator until it was taught
+otherwise: **confirm it handles a rename before trusting the flags.**
 
-Suite is at **327 passing**, `provenance OK`, 94 `rule=absent` enforced, 542 manifest rows.
+Suite is at **356 passing**, `provenance OK`, 543 manifest rows, 94 `rule=absent` enforced.
 Reports under `.superpowers/sdd/2026-08-10-process-chain/`: `task-1-report.md` (rounds 0–3),
-`task-1-round4-report.md`, `task-2-report.md` (task + 2 fix rounds).
+`task-1-round4-report.md`, `task-2-report.md`, `task-3-report.md` (task + 2 fix rounds each).
+
+**The chain now exists end to end except its entry point.** `unity-planning` → the fork →
+`subagent-driven-implementation` or `unity-execution`, with the execution mode written and read at
+five ends. Task 4 supplies `unity-brainstorming`, which two surfaces already name by path — and
+**nothing in the suite catches a dangling skill→skill path reference**, so their silence is not
+confirmation that Task 4 landed.
 
 **The cut-criterion gate on `unity-execution` was answered "ship it"**, and the argument is on the
 record: the Deslop Pass's two restraining rules — a scope boundary and a default — are what an
@@ -86,6 +94,26 @@ Copy this section into every dispatch. A fresh subagent inherits none of it.
      `tests/kinglet/test_baseline_inventory.py`'s hand-maintained constants** — three assertions go
      red while the tool prints success. Fold the constants into the baseline commit; they are one
      logical change with the JSON.
+- **Guard what `provenance.tsv` claims — that is the criterion, not "does this read as important".**
+  Derived in Task 3's re-review and it unifies the two most expensive defects of this wave: Task 2's
+  Critical (a note calling ECU text Kinglet's) and Task 3's Spec ❌ (a note listing a header the file
+  did not carry). Neither is *loss of the idea*; both are **the manifest becoming a lie**, and
+  `check-provenance.sh` **never reads the free-text `note` column** — so the only thing standing
+  between a manifest claim and a silent falsehood is a guard on the content it claims.
+
+  Task 3's live instance, measured: `provenance.tsv:555` claimed the `Files:`/`Interfaces:` blocks
+  were carried, and deleting the whole 23-line template left the suite **27/27 green**. Four needles
+  closed it. The rejected criterion — *"is there an upstream to restore from?"* — is reasonable and
+  answers the wrong question.
+
+- **`grep -F` treats a multi-line pattern as alternatives, not a block.** This has now bitten two
+  different guards in this wave wearing different text: Task 1's here-doc pin (any surviving line
+  satisfied it) and Task 3's three-line handoff assertion (same). Confirmed on both binaries here
+  (GNU grep 3.11, ugrep 7.5.0). **Adding more needles does not fix it** — full-line needles still
+  miss reordering. Compare the block character-for-character instead; Task 3 added a local
+  `assert_same` that survived six vacuity probes (missing file, empty file, em-dash swap, backticks
+  stripped, one trailing space, two-space indent).
+
 - **Before recording transcribed text as original, sweep every line against the vendor commit.**
   Task 2 asserted the Deslop Pass was Kinglet-original; it is **ECU v1.5.0 verbatim**, and so are the
   Final Summary, the `max 3 iterations` bound and two verify-loop steps — 32 content lines in three
@@ -176,6 +204,24 @@ State these in later dispatches rather than letting a brief guess.
   existed before`. The plan's own needle was lowercase, which would have made the guard pass against
   a paraphrase and fail against the verbatim transcription the plan required.
 
+**From Task 3** (commits `dfa8684..5e81a49`):
+
+- **`.claude/skills/unity-planning/SKILL.md` exists** and carries the fork. Phase 1a's plan-adoption
+  logic moved into it and was **measured Kinglet-original** — 21 of 21 non-blank lines absent from
+  `45eada9`, plus a substring sweep with zero hits, and `git log -S` dating it to `b19d3d0`.
+- **The execution-mode contract is live and has five ends, all asserted.** The ledger's **line two**
+  is `**Execution mode:** subagent-driven` or `**Execution mode:** inline`, line one being the plan
+  path. Written by `unity-planning` §6 after the choice, and by whichever branch runs; read by all
+  three surfaces, each honouring a mode **whichever surface wrote it** — otherwise a run started
+  inline and resumed through the recommended branch silently changes mode.
+  **`unity-execution` previously kept no ledger at all**, which made the inline branch the one that
+  could not be resumed; it now writes two lines.
+- **A ledger lives beside its plan** — `docs/features/<slug>/ledger.md` and `<plan-slug>-ledger.md`
+  are that one rule applied, not a rule plus an exception.
+- `subagent-driven-implementation`'s `description:` no longer names `/unity-workflow`. **One body
+  reference survives at its line 8** (`"/unity-workflow Phase 3 today is a document…"`) — historical
+  framing, and **Task 5's to resolve**.
+
 - **`tests/test-provenance-origins.sh` exists and is self-contained** — own helpers, own
   `set -euo pipefail`, valid to run standalone. Tasks 5 and 7 extend it. It uses
   `${BASH_SOURCE[0]}`, not `$0`: inside `( source "$file" )` a test file sees the *sourcing* shell's
@@ -188,7 +234,7 @@ State these in later dispatches rather than letting a brief guess.
 |---|---|---|---|---|
 | 1 | Provenance accepts a `superpowers` origin; two refusals recorded | **done** | `0b67c49..a7c0d7f` | 4 fix rounds. Spec ✅, Quality Approved, 0 Critical. Rounds 1–3 with the original implementer, round 4 with a fresh one per the loop's rule; round 4 found the guard's **shape** was wrong, which retroactively explains rounds 2–3 as symptom-patching |
 | 2 | `unity-execution` — inline branch, Deslop Pass, cut-criterion gate | **done** | `4fb4493..04e1d96` | 2 fix rounds. Spec ✅, 1 Critical + 2 Important + 3 Minor, all ADDRESSED. **The cut-criterion gate was answered "ship it" with a concrete defence** — see below |
-| 3 | `unity-planning` — plan-writing as a skill, carrying the fork | **pending** | — | |
+| 3 | `unity-planning` — plan-writing as a skill, carrying the fork | **done** | `dfa8684..5e81a49` | 2 fix rounds. Spec ❌→✅ (the `writing-plans` document header was missing), 4 Important + 7 Minor, all ADDRESSED. **The fork's write half did not exist** — see below |
 | 4 | `unity-brainstorming` — rename + the design half | **pending** | — | path-set change: rename = removal + addition |
 | 5 | Delete the two sequencer commands, repair 22 references | **pending** | — | `generate-claude-md.sh` ships names into user projects |
 | 6 | `using-kinglet` becomes a mandate | **pending** | — | |
@@ -255,6 +301,33 @@ maintenance, which is exactly the property round 3 lacked, one contradicts a com
 it, and `run-tests.sh` separately flags a file that exits non-zero without reporting.
 
 ## Deferred and parked findings
+
+### Task 5 must do these — they are not optional cleanups
+
+- **Drop `provenance.tsv:545`'s parenthetical** *"(it is still present in the tree this row
+  describes)"*. It is true today and becomes false the moment the command is deleted.
+- **Resolve `subagent-driven-implementation`'s line 8**, which opens by describing `/unity-workflow`
+  Phase 3 in the present tense.
+
+### Seven from Task 3, deferred with rulings
+
+1. **`unity-execution`'s ledger address is unguarded** while `subagent-driven-implementation`'s
+   identical address is guarded. The two writers can drift apart silently.
+2. **The handoff's *position* inside the header block is prose-only.** `assert_same` extracts by awk
+   from the first `**For agentic workers:**` regardless of where it sits, so "in this order" and
+   "under the title" are asserted in text and not enforced.
+3. **The precedence sentence that does Important 3's actual work is unguarded** — deleting only it
+   leaves the suite green, because the needle `plan path` is satisfied by the input-list clause.
+4. **`## Global Constraints` inside a fenced block reads as a real heading to any `^## ` scanner**,
+   and silently truncated the re-reviewer's own extraction. A hazard for any future section-anchored
+   assertion in `unity-planning`.
+5. **Selection tie-break is one-sided.** `unity-planning` now owns the token "plan path" and states a
+   precedence rule; `subagent-driven-implementation`'s description does not concede it.
+6. **~18 pre-existing `docs/superpowers/plans/*.md` carry the upstream
+   `superpowers:subagent-driven-development` handoff**, which is not a Kinglet surface. Task 7/8.
+7. **Nothing in the suite covers a skill→skill path reference.** `test-skill-discovery.sh` scans only
+   `.claude/agents` and `.claude/commands`; `test-surface-references.sh` scans skill bodies only for
+   `/unity-*` **command** tokens. Task 8 step 2 checks it once; consider making it permanent.
 
 ### Six from Task 2, deferred with rulings
 
