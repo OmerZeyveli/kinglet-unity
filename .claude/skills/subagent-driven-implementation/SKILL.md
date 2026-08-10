@@ -22,7 +22,14 @@ built on Kinglet's own surfaces and carries rules a generic loop does not need.
 
 ## The loop
 
-**Setup.** Create a ledger file. **A ledger lives beside its plan** — the pairing is what makes it
+**Setup.** **Look for the ledger before creating one.** The plan's own handoff line routes a fresh
+session straight to this skill, bypassing `unity-planning`, so starting a plan and resuming a
+half-finished one arrive by the same door and look identical from here. If a ledger already exists at
+the address below, this is a resume: read it, do not overwrite it, and pick up at the first open item.
+**If it already records a mode, do not ask** — a decision already written down is not reopened, and it
+does not matter which surface wrote it. Only create a ledger when there is none.
+
+**A ledger lives beside its plan** — the pairing is what makes it
 findable, and every address below is that one rule applied. A plan written by `unity-planning` sits
 at `docs/features/<slug>/plan.md`, so its ledger is `docs/features/<slug>/ledger.md`: the third file
 beside the `design.md` and `plan.md` this work came from, so one directory holds what was decided,

@@ -164,6 +164,34 @@ assert_has "$BODY" '"Similar to Task N" — repeat the code' \
     "repeat-the-code survives, because a fresh implementer reads exactly one task"
 assert_has "$BODY" "Type consistency" "the self-review checks names across tasks"
 
+# The `### Task N` template, because provenance.tsv:555 CLAIMS the Files:/Interfaces:
+# blocks are carried from writing-plans.
+#
+# This is the criterion, and it is narrower than "guard what matters": guard what the
+# manifest asserts. check-provenance.sh validates paths, checksums and field agreement and
+# never reads the free-text note column, so a note is only as true as the last person to
+# read it — and the two defects this task has already paid for (Task 2's Critical, this
+# task's Spec ❌) were both a note describing a file that had stopped matching it, not an
+# idea being lost. Measured before this block existed: deleting the whole 23-line template
+# left 27/27 green with the row still claiming both blocks.
+assert_has "$BODY" "### Task N: [Component Name]" "the task template survives"
+assert_has "$BODY" '- Modify: `Assets/Scripts/Existing.cs:123-145`' \
+    "the Files: block shows exact paths with line ranges"
+assert_has "$BODY" "- Consumes: what this task uses from earlier tasks — exact signatures" \
+    "the Interfaces: block names what a task consumes"
+assert_has "$BODY" "A task's implementer sees only their own task; this block is how they learn the names and types" \
+    "…and why it exists at all, which is the half a shortened template drops"
+
+# `never git add -A`. Unguarded anywhere in tests/ before this line, and by this repo's own
+# damage model it is the costliest thing in the file to lose: in a Unity project `-A` stages
+# .meta churn, and .meta loss is what the rules spend the most effort preventing. Both
+# halves are asserted — the instruction is useless without the reason, because a reader who
+# does not know why will reasonably decide their case is the exception.
+assert_has "$BODY" 'never `git add -A`, because in a Unity' \
+    "the plan is committed by path only, never with git add -A"
+assert_has "$BODY" 'project that stages `.meta` churn, and `.meta` loss is the damage' \
+    "…with the reason attached, not just the prohibition"
+
 # The fork lives here, and it does not reopen a decision the ledger already records.
 assert_has "$BODY" "If the ledger already records a mode, do not ask" \
     "a recorded execution mode is not reopened"
@@ -192,6 +220,14 @@ SDI_FRONT="$(awk 'NR==1 && /^---$/{f=1;next} f && /^---$/{exit} f' "$SDI" 2>/dev
 assert_has "$SDI_BODY" "docs/features/<slug>/ledger.md" "the ledger has an address beside the plan"
 assert_has "$SDI_BODY" "**Execution mode:** subagent-driven" \
     "the subagent branch writes the mode a resuming controller reads"
+# ...and reads one. The plan-borne handoff routes a fresh session straight to this skill,
+# bypassing unity-planning, so this is the branch on which the resume route actually lands
+# — and it is the recommended one. Told only "create a ledger", it would overwrite the
+# record the write half exists to leave.
+assert_has "$SDI_BODY" "Look for the ledger before creating one" \
+    "the subagent branch reads an existing ledger instead of recreating it"
+assert_has "$SDI_BODY" "If it already records a mode, do not ask" \
+    "…and honours a mode it finds there, whichever surface wrote it"
 assert_lacks "$SDI_FRONT" "/unity-workflow" \
     "the selection description does not route through a command"
 
