@@ -414,7 +414,8 @@ history; both are benign in direction, so neither was fixed.
 ## unity-brainstorming (was deep-interview): the full note history
 
 `provenance.tsv`'s `note` column is free text that `scripts/check-provenance.sh` never reads. This
-row's note had accumulated five unrelated historical clauses, and the 2026-08-03 ledger deferred the
+row's note had accumulated five unrelated historical clauses — they are numbered 1 to 5 below, so
+that count is checkable by reading rather than by trust — and the 2026-08-03 ledger deferred the
 readability question with an explicit trigger — *"may need a rethink if another wave adds a fifth."*
 The 2026-08-10 process-chain wave was the trigger. The note now carries one summary clause plus a
 pointer here; the prose history it used to carry is below, unchanged in substance.
@@ -429,14 +430,21 @@ contradicted the Handoff in the same file: an opt-out permitted at one heading a
 another. The step's stem survives and now proceeds *to* presenting the design rather than past it.
 That is the whole of the difference between 33 and 32.
 
-Both halves are checked rather than asserted. Each named block is compared **whole** in
-`tests/test-surface-references.sh` — the 0–2 table, the dimensions, protocol steps 1–3 and both
-scoring examples — because a per-line needle lets a whole section vanish green (measured: 153 of 176
-lines could be deleted one at a time with the suite green, and dropping just `## Interview Protocol`
-and `## Scoring Examples` took the survivor count from 33 to 14). The **number** is re-derived in
-`tests/test-derived-counts.sh` and compared against the figure quoted here and in `provenance.tsv`,
-so it cannot go stale the way the five-row claim in clause 5 below did. The derivation is a line-by-
-line comparison against `git show 45eada9:.claude/skills/core/deep-interview/SKILL.md`.
+Both halves are checked rather than asserted, and this paragraph deliberately states no figure it
+cannot check. Each named block — the 0–2 table, the dimensions, the threshold and its gloss, the
+protocol, and both scoring examples — is located **by its heading** and compared **whole** in
+`tests/test-surface-references.sh`. Three weaker forms were tried and each let a mutation through
+with the suite green: a per-line needle let whole sections vanish; a needle satisfied by a duplicate
+elsewhere in the file could not detect either copy being lost; and a content-anchored extractor
+asserted that the text existed *somewhere*, so the score table could be moved to an appendix and a
+sixth dimension appended, both green. A whole-section comparison is the only form that catches
+deletion, relocation and insertion at once, which is why the skill gained a `### Threshold` heading:
+one claimed block, one section, one comparison.
+
+The **number** is re-derived in `tests/test-derived-counts.sh` — a line-by-line comparison against
+`git show 45eada9:.claude/skills/core/deep-interview/SKILL.md` — and checked against every file that
+quotes it, this one included. It therefore cannot go stale the way the five-row claim in clause 5
+below did.
 
 The Superpowers adaptation is recorded in the note and discharged in `CREDITS.md` and
 `.claude/NOTICE.md`, which is where licence obligations belong; the schema has one origin column and

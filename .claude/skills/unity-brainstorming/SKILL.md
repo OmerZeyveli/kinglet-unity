@@ -85,6 +85,8 @@ Rate the request across 5 dimensions. Each scores 0–2:
 4. **Integration** — What existing systems does this touch? Dependencies? Data flow?
 5. **Acceptance Criteria** — How do we know it's done? What should we test? What does success look like?
 
+### Threshold
+
 **Threshold: total score >= 6 out of 10 to proceed.**
 
 That line is ECU's, kept, and "proceed" is now defined: it means **proceed to presenting the

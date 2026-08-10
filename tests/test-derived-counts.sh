@@ -123,21 +123,44 @@ DCE_UPSTREAM_PATH=".claude/skills/core/deep-interview/SKILL.md"
 
 DCE_ORIGINAL="$(git -C "$REPO_DIR" show "${DCE_ANCHOR}:${DCE_UPSTREAM_PATH}" 2>/dev/null || true)"
 
-if [ -z "$DCE_ORIGINAL" ] || [ ! -f "$DCE_SKILL" ]; then
-  # A shallow clone has no $DCE_ANCHOR and cannot derive anything. Skipping is honest and visible in
-  # the runner's output; failing would red the suite for a checkout depth rather than for a defect.
-  skip_test "ECU survival not derivable here (no blob ${DCE_ANCHOR}:${DCE_UPSTREAM_PATH} — shallow clone?)"
-else
+# Two separate preconditions, asserted separately. Round 1 ORed them into one `skip_test`, which
+# meant a deleted skill file and an unreachable blob produced the same silent green — and a shallow
+# clone silenced the guard entirely. Demonstrated by the round-2 review: in a `git clone --depth 1`
+# the block printed SKIP, the figure was then set to `99 of ECU's 69` in BOTH quoting files, the
+# suite stayed green and `check-provenance.sh` still printed `provenance OK`.
+#
+# Ruling taken: FAIL, do not skip. A shallow checkout is not a supported environment anywhere else in
+# this suite — tests/test-surface-references.sh runs `git ls-files`, the baseline regenerator runs
+# `git ls-tree` against an anchor commit — and a guard that turns itself off in an unusual state is
+# one that goes quiet exactly when nobody is watching.
+assert_file_exists "$DCE_SKILL" \
+  "the skill whose ECU survival is being derived exists"
+
+DCE_HAVE_BLOB="yes"
+[ -n "$DCE_ORIGINAL" ] || DCE_HAVE_BLOB="no (unreachable: ${DCE_ANCHOR}:${DCE_UPSTREAM_PATH} — shallow clone or rewritten history)"
+assert_eq "yes" "$DCE_HAVE_BLOB" \
+  "the vendored ECU original is readable at ${DCE_ANCHOR}, so the figure can be derived at all"
+
+if [ -n "$DCE_ORIGINAL" ] && [ -f "$DCE_SKILL" ]; then
   DCE_DERIVED="$(printf '%s\n' "$DCE_ORIGINAL" | awk '
     NR == FNR { if ($0 ~ /[^[:space:]]/) cur[$0] = 1; next }
     $0 ~ /[^[:space:]]/ && $0 != "---" { total++; if ($0 in cur) kept++ }
     END { printf "%d of ECU'"'"'s %d substantive lines", kept + 0, total + 0 }
   ' "$DCE_SKILL" -)"
 
-  # Every file that quotes it. A file added to this list without the phrase fails the vacuity check
-  # below rather than passing silently — the finding-8 shape this file already carries once.
+  # Every file that quotes the figure — INCLUDING THIS ONE. Round 1 quoted it in the header comment
+  # above and left itself off the list, so the guard did not check itself: the one file guaranteed to
+  # be read by anyone debugging the number was the one file allowed to state it wrongly. A file added
+  # here without the phrase fails the vacuity check below rather than passing silently — the
+  # finding-8 shape this file already carries once.
+  #
+  # Note the header comment is the ONLY place in this file allowed to state the figure. Do not quote
+  # it again in prose here, not even historically: this guard cannot tell a stale claim from a
+  # correct record of an older one, and a comment saying "round 1 said N" would go red the day N
+  # legitimately changes.
   DCE_QUOTING_FILES="provenance.tsv
-MERGE-NOTES.md"
+MERGE-NOTES.md
+tests/test-derived-counts.sh"
 
   DCE_BAD=""
   DCE_VACUOUS=""

@@ -370,13 +370,11 @@ ub_trim() {
     }'
 }
 
-# The first paragraph of a section: from the heading, past the blank line under it, to the next blank
-# line. `### Dimensions` is followed in the same section by the threshold line and its gloss, so a
-# whole-section comparison there would assert three unrelated things as one block and fail for the
-# wrong reason whenever any of them is edited.
-ub_first_para() {
-  ub_section "$1" | awk 'started && /^[[:space:]]*$/ { exit } /[^[:space:]]/ { started = 1 } started'
-}
+# There was a `ub_first_para` here in round 1, used where a whole-section comparison would have
+# bundled two unrelated claims. Round 2 gave the skill a `### Threshold` heading instead, so every
+# claimed block owns exactly one section and every comparison below is a whole section — which is
+# what makes relocation and insertion detectable, and what a first-paragraph extractor cannot do
+# (append a sixth dimension after a blank line and it stops before reaching it).
 
 # --- D2: the trigger is a category of work, not a judgment about the request -----------------
 # The description IS the selection mechanism — there is no glob and no always-apply — so this
@@ -408,63 +406,90 @@ assert_eq "$UB_GATE_EXPECTED" "$UB_GATE_ACTUAL" \
   "unity-brainstorming's HARD-GATE is D3's text, character for character"
 
 # ============================================================================
-# The four ECU blocks `provenance.tsv:71` and its MERGE-NOTES.md section name by name.
+# The blocks `provenance.tsv:71` and its MERGE-NOTES.md section name by name.
 #
 # The note says ECU's Ambiguity Score is what survives and that this is what `origin=ecu` rests on;
-# MERGE-NOTES.md enumerates five things — the 0-2 scale, the five dimensions, the >= 6 threshold,
-# the interview protocol and the two scoring examples. Two of the five were guarded before this
-# round and three were not. All five are below, three of them as whole blocks.
-UB_SCORE_TABLE_EXPECTED='| Score | Meaning |
+# MERGE-NOTES.md enumerates the 0-2 scale, the five dimensions, the >= 6 threshold, the interview
+# protocol's first three steps and both scoring examples.
+#
+# ROUND 2: every one of these is now HEADING-anchored — the section is located by its heading and
+# compared whole. Round 1 anchored most of them by CONTENT (`/^\| Score \| Meaning \|$/`,
+# `/^That line is ECU/`, `/^\*\*Depth scales/`, `/^1\. \*\*Present the current scores\*\*/`), which
+# asserts that the text exists SOMEWHERE and says nothing about where. Two measured escapes, both
+# green against the round-1 guard:
+#
+#   - move ECU's 0-2 score table out of `## Ambiguity Score` into an appendix at the end of the file;
+#   - append a sixth dimension after a blank line, so "five dimensions survive whole" passes while
+#     the file lists six.
+#
+# The manifest does not claim this text is present. It claims ECU's Ambiguity Score survives — a
+# structure, in named sections. A whole-section comparison is the only form that catches all three
+# mutations at once: deletion (section missing), relocation (section no longer holds it), and
+# insertion (section holds more than it should). The skill gained a `### Threshold` heading in this
+# round so that each claimed block owns exactly one section and no comparison bundles two claims.
+UB_SCORE_SECTION_EXPECTED='Rate the request across 5 dimensions. Each scores 0–2:
+
+| Score | Meaning |
 |-------|---------|
 | 0 | Unspecified — no information provided |
 | 1 | Partial — vague or implied |
 | 2 | Clear — explicitly stated or obvious from context |'
-UB_SCORE_TABLE_ACTUAL="$(awk '/^\| Score \| Meaning \|$/ {f=1} f && /^[[:space:]]*$/ {exit} f' "$UB_SKILL" 2>/dev/null || true)"
-assert_eq "$UB_SCORE_TABLE_EXPECTED" "$UB_SCORE_TABLE_ACTUAL" \
-  "ECU's 0-2 score table survives whole (MERGE-NOTES names it; nothing guarded it before round 1)"
+assert_eq "$UB_SCORE_SECTION_EXPECTED" "$(ub_section '## Ambiguity Score' | ub_trim)" \
+  "ECU's 0-2 score table survives whole, inside ## Ambiguity Score and nowhere else"
 
 UB_DIMENSIONS_EXPECTED='1. **Scope** — What exactly is being built? What are its boundaries? What is NOT included?
 2. **Platform** — Target platform, Unity version, render pipeline, input method?
 3. **Performance** — FPS target, memory budget, draw call limits, target device tier?
 4. **Integration** — What existing systems does this touch? Dependencies? Data flow?
 5. **Acceptance Criteria** — How do we know it'"'"'s done? What should we test? What does success look like?'
-UB_DIMENSIONS_ACTUAL="$(ub_first_para '### Dimensions')"
-assert_eq "$UB_DIMENSIONS_EXPECTED" "$UB_DIMENSIONS_ACTUAL" \
-  "ECU's five dimensions survive whole, and under their own heading"
+assert_eq "$UB_DIMENSIONS_EXPECTED" "$(ub_section '### Dimensions' | ub_trim)" \
+  "ECU's five dimensions survive whole — and the section holds five, not six"
 
-# The threshold line, plus the sentence that reconciles it. ECU wrote ">= 6 ... to proceed", which is
-# verbatim the score's OLD gate job; D2 gives the score a new one. Round 1 found all three statements
-# in the file disagreeing, so the gloss is asserted beside the line it glosses — losing it puts the
-# contradiction straight back.
-assert_contains "$brainstorm" '**Threshold: total score >= 6 out of 10 to proceed.**' \
-  "ECU's threshold line survives"
+# The threshold, plus the sentence reconciling it. ECU wrote ">= 6 ... to proceed", which is verbatim
+# the score's OLD gate job; D2 gives the score a new one. Round 1 found all three statements in the
+# file disagreeing, so the gloss lives in the same section as the line it glosses and they are
+# compared together — losing either puts the contradiction straight back.
+UB_THRESHOLD_EXPECTED='**Threshold: total score >= 6 out of 10 to proceed.**
 
-# The gloss, compared WHOLE. The first version of this assertion was a two-line `assert_contains`
-# needle — which is the alternatives trap this file's own header comment documents, committed six
-# lines below the comment. The deletion harness caught it: removing the middle line of the gloss left
-# the other line matching and the suite green. Written down rather than quietly fixed, because the
-# lesson is that knowing about the trap is not the same as not falling into it, and `assert_eq` is
-# the only form that cannot.
-UB_GLOSS_EXPECTED='That line is ECU'"'"'s, kept, and "proceed" is now defined: it means **proceed to presenting the
+That line is ECU'"'"'s, kept, and "proceed" is now defined: it means **proceed to presenting the
 design**, never proceed past it. The threshold divides the same two states it always divided; what
 changed is what lies on the far side. Below 6 nothing routes around the round, and at or above 6
 nothing skips the artifact.'
-UB_GLOSS_ACTUAL="$(awk '/^That line is ECU/ {f=1} f && /^[[:space:]]*$/ {exit} f' "$UB_SKILL" 2>/dev/null || true)"
-assert_eq "$UB_GLOSS_EXPECTED" "$UB_GLOSS_ACTUAL" \
-  "'proceed' is defined whole, so the retained ECU wording cannot be read as the old gate job"
+assert_eq "$UB_THRESHOLD_EXPECTED" "$(ub_section '### Threshold' | ub_trim)" \
+  "ECU's threshold survives with 'proceed' defined beside it, both in ### Threshold"
+
+# D2's two rules about what the score decides. Compared as one section because they are one claim in
+# two paragraphs: the score sets depth, and depth never reaches the artifact. Round 1 guarded the
+# second and the first deleted green; round 1's fix guarded both but by content, so either could be
+# moved out of the section that names them.
+UB_SCORE_JOB_EXPECTED='The score sets the depth of the round, not whether the round happens. Below 6, ask up to three
+questions and re-score. At or above 6, one confirming round is enough.
+
+**Depth scales the round, never the artifact.** At depth 1 the design may be three sentences, but
+`design.md` is still written, still presented, and still approved. "Short design" and "no design"
+are different outcomes and only one of them is allowed.'
+assert_eq "$UB_SCORE_JOB_EXPECTED" "$(ub_section '### What the score decides' | ub_trim)" \
+  "D2's depth rules are stated whole, punchline included, inside ### What the score decides"
 
 # The Interview Protocol. Steps 1-3 are ECU verbatim; step 4 is NOT, and deliberately so — ECU's
 # ended with an explicit-opt-out clause that was the `--skip-interview` exemption in other clothes
-# and contradicted the Handoff. Asserting 1-3 as a block and 4 separately is what keeps the note's
-# claim precise: the note may not say "the interview protocol survives verbatim" while this passes.
-UB_PROTOCOL_123_EXPECTED='1. **Present the current scores** — show the user which dimensions are weak
+# and contradicted the Handoff. The whole section is compared, which additionally catches a step 5
+# being appended and the "one question per message" reconciliation being dropped.
+UB_PROTOCOL_EXPECTED='When the score is below threshold:
+
+1. **Present the current scores** — show the user which dimensions are weak
 2. **Ask targeted questions** — max 3 questions per round, focused on the lowest-scoring dimensions
-3. **Re-score after each round** — update scores based on answers'
-UB_PROTOCOL_123_ACTUAL="$(awk '/^1\. \*\*Present the current scores\*\*/ {f=1} f && /^4\./ {exit} f' "$UB_SKILL" 2>/dev/null | ub_trim)"
-assert_eq "$UB_PROTOCOL_123_EXPECTED" "$UB_PROTOCOL_123_ACTUAL" \
-  "ECU's interview protocol steps 1-3 survive whole"
-assert_contains "$brainstorm" '4. **Proceed when threshold is met** — to presenting the design. There is no opt-out.' \
-  "step 4 is reconciled, not retained: proceeding means proceeding to the design"
+3. **Re-score after each round** — update scores based on answers
+4. **Proceed when threshold is met** — to presenting the design. There is no opt-out. "Just do it"
+   is answered by the depth-1 round: three sentences, one approval, and the file still written.
+
+**One question per message.** Three per round is the budget, not the message size: a message
+carrying three questions gets one answer, usually to the last of them. Prefer multiple choice where
+the options are genuinely enumerable, open-ended where they are not.
+
+Question style: be direct and specific, not generic. Instead of "What platform?", ask "Is this keyboard+mouse first or gamepad first — and does it have to hold 60fps on min-spec, or is the target high-end PC only?"'
+assert_eq "$UB_PROTOCOL_EXPECTED" "$(ub_section '## Interview Protocol' | ub_trim)" \
+  "ECU's protocol steps 1-3 survive whole and step 4 is reconciled, all inside ## Interview Protocol"
 
 UB_EXAMPLES_EXPECTED='**Vague (score 3/10):** "Add multiplayer to my game"
 - Scope: 1 (multiplayer is broad — co-op? competitive? matchmaking?)
@@ -481,35 +506,8 @@ UB_EXAMPLES_EXPECTED='**Vague (score 3/10):** "Add multiplayer to my game"
 - Acceptance: 1 (implied: both players can play simultaneously)
 
 Both of these are builds. The second scores 7 and still gets a design — one round, a short file.'
-UB_EXAMPLES_ACTUAL="$(ub_section '## Scoring Examples' | ub_trim)"
-assert_eq "$UB_EXAMPLES_EXPECTED" "$UB_EXAMPLES_ACTUAL" \
+assert_eq "$UB_EXAMPLES_EXPECTED" "$(ub_section '## Scoring Examples' | ub_trim)" \
   "ECU's two scoring examples survive whole, under their own heading"
-
-# ============================================================================
-# D2: depth scales the round, never the artifact.
-#
-# The plan's needle here was the bare `design.md is still written`, which cannot match the plan's own
-# fixed body text: that text writes it as `` `design.md` is still written ``, and assert_contains is
-# `grep -F`, so the backticks are two characters that must be there. Caught by running the suite
-# against a faithful transcription of the plan's block.
-#
-# Compared whole, because round 1 measured the punchline — "and only one of them is allowed" —
-# deleting green while the two lines above it were guarded.
-# D2's own sentence — the score's new job — which the reverse sweep found escaping: the paragraph
-# could be deleted entire and only the paragraph BELOW it was guarded, leaving the file with a
-# threshold, a gloss on the threshold, and nothing saying what the score now decides.
-UB_SCORE_JOB_EXPECTED='The score sets the depth of the round, not whether the round happens. Below 6, ask up to three
-questions and re-score. At or above 6, one confirming round is enough.'
-UB_SCORE_JOB_ACTUAL="$(ub_first_para '### What the score decides')"
-assert_eq "$UB_SCORE_JOB_EXPECTED" "$UB_SCORE_JOB_ACTUAL" \
-  "D2's rule — the score sets depth, not whether the round happens — is stated whole"
-
-UB_DEPTH_EXPECTED='**Depth scales the round, never the artifact.** At depth 1 the design may be three sentences, but
-`design.md` is still written, still presented, and still approved. "Short design" and "no design"
-are different outcomes and only one of them is allowed.'
-UB_DEPTH_ACTUAL="$(awk '/^\*\*Depth scales the round, never the artifact\.\*\*/ {f=1} f && /^[[:space:]]*$/ {exit} f' "$UB_SKILL" 2>/dev/null || true)"
-assert_eq "$UB_DEPTH_EXPECTED" "$UB_DEPTH_ACTUAL" \
-  "the depth rule is D2's text whole, punchline included"
 
 # --- The checklist, anchored so its deletion is not covered by a duplicate elsewhere -----------
 # Every item here restates something the body also says. That is fine for a reader and fatal for an
@@ -636,10 +634,13 @@ assert_not_contains "$UB_ROW" "’" \
   "the note uses straight apostrophes, like every other row"
 
 # The "thought that means you are about to treat vague as clear" table. MERGE-NOTES.md clause 5 says
-# the 2026-08-10 rewrite keeps both rows, and the reverse sweep found both deleting green. Two rows
-# are two lines, so the block form is exact: it catches a deleted row AND a hollowed-out one.
-UB_VAGUE_TABLE_EXPECTED='| "They said what they want" | A want is not an acceptance criterion. "Add multiplayer" states a want; it does not say whether success is two players on one screen or matchmaking across regions. | The Ambiguity Score'"'"'s own Acceptance Criteria dimension, and the scoring examples above |
+# the 2026-08-10 rewrite keeps both rows, and the reverse sweep found both deleting green.
+# Heading-anchored and whole, like every other claimed block: the header row and separator are
+# included, so a table hollowed out to its header, a third row appended, or the whole table moved to
+# an appendix all fail. Round 1 anchored this by the first row's content and caught none of those.
+UB_VAGUE_TABLE_EXPECTED='| Thought | Reality | Source |
+|---|---|---|
+| "They said what they want" | A want is not an acceptance criterion. "Add multiplayer" states a want; it does not say whether success is two players on one screen or matchmaking across regions. | The Ambiguity Score'"'"'s own Acceptance Criteria dimension, and the scoring examples above |
 | "The request has a code block, so it is specific" | A code block establishes syntax, not scope. Specificity is about the *outcome* — what done looks like — not about whether the input contains a snippet. | The Ambiguity Score'"'"'s five dimensions, none of which is "contains code" |'
-UB_VAGUE_TABLE_ACTUAL="$(awk '/^\| "They said what they want" \|/ {f=1} f && !/^\| / {exit} f' "$UB_SKILL" 2>/dev/null || true)"
-assert_eq "$UB_VAGUE_TABLE_EXPECTED" "$UB_VAGUE_TABLE_ACTUAL" \
-  "both rows of the vague-as-clear table survive, bodies included"
+assert_eq "$UB_VAGUE_TABLE_EXPECTED" "$(ub_section '## The thought that means you are about to treat vague as clear' | ub_trim)" \
+  "both rows of the vague-as-clear table survive, bodies included, under their own heading"
