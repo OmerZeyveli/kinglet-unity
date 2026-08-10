@@ -65,60 +65,77 @@ else
   fail "provenance.tsv does not pin superpowers 6.2.0 at 3dcbd5c — either the pin was lost, or the upstream was legitimately bumped and this constant needs updating to match provenance.tsv"
 fi
 
-# ── Assertions 5a and 5 share ONE copy of the extraction expression ──────────────────────────────
-# The expression check-provenance.sh uses to read the ECU commit appears exactly once in this file:
-# the here-doc immediately below. 5a pins that string to the checker; 5 *executes that same string*.
+# ── 5. The ECU pin keeps its own header line ─────────────────────────────────────────────────────
+# What --online depends on is a property of provenance.tsv, not of check-provenance.sh: the `# ecu=`
+# header line must carry exactly ONE 40-hex pin. The manifest's own header states the rule in prose
+# — "Keep that pin on its own line" — because the checker's extraction is greedy (`.*` before the
+# parenthesis, so the *last* parenthesis on the line wins) and is correct only while that holds.
+# Adding the Superpowers pin is what made it a live risk: a second 40-hex parenthesis here sends
+# --online to clone ECU and check out a SHA that is not in that clone, where git errors and the
+# script dies under set -e. Hard breakage, but nothing in the suite runs --online, so it stays
+# invisible until someone does.
 #
-# It used to appear twice — once pinned, once transcribed and run — and nothing tied the two
-# together. Editing only the transcribed one (say, to take the first parenthesis where the checker's
-# greedy `.*` takes the last) left all seven assertions green while the checker's real behaviour had
-# diverged. That is the identical defect 5a exists to catch, one level in: a copy that nothing pins
-# is a comment about its subject. One copy is the fix; there is no "live expression" left to edit
-# on its own.
-ecu_expr="$(cat <<'EXPR'
-ECU_COMMIT=$(grep -m1 '^# ecu=' "$MANIFEST" | sed -n 's/.*(\([0-9a-f]\{40\}\)).*/\1/p')
-EXPR
-)"
+# THIS FILE KEEPS NO COPY OF THE CHECKER'S CODE, AND EXECUTES NOTHING IT CONTAINS. Earlier rounds
+# asserted the same thing by holding the checker's extraction expression as a string and running it.
+# Three of the four defects found in this guard were defects of that copy, not of the invariant:
+# a copy nothing pinned, then two copies where editing one alone kept every assertion green, then
+# the discovery that `grep -F` with a multi-line pattern is an OR over its lines — so appending one
+# line inside the pinned here-doc silently changed what the assertion ran while the pin stayed
+# green. A copy of the subject, living inside the test, is what all three have in common. Asserting
+# the invariant directly removes the category rather than adding a fifth layer of pin.
+#
+# Two independent assertions, 5b and 5c, both driven off one single-sourced key. The regression this
+# guards trips 5b on its shape regardless of what value it carries, and 5c on its value regardless
+# of how many there are — so no one edit here can hide it.
+#
+# What that trades away, stated plainly: if check-provenance.sh alone stopped reading this header
+# key, --online would `warn` and skip, and the data assertions would be describing a header nothing
+# reads. 5a is the link that covers it — a pin on the seven characters of the key, single-sourced
+# with the probe below so the two cannot disagree, and never executed.
+ecu_key='^# ecu='
 
-# 5a. The one copy must still be what the checker actually runs.
-if grep -qF -- "$ecu_expr" <<< "$haystack"; then
-  pass "check-provenance.sh extracts the ECU commit with the expression this file runs"
+# 5a. The checker still reads the ECU pin from the same header key this file probes.
+if grep -qF -- "$ecu_key" <<< "$haystack"; then
+  pass "check-provenance.sh reads the ECU pin from provenance.tsv's '$ecu_key' line"
 else
-  fail "check-provenance.sh no longer contains the extraction expression this file runs — re-sync the here-doc above, then re-check what --online actually extracts"
+  fail "check-provenance.sh no longer looks for a '$ecu_key' line — --online would warn and skip, and the two assertions below would be describing a header nothing reads"
 fi
 
-# 5. Adding the superpowers pin must not have stolen --online's ECU commit.
-# check-provenance.sh --online extracts the ECU commit with a greedy `.*` before the parenthesis, so
-# a second 40-hex parenthesis on the `# ecu=` line wins. --online would then clone ECU and try to
-# check out a SHA that is not in that clone: `git checkout` errors and the script dies under set -e.
-# Hard breakage, not silently-wrong verification — but nothing in the suite runs --online, so it is
-# still invisible until someone does. The pin lives on its own line for this reason; this asserts
-# the reason still holds.
+# 5b. Exactly one 40-hex pin on that line. `grep -m1` matches the checker's own selection, so if a
+# second `# ecu=` line is ever added both read the same one.
 #
-# Run through `bash -c`, not `eval`. Either way a string is being executed as code, so the choice is
-# about blast radius: a separate interpreter cannot set shell options, clobber a variable, or take
-# this sourced file down with it when the expression dies under `set -e`. `eval` runs in *this*
-# shell and can do all three, and the last one would undo Minor 3 — the diagnostic below is the
-# whole point of the assertion, so nothing may kill the file before it prints.
-#
-# The probe sets the same options the checker runs under, so it fails the same way the checker
-# would. `|| true` and the empty branch, not a bare assignment: if the `# ecu=` line is renamed or
-# removed, grep -m1 exits 1, pipefail propagates, and without the guard the assignment would kill
-# this subshell before the diagnostic prints. check-provenance.sh:153 handles the same case rather
-# than dying; so does this.
-ecu_probe="$(cat <<EXEC
-set -euo pipefail
-$ecu_expr
-printf '%s' "\$ECU_COMMIT"
-EXEC
-)"
-ecu_commit="$(MANIFEST="$REPO/provenance.tsv" bash -c "$ecu_probe")" || true
-if [ -z "$ecu_commit" ]; then
-  fail "no ECU commit could be read from provenance.tsv's '# ecu=' line — --online would skip silently"
-elif [ "$ecu_commit" = "bb28ccbd40b065b0958b02df0c03fb91c4fb7c5b" ]; then
-  pass "--online still resolves the ECU commit, not another upstream's"
+# A here-string feeds the loop, never a pipe: a `while read` is a reader that can stop early, and
+# under `set -euo pipefail` the writer's SIGPIPE becomes 141 becomes a dead file. Running the loop
+# in this shell rather than a subshell is also what lets the counters survive it.
+ecu_header="$(grep -m1 -- "$ecu_key" "$REPO/provenance.tsv" || true)"
+ecu_pin_count=0
+ecu_pin=''
+while IFS= read -r token; do
+  [ -n "$token" ] || continue
+  ecu_pin_count=$((ecu_pin_count + 1))
+  # Last one wins — the same one the checker's greedy `.*` would take, so 5c judges the value
+  # --online would actually use.
+  ecu_pin="${token#\(}"; ecu_pin="${ecu_pin%\)}"
+done <<< "$(grep -o -- '([0-9a-f]\{40\})' <<< "$ecu_header" || true)"
+
+# Every message below names the key it actually read, rather than assuming it read '^# ecu='. If the
+# key is ever edited into something that selects a different line, the output says so instead of
+# reporting a true-sounding sentence about a line it never looked at.
+if [ "$ecu_pin_count" -eq 1 ]; then
+  pass "provenance.tsv's '$ecu_key' line carries exactly one 40-hex pin"
+elif [ "$ecu_pin_count" -eq 0 ]; then
+  fail "no '$ecu_key' line in provenance.tsv carries a 40-hex pin — --online would warn and skip its verbatim check entirely"
 else
-  fail "--online would clone ECU and check out '$ecu_commit' — either a second upstream pin moved onto the '# ecu=' line, or ECU was legitimately bumped and this constant needs updating to match provenance.tsv"
+  fail "provenance.tsv's '$ecu_key' line carries $ecu_pin_count 40-hex pins — --online takes the last and would clone ECU to check out another upstream's SHA. Give the new pin its own header line"
+fi
+
+# 5c. And that pin is ECU's.
+if [ "$ecu_pin" = 'bb28ccbd40b065b0958b02df0c03fb91c4fb7c5b' ]; then
+  pass "--online still resolves the ECU commit, not another upstream's"
+elif [ -z "$ecu_pin" ]; then
+  fail "no 40-hex pin to read on provenance.tsv's '$ecu_key' line — see the failure above it"
+else
+  fail "the pin on provenance.tsv's '$ecu_key' line is '$ecu_pin', not ECU's — either another upstream's pin moved onto that line, in which case --online would clone ECU and check that SHA out, or ECU was legitimately bumped and this constant needs updating to match provenance.tsv"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
