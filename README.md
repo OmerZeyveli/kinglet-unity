@@ -160,11 +160,12 @@ guessing.
 
 Because this repo contains other people's code, it tracks whose:
 
-- **`provenance.tsv`** — one row per file: origin (`ecu` / `donchitos` / `original`), upstream
-  version and path, upstream checksum, and whether we modified it. Currently 536 rows: 101 from ECU
-  (25 verbatim, 76 modified — nearly every surviving ECU surface has been rewritten for an agent
-  reader), 0 from Donchitos (that layer was removed 2026-08-03; `provenance-skip.tsv`
-  keeps the record).
+- **`provenance.tsv`** — one row per file: origin (`ecu` / `donchitos` / `superpowers` / `original`),
+  upstream version and path, upstream checksum, and whether we modified it. The vendored layer is
+  101 files from ECU plus the process-chain surfaces adapted from Superpowers 6.2.0, and 0 from
+  Donchitos (that layer was removed 2026-08-03; `provenance-skip.tsv` keeps the record). Repo-wide
+  that is 25 verbatim, 77 modified — nearly every vendored surface has been rewritten for an agent
+  reader.
 - **`provenance-skip.tsv`** — what we deliberately did *not* vendor, and why. This is what stops a
   future upstream sync from quietly reintroducing the mobile content.
 - **`scripts/check-provenance.sh`** — validates the manifest in both directions: no rows without

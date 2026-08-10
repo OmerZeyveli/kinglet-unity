@@ -189,3 +189,43 @@ if [ -n "$BLOCKLESS" ]; then
 fi
 assert_eq "0" "$(printf '%s' "$BLOCKLESS" | grep -c . || true)" \
   "every agent still has a Skills to load block this guard can read"
+
+# ============================================================================
+# The Deslop Pass was the only content of /unity-workflow with no other owner.
+#
+# It must survive the move to `unity-execution`, category by category — a move that drops a
+# category is exactly the silent loss this wave exists to prevent, and it is invisible to every
+# other guard here: nothing in the repo compares a deleted command's body against its new home.
+# The two restraining rules are asserted separately from the five categories because they are the
+# half a paraphrase loses first: without them the pass reads as "clean up the code", which is
+# advice the model already follows badly.
+#
+# Read defensively. `deslop="$(cat missing)"` under the runner's inherited `set -e` aborts the
+# whole sourced subshell, so the assertions BELOW this block would silently stop running while the
+# suite still reported the file's earlier passes — the same runner-died-reporting-green shape this
+# suite exists to make impossible. assert_file_exists names the real problem; `|| true` keeps
+# every later assertion alive.
+UE_SKILL="$REPO_DIR/.claude/skills/unity-execution/SKILL.md"
+assert_file_exists "$UE_SKILL" \
+  "unity-execution exists — the inline branch of the execution fork has a home"
+
+deslop="$(cat "$UE_SKILL" 2>/dev/null || true)"
+for category in \
+  "Unnecessary abstractions" \
+  "Over-commenting" \
+  "Redundant error handling" \
+  "Dead code" \
+  "Over-engineering"
+do
+  assert_contains "$deslop" "$category" \
+    "unity-execution carries the Deslop category: $category"
+done
+
+# Verbatim from the command body, capitalisation included. `assert_contains` is `grep -F` with no
+# `-i`, so the plan's lowercase "do not touch code that existed before" would have failed against a
+# faithful transcription and passed only against a paraphrase — a guard that punishes the thing it
+# is asking for. Corrected to the source's own casing.
+assert_contains "$deslop" "Do not touch code that existed before" \
+  "unity-execution carries the Deslop restraint: pre-existing code is out of scope"
+assert_contains "$deslop" "false positives are worse than missed bloat" \
+  "unity-execution carries the Deslop restraint: doubt means leave it alone"

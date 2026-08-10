@@ -5,9 +5,17 @@ merely depend on them — it **contains** them. Attribution is therefore an obli
 
 `provenance.tsv` at the repo root records, for every tracked file, which upstream it came from,
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
-is asserted on trust. The 25/76 split below is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
-$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 76 `modified` rows
-with `origin=ecu`.
+is asserted on trust. The 25/77 split below is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
+$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 77 `modified` rows
+across the whole manifest.
+
+**The split is repo-wide, not ECU's.** This paragraph attributed it to `origin=ecu` until
+2026-08-10, and that was true only by coincidence: ECU was the only vendored origin. It no longer
+is. The process-chain surfaces adapted from Superpowers 6.2.0 carry `origin=superpowers`, and every
+one of them is `modified`, so the second number now counts files from two upstreams. Per-origin
+counts belong in the sections below and in `provenance.tsv`, never in this sentence — a per-origin
+number written in the same phrasing as the repo-wide one is indistinguishable from it to any reader,
+including `tests/test-derived-counts.sh`.
 
 **Re-derive it before quoting it.** A single `status` flip changes the split, and this number has now
 gone stale twice — most recently one commit after it was corrected, when `docs/MODEL-ROUTING.md`
@@ -15,7 +23,7 @@ moved from `verbatim` to `modified`. Nothing asserts it, so nothing will tell yo
 
 | Project | Relationship | In this repo? |
 |---------|--------------|---------------|
-| [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (XeldarAlz) | **Vendored** at v1.5.0 — the engineering layer | **Yes** — 101 files (25 verbatim, 76 modified) |
+| [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (XeldarAlz) | **Vendored** at v1.5.0 — the engineering layer | **Yes** — 101 files; 25 of them still byte-identical to upstream, the rest rewritten |
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) (Donchitos) | **Adapted** at `984023d` — the design/production layer, removed 2026-08-03 | **No** — 0 files; see §2 for why the notice is retained anyway |
 | [unity-mcp](https://github.com/CoplayDev/unity-mcp) (CoplayDev) | **Targeted** — the MCP editor bridge | No — install it yourself |
 
