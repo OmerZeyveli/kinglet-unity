@@ -1,6 +1,12 @@
 # Kinglet Process Chain Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL — execute this plan task by task with
+> `.claude/skills/subagent-driven-implementation/SKILL.md` (recommended) or inline with checkpoints.
+> Steps use checkbox (`- [ ]`) syntax for tracking. Do not implement directly from this file.
+>
+> *(This line arrived from `writing-plans`' template naming the upstream skills, which would have
+> routed a fresh session to a loop this repo does not use. Corrected 2026-08-10 — the same defect
+> D8 exists to prevent, caught on its first real outing.)*
 
 **Goal:** Replace Kinglet's process chain with three skills that pull each other, delete the two commands that only sequence them, and turn `using-kinglet` from a summary into a mandate.
 
