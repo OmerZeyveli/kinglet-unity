@@ -191,41 +191,100 @@ assert_eq "0" "$(printf '%s' "$BLOCKLESS" | grep -c . || true)" \
   "every agent still has a Skills to load block this guard can read"
 
 # ============================================================================
-# The Deslop Pass was the only content of /unity-workflow with no other owner.
+# `unity-execution` holds the last copy of three blocks of vendored ECU v1.5.0 text.
 #
-# It must survive the move to `unity-execution`, category by category — a move that drops a
-# category is exactly the silent loss this wave exists to prevent, and it is invisible to every
-# other guard here: nothing in the repo compares a deleted command's body against its new home.
-# The two restraining rules are asserted separately from the five categories because they are the
-# half a paraphrase loses first: without them the pass reads as "clean up the code", which is
-# advice the model already follows badly.
+# The Deslop Pass, the Final Summary template and the max-3 verify bound were vendored verbatim in
+# 45eada9 ("Vendor everything-claude-unity v1.5.0 verbatim") as part of
+# `.claude/commands/unity-workflow.md`, and transcribed unchanged into this skill. When that command
+# is deleted, these are the ONLY copies in the repository and nothing else guards them — no other
+# test in tests/ names any of these strings.
 #
-# Read defensively. `deslop="$(cat missing)"` under the runner's inherited `set -e` aborts the
-# whole sourced subshell, so the assertions BELOW this block would silently stop running while the
-# suite still reported the file's earlier passes — the same runner-died-reporting-green shape this
-# suite exists to make impossible. assert_file_exists names the real problem; `|| true` keeps
-# every later assertion alive.
+# The first version of this block asserted five bare category HEADINGS and two of the five rules.
+# That is the silent loss it was written to catch, walking through it: a rewrite that keeps the five
+# bold headings and paraphrases every explanation passes green, and the Final Summary could be
+# deleted outright without reddening anything. So each category needle now carries its own body, all
+# five rules are asserted, and the summary is asserted by its section headings AND two of its body
+# lines — headings alone would let the same hollowing-out through one level down.
+#
+# Each needle below was proved load-bearing by deleting exactly that text from a scratch copy of the
+# skill and confirming the assertion fails: none of them is satisfied by any other part of the file.
+#
+# Read the file defensively. `assert_file_exists` turns a missing skill into one counted, named
+# assertion instead of a raw `cat:` on stderr followed by seven identical "not found" failures, and
+# `|| true` keeps `$deslop` a defined empty string under the runner's inherited `nounset`. (The
+# runner does `set +e` immediately before sourcing each file — see tests/run-tests.sh — so errexit
+# is OFF here and an unguarded `cat` would not have aborted the rest of this file. An earlier
+# version of this comment claimed it would. It does not, and CLAUDE.md is the record for those
+# semantics.)
 UE_SKILL="$REPO_DIR/.claude/skills/unity-execution/SKILL.md"
 assert_file_exists "$UE_SKILL" \
   "unity-execution exists — the inline branch of the execution fork has a home"
 
 deslop="$(cat "$UE_SKILL" 2>/dev/null || true)"
-for category in \
-  "Unnecessary abstractions" \
-  "Over-commenting" \
-  "Redundant error handling" \
-  "Dead code" \
-  "Over-engineering"
-do
-  assert_contains "$deslop" "$category" \
-    "unity-execution carries the Deslop category: $category"
-done
 
-# Verbatim from the command body, capitalisation included. `assert_contains` is `grep -F` with no
-# `-i`, so the plan's lowercase "do not touch code that existed before" would have failed against a
-# faithful transcription and passed only against a paraphrase — a guard that punishes the thing it
-# is asking for. Corrected to the source's own casing.
-assert_contains "$deslop" "Do not touch code that existed before" \
-  "unity-execution carries the Deslop restraint: pre-existing code is out of scope"
-assert_contains "$deslop" "false positives are worse than missed bloat" \
-  "unity-execution carries the Deslop restraint: doubt means leave it alone"
+# Scope sentence first: it is what makes the pass bounded rather than "tidy up the codebase".
+assert_contains "$deslop" \
+  "perform a targeted code-bloat review on all files created or modified during this workflow" \
+  "unity-execution carries the Deslop scope sentence"
+
+# Heading AND body, per category. `${needle%% —*}` recovers the heading for the message.
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$deslop" "$needle" \
+    "unity-execution carries the Deslop category, body included: ${needle%% —*}"
+done <<'UE_DESLOP_CATEGORIES'
+**Unnecessary abstractions** — interfaces with one implementation, factory classes that create one type, wrapper classes that add no behavior
+**Over-commenting** — comments that restate the code, obvious doc comments, commented-out code blocks
+**Redundant error handling** — try/catch that just rethrows, null checks on values that can never be null, defensive code with no plausible failure mode
+**Dead code** — unused private methods, unreachable branches, unused parameters
+**Over-engineering** — generic solutions for non-generic problems, premature optimization patterns, unnecessary design patterns
+UE_DESLOP_CATEGORIES
+
+# All five rules, not just the two restraining ones. Rules 1, 2 and 5 were unguarded and are the
+# ones a summariser drops first, being the least quotable.
+#
+# Capitalisation is load-bearing and was the plan's one defect here: `assert_contains` is `grep -F`
+# with no `-i`, so the planned lowercase "do not touch code that existed before" would have failed
+# against a faithful transcription and passed only against a paraphrase.
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$deslop" "$needle" \
+    "unity-execution carries the Deslop rule: $needle"
+done <<'UE_DESLOP_RULES'
+Only simplify, never add complexity
+Preserve all runtime behavior
+Do not touch code that existed before this workflow started
+If in doubt, leave it alone — false positives are worse than missed bloat
+Apply fixes directly, then re-check console via `read_console` to confirm no regressions
+UE_DESLOP_RULES
+
+# The verify loop. The bound is the half that earns the surface — an unbounded self-review either
+# runs once and declares victory or runs until it gets bored — and nothing else asserted it.
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$deslop" "$needle" \
+    "unity-execution carries the verify-loop step: $needle"
+done <<'UE_VERIFY_LOOP'
+**Auto-fix** issues that are safe to fix automatically
+**Re-verify** if fixes were applied (max 3 iterations)
+**Run tests** via MCP if available
+UE_VERIFY_LOOP
+
+# The Final Summary template, which had no assertion at all. Section headings detect its removal;
+# the two body lines detect it being hollowed out into headings with nothing under them — the same
+# failure the category needles above were widened to catch.
+while IFS= read -r needle; do
+  [ -n "$needle" ] || continue
+  assert_contains "$deslop" "$needle" \
+    "unity-execution carries the Final Summary line: $needle"
+done <<'UE_FINAL_SUMMARY'
+## Workflow Complete
+### What was built
+### Files created/modified
+### Verification results
+### Test results
+### Manual steps needed
+### How to test
+- [compilation status, test pass/fail counts]
+- [any inspector assignments, scene references, etc.]
+UE_FINAL_SUMMARY
