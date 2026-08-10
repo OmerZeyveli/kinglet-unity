@@ -27,9 +27,31 @@
 # IDIOM — self-contained. This file defines its own assertion helpers and
 # counters and sets its own `set -euo pipefail`, so `bash
 # tests/test-workflow-plan-input.sh` is a valid way to run it. Keep it that
-# way: reaching for the runner's `assert_contains` or `$REPO_DIR` in here
-# would leave the file passing under the runner and dying on an unbound
-# variable when run standalone.
+# way. Reaching for the runner's `assert_contains` or `$REPO_DIR` in here
+# breaks it in both directions, measured rather than reasoned — a scratch copy
+# of this file with one borrowed `assert_contains` deliberately failing:
+#
+#   $ bash mixed.sh                      # standalone
+#   PASS: own helper still works
+#   mixed.sh: line 9: assert_contains: command not found
+#   rc=127                               # errexit kills it; the tail never runs
+#
+#   $ source tests/run-tests.sh --source-only
+#   $ set +e; out=$( ( source mixed.sh ) 2>&1 </dev/null ); rc=$?
+#   PASS: own helper still works
+#   FAIL borrowed helper, deliberately failing
+#   reached the tail: TESTS_FAILED=0
+#   rc=0                                 # this file's own summary says green
+#
+# The borrowed helper increments the RUNNER's counters, not the ones below, so
+# under the runner the file's own `[ "$TESTS_FAILED" -eq 0 ]` exits 0 while an
+# assertion has failed — only the runner's grep for FAIL tokens in the captured
+# output catches it. `$REPO_DIR` fails the other way: unset under this file's
+# own `set -u` it is fatal on expansion —
+#
+#   $ bash -c 'set -euo pipefail; body="$(cat "$REPO_DIR/x" 2>/dev/null || true)"; echo reached'
+#   bash: line 1: REPO_DIR: unbound variable
+#   rc=1
 # ============================================================================
 
 set -euo pipefail
