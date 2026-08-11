@@ -212,9 +212,17 @@ dead_readme=0
 dead_read=''
 while IFS= read -r dead_f; do
   [ -n "$dead_f" ] || continue
-  case "$dead_f" in
-    .claude/NOTICE.md) continue ;;  # a licence record; its /unity-workflow mention is history
-  esac
+  # The skip list is EMPTY, and that is a deliberate state rather than an oversight.
+  #
+  # It held one entry — `.claude/NOTICE.md`, excused because its §3 named `/unity-workflow` as the
+  # command whose dispatch loop the credit compared itself against. Task 7 rewrote that section on
+  # 2026-08-11 for the licence facts, and the sentence went with it; the ECU rename history that
+  # replaced it lives in CREDITS.md, which is outside these globs. So the excuse expired, and an
+  # excuse that outlives its reason is a hole in a shipped file that nobody is looking at. NOTICE.md
+  # is now scanned like the rest of the payload and carries a sentinel below.
+  #
+  # Re-adding an entry here is the wrong repair for a dead name in prose: rewrite the sentence into
+  # the past tense, or move the history to a file these globs do not reach.
   dead_scanned=$((dead_scanned + 1))
   # Per-glob tallies, for the floors below. Counted here rather than by re-running ls-files per
   # glob, so the numbers describe the set actually inspected and cannot drift from it.
@@ -292,11 +300,237 @@ while IFS= read -r dead_s; do
   fi
 done <<'DEAD_SENTINELS'
 .claude/skills/using-kinglet/SKILL.md
+.claude/NOTICE.md
 scripts/studio-doctor.sh
 scripts/generate-claude-md.sh
 docs/SKILL-CATALOG.md
 README.md
 DEAD_SENTINELS
+
+# ── 7. Superpowers: adaptation is a licence obligation, and the shipped notice discharges it ─────
+# D10. Until 2026-08-10 Superpowers was an influence: the chain design and two skill names were
+# taken, the wording was not, and both credit documents said so and reproduced no licence text. This
+# wave adapted three surfaces at the expression level, which makes every one of those sentences
+# false — in `.claude/NOTICE.md`, which is INSTALLED INTO EVERY USER PROJECT. A stale attribution
+# claim in that file is a defect this repo has already shipped once and fixed once.
+#
+# Nothing else can catch this. `scripts/check-provenance.sh` never reads the free-text `note`
+# column, and its two checksum comparisons both filter on `status=verbatim` — the `--online` loop
+# additionally on `origin=ecu`. Every adapted surface here is `status=modified`, so no code path in
+# this repository verifies the Superpowers pin, the adapted rows, or one word of what the credit
+# documents say about them. Measured 2026-08-11:
+#
+#   $ awk -F'\t' '$2=="superpowers" && $6=="verbatim" {c++} END {print c+0}' provenance.tsv
+#   0
+#
+# THE LIST IS DERIVED FROM THE MANIFEST, NEVER TYPED HERE. A hardcoded list of three paths would go
+# green on the day a fourth surface is adapted and left out of the notice, which is the exact failure
+# this block exists to prevent.
+
+# 7a. Derive (our path, their path) from provenance.tsv, by BOTH routes a Superpowers adaptation is
+# recorded — and they are different routes, not one route with an exception:
+#
+#   origin=superpowers            the file's whole lineage is Superpowers; upstream_path is column 4
+#   the note clause               the file has TWO upstreams and the schema has one origin column, so
+#                                 D10 ruled the origin stays with the first and the second is
+#                                 recorded in the note. `unity-brainstorming` is origin=ecu — 32 of
+#                                 ECU's 69 substantive lines survive — and its Superpowers lineage is
+#                                 visible ONLY here. An origin-column-only derivation finds two of
+#                                 the three surfaces and reports success.
+#
+# The clause is matched in its canonical form, `adapted from Superpowers <version> skills/<x>/SKILL.md`,
+# which is what pins the upstream path. That deliberately does not match
+# `subagent-driven-implementation`'s note ("architecture adopted from Superpowers'
+# subagent-driven-development, wording original") — architecture is not expression, that row stays
+# origin=original, and it is credited in the documents' influence paragraph rather than the
+# obligation table.
+sp_pairs="$(awk -F'\t' '
+  $0 ~ /^#/ { next }
+  $1 == "path" { next }
+  {
+    ours = ""; theirs = ""
+    if ($2 == "superpowers") { ours = $1; theirs = $4 }
+    else if (match($7, /adapted from Superpowers [0-9]+\.[0-9]+\.[0-9]+ skills\/[A-Za-z0-9_.-]+\/SKILL\.md/)) {
+      ours = $1
+      theirs = substr($7, RSTART, RLENGTH)
+      sub(/^adapted from Superpowers [0-9]+\.[0-9]+\.[0-9]+ /, "", theirs)
+    }
+    if (ours != "") { print ours "\t" theirs }
+  }' "$REPO/provenance.tsv" | sort -u)"
+sp_ours="$(awk -F'\t' 'NF { print $1 }' <<< "$sp_pairs" | sort -u)"
+sp_count=$(grep -c . <<< "$sp_pairs" || true)
+
+# 7b. One sentinel per derivation route, because the two fail independently and a count cannot tell
+# them apart. Drop the note-clause branch and `sp_count` falls 3 -> 2 while every remaining assertion
+# stays green and `unity-brainstorming` quietly leaves the notice. Each sentinel names the surface
+# that route alone can see. If a surface here is deliberately retired, this fails and the removal is
+# a decision someone makes on purpose — which is the point.
+if [ "$sp_count" -ge 3 ]; then
+  pass "the manifest yields $sp_count Superpowers-adapted surfaces"
+else
+  fail "the manifest yields only $sp_count Superpowers-adapted surfaces — a derivation route broke, and every 'matches the manifest' result below is worthless for the surfaces it stopped finding"
+fi
+while IFS=$'\t' read -r sp_sentinel sp_route; do
+  [ -n "$sp_sentinel" ] || continue
+  if grep -qxF -- "$sp_sentinel" <<< "$sp_ours"; then
+    pass "the $sp_route route still finds $sp_sentinel"
+  else
+    fail "the $sp_route route no longer finds $sp_sentinel — that route is broken, or the surface was retired without updating this guard"
+  fi
+done <<'SP_SENTINELS'
+.claude/skills/unity-planning/SKILL.md	origin-column
+.claude/skills/unity-brainstorming/SKILL.md	note-clause
+SP_SENTINELS
+
+# 7c. Both credit documents must carry exactly that set — no surface missing, nothing claimed that
+# the manifest does not support.
+#
+# `.claude/NOTICE.md` is the one that ships; `CREDITS.md` is the repository's record and states the
+# same list at more detail. Checking both is what stops them drifting apart, which is how the
+# situation this block corrects arose in the first place.
+#
+# Anchored BY POSITION, not by what a line looks like: the section is everything between its `## `
+# heading and the next `## `, and the obligation table is everything between `### Adapted surfaces`
+# and the next `### `. A grep over the whole file would be satisfied by a path mentioned anywhere —
+# including the influence paragraph, whose whole point is that those surfaces are NOT part of the
+# obligation.
+#
+# The anchors below write the literal dot as `[.]`, not `\.`. awk's `-v` expands escape sequences in
+# the VALUE before the regex ever sees it, so `\.` arrives as a bare `.` — a warning on stderr and a
+# pattern that matches any character. Measured 2026-08-11:
+#   awk: warning: escape sequence `\.' treated as plain `.'
+sp_license_expected="$(cat <<'SP_LICENSE_TEXT'
+MIT License
+
+Copyright (c) 2025 Jesse Vincent
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+SP_LICENSE_TEXT
+)"
+
+while IFS=$'\t' read -r sp_file sp_anchor; do
+  [ -n "$sp_file" ] || continue
+
+  sp_sec="$(awk -v pat="$sp_anchor" '$0 ~ pat { inb = 1; next } inb && /^## / { exit } inb { print }' "$REPO/$sp_file")"
+  if [ -z "$sp_sec" ]; then
+    fail "no Superpowers section in $sp_file at '$sp_anchor' — it was renamed, renumbered or deleted, and nothing below this line was checked for that file"
+    continue
+  fi
+  pass "found the Superpowers section in $sp_file"
+
+  sp_tbl="$(awk '/^### Adapted surfaces$/ { inb = 1; next } inb && /^### / { exit } inb { print }' <<< "$sp_sec")"
+  sp_named="$(grep -o -- '\.claude/skills/[a-z0-9-]*/SKILL\.md' <<< "$sp_tbl" | sort -u || true)"
+
+  # Whole-block compare, never `grep -F` with a multi-line pattern: that is an OR over its lines, so
+  # a set missing one member would still match on the others and report agreement.
+  if [ "$sp_named" = "$sp_ours" ]; then
+    pass "$sp_file names exactly the Superpowers-adapted surfaces the manifest records"
+  else
+    printf '     manifest:\n%s\n     %s:\n%s\n' "$sp_ours" "$sp_file" "$sp_named"
+    fail "$sp_file's 'Adapted surfaces' table disagrees with provenance.tsv — the document is wrong, not the manifest"
+  fi
+
+  # Pairing, not merely membership. A table that names all three of our files while attributing one
+  # of them to the wrong upstream skill passes the set check above and is still a false attribution.
+  while IFS=$'\t' read -r sp_o sp_t; do
+    [ -n "$sp_o" ] || continue
+    sp_paired=0
+    while IFS= read -r sp_row; do
+      case "$sp_row" in
+        *"$sp_o"*) case "$sp_row" in *"$sp_t"*) sp_paired=1 ;; esac ;;
+      esac
+    done <<< "$sp_tbl"
+    if [ "$sp_paired" -eq 1 ]; then
+      pass "$sp_file attributes $sp_o to $sp_t"
+    else
+      fail "$sp_file does not attribute $sp_o to $sp_t on one row — the manifest pairs them"
+    fi
+  done <<< "$sp_pairs"
+
+  # The obligation itself. Extracted from the section, so another upstream's MIT block elsewhere in
+  # the same file cannot satisfy it — `.claude/NOTICE.md` already carries two, and a file-wide grep
+  # for "Permission is hereby granted" passes on it TODAY, before Superpowers' text is added at all.
+  # Measured 2026-08-11 against the pre-rewrite file: that needle passed while the notice reproduced
+  # no Superpowers licence text whatsoever.
+  sp_lic="$(awk '/^```$/ { inb = !inb; if (!inb) exit; next } inb { print }' <<< "$sp_sec")"
+  if [ "$sp_lic" = "$sp_license_expected" ]; then
+    pass "$sp_file reproduces Superpowers' MIT licence text with its copyright line"
+  else
+    fail "$sp_file's Superpowers section does not reproduce the MIT licence text character-for-character (missing, truncated, or the copyright line edited)"
+  fi
+done <<'SP_SECTIONS'
+.claude/NOTICE.md	^## 3[.] Superpowers
+CREDITS.md	^## 4[.] Superpowers
+SP_SECTIONS
+
+# 7d. The superseded claims must be gone from everything that describes the toolkit as it stands —
+# including provenance.tsv's own `note` column, which repeated them and which check-provenance.sh
+# never reads.
+#
+# Matched against the file with newlines collapsed to spaces. `.claude/NOTICE.md` wrapped "What was
+# not taken is the / text" across a line break, so a plain `grep -F` for that sentence reported the
+# claim ABSENT while it was on screen — measured 2026-08-11 on the pre-rewrite file. A guard that
+# reads a stale claim as removed is worse than no guard.
+#
+# The dated history of these claims is deliberately kept in both documents, phrased so it does not
+# reproduce the sentences themselves. Historical plans and specs under docs/ are records of what was
+# believed on a date and are correctly out of this sweep.
+sp_stale='influence, not a license obligation
+What was not taken is the text
+not a license obligation
+no license text reproduced
+0.120
+0.183
+0.156'
+sp_stale_files='.claude/NOTICE.md
+CREDITS.md
+provenance.tsv'
+
+while IFS= read -r sp_f; do
+  [ -n "$sp_f" ] || continue
+  # tr drains its input; no reader here can exit early.
+  sp_flat="$(tr '\n' ' ' < "$REPO/$sp_f" | tr -s ' ')"
+  sp_dirty=0
+  while IFS= read -r sp_n; do
+    [ -n "$sp_n" ] || continue
+    case "$sp_flat" in
+      *"$sp_n"*) fail "$sp_f still carries a claim the 2026-08-10 adaptation made false: '$sp_n'"; sp_dirty=1 ;;
+    esac
+  done <<< "$sp_stale"
+  [ "$sp_dirty" -eq 0 ] && pass "$sp_f carries none of the superseded influence-only claims"
+done <<< "$sp_stale_files"
+
+# 7e. The pinned licence text above is a copy, and this is the one place it can be checked against
+# the real upstream. `.research/` is gitignored, so it is present in a working clone and absent in a
+# fresh one — which is why 7c compares against the pin rather than the file. When the file IS there,
+# say so either way rather than skipping silently: a line that appears only on success is
+# indistinguishable from a check that never ran.
+sp_upstream_license="$REPO/.research/superpowers/LICENSE"
+if [ -f "$sp_upstream_license" ]; then
+  if [ "$(cat "$sp_upstream_license")" = "$sp_license_expected" ]; then
+    pass "the pinned MIT text matches .research/superpowers/LICENSE byte-for-byte"
+  else
+    fail "the pinned MIT text differs from .research/superpowers/LICENSE — the upstream notice changed, or the pin was mistyped"
+  fi
+else
+  printf 'note: %s\n' ".research/superpowers/LICENSE is absent (gitignored working copy), so the pinned MIT text was not cross-checked against upstream this run"
+fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all provenance-origin assertions passed\n'

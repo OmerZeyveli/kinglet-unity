@@ -97,6 +97,71 @@ assert_eq "0" "$(printf '%s' "$DC_VACUOUS" | grep -c . || true)" \
   "every prose file this guard covers still states the split in a form it can read"
 
 # ============================================================================
+# ECU's own footprint — a PER-ORIGIN count, and a different number from the repo-wide split above.
+#
+# CREDITS.md's relationship table read "101 files" on 2026-08-11 while provenance.tsv held 99
+# origin=ecu rows and README.md, four sections away, correctly said 99. Two of the repo's own
+# provenance documents disagreed with each other and with the manifest, and every guard in this
+# suite was green: the block above only reads the repo-wide verbatim/modified split, which was
+# correct the whole time.
+#
+# CREDITS.md warns in prose that per-origin counts belong in the sections and the manifest, never in
+# the repo-wide sentence. That warning is why the two numbers are distinguishable at all — and it is
+# also why this block exists, because a warning is not a guard, which is the lesson the header of
+# this file already records once.
+echo "--- derived counts: ECU footprint ---"
+
+DCF_ECU_FILES=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $2 == "ecu"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
+DCF_ECU_VERBATIM=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $2 == "ecu" && $6 == "verbatim"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
+
+# Two phrasings, in two files, saying the same thing — the shape that let the disagreement above
+# survive. Both are read here so neither can drift alone.
+#   CREDITS.md   "99 files; 25 of them still byte-identical"   (count and verbatim count)
+#   README.md    "99 files from ECU"                           (count only)
+DCF_BAD=""
+DCF_VACUOUS=""
+while IFS= read -r rel; do
+  [ -n "$rel" ] || continue
+  [ -f "$REPO_DIR/$rel" ] || continue
+  dcf_found=0
+
+  while IFS= read -r claim; do
+    [ -n "$claim" ] || continue
+    dcf_found=$((dcf_found + 1))
+    dcf_c=$(printf '%s' "$claim" | awk '{print $1}')
+    dcf_v=$(printf '%s' "$claim" | awk '{print $3}')
+    if [ "$dcf_c" != "$DCF_ECU_FILES" ] || [ "$dcf_v" != "$DCF_ECU_VERBATIM" ]; then
+      DCF_BAD="${DCF_BAD}${rel} claims ${dcf_c} ECU files, ${dcf_v} byte-identical — provenance.tsv has ${DCF_ECU_FILES} and ${DCF_ECU_VERBATIM}"$'\n'
+    fi
+  done <<< "$(grep -oE '[0-9]+ files; [0-9]+ of them still byte-identical' "$REPO_DIR/$rel" || true)"
+
+  while IFS= read -r claim; do
+    [ -n "$claim" ] || continue
+    dcf_found=$((dcf_found + 1))
+    dcf_c=$(printf '%s' "$claim" | awk '{print $1}')
+    if [ "$dcf_c" != "$DCF_ECU_FILES" ]; then
+      DCF_BAD="${DCF_BAD}${rel} claims ${dcf_c} files from ECU — provenance.tsv has ${DCF_ECU_FILES}"$'\n'
+    fi
+  done <<< "$(grep -oE '[0-9]+ files from ECU' "$REPO_DIR/$rel" || true)"
+
+  if [ "$dcf_found" -lt 1 ]; then
+    DCF_VACUOUS="${DCF_VACUOUS}${rel} states ECU's footprint in no form this guard can read"$'\n'
+  fi
+done <<< "$DC_QUOTING_FILES"
+
+if [ -n "$DCF_BAD" ]; then
+  printf '%s' "$DCF_BAD"
+fi
+assert_eq "0" "$(printf '%s' "$DCF_BAD" | grep -c . || true)" \
+  "every ECU footprint quoted in prose matches provenance.tsv ($DCF_ECU_FILES files, $DCF_ECU_VERBATIM verbatim)"
+
+if [ -n "$DCF_VACUOUS" ]; then
+  printf '%s' "$DCF_VACUOUS"
+fi
+assert_eq "0" "$(printf '%s' "$DCF_VACUOUS" | grep -c . || true)" \
+  "every prose file this guard covers still states ECU's footprint in a form it can read"
+
+# ============================================================================
 # The second derived number in this repository: how much of ECU survives in `unity-brainstorming`.
 #
 # `provenance.tsv:71` rules `origin=ecu` for a file that was rewritten on 2026-08-10, and its stated

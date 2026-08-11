@@ -1,9 +1,9 @@
 # Third-Party Notices
 
-The `.claude/` directory installed into your project contains MIT-licensed material from two upstream
-projects. The MIT License requires their copyright and permission notices to travel with all copies
-or substantial portions of the software — this file is how that obligation is met, and it is why it
-ships into your project rather than staying in the toolkit repo.
+The `.claude/` directory installed into your project contains MIT-licensed material from other
+open-source projects. The MIT License requires their copyright and permission notices to travel with
+all copies or substantial portions of the software — this file is how that obligation is met, and it
+is why it ships into your project rather than staying in the toolkit repo.
 
 You do not need to do anything with this file. Keep it alongside `.claude/` and the obligation stays
 satisfied.
@@ -22,8 +22,9 @@ verifiable; you just verify them against the source rather than a snapshot.
 |---|---|---|
 | [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) | vendored at v1.5.0 (`bb28ccb`); mobile content removed, some files modified | agents `unity-*`, commands `unity-*`, skills, hooks, 5 rules, `settings.json` |
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) | adapted at `984023d`, removed 2026-08-03; no Claude-Code-Game-Studios content ships in this toolkit today | 0 files |
+| [Superpowers](https://github.com/obra/superpowers) | adapted at 6.2.0 (`3dcbd5c`) on 2026-08-10 — the process-chain skills, rewritten for Unity from its originals | the skills listed in §3 |
 
-Files not attributable to either are original to Kinglet Pioneer, MIT, Copyright (c) 2026
+Files not attributable to any of those are original to Kinglet Pioneer, MIT, Copyright (c) 2026
 OmerZeyveli. **The manifest is the list**, not this paragraph — every row with `origin=original` in the
 toolkit's `provenance.tsv`, linked above. At the time of writing that is five files:
 
@@ -106,21 +107,84 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## 3. Superpowers — influence, not a license obligation
+## 3. Superpowers — adapted, MIT
 
-Not vendored, not adapted — no license text follows. Named here because `CREDITS.md` in the toolkit
-repository opens "nothing here is asserted on trust," and three files there named Superpowers only as
-the competitor the `/unity-workflow` command's dispatch loop measured itself against — that command
-was deleted on 2026-08-10 and its loop is now `subagent-driven-implementation` — which was an incomplete
-record by that document's own standard. What was taken: the chain
-design (skills that name the next skill), the execution loop
-(`subagent-driven-implementation`, adapted from Superpowers' `subagent-driven-development`), and two
-skill names, `systematic-debugging` and `verification-before-completion`. What was not taken is the
-text — measured similarity of our three skills against their Superpowers counterparts is 0.120,
-0.183, and 0.156, with nothing shared beyond YAML frontmatter and one heading.
+Superpowers is a Claude Code skill library by Jesse Vincent. This toolkit's process chain — the
+skills that decide what happens before code is written — is adapted from it.
 
-MIT covers expression, and the measured similarity says the expression is ours. `provenance.tsv`'s
-`origin=original` on those three skills is correct and does not change; this section does not assert
-a license obligation and no license text for Superpowers is reproduced — nothing here is vendored or
-derived at the expression level, so a license block would misstate what happened, not clarify it.
-See the toolkit repository's `CREDITS.md` for the full section.
+**What this section used to say, and why it changed.** Until 2026-08-10 it recorded Superpowers as
+an influence only: the chain design (skills that name the next skill) and two skill names had been
+taken; the skills that existed then had had their wording measured against their Superpowers
+counterparts and found to be ours; and no license text was reproduced. That was an accurate account
+of the toolkit as it stood on that date.
+
+On 2026-08-10 the process chain was rebuilt, and three skills were adapted from Superpowers **at the
+expression level** — their structure, their step sequence and, in places, their wording. MIT covers
+expression. The obligation therefore exists as of that date, and this section is where it is
+discharged.
+
+The earlier similarity measurements are **withdrawn, not re-taken.** They described a state that no
+longer holds, and a freshly measured number would go stale in exactly the same way. The per-file
+truth lives in `provenance.tsv`, linked at the top of this file, where it is re-derived rather than
+remembered.
+
+### Adapted surfaces
+
+| File in this toolkit | Adapted from Superpowers 6.2.0 | How `provenance.tsv` records it |
+|---|---|---|
+| `.claude/skills/unity-brainstorming/SKILL.md` | `skills/brainstorming/SKILL.md` | `origin=ecu` — this file's lineage begins at everything-claude-unity and that material survives in it, so the origin column stays with the first upstream and the Superpowers adaptation is recorded in the row's note |
+| `.claude/skills/unity-planning/SKILL.md` | `skills/writing-plans/SKILL.md` | `origin=superpowers` |
+| `.claude/skills/unity-execution/SKILL.md` | `skills/executing-plans/SKILL.md` | `origin=superpowers` |
+
+All three are `status=modified`: every one was rewritten for Unity 6 and for this toolkit's surfaces,
+and none is a copy. That is a statement about how much changed, not a reduction of the obligation.
+
+**No automated check in the toolkit verifies the Superpowers pin.** `scripts/check-provenance.sh`
+compares checksums only for rows marked `status=verbatim`, and its `--online` pass additionally only
+for rows from everything-claude-unity — so both skip every row above. The `6.2.0` / `3dcbd5c` pin in
+`provenance.tsv` is a record kept by hand, and it is worth saying so rather than letting the presence
+of checksum machinery imply a coverage it does not have.
+
+### Still influence, not expression
+
+Three further surfaces owe Superpowers something short of expression, and stay `origin=original` in
+`provenance.tsv`:
+
+- `.claude/skills/subagent-driven-implementation/` takes the shape of its loop — a fresh implementer
+  per task, a review gate between tasks — from Superpowers' `subagent-driven-development`. The
+  wording, and the Unity rules layered on it, are ours.
+- `.claude/skills/systematic-debugging/SKILL.md` and
+  `.claude/skills/verification-before-completion/SKILL.md` share their names with Superpowers
+  skills, and nothing else.
+
+They are named here for completeness. They are not part of the obligation discharged above.
+
+### License text
+
+Reproduced verbatim from Superpowers' `LICENSE` at 6.2.0.
+
+```
+MIT License
+
+Copyright (c) 2025 Jesse Vincent
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+See the toolkit repository's `CREDITS.md` for the same record at more detail.
