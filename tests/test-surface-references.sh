@@ -132,6 +132,43 @@ fi
 assert_eq "0" "$(printf '%s' "$BAD_CMD_REFS" | grep -c . || true)" \
   "no skill body names a /unity-* command that does not exist"
 
+# ============================================================================
+# The red-flag section exists in all three skills that are said to carry one.
+#
+# `using-kinglet` is injected at session start and tells the model that these skills each carry a
+# "the thought that means you are about to…" section, to be read when the situation feels like an
+# exception. That is a claim about three OTHER files, and on 2026-08-10 it was shipped false: the
+# process-chain wave rewrote `unity-brainstorming`, the sentence was updated on the belief that the
+# section had been removed with the exemption list, and the payload then steered readers away from
+# a section that was sitting at `:183` under a new title the whole time. D2 removed the five-item
+# exemption LIST; the red-flag section was retitled, not deleted.
+#
+# Matched on the stable prefix, not the full heading. The tails differ by design and one of them
+# has already been rewritten once — `…about to skip this`, `…about to skip a step`, `…about to
+# treat vague as clear`. Pinning the tail would fail on a legitimate retitle, which is the shape
+# field note 81 rules against; pinning the prefix fails only when the section actually goes.
+RF_PREFIX='## The thought that means you are about to'
+RF_MISSING=""
+while IFS= read -r rf_name; do
+  [ -n "$rf_name" ] || continue
+  rf_file="$REPO_DIR/.claude/skills/$rf_name/SKILL.md"
+  if [ ! -f "$rf_file" ]; then
+    RF_MISSING="${RF_MISSING}${rf_name}: no SKILL.md"$'\n'
+  elif ! grep -qF -- "$RF_PREFIX" "$rf_file"; then
+    RF_MISSING="${RF_MISSING}${rf_name}: no '${RF_PREFIX}…' section, but using-kinglet tells every session to read one"$'\n'
+  fi
+done <<'RF_SKILLS'
+unity-brainstorming
+systematic-debugging
+verification-before-completion
+RF_SKILLS
+
+if [ -n "$RF_MISSING" ]; then
+  printf '%s' "$RF_MISSING"
+fi
+assert_eq "0" "$(printf '%s' "$RF_MISSING" | grep -c . || true)" \
+  "every skill using-kinglet says carries a red-flag section actually carries one"
+
 # An untracked file under .claude/ is live for Claude Code and invisible to check-provenance.sh
 # (git ls-files) and to baseline-regenerate (ls-tree against a commit). Nothing else asserts this.
 UNTRACKED_PAYLOAD=$(cd "$REPO_DIR" && git ls-files --others --exclude-standard -- .claude 2>/dev/null || true)

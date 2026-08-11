@@ -31,10 +31,14 @@ detected from the project's own code, not assumed. Read it before asserting that
 
 A question that the rules already answer needs no surface. Answer it.
 
-`systematic-debugging` and `verification-before-completion` each carry a "the thought that means you
-are about to skip this" section — read it when the situation feels like an exception, because that
-feeling is what it names. `unity-brainstorming` answers the same feeling by refusing to keep a list:
-it has no exemptions, and its hard gate holds however simple the request looks.
+`unity-brainstorming`, `systematic-debugging` and `verification-before-completion` each carry a "the
+thought that means you are about to…" section — read it when the situation feels like an exception,
+because that feeling is what it names. `unity-brainstorming`'s is titled for its own failure mode:
+**the thought that means you are about to treat vague as clear**.
+
+What `unity-brainstorming` does not keep is a *list* of exemptions. It has exactly one — a throwaway
+scene built to try an idea goes to `/unity-prototype` — and that choice is made before a round
+starts, never from inside one.
 
 ## Offer the next step
 

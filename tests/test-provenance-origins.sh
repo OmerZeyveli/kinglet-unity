@@ -187,36 +187,99 @@ done
 # The skip is one file and stays one file. Wanting to add a second is the signal that a sentence
 # needs rewriting into the past tense, not that the guard needs loosening.
 dead_scan="$(git -C "$REPO" ls-files '.claude/*' 'scripts/*' ':(glob)docs/*.md' 'README.md')"
+
+# The needles are matched BARE, without a leading slash.
+#
+# Round 1 matched the two commands as `/unity-workflow` and `/unity-feature` and only the skill
+# bare. Measured against that version: bare `unity-workflow` appended to using-kinglet, and bare
+# `unity-feature` appended to GETTING-STARTED.md, both passed the whole suite. The deleted
+# command's own frontmatter key was `name: unity-workflow`, and "the unity-workflow pipeline" is
+# the natural way a future writer names it in prose — so the slash form is the ONE form the guard
+# could afford to miss, and it was the only form it matched. Task 4's lesson, one shape over.
+#
+# The trade: a future surface named `unity-feature-flags` would trip this. That is the correct
+# outcome and not a false positive — these two names are retired, and `provenance-skip.tsv`
+# forbids their paths. Reusing either name is the thing being prevented.
+dead_needles='unity-workflow
+unity-feature
+deep-interview'
+
 dead_scanned=0
+dead_payload=0
+dead_scripts=0
+dead_docs=0
+dead_readme=0
 while IFS= read -r dead_f; do
   [ -n "$dead_f" ] || continue
   case "$dead_f" in
     .claude/NOTICE.md) continue ;;  # a licence record; its /unity-workflow mention is history
   esac
   dead_scanned=$((dead_scanned + 1))
+  # Per-glob tallies, for the floors below. Counted here rather than by re-running ls-files per
+  # glob, so the numbers describe the set actually inspected and cannot drift from it.
+  case "$dead_f" in
+    .claude/*) dead_payload=$((dead_payload + 1)) ;;
+    scripts/*) dead_scripts=$((dead_scripts + 1)) ;;
+    README.md) dead_readme=$((dead_readme + 1)) ;;
+    docs/*)    dead_docs=$((dead_docs + 1)) ;;
+  esac
   dead_body="$(cat "$REPO/$dead_f")"
-  # Here-strings, never pipes: `grep -q` exits on first match without draining stdin, and under
-  # `set -euo pipefail` the writer's SIGPIPE becomes 141 becomes a dead script — on large inputs
-  # only, so it passes in test and breaks in the field.
-  if grep -qF -- '/unity-workflow' <<< "$dead_body"; then
-    fail "names deleted /unity-workflow: $dead_f"
-  fi
-  if grep -qF -- '/unity-feature' <<< "$dead_body"; then
-    fail "names deleted /unity-feature: $dead_f"
-  fi
-  if grep -qF -- 'deep-interview' <<< "$dead_body"; then
-    fail "names renamed deep-interview (now unity-brainstorming): $dead_f"
-  fi
+  while IFS= read -r dead_n; do
+    [ -n "$dead_n" ] || continue
+    # Here-strings, never pipes: `grep -q` exits on first match without draining stdin, and under
+    # `set -euo pipefail` the writer's SIGPIPE becomes 141 becomes a dead script — on large inputs
+    # only, so it passes in test and breaks in the field.
+    if grep -qF -- "$dead_n" <<< "$dead_body"; then
+      fail "names retired surface '$dead_n': $dead_f"
+    fi
+  done <<< "$dead_needles"
 done <<< "$dead_scan"
 
-# Anti-vacuity. A loop that examined nothing reports success, which is the shape of the defect
-# this whole section exists to catch. The scan covers ~94 tracked files; a collapse to a handful
-# means a pathspec broke, not that the toolkit shrank.
-if [ "$dead_scanned" -ge 60 ]; then
-  pass "the dead-name scan examined $dead_scanned files"
+# Anti-vacuity, per glob and by sentinel — NOT as one total.
+#
+# Round 1 asserted a single floor of 60 over 94 files. `.claude/*` alone contributes 76 of those,
+# so the floor was a test of that one glob wearing the costume of a test of all four. Measured by
+# deleting one pathspec at a time and planting a dead name behind it:
+#
+#   pathspec dropped          files scanned   old floor   planted name                 result
+#   scripts/*                 83              passes      deep-interview in doctor     UNDETECTED
+#   :(glob)docs/*.md README   87              passes      /unity-workflow in README    UNDETECTED
+#   .claude/*                 18              fires       —                            caught
+#
+# Three of the four could break without collapsing the total. Worse, `scripts/*` is the glob the
+# comment above singles out as the reason `scripts/studio-doctor.sh:275` belonged to no task's
+# file list — the floor did not protect the one failure it was written next to.
+#
+# Two mechanisms, because they fail differently. The floors catch a glob that empties; the
+# sentinels catch a glob that still returns files but no longer returns the RIGHT ones, which no
+# count can see. Each sentinel is a file that has actually carried a dead name.
+dead_floor_bad=""
+[ "$dead_payload" -ge 60 ] || dead_floor_bad="${dead_floor_bad}.claude/* scanned $dead_payload files (expected >= 60)"$'\n'
+[ "$dead_scripts" -ge 8 ]  || dead_floor_bad="${dead_floor_bad}scripts/* scanned $dead_scripts files (expected >= 8)"$'\n'
+[ "$dead_docs"    -ge 4 ]  || dead_floor_bad="${dead_floor_bad}docs/*.md scanned $dead_docs files (expected >= 4)"$'\n'
+[ "$dead_readme"  -eq 1 ]  || dead_floor_bad="${dead_floor_bad}README.md scanned $dead_readme times (expected exactly 1)"$'\n'
+
+if [ -z "$dead_floor_bad" ]; then
+  pass "every glob in the dead-name scan returned a plausible number of files ($dead_payload payload, $dead_scripts scripts, $dead_docs docs, $dead_readme readme; $dead_scanned total)"
 else
-  fail "the dead-name scan examined only $dead_scanned files — a pathspec broke; every 'clean' result above is worthless"
+  printf '%s' "$dead_floor_bad"
+  fail "a pathspec in the dead-name scan broke — every 'clean' result above is worthless for the files it stopped reaching"
 fi
+
+while IFS= read -r dead_s; do
+  [ -n "$dead_s" ] || continue
+  if grep -qxF -- "$dead_s" <<< "$dead_scan"; then
+    pass "the dead-name scan reaches its sentinel: $dead_s"
+  else
+    fail "the dead-name scan no longer reaches $dead_s — the glob covering it changed shape, and that file has carried a dead name before"
+  fi
+done <<'DEAD_SENTINELS'
+.claude/skills/using-kinglet/SKILL.md
+scripts/studio-doctor.sh
+scripts/generate-claude-md.sh
+docs/SKILL-CATALOG.md
+README.md
+DEAD_SENTINELS
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all provenance-origin assertions passed\n'

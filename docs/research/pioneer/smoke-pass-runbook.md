@@ -1,5 +1,14 @@
 # Kinglet Pioneer — smoke pass runbook
 
+> **Staleness notice (2026-08-10). Read this before acting on anything below.** This runbook was
+> written against the pre-cut surface pool and has **not** been re-derived since. Every count and
+> surface name in it records what existed when it was written, not what you are about to test.
+> Known wrong today: the counts in "Why it exists" — 36 commands, 28 agents, 39 skills, 25 hooks,
+> where the tree now has **9, 8, 16 and 27**; the `serialization-safety` skill in §3, which does not
+> exist under that name; and `/unity-workflow` and `/unity-feature`, deleted on 2026-08-10 in favour
+> of the skill chain that begins at `unity-brainstorming`. Re-derive against the current tree before
+> running a pass.
+
 **For:** the operator running this by hand. Not automated, and not automatable.
 
 **Why it exists.** The test suite proves the installer places correct bytes. It proves nothing about
@@ -127,10 +136,8 @@ Repeat with a process-shaped request:
 > "Let's add a double jump to the player."
 
 Record **which surface, if any, the model selected** — `unity-brainstorming`? `unity-prototyper`?
-nothing at all, just starting to write code? (This runbook was written against the pre-cut surface
-pool; the two commands it originally named here, `/unity-workflow` and `/unity-feature`, were deleted
-on 2026-08-10 and the chain's entry point is now the `unity-brainstorming` skill. The rest of this
-document has not been re-derived against the current pool.) This single observation is the
+nothing at all, just starting to write code? (Two commands originally named here were deleted on
+2026-08-10; see the staleness notice at the top.) This single observation is the
 evidence behind the whole "make the surface machine-selectable" item, so record it exactly, including
 if the answer is "it ignored all 75 surfaces and just started coding".
 
