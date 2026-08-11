@@ -11,19 +11,20 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1–5 are done and closed. The chain exists end to end and the sequencers are gone.**
+**Tasks 1–6 are done and closed. The chain exists, the sequencers are gone, and the injected text is
+a mandate rather than a summary.**
 
 `unity-brainstorming` → `unity-planning` → the fork → `subagent-driven-implementation` or
-`unity-execution`. `/unity-workflow` and `/unity-feature` are deleted and `rule=absent`; the surface
-pool is **8 agents + 9 commands + 16 skills = 33**, exactly D7's arithmetic. Nothing is dispatched.
+`unity-execution`. Pool is **8 agents + 9 commands + 16 skills = 33**, exactly D7's arithmetic.
+Nothing is dispatched.
 
-**Task 6 is next** — `using-kinglet` becomes a mandate. Read deferred item 3 above before writing the
-brief: Task 5 had to repair that file mid-task (its own guard failed on it otherwise) and left the
-*shape* deliberately, so **row 20 still carries the pre-D2 vagueness gate** — "the request is vague
-and has no file, type or acceptance criterion" — sitting above the unconditional category trigger
-that replaced it. Two triggers, the softer one first.
+**Task 7 is next** — the licence facts. It is the task with the sharpest external consequence:
+`.claude/NOTICE.md` ships into **every installed project**, and since Task 2 it has carried a claim
+that adaptation made false. Read the Task 5 and Task 2 deferred items before writing the brief —
+`CREDITS.md` now contradicts **itself internally**, not merely upstream, and Task 7 is scheduled to
+fix the staleness rather than the self-contradiction.
 
-Suite is at **412 passing**, `provenance OK`, 541 manifest rows, 96 `rule=absent` enforced.
+Suite is at **438 passing**, `provenance OK`, 541 manifest rows, 96 `rule=absent` enforced.
 Reports under `.superpowers/sdd/2026-08-10-process-chain/`: `task-1-report.md` (rounds 0–3),
 `task-1-round4-report.md`, `task-2-report.md`, `task-3-report.md`, `task-4-report.md`,
 `task-5-report.md`.
@@ -95,6 +96,31 @@ Copy this section into every dispatch. A fresh subagent inherits none of it.
      `tests/kinglet/test_baseline_inventory.py`'s hand-maintained constants** — three assertions go
      red while the tool prints success. Fold the constants into the baseline commit; they are one
      logical change with the JSON.
+- **Sweep by insertion as well as by deletion — they find different things.** Every sweep before
+  Task 6 deleted lines, which finds unguarded **content**. Inserting at every position finds
+  unguarded **space**: places where nothing is asserted because nothing is there yet. Task 6's
+  insertion sweep found twelve silent positions *between two table rows* — `UK_TAIL` discarded them,
+  the row count stayed 11, and in Markdown a line there **ends the table**, so every route below it
+  stops rendering while the guard reads eleven rows.
+
+- **A sweep proves something only about the payload shapes it uses.** Task 6's first sweep used one
+  generic marker and reported "zero silent at 65 positions". A marker that never matches `^\|` is
+  *structurally incapable* of reaching a guard's pipe-shaped exclusions. Re-run with seven content
+  shapes × 65 positions: 455 insertions, zero silent — and the eighth shape, a bare blank line, is
+  silent at 26 positions **by design**, recorded because "zero silent" without that footnote is the
+  same overclaim one size down.
+
+- **A guess about shape is a costume anyone can wear.** Task 6's row guard excluded the header and
+  delimiter by *what they look like* (`$2 !~ /^ *Situation *$/`, `$0 !~ /^\s*\|-/`). A twelfth row
+  wearing either costume was invisible to the row count, the residue rule, the existence rule and the
+  contiguity check at once. Two positions were worse than a smuggled row: displacing the real header
+  makes **the table stop being a table in GFM** while the needle still matches and the count still
+  reads eleven. Anchor by **position** — line 1 must *be* the header, line 2 must *be* the delimiter.
+
+  The `assert_contains` forms were **deleted, not moved**: "does such a line exist anywhere" stays
+  true exactly when a row has been inserted above the real header. An existence check satisfied by
+  the mutation that breaks the thing is worse than no check.
+
 - **Only the artifact ships.** Task 5's implementer read `unity-brainstorming`, wrote the accurate
   claim into its *report*, and then wrote a stronger, false version into the **payload file injected
   at session start**. Its own words: *"I read the file, wrote the accurate version in prose, then
@@ -287,7 +313,7 @@ State these in later dispatches rather than letting a brief guess.
 | 3 | `unity-planning` — plan-writing as a skill, carrying the fork | **done** | `dfa8684..5e81a49` | 2 fix rounds. Spec ❌→✅ (the `writing-plans` document header was missing), 4 Important + 7 Minor, all ADDRESSED. **The fork's write half did not exist** — see below |
 | 4 | `unity-brainstorming` — rename + the design half | **done** | `dd7f434..f648047` | 2 fix rounds. Spec ✅, 5 Important + 5 Minor, all ADDRESSED. **32 of ECU's 69 substantive lines survive**, measured, so D10's `origin=ecu` ruling holds. Reverse-sweep escapes 153/176 → **66/153, zero in any ECU or manifest-named section** |
 | 5 | Delete the two sequencer commands, repair every reference | **done** | `308136e..b0adca5` | 2 fix rounds. Spec ✅, 3 Important + 5 Minor, all ADDRESSED. **28 files touched**, three dead names swept, and the pool is now **8 + 9 + 16 = 33**, matching D7's arithmetic exactly |
-| 6 | `using-kinglet` becomes a mandate | **pending** | — | |
+| 6 | `using-kinglet` becomes a mandate | **done** | `0492ec5..4222036` | 2 fix rounds. Spec ✅, 2 Important + 8 Minor, all ADDRESSED. The file is 64 lines and still read in full; the growth was all meta. **Nothing in `tests/` had ever executed `session-brief.sh`** — see below |
 | 7 | Licence facts — NOTICE gains MIT text, stale claims go | **pending** | — | NOTICE ships into user projects |
 | 8 | Whole-wave verification | **pending** | — | |
 
@@ -375,6 +401,25 @@ it, and `run-tests.sh` separately flags a file that exits non-zero without repor
    by an `assert_eq` in `test-surface-references.sh`. That works, and the plan did not ask for a row,
    but `CLAUDE.md` designates `rule=absent` as *"what keeps a removed surface from silently
    returning"* — Task 8 should say yes or no deliberately.
+
+### Four from Task 6, deferred with rulings
+
+1. **`.claude/hooks/session-brief.sh` had never been executed by any test.** Delete the closing `---`
+   of `using-kinglet`'s frontmatter and its awk stays in frontmatter mode for the whole file: the hook
+   **prints nothing, exits 0, and a session opens with no brief at all**, suite green in both
+   directions. Task 6 closed it **for that one file, via the hook**. The class stands for the other
+   15 skills: `test-skill-discovery.sh` greps for a `name:` line and a `description:` line, so any
+   skill can carry a third key or an unparseable block with the suite green. Same shape as Task 4's
+   deferred fence item; they are one item and belong together in `test-skill-discovery.sh`.
+2. **The Situation column is free text.** A full description of what a surface contains lives there
+   green — measured, renders, ships. Closing it needs a rule about what a Situation cell may *say*,
+   which is a design question rather than a guard fix.
+3. **`UK_SECTIONS_EXPECTED` matches ATX headings only.** Setext underlines and `<h2>` blocks are
+   caught *only* because the five whole-block compares tile the file end to end, so relaxing any one
+   of them to an `assert_contains` reopens both. A note now says so in the guard; no check.
+4. **`SKILL.md:8`'s "Five rules" and `:54`'s "six rule files"** are true today and rot together on a
+   seventh rule file; `"six rule files"` is duplicated in `unity-brainstorming:23`. Same class as the
+   surface counts nothing re-derives.
 
 ### Four from Task 5, deferred with rulings
 
