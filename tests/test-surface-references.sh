@@ -329,11 +329,19 @@ UE_DESLOP_RULES
 
 # The verify loop. The bound is the half that earns the surface — an unbounded self-review either
 # runs once and declares victory or runs until it gets bored — and nothing else asserted it.
+#
+# Step 1 was missing from this block until 2026-08-11: it guarded steps 2, 3 and 4 and not the
+# `unity-reviewer` invocation, which is the step that makes this a REVIEW loop rather than a
+# self-assessment. Delete step 1 and the remaining three still describe something coherent — fix,
+# re-check, test — so nothing here would have gone red while the only independent reader in the
+# inline branch quietly left. The needle carries the agent name and the read-only qualifier, not the
+# bold heading, so a rewrite that keeps "**Review**" and drops the agent fails.
 while IFS= read -r needle; do
   [ -n "$needle" ] || continue
   assert_contains "$deslop" "$needle" \
     "unity-execution carries the verify-loop step: $needle"
 done <<'UE_VERIFY_LOOP'
+**Review** — invoke the `unity-reviewer` agent (read-only) against all changed files
 **Auto-fix** issues that are safe to fix automatically
 **Re-verify** if fixes were applied (max 3 iterations)
 **Run tests** via MCP if available
@@ -676,8 +684,23 @@ UB_ROW_ORIGIN="$(awk -F'\t' '$1 == ".claude/skills/unity-brainstorming/SKILL.md"
 UB_ROW_STATUS="$(awk -F'\t' '$1 == ".claude/skills/unity-brainstorming/SKILL.md" { print $6 }' "$REPO_DIR/provenance.tsv" 2>/dev/null || true)"
 assert_eq "ecu" "$UB_ROW_ORIGIN" \
   "unity-brainstorming's row records origin=ecu in FIELD 2 (D10) — not merely somewhere in its note"
+# The rationale here read "so no checksum comparison is silently skipped" until 2026-08-11, and it
+# had the direction backwards. `check-provenance.sh` gates BOTH of its comparisons on
+# `[ "$status" = verbatim ] || continue` — the offline sha256 check at :84 and the --online `cmp` at
+# :170 — so `verbatim` is what TRIGGERS a comparison and `modified` is what skips it. Flipping this
+# field to `verbatim` runs a check rather than skipping one, and the check fails, because the file
+# was rewritten on 2026-08-10 and cannot match ECU's bytes. Measured, offline, no --online needed:
+#
+#   $ # field 6 of the unity-brainstorming row set to `verbatim`
+#   $ bash scripts/check-provenance.sh
+#   FAIL status=verbatim but the file differs from its recorded upstream: .claude/skills/unity-brainstorming/SKILL.md
+#   provenance check FAILED — 1 problem(s)
+#
+# So the assertion is right for a different reason than it claimed: the row must not assert a
+# byte-identity it does not have. A comment that states a true fact for a false reason survives
+# review indefinitely, because the assertion it sits on keeps passing.
 assert_eq "modified" "$UB_ROW_STATUS" \
-  "and status=modified in field 6, so no checksum comparison is silently skipped"
+  "and status=modified in field 6 — the file differs from ECU's, so verbatim would be a false claim"
 
 # The note was collapsed to a summary plus a pointer into MERGE-NOTES.md, so the pointer is now
 # load-bearing: a renamed section there would silently orphan the file's whole history. Nothing else
@@ -1076,8 +1099,13 @@ UK_ROW_ORIGIN="$(awk -F'\t' '$1 == ".claude/skills/using-kinglet/SKILL.md" { pri
 UK_ROW_STATUS="$(awk -F'\t' '$1 == ".claude/skills/using-kinglet/SKILL.md" { print $6 }' "$REPO_DIR/provenance.tsv" 2>/dev/null || true)"
 assert_eq "original" "$UK_ROW_ORIGIN" \
   "using-kinglet's row records origin=original in FIELD 2 — this file was never vendored"
+# Same correction as the unity-brainstorming block above, where the wrong rationale was written
+# first and then copied here during this wave. `original` does not skip a checksum comparison —
+# `verbatim` is the only status --online compares at all, and there is no upstream file to compare
+# this one against in any case. What the assertion actually protects: a file written here from
+# scratch must not acquire a status that claims an upstream relationship it never had.
 assert_eq "original" "$UK_ROW_STATUS" \
-  "and status=original in field 6, so no checksum comparison is silently skipped"
+  "and status=original in field 6 — nothing upstream to compare it to, and none claimed"
 
 # --- The bytes that actually reach a session -----------------------------------------------------
 # Everything above reads the FILE. What ships is the HOOK's output, and nothing in tests/ ran

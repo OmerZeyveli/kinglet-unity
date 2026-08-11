@@ -234,6 +234,13 @@ assert_lacks "$SDI_FRONT" "/unity-workflow" \
 UE_BODY="$(cat "$UE" 2>/dev/null || true)"
 assert_has "$UE_BODY" "**Execution mode:** inline" \
     "the inline branch writes the mode too — it is the branch with no other ledger"
+# ...and to the same address. Until 2026-08-11 this branch's MODE line was asserted and its ADDRESS
+# was not, while the subagent branch's address was — so the two writers of the same file could drift
+# on where it lives, and a resuming controller reading one of them would look in a directory the
+# other never wrote to. Deliberately the identical needle used for SDI_BODY above: it is the
+# agreement between the two that is being asserted, not the string.
+assert_has "$UE_BODY" "docs/features/<slug>/ledger.md" \
+    "the inline branch writes it to the same address the subagent branch does"
 
 echo ""
 echo "=== Workflow Plan-Input: $TESTS_PASSED/$TESTS_RUN passed, $TESTS_FAILED failed ==="

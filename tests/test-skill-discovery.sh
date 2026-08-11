@@ -185,9 +185,15 @@ S2S_FLOOR_STATE="ok"
 [ "$S2S_CHECKED" -ge 5 ] || S2S_FLOOR_STATE="only ${S2S_CHECKED} skill->skill references inspected"
 assert_eq "$S2S_FLOOR_STATE" "ok" "the skill->skill sweep still reads the chain, rather than passing on an empty set"
 
-# The sentinels are the fork itself: the two branches unity-planning chooses
-# between, and unity-planning, which both of its neighbours name. If the sweep
+# The sentinels are the chain itself: its entry point, the skill both of its
+# neighbours name, and the two branches that skill forks between. If the sweep
 # above stops seeing these, it has stopped seeing the thing it was written for.
+#
+# unity-brainstorming was NOT in this list until 2026-08-11 — the fork was
+# guarded and the door into it was not. It is where a user arrives and where
+# unity-planning sends a caller back to when no design exists, so a sweep that
+# stopped reaching it would break the chain at its only entrance while the three
+# sentinels below still reported "seen".
 #
 # These strings appear in this test file, and that is safe by construction
 # rather than by luck: the sweep reads .claude/skills only, so a copy living in
@@ -198,6 +204,7 @@ while IFS= read -r SENTINEL; do
   grep -qxF -- "$SENTINEL" <<< "$S2S_READ" && S2S_SEEN="seen"
   assert_eq "$S2S_SEEN" "seen" "the skill->skill sweep still reaches: $SENTINEL"
 done <<'S2S_SENTINELS'
+.claude/skills/unity-brainstorming/SKILL.md
 .claude/skills/unity-planning/SKILL.md
 .claude/skills/unity-execution/SKILL.md
 .claude/skills/subagent-driven-implementation/SKILL.md

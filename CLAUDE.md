@@ -21,12 +21,25 @@ It is assembled from other people's work, and that is the central fact about mai
   project. `provenance-skip.tsv` records every path as `rule=absent`; `MERGE-NOTES.md` Part 1 keeps
   the adaptation reasoning for history. The 8 agents shipped today are all ECU-origin `unity-*`
   implementers, not this layer.
+- **Superpowers (Jesse Vincent)** — MIT, **adapted** at 6.2.0 (`3dcbd5c`) on 2026-08-10. The process
+  chain, rewritten for Unity at the expression level, not vendored: `.claude/skills/unity-planning/`
+  from `skills/writing-plans/`, `.claude/skills/unity-execution/` from `skills/executing-plans/`
+  (both `origin=superpowers`), and `.claude/skills/unity-brainstorming/` from `skills/brainstorming/`
+  on top of ECU's `deep-interview` — which is why that one row stays `origin=ecu` with the adaptation
+  recorded in its note. It is the newest upstream and the only one whose obligation this repo
+  incurred itself rather than inherited: `.claude/NOTICE.md` §3 and `CREDITS.md` §4 discharge it, and
+  `.claude/UPSTREAM` carries the pin. **No code path verifies that pin** — every adapted row is
+  `status=modified`, so `--online` never reaches it.
 - **CoplayDev unity-mcp** — not vendored. `.mcp.json` points at it on `localhost:8080`.
 
 ## The provenance contract
 
-`provenance.tsv` has one row per tracked file: origin (`ecu` / `donchitos` / `original`), upstream
-version and path, the upstream checksum, status (`verbatim` / `modified` / `original`), and a note.
+`provenance.tsv` has one row per tracked file: origin (`ecu` / `donchitos` / `superpowers` /
+`original` — four legal values, as `provenance.tsv`'s own header line and `check-provenance.sh`'s
+origin check both state; `superpowers` became legal on 2026-08-10 and this guide went a wave without
+saying so, which is how a maintainer ends up writing `original` for a row that has an upstream),
+upstream version and path, the upstream checksum, status (`verbatim` / `modified` / `original`), and
+a note.
 
 **If you change a vendored file, flip its `status` to `modified` and say why in the `note` column.**
 Kinglet's surfaces are no longer vendored copies. `origin` records where a file came from and is a
@@ -63,8 +76,10 @@ never exist here; `rule=ours-wins` means upstream has the path and we ship our o
   `.claude/skills/<name>/SKILL.md` — one level, because that is the only depth Claude Code
   discovers. Nesting them under categories, which is how they arrived from ECU and how they sat
   until 2026-08-03, makes all 39 invisible with no error of any kind. `name:` must match the
-  directory, `description:` must be non-empty (it is the entire selection mechanism), and no skill
-  may carry `alwaysApply` or `globs` — both are inert Cursor keys that get read as guarantees.
+  directory, `description:` must be non-empty (it is the entire selection mechanism). No skill may
+  carry `alwaysApply` or `globs` either — both are inert Cursor keys that get read as guarantees —
+  but that one is asserted in `tests/test-no-mobile.sh:96`, not here; this guide cited the wrong file
+  for it until 2026-08-11.
   Every skill an agent, a command, **or another skill** names by path must exist. The skill→skill
   direction was added 2026-08-11 (section 6 of that test) and it is the one the process chain is
   built out of: during the 2026-08-10 wave three surfaces named each other by path *before the
@@ -77,6 +92,14 @@ never exist here; `rule=ours-wins` means upstream has the path and we ship our o
   ```bash
   ls .claude/agents/*.md | wc -l ; ls .claude/commands/*.md | wc -l ; ls -d .claude/skills/*/ | wc -l
   ```
+
+  The user-facing documents *do* quote it, because a reader deciding whether to install needs a size.
+  Those quotes are guarded rather than trusted: `tests/test-derived-counts.sh`'s surface-pool block
+  runs that derivation and fails when `README.md`, `docs/ARCHITECTURE.md` or `docs/SKILL-CATALOG.md`
+  disagrees with the tree. It was written on 2026-08-11 because the 2026-08-10 wave changed the
+  pool's *composition* without changing its total — two commands out, two skills in — so every guard
+  that watched a total stayed green while four quoted numbers went wrong at once. No total is written
+  here; that is the bullet's own ruling applied to the bullet's own explanation.
 
   This bullet read *"the surface pool is 32 by design"* from the 2026-08-03 cut until 2026-08-11, and
   the tree had moved on without it — a stale count in the file that warns against stale counts, in a
@@ -153,9 +176,18 @@ because Unity writes two lines and both match the version regex.
 
 The runner sources nothing into itself — each file runs in a subshell with stdin at `/dev/null`. It
 used to `source` them into the runner process, and since several end in `exit`, the runner died in
-the first file and 7 of 8 never ran while reporting green. If you touch the runner, confirm the
-number of `--- test-*.sh ---` headers in the output equals `ls tests/test-*.sh | wc -l` — **and
-strip the ANSI escapes before counting**:
+the first file and 7 of 8 never ran while reporting green.
+
+**The runner now checks its own discovery.** It counts the files the loop actually ran and compares
+that against `find tests -maxdepth 1 -name 'test-*.sh'`, and it fails on a shortfall or an empty
+discovery instead of printing a green zero. Until 2026-08-11 it did not: `nullglob` was unset, so an
+unmatched glob left the pattern itself in the array, `${#test_files[@]}` was 1 rather than 0, and the
+`-eq 0` guard with its `No test files found.` message was unreachable code. Measured on a copy of the
+runner alone in an empty directory: `Total: 0  Passed: 0  Failed: 0`, **exit 0** — a strictly worse
+version of the failure this paragraph opens with, because that one at least ran one file.
+
+The by-eye version below is still worth knowing, since it is how you read a suite log rather than a
+suite exit code — **and you must strip the ANSI escapes before counting**:
 
 ```bash
 bash tests/run-tests.sh 2>&1 | tee /tmp/suite.log

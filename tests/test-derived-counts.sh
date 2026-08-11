@@ -287,3 +287,123 @@ tests/test-derived-counts.sh"
   assert_eq "0" "$(printf '%s' "$DCE_VACUOUS" | grep -c . || true)" \
     "every file this guard covers still states the ECU survival in a form it can read"
 fi
+
+# ============================================================================
+# The surface pool — agents, commands and skills, counted in the tree.
+#
+# The 2026-08-10 process-chain wave changed the pool's COMPOSITION without changing its TOTAL: two
+# commands were deleted and two skills added. Nothing in this repository watched a composition, so
+# four numbers went wrong simultaneously and eight consecutive task reviews passed over them —
+# README.md's "What's in the box" table (commands and skills), and docs/ARCHITECTURE.md's component
+# tree (the same two). All four were correct at the branch point and wrong from the first task
+# onward. A fifth and sixth, docs/ARCHITECTURE.md's two prose skill counts, had been stale since the
+# wave before that.
+#
+# The excuse that let them rot is worth recording, because it was written down in the file it
+# protected: docs/ARCHITECTURE.md carried a parenthetical saying "Nothing enforces these exact
+# numbers in text — cross-check … if they look stale." That is the same shape this file's own header
+# already answers at :16 — a warning is not a guard — reproduced four sections lower. Both the
+# parenthetical and the numbers are fixed; this block is why the fix stays fixed.
+#
+# CLAUDE.md is deliberately NOT in the table below. Its ruling is that the repo guide states the
+# criterion and never the count ("Derive it, never quote it"), so there is nothing here to check —
+# a file that quotes no number cannot quote a stale one. Adding it would mean adding a number to it
+# first, which is the opposite of the fix.
+echo "--- derived counts: the surface pool ---"
+
+# One `ls` per surface class, `grep -c .` to count — it drains its input, so no early-exit reader is
+# on the right-hand side of these pipes. Skills are counted as SKILL.md files exactly one level deep,
+# which is the only depth Claude Code discovers; a nested skill is test-skill-discovery.sh §1's
+# business, not this file's, and would show up here as a shortfall rather than as a wrong number.
+DCS_AGENTS=$(ls -1 "$REPO_DIR"/.claude/agents/*.md 2>/dev/null | grep -c . || true)
+DCS_COMMANDS=$(ls -1 "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | grep -c . || true)
+DCS_SKILLS=$(ls -1 "$REPO_DIR"/.claude/skills/*/SKILL.md 2>/dev/null | grep -c . || true)
+DCS_TOTAL=$((DCS_AGENTS + DCS_COMMANDS + DCS_SKILLS))
+
+# The derivation itself has to be able to fail. Run from the wrong directory, or against a tree where
+# the payload has moved, every count above is 0 — and 0 compared against 0 is a green suite that
+# inspected nothing. Asserted before anything is compared to them.
+DCS_DERIVATION="ok"
+[ "$DCS_AGENTS"   -ge 1 ] || DCS_DERIVATION="no agents found under \$REPO_DIR/.claude/agents"
+[ "$DCS_COMMANDS" -ge 1 ] || DCS_DERIVATION="no commands found under \$REPO_DIR/.claude/commands"
+[ "$DCS_SKILLS"   -ge 1 ] || DCS_DERIVATION="no skills found under \$REPO_DIR/.claude/skills"
+assert_eq "ok" "$DCS_DERIVATION" \
+  "the surface counts are derived from a tree that actually has surfaces in it"
+
+# Every phrasing, in every file that quotes one, each with its own floor. A per-FILE floor cannot see
+# a single phrasing going unread — README.md would keep three table rows matching while its pool
+# sentence was reworded into invisibility — which is finding 1 of this wave's round 1, recorded at
+# :113-125 above and not repeated here by hand.
+#
+# Field 3 is the value the first captured number must equal; field 4 the second, or `-` for the
+# single-number phrasings, which is all of these.
+#
+# MATCHED AGAINST THE FILE FLATTENED, and here that is load-bearing for four of the eleven pairs
+# rather than a precaution. Measured 2026-08-11 on the corrected files:
+#
+#   $ grep -oE 'agents/ [0-9]+ agent definitions' docs/ARCHITECTURE.md          -> no match
+#   $ grep -oE '[0-9]+-surface pool' README.md                                  -> no match
+#
+# The tree block writes `agents/             8 agent definitions`, so the words are separated by a
+# run of spaces that only `tr -s ' '` collapses; and README.md's pool sentence wraps mid-phrase.
+# The wrap has a second sting: it wraps inside a BLOCKQUOTE, so flattening leaves the `>`
+# continuation marker standing between the two words —
+#
+#   $ tr '\n' ' ' < README.md | tr -s ' ' | grep -oE '.{18}[0-9]+-surface.{12}'
+#    code is whose, a 33-surface > pool cut
+#
+# — which is why that one pattern tolerates an optional `> ` and the others do not. A rewrap at a
+# different point in the phrase would not match, and that is deliberate: it fails the floor below by
+# name instead of quietly checking nothing.
+DCS_CLAIMS="README.md	\*\*Agents\*\* [|] [0-9]+	$DCS_AGENTS	-
+README.md	\*\*Commands\*\* [|] [0-9]+	$DCS_COMMANDS	-
+README.md	\*\*Skills\*\* [|] [0-9]+	$DCS_SKILLS	-
+README.md	[0-9]+-surface (> )?pool	$DCS_TOTAL	-
+docs/ARCHITECTURE.md	agents/ [0-9]+ agent definitions	$DCS_AGENTS	-
+docs/ARCHITECTURE.md	commands/ [0-9]+ user-invocable slash commands	$DCS_COMMANDS	-
+docs/ARCHITECTURE.md	skills/ [0-9]+ knowledge modules	$DCS_SKILLS	-
+docs/ARCHITECTURE.md	[0-9]+ in total, flat	$DCS_SKILLS	-
+docs/ARCHITECTURE.md	stripped from every skill . all [0-9]+ of them	$DCS_SKILLS	-
+docs/ARCHITECTURE.md	[0-9]+ agents total	$DCS_AGENTS	-
+docs/SKILL-CATALOG.md	[0-9]+ skills, one directory each	$DCS_SKILLS	-
+docs/SKILL-CATALOG.md	Current Skills \([0-9]+, flat\)	$DCS_SKILLS	-"
+
+DCS_BAD=""
+DCS_VACUOUS=""
+while IFS=$'\t' read -r dcs_rel dcs_pat dcs_want1 dcs_want2; do
+  [ -n "$dcs_rel" ] || continue
+  if [ ! -f "$REPO_DIR/$dcs_rel" ]; then
+    DCS_VACUOUS="${DCS_VACUOUS}${dcs_rel} is not present, so its '${dcs_pat}' claim was never checked"$'\n'
+    continue
+  fi
+
+  # tr drains its input; neither reader here can exit early.
+  dcs_flat="$(tr '\n' ' ' < "$REPO_DIR/$dcs_rel" | tr -s ' ')"
+  dcs_hits=0
+  while IFS= read -r dcs_claim; do
+    [ -n "$dcs_claim" ] || continue
+    dcs_hits=$((dcs_hits + 1))
+    dcs_got1=$(printf '%s' "$dcs_claim" | grep -oE '[0-9]+' | sed -n 1p)
+    dcs_got2=$(printf '%s' "$dcs_claim" | grep -oE '[0-9]+' | sed -n 2p)
+    if [ "$dcs_got1" != "$dcs_want1" ] || { [ "$dcs_want2" != "-" ] && [ "$dcs_got2" != "$dcs_want2" ]; }; then
+      DCS_BAD="${DCS_BAD}${dcs_rel} claims '${dcs_claim}' — the tree has ${dcs_want1}"$'\n'
+    fi
+  done <<< "$(grep -oE "$dcs_pat" <<< "$dcs_flat" || true)"
+
+  if [ "$dcs_hits" -lt 1 ]; then
+    DCS_VACUOUS="${DCS_VACUOUS}${dcs_rel} no longer states its '${dcs_pat}' claim in a form this guard can read"$'\n'
+  fi
+done <<< "$DCS_CLAIMS"
+
+if [ -n "$DCS_BAD" ]; then
+  printf '%s' "$DCS_BAD"
+  printf '     %s\n' "Re-derive with: ls .claude/agents/*.md | wc -l ; ls .claude/commands/*.md | wc -l ; ls .claude/skills/*/SKILL.md | wc -l"
+fi
+assert_eq "0" "$(printf '%s' "$DCS_BAD" | grep -c . || true)" \
+  "every surface count quoted in prose matches the tree ($DCS_AGENTS agents, $DCS_COMMANDS commands, $DCS_SKILLS skills, $DCS_TOTAL total)"
+
+if [ -n "$DCS_VACUOUS" ]; then
+  printf '%s' "$DCS_VACUOUS"
+fi
+assert_eq "0" "$(printf '%s' "$DCS_VACUOUS" | grep -c . || true)" \
+  "every surface-count phrasing this guard covers is still present in the file that carries it"

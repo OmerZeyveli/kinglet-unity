@@ -12,7 +12,7 @@ for the record of what was cut and why.
 > **Honest positioning:** almost none of this is written from scratch. The engineering layer is
 > [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (MIT), vendored and
 > then rewritten for an agent reader. What this project adds is the merge: one installer, PC/console
-> instead of mobile, a provenance manifest so you can see exactly whose code is whose, a 32-surface
+> instead of mobile, a provenance manifest so you can see exactly whose code is whose, a 33-surface
 > pool cut down from 103 on the criterion "does this do something the model cannot do unaided," and
 > fixes to a handful of upstream defects — including one that destroyed your `CLAUDE.md` on
 > re-install. See [CREDITS.md](CREDITS.md) and [MERGE-NOTES.md](MERGE-NOTES.md).
@@ -85,8 +85,8 @@ Installed into your project's `.claude/`:
 | | Count | |
 |---|---|---|
 | **Agents** | 8 | ECU-origin `unity-*` implementers: `unity-coder`, `unity-reviewer`, `unity-optimizer`, `unity-fixer`, `unity-prototyper`, `unity-scene-builder`, `unity-test-runner`, `unity-ui-builder` |
-| **Commands** | 11 | All `/unity-*` — see `.claude/commands/` |
-| **Skills** | 14 | Unity subsystems and cross-cutting process skills, flat at `.claude/skills/<name>/SKILL.md` |
+| **Commands** | 9 | All `/unity-*` — see `.claude/commands/` |
+| **Skills** | 16 | Unity subsystems and cross-cutting process skills, flat at `.claude/skills/<name>/SKILL.md` |
 | **Hooks** | 27 registered | Prompt-time guards (some blocking, the rest advisory). 28 files on disk — `_lib.sh` is a shared library, not a hook |
 | **Rules** | 6 | 5 spine rules + `pc-console.md` |
 | **Templates** | 10 | C# templates for the MVS pattern (`Model`, `View`, `System`, `LifetimeScope`, `Message`, tests, …) at the repo-level `templates/`. `.claude/templates/` (design-doc templates) does not exist — that layer was removed 2026-08-03. |
@@ -192,8 +192,10 @@ reasoning.
 ## Credits & License
 
 - **License:** MIT — see [LICENSE](LICENSE). Copyright (c) 2026 OmerZeyveli.
-- **Credits & third-party licenses:** [CREDITS.md](CREDITS.md). ECU is vendored and Donchitos is
-  adapted; both are MIT and both are attributed there in full.
+- **Credits & third-party licenses:** [CREDITS.md](CREDITS.md). ECU is vendored, the process chain is
+  adapted from [Superpowers](https://github.com/obra/superpowers), and Donchitos was adapted and then
+  removed on 2026-08-03 with 0 files remaining. All three are MIT and all three are attributed there
+  in full — Superpowers in §4, and again in `.claude/NOTICE.md` §3, which ships into your project.
 - **Build record:** [MERGE-NOTES.md](MERGE-NOTES.md) — what was taken, adapted, fixed, and left out.
 
 > **Support:** this is a **low-support** project — issues and PRs are welcome but may be slow. See

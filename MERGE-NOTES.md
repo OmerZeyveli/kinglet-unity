@@ -376,9 +376,18 @@ command. That command was deleted on 2026-08-10 (see `provenance-skip.tsv`), and
 of the two branches `unity-planning` forks to; the other is `unity-execution`. Count at the close of
 that wave: 33 surfaces — 8 agents, 11 commands, 14 skills — the same 27 registered hooks and 6 rules
 unchanged. After the 2026-08-10 process-chain wave it is still 33, differently composed: 8 agents, 9
-commands, 16 skills, hooks and rules again unchanged. `docs/SKILL-CATALOG.md`, `README.md`, and
-`docs/ARCHITECTURE.md` carry the updated skill count; this section is left at its original 13/32
-above because it is a record of what Task 4's cut produced, not a running total.
+commands, 16 skills, hooks and rules again unchanged.
+
+Both figures in this section are **records of what a wave produced on a date**, not running totals,
+which is why the 13/32 above is left where it stands. That distinction used to be the reason this
+section was allowed to stay stale, delegating the live count to `docs/SKILL-CATALOG.md`, `README.md`
+and `docs/ARCHITECTURE.md` — and on 2026-08-11 a whole-branch review measured that only
+`SKILL-CATALOG.md` had actually followed: `README.md` still said 11 commands and 14 skills, and
+`docs/ARCHITECTURE.md` said the same, all four correct at `7b18e63` and wrong from the moment this
+wave landed. A delegation to documents nobody checks is not a delegation. The live count now has a
+guard — `tests/test-derived-counts.sh` derives it from `.claude/agents/*.md`,
+`.claude/commands/*.md` and `.claude/skills/*/SKILL.md` and fails when any of those three files
+drifts — and *that* is what lets this section stay historical.
 
 ## The gap this plan corrected
 

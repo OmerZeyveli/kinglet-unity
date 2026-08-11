@@ -149,7 +149,14 @@ fi
 
 # ── 6. --online: verbatim rows still match upstream ──────────────────────────
 if [ "$ONLINE" -eq 1 ]; then
-  ECU_COMMIT=$(grep -m1 '^# ecu=' "$MANIFEST" | sed -n 's/.*(\([0-9a-f]\{40\}\)).*/\1/p')
+  # `|| true` is load-bearing. With the `# ecu=` header line ABSENT, grep exits 1, pipefail makes the
+  # pipeline exit 1, and `set -e` kills the script on the assignment itself — so the warn branch two
+  # lines down, which exists precisely for that case, was unreachable. Measured 2026-08-11 against a
+  # manifest with that one line stripped: the script died after "every rule=ours-wins path is ours",
+  # printing neither "skipping --online" (0 occurrences) nor its own summary line, and exited 1 with
+  # no explanation of what was wrong. The MALFORMED-pin case never had this problem — grep matches,
+  # sed prints nothing, rc is 0, and the warn printed correctly — which is why it read as covered.
+  ECU_COMMIT=$(grep -m1 '^# ecu=' "$MANIFEST" | sed -n 's/.*(\([0-9a-f]\{40\}\)).*/\1/p' || true)
   if [ -z "$ECU_COMMIT" ]; then
     warn "could not read the pinned ECU commit from $MANIFEST header — skipping --online"
   else
