@@ -54,7 +54,7 @@ starts, never from inside one.
 | "This request is already clear" | That judgment is made by a model that has just read six rule files and a generated block. It is exactly the one miss that was measured. |
 | "The table already tells me what to do" | The table names the file. It is not the file. Twice, the chain was executed without ever loading it. |
 | "I am resuming from a ledger, the decision is made" | A ledger records the **mode**. It does not record the design of a new task. |
-| "I remember this skill" | The block is 41 lines; the skill is over 110. What you remember is the block. |
+| "I remember this skill" | You have read this block at the start of every session and the skill perhaps once. Recall that confident is evidence of the block, not of the skill. |
 | "Let me look at the code first" | The surface is the thing that tells you how to look at it. |
 
 ## Offer the next step

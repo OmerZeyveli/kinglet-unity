@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 #
-# test-surface-references.sh — an agent or command must not name a skill that does not exist.
+# test-surface-references.sh — a surface must not name something that does not exist, and the
+# claims this repo makes about its own payload must be falsifiable.
+#
+# It started as the first of those and has grown into the second. Four kinds of check now live here,
+# and a reader looking for one should know the others are present:
+#
+#   1. REFERENCE INTEGRITY — an agent or command naming a skill, a skill body naming a `/unity-*`
+#      command, a chain-table cell naming a surface. The original job; described below.
+#   2. STRUCTURAL CLAIMS about a payload file — every agent has a Skills to load block naming
+#      `verification-before-completion`; the three skills `using-kinglet` advertises actually carry a
+#      red-flag section.
+#   3. FROZEN PROSE — roughly sixty lines of `unity-brainstorming`, `unity-execution` and
+#      `using-kinglet` are compared character for character, because `provenance.tsv` and
+#      `MERGE-NOTES.md` make claims about them and `check-provenance.sh` never reads a note. These
+#      assertions are meant to fail when the prose changes: that is the contract, not a nuisance.
+#      Changing the payload means changing the expected block in the same commit.
+#   4. A HOOK IS EXECUTED — `.claude/hooks/session-brief.sh` is run and its output inspected, because
+#      what ships into a session is the hook's stdout and not the file on disk.
 #
 # tests/test-skill-discovery.sh already checks PATH-FORM references (`.claude/skills/<name>`).
 # It does not catch a bare name in a "Skills to load" list or a `skills:` frontmatter value,
@@ -712,6 +729,46 @@ uk_section() {
   ' "$UK_SKILL" 2>/dev/null || true
 }
 
+# --- The frontmatter, which the same insertion sweep found open ---------------------------------
+# `test-skill-discovery.sh` checks that `name:` matches the directory and that `description:` is
+# non-empty, both by grepping for a line. Neither notices a THIRD line: inserting one after line 1, 2
+# or 3 was silent across this whole file's assertions and that file's. The block is two keys and
+# stays two keys — an unparseable frontmatter makes a skill invisible to Claude Code with no error,
+# and this one is also read by a SessionStart hook that strips whatever sits between the delimiters.
+UK_FRONTMATTER_EXPECTED='name: using-kinglet
+description: "Use at the start of every session in a Unity project — establishes which Kinglet surface handles which situation, and that a process surface is chosen before code is written."'
+assert_eq "$UK_FRONTMATTER_EXPECTED" "$(awk '
+    NR == 1 && $0 == "---" { f = 1; next }
+    f && $0 == "---" { exit }
+    f { print }
+' "$UK_SKILL" 2>/dev/null || true)" \
+  "the frontmatter is exactly the two keys the convention allows, and the description is unchanged"
+
+# --- The section list, which is also the section BUDGET ----------------------------------------
+# Every other assertion in this block compares a section that exists today, and `uk_section` stops at
+# the next heading — so a NEW section is invisible to all of them at once. Three insertion points
+# were measured, each producing 0 failures against the round-1 guard: a section appended at EOF; a
+# section between the intro and `## The rule` (the ordering check only compares Rule against Chain);
+# and a paragraph above the table, closed separately below.
+#
+# The second is the regression this whole wave exists to prevent. A `## What each surface does`
+# section containing "`unity-brainstorming` asks, it does not guess" is the summary that made loading
+# unnecessary, restored one heading lower than the table it was removed from, injected at every
+# session start, and green.
+#
+# THE BUDGET IS FIVE SECTIONS AND THIS ASSERTION IS WHERE THAT TRADE IS MADE. A sixth requires
+# deleting one, here, in the same commit — and the arithmetic has to be argued rather than assumed,
+# because this file's whole failure mode is being long enough to substitute for what it points at.
+# The round-1 report of this task wrote "I would not add a seventh section without deleting one" and
+# that sentence protected nothing: a report is not a constraint. This is.
+UK_SECTIONS_EXPECTED='# Using Kinglet
+## The rule
+## The chain
+## The thoughts that mean you are about to skip a surface
+## Offer the next step'
+assert_eq "$UK_SECTIONS_EXPECTED" "$(awk '/^#+ / { print }' "$UK_SKILL" 2>/dev/null || true)" \
+  "the session brief has exactly these five sections, in this order — adding one means removing one"
+
 # --- D9 device 1 and 2: the ordering rule and the announce ritual ------------------------------
 # Compared whole. The plan's own guard was three `assert_contains` needles — "before any response or
 # action", "Using [skill] to [purpose]" — and each of those is satisfied while the sentence around it
@@ -752,12 +809,47 @@ assert_eq "before" "$UK_ORDER" \
 #   `unity-planning` first — it adopts the plan and records how…  -> residue: — it adopts the plan…
 #
 # and against all eleven surviving cells, whose residue is empty.
+#
+# LEADING WHITESPACE IS PART OF THE PATTERN, in both places below. Markdown accepts up to three
+# spaces of indent on a table row and still renders it as a row. Measured against the first version
+# of this block, which anchored on a bare `^\|`: a twelfth row inserted mid-table with two spaces of
+# indent —
+#
+#     | A tweak to something that already works | `unity-execution` — it skips the round entirely |
+#
+# — produced 0 failures and 93 green assertions, and rendered. The row-count anti-vacuity did not
+# see it either, so the count was the thing being evaded rather than the thing catching it. The
+# identical row unindented fails two assertions. `[[:space:]]*` rather than ` \{0,3\}` because a tab
+# indents too and an over-indented row is not a thing this guard should be lenient about.
 UK_CHAIN="$(uk_section '## The chain')"
-UK_ROWS="$(awk -F'|' '/^\|/ && $0 !~ /^\|-/ && $2 !~ /^ *Situation *$/' <<< "$UK_CHAIN")"
+UK_ROWS="$(awk -F'|' '/^[[:space:]]*\|/ && $0 !~ /^[[:space:]]*\|-/ && $2 !~ /^ *Situation *$/' <<< "$UK_CHAIN")"
 
 # Anti-vacuity: an emptied or renamed table makes every row check below pass on zero rows.
-assert_eq "11" "$(printf '%s\n' "$UK_ROWS" | grep -c '^|' || true)" \
+assert_eq "11" "$(printf '%s\n' "$UK_ROWS" | grep -c '^[[:space:]]*|' || true)" \
   "the chain table still has its eleven routing rows for this guard to read"
+
+# Nothing but the table may sit between the heading and the first row. `UK_TAIL` below rebuilds its
+# buffer at every table row, so anything written ABOVE the table is discarded before it is compared
+# — measured: a paragraph inserted between `## The chain` and the header row produced 0 failures.
+# The section-list assertion further down cannot see it either, because a paragraph is not a heading.
+assert_eq "" "$(awk '/^[[:space:]]*\|/ { exit } { print }' <<< "$UK_CHAIN" | ub_trim)" \
+  "the chain section opens with its table — no prose is smuggled in above the first row"
+
+# …and the table is CONTIGUOUS. Same hole one place over, found by inserting a line at each of the
+# 65 positions in the file and counting failures: a non-table line between two rows is discarded by
+# `UK_TAIL` (which rebuilds its buffer at the next row), leaves the row count at eleven, and sits
+# above the preamble check's exit. Twelve positions, lines 23 through 34, were silent. In Markdown
+# such a line also ends the table, so every row below it stops being a row.
+UK_TABLE_BREAKS="$(awk '
+  /^[[:space:]]*\|/ { last = NR; if (!first) first = NR; next }
+  { text[NR] = $0 }
+  END { for (n = first; n <= last; n++) if (n in text) print "line " n " breaks the table: " text[n] }
+' <<< "$UK_CHAIN")"
+if [ -n "$UK_TABLE_BREAKS" ]; then
+  printf '%s\n' "$UK_TABLE_BREAKS"
+fi
+assert_eq "0" "$(printf '%s' "$UK_TABLE_BREAKS" | grep -c . || true)" \
+  "the chain table is one contiguous block — nothing is written between two rows"
 
 UK_SUMMARIES=""
 UK_MISSING_SURFACE=""
@@ -767,26 +859,61 @@ while IFS= read -r uk_row; do
   uk_situation="$(awk -F'|' '{ print $2 }' <<< "$uk_row")"
 
   # Residue after removing backticked surface names and the routing connectives.
+  #
+  # Split by `tr` into one word per line and read, not by an unquoted command substitution. The
+  # substitution form word-splits (which is wanted) and then PATHNAME-EXPANDS (which is not). Run,
+  # not reasoned — from `.claude/skills/`, on a cell whose residue is a single `*`:
+  #
+  #   $ for w in $stripped; do echo "  [$w]"; done
+  #     [addressables]
+  #     [assembly-definitions]
+  #     [input-system]
+  #     ...  16 words seen
+  #   $ while IFS= read -r w; do echo "  [$w]"; done <<< "$(tr -s '[:space:]' '\n' <<< "$stripped")"
+  #     [*]              1 word seen
+  #
+  # Sixteen skill directories, none of them in the file. No current cell contains a `*`, which is
+  # exactly the shape of latent trap this repo's shell conventions are written unconditionally to
+  # prevent — and the residue rule would then have reported a directory listing as the summary.
   uk_residue=""
-  for uk_word in $(sed 's/`[^`]*`//g' <<< "$uk_surface"); do
+  while IFS= read -r uk_word; do
+    [ -n "$uk_word" ] || continue
     case "$uk_word" in ,|then|or|first) continue ;; esac
     uk_residue="${uk_residue}${uk_word} "
-  done
+  done <<< "$(sed 's/`[^`]*`//g' <<< "$uk_surface" | tr -s '[:space:]' '\n')"
   if [ -n "$uk_residue" ]; then
     UK_SUMMARIES="${UK_SUMMARIES}Surface column summarises instead of naming: ${uk_residue}"$'\n'
   fi
 
-  # Every bare (non-slash) backticked name in the Surface column must be a real skill directory.
-  # `/unity-*` tokens are already covered by the BAD_CMD_REFS block near the top of this file;
-  # skill names in a SKILL body were covered by nothing — test-skill-discovery.sh matches only
-  # path-form references, and the blocks above scan agents and commands, never skills.
-  for uk_tok in $(grep -o '`[^`]*`' <<< "$uk_surface" | tr -d '`'); do
+  # Every backticked token in the Surface column must be a surface that exists.
+  #
+  # A `/unity-*` token is a command and is covered by the BAD_CMD_REFS block near the top of this
+  # file. ANY OTHER slash token is covered by nothing, and the first version of this loop exempted
+  # every one of them with a bare `/*) continue`. That was a real hole and not a theoretical one:
+  #
+  #     | A written plan handed over | `unity-planning` first `/it-adopts-the-plan-and-records-how-it-runs` |
+  #
+  # gave 0 failures. The span is stripped by the residue rule (it is backticked) and skipped by the
+  # existence rule (it starts with a slash), so a summary in that costume passed both halves of the
+  # check written to stop summaries. The exemption is now `/unity-*` only.
+  #
+  # Read line-by-line and QUOTED, for the pathname-expansion reason above and for one more: the
+  # unquoted form also word-split the token, so a multi-word backticked span was tested as several
+  # separate directory names. It failed — three times, with three confusing messages — rather than
+  # once naming the span. Quoted, a `` `unity-brainstorming — ask, do not guess` `` span is one
+  # token, fails once, and prints the thing that is wrong.
+  while IFS= read -r uk_tok; do
+    [ -n "$uk_tok" ] || continue
     case "$uk_tok" in
-      /*) continue ;;
+      /unity-*) continue ;;
+      /*)
+        UK_MISSING_SURFACE="${UK_MISSING_SURFACE}chain table names a slash token that is no Kinglet command: ${uk_tok}"$'\n'
+        continue
+        ;;
     esac
     [ -d "$REPO_DIR/.claude/skills/$uk_tok" ] || \
       UK_MISSING_SURFACE="${UK_MISSING_SURFACE}chain table names missing skill: ${uk_tok}"$'\n'
-  done
+  done <<< "$(grep -o '`[^`]*`' <<< "$uk_surface" | tr -d '`')"
 
   # The pre-D2 vagueness gate, asserted by absence and by shape. D2 replaced "the request is vague"
   # with an unconditional category of work; the row carrying the old trigger survived the rename and
@@ -832,7 +959,7 @@ UK_CHAIN_SURFACES
 # generalisation from "the rules answer this" to "I feel I can answer this". Compared whole, because
 # the halves fail differently — drop the first sentence and every rules question drags in a surface;
 # drop the second and the file is back to licensing a feeling.
-UK_TAIL="$(awk '/^\|/ { buf = ""; next } { buf = buf $0 "\n" } END { printf "%s", buf }' <<< "$UK_CHAIN" | ub_trim)"
+UK_TAIL="$(awk '/^[[:space:]]*\|/ { buf = ""; next } { buf = buf $0 "\n" } END { printf "%s", buf }' <<< "$UK_CHAIN" | ub_trim)"
 
 UK_ESCAPE_EXPECTED='A question about what the rules already state is answered from the rules — that is not work, and it
 selects no surface. A request to build, change, or fix something is work, and work always selects a
@@ -859,12 +986,22 @@ assert_eq "$UK_POINTER_EXPECTED" "$(awk 'f { print } NF == 0 { f = 1 }' <<< "$UK
 # Five rows of measured rationalizations from THIS toolkit, not Superpowers' generic list. Compared
 # whole and heading-anchored: the reality half is the entire value, so a table hollowed out to its
 # thoughts, a sixth row appended, or the table relocated to the end of the file all fail.
+#
+# ROW 4 CARRIES NO NUMBERS, DELIBERATELY. The design spec wrote it as "The block is 41 lines; the
+# skill is over 110" — measured when this file was exactly 41 lines. The rewrite that turned it into
+# a mandate made the first number wrong (60 injected lines), and measurement made the second
+# INVERTED: `systematic-debugging` is 44 lines and `verification-before-completion` is 52, two of the
+# three skills this file's own pointer paragraph names. For most of what the chain routes to the
+# skill is SHORTER than the block, so a length argument does not merely drift, it argues the wrong
+# way. What survives is a claim about exposure rather than size: this block is read at every session
+# start and the skill is not. Keeping the row inside this frozen block is the mechanism — the
+# numbers rotted unnoticed precisely because nothing had to be edited alongside them.
 UK_REDFLAGS_EXPECTED='| Thought | Reality |
 |---|---|
 | "This request is already clear" | That judgment is made by a model that has just read six rule files and a generated block. It is exactly the one miss that was measured. |
 | "The table already tells me what to do" | The table names the file. It is not the file. Twice, the chain was executed without ever loading it. |
 | "I am resuming from a ledger, the decision is made" | A ledger records the **mode**. It does not record the design of a new task. |
-| "I remember this skill" | The block is 41 lines; the skill is over 110. What you remember is the block. |
+| "I remember this skill" | You have read this block at the start of every session and the skill perhaps once. Recall that confident is evidence of the block, not of the skill. |
 | "Let me look at the code first" | The surface is the thing that tells you how to look at it. |'
 assert_eq "$UK_REDFLAGS_EXPECTED" \
   "$(uk_section '## The thoughts that mean you are about to skip a surface' | ub_trim)" \
@@ -935,6 +1072,12 @@ assert_eq "# Using Kinglet" "$(awk 'NF { print; exit }' <<< "$UK_INJECTED")" \
 
 # And the whole body, not a prefix of it: a hook that truncated or reordered would still open with
 # the right heading.
+# The whole body, not a prefix of it — and be exact about what this can detect. It re-implements the
+# hook's own awk and runs it against the same file, so it is a check on the hook's SCRIPT, not an
+# independent reading of its output: it fires when the hook starts filtering, truncating or
+# reordering, and it cannot fire on a content divergence, because there is no second source of truth
+# for the content to diverge from. Measured, with the closing `---` deleted: both sides are empty and
+# this assertion PASSES. The first-non-blank-line assertion above is the one that caught it.
 UK_BODY_EXPECTED="$(awk '
     NR == 1 && $0 == "---" { infm = 1; next }
     infm && $0 == "---" { infm = 0; next }
@@ -942,7 +1085,7 @@ UK_BODY_EXPECTED="$(awk '
     { print }
 ' "$UK_SKILL" 2>/dev/null || true)"
 assert_eq "$UK_BODY_EXPECTED" "$UK_INJECTED" \
-  "what the hook ships is the whole skill body, byte for byte — the file is not the artifact"
+  "the hook still ships the whole body rather than filtering, truncating or reordering it"
 
 # The mandate itself survives the trip. Redundant while the two assertions above hold, and the one
 # that stays meaningful if the hook is ever rewritten to assemble the brief from parts.
