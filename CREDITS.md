@@ -206,7 +206,7 @@ machinery next door should not be read as covering them.
 
 ### Influence, not expression
 
-Three further surfaces owe Superpowers something short of expression, and keep `origin=original`:
+The surfaces below owe Superpowers something short of expression, and keep `origin=original`:
 
 - `.claude/skills/subagent-driven-implementation/` — the shape of the loop (a fresh implementer per
   task, a review gate between tasks) comes from Superpowers' `subagent-driven-development`. The

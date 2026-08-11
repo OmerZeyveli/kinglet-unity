@@ -22,7 +22,7 @@ verifiable; you just verify them against the source rather than a snapshot.
 |---|---|---|
 | [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) | vendored at v1.5.0 (`bb28ccb`); mobile content removed, some files modified | agents `unity-*`, commands `unity-*`, skills, hooks, 5 rules, `settings.json` |
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) | adapted at `984023d`, removed 2026-08-03; no Claude-Code-Game-Studios content ships in this toolkit today | 0 files |
-| [Superpowers](https://github.com/obra/superpowers) | adapted at 6.2.0 (`3dcbd5c`) on 2026-08-10 — the process chain, rewritten for Unity from its originals | the three skills in §3's *Adapted surfaces* table |
+| [Superpowers](https://github.com/obra/superpowers) | adapted at 6.2.0 (`3dcbd5c`) on 2026-08-10 — the process chain, rewritten for Unity from its originals | the skills in §3's *Adapted surfaces* table |
 
 Files not attributable to any of those are original to Kinglet Pioneer, MIT, Copyright (c) 2026
 OmerZeyveli. **The manifest is the list**, not this paragraph — every row with `origin=original` in the
@@ -154,7 +154,7 @@ of checksum machinery imply a coverage it does not have.
 
 ### Influence, not expression
 
-Three further surfaces owe Superpowers something short of expression, and stay `origin=original` in
+The surfaces below owe Superpowers something short of expression, and stay `origin=original` in
 `provenance.tsv`:
 
 - `.claude/skills/subagent-driven-implementation/` takes the shape of its loop — a fresh implementer

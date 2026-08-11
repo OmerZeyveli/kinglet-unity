@@ -590,6 +590,15 @@ while IFS=$'\t' read -r sp_file sp_anchor; do
   # Directory tokens are how the influence subsection names a multi-file skill
   # (`.claude/skills/subagent-driven-implementation/` stands for its five rows), so a token ending in
   # `/` is accepted when it prefixes a manifest path.
+  #
+  # THIRD LIMIT, and the one the comment above used to leave out: BACKTICKS ARE REQUIRED. A surface
+  # named in prose without them — "adapted .claude/agents/unity-coder.md from writing-plans" — is not
+  # seen at all. Round 2 finding. It is a real gap and it is not closed here, because dropping the
+  # backtick requirement makes the scan read every path-shaped run of text in the section, including
+  # the ones inside the licence block and the prose, and a guard that fires on everything
+  # distinguishes nothing. Both documents write surface paths in backticks throughout; that is a
+  # house convention, and this check enforces it only in the sense that an unbackticked path escapes
+  # notice rather than failing. Stated so nobody reads the assertion below as broader than it is.
   sp_mentions="$(grep -o -- '`\.claude/\(skills\|agents\|commands\)/[^`]*`' <<< "$sp_sec" | tr -d '`' | sort -u || true)"
   sp_unbacked=""
   while IFS= read -r sp_m; do
@@ -772,14 +781,28 @@ else
   fail ".claude/NOTICE.md's original-files table names the paths above, which no origin=original row in provenance.tsv supports"
 fi
 
-# And the count that rotted stays gone. Any "<n> files" sentence introducing that table is the shape
-# that failed; the table enumerates instead.
+# A TRIPWIRE FOR ONE SENTENCE, NOT A BAN ON COUNTS — and the difference matters, because the first
+# draft of this comment claimed the second.
+#
+# It said "any `<n> files` sentence introducing that table is the shape that failed". It is one
+# literal phrasing. Measured in round 2: "There are five such files." and "All 5 of them are listed
+# above." both put a false count back into the shipping notice with the whole suite green.
+#
+# Adding a third pattern, then a fourth, is the losing game — the same enumerate-the-phrasings trap
+# that let a stale ECU number sit thirteen lines from a correct one, and the same overstated-comment
+# shape as the finding this check was written to close. It is not fixed by more patterns.
+#
+# What actually protects the reader is the enumeration above, asserted in both directions: a count
+# can lie about how many files there are, but no attribution goes missing while every origin=original
+# row must appear in the table and every row must match one. This tripwire catches only the exact
+# sentence that rotted, so that reintroducing IT is loud. Read it as a bookmark on a known mistake,
+# not as coverage.
 np_flat="$(tr '\n' ' ' < "$REPO/.claude/NOTICE.md" | tr -s ' ')"
 case "$np_flat" in
   *"At the time of writing that is"*)
-    fail ".claude/NOTICE.md has regained a count of its original files — that sentence went stale by nine once already; enumerate in the table instead" ;;
+    fail ".claude/NOTICE.md has regained the exact count sentence that went stale by nine — enumerate in the table instead" ;;
   *)
-    pass "the shipped NOTICE's original-files table carries no count to go stale" ;;
+    pass "the shipped NOTICE has not regained the count sentence that rotted (one phrasing; see the comment for what this does not cover)" ;;
 esac
 
 [ "$FAILURES" -eq 0 ] || exit 1
