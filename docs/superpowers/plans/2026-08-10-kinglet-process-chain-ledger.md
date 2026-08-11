@@ -337,7 +337,50 @@ State these in later dispatches rather than letting a brief guess.
 | 5 | Delete the two sequencer commands, repair every reference | **done** | `308136e..b0adca5` | 2 fix rounds. Spec ✅, 3 Important + 5 Minor, all ADDRESSED. **28 files touched**, three dead names swept, and the pool is now **8 + 9 + 16 = 33**, matching D7's arithmetic exactly |
 | 6 | `using-kinglet` becomes a mandate | **done** | `0492ec5..4222036` | 2 fix rounds. Spec ✅, 2 Important + 8 Minor, all ADDRESSED. The file is 64 lines and still read in full; the growth was all meta. **Nothing in `tests/` had ever executed `session-brief.sh`** — see below |
 | 7 | Licence facts — NOTICE gains MIT text, stale claims go | **done** | `08a568f..cb61c25` | 2 fix rounds. Spec ✅, 4 Important + 8 Minor, all ADDRESSED. **MIT text byte-identical to upstream in both documents**, verified three ways; the wave's only external obligation is discharged |
-| 8 | Whole-wave verification | **pending** | — | |
+| 8 | Whole-wave verification | **done** | `a4de898` | 0 fix rounds. Four deferred decisions answered with measurements, not preferences; the forward-reference check became permanent as `test-skill-discovery.sh` §6 |
+| — | **Whole-branch review + fix** | **done** | `e04571e..0d6cb06` | 4 Critical + 5 small, all closed. The Criticals were **cross-task**: no single task review could have seen them |
+| — | **Product fixes P2/P4/P8** (owner-selected) | **done** | after `0d6cb06` | Three contradictions, not preferences. P4 required a routing decision — see below |
+
+## What only a whole-branch view could see
+
+Eight task reviews and eleven fix rounds missed all four of these, and the reason is structural: **no
+task review's scope includes another task's diff.**
+
+- **The wave changed the pool's composition without changing its total.** 11 commands → 9, 14 skills
+  → 16, total still 33. Four counts in `README.md` and `docs/ARCHITECTURE.md` were **correct at base
+  and wrong at HEAD**, and nothing that checks a total moved. Now derived by
+  `tests/test-derived-counts.sh`, twelve (file, phrasing) pairs each with its own floor — and
+  mutation-proven on the *class*: delete one command, add one skill, total unchanged → red.
+- **`tests/run-tests.sh` exited 0 on zero test files.** The gate every task in this wave leaned on.
+  `nullglob` was unset, so the unmatched glob left one literal string, `${#test_files[@]}` was 1, and
+  the "no test files found" guard was dead code. The header-count check that would have caught it is
+  a **manual instruction enforced by nothing**. Fixed inside the runner.
+- **`CONTRIBUTING.md` instructed the exact failures the suite forbids** — the nested skill layout, the
+  inert Cursor keys, removed agents and directories — and cited a test as asserting the opposite of
+  what it asserts. A wave about removing second definitions was shipping one at the contributor's
+  front door. And **`CLAUDE.md` carried the same class**: it cited the wrong test file for the
+  `alwaysApply`/`globs` prohibition, so "point at CLAUDE.md rather than restate" was not free.
+- **Two shipped documents did not know Superpowers exists.** `CLAUDE.md`'s "assembled from other
+  people's work" list named three upstreams and omitted the newest — the only one carrying an
+  obligation *this wave created* — and its description of the manifest schema omitted the origin value
+  Task 1 had added and Tasks 2–3 had used. `.claude/UPSTREAM` ships to every user as the pin summary
+  without that pin.
+
+## The routing decision P4 forced, and how to reverse it
+
+`using-kinglet`'s escape clause says *"a request to build, **change**, or fix something is work, and
+work always selects a surface"* — while `unity-brainstorming` excludes tweaks by design. So the most
+common request a Unity developer makes matched no row while the mandate said it must.
+
+**Decision: a twelfth chain row, `A tweak — a named field or value in something that already works →
+verification-before-completion`.** The escape sentence was already right; the table was incomplete.
+The row points at the build/tweak test rather than restating it, so the boundary stays in one place.
+
+Rejected, with reasons: amending the escape clause so a tweak selects nothing recreates the
+self-assessed "no surface needed" branch D9 removed; deleting "change" turns a visible hole into an
+invisible one; `unity-execution` executes a plan and a tweak has none.
+
+**This reaches every user and it is one line to reverse** — one row, one count, one assertion.
 
 ## Loop rule added mid-run — the controller does not commit while a round is open
 
