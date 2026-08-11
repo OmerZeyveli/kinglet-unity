@@ -138,21 +138,34 @@ else
   fail "the pin on provenance.tsv's '$ecu_key' line is '$ecu_pin', not ECU's — either another upstream's pin moved onto that line, in which case --online would clone ECU and check that SHA out, or ECU was legitimately bumped and this constant needs updating to match provenance.tsv"
 fi
 
-# ── 6. The two sequencer commands are gone, and nothing shipped still names them ─────────────────
+# ── 6. Every path this wave retired is gone, and the manifest forbids each one ────────────────────
 # D7: a command that only sequences other surfaces is a second definition of the chain. The chain
 # now lives in unity-brainstorming -> unity-planning -> subagent-driven-implementation | unity-execution,
 # so /unity-workflow and /unity-feature were deleted 2026-08-10.
 #
-# Two assertions per command, and they answer different questions: the file is gone (deletion
-# happened) and the skip manifest forbids it (deletion is enforced). Only the second survives a
-# future contributor recreating the file, because check-provenance.sh is what reads the manifest.
+# Two assertions per path, and they answer different questions: the file is gone (removal happened)
+# and the skip manifest forbids it (removal is enforced). Only the second survives a future
+# contributor recreating the file, because check-provenance.sh is what reads the manifest — and
+# check-provenance.sh is the OTHER gate, so the prohibition holds even if this whole suite is
+# skipped. The converse also matters and is why the row is asserted here rather than trusted:
+# check-provenance.sh enforces the rows it is given and cannot notice one being deleted.
+#
+# `deep-interview` is the third path, added 2026-08-11 by Task 8. It was retired by RENAME rather
+# than by deletion, and until then its absence was guarded only by a bespoke assert_eq in
+# tests/test-surface-references.sh. That worked, but it left this wave retiring three surfaces
+# through two different mechanisms, and CLAUDE.md names rule=absent as "what keeps a removed surface
+# from silently returning". A rename is exactly the case that needs it: the successor answers the
+# same trigger, so a resurrected deep-interview/ directory registers a SECOND skill for it with no
+# error of any kind — the silent-load failure, in the one direction a rename makes easy to walk
+# back into. test-surface-references.sh's assertion is left in place; two guards on an absence is
+# not a defect worth spending a deletion on.
 #
 # The rule=absent row is matched by exact field, not by substring anywhere in the file — the same
 # form assertion 3 uses, and for the same reason: a commented-out row or a rule flipped to
 # ours-wins is still *present* as a substring while no longer being a prohibition.
-for gone in ".claude/commands/unity-workflow.md" ".claude/commands/unity-feature.md"; do
+for gone in ".claude/commands/unity-workflow.md" ".claude/commands/unity-feature.md" ".claude/skills/deep-interview/SKILL.md"; do
   if [ -e "$REPO/$gone" ]; then
-    fail "deleted sequencer command has returned: $gone"
+    fail "retired surface has returned: $gone"
   else
     pass "absent: $gone"
   fi

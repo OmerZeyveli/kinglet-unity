@@ -65,12 +65,26 @@ never exist here; `rule=ours-wins` means upstream has the path and we ship our o
   until 2026-08-03, makes all 39 invisible with no error of any kind. `name:` must match the
   directory, `description:` must be non-empty (it is the entire selection mechanism), and no skill
   may carry `alwaysApply` or `globs` — both are inert Cursor keys that get read as guarantees.
-  Every skill an agent or command names by path must exist.
-- **The surface pool is 32 by design.** A surface — agent, command, or skill — survives the
-  2026-08-03 cut only if it does something the model cannot do unaided. That criterion was applied to
-  agents, commands, and skills; hooks were out of scope for this wave. All 27 hooks survived
-  untouched, and applying the same test to them is an open question for the next pass, not a settled
-  one. `tests/test-surface-references.sh`
+  Every skill an agent, a command, **or another skill** names by path must exist. The skill→skill
+  direction was added 2026-08-11 (section 6 of that test) and it is the one the process chain is
+  built out of: during the 2026-08-10 wave three surfaces named each other by path *before the
+  targets existed*, across three tasks, and nothing in the suite went red at any point.
+- **The surface pool is closed by a criterion, not by a number.** A surface — agent, command, or
+  skill — survives the 2026-08-03 cut only if it does something the model cannot do unaided. That is
+  the whole admission test: adding one means answering that question, not filling a quota, and the
+  count is whatever the criterion leaves. Derive it, never quote it:
+
+  ```bash
+  ls .claude/agents/*.md | wc -l ; ls .claude/commands/*.md | wc -l ; ls -d .claude/skills/*/ | wc -l
+  ```
+
+  This bullet read *"the surface pool is 32 by design"* from the 2026-08-03 cut until 2026-08-11, and
+  the tree had moved on without it — a stale count in the file that warns against stale counts, in a
+  sentence stating a *number* where the load-bearing content was the *criterion*. The criterion was
+  applied to agents, commands, and skills; hooks were out of scope for that wave. Every hook survived
+  untouched — they are the `.claude/hooks/*.sh` files less `_lib.sh`, which is a shared library and
+  not a hook, and each real one is registered in `.claude/settings.json` — and applying the same test
+  to them is an open question for the next pass, not a settled one. `tests/test-surface-references.sh`
   guards bare-name skill references (a skill named without its `.claude/skills/<name>/SKILL.md`
   path); `tests/test-skill-discovery.sh` only matches path-form references and misses those entirely
   — that gap shipped nine dangling bare-name references on 2026-08-03 before the guard existed.
@@ -140,10 +154,25 @@ because Unity writes two lines and both match the version regex.
 The runner sources nothing into itself — each file runs in a subshell with stdin at `/dev/null`. It
 used to `source` them into the runner process, and since several end in `exit`, the runner died in
 the first file and 7 of 8 never ran while reporting green. If you touch the runner, confirm the
-number of `--- test-*.sh ---` headers in the output equals `ls tests/test-*.sh | wc -l`. **Do not
-write the expected number down here** — a hardcoded count goes stale the next time a test file is
-added or removed, which is exactly the failure mode this note exists to prevent, and it had gone
-stale twice by 2026-08-03.
+number of `--- test-*.sh ---` headers in the output equals `ls tests/test-*.sh | wc -l` — **and
+strip the ANSI escapes before counting**:
+
+```bash
+bash tests/run-tests.sh 2>&1 | tee /tmp/suite.log
+sed $'s/\x1b\\[[0-9;]*m//g' /tmp/suite.log | grep -c '^--- test-.*\.sh ---'
+ls tests/test-*.sh | wc -l
+```
+
+The runner **colours** that header, so the escape sequence sits between the line start and the text —
+the line begins `ESC [ 0 ; 3 6 m - - -`, which `od -c` will show you. An anchored `grep -c` on raw
+output therefore returns **0** on a completely healthy suite, and 0 is indistinguishable from the
+catastrophe this count exists to detect. Unstripped, the instruction does not merely fail to check:
+it reports that catastrophe on every single run, so anyone following it literally either panics or
+"fixes" something that was never wrong. Measured 2026-08-11 against a green suite: raw **0**,
+stripped and `ls` in agreement. (`$'…'` is bash ANSI-C quoting, so the pattern carries a literal ESC
+byte rather than relying on `sed` to interpret `\x1b`.) **Do not write the expected number down
+here** — a hardcoded count goes stale the next time a test file is added or removed, which is exactly
+the failure mode this note exists to prevent, and it had gone stale twice by 2026-08-03.
 
 **It still sources — into the subshell.** `( source "$test_file" )` is what actually runs, so a test
 file inherits the runner's assertion helpers (`assert_contains`, `assert_eq`, `assert_file_exists`)
