@@ -94,7 +94,7 @@ assert_contains "$TSD_STALE_OUT" "superpowers" \
     "doctor names the declared provider"
 assert_contains "$TSD_STALE_OUT" "this project's process provider, but it is not" \
     "doctor says the declared provider is not installed"
-assert_contains "$TSD_STALE_OUT" "deep-interview" \
+assert_contains "$TSD_STALE_OUT" "unity-brainstorming" \
     "doctor names the built-in fallback"
 rm -rf "$TSD_STALE"
 

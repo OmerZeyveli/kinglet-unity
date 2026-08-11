@@ -371,10 +371,14 @@ logical next step rather than requiring the user to already know the chain.
 **A fourteenth skill, added afterward.** `subagent-driven-implementation` (adapted from Superpowers'
 `subagent-driven-development`) shipped in the `process-layer-2` wave that built the execution loop
 (`implementer-prompt.md`, `task-reviewer-prompt.md`, `re-review-prompt.md`) it documents. It is
-`/unity-workflow`'s alternative to inline execution. Current count: 33 surfaces — 8 agents, 11
-commands, 14 skills — the same 27 registered hooks and 6 rules unchanged. `docs/SKILL-CATALOG.md`,
-`README.md`, and `docs/ARCHITECTURE.md` carry the updated skill count; this section is left at its
-original 13/32 above because it is a record of what Task 4's cut produced, not a running total.
+that wave's alternative to executing a plan inline, offered at the time by the `/unity-workflow`
+command. That command was deleted on 2026-08-10 (see `provenance-skip.tsv`), and the skill is now one
+of the two branches `unity-planning` forks to; the other is `unity-execution`. Count at the close of
+that wave: 33 surfaces — 8 agents, 11 commands, 14 skills — the same 27 registered hooks and 6 rules
+unchanged. After the 2026-08-10 process-chain wave it is still 33, differently composed: 8 agents, 9
+commands, 16 skills, hooks and rules again unchanged. `docs/SKILL-CATALOG.md`, `README.md`, and
+`docs/ARCHITECTURE.md` carry the updated skill count; this section is left at its original 13/32
+above because it is a record of what Task 4's cut produced, not a running total.
 
 ## The gap this plan corrected
 

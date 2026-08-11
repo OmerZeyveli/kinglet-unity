@@ -456,7 +456,7 @@ emit_provider_verdict() {
     echo "### Process provider"
     echo ""
     echo "Discovery and written planning in this project are owned by \`$PROVIDER\`."
-    echo "The \`deep-interview\` skill yields to it and does not compete for the discovery stage."
+    echo "The \`unity-brainstorming\` skill yields to it and does not compete for the discovery stage."
     echo "Unity implementation, Unity verification and Unity domain knowledge stay with this toolkit."
 }
 
@@ -537,8 +537,10 @@ cat <<'MDEOF'
 
 ## How to work
 
-- **Feature work:** the `deep-interview` skill clarifies requirements, `/unity-workflow` plans,
-  executes and verifies, `/unity-review` reviews the result.
+- **Feature work:** the `unity-brainstorming` skill clarifies requirements and records the design
+  decision, `unity-planning` turns it into a plan and chooses how the plan runs, and that choice
+  runs it — `subagent-driven-implementation` or `unity-execution`. `/unity-review` reviews the
+  result.
 - **MCP:** the CoplayDev Unity MCP bridge must be running for editor control — see `MCP-SETUP.md`.
   Verify with "What's in the current scene?"
 

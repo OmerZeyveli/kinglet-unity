@@ -416,21 +416,33 @@ Sessions expire after a configurable time-to-live. Set via `UNITY_SESSION_TTL_HO
 
 ## Workflow Pipeline
 
-The `/unity-workflow` command implements a staged pipeline inspired by modern AI coding orchestrators:
+The process chain implements a staged pipeline inspired by modern AI coding orchestrators:
 
 ```
 Clarify → Plan → Execute → Verify
 ```
 
-1. **Clarify** -- interview the user about requirements, constraints, and acceptance criteria
-2. **Plan** -- analyze the project, identify subsystems, choose agents, present an implementation plan
-3. **Execute** -- route to appropriate agent(s) (coder, prototyper, UI builder, etc.)
-4. **Verify** -- perform a verify-fix loop directly in the command body (no dedicated verifier
-   agent — that agent was removed 2026-08-03; see `provenance-skip.tsv`)
+Until 2026-08-10 the pipeline was a single command that sequenced the stages. It is now a chain of
+skills, each naming the next: a command that only sequences other surfaces is a second definition of
+the chain, and the two that did were deleted (see `provenance-skip.tsv`, and D7 in
+`docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`). Every stage can therefore be
+entered directly, and no stage is reachable only by typing a command name nobody remembers.
+
+1. **Clarify** -- `unity-brainstorming` interviews the user about requirements, constraints and
+   acceptance criteria, weighs 2-3 approaches, and writes the decision to
+   `docs/features/<slug>/design.md`
+2. **Plan** -- `unity-planning` analyzes the project, identifies subsystems, and writes a
+   task-by-task plan to `docs/features/<slug>/plan.md`. It also adopts a plan written elsewhere, and
+   it is where the execution branch is chosen and recorded
+3. **Execute** -- the recorded branch runs the plan and routes to the agents (coder, prototyper, UI
+   builder, etc.): `subagent-driven-implementation` with a fresh implementer per task and a review
+   gate between tasks, or `unity-execution` inline in this session
+4. **Verify** -- `unity-execution` performs a verify-fix loop directly in its own body (no dedicated
+   verifier agent — that agent was removed 2026-08-03; see `provenance-skip.tsv`)
 
 ### Verify-Fix Loop
 
-`/unity-workflow` Phase 4 runs a bounded loop (max 3 iterations) directly, without a dedicated agent:
+`unity-execution` runs a bounded loop (max 3 iterations) directly, without a dedicated agent:
 
 ```
 Invoke unity-reviewer (read-only) → Auto-fix safe issues → Run tests → Re-verify

@@ -5,8 +5,8 @@ description: "Use when a written plan needs to be executed task by task, with a 
 
 # Subagent-Driven Implementation
 
-`/unity-workflow` Phase 3 today is a document: it dispatches and that is all. This skill is the loop
-that ran on this repository yesterday instead — fresh implementer per task, review gating on spec
+Dispatching each task and taking its report at face value is a document, not a loop. This skill is
+the loop that ran on this repository instead — fresh implementer per task, review gating on spec
 *and* quality, a bounded fix loop, a ledger, one whole-branch review at the end — and what it found
 is the argument for running it rather than executing inline: an installer that overwrote user files
 under SIGPIPE, an installer that never removed what a shrinking payload had dropped, a skill whose

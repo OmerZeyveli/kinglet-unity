@@ -126,8 +126,11 @@ Repeat with a process-shaped request:
 
 > "Let's add a double jump to the player."
 
-Record **which surface, if any, the model selected** — `/unity-workflow`? `/unity-feature`?
-`unity-prototyper`? nothing at all, just starting to write code? This single observation is the
+Record **which surface, if any, the model selected** — `unity-brainstorming`? `unity-prototyper`?
+nothing at all, just starting to write code? (This runbook was written against the pre-cut surface
+pool; the two commands it originally named here, `/unity-workflow` and `/unity-feature`, were deleted
+on 2026-08-10 and the chain's entry point is now the `unity-brainstorming` skill. The rest of this
+document has not been re-derived against the current pool.) This single observation is the
 evidence behind the whole "make the surface machine-selectable" item, so record it exactly, including
 if the answer is "it ignored all 75 surfaces and just started coding".
 

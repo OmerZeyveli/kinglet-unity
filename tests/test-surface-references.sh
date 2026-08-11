@@ -92,7 +92,7 @@ fi
 assert_eq "0" "$(printf '%s' "$BAD_REFS" | grep -c . || true)" \
   "no agent or command names a skill that does not exist"
 
-# A skill's body can name a `/unity-*` command (e.g. using-kinglet's chain table, deep-interview's
+# A skill's body can name a `/unity-*` command (e.g. using-kinglet's chain table, unity-brainstorming's
 # handoff) with nothing checking the name is real. test-skill-discovery.sh only checks the reverse
 # direction — a command/agent naming a skill — so a skill naming a deleted command is invisible.
 # Same shape, opposite direction: collect every `/unity-*` token in every skill body, report the
@@ -195,9 +195,10 @@ assert_eq "0" "$(printf '%s' "$BLOCKLESS" | grep -c . || true)" \
 #
 # The Deslop Pass, the Final Summary template and the max-3 verify bound were vendored verbatim in
 # 45eada9 ("Vendor everything-claude-unity v1.5.0 verbatim") as part of
-# `.claude/commands/unity-workflow.md`, and transcribed unchanged into this skill. When that command
-# is deleted, these are the ONLY copies in the repository and nothing else guards them — no other
-# test in tests/ names any of these strings.
+# `.claude/commands/unity-workflow.md`, and transcribed unchanged into this skill. That command was
+# deleted on 2026-08-10, so these ARE now the only copies in the repository and nothing else guards
+# them — no other test in tests/ names any of these strings. The vendored original is still readable
+# at `git show 45eada9:.claude/commands/unity-workflow.md` if a needle here ever needs re-deriving.
 #
 # The first version of this block asserted five bare category HEADINGS and two of the five rules.
 # That is the silent loss it was written to catch, walking through it: a rewrite that keeps the five

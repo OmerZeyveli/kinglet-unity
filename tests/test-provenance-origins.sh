@@ -138,5 +138,85 @@ else
   fail "the pin on provenance.tsv's '$ecu_key' line is '$ecu_pin', not ECU's — either another upstream's pin moved onto that line, in which case --online would clone ECU and check that SHA out, or ECU was legitimately bumped and this constant needs updating to match provenance.tsv"
 fi
 
+# ── 6. The two sequencer commands are gone, and nothing shipped still names them ─────────────────
+# D7: a command that only sequences other surfaces is a second definition of the chain. The chain
+# now lives in unity-brainstorming -> unity-planning -> subagent-driven-implementation | unity-execution,
+# so /unity-workflow and /unity-feature were deleted 2026-08-10.
+#
+# Two assertions per command, and they answer different questions: the file is gone (deletion
+# happened) and the skip manifest forbids it (deletion is enforced). Only the second survives a
+# future contributor recreating the file, because check-provenance.sh is what reads the manifest.
+#
+# The rule=absent row is matched by exact field, not by substring anywhere in the file — the same
+# form assertion 3 uses, and for the same reason: a commented-out row or a rule flipped to
+# ours-wins is still *present* as a substring while no longer being a prohibition.
+for gone in ".claude/commands/unity-workflow.md" ".claude/commands/unity-feature.md"; do
+  if [ -e "$REPO/$gone" ]; then
+    fail "deleted sequencer command has returned: $gone"
+  else
+    pass "absent: $gone"
+  fi
+  if awk -F'\t' -v want="$gone" '$1 == want && $3 == "absent" { found = 1 } END { exit !found }' <<< "$skip_rows"; then
+    pass "enforced rule=absent row present: $gone"
+  else
+    fail "no enforced rule=absent row in provenance-skip.tsv for: $gone (missing, commented out, or rule changed)"
+  fi
+done
+
+# No file that describes the toolkit as it stands today may name a surface that does not exist.
+#
+# Three dead names, not two. `deep-interview` was renamed to unity-brainstorming on 2026-08-10 and
+# left seven live references behind, two of them in scripts/ — and a backticked name inside a
+# Markdown table is invisible to tests/test-skill-discovery.sh (path-form references only) and to
+# tests/test-surface-references.sh (bare-name *skill* references in payload). Neither would have
+# gone red. This assertion is the one that reads the tree.
+#
+# What is scanned, and why these globs:
+#   .claude/*   the shipped payload — a dangling name here becomes a project instruction
+#   scripts/*   generate-claude-md.sh EMITS surface names into every installed CLAUDE.md, and
+#               studio-doctor.sh names them in its advice. `scripts/generate-claude-md.sh` alone
+#               was the first draft of this glob, and it is exactly why studio-doctor.sh:275
+#               belonged to no task's file list.
+#   :(glob)docs/*.md and README.md — the current-state documentation. The `:(glob)` magic is
+#               load-bearing: a bare `docs/*.md` pathspec matches slashes too (measured: 53 files
+#               vs 6), which would drag in docs/research/ and docs/superpowers/. Those are
+#               RECORDS of what was measured and planned on a date, and their mentions must
+#               survive. MERGE-NOTES.md, CREDITS.md and .claude/NOTICE.md are records for the
+#               same reason and are outside these globs / skipped below.
+#
+# The skip is one file and stays one file. Wanting to add a second is the signal that a sentence
+# needs rewriting into the past tense, not that the guard needs loosening.
+dead_scan="$(git -C "$REPO" ls-files '.claude/*' 'scripts/*' ':(glob)docs/*.md' 'README.md')"
+dead_scanned=0
+while IFS= read -r dead_f; do
+  [ -n "$dead_f" ] || continue
+  case "$dead_f" in
+    .claude/NOTICE.md) continue ;;  # a licence record; its /unity-workflow mention is history
+  esac
+  dead_scanned=$((dead_scanned + 1))
+  dead_body="$(cat "$REPO/$dead_f")"
+  # Here-strings, never pipes: `grep -q` exits on first match without draining stdin, and under
+  # `set -euo pipefail` the writer's SIGPIPE becomes 141 becomes a dead script — on large inputs
+  # only, so it passes in test and breaks in the field.
+  if grep -qF -- '/unity-workflow' <<< "$dead_body"; then
+    fail "names deleted /unity-workflow: $dead_f"
+  fi
+  if grep -qF -- '/unity-feature' <<< "$dead_body"; then
+    fail "names deleted /unity-feature: $dead_f"
+  fi
+  if grep -qF -- 'deep-interview' <<< "$dead_body"; then
+    fail "names renamed deep-interview (now unity-brainstorming): $dead_f"
+  fi
+done <<< "$dead_scan"
+
+# Anti-vacuity. A loop that examined nothing reports success, which is the shape of the defect
+# this whole section exists to catch. The scan covers ~94 tracked files; a collapse to a handful
+# means a pathspec broke, not that the toolkit shrank.
+if [ "$dead_scanned" -ge 60 ]; then
+  pass "the dead-name scan examined $dead_scanned files"
+else
+  fail "the dead-name scan examined only $dead_scanned files — a pathspec broke; every 'clean' result above is worthless"
+fi
+
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all provenance-origin assertions passed\n'

@@ -17,10 +17,11 @@ detected from the project's own code, not assumed. Read it before asserting that
 | Situation | Surface |
 |---|---|
 | Kinglet was just installed and `CLAUDE.md` still has unfilled `FILL:` markers | `/unity-init` |
-| The request is vague and has no file, type, or acceptance criterion | `deep-interview` — ask, do not guess |
-| A feature, taken end to end, or an existing written plan to execute | `/unity-workflow` |
+| The request is vague and has no file, type, or acceptance criterion | `unity-brainstorming` — ask, do not guess |
+| Anything to build in this project — a whole feature or one scoped addition | `unity-brainstorming`, then `unity-planning`. Depth scales the round, not the chain |
+| A written plan handed over to be executed | `unity-planning` first — it adopts the plan and records how it runs |
 | A written plan to execute, task by task, with review between | `subagent-driven-implementation` |
-| One scoped addition to code that already exists | `/unity-feature` |
+| A plan small enough to execute inline, in this session | `unity-execution` |
 | A mechanic to try, in a new throwaway scene | `/unity-prototype` |
 | Something is broken and the cause is not yet known | `systematic-debugging`, then `/unity-fix` |
 | Code was just written and is not yet verified | `verification-before-completion`, then `/unity-review` or `/unity-test` |
@@ -30,9 +31,10 @@ detected from the project's own code, not assumed. Read it before asserting that
 
 A question that the rules already answer needs no surface. Answer it.
 
-`deep-interview`, `systematic-debugging`, and `verification-before-completion` each carry a
-"the thought that means you are about to skip this" section — read it when the situation feels
-like an exception, because that feeling is what it names.
+`systematic-debugging` and `verification-before-completion` each carry a "the thought that means you
+are about to skip this" section — read it when the situation feels like an exception, because that
+feeling is what it names. `unity-brainstorming` answers the same feeling by refusing to keep a list:
+it has no exemptions, and its hard gate holds however simple the request looks.
 
 ## Offer the next step
 

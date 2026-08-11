@@ -54,7 +54,8 @@ left them nothing to decide.
 That gap is closed as of 2026-08-03 (Task 7 of the surface-cut wave, see
 `docs/research/pioneer/smoke-pass.md`'s dated section): three of smoke-pass.md §10's prompts were
 re-run against a fresh install with the competing Superpowers plugin **enabled**, and all three
-selected a Kinglet surface — `deep-interview` for an ambiguous "add a double jump," `systematic-debugging`
+selected a Kinglet surface — the discovery skill now called `unity-brainstorming`, under the name it
+carried until the 2026-08-10 rename, for an ambiguous "add a double jump"; `systematic-debugging`
 routed through `/unity-fix` → `unity-fixer` for a bug report, and `/unity-optimize` → `unity-optimizer`
 for a performance check. A fourth, unrelated regression probe (a serialization-rename question already
 answered by `.claude/rules/serialization.md`) correctly triggered zero tool calls — no skill was
@@ -145,8 +146,13 @@ guessing.
 
 ```
 /unity-init                         → fills the generated CLAUDE.md's FILL: markers once, post-install
-/unity-workflow "add a dash ability"  → Clarify → Plan → Execute → Verify, for a multi-step feature
-/unity-feature "add a double jump"  → one scoped addition, no plan phase — routes to unity-coder
+
+  the chain — skills, not commands, so every stage can be entered directly:
+unity-brainstorming                 → clarify, weigh 2-3 approaches, write the design decision down
+unity-planning                      → turn that into a task-by-task plan, and record how it will run
+subagent-driven-implementation      → execute task by task: fresh implementer, review gate between
+unity-execution                     → or execute inline, when the plan is small enough to warrant it
+
 /unity-fix "enemy walks through walls" → reads console output, verifies the fix via MCP
 /unity-review                       → Unity-aware review before considering changes done
 /unity-test                         → writes and runs EditMode/PlayMode tests via MCP
@@ -162,9 +168,9 @@ Because this repo contains other people's code, it tracks whose:
 
 - **`provenance.tsv`** — one row per file: origin (`ecu` / `donchitos` / `superpowers` / `original`),
   upstream version and path, upstream checksum, and whether we modified it. The vendored layer is
-  101 files from ECU plus the process-chain surfaces adapted from Superpowers 6.2.0, and 0 from
+  99 files from ECU plus the process-chain surfaces adapted from Superpowers 6.2.0, and 0 from
   Donchitos (that layer was removed 2026-08-03; `provenance-skip.tsv` keeps the record). Repo-wide
-  that is 25 verbatim, 78 modified — nearly every vendored surface has been rewritten for an agent
+  that is 25 verbatim, 76 modified — nearly every vendored surface has been rewritten for an agent
   reader.
 - **`provenance-skip.tsv`** — what we deliberately did *not* vendor, and why. This is what stops a
   future upstream sync from quietly reintroducing the mobile content.

@@ -189,7 +189,7 @@ echo ""
 echo "--- Case: provider declaration ---"
 OUT_PROV="$(bash "$GEN" --provider superpowers "$TMP/legacy" 2>/dev/null)"
 assert_has "$OUT_PROV" "owned by \`superpowers\`" "declared provider is named"
-assert_has "$OUT_PROV" "deep-interview" "the surface that yields is named"
+assert_has "$OUT_PROV" "unity-brainstorming" "the surface that yields is named"
 assert_lacks "$OUT_LEGACY" "owned by" "no provider flag means no sentence"
 
 # The sentence lives inside the markers, so a --facts-only refresh must carry it.

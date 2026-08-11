@@ -66,16 +66,12 @@ After installation, your project contains:
 
 ```
 .claude/
-  agents/          28 specialized sub-agents (coder, reviewer, verifier, scene-builder, game-designer, etc.)
-  commands/        36 slash commands (/unity-workflow, /unity-prototype, /unity-doctor, etc.)
-  hooks/           26 hooks + _lib.sh (safety, quality, session, learning) — 8 of them blocking
+  agents/           8 specialized sub-agents (coder, reviewer, scene-builder, prototyper, etc.)
+  commands/         9 slash commands (/unity-prototype, /unity-fix, /unity-doctor, etc.)
+  hooks/           27 hooks + _lib.sh (safety, quality, session, learning) — 8 of them blocking
   rules/            6 always-loaded coding standards (C# style, performance, architecture, PC/console)
-  skills/          39 knowledge modules, one directory each (flat — see below)
-    core/            Assembly definitions, event systems, object pooling, MCP patterns
-    gameplay/        Character controllers, inventory, dialogue, save systems
-    genre/           Genre-specific patterns (RPG, platformer, top-down, match-3, puzzle, idle)
-    systems/         Unity subsystems (Input System, Addressables, Cinemachine, etc.)
-    third-party/     Third-party integrations (DOTween, UniTask, VContainer, etc.)
+  skills/          16 knowledge modules, one directory each — flat, never nested, because one level
+                   is the only depth Claude Code discovers (see below)
   settings.json    Permissions, hook definitions
 ```
 
@@ -158,7 +154,7 @@ See [MCP-SETUP.md](MCP-SETUP.md) for detailed setup and troubleshooting.
 | `/unity-init` | Scans your project and generates a tailored CLAUDE.md |
 | `/unity-review` | Reviews your C# code for Unity-specific issues |
 | `/unity-prototype "description"` | Creates a playable prototype from a text description |
-| `/unity-workflow "description"` | Full pipeline: clarify requirements → plan → execute → verify |
+| `unity-brainstorming` (a skill, not a command) | The chain's entry for anything new: clarify requirements → plan → execute → verify, one skill handing to the next |
 | `/unity-fix` | Diagnoses and fixes bugs using console errors |
 | `/unity-scene "description"` | Builds a scene from a natural language description |
 | `/unity-test` | Writes and runs EditMode/PlayMode tests |

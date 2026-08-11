@@ -5,8 +5,8 @@ merely depend on them — it **contains** them. Attribution is therefore an obli
 
 `provenance.tsv` at the repo root records, for every tracked file, which upstream it came from,
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
-is asserted on trust. The manifest's 25/78 split is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
-$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 78 `modified` rows
+is asserted on trust. The manifest's 25/76 split is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
+$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 76 `modified` rows
 across the whole manifest. The table below states each upstream's own footprint instead, in wording
 that cannot be mistaken for this repo-wide number — see the next paragraph for why that matters.
 
@@ -164,9 +164,10 @@ open-source bridge needs no API key (that is Coplay's separate commercial produc
 - **Repository:** https://github.com/obra/superpowers (Jesse Vincent)
 - **License:** MIT
 
-Three files in this repo name Superpowers, and until now all three called it only the competitor
-`unity-workflow`'s dispatch loop measures itself against. That is an incomplete record by this
-document's own opening standard. What was taken: the chain design (skills that name the next skill
+Three files in this repo name Superpowers, and until now all three called it only the competitor the
+`/unity-workflow` command's dispatch loop measured itself against — a command deleted on 2026-08-10,
+whose loop is now `subagent-driven-implementation`. That is an incomplete record by this document's
+own opening standard. What was taken: the chain design (skills that name the next skill
 so a process surface is chosen before code is written), the execution loop
 (`subagent-driven-implementation`, adapted from Superpowers' `subagent-driven-development`), and two
 skill names, `systematic-debugging` and `verification-before-completion`.

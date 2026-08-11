@@ -11,8 +11,15 @@
 # Measured 2026-08-04 on a real project with 0 VContainer files: the model read the generated
 # block, correctly concluded the stack does not bind, and then ruled out `/unity-workflow` and
 # `/unity-feature` on the grounds that they "generate code with MVS/VContainer assumptions".
-# `/unity-feature` names none of the four; `/unity-workflow` names VContainer once, in a
+# `/unity-feature` named none of the four; `/unity-workflow` named VContainer once, in a
 # sentence about when to escalate. Neither claim was checked against the files.
+#
+# Both commands were deleted on 2026-08-10 — they only sequenced other surfaces, which is a second
+# definition of the chain (D7). That removes the two files the refusal landed on and NOT the
+# regression: the loop below is driven by globs, so it never named those two, and the stack-naming
+# prose that provoked the refusal lives on in `.claude/agents/unity-coder.md` and the surviving
+# commands, which the same globs still reach. Measured across the deletion: 23 surfaces examined
+# before, 21 after — the coverage moved by exactly the two files that stopped existing.
 #
 # What the refusal actually cost, measured the next day rather than predicted: nothing. The
 # same session went on to dispatch `unity-coder` twelve times and `unity-reviewer` seventeen
