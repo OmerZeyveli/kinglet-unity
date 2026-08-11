@@ -116,7 +116,16 @@ the failure mode this repository has recorded three times.
 1. **No `§N` in any shipped `.md`**, except `NOTICE.md`'s own `§3` — a section of the file it appears
    in.
 2. **No backticked token that names a real file in this repository and is absent from the payload**,
-   unless a URL appears in the same block.
+   unless the same file carries a URL whose own text ends with that path.
+
+The escape is scoped to the file, not to the block. `NOTICE.md` is one document: a reader who meets
+"linked at the top of this file" scrolls up and finds the link. Scoping it to the block would force a
+URL into `:140`'s table header — `| How `provenance.tsv` records it |` — which is naming the manifest,
+not pointing at it.
+
+The escape matches on the URL's **text**, not its presence, and that is what keeps it from being a
+loophole: `NOTICE.md` carries five URLs, and none of them ends in `test-provenance-origins.sh`, so
+`:49` still fires.
 
 Rule 2 resolves against the repository tree, which is what keeps it from firing on user-project
 paths: `docs/features/<slug>/design.md` names no file here, so it is never flagged, while
@@ -141,10 +150,24 @@ signal to re-examine rule 2, not to append.
 `CREDITS.md`, `install.sh`, `provenance.tsv`, `provenance-skip.tsv`, `scripts/check-provenance.sh`,
 and four `tests/*.sh`. Every one is either deleted with its prose kept, reframed, or given a URL.
 
-`provenance.tsv` appears at four sites in `NOTICE.md`. The one at `:12` carries the URL; the other
-three say "linked at the top of this file", which **does not** satisfy rule 2 as written — the rule
-is a URL in the same block, and a cross-reference to another part of the document is the prose frame
-D1 already rejected. Those three get the link. The rule is not widened to accommodate them.
+`provenance.tsv` is **not** among them. It appears at four sites in `NOTICE.md` — `:12`, `:29`, `:135`
+and `:140` — and rule 2's file-scoped escape clears all four from the URL `:12` already carries. No
+edit is needed at any of them, and none was made.
+
+Run against the rule as specified, the flag set is exactly eight, in three files:
+
+```
+CREDITS.md                         .claude/NOTICE.md
+scripts/check-provenance.sh        .claude/NOTICE.md
+tests/test-provenance-origins.sh   .claude/NOTICE.md
+provenance-skip.tsv                .claude/rules/pc-console.md
+tests/test-no-mobile.sh            .claude/rules/pc-console.md
+install.sh                         .claude/skills/verification-before-completion/SKILL.md
+tests/test-bash32-compat.sh        .claude/skills/verification-before-completion/SKILL.md
+tests/test-surface-references.sh   .claude/skills/verification-before-completion/SKILL.md
+```
+
+`CREDITS.md` is fixed by adding the URL, which then clears it by the same rule that flagged it.
 
 ### D8 — `install.sh`'s dry-run states what the real run does
 
@@ -173,7 +196,8 @@ never as "the full pipeline", which is the one thing it is not.
    `ls tests/test-*.sh | wc -l`.
 2. `bash scripts/check-provenance.sh` ends `provenance OK`, with rows for every file this wave adds.
 3. `grep -rn '§[0-9]' .claude --include='*.md'` returns exactly one line: `NOTICE.md`'s `§3`.
-4. The derivation in "The path class" above, re-run, returns only the three allow-listed tokens.
+4. The guard's flag set is **empty**. Before the fixes it is the eight rows listed under D7; each
+   fix removes exactly one, and no row appears that is not on that list.
 5. `tests/test-shipped-citations.sh` is mutation-proven on both rules and on the allow-list:
    - adding `§99` to any shipped skill → red;
    - adding `` `tests/anything.sh` `` to any shipped surface → red;
