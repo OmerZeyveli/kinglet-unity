@@ -12,14 +12,19 @@ bind: `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`
 **Which of those rules apply to this project is stated in `CLAUDE.md`'s generated block.** It is
 detected from the project's own code, not assumed. Read it before asserting that a rule binds.
 
+## The rule
+
+Invoke the surface **before any response or action** — including clarifying questions, reading files,
+and exploring the code. Then announce `Using [skill] to [purpose]` and follow it. If it turns out
+wrong for the situation, you do not have to use it — but you have to have looked.
+
 ## The chain
 
 | Situation | Surface |
 |---|---|
 | Kinglet was just installed and `CLAUDE.md` still has unfilled `FILL:` markers | `/unity-init` |
-| The request is vague and has no file, type, or acceptance criterion | `unity-brainstorming` — ask, do not guess |
-| Anything to build in this project — a whole feature or one scoped addition | `unity-brainstorming`, then `unity-planning`. Depth scales the round, not the chain |
-| A written plan handed over to be executed | `unity-planning` first — it adopts the plan and records how it runs |
+| Anything to build in this project — a whole feature or one scoped addition | `unity-brainstorming`, then `unity-planning` |
+| A written plan handed over to be executed | `unity-planning` first |
 | A written plan to execute, task by task, with review between | `subagent-driven-implementation` |
 | A plan small enough to execute inline, in this session | `unity-execution` |
 | A mechanic to try, in a new throwaway scene | `/unity-prototype` |
@@ -29,7 +34,9 @@ detected from the project's own code, not assumed. Read it before asserting that
 | A UI screen, or a scene to build | `/unity-ui`, `/unity-scene` |
 | The setup itself may be wrong | `/unity-doctor` |
 
-A question that the rules already answer needs no surface. Answer it.
+A question about what the rules already state is answered from the rules — that is not work, and it
+selects no surface. A request to build, change, or fix something is work, and work always selects a
+surface.
 
 `unity-brainstorming`, `systematic-debugging` and `verification-before-completion` each carry a "the
 thought that means you are about to…" section — read it when the situation feels like an exception,
@@ -39,6 +46,16 @@ because that feeling is what it names. `unity-brainstorming`'s is titled for its
 What `unity-brainstorming` does not keep is a *list* of exemptions. It has exactly one — a throwaway
 scene built to try an idea goes to `/unity-prototype` — and that choice is made before a round
 starts, never from inside one.
+
+## The thoughts that mean you are about to skip a surface
+
+| Thought | Reality |
+|---|---|
+| "This request is already clear" | That judgment is made by a model that has just read six rule files and a generated block. It is exactly the one miss that was measured. |
+| "The table already tells me what to do" | The table names the file. It is not the file. Twice, the chain was executed without ever loading it. |
+| "I am resuming from a ledger, the decision is made" | A ledger records the **mode**. It does not record the design of a new task. |
+| "I remember this skill" | The block is 41 lines; the skill is over 110. What you remember is the block. |
+| "Let me look at the code first" | The surface is the thing that tells you how to look at it. |
 
 ## Offer the next step
 

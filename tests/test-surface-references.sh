@@ -682,3 +682,277 @@ UB_VAGUE_TABLE_EXPECTED='| Thought | Reality | Source |
 | "The request has a code block, so it is specific" | A code block establishes syntax, not scope. Specificity is about the *outcome* — what done looks like — not about whether the input contains a snippet. | The Ambiguity Score'"'"'s five dimensions, none of which is "contains code" |'
 assert_eq "$UB_VAGUE_TABLE_EXPECTED" "$(ub_section '## The thought that means you are about to treat vague as clear' | ub_trim)" \
   "both rows of the vague-as-clear table survive, bodies included, under their own heading"
+
+# ============================================================================
+# `using-kinglet` is the injected session brief, and D9 turns it into a mandate.
+#
+# `.claude/hooks/session-brief.sh` prints this file (minus its frontmatter) at every SessionStart,
+# so it is the first text a fresh model reads. The measurement that started the 2026-08-10 wave is
+# about exactly this file: across two real runs the chain's behaviour was executed WITHOUT the
+# chain's skills ever being loaded, because the table described them well enough to substitute for
+# them. D9's repair is three devices — an ordering rule, an announce ritual, and a red-flag table —
+# plus a table whose Surface column names surfaces and says nothing about what they contain.
+#
+# Nothing else in the suite reads this file's content. `test-provenance-origins.sh` scans it for
+# three RETIRED names (`unity-workflow`, `unity-feature`, `deep-interview`) and `test-skill-discovery.sh`
+# checks its frontmatter; neither can see a mandate softening back into a description.
+UK_SKILL="$REPO_DIR/.claude/skills/using-kinglet/SKILL.md"
+assert_file_exists "$UK_SKILL" \
+  "using-kinglet exists — the SessionStart hook has something to inject"
+
+uk="$(cat "$UK_SKILL" 2>/dev/null || true)"
+
+# Same shape as ub_section above, against a different file. `ub_trim` is file-agnostic (it filters
+# stdin), so it is reused rather than duplicated.
+uk_section() {
+  awk -v want="$1" '
+    $0 == want { f = 1; next }
+    f && /^#{1,3} / { exit }
+    f { print }
+  ' "$UK_SKILL" 2>/dev/null || true
+}
+
+# --- D9 device 1 and 2: the ordering rule and the announce ritual ------------------------------
+# Compared whole. The plan's own guard was three `assert_contains` needles — "before any response or
+# action", "Using [skill] to [purpose]" — and each of those is satisfied while the sentence around it
+# says the opposite ("...is usually unnecessary before any response or action"). The clause that does
+# the work is the last one: it concedes the surface may be wrong and still requires the look. That
+# concession is what a rewrite drops, and no single-line needle covers it.
+UK_RULE_EXPECTED='Invoke the surface **before any response or action** — including clarifying questions, reading files,
+and exploring the code. Then announce `Using [skill] to [purpose]` and follow it. If it turns out
+wrong for the situation, you do not have to use it — but you have to have looked.'
+assert_eq "$UK_RULE_EXPECTED" "$(uk_section '## The rule' | ub_trim)" \
+  "the ordering rule and the announce ritual are D9's text, character for character"
+
+# The rule must precede the table it governs. A mandate placed after the routing table is read after
+# the reader has already routed — which is the failure being repaired, one level up.
+UK_RULE_LINE="$(awk '$0 == "## The rule" { print NR; exit }' "$UK_SKILL" 2>/dev/null || true)"
+UK_CHAIN_LINE="$(awk '$0 == "## The chain" { print NR; exit }' "$UK_SKILL" 2>/dev/null || true)"
+UK_ORDER="after"
+if [ -n "$UK_RULE_LINE" ] && [ -n "$UK_CHAIN_LINE" ] && [ "$UK_RULE_LINE" -lt "$UK_CHAIN_LINE" ]; then
+  UK_ORDER="before"
+fi
+assert_eq "before" "$UK_ORDER" \
+  "## The rule sits above ## The chain — the mandate is read before the routing table"
+
+# --- D9's central claim: the Surface column names a surface and does not summarise it -----------
+# Asserted STRUCTURALLY, not as a frozen copy of today's table. A frozen table would catch the three
+# parentheticals this task removed and nothing else; a future row arriving with a fresh summary is
+# the same defect and is what actually has to be prevented.
+#
+# The rule: strip every backticked span from the Surface cell, then every routing connective. What
+# remains must be nothing. Routing is allowed because it is the table's job — `systematic-debugging`,
+# then `/unity-fix` tells the reader which surface comes NEXT. A summary tells the reader what the
+# surface CONTAINS, which is what let two real runs execute the chain without opening it.
+#
+# Measured against the three cells this task removed, before removing them:
+#
+#   `unity-brainstorming` — ask, do not guess                     -> residue: — ask, do not guess
+#   `unity-brainstorming`, then `unity-planning`. Depth scales…   -> residue: . Depth scales the round…
+#   `unity-planning` first — it adopts the plan and records how…  -> residue: — it adopts the plan…
+#
+# and against all eleven surviving cells, whose residue is empty.
+UK_CHAIN="$(uk_section '## The chain')"
+UK_ROWS="$(awk -F'|' '/^\|/ && $0 !~ /^\|-/ && $2 !~ /^ *Situation *$/' <<< "$UK_CHAIN")"
+
+# Anti-vacuity: an emptied or renamed table makes every row check below pass on zero rows.
+assert_eq "11" "$(printf '%s\n' "$UK_ROWS" | grep -c '^|' || true)" \
+  "the chain table still has its eleven routing rows for this guard to read"
+
+UK_SUMMARIES=""
+UK_MISSING_SURFACE=""
+while IFS= read -r uk_row; do
+  [ -n "$uk_row" ] || continue
+  uk_surface="$(awk -F'|' '{ print $3 }' <<< "$uk_row")"
+  uk_situation="$(awk -F'|' '{ print $2 }' <<< "$uk_row")"
+
+  # Residue after removing backticked surface names and the routing connectives.
+  uk_residue=""
+  for uk_word in $(sed 's/`[^`]*`//g' <<< "$uk_surface"); do
+    case "$uk_word" in ,|then|or|first) continue ;; esac
+    uk_residue="${uk_residue}${uk_word} "
+  done
+  if [ -n "$uk_residue" ]; then
+    UK_SUMMARIES="${UK_SUMMARIES}Surface column summarises instead of naming: ${uk_residue}"$'\n'
+  fi
+
+  # Every bare (non-slash) backticked name in the Surface column must be a real skill directory.
+  # `/unity-*` tokens are already covered by the BAD_CMD_REFS block near the top of this file;
+  # skill names in a SKILL body were covered by nothing — test-skill-discovery.sh matches only
+  # path-form references, and the blocks above scan agents and commands, never skills.
+  for uk_tok in $(grep -o '`[^`]*`' <<< "$uk_surface" | tr -d '`'); do
+    case "$uk_tok" in
+      /*) continue ;;
+    esac
+    [ -d "$REPO_DIR/.claude/skills/$uk_tok" ] || \
+      UK_MISSING_SURFACE="${UK_MISSING_SURFACE}chain table names missing skill: ${uk_tok}"$'\n'
+  done
+
+  # The pre-D2 vagueness gate, asserted by absence and by shape. D2 replaced "the request is vague"
+  # with an unconditional category of work; the row carrying the old trigger survived the rename and
+  # sat ABOVE its replacement until 2026-08-10. A literal-string check would only catch that exact
+  # row returning, so the Situation column is also checked for the vocabulary any rewrite of it would
+  # use. Scoped to the column: the body legitimately says "about to treat vague as clear".
+  for uk_judgment in vague unclear ambiguous; do
+    if grep -qF -- "$uk_judgment" <<< "$uk_situation"; then
+      UK_SUMMARIES="${UK_SUMMARIES}Situation column judges the request's clarity ('${uk_judgment}') instead of naming a category of work: ${uk_situation}"$'\n'
+    fi
+  done
+done <<< "$UK_ROWS"
+
+if [ -n "$UK_SUMMARIES" ]; then
+  printf '%s' "$UK_SUMMARIES"
+fi
+assert_eq "0" "$(printf '%s' "$UK_SUMMARIES" | grep -c . || true)" \
+  "every chain row names surfaces and routes between them — no cell describes what a surface contains"
+
+if [ -n "$UK_MISSING_SURFACE" ]; then
+  printf '%s' "$UK_MISSING_SURFACE"
+fi
+assert_eq "0" "$(printf '%s' "$UK_MISSING_SURFACE" | grep -c . || true)" \
+  "every skill the chain table names exists — nothing else checks a skill named inside a skill"
+
+# The four process-chain surfaces are actually routed to. The structural check above passes on a
+# table that names only commands, which is what the chain looked like before this wave.
+UK_SURFACE_COL="$(awk -F'|' '{ print $3 }' <<< "$UK_ROWS")"
+while IFS= read -r uk_needed; do
+  [ -n "$uk_needed" ] || continue
+  assert_contains "$UK_SURFACE_COL" "\`$uk_needed\`" \
+    "the chain routes to the process surface: $uk_needed"
+done <<'UK_CHAIN_SURFACES'
+unity-brainstorming
+unity-planning
+subagent-driven-implementation
+unity-execution
+UK_CHAIN_SURFACES
+
+# --- D9's rewritten escape clause, and the tail it shares with the red-flag pointer -------------
+# Rewritten, NOT deleted: the 2026-08-03 wave measured a serialization question correctly selecting
+# nothing, and its note records that "a selection here is a regression". What closed is the
+# generalisation from "the rules answer this" to "I feel I can answer this". Compared whole, because
+# the halves fail differently — drop the first sentence and every rules question drags in a surface;
+# drop the second and the file is back to licensing a feeling.
+UK_TAIL="$(awk '/^\|/ { buf = ""; next } { buf = buf $0 "\n" } END { printf "%s", buf }' <<< "$UK_CHAIN" | ub_trim)"
+
+UK_ESCAPE_EXPECTED='A question about what the rules already state is answered from the rules — that is not work, and it
+selects no surface. A request to build, change, or fix something is work, and work always selects a
+surface.'
+assert_eq "$UK_ESCAPE_EXPECTED" "$(awk 'NF == 0 { exit } { print }' <<< "$UK_TAIL")" \
+  "the escape clause draws the line at work versus question, not at confidence (D9)"
+
+# The rest of the chain's tail: the pointer at the three skills' own red-flag sections, and the one
+# real exemption. Verified clause by clause against all three skills on 2026-08-10 after a shipped
+# false version of it, and compared whole here so that (a) it cannot rot again unnoticed and (b)
+# nothing can be inserted between it and the escape clause above.
+UK_POINTER_EXPECTED='`unity-brainstorming`, `systematic-debugging` and `verification-before-completion` each carry a "the
+thought that means you are about to…" section — read it when the situation feels like an exception,
+because that feeling is what it names. `unity-brainstorming`'"'"'s is titled for its own failure mode:
+**the thought that means you are about to treat vague as clear**.
+
+What `unity-brainstorming` does not keep is a *list* of exemptions. It has exactly one — a throwaway
+scene built to try an idea goes to `/unity-prototype` — and that choice is made before a round
+starts, never from inside one.'
+assert_eq "$UK_POINTER_EXPECTED" "$(awk 'f { print } NF == 0 { f = 1 }' <<< "$UK_TAIL" | ub_trim)" \
+  "the red-flag pointer and the one real exemption follow the escape clause, with nothing between"
+
+# --- D9 device 3: the red-flag table ------------------------------------------------------------
+# Five rows of measured rationalizations from THIS toolkit, not Superpowers' generic list. Compared
+# whole and heading-anchored: the reality half is the entire value, so a table hollowed out to its
+# thoughts, a sixth row appended, or the table relocated to the end of the file all fail.
+UK_REDFLAGS_EXPECTED='| Thought | Reality |
+|---|---|
+| "This request is already clear" | That judgment is made by a model that has just read six rule files and a generated block. It is exactly the one miss that was measured. |
+| "The table already tells me what to do" | The table names the file. It is not the file. Twice, the chain was executed without ever loading it. |
+| "I am resuming from a ledger, the decision is made" | A ledger records the **mode**. It does not record the design of a new task. |
+| "I remember this skill" | The block is 41 lines; the skill is over 110. What you remember is the block. |
+| "Let me look at the code first" | The surface is the thing that tells you how to look at it. |'
+assert_eq "$UK_REDFLAGS_EXPECTED" \
+  "$(uk_section '## The thoughts that mean you are about to skip a surface' | ub_trim)" \
+  "the red-flag table carries D9's five measured rationalizations, bodies included"
+
+# --- The two sections a reverse sweep found deleting green ---------------------------------------
+# Every line of this file above was proved load-bearing by deleting it and watching an assertion
+# fail. A line-by-line sweep of the WHOLE file then found what that proof cannot: two sections with
+# no needle pointing at them at all. Both are injected at every session start and both carry
+# behaviour, so both are now compared whole.
+UK_RULES_EXPECTED='Kinglet is a Unity 6 PC/console toolkit. Five rules in `.claude/rules/` load automatically and
+bind: `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`,
+`unity-specifics.md`. `pc-console.md` adds platform specifics on top; it does not override them.
+
+**Which of those rules apply to this project is stated in `CLAUDE.md`'"'"'s generated block.** It is
+detected from the project'"'"'s own code, not assumed. Read it before asserting that a rule binds.'
+assert_eq "$UK_RULES_EXPECTED" "$(uk_section '# Using Kinglet' | ub_trim)" \
+  "the session brief still names the five binding rules and points at the generated block"
+
+UK_OFFER_EXPECTED='When a unit of work finishes, name what would sensibly come next and offer it — a review after an
+implementation, a test after a fix, a profile after an optimisation. **Offer; do not act.** Starting
+a review nobody asked for is worse than waiting to be asked.'
+assert_eq "$UK_OFFER_EXPECTED" "$(uk_section '## Offer the next step' | ub_trim)" \
+  "the proactive posture is offer-then-wait, not act — restraint stated, not implied"
+
+# --- The manifest row -----------------------------------------------------------------------------
+# `check-provenance.sh` never reads the free-text note, so the note's claims about this file are
+# guarded here or nowhere. Every clause the row asserts about the 2026-08-10 mandate rewrite — the
+# ordering rule, the announce ritual, the red-flag table, the removed vagueness row, and a Surface
+# column that names rather than summarises — is an assertion above. Fields 2 and 6 are extracted and
+# compared on their own rather than searched for in the joined row, which is how the neighbouring
+# unity-brainstorming block was measured vacuous in round 1 of this wave.
+UK_ROW_ORIGIN="$(awk -F'\t' '$1 == ".claude/skills/using-kinglet/SKILL.md" { print $2 }' "$REPO_DIR/provenance.tsv" 2>/dev/null || true)"
+UK_ROW_STATUS="$(awk -F'\t' '$1 == ".claude/skills/using-kinglet/SKILL.md" { print $6 }' "$REPO_DIR/provenance.tsv" 2>/dev/null || true)"
+assert_eq "original" "$UK_ROW_ORIGIN" \
+  "using-kinglet's row records origin=original in FIELD 2 — this file was never vendored"
+assert_eq "original" "$UK_ROW_STATUS" \
+  "and status=original in field 6, so no checksum comparison is silently skipped"
+
+# --- The bytes that actually reach a session -----------------------------------------------------
+# Everything above reads the FILE. What ships is the HOOK's output, and nothing in tests/ ran
+# `.claude/hooks/session-brief.sh` at all before this block. The gap is not theoretical: the hook
+# strips frontmatter with `NR==1 && $0=="---"` … `infm && $0=="---"`, so deleting the CLOSING `---`
+# leaves `infm` set for the rest of the file and the hook prints NOTHING and exits 0 — a session
+# that opens with no brief at all, silently. Measured: with line 4 removed, every assertion above
+# still passed and `test-skill-discovery.sh` passed too.
+#
+#   $ awk -v skip=4 'NR != skip' SKILL.md > SKILL.md.broken   # closing --- gone
+#   deleted line 1 -> FAIL count: 0
+#   deleted line 4 -> FAIL count: 0
+#
+# Deleting the OPENING `---` fails the other way: the hook then prints `name:` and `description:`
+# into the session as if they were guidance. The first-line assertion catches both directions at
+# once — empty output has no first line, and unstripped output's first line is the `name:` key.
+UK_INJECTED="$(CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$REPO_DIR/.claude/hooks/session-brief.sh" 2>/dev/null || true)"
+
+# First NON-BLANK line: the hook strips the frontmatter delimiters but not the blank line that
+# followed the closing `---`, so the injected text genuinely begins with an empty line. Measured
+# rather than assumed — the first version of this assertion compared line 1 and failed against a
+# perfectly healthy file:
+#
+#   $ CLAUDE_PROJECT_DIR=. bash .claude/hooks/session-brief.sh | head -3 | cat -A
+#   $
+#   # Using Kinglet$
+#   $
+assert_eq "# Using Kinglet" "$(awk 'NF { print; exit }' <<< "$UK_INJECTED")" \
+  "the SessionStart hook injects the body — not nothing, and not the frontmatter keys"
+
+# And the whole body, not a prefix of it: a hook that truncated or reordered would still open with
+# the right heading.
+UK_BODY_EXPECTED="$(awk '
+    NR == 1 && $0 == "---" { infm = 1; next }
+    infm && $0 == "---" { infm = 0; next }
+    infm { next }
+    { print }
+' "$UK_SKILL" 2>/dev/null || true)"
+assert_eq "$UK_BODY_EXPECTED" "$UK_INJECTED" \
+  "what the hook ships is the whole skill body, byte for byte — the file is not the artifact"
+
+# The mandate itself survives the trip. Redundant while the two assertions above hold, and the one
+# that stays meaningful if the hook is ever rewritten to assemble the brief from parts.
+assert_contains "$UK_INJECTED" 'Invoke the surface **before any response or action**' \
+  "the ordering rule is in the text a fresh session actually reads"
+
+# The chain table's header and separator, which the row checks above cannot see: with either line
+# deleted the eleven rows are still eleven rows and every assertion stays green, while the Markdown
+# stops being a table. Found by the line-by-line sweep, not by the deletion proof.
+assert_contains "$UK_CHAIN" '| Situation | Surface |' \
+  "the chain table still has its header row"
+assert_contains "$UK_CHAIN" '|---|---|' \
+  "…and its separator, so the eleven rows are rows of something"
