@@ -11,20 +11,20 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1–6 are done and closed. The chain exists, the sequencers are gone, and the injected text is
-a mandate rather than a summary.**
+**Tasks 1–7 are done and closed. Only verification remains.**
 
 `unity-brainstorming` → `unity-planning` → the fork → `subagent-driven-implementation` or
-`unity-execution`. Pool is **8 agents + 9 commands + 16 skills = 33**, exactly D7's arithmetic.
-Nothing is dispatched.
+`unity-execution`. Pool is **8 agents + 9 commands + 16 skills = 33**, exactly D7's arithmetic. The
+external obligation is discharged: Superpowers' MIT text is reproduced byte-identically in both
+credit documents, three adapted surfaces are named and guarded in both directions, and the
+unverifiable pin says so of itself. Nothing is dispatched.
 
-**Task 7 is next** — the licence facts. It is the task with the sharpest external consequence:
-`.claude/NOTICE.md` ships into **every installed project**, and since Task 2 it has carried a claim
-that adaptation made false. Read the Task 5 and Task 2 deferred items before writing the brief —
-`CREDITS.md` now contradicts **itself internally**, not merely upstream, and Task 7 is scheduled to
-fix the staleness rather than the self-contradiction.
+**Task 8 is next** — whole-wave verification, and it owns four deferred decisions as well as its own
+steps: `CLAUDE.md`'s "pool is 32" (wrong since Task 2), its header-count instruction (which returns
+the catastrophe signal on a healthy suite), whether the old `deep-interview` path takes a
+`provenance-skip.tsv` row, and whether the forward-reference check becomes a permanent guard.
 
-Suite is at **438 passing**, `provenance OK`, 541 manifest rows, 96 `rule=absent` enforced.
+Suite is at **468 passing**, `provenance OK`, 541 manifest rows, 96 `rule=absent` enforced.
 Reports under `.superpowers/sdd/2026-08-10-process-chain/`: `task-1-report.md` (rounds 0–3),
 `task-1-round4-report.md`, `task-2-report.md`, `task-3-report.md`, `task-4-report.md`,
 `task-5-report.md`.
@@ -96,6 +96,28 @@ Copy this section into every dispatch. A fresh subagent inherits none of it.
      `tests/kinglet/test_baseline_inventory.py`'s hand-maintained constants** — three assertions go
      red while the tool prints success. Fold the constants into the baseline commit; they are one
      logical change with the JSON.
+- **`grep` is line-oriented and prose is not. Flatten before sweeping.** Task 7 found the same class
+  twice: the plan's needle `"What was not taken is the text"` **already passed** on the pre-rewrite
+  NOTICE because the sentence wrapped across two lines, and `README.md`'s stale `71 of 101 ECU-origin
+  files` wrapped between `:184` and `:185`, so **no line-oriented grep could have read it whatever
+  pattern it carried**. The implementer found the class in the licence sweep, fixed it there, and
+  wrote a fresh unflattened block into the same commit.
+
+  A red-first step that starts green is worse than no red-first step: it reads as "the work is
+  already done". **A needle that passes for the wrong reason is worse than no needle** — the plan's
+  `"Permission is hereby granted"` assertion, meant to prove the Superpowers obligation discharged,
+  was satisfied file-wide by ECU's and Donchitos' MIT blocks.
+
+- **A sentinel must not contain its own needle.** Task 7's note on `subagent-driven-implementation`
+  carried the string `its 'adopted from Superpowers' clause is now load-bearing` — which matched the
+  `adopted from Superpowers` regex the clause existed to satisfy. Deleting the real clause left the
+  row deriving correctly and the guard green.
+
+  The implementer's own account is the one to keep: *"round 0's comment block in this same test file
+  records that three of four defects in an earlier guard were defects of a copy of the subject living
+  inside the test, and in round 1 I wrote a fresh copy into the manifest, inside a note explaining
+  that the thing I was copying was load-bearing."*
+
 - **Sweep by insertion as well as by deletion — they find different things.** Every sweep before
   Task 6 deleted lines, which finds unguarded **content**. Inserting at every position finds
   unguarded **space**: places where nothing is asserted because nothing is there yet. Task 6's
@@ -314,7 +336,7 @@ State these in later dispatches rather than letting a brief guess.
 | 4 | `unity-brainstorming` — rename + the design half | **done** | `dd7f434..f648047` | 2 fix rounds. Spec ✅, 5 Important + 5 Minor, all ADDRESSED. **32 of ECU's 69 substantive lines survive**, measured, so D10's `origin=ecu` ruling holds. Reverse-sweep escapes 153/176 → **66/153, zero in any ECU or manifest-named section** |
 | 5 | Delete the two sequencer commands, repair every reference | **done** | `308136e..b0adca5` | 2 fix rounds. Spec ✅, 3 Important + 5 Minor, all ADDRESSED. **28 files touched**, three dead names swept, and the pool is now **8 + 9 + 16 = 33**, matching D7's arithmetic exactly |
 | 6 | `using-kinglet` becomes a mandate | **done** | `0492ec5..4222036` | 2 fix rounds. Spec ✅, 2 Important + 8 Minor, all ADDRESSED. The file is 64 lines and still read in full; the growth was all meta. **Nothing in `tests/` had ever executed `session-brief.sh`** — see below |
-| 7 | Licence facts — NOTICE gains MIT text, stale claims go | **pending** | — | NOTICE ships into user projects |
+| 7 | Licence facts — NOTICE gains MIT text, stale claims go | **done** | `08a568f..cb61c25` | 2 fix rounds. Spec ✅, 4 Important + 8 Minor, all ADDRESSED. **MIT text byte-identical to upstream in both documents**, verified three ways; the wave's only external obligation is discharged |
 | 8 | Whole-wave verification | **pending** | — | |
 
 ## Loop rule added mid-run — the controller does not commit while a round is open
