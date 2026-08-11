@@ -338,27 +338,62 @@ DEAD_SENTINELS
 #                                 visible ONLY here. An origin-column-only derivation finds two of
 #                                 the three surfaces and reports success.
 #
-# The clause is matched in its canonical form, `adapted from Superpowers <version> skills/<x>/SKILL.md`,
-# which is what pins the upstream path. That deliberately does not match
-# `subagent-driven-implementation`'s note ("architecture adopted from Superpowers'
-# subagent-driven-development, wording original") — architecture is not expression, that row stays
-# origin=original, and it is credited in the documents' influence paragraph rather than the
-# obligation table.
+# The clause is `adapted from Superpowers <version> <upstream path>`, which is what pins the upstream.
+# It deliberately does not match `subagent-driven-implementation`'s note ("architecture adopted from
+# Superpowers' subagent-driven-development, wording original") — architecture is not expression, that
+# row stays origin=original, and it is credited in the documents' influence subsection rather than
+# the obligation table. `adopted` is not `adapted`, and there is no version or path to extract.
+#
+# ROUND 1 — THE VERSION AND PATH SHAPES ARE DELIBERATELY LOOSE, and the first draft's were not.
+# It required `[0-9]+\.[0-9]+\.[0-9]+` and `skills/<one segment>/SKILL.md`, which silently dropped
+# three shapes a writer would believe were canonical, because they ARE canonical — only the regex
+# was narrow:
+#
+#   an upstream that is not a SKILL.md   Superpowers ships 36 such files under skills/, and this
+#                                        repo already carries a rule=absent row for one of them
+#                                        (brainstorming/visual-companion.md). Four of our own shipped
+#                                        surfaces are *-prompt.md files, so the likeliest next
+#                                        adaptation is one of Superpowers' reviewer prompts.
+#   a nested upstream path               skills/a/b/c.md
+#   a two-segment version                6.2 rather than 6.2.0
+#
+# That is worse than the non-canonical-prose gap it sits next to: there, the writer has departed from
+# the convention and might check. Here the writer follows the convention, the row looks right, and
+# nothing prompts anyone to look. So: any dotted version of two or more segments, and any non-blank
+# path ending in .md. The trailing `[^ ,;]+` stops at the comma that begins the rest of the clause.
 sp_pairs="$(awk -F'\t' '
   $0 ~ /^#/ { next }
   $1 == "path" { next }
   {
     ours = ""; theirs = ""
     if ($2 == "superpowers") { ours = $1; theirs = $4 }
-    else if (match($7, /adapted from Superpowers [0-9]+\.[0-9]+\.[0-9]+ skills\/[A-Za-z0-9_.-]+\/SKILL\.md/)) {
+    else if (match($7, /adapted from Superpowers [0-9]+(\.[0-9]+)+ [^ ,;]+\.md/)) {
       ours = $1
       theirs = substr($7, RSTART, RLENGTH)
-      sub(/^adapted from Superpowers [0-9]+\.[0-9]+\.[0-9]+ /, "", theirs)
+      sub(/^adapted from Superpowers [0-9]+(\.[0-9]+)+ /, "", theirs)
     }
     if (ours != "") { print ours "\t" theirs }
   }' "$REPO/provenance.tsv" | sort -u)"
 sp_ours="$(awk -F'\t' 'NF { print $1 }' <<< "$sp_pairs" | sort -u)"
 sp_count=$(grep -c . <<< "$sp_pairs" || true)
+
+# The OTHER relationship, and the reason it is derived rather than assumed. Some surfaces owe
+# Superpowers something short of expression — an architecture, or only a name — and the documents say
+# so in an influence subsection. Those are legitimate mentions of a `.claude/` surface inside the
+# Superpowers section that are NOT part of the obligation, which is exactly what makes "is this
+# surface allowed to appear here?" a question needing an answer from the manifest rather than a
+# reader's judgement. Two clause forms, matching what the rows actually carry:
+#
+#   adopted from Superpowers …       subagent-driven-implementation (architecture, wording original)
+#   name shared with Superpowers …   systematic-debugging, verification-before-completion
+#
+# Neither can be mistaken for the adaptation clause above: that one requires `adapted from
+# Superpowers <version> <path>`, and `adopted` is not `adapted`.
+sp_influence="$(awk -F'\t' '
+  $0 ~ /^#/ { next }
+  $1 == "path" { next }
+  $7 ~ /(adopted from|name shared with) Superpowers/ { print $1 }
+' "$REPO/provenance.tsv" | sort -u)"
 
 # 7b. One sentinel per derivation route, because the two fail independently and a count cannot tell
 # them apart. Drop the note-clause branch and `sp_count` falls 3 -> 2 while every remaining assertion
@@ -399,6 +434,7 @@ SP_SENTINELS
 # the VALUE before the regex ever sees it, so `\.` arrives as a bare `.` — a warning on stderr and a
 # pattern that matches any character. Measured 2026-08-11:
 #   awk: warning: escape sequence `\.' treated as plain `.'
+sp_head_sig=""
 sp_license_expected="$(cat <<'SP_LICENSE_TEXT'
 MIT License
 
@@ -434,32 +470,98 @@ while IFS=$'\t' read -r sp_file sp_anchor; do
   fi
   pass "found the Superpowers section in $sp_file"
 
-  sp_tbl="$(awk '/^### Adapted surfaces$/ { inb = 1; next } inb && /^### / { exit } inb { print }' <<< "$sp_sec")"
-  sp_named="$(grep -o -- '\.claude/skills/[a-z0-9-]*/SKILL\.md' <<< "$sp_tbl" | sort -u || true)"
+  # ROUND 1 — THE SECOND DIRECTION WAS A CLAIM, NOT A CHECK, AND THIS IS WHERE IT WAS FIXED.
+  #
+  # The first draft took the block between `### Adapted surfaces` and the next `### `, then ran
+  # `grep -o '\.claude/skills/[a-z0-9-]*/SKILL\.md'` over it. That reads a shape, not a table, and
+  # three mutations went GREEN against it while the comment overhead read "nothing claimed that the
+  # manifest does not support":
+  #
+  #   a row naming `.claude/agents/unity-coder.md`   not skill-shaped, so invisible to the grep
+  #   a row naming a surface by bare name            no path at all, so invisible to the grep
+  #   an unsupported claim in the PROSE above        outside the table, but inside the block
+  #
+  # All three are exactly the direction being asserted: a document claiming an adaptation the
+  # manifest does not record. Only the first direction — a manifest row missing from the document —
+  # actually worked.
+  #
+  # The table is now parsed AS A TABLE, by position within it:
+  #   * the separator row (`|---|---|`, nothing but pipes, dashes, colons and spaces) marks where
+  #     data begins, so the header row is identified by its position and not by what it says;
+  #   * data rows are the `|`-leading lines after it, which ends the block at the first prose
+  #     paragraph — the previous `### `-bounded block swallowed the two paragraphs that follow the
+  #     table, so a future `.claude/…` mention in the unverified-pin paragraph would have been read
+  #     as a table entry;
+  #   * column 1 must be a backticked path AND that path must be in the manifest's set. A cell that
+  #     is a bare name, an unbackticked path, or a path of any other shape is a violation rather
+  #     than a silent non-match — which is what closes all three mutations above;
+  #   * column 2 must carry the upstream the manifest pairs with that path, so a correct set with a
+  #     swapped attribution still fails.
+  sp_rows="$(awk '
+    /^### Adapted surfaces$/ { inb = 1; next }
+    inb && /^### / { exit }
+    inb && /^\|/ && $0 ~ /^[|: -]+$/ { seen = 1; next }
+    inb && seen && /^\|/ { print; next }
+    inb && seen && !/^\|/ { exit }
+  ' <<< "$sp_sec")"
+
+  # Column 1 of every data row, backticks stripped, plus a note of any cell that was not a backticked
+  # path at all. Both feed the comparison below: the malformed cells are reported by name, and they
+  # are ALSO absent from `sp_named`, so the set compare fails too — two independent ways to see one
+  # defect, rather than a lenient parse that quietly drops what it cannot read.
+  sp_named=""
+  sp_malformed=""
+  while IFS= read -r sp_row; do
+    [ -n "$sp_row" ] || continue
+    sp_c1="$(awk -F'|' '{ print $2 }' <<< "$sp_row" | sed 's/^ *//; s/ *$//')"
+    case "$sp_c1" in
+      '`'*'`')
+        sp_p="${sp_c1#\`}"; sp_p="${sp_p%\`}"
+        sp_named="${sp_named}${sp_p}"$'\n'
+        ;;
+      *)
+        sp_malformed="${sp_malformed}${sp_row}"$'\n'
+        ;;
+    esac
+  done <<< "$sp_rows"
+  sp_named="$(printf '%s' "$sp_named" | sort -u)"
+
+  if [ -z "$sp_malformed" ]; then
+    pass "$sp_file's 'Adapted surfaces' table gives every row a backticked path in column 1"
+  else
+    printf '%s' "$sp_malformed"
+    fail "$sp_file's 'Adapted surfaces' table has a row whose first column is not a backticked path — a bare name or free text there is a claim nothing can check against the manifest"
+  fi
 
   # Whole-block compare, never `grep -F` with a multi-line pattern: that is an OR over its lines, so
-  # a set missing one member would still match on the others and report agreement.
+  # a set missing one member would still match on the others and report agreement. Set equality, so
+  # this is the assertion that runs in BOTH directions — a manifest row absent from the table, and a
+  # table row the manifest does not support.
   if [ "$sp_named" = "$sp_ours" ]; then
-    pass "$sp_file names exactly the Superpowers-adapted surfaces the manifest records"
+    pass "$sp_file names exactly the Superpowers-adapted surfaces the manifest records, and nothing else"
   else
     printf '     manifest:\n%s\n     %s:\n%s\n' "$sp_ours" "$sp_file" "$sp_named"
     fail "$sp_file's 'Adapted surfaces' table disagrees with provenance.tsv — the document is wrong, not the manifest"
   fi
 
-  # Pairing, not merely membership. A table that names all three of our files while attributing one
-  # of them to the wrong upstream skill passes the set check above and is still a false attribution.
+  # Pairing, and BY COLUMN. A table that names all three of our files while attributing one of them
+  # to the wrong upstream passes the set check above and is still a false attribution; a row that
+  # merely mentions the right upstream somewhere in its explanatory third column is not an
+  # attribution either.
   while IFS=$'\t' read -r sp_o sp_t; do
     [ -n "$sp_o" ] || continue
     sp_paired=0
     while IFS= read -r sp_row; do
-      case "$sp_row" in
-        *"$sp_o"*) case "$sp_row" in *"$sp_t"*) sp_paired=1 ;; esac ;;
-      esac
-    done <<< "$sp_tbl"
+      [ -n "$sp_row" ] || continue
+      sp_f1="$(awk -F'|' '{ print $2 }' <<< "$sp_row" | sed 's/^ *//; s/ *$//')"
+      sp_f2="$(awk -F'|' '{ print $3 }' <<< "$sp_row")"
+      [ "$sp_f1" = "\`$sp_o\`" ] || continue
+      case "$sp_f2" in *"$sp_t"*) sp_paired=1 ;; esac
+    done <<< "$sp_rows"
     if [ "$sp_paired" -eq 1 ]; then
-      pass "$sp_file attributes $sp_o to $sp_t"
+      pass "$sp_file attributes $sp_o to $sp_t in column 2"
     else
-      fail "$sp_file does not attribute $sp_o to $sp_t on one row — the manifest pairs them"
+      fail "$sp_file does not attribute $sp_o to $sp_t in its second column — the manifest pairs them"
     fi
   done <<< "$sp_pairs"
 
@@ -474,10 +576,68 @@ while IFS=$'\t' read -r sp_file sp_anchor; do
   else
     fail "$sp_file's Superpowers section does not reproduce the MIT licence text character-for-character (missing, truncated, or the copyright line edited)"
   fi
+
+  # ROUND 1, third mutation: an unsupported adaptation asserted in the section's PROSE, above the
+  # table, was green — the table check cannot see it, because it is not in the table. Closing that
+  # needs a rule about the whole section, not the table: every surface path the section names must be
+  # one the manifest connects to Superpowers, in one of the two recorded relationships.
+  #
+  # Scoped to the three SURFACE namespaces. A blanket `.claude/` scan would flag the section's own
+  # cross-reference to `.claude/NOTICE.md`, which is a document pointer and not a claim about a
+  # surface. Rules and hooks are omitted for the same reason they have never appeared here; add the
+  # namespace if that changes.
+  #
+  # Directory tokens are how the influence subsection names a multi-file skill
+  # (`.claude/skills/subagent-driven-implementation/` stands for its five rows), so a token ending in
+  # `/` is accepted when it prefixes a manifest path.
+  sp_mentions="$(grep -o -- '`\.claude/\(skills\|agents\|commands\)/[^`]*`' <<< "$sp_sec" | tr -d '`' | sort -u || true)"
+  sp_unbacked=""
+  while IFS= read -r sp_m; do
+    [ -n "$sp_m" ] || continue
+    sp_ok=0
+    while IFS= read -r sp_known; do
+      [ -n "$sp_known" ] || continue
+      case "$sp_m" in
+        */) case "$sp_known" in "$sp_m"*) sp_ok=1 ;; esac ;;
+        *)  [ "$sp_m" = "$sp_known" ] && sp_ok=1 ;;
+      esac
+    done <<< "$sp_ours
+$sp_influence"
+    [ "$sp_ok" -eq 1 ] || sp_unbacked="${sp_unbacked}${sp_m}"$'\n'
+  done <<< "$sp_mentions"
+
+  if [ -z "$sp_unbacked" ]; then
+    pass "$sp_file's Superpowers section names only surfaces the manifest ties to Superpowers ($(grep -c . <<< "$sp_mentions") mentions)"
+  else
+    printf '%s' "$sp_unbacked"
+    fail "$sp_file's Superpowers section names the surfaces above, which no provenance.tsv row ties to Superpowers as either an adaptation or an influence — a claim in prose is still a claim"
+  fi
+
+  # The two sections are written in lock-step on purpose: the same subsections, in the same order, so
+  # that the obligation and the influence list cannot end up in one document and not the other. That
+  # was an intention with nothing enforcing it, and the first draft already drifted — one document
+  # said `### Still influence, not expression` and the other `### Influence, not expression`. Signed
+  # here so the next drift is a failure rather than a reviewer noticing.
+  sp_head_sig="${sp_head_sig}${sp_file}	$(grep '^### ' <<< "$sp_sec" | tr '\n' '~')"$'\n'
 done <<'SP_SECTIONS'
 .claude/NOTICE.md	^## 3[.] Superpowers
 CREDITS.md	^## 4[.] Superpowers
 SP_SECTIONS
+
+# The subsection lists, compared as whole strings. Two entries expected; a section that failed to
+# resolve above contributed none, and the count check says so rather than letting one entry compare
+# equal to itself.
+sp_sig_count=$(grep -c . <<< "$sp_head_sig" || true)
+sp_sig_a="$(sed -n 1p <<< "$sp_head_sig" | cut -f2)"
+sp_sig_b="$(sed -n 2p <<< "$sp_head_sig" | cut -f2)"
+if [ "$sp_sig_count" -ne 2 ]; then
+  fail "only $sp_sig_count Superpowers section(s) resolved, so the two documents' subsection lists were not compared"
+elif [ "$sp_sig_a" = "$sp_sig_b" ]; then
+  pass "both credit documents carry the same Superpowers subsections, in the same order"
+else
+  printf '     %s\n     %s\n' "$sp_sig_a" "$sp_sig_b"
+  fail "the two credit documents' Superpowers subsections have drifted apart — they are written in lock-step so neither can lose the obligation table or the influence list alone"
+fi
 
 # 7d. The superseded claims must be gone from everything that describes the toolkit as it stands —
 # including provenance.tsv's own `note` column, which repeated them and which check-provenance.sh
@@ -531,6 +691,96 @@ if [ -f "$sp_upstream_license" ]; then
 else
   printf 'note: %s\n' ".research/superpowers/LICENSE is absent (gitignored working copy), so the pinned MIT text was not cross-checked against upstream this run"
 fi
+
+# ── 8. The shipped notice enumerates every original file, and does it without a count ────────────
+# `.claude/NOTICE.md` states the copyright holder for files original to this toolkit. The class
+# sentence covers all of them, and a table names them so a reader can see what it covers.
+#
+# That table has now failed twice, in opposite directions. It first named three files and stopped,
+# so three original files travelled with no stated copyright holder in the document whose whole job
+# is to state them. The fix added a count — "at the time of writing that is five files" — and the
+# count went stale by NINE while the same file's §3 named three of the missing surfaces by path, so
+# the document enumerated original files its own summary excluded.
+#
+# Ruling: no count, full enumeration, and this guard. A count of original files moves on every commit
+# that adds one and tells a reader nothing they would act on — the same reasoning that removed the
+# original-row count from tests/test-derived-counts.sh. Coverage is what carries signal, so coverage
+# is what is asserted.
+#
+# Directory rows are how the table stays readable: `skills/subagent-driven-implementation/` covers
+# its five files. A row is a prefix if it ends in `/`, and an exact path otherwise. Both directions
+# run — a manifest row no row covers, and a row that covers nothing in the manifest.
+np_want="$(awk -F'\t' '
+  $0 ~ /^#/ { next }
+  $1 == "path" { next }
+  $2 == "original" && $1 ~ /^\.claude\// { sub(/^\.claude\//, "", $1); print $1 }
+' "$REPO/provenance.tsv" | sort -u)"
+
+# Anchored on the sentence that introduces the table, then parsed as a table by the same
+# separator-row rule block 7 uses. If that sentence is ever reworded the block empties and every
+# path below is reported uncovered — loud, not silent.
+np_rows="$(awk '
+  /Those rows are:$/ { inb = 1; next }
+  inb && /^\|/ && $0 ~ /^[|: -]+$/ { seen = 1; next }
+  inb && seen && /^\|/ { print; next }
+  inb && seen && !/^\|/ { exit }
+' "$REPO/.claude/NOTICE.md")"
+
+# Every backticked token in column 1 — the VERSION/UPSTREAM row carries two, which is why this reads
+# all of them rather than requiring one cell to be one path.
+np_have="$(awk -F'|' '{ print $2 }' <<< "$np_rows" | grep -o '`[^`]*`' | tr -d '`' | sort -u || true)"
+
+np_uncovered=""
+while IFS= read -r np_p; do
+  [ -n "$np_p" ] || continue
+  np_hit=0
+  while IFS= read -r np_t; do
+    [ -n "$np_t" ] || continue
+    case "$np_t" in
+      */) case "$np_p" in "$np_t"*) np_hit=1 ;; esac ;;
+      *)  [ "$np_t" = "$np_p" ] && np_hit=1 ;;
+    esac
+  done <<< "$np_have"
+  [ "$np_hit" -eq 1 ] || np_uncovered="${np_uncovered}${np_p}"$'\n'
+done <<< "$np_want"
+
+if [ -z "$np_uncovered" ]; then
+  pass "the shipped NOTICE enumerates every origin=original file under .claude/ ($(grep -c . <<< "$np_want") paths, $(grep -c . <<< "$np_have") rows)"
+else
+  printf '%s' "$np_uncovered"
+  fail ".claude/NOTICE.md's original-files table does not cover the paths above — they ship with their copyright stated only by the class sentence, which is the defect that table exists to close"
+fi
+
+np_orphan=""
+while IFS= read -r np_t; do
+  [ -n "$np_t" ] || continue
+  np_hit=0
+  while IFS= read -r np_p; do
+    [ -n "$np_p" ] || continue
+    case "$np_t" in
+      */) case "$np_p" in "$np_t"*) np_hit=1 ;; esac ;;
+      *)  [ "$np_t" = "$np_p" ] && np_hit=1 ;;
+    esac
+  done <<< "$np_want"
+  [ "$np_hit" -eq 1 ] || np_orphan="${np_orphan}${np_t}"$'\n'
+done <<< "$np_have"
+
+if [ -z "$np_orphan" ]; then
+  pass "every row in the shipped NOTICE's original-files table matches an origin=original manifest row"
+else
+  printf '%s' "$np_orphan"
+  fail ".claude/NOTICE.md's original-files table names the paths above, which no origin=original row in provenance.tsv supports"
+fi
+
+# And the count that rotted stays gone. Any "<n> files" sentence introducing that table is the shape
+# that failed; the table enumerates instead.
+np_flat="$(tr '\n' ' ' < "$REPO/.claude/NOTICE.md" | tr -s ' ')"
+case "$np_flat" in
+  *"At the time of writing that is"*)
+    fail ".claude/NOTICE.md has regained a count of its original files — that sentence went stale by nine once already; enumerate in the table instead" ;;
+  *)
+    pass "the shipped NOTICE's original-files table carries no count to go stale" ;;
+esac
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all provenance-origin assertions passed\n'

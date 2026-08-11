@@ -22,24 +22,31 @@ verifiable; you just verify them against the source rather than a snapshot.
 |---|---|---|
 | [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) | vendored at v1.5.0 (`bb28ccb`); mobile content removed, some files modified | agents `unity-*`, commands `unity-*`, skills, hooks, 5 rules, `settings.json` |
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) | adapted at `984023d`, removed 2026-08-03; no Claude-Code-Game-Studios content ships in this toolkit today | 0 files |
-| [Superpowers](https://github.com/obra/superpowers) | adapted at 6.2.0 (`3dcbd5c`) on 2026-08-10 — the process-chain skills, rewritten for Unity from its originals | the skills listed in §3 |
+| [Superpowers](https://github.com/obra/superpowers) | adapted at 6.2.0 (`3dcbd5c`) on 2026-08-10 — the process chain, rewritten for Unity from its originals | the three skills in §3's *Adapted surfaces* table |
 
 Files not attributable to any of those are original to Kinglet Pioneer, MIT, Copyright (c) 2026
 OmerZeyveli. **The manifest is the list**, not this paragraph — every row with `origin=original` in the
-toolkit's `provenance.tsv`, linked above. At the time of writing that is five files:
+toolkit's `provenance.tsv`, linked above. Those rows are:
 
 | File | What it is |
 |---|---|
 | `rules/pc-console.md` | the platform spec; the only rule not vendored |
 | `hooks/block-legacy-input.sh` | blocks the legacy Input Manager API. Three rule files had claimed for a long time that a hook enforced this. None did — not here, not in ECU v1.5.0. This is that hook. |
+| `hooks/session-brief.sh` | the session-start brief |
+| `skills/using-kinglet/SKILL.md` | which surface handles which situation |
+| `skills/subagent-driven-implementation/` | the execution loop — `SKILL.md` and its four prompt files |
+| `skills/systematic-debugging/SKILL.md` | read the real console before proposing a fix |
+| `skills/verification-before-completion/SKILL.md` | evidence before a completion claim |
 | `NOTICE.md` | this file |
 | `VERSION`, `UPSTREAM` | which toolkit build this is, and what it pins |
 
-This paragraph used to name three of them and stop, which meant three original files travelled with
-no stated copyright holder at all — in the document whose whole job is to state copyright holders.
-It was found by someone reading this file and reporting back what it said. If you add an original
-file under `.claude/`, add its manifest row; that is what makes it attributable, and this table is a
-convenience that follows from it.
+**This table carries no count, deliberately.** It used to name three files and stop, which meant
+three original files travelled with no stated copyright holder at all — in the document whose whole
+job is to state copyright holders. It was then given a count, and the count went stale by nine while
+the sentence above it still read "at the time of writing". A number that moves every time an
+original file is added carries no signal a reader would act on, so the table enumerates instead. If
+you add an original file under `.claude/`, add its manifest row and a row here; the first is what
+makes it attributable and `tests/test-provenance-origins.sh` fails until the second exists.
 
 The [CoplayDev Unity MCP bridge](https://github.com/CoplayDev/unity-mcp) is **not** included here.
 `.mcp.json` merely points at it on `localhost`; install it yourself via Package Manager.
@@ -145,7 +152,7 @@ for rows from everything-claude-unity — so both skip every row above. The `6.2
 `provenance.tsv` is a record kept by hand, and it is worth saying so rather than letting the presence
 of checksum machinery imply a coverage it does not have.
 
-### Still influence, not expression
+### Influence, not expression
 
 Three further surfaces owe Superpowers something short of expression, and stay `origin=original` in
 `provenance.tsv`:

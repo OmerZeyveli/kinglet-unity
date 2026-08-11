@@ -181,7 +181,7 @@ Because this repo contains other people's code, it tracks whose:
   **`.claude/NOTICE.md`**, which carries the upstream MIT notices as their licenses require.
 
 Vendoring trades one risk for another. The old overlay broke whenever ECU moved a file; that risk is
-gone. The new one is staleness — upstream fixes no longer reach us on their own, and with 71 of 101
+gone. The new one is staleness — upstream fixes no longer reach us on their own, and with 74 of 99
 ECU-origin files now `modified`, a future `--online` diff against a newer ECU verifies little. The
 offline half of `provenance.tsv` — no rows without files, no files without rows, every `rule=absent`
 path stays absent — is what still carries weight; see `CLAUDE.md`'s provenance section for the full

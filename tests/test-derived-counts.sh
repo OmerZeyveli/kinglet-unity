@@ -109,57 +109,86 @@ assert_eq "0" "$(printf '%s' "$DC_VACUOUS" | grep -c . || true)" \
 # the repo-wide sentence. That warning is why the two numbers are distinguishable at all — and it is
 # also why this block exists, because a warning is not a guard, which is the lesson the header of
 # this file already records once.
+#
+# ROUND 1: this block shipped reading ONE phrasing per file, and the phrasing it did not read was the
+# one that was wrong. README.md:184 said "71 of 101 ECU-origin files now `modified`" thirteen lines
+# below its own correct "99 files from ECU", and the per-file vacuity check was satisfied by the
+# correct occurrence. That is verbatim the failure this file's header records at :37-41 — one correct
+# occurrence and one stale occurrence in a different phrasing, guard calls it clean — reproduced by
+# the commit that cites it.
+#
+# Two changes came out of that:
+#
+#   1. EVERY phrasing the covered files actually use is read, and each (file, phrasing) pair carries
+#      its own floor. A per-FILE floor cannot see a phrasing going unread, because another phrasing
+#      in the same file keeps the file's count above 1. A per-pair floor turns "someone reworded the
+#      sentence" from silent narrowing into a failure that names the file and the phrasing.
+#
+#   2. Every match runs against the file with newlines collapsed to spaces. `71 of 101` sat at the
+#      end of README.md:184 and `ECU-origin files now \`modified\`` began :185, so NO line-oriented
+#      grep could have read it at any point. Measured 2026-08-11 on the pre-fix file:
+#        $ grep -oE '[0-9]+ of [0-9]+ ECU-origin files' README.md      -> no match
+#        $ tr '\n' ' ' < README.md | tr -s ' ' | grep -oE '...'        -> 71 of 101 ECU-origin files
+#      This is the second line-wrap false-negative found in this wave; the first was a stale licence
+#      claim in .claude/NOTICE.md that a plain grep -F reported as removed.
 echo "--- derived counts: ECU footprint ---"
 
 DCF_ECU_FILES=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $2 == "ecu"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
 DCF_ECU_VERBATIM=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $2 == "ecu" && $6 == "verbatim"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
+DCF_ECU_MODIFIED=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $2 == "ecu" && $6 == "modified"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
 
-# Two phrasings, in two files, saying the same thing — the shape that let the disagreement above
-# survive. Both are read here so neither can drift alone.
-#   CREDITS.md   "99 files; 25 of them still byte-identical"   (count and verbatim count)
-#   README.md    "99 files from ECU"                           (count only)
+# The three phrasings, and which file carries each. Field 3 is the expected value the first captured
+# number must equal; field 4 the second, or `-` when the phrasing carries only one number.
+#
+#   CREDITS.md   "99 files; 25 of them still byte-identical"         total, verbatim
+#   README.md    "99 files from ECU"                                 total
+#   README.md    "74 of 99 ECU-origin files now `modified`"          modified, total
+#
+# A phrasing this table does not list is still unread — that is the standing residual, and the reason
+# the pairs carry floors is so that shrinking the covered set is loud even though growing it is not.
+DCF_CLAIMS="CREDITS.md	[0-9]+ files; [0-9]+ of them still byte-identical	$DCF_ECU_FILES	$DCF_ECU_VERBATIM
+README.md	[0-9]+ files from ECU	$DCF_ECU_FILES	-
+README.md	[0-9]+ of [0-9]+ ECU-origin files now .modified.	$DCF_ECU_MODIFIED	$DCF_ECU_FILES"
+
 DCF_BAD=""
 DCF_VACUOUS=""
-while IFS= read -r rel; do
-  [ -n "$rel" ] || continue
-  [ -f "$REPO_DIR/$rel" ] || continue
-  dcf_found=0
-
-  while IFS= read -r claim; do
-    [ -n "$claim" ] || continue
-    dcf_found=$((dcf_found + 1))
-    dcf_c=$(printf '%s' "$claim" | awk '{print $1}')
-    dcf_v=$(printf '%s' "$claim" | awk '{print $3}')
-    if [ "$dcf_c" != "$DCF_ECU_FILES" ] || [ "$dcf_v" != "$DCF_ECU_VERBATIM" ]; then
-      DCF_BAD="${DCF_BAD}${rel} claims ${dcf_c} ECU files, ${dcf_v} byte-identical — provenance.tsv has ${DCF_ECU_FILES} and ${DCF_ECU_VERBATIM}"$'\n'
-    fi
-  done <<< "$(grep -oE '[0-9]+ files; [0-9]+ of them still byte-identical' "$REPO_DIR/$rel" || true)"
-
-  while IFS= read -r claim; do
-    [ -n "$claim" ] || continue
-    dcf_found=$((dcf_found + 1))
-    dcf_c=$(printf '%s' "$claim" | awk '{print $1}')
-    if [ "$dcf_c" != "$DCF_ECU_FILES" ]; then
-      DCF_BAD="${DCF_BAD}${rel} claims ${dcf_c} files from ECU — provenance.tsv has ${DCF_ECU_FILES}"$'\n'
-    fi
-  done <<< "$(grep -oE '[0-9]+ files from ECU' "$REPO_DIR/$rel" || true)"
-
-  if [ "$dcf_found" -lt 1 ]; then
-    DCF_VACUOUS="${DCF_VACUOUS}${rel} states ECU's footprint in no form this guard can read"$'\n'
+while IFS=$'\t' read -r dcf_rel dcf_pat dcf_want1 dcf_want2; do
+  [ -n "$dcf_rel" ] || continue
+  if [ ! -f "$REPO_DIR/$dcf_rel" ]; then
+    DCF_VACUOUS="${DCF_VACUOUS}${dcf_rel} is not present, so its '${dcf_pat}' claim was never checked"$'\n'
+    continue
   fi
-done <<< "$DC_QUOTING_FILES"
+
+  # tr drains its input; neither reader here can exit early.
+  dcf_flat="$(tr '\n' ' ' < "$REPO_DIR/$dcf_rel" | tr -s ' ')"
+  dcf_hits=0
+  while IFS= read -r dcf_claim; do
+    [ -n "$dcf_claim" ] || continue
+    dcf_hits=$((dcf_hits + 1))
+    # Numbers in order of appearance, whatever the phrasing puts around them.
+    dcf_got1=$(printf '%s' "$dcf_claim" | grep -oE '[0-9]+' | sed -n 1p)
+    dcf_got2=$(printf '%s' "$dcf_claim" | grep -oE '[0-9]+' | sed -n 2p)
+    if [ "$dcf_got1" != "$dcf_want1" ] || { [ "$dcf_want2" != "-" ] && [ "$dcf_got2" != "$dcf_want2" ]; }; then
+      DCF_BAD="${DCF_BAD}${dcf_rel} claims '${dcf_claim}' — provenance.tsv gives ${dcf_want1}"$([ "$dcf_want2" != "-" ] && printf ' and %s' "$dcf_want2")$'\n'
+    fi
+  done <<< "$(grep -oE "$dcf_pat" <<< "$dcf_flat" || true)"
+
+  if [ "$dcf_hits" -lt 1 ]; then
+    DCF_VACUOUS="${DCF_VACUOUS}${dcf_rel} no longer states its '${dcf_pat}' claim in a form this guard can read"$'\n'
+  fi
+done <<< "$DCF_CLAIMS"
 
 if [ -n "$DCF_BAD" ]; then
   printf '%s' "$DCF_BAD"
 fi
 assert_eq "0" "$(printf '%s' "$DCF_BAD" | grep -c . || true)" \
-  "every ECU footprint quoted in prose matches provenance.tsv ($DCF_ECU_FILES files, $DCF_ECU_VERBATIM verbatim)"
+  "every ECU footprint quoted in prose matches provenance.tsv ($DCF_ECU_FILES files, $DCF_ECU_VERBATIM verbatim, $DCF_ECU_MODIFIED modified)"
 
 if [ -n "$DCF_VACUOUS" ]; then
   printf '%s' "$DCF_VACUOUS"
 fi
 assert_eq "0" "$(printf '%s' "$DCF_VACUOUS" | grep -c . || true)" \
-  "every prose file this guard covers still states ECU's footprint in a form it can read"
+  "every ECU-footprint phrasing this guard covers is still present in the file that carries it"
 
 # ============================================================================
 # The second derived number in this repository: how much of ECU survives in `unity-brainstorming`.
