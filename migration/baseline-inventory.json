@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "08a568fa310ef1b4e55d97331d334407116e5b97",
+  "source_commit": "a32ddc1a049472b50fa1cecc6032689d0f24f989",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 77,
     "files": [
       {
         "path": ".claude/NOTICE.md",
-        "sha256": "120f3f93036d35cf8ac80fdf4cd3603add1200bba6f3210aaa79148533cfc1d5",
+        "sha256": "cecbe102dec60a2e61dee643e00fe88768071d90f453990a32e04e506648e848",
         "git_mode": "100644"
       },
       {
