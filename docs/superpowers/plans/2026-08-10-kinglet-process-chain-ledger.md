@@ -11,22 +11,22 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1–4 are done and closed. The chain exists end to end.**
+**Tasks 1–5 are done and closed. The chain exists end to end and the sequencers are gone.**
 
 `unity-brainstorming` → `unity-planning` → the fork → `subagent-driven-implementation` or
-`unity-execution`, with the execution mode written and read at five ends and every path reference
-resolving. Nothing is currently dispatched.
+`unity-execution`. `/unity-workflow` and `/unity-feature` are deleted and `rule=absent`; the surface
+pool is **8 agents + 9 commands + 16 skills = 33**, exactly D7's arithmetic. Nothing is dispatched.
 
-**Task 5 is next** — delete `/unity-workflow` and `/unity-feature` and repair every reference. It is
-the largest blast radius of the wave and the plan has been widened twice since it was written:
-`deep-interview` is now a **third dead name** to sweep for, `scripts/studio-doctor.sh` joined the file
-list, and Step 4's proof command was rewritten because the original **passed by examining nothing**
-(`--project-dir` is not a flag this script has; it exited 2, wrote zero bytes, and the grep printed
-`clean` against an empty file).
+**Task 6 is next** — `using-kinglet` becomes a mandate. Read deferred item 3 above before writing the
+brief: Task 5 had to repair that file mid-task (its own guard failed on it otherwise) and left the
+*shape* deliberately, so **row 20 still carries the pre-D2 vagueness gate** — "the request is vague
+and has no file, type or acceptance criterion" — sitting above the unconditional category trigger
+that replaced it. Two triggers, the softer one first.
 
-Suite is at **401 passing**, `provenance OK`, 543 manifest rows, 94 `rule=absent` enforced.
+Suite is at **412 passing**, `provenance OK`, 541 manifest rows, 96 `rule=absent` enforced.
 Reports under `.superpowers/sdd/2026-08-10-process-chain/`: `task-1-report.md` (rounds 0–3),
-`task-1-round4-report.md`, `task-2-report.md`, `task-3-report.md`, `task-4-report.md`.
+`task-1-round4-report.md`, `task-2-report.md`, `task-3-report.md`, `task-4-report.md`,
+`task-5-report.md`.
 
 **The cut-criterion gate on `unity-execution` was answered "ship it"**, and the argument is on the
 record: the Deslop Pass's two restraining rules — a scope boundary and a default — are what an
@@ -95,6 +95,35 @@ Copy this section into every dispatch. A fresh subagent inherits none of it.
      `tests/kinglet/test_baseline_inventory.py`'s hand-maintained constants** — three assertions go
      red while the tool prints success. Fold the constants into the baseline commit; they are one
      logical change with the JSON.
+- **Only the artifact ships.** Task 5's implementer read `unity-brainstorming`, wrote the accurate
+  claim into its *report*, and then wrote a stronger, false version into the **payload file injected
+  at session start**. Its own words: *"I read the file, wrote the accurate version in prose, then
+  wrote a stronger false version into the artifact."* The reasoning being right is not evidence that
+  the shipped sentence is. Check the artifact against the file, not against your understanding of it.
+
+  The same defect twice over, because a rename does not carry a sentence's truth: `using-kinglet`
+  said three skills carry a "the thought that means you are about to skip this" section. Renaming
+  `deep-interview` kept the sentence grammatical and made it false — **and then the correction was
+  false too**, because D2 removed the exemption *list*, not the section, which exists retitled at
+  `unity-brainstorming:183`.
+
+- **A guard can be narrowed by narrowing what it inspects, and every assertion about the inspection
+  stays green.** Five routes were measured in Task 5, all with a real dead name planted behind the
+  loss and the suite at exit 0: a second entry in a skip `case`; excluding `.claude/commands/*` or
+  `.claude/agents/*`; narrowing `scripts/*` to `scripts/*.sh` (a `.py` script lives there **today**,
+  so this reads as a tidy-up); replacing a glob with an explicit file list.
+
+  The shape, in the implementer's words: **each narrows *what is inspected* while leaving *what is
+  asserted about the inspection* untouched.** A file-count floor does not move; sentinels named by
+  path still match. The fix that worked was to assert against **the set the loop actually read**,
+  accumulated after the skip, rather than against the raw `git ls-files` output.
+
+- **A comment asking for something is not a check for it.** Round 1 of Task 5 wrote *"The skip is one
+  file and stays one file"* two blocks above a check that could not detect a second entry — written
+  in the same edit that enforced the other half, by an implementer who had just quoted
+  `test-derived-counts.sh`'s *"a warning is not a guard"*. Prose next to a guard reads as part of the
+  guard and is not.
+
 - **A check that fires on everything distinguishes nothing.** The controller deleted a skill's closing
   frontmatter fence, saw two failures, and concluded the fence was guarded. It was not: both failures
   came from `tests/kinglet/test_baseline_inventory.py`'s **sha256 tripwires**, which fire for any byte
@@ -257,7 +286,7 @@ State these in later dispatches rather than letting a brief guess.
 | 2 | `unity-execution` — inline branch, Deslop Pass, cut-criterion gate | **done** | `4fb4493..04e1d96` | 2 fix rounds. Spec ✅, 1 Critical + 2 Important + 3 Minor, all ADDRESSED. **The cut-criterion gate was answered "ship it" with a concrete defence** — see below |
 | 3 | `unity-planning` — plan-writing as a skill, carrying the fork | **done** | `dfa8684..5e81a49` | 2 fix rounds. Spec ❌→✅ (the `writing-plans` document header was missing), 4 Important + 7 Minor, all ADDRESSED. **The fork's write half did not exist** — see below |
 | 4 | `unity-brainstorming` — rename + the design half | **done** | `dd7f434..f648047` | 2 fix rounds. Spec ✅, 5 Important + 5 Minor, all ADDRESSED. **32 of ECU's 69 substantive lines survive**, measured, so D10's `origin=ecu` ruling holds. Reverse-sweep escapes 153/176 → **66/153, zero in any ECU or manifest-named section** |
-| 5 | Delete the two sequencer commands, repair 22 references | **pending** | — | `generate-claude-md.sh` ships names into user projects |
+| 5 | Delete the two sequencer commands, repair every reference | **done** | `308136e..b0adca5` | 2 fix rounds. Spec ✅, 3 Important + 5 Minor, all ADDRESSED. **28 files touched**, three dead names swept, and the pool is now **8 + 9 + 16 = 33**, matching D7's arithmetic exactly |
 | 6 | `using-kinglet` becomes a mandate | **pending** | — | |
 | 7 | Licence facts — NOTICE gains MIT text, stale claims go | **pending** | — | NOTICE ships into user projects |
 | 8 | Whole-wave verification | **pending** | — | |
@@ -346,6 +375,25 @@ it, and `run-tests.sh` separately flags a file that exits non-zero without repor
    by an `assert_eq` in `test-surface-references.sh`. That works, and the plan did not ask for a row,
    but `CLAUDE.md` designates `rule=absent` as *"what keeps a removed surface from silently
    returning"* — Task 8 should say yes or no deliberately.
+
+### Four from Task 5, deferred with rulings
+
+1. **Four narrowing routes past the dead-name guard remain** — excluding `.claude/commands/*` or
+   `.claude/agents/*`, narrowing `scripts/*` to `*.sh`, or replacing the docs glob with a file list.
+   Each measured with a plant getting through. Narrower and less likely than the skip-case route that
+   was fixed; the honest limit of floors-plus-sentinels is that **skipping a non-sentinel file still
+   passes**, since one file does not move a `>= 60` floor. Inherent to the mechanism, not residue.
+2. **The red-flag assertion is existence-only for `systematic-debugging` and
+   `verification-before-completion`.** Gutting either body or retitling either tail passes everything
+   — Task 4's exact-title assertion covers only `unity-brainstorming`. It is nonetheless **the only
+   coverage those two skills have.**
+3. **`using-kinglet:20` and `:21` overlap.** Row 20 preserves the pre-D2 vagueness gate that D2
+   explicitly replaced with an unconditional category trigger. **Task 6 owns this rewrite** — do not
+   let it survive as a second, softer trigger sitting above the real one.
+4. **Nothing re-derives the surface counts** in `docs/GETTING-STARTED.md`, `docs/SKILL-CATALOG.md` or
+   `CLAUDE.md`. Task 5 audited and corrected them (they are true today: 9 commands, 8 agents, 16
+   skills, 27 hooks), but the class stands. Extending `tests/test-derived-counts.sh` to surface counts
+   would close it **and** catch `CLAUDE.md`'s "32", which Task 8 Step 1 currently fixes by hand.
 
 ### Task 5 must do these — they are not optional cleanups
 
