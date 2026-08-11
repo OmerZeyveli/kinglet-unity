@@ -209,6 +209,7 @@ dead_payload=0
 dead_scripts=0
 dead_docs=0
 dead_readme=0
+dead_read=''
 while IFS= read -r dead_f; do
   [ -n "$dead_f" ] || continue
   case "$dead_f" in
@@ -224,6 +225,10 @@ while IFS= read -r dead_f; do
     docs/*)    dead_docs=$((dead_docs + 1)) ;;
   esac
   dead_body="$(cat "$REPO/$dead_f")"
+  # The set the sentinels are judged against: files whose bytes this loop actually read. Built
+  # here, after the skip `case` and after the `cat`, so it cannot describe a file that was
+  # skipped. See the sentinel block for what judging the raw ls-files output instead cost.
+  dead_read="${dead_read}${dead_f}"$'\n'
   while IFS= read -r dead_n; do
     [ -n "$dead_n" ] || continue
     # Here-strings, never pipes: `grep -q` exits on first match without draining stdin, and under
@@ -253,6 +258,18 @@ done <<< "$dead_scan"
 # Two mechanisms, because they fail differently. The floors catch a glob that empties; the
 # sentinels catch a glob that still returns files but no longer returns the RIGHT ones, which no
 # count can see. Each sentinel is a file that has actually carried a dead name.
+#
+# BOTH are judged against `$dead_read` — the paths the loop above actually read — and never against
+# `$dead_scan`, the raw `git ls-files` output. Round 1 grepped the raw output, and the difference is
+# not academic: a file `continue`d past by the skip `case` still appears in `ls-files`, so it kept
+# passing its own sentinel while nothing ever opened it. Measured on that version — add one entry to
+# the skip `case`, plant `/unity-workflow` in `.claude/skills/using-kinglet/SKILL.md`, and the guard
+# exits 0 with 93 files scanned and all five sentinels green. The sentinels were checking a set that
+# did not reflect the skipping they exist to police.
+#
+# That is also the likely edit rather than an exotic one. The comment above says "the skip is one
+# file and stays one file", which is a request; the next contributor who meets an awkward file will
+# reach for that `case` first, and a request is not a guard.
 dead_floor_bad=""
 [ "$dead_payload" -ge 60 ] || dead_floor_bad="${dead_floor_bad}.claude/* scanned $dead_payload files (expected >= 60)"$'\n'
 [ "$dead_scripts" -ge 8 ]  || dead_floor_bad="${dead_floor_bad}scripts/* scanned $dead_scripts files (expected >= 8)"$'\n'
@@ -268,10 +285,10 @@ fi
 
 while IFS= read -r dead_s; do
   [ -n "$dead_s" ] || continue
-  if grep -qxF -- "$dead_s" <<< "$dead_scan"; then
-    pass "the dead-name scan reaches its sentinel: $dead_s"
+  if grep -qxF -- "$dead_s" <<< "$dead_read"; then
+    pass "the dead-name scan read its sentinel: $dead_s"
   else
-    fail "the dead-name scan no longer reaches $dead_s — the glob covering it changed shape, and that file has carried a dead name before"
+    fail "the dead-name scan never read $dead_s — a glob changed shape or the skip list grew, and that file has carried a dead name before"
   fi
 done <<'DEAD_SENTINELS'
 .claude/skills/using-kinglet/SKILL.md
