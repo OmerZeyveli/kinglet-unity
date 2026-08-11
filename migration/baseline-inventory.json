@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "e04571ed8b4c85bf4510cdc62e18e2fb9c81be3d",
+  "source_commit": "4660d85169a8e81e47fbefc572c3763170cef123",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 77,
@@ -358,7 +358,7 @@
       },
       {
         "path": ".claude/skills/unity-execution/SKILL.md",
-        "sha256": "60f970f6168423754cf80675fb38b21108b7ebbf34d696ea2722998e5f646272",
+        "sha256": "29d090997983baca7093210a5d99ea85d34422db938c8a5ea7275d0e56a9bbc0",
         "git_mode": "100644"
       },
       {
@@ -368,7 +368,7 @@
       },
       {
         "path": ".claude/skills/unity-planning/SKILL.md",
-        "sha256": "c29910ea792bf15a78f5a001a6a48c59a42be56f1332ab069ff08c51fe77f308",
+        "sha256": "874d9ba11c7ab4503c7992fc56911846886588fee93d6cf3edf770b67b3244cc",
         "git_mode": "100644"
       },
       {
@@ -378,7 +378,7 @@
       },
       {
         "path": ".claude/skills/using-kinglet/SKILL.md",
-        "sha256": "bcdd1c27671b8fb560d8cae3254d3f9cff15eff3c5f5d223bb55c58e1c476392",
+        "sha256": "abfb8594df60e0013e4f3a34e1cef88ccf35866d29653a2814651a0b5ab571f6",
         "git_mode": "100644"
       },
       {
@@ -547,7 +547,7 @@
         },
         {
           "path": ".claude/skills/unity-execution/SKILL.md",
-          "sha256": "60f970f6168423754cf80675fb38b21108b7ebbf34d696ea2722998e5f646272",
+          "sha256": "29d090997983baca7093210a5d99ea85d34422db938c8a5ea7275d0e56a9bbc0",
           "git_mode": "100644"
         },
         {
@@ -557,7 +557,7 @@
         },
         {
           "path": ".claude/skills/unity-planning/SKILL.md",
-          "sha256": "c29910ea792bf15a78f5a001a6a48c59a42be56f1332ab069ff08c51fe77f308",
+          "sha256": "874d9ba11c7ab4503c7992fc56911846886588fee93d6cf3edf770b67b3244cc",
           "git_mode": "100644"
         },
         {
@@ -567,7 +567,7 @@
         },
         {
           "path": ".claude/skills/using-kinglet/SKILL.md",
-          "sha256": "bcdd1c27671b8fb560d8cae3254d3f9cff15eff3c5f5d223bb55c58e1c476392",
+          "sha256": "abfb8594df60e0013e4f3a34e1cef88ccf35866d29653a2814651a0b5ab571f6",
           "git_mode": "100644"
         },
         {
