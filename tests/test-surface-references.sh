@@ -11,11 +11,16 @@
 #   2. STRUCTURAL CLAIMS about a payload file — every agent has a Skills to load block naming
 #      `verification-before-completion`; the three skills `using-kinglet` advertises actually carry a
 #      red-flag section.
-#   3. FROZEN PROSE — roughly sixty lines of `unity-brainstorming`, `unity-execution` and
-#      `using-kinglet` are compared character for character, because `provenance.tsv` and
-#      `MERGE-NOTES.md` make claims about them and `check-provenance.sh` never reads a note. These
-#      assertions are meant to fail when the prose changes: that is the contract, not a nuisance.
-#      Changing the payload means changing the expected block in the same commit.
+#   3. FROZEN PROSE — named blocks of `unity-brainstorming` and `using-kinglet` are compared WHOLE
+#      with `assert_eq`, because `provenance.tsv` and `MERGE-NOTES.md` make claims about them and
+#      `check-provenance.sh` never reads a note. These assertions are meant to fail when the prose
+#      changes: that is the contract, not a nuisance. Changing the payload means changing the
+#      expected block in the same commit. `unity-execution` is guarded differently and more weakly —
+#      about twenty `assert_contains` needles fed from the heredoc lists further down, no whole-block
+#      comparison — so a rewrite of it that keeps those needles passes. Deliberately no line count
+#      here: the first version of this header carried one, it was wrong on the day it was written,
+#      and a count is the thing in this file most certain to rot (see the red-flag row's own numbers,
+#      which is the same lesson one level down).
 #   4. A HOOK IS EXECUTED — `.claude/hooks/session-brief.sh` is run and its output inspected, because
 #      what ships into a session is the hook's stdout and not the file on disk.
 #
@@ -756,6 +761,11 @@ assert_eq "$UK_FRONTMATTER_EXPECTED" "$(awk '
 # unnecessary, restored one heading lower than the table it was removed from, injected at every
 # session start, and green.
 #
+# It matches ATX headings only. Setext (`Heading` over `-----`) and raw HTML headings are covered
+# not by this assertion but by the tiling of the five whole-block comparisons, which between them
+# account for every non-blank line of the file — so relaxing ANY of those five to an `assert_contains`
+# silently reopens both. Ruled to the ledger 2026-08-11 as a note rather than a check.
+#
 # THE BUDGET IS FIVE SECTIONS AND THIS ASSERTION IS WHERE THAT TRADE IS MADE. A sixth requires
 # deleting one, here, in the same commit — and the arithmetic has to be argued rather than assumed,
 # because this file's whole failure mode is being long enough to substitute for what it points at.
@@ -821,8 +831,36 @@ assert_eq "before" "$UK_ORDER" \
 # see it either, so the count was the thing being evaded rather than the thing catching it. The
 # identical row unindented fails two assertions. `[[:space:]]*` rather than ` \{0,3\}` because a tab
 # indents too and an over-indented row is not a thing this guard should be lenient about.
+#
+# THE HEADER AND DELIMITER ARE ANCHORED BY POSITION, NOT EXCLUDED BY SHAPE. The first version of
+# this collector skipped them with `$0 !~ /^[[:space:]]*\|-/ && $2 !~ /^ *Situation *$/`, and both
+# exclusions were escape hatches a twelfth row could simply wear. Measured at 0 failures, rendering,
+# and shipped by the hook:
+#
+#     | Situation | `unity-brainstorming` asks, it does not guess — the file is only needed when you doubt it |
+#
+# It is a pipe line, so the contiguity check above sees a table row; it matches an exclusion, so the
+# count, the residue rule and the existence rule never see it at all. A row beginning `|-` wore the
+# other costume with the same result. Worse, inserting either at table position 1 or 2 DISPLACES the
+# real header or delimiter: line 2 stops being a delimiter row, the block stops being a table in GFM
+# altogether, and a `assert_contains` for `| Situation | Surface |` still finds its needle while the
+# count still reads eleven. That is the indent hole one layer down — the eleven-row count is again
+# the thing being evaded rather than the thing catching it.
+#
+# Pre-existing rather than introduced: replayed against 6542d99, also 0 failures.
+#
+# So: take the table lines in order, assert what lines 1 and 2 ARE, and treat every line after them
+# as a row with no exemption of any kind. A costume now makes a twelfth row instead of a hidden one,
+# and a displacement fails on the line it displaced.
 UK_CHAIN="$(uk_section '## The chain')"
-UK_ROWS="$(awk -F'|' '/^[[:space:]]*\|/ && $0 !~ /^[[:space:]]*\|-/ && $2 !~ /^ *Situation *$/' <<< "$UK_CHAIN")"
+UK_TABLE_LINES="$(awk '/^[[:space:]]*\|/ { print }' <<< "$UK_CHAIN")"
+
+assert_eq '| Situation | Surface |' "$(awk 'NR == 1' <<< "$UK_TABLE_LINES")" \
+  "the chain table's FIRST line is its header — not merely a line somewhere that looks like one"
+assert_eq '|---|---|' "$(awk 'NR == 2' <<< "$UK_TABLE_LINES")" \
+  "…and its SECOND is the delimiter, without which GFM renders no table at all"
+
+UK_ROWS="$(awk 'NR > 2' <<< "$UK_TABLE_LINES")"
 
 # Anti-vacuity: an emptied or renamed table makes every row check below pass on zero rows.
 assert_eq "11" "$(printf '%s\n' "$UK_ROWS" | grep -c '^[[:space:]]*|' || true)" \
@@ -1001,7 +1039,7 @@ UK_REDFLAGS_EXPECTED='| Thought | Reality |
 | "This request is already clear" | That judgment is made by a model that has just read six rule files and a generated block. It is exactly the one miss that was measured. |
 | "The table already tells me what to do" | The table names the file. It is not the file. Twice, the chain was executed without ever loading it. |
 | "I am resuming from a ledger, the decision is made" | A ledger records the **mode**. It does not record the design of a new task. |
-| "I remember this skill" | You have read this block at the start of every session and the skill perhaps once. Recall that confident is evidence of the block, not of the skill. |
+| "I remember this skill" | You have read this block at the start of every session, and the skill perhaps once. Confidence that strong is evidence of the block, not of the skill. |
 | "Let me look at the code first" | The surface is the thing that tells you how to look at it. |'
 assert_eq "$UK_REDFLAGS_EXPECTED" \
   "$(uk_section '## The thoughts that mean you are about to skip a surface' | ub_trim)" \
@@ -1092,10 +1130,8 @@ assert_eq "$UK_BODY_EXPECTED" "$UK_INJECTED" \
 assert_contains "$UK_INJECTED" 'Invoke the surface **before any response or action**' \
   "the ordering rule is in the text a fresh session actually reads"
 
-# The chain table's header and separator, which the row checks above cannot see: with either line
-# deleted the eleven rows are still eleven rows and every assertion stays green, while the Markdown
-# stops being a table. Found by the line-by-line sweep, not by the deletion proof.
-assert_contains "$UK_CHAIN" '| Situation | Surface |' \
-  "the chain table still has its header row"
-assert_contains "$UK_CHAIN" '|---|---|' \
-  "…and its separator, so the eleven rows are rows of something"
+# The chain table's header and delimiter were asserted here, by `assert_contains` against the whole
+# section. That form is deleted rather than moved: it answers "does a line like this exist anywhere",
+# which stays true when a twelfth row is inserted ABOVE the real header and the block stops being a
+# table. Both are now positional `assert_eq`s beside the row collector, where the answer is "is this
+# the first line of the table" — see the header-and-delimiter block above.
