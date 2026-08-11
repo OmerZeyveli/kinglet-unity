@@ -158,12 +158,11 @@ repeated per task.]
 ---
 ````
 
-The handoff line is fixed text, character for character, and
-`tests/test-workflow-plan-input.sh` compares the whole block against a literal — reword it and the
-suite goes red. That is deliberate: it is the quietest device in this chain and the most effective
-one, because the plan file names its own required next skill, so a session handed nothing but a path
-is routed correctly without consulting any table. A paraphrase still reads fine to a human and stops
-being a match for anything.
+The handoff line is fixed text, character for character — copy it exactly rather than rewording it.
+That is deliberate: it is the quietest device in this chain and the most effective one, because the
+plan file names its own required next skill, so a session handed nothing but a path is routed
+correctly without consulting any table. A paraphrase still reads fine to a human and stops being a
+match for anything.
 
 Commit the plan. An uncommitted artifact is lost at the next checkout, which is the failure this
 whole chain exists to repair. Commit **the plan path only** — never `git add -A`, because in a Unity

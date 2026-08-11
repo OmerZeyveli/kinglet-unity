@@ -16,7 +16,9 @@ detected from the project's own code, not assumed. Read it before asserting that
 
 Invoke the surface **before any response or action** — including clarifying questions, reading files,
 and exploring the code. Then announce `Using [skill] to [purpose]` and follow it. If it turns out
-wrong for the situation, you do not have to use it — but you have to have looked.
+wrong for the situation, route to the right surface — but you have to have looked, and "wrong
+surface" never means "no surface". A surface that states it has no opt-out is not made optional by
+this line.
 
 ## The chain
 
@@ -24,6 +26,7 @@ wrong for the situation, you do not have to use it — but you have to have look
 |---|---|
 | Kinglet was just installed and `CLAUDE.md` still has unfilled `FILL:` markers | `/unity-init` |
 | Anything to build in this project — a whole feature or one scoped addition | `unity-brainstorming`, then `unity-planning` |
+| A tweak — a named field or value in something that already works | `verification-before-completion` |
 | A written plan handed over to be executed | `unity-planning` first |
 | A written plan to execute, task by task, with review between | `subagent-driven-implementation` |
 | A plan small enough to execute inline, in this session | `unity-execution` |

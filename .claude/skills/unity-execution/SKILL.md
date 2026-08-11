@@ -33,8 +33,8 @@ that the author is also the reviewer.
 
 Do not create a worktree. Upstream's version of this step opens one; Unity is the reason it is
 dropped here. Worktrees do not share `Library/`, so every one triggers a full reimport, and
-`.meta` GUIDs diverge between trees — the refusal is recorded in `provenance-skip.tsv`. Work in
-the checkout you are in, on a branch that is not `main`.
+`.meta` GUIDs diverge between trees. Work in the checkout you are in, on a branch that is not
+`main`.
 
 ## 2. Execute
 

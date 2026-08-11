@@ -291,6 +291,27 @@ assert_file_exists "$UE_SKILL" \
 
 deslop="$(cat "$UE_SKILL" 2>/dev/null || true)"
 
+# The worktree refusal, and the artifact it used to cite.
+#
+# Until 2026-08-11 this paragraph ended "the refusal is recorded in `provenance-skip.tsv`". That
+# file does not ship: `install.sh` copies `scripts/` and deliberately not `tests/`, and the manifest
+# and its skip list were dropped from the payload on 2026-08-04. Verified against a fixture install
+# on 2026-08-11 — `.claude/` in an installed project contains agents, commands, hooks, rules,
+# scripts, skills, state and four files, and no `provenance*` anywhere in the tree. So the sentence
+# sent a model reading this skill inside a user's Unity project after a file it cannot open.
+#
+# What the citation was protecting is the REASON, and the reason is Unity's and travels: no shared
+# `Library/`, a full reimport per tree, diverging `.meta` GUIDs. That is asserted here. The
+# `assert_not_contains` is the other half — the reason reads perfectly well with the dead pointer
+# restored beside it, so a positive needle alone cannot keep it out.
+assert_contains "$deslop" \
+  'Worktrees do not share `Library/`, so every one triggers a full reimport, and' \
+  "unity-execution refuses the worktree with the Unity reason, not a pointer at a file"
+assert_not_contains "$deslop" "provenance-skip.tsv" \
+  "…and cites no provenance artifact, which does not ship into a user's Unity project"
+assert_not_contains "$deslop" "tests/" \
+  "…nor a path under tests/, which install.sh deliberately does not copy either"
+
 # Scope sentence first: it is what makes the pass bounded rather than "tidy up the codebase".
 assert_contains "$deslop" \
   "perform a targeted code-bloat review on all files created or modified during this workflow" \
@@ -808,9 +829,20 @@ assert_eq "$UK_SECTIONS_EXPECTED" "$(awk '/^#+ / { print }' "$UK_SKILL" 2>/dev/n
 # says the opposite ("...is usually unnecessary before any response or action"). The clause that does
 # the work is the last one: it concedes the surface may be wrong and still requires the look. That
 # concession is what a rewrite drops, and no single-line needle covers it.
+#
+# THE LAST TWO SENTENCES ARE THE 2026-08-11 RECONCILIATION AND THEY ARE NOT DECORATION. Until then
+# this section ended "you do not have to use it — but you have to have looked", and
+# `unity-brainstorming/SKILL.md:113` ended "There is no opt-out." Both ship, both are read at every
+# session start, and this one is the LAST text read before the other would load — so the generic
+# escape was available to exactly the reader D2 describes, granting the exemption the skill it
+# points at refuses. Reconciled in D2's direction, because D2 is the decision: the concession D9
+# needs is that a surface can be the wrong one, and the correction for that is to route, never to
+# proceed with none.
 UK_RULE_EXPECTED='Invoke the surface **before any response or action** — including clarifying questions, reading files,
 and exploring the code. Then announce `Using [skill] to [purpose]` and follow it. If it turns out
-wrong for the situation, you do not have to use it — but you have to have looked.'
+wrong for the situation, route to the right surface — but you have to have looked, and "wrong
+surface" never means "no surface". A surface that states it has no opt-out is not made optional by
+this line.'
 assert_eq "$UK_RULE_EXPECTED" "$(uk_section '## The rule' | ub_trim)" \
   "the ordering rule and the announce ritual are D9's text, character for character"
 
@@ -886,8 +918,24 @@ assert_eq '|---|---|' "$(awk 'NR == 2' <<< "$UK_TABLE_LINES")" \
 UK_ROWS="$(awk 'NR > 2' <<< "$UK_TABLE_LINES")"
 
 # Anti-vacuity: an emptied or renamed table makes every row check below pass on zero rows.
-assert_eq "11" "$(printf '%s\n' "$UK_ROWS" | grep -c '^[[:space:]]*|' || true)" \
-  "the chain table still has its eleven routing rows for this guard to read"
+assert_eq "12" "$(printf '%s\n' "$UK_ROWS" | grep -c '^[[:space:]]*|' || true)" \
+  "the chain table still has its twelve routing rows for this guard to read"
+
+# The tweak row, added 2026-08-11, and the count above is not what protects it — a count catches a
+# deletion and blesses a substitution, and the whole point of this row is WHICH surface it names.
+#
+# The hole it closes: the escape clause below says "a request to build, change, or fix something is
+# work, and work always selects a surface", and until this row existed "make the jump 20% higher" —
+# the commonest request a Unity developer makes — matched no row at all. The reader was left to
+# force it into `unity-brainstorming`, whose own `description:` ends "Not for a tweak to something
+# that already works", or to break the mandate it had just read. Both are worse than a stated route.
+#
+# Anchored to $UK_ROWS rather than to the file: the rows are what survive the positional header and
+# delimiter assertions above, so this cannot be satisfied by the same text written as prose, nor by
+# a line smuggled above the real header where the block stops being a table.
+assert_contains "$UK_ROWS" \
+  '| A tweak — a named field or value in something that already works | `verification-before-completion` |' \
+  "a tweak has a row, and it routes to verification rather than to the round that excludes it"
 
 # Nothing but the table may sit between the heading and the first row. `UK_TAIL` below rebuilds its
 # buffer at every table row, so anything written ABOVE the table is discarded before it is compared

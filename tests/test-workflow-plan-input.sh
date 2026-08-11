@@ -144,6 +144,26 @@ HANDOFF_ACTUAL="$(awk '/^\*\*For agentic workers:\*\*/{f=1} f{print} f && /imple
 assert_same "$HANDOFF_EXPECTED" "$HANDOFF_ACTUAL" \
     "the plan template's handoff is the fixed text, character for character"
 
+# ...and the skill has to TELL the planner that, or the whole-block comparison above is a trap the
+# author walks into. Until 2026-08-11 it told them by citing this file: "`tests/test-workflow-plan-
+# input.sh` compares the whole block against a literal — reword it and the suite goes red." That is
+# true of THIS repository and false where the skill is read. `install.sh` ships `scripts/` and
+# deliberately not `tests/`; verified against a fixture install on 2026-08-11, an installed
+# `.claude/` holds agents, commands, hooks, rules, scripts, skills, state and four files, and no
+# `tests` directory anywhere in the project. A model reading the old sentence in a user's Unity
+# project either hunts for a file that is not there or concludes the stated enforcement is absent
+# and rewords freely — and it is the truth of the claim that makes the second reading dangerous.
+#
+# So the instruction is kept and the citation is dropped: fixed text, copy it, do not reword. The
+# two `assert_lacks` are what keep the pointer from coming back, because the instruction reads
+# perfectly well with it restored.
+assert_has "$BODY" "fixed text, character for character — copy it exactly rather than rewording it" \
+    "the skill tells the planner the handoff is copied, not paraphrased"
+assert_lacks "$BODY" "tests/" \
+    "…without citing a tests/ path, which install.sh does not ship into a user's project"
+assert_lacks "$BODY" "provenance" \
+    "…nor a provenance artifact, which does not ship either"
+
 # Both branches named by path, symmetrically. The inline branch was asserted by path from
 # the start and the subagent branch only by bare name, so the whole fork block could lose
 # its path reference to one of the two and stay green.
