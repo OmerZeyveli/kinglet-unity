@@ -11,7 +11,9 @@ Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md
 
 ## RESUME HERE
 
-**Tasks 1, 1b and 1c are done and closed.** **Task 1d is next.**
+**Tasks 1, 1b and 1c are done and closed. Task 1d's work has LANDED BUT WAS NEVER REVIEWED** — its
+implementer was stopped by the operator while writing its report, after committing. **Task 1d's
+review is the next action**, then Task 2.
 
 The wave keeps growing because each task's review finds the next instance of one root cause. The
 spec now carries **nine decisions**, and the tally is: the origin column is written in four places
@@ -20,7 +22,7 @@ and, before this wave, read in none. Task 1 fixed the project-root rows, Task 1b
 run prints `keeping yours:` naming a file it overwrites in the same output** — and Task 1d fixes
 `studio-doctor.sh`, the last reader, which also carries two `printf | head` SIGPIPE traps.
 
-Suite: **628/628**, 32 test files, `provenance OK`.
+Suite: **641/641**, 32 test files, `provenance OK`, baseline zero drift, tree clean at `6a2793e`.
 
 Nine defects now, one shape: the installer makes a claim it does not keep. The receipt is rebuilt every
 run and two project-root files write their rows inside a *create* branch, so a second install
@@ -115,7 +117,7 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 1 | The receipt records ownership, not this run's writes | **done** | `e6116d0..6684165` | 1 fix round. Spec ✅, Quality Approved, 5 Minor. Added state B2 after proving the upgrade path was dead code; found the `uninstall.sh` data loss |
 | 1b | `uninstall.sh` reads the origin column | **done** | `5650580..493db8a` | 1 fix round. Spec ✅, Approved, 4 Minor. Fails closed via `case`; guarded by a receipt row `install.sh` cannot produce |
 | 1c | The scripts loop respects a user edit | **done** | `a192776..2f2b820` | 1 fix round. Spec ✅, Approved. State H now edits **two** scripts — one file cannot tell "keeps edits" from "keeps THIS file" from "keeps ONE file" |
-| 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | open (brief pending) | — | **Inserted.** Last reader; plus two documented SIGPIPE traps; spec D9 |
+| 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | **landed, UNREVIEWED** | `cfc35b9..6a2793e` | Implementer stopped mid-report by the operator, after committing. **No task review ran, and no implementer report exists.** Controller verified only: suite 641/641, `provenance OK`, zero baseline drift, the `case` grammar matches `uninstall.sh`'s, and the three surviving `head -` matches are all in comments describing what was replaced. The commit says it fixed **four** pipes, not the two the brief named — unverified |
 | 2 | A kept backup is a file the installer owns | open (brief pending) | — | Extends Task 1's test |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
 | 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |
@@ -180,6 +182,37 @@ else. The guard read as absent rather than red.
 Same family as the previous wave's finding that the runner is blind to python results in both
 directions. **A test file needs a completion sentinel** — the runner has no way today to tell a
 deliberate `exit 1` from a death, and that is the discriminator it lacks.
+
+## Task 1d — what is known, and what is not
+
+**Stopped by the operator, not by a failure.** The commit `6a2793e` exists and the tree is clean;
+the implementer was writing its report when it was killed, so `.superpowers/sdd/…/task-1d-report.md`
+does not exist and **nothing has reviewed this work.**
+
+Verified by the controller directly:
+
+- suite **641/641**, discovery 32 = 32, runner exit 0;
+- `provenance OK`; baseline `0 change(s)` at `6a2793e`;
+- `scripts/studio-doctor.sh` now reads the origin column with a `case`, matching `uninstall.sh`'s
+  grammar, and its comments name the trailing-space / CRLF / fifth-column shapes Task 1b's fix
+  covers;
+- the three remaining `head -` matches in that file are **all inside comments** describing what was
+  replaced — no live pipe survives.
+
+**Not verified, and a reviewer must:**
+
+- the commit claims **four** pipes fixed; the brief named two, so two were found beyond it and their
+  replacements are unexamined;
+- whether the origin `case`'s safe analogue for a *health check* is the right one — the plan left
+  that judgement to the implementer and required it to justify the choice, and that justification
+  was in the report that was never written;
+- whether `tests/test-studio-doctor.sh` (runner-provided) actually asserts anything new, or whether
+  the +13 assertions came from elsewhere;
+- the SIGPIPE reproduction, which the brief explicitly said might not fire and should be reported
+  honestly either way.
+
+**Do not treat the green suite as a review.** This wave has had a guard read as absent rather than
+red, a mutation pass 114 assertions, and a test file die mid-state — all with the suite green.
 
 ## Deferred and parked findings
 
