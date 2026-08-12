@@ -11,10 +11,10 @@ Spec: `docs/superpowers/specs/2026-08-11-shipped-citations-resolve-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1–4 are done and closed.** The guard exists, both rules pass, all sixteen citation sites are
-fixed, the installer's dry-run describes the program it actually runs, and the fork's two branches
-agree on their threshold. **Task 5 is next** — `GETTING-STARTED.md:162` and the process-chain
-ledger's stale `RESUME HERE`. Nothing is dispatched.
+**Tasks 1–5 are done and closed.** The guard exists, both rules pass, all sixteen citation sites are
+fixed, the installer's dry-run describes the program it actually runs, the fork's two branches agree
+on their threshold, and the getting-started page no longer clones a different repository. **Task 6 is
+next** — whole-wave verification, with its brief amended below. Nothing is dispatched.
 
 The wave makes every citation a shipped surface makes resolve in an installed Unity project. Eight
 `§N` markers abbreviate a citation to `docs/research/pioneer/field-notes.md`, which is tracked and
@@ -137,7 +137,7 @@ before a trailing `printf` as the plan's Step 1 implies. Reported by Task 1's im
 | 2 | Guard rule 2 (repo-only paths) + the eight path sites | **done** | `909d85b..803b3d6` | 2 fix rounds. Spec ✅, 4 Important + 8 Minor, all Important ADDRESSED. **The header comment written to state true things stated two false ones, falsified by its own commit** — see below. Round 2's verification was the controller's, by stated deviation |
 | 3 | The installer's dry-run states what the real run does | **done** | `037304b..240ee6f` | 2 fix rounds. Spec ✅, 2 Important + 3 Minor. **Scope widened once by controller ruling** (`MCP-SETUP.md`), then held. The reviewer built seven fixture states; the implementer had built three |
 | 4 | The fork states its threshold once | **done** | `c78c70e..42ae003` | 1 fix round. Spec ✅, 2 Important + 4 Minor. **A third statement of the threshold existed that neither plan nor spec anticipated**, and the guard's flattening read one wrap shape of six — see below |
-| 5 | The two documents that contradict themselves | open (brief pending) | — | `GETTING-STARTED.md:162`, the process-chain ledger's `RESUME HERE` |
+| 5 | The two documents that contradict themselves | **done** | `4f9f3a8..c926969` | 1 fix round. Spec ✅, 1 Important + 6 Minor. **The implementer refused the plan's supplied wording and was right**; scope widened once more by controller ruling — see below |
 | 6 | Whole-wave verification | open (brief pending) | — | Cites Task 2's mutation results rather than re-running them |
 
 ## What Task 1 found that the controller had wrong
@@ -472,6 +472,95 @@ Both were confirmed by the review before the controller acted on them.
    one'` over the two skills prints **three** lines, and the middle one ends at a bare `more than
    one` because of the `:10-11` wrap. Replaced with a flattened form; verified to print two unique
    results, both `more than one substantial`.
+
+## What Task 5 found — including in the plan's own supplied wording
+
+**The implementer refused the wording the plan handed it, and it was right on three counts.** The
+plan's replacement for `GETTING-STARTED.md:162` called `/unity-review` and `/unity-prototype` "the
+two entry points that stand outside that chain". Measured against the payload:
+
+- `using-kinglet:35` places `/unity-review` **inside** the chain, at the verify end;
+- `unity-brainstorming:41` says **"One real exemption"**, not two;
+- `:21-22` explicitly refuses to keep an exemption list — *"a list of exemptions is a list of ways to
+  talk yourself out of the round"*.
+
+So the plan manufactured a second exemption in a sentence describing the document that refuses to
+keep a list of them. The review confirmed the deviation independently and checked every claim the
+shipped sentence makes — including that `/unity-review` "reads and reports, and changes nothing",
+which holds: `unity-reviewer.md:6` is `tools: Skill, Read, Glob, Grep`, and `unity-review.md:74` says
+*"offer to fix them. Do not fix them unasked."*
+
+### The rewritten RESUME HERE declared closed work open — and the §N irony
+
+The first attempt at the previous wave's `RESUME HERE` said *"The Deferred and parked findings
+sections below are a backlog, not history. Every item there was ruled on rather than closed."* At
+least two subsections were closed, and **the same block cited one of them as discharged seventeen
+lines above**.
+
+**The implementer then corrected the controller's fix instruction in both directions**, which is the
+part worth keeping. The review said thirteen subsections; it is twelve. The review suggested scoping
+the sentence to the *"deferred with rulings"* lists; that would still have been wrong, because **four
+items inside those lists are also closed** — Task 2 #5, Task 2 #6, Task 4 #5 and Task 5 #3 all shipped
+— while Task 2 #1 is genuinely open. The lists are *mixed*, not uniformly stale, so the replacement
+leads with the instruction rather than a classification: **check an item against the tree before
+acting on it.**
+
+**And the block introduced a `§N` citation** — in the wave that removes them — that landed off-target:
+*"`NOTICE.md` §3's closing paragraph"*, where §3 runs from `:117` to end of file through two more
+subheadings and the pin paragraph closes a *subsection*. Now cites `.claude/NOTICE.md:149`. This is
+the sixth time in the wave that a document failed to apply its own subject to itself.
+
+### Scope widened a second time, by controller ruling
+
+`docs/GETTING-STARTED.md` told a new user to `git clone …/everything-claude-unity.git` at three
+places, and `:12` promised *"Unity 2021.3 LTS+ / Any render pipeline"* for a Unity-6, URP-first,
+PC/console toolkit. Widened with the reason stated: **D8's principle in a document rather than an
+installer — a file does not get to describe a different program.** Fixed against `README.md:107` and
+`install.sh:111-115`, which really does detect all three pipelines, so `:12` now says so rather than
+overclaiming in either direction.
+
+## Deferred from Task 5
+
+1. **`docs/GETTING-STARTED.md:34-45`, "Option B: Manual Copy", describes an install `uninstall.sh`
+   refuses to touch.** Verified: `uninstall.sh` hard-fails without the receipt only `install.sh`
+   writes. A `cp -r` install also skips `CLAUDE.md` generation, which `/unity-init` and
+   `architecture.md`'s "detected, not assumed" block both depend on. **Same class as the wrong clone
+   URL and larger than it** — reported and stopped, per the brief's one-widening limit.
+2. **`GETTING-STARTED.md:162` silently takes a position on parked decision P3** — which surface owns
+   "a scene to build". The position is the one the payload supports (`unity-brainstorming`'s
+   `description:` names a scene; `unity-scene.md:54` offers `unity-brainstorming` as *"where work on
+   the real project starts"*), so it is not wrong — but the table row at `:159` reads as a
+   counter-example. **For the P1/P3 round**, so Task 6 does not rediscover it as a fresh
+   contradiction.
+3. **Five derived counts at `docs/GETTING-STARTED.md:69-74`** — 8 agents, 9 commands, 16 skills, 27
+   hooks, 6 rules. All true today; none guarded. `test-derived-counts.sh` reads only `README.md`,
+   `CREDITS.md`, `docs/ARCHITECTURE.md` and `docs/SKILL-CATALOG.md`.
+4. **`docs/HOOK-REFERENCE.md:9` says 25 hooks; the tree has 27**, and `GETTING-STARTED:71` says 27.
+   Two shipped-adjacent documents disagreeing, one of them wrong, guarded by nothing.
+
+## Task 6's brief, as amended — with measurements, not estimates
+
+The plan's Task 6 stands, with these changes. The first two were measured by the controller before
+dispatch, precisely so the implementer does not have to guess at an expected result.
+
+1. **Step 2's first sweep is unsatisfiable as written.** `grep -rn 'sourced-incidents' .
+   --exclude-dir=.git || echo "clean"` returns **15 hits** today, every one of them in this wave's own
+   spec, plan and ledger. It can never print `clean`. Scope it to what ships: `.claude/` and nothing
+   else.
+2. **Step 2's real question — do shipped *non-Markdown* surfaces cite repo-only paths? — has a
+   measured answer: exactly three, all in `.claude/UPSTREAM`** (`MERGE-NOTES.md`,
+   `provenance-skip.tsv`, `provenance.tsv`). Both guard rules scan `find .claude -name '*.md'`, so
+   `UPSTREAM` is outside them by construction; the spec records this under *Out of scope*.
+
+   **The sweep must not require a `/` in the token.** The controller's first attempt filtered on
+   `*/*` and returned **zero**, which reads as clean — `provenance.tsv` has no slash in it. That is
+   the wave's own subject applied to the controller mid-measurement, and it is why the expected
+   number is written down here rather than left to the implementer's probe to discover.
+3. **Criterion 7's command is already fixed in the plan.** The line-oriented `grep -h 'more than one'`
+   printed three lines with the middle one ending bare, because `unity-execution:10-11` wraps
+   mid-phrase. The flattened replacement prints two unique results, both `more than one substantial`.
+4. **Task 2's mutation results are cited, not re-run.** They are recorded above, re-verified twice,
+   and reproduced by two reviewers with differently-shaped probes.
 
 ## Controller deviations, stated so their absence is not read as an omission
 
