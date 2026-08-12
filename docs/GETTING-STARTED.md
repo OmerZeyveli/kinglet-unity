@@ -159,7 +159,7 @@ See [MCP-SETUP.md](MCP-SETUP.md) for detailed setup and troubleshooting.
 | `/unity-scene "description"` | Builds a scene from a natural language description |
 | `/unity-test` | Writes and runs EditMode/PlayMode tests |
 
-Start with `/unity-init`, then `/unity-doctor` to get a baseline. From there, try `/unity-review` on existing code or `/unity-prototype` to see the full pipeline in action.
+Start with `/unity-init`, then `/unity-doctor` to get a baseline. On a project that already has code, `/unity-review` is the safe next thing to run — it reads and reports, and changes nothing. Anything you want to *build*, though, does not start with a command at all: it starts at `unity-brainstorming`, which hands to `unity-planning`, where how the work gets executed is decided. The one build that stands outside that chain is a throwaway scene made to try a mechanic — `/unity-prototype` — and that is a choice made before the work starts, never from part-way in.
 
 ---
 

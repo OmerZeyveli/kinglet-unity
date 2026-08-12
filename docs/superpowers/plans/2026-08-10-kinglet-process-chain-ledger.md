@@ -11,23 +11,52 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1–7 are done and closed. Only verification remains.**
+**This wave is closed and nothing from this plan is dispatched.** All eight tasks are done, the
+whole-branch review and its fixes are done (`e04571e..0d6cb06`), and the owner-selected product fixes
+P2/P4/P8 are done (`4660d85`, with its baseline in `66b53dc`). The wave's last commit is `a29d830`.
+The task table below carries every range.
 
-`unity-brainstorming` → `unity-planning` → the fork → `subagent-driven-implementation` or
-`unity-execution`. Pool is **8 agents + 9 commands + 16 skills = 33**, exactly D7's arithmetic. The
-external obligation is discharged: Superpowers' MIT text is reproduced byte-identically in both
-credit documents, three adapted surfaces are named and guarded in both directions, and the
-unverifiable pin says so of itself. Nothing is dispatched.
+**What it built:** `unity-brainstorming` → `unity-planning` → the fork →
+`subagent-driven-implementation` or `unity-execution`. The pool ended matching D7's arithmetic
+exactly — but the wave changed its *composition* without changing its total, which is how four quoted
+counts went wrong at once while every guard watching a total stayed green. **Derive it, never quote
+it:** `ls .claude/agents/*.md | wc -l`, and the same for `.claude/commands/*.md` and
+`.claude/skills/*/`. `tests/test-derived-counts.sh` now runs that derivation against `README.md`,
+`docs/ARCHITECTURE.md` and `docs/SKILL-CATALOG.md`. The external obligation is discharged:
+Superpowers' MIT text is reproduced byte-identically in both credit documents, three adapted surfaces
+are named and guarded in both directions, and the unverifiable pin says so of itself
+(`.claude/NOTICE.md` §3's closing paragraph; `.claude/UPSTREAM`'s `superpowers_pin_verified=no`).
 
-**Task 8 is next** — whole-wave verification, and it owns four deferred decisions as well as its own
-steps: `CLAUDE.md`'s "pool is 32" (wrong since Task 2), its header-count instruction (which returns
-the catastrophe signal on a healthy suite), whether the old `deep-interview` path takes a
-`provenance-skip.tsv` row, and whether the forward-reference check becomes a permanent guard.
+**What is still open — this is why the section exists.**
 
-Suite is at **468 passing**, `provenance OK`, 541 manifest rows, 96 `rule=absent` enforced.
-Reports under `.superpowers/sdd/2026-08-10-process-chain/`: `task-1-report.md` (rounds 0–3),
-`task-1-round4-report.md`, `task-2-report.md`, `task-3-report.md`, `task-4-report.md`,
-`task-5-report.md`.
+- **The branch is not merged.** `pioneer/process-chain` is still ahead of `main`; check it rather
+  than trust this line — `git merge-base --is-ancestor a29d830 main` answers no. Whether the wave
+  merges is a decision nobody has made.
+- **Two owner design calls are parked**, deferred to a round of their own and recorded as out of
+  scope in `docs/superpowers/specs/2026-08-11-shipped-citations-resolve-design.md`:
+  - **P1 — the Ambiguity Score's calibration.** `unity-brainstorming`'s score has never been
+    calibrated against the difference between a project that *has* a generated `CLAUDE.md` block and
+    one that does not, though the skill leans on that block in three places.
+  - **P3 — routing precedence.** `using-kinglet`'s chain table routes *"anything to build"* to
+    `unity-brainstorming` and *"a UI screen, or a scene to build"* to `/unity-ui` / `/unity-scene`.
+    A UI screen is both. Nothing states which row wins, and `unity-brainstorming`'s boundary section
+    names exactly one exemption and it is not these.
+- **The *Deferred and parked findings* sections below are a backlog, not history.** Every item there
+  was ruled on rather than closed. Two are still recorded as out of scope by the wave *after* this
+  one: the unguarded closing `---` frontmatter fence across every skill, and the surface criterion
+  applied to hooks and `scripts/`.
+
+**A successor wave runs on the same branch and keeps its own ledger** —
+`docs/superpowers/plans/2026-08-11-shipped-citations-resolve-ledger.md`, against plan
+`docs/superpowers/plans/2026-08-11-shipped-citations-resolve.md`. **That file, not this one, holds
+the live dispatch state and the current suite figures.** This ledger records a wave that ended at
+`a29d830`; deliberately no suite total is written here, because a number frozen at a closed wave and
+a number meaning *now* are indistinguishable once the surrounding prose is skimmed.
+
+Reports for this wave are under `.superpowers/sdd/2026-08-10-process-chain/` — one per task, plus
+`task-1-round4-report.md`, `whole-branch-fix-report.md` and `product-fix-report.md`. That directory
+is **gitignored** (`.gitignore:14`), so it exists only in the working tree that ran the wave and no
+clone will have it.
 
 **The cut-criterion gate on `unity-execution` was answered "ship it"**, and the argument is on the
 record: the Deslop Pass's two restraining rules — a scope boundary and a default — are what an
@@ -36,9 +65,11 @@ unaided cleanup lacks, and folding into `subagent-driven-implementation` would f
 corrected the reasoning: the load-bearing content is **ECU's, transplanted**, not Kinglet's. The
 surface still earns its place — the criterion asks what a surface *does*, not who wrote the words.
 
-Read, before dispatching Task 2, in this order: *Standing facts*, *Interfaces produced so far*, and
-*Ask the shape question early* — the last is why Task 1 cost four rounds and is the cheapest thing
-here to reuse.
+Read, before dispatching anything on this branch, in this order: *Standing facts*, *Interfaces
+produced so far*, and *Ask the shape question early* — the last is why Task 1 cost four rounds and is
+the cheapest thing here to reuse. (It read "before dispatching Task 2" until 2026-08-12, which was a
+stale instruction sitting inside the block being corrected for staleness; the list itself is
+unchanged and still worth reading.)
 
 ## Controller decisions, made at setup
 
