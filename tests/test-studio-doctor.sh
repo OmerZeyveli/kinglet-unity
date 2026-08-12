@@ -139,6 +139,13 @@ rm -rf "$TSD_DISABLED" "$TSD_DISABLED_SETTINGS"
 # reasons: `user-modified` (the real case) and an origin that is neither legal value — the catch-all
 # uninstall.sh's classifier grew on 2026-08-12 for the same reason. A row whose provenance cannot be
 # read is not ours to delete there, and not ours to certify here.
+#
+# The two branches also report SEPARATELY, and that is asserted below rather than assumed. They were
+# one bucket until 2026-08-13, printed under `install.sh will keep your versions` — a sentence
+# measured false for the unreadable-origin row on that date: with its bytes still matching the
+# recorded sha, install.sh printed no `keeping yours` line, overwrote the file, and rewrote the row as
+# a clean `toolkit`. install.sh's upgrade scan classifies with an `if/else` on `user-modified`, not
+# with a `case`, so an origin it cannot read falls to the sha test and the bytes decide.
 echo ""
 echo "--- Test: the receipt's origin column is read ---"
 TSD_ORIGIN="/tmp/kinglet-doctor-origin-$$"
@@ -170,14 +177,41 @@ mv "${TSD_ORIGIN_RECEIPT}.probe" "$TSD_ORIGIN_RECEIPT"
 
 TSD_ORIGIN_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_ORIGIN" 2>&1)
 TSD_ORIGIN_RC=$?
-assert_contains "$TSD_ORIGIN_OUT" "2 file(s) modified since install" \
-    "doctor counts both the user-modified row and the unreadable-origin row as modified"
+# The counts are anchored on the `WARN ` prefix the doctor prints. Unanchored, `grep -F` substring
+# matching accepts `11`, `21`, … `81 file(s) modified since install` as a match for `1 file(s) …`,
+# so the assertion would survive the very miscount it exists to detect.
+assert_contains "$TSD_ORIGIN_OUT" "WARN 1 file(s) modified since install" \
+    "doctor counts the user-modified row as modified, and only it"
 assert_contains "$TSD_ORIGIN_OUT" ".claude/rules/pc-console.md" \
     "doctor NAMES the edited file rather than folding it into the verified count"
+assert_contains "$TSD_ORIGIN_OUT" "WARN 1 file(s) have a receipt origin this check does not recognise" \
+    "the unreadable-origin row is reported on its OWN line, not merged into the modified count"
 assert_contains "$TSD_ORIGIN_OUT" ".claude/rules/performance.md" \
-    "doctor fails closed on an origin it cannot read, as uninstall.sh keeps such a file"
-assert_not_contains "$TSD_ORIGIN_OUT" "Install intact: 87 file(s)" \
-    "the two unverifiable rows are subtracted from the verified count, not counted twice"
+    "doctor names the origin it cannot read rather than certifying it, as uninstall.sh keeps such a file"
+# WHICH list a path lands in is the whole point, and a substring test over the full output cannot see
+# it — both paths are present either way. So extract the indented block that follows the
+# `keep your versions` header (print_first_5 indents by seven spaces) and test membership there.
+# The two assertions are a pair on purpose: if the extraction ever yields nothing, the assert_contains
+# goes red, so the assert_not_contains cannot quietly pass on an empty haystack.
+TSD_ORIGIN_KEPT=$(awk '
+    /file\(s\) modified since install/ { in_block = 1; next }
+    in_block && /^       / { print; next }
+    in_block { in_block = 0 }' <<< "$TSD_ORIGIN_OUT")
+assert_contains "$TSD_ORIGIN_KEPT" ".claude/rules/pc-console.md" \
+    "…listed under the header promising install.sh keeps it, which for a user-modified row is true"
+assert_not_contains "$TSD_ORIGIN_KEPT" ".claude/rules/performance.md" \
+    "…and the unreadable-origin row is NOT under that header: measured 2026-08-13, install.sh overwrote such a file whose bytes still matched its recorded sha"
+# Derived, not hardcoded. This read `Install intact: 87 file(s)` until 2026-08-13; 87 is this
+# payload's receipt row count today, so the assertion would have gone permanently vacuous — with no
+# signal — the day the payload gained or lost a file. The expression mirrors the doctor's own skip
+# list (`case "$rel" in ''|\#*|path`). Note `grep -vc '^#' "$RECEIPT"` does NOT work here: measured
+# 2026-08-13 it returns 88 against the doctor's 87, because it keeps the `path` header row.
+TSD_ORIGIN_ROWS=$(awk -F'\t' '!/^#/ && NF && $1 != "path" { rows++ } END { print rows + 0 }' \
+    "$TSD_ORIGIN_RECEIPT")
+assert_contains "$TSD_ORIGIN_OUT" "Install intact: $((TSD_ORIGIN_ROWS - 2)) file(s) verified against the receipt" \
+    "the verified count is every receipt row less the two unverifiable ones"
+assert_not_contains "$TSD_ORIGIN_OUT" "Install intact: $TSD_ORIGIN_ROWS file(s)" \
+    "…and specifically not the full row count, which is what a classifier that certifies them prints"
 # The message deliberately avoids a bare `FAIL` token. The runner tallies results by grepping its
 # subshell's output for `(^|[[:space:]])(PASS|FAIL|SKIP)(:|[[:space:]])`, so an assertion MESSAGE
 # containing one is counted as a result in its own right: the first draft of this line read

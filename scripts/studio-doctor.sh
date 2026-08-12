@@ -256,20 +256,41 @@ else
   # and nobody touched it" from an edit made AFTER the last install, which is the only kind a
   # `toolkit` row can express.
   #
-  # AN ORIGIN WE CANNOT READ IS REPORTED, NOT COUNTED VERIFIED. `case` with an explicit catch-all
-  # rather than an if/elif that lets anything unrecognised fall through to the sha test: a row with a
-  # trailing space, a CRLF ending or a fifth column is no longer byte-equal to `user-modified`, and
-  # under a fall-through it would be silently certified. uninstall.sh keeps such a file rather than
-  # deleting it; the health-check analogue of keeping is naming — install.sh and uninstall.sh will
-  # both leave that file alone, so folding it into a PASS count would have doctor contradict what the
-  # other two readers are actually going to do. A file whose provenance cannot be read is not ours to
-  # certify.
+  # AN ORIGIN WE CANNOT READ IS REPORTED, NOT COUNTED VERIFIED — AND REPORTED ON ITS OWN LINE. `case`
+  # with an explicit catch-all rather than an if/elif that lets anything unrecognised fall through to
+  # the sha test: a row with a trailing space, a CRLF ending or a fifth column is no longer byte-equal
+  # to `user-modified`, and under a fall-through it would be silently certified. A file whose
+  # provenance cannot be read is not ours to certify.
+  #
+  # It is not ours to summarise, either, and this comment claimed otherwise until 2026-08-13: it said
+  # install.sh and uninstall.sh would "both leave that file alone", and the third bucket was printed
+  # under `modified since install — install.sh will keep your versions`. Half of that is false. The
+  # two readers do NOT agree about an unreadable-origin row, because only one of them classifies with
+  # a `case`. Measured 2026-08-13 on a fixture whose origin column was mangled to `toolkit ` (trailing
+  # space), the toolkit's own copy of the file bumped so an overwrite would be visible:
+  #
+  #   uninstall.sh — a `case` whose `*)` branch keeps. Kept the file, printed `keep 1 file(s) you
+  #                  modified`. True whatever the bytes say.
+  #   install.sh   — NOT a `case`. `grep -n 'if \[ "$origin" = user-modified \]' install.sh` finds an
+  #                  if/else, so an unreadable origin falls straight to the sha test and the BYTES
+  #                  decide, not the column:
+  #                    bytes still match the recorded sha → the row never enters MODIFIED_FILES, no
+  #                      `keeping yours` line is printed, the payload loop OVERWRITES the file, and the
+  #                      row is rewritten as a clean `toolkit`;
+  #                    bytes drifted → the sha test catches it and the file is kept.
+  #
+  # So `install.sh will keep your versions` is true of `user-modified` rows and of `toolkit` rows whose
+  # bytes drifted, and false for exactly the sub-case above — the one a mangled column most likely
+  # produces, since mangling the column does not touch the file. These rows therefore get their own
+  # line, which also keeps them out of a MODIFIED count that would then be describing two different
+  # futures. Fixing install.sh's asymmetry is a separate change; this file describes install.sh as it
+  # is.
   #
   # The sha comparison stays fail-closed the same way uninstall.sh's `sha_of` is: an unreadable file
   # yields the empty string, which never equals a recorded checksum, so the row lands in MODIFIED and
   # is reported rather than silently passed.
-  VERIFIED=0; MODIFIED=0; MISSING=0
-  MODIFIED_LIST=""; MISSING_LIST=""
+  VERIFIED=0; MODIFIED=0; MISSING=0; UNREADABLE=0
+  MODIFIED_LIST=""; MISSING_LIST=""; UNREADABLE_LIST=""
   while IFS=$'\t' read -r rel recorded _mode origin; do
     case "$rel" in ''|\#*|path) continue ;; esac
     abs="$PROJECT_DIR/$rel"
@@ -289,7 +310,7 @@ else
         fi
         ;;
       *)
-        MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+        UNREADABLE=$((UNREADABLE + 1)); UNREADABLE_LIST="${UNREADABLE_LIST}${rel}"$'\n'
         ;;
     esac
   done < <(grep -v '^#' "$RECEIPT")
@@ -303,8 +324,22 @@ else
   if [ "$MODIFIED" -gt 0 ]; then
     # Not a failure. Editing the toolkit in place is legitimate; you just want to know you did,
     # because re-install will keep these and upstream fixes will not reach them.
+    #
+    # The sentence is true of both branches that feed this list, and of neither more than the other:
+    # a `user-modified` row is kept by install.sh's first test, a `toolkit` row whose bytes drifted is
+    # kept by its second. The third bucket used to be here too and is not kept — see the classifier's
+    # comment above.
     warn "$MODIFIED file(s) modified since install — install.sh will keep your versions:"
     print_first_5 "$MODIFIED_LIST"
+  fi
+  if [ "$UNREADABLE" -gt 0 ]; then
+    # Also not a failure, and deliberately not a claim about what happens next: the two readers
+    # disagree about these rows and install.sh decides on the bytes rather than the column, so the
+    # only honest thing to print is what this check did and did not do with them.
+    warn "$UNREADABLE file(s) have a receipt origin this check does not recognise — reported, not verified:"
+    print_first_5 "$UNREADABLE_LIST"
+    warn "     Neither toolkit nor user-modified in the receipt's fourth column. uninstall.sh keeps"
+    warn "     such a file; what install.sh does with one depends on its bytes, not on that column."
   fi
 fi
 
