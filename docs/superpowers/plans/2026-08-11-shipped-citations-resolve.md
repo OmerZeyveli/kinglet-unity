@@ -806,12 +806,16 @@ rm -rf /tmp/citefix-v && bash tests/fixtures/mkproject.sh /tmp/citefix-v
 bash install.sh --project-dir /tmp/citefix-v --dry-run 2>&1 | grep -A4 'Would install:'
 bash install.sh --project-dir /tmp/citefix-v >/dev/null 2>&1 && ls /tmp/citefix-v/.claude/
 
-# 7. one threshold, stated identically
-grep -h 'more than one' .claude/skills/unity-execution/SKILL.md \
-                        .claude/skills/subagent-driven-implementation/SKILL.md
+# 7. one threshold, stated identically — flattened, because it wraps
+for f in .claude/skills/unity-execution/SKILL.md \
+         .claude/skills/subagent-driven-implementation/SKILL.md; do
+  tr '\n' ' ' < "$f" | grep -oE 'more than one[[:space:]]+[a-z]+' | sort -u
+done
 ```
 
-Expected: suite green with the two counts equal; `provenance OK`; one `§` line, `.claude/NOTICE.md:25`; guard `exit=0`; dry-run naming no directory the real run omits; and the two `more than one` lines both reading `more than one substantial task`.
+Expected: suite green with the two counts equal; `provenance OK`; one `§` line, `.claude/NOTICE.md:25`; guard `exit=0`; dry-run naming no directory the real run omits; and every `more than one …` occurrence reading `more than one substantial`.
+
+**The line-oriented form this step originally carried does not work here**, and would have read as a failed fix: `grep -h 'more than one'` prints **three** lines, not two, because `unity-execution` states the threshold a third time in its body at `:10-11` — and that occurrence wraps mid-phrase, so the middle line ends at a bare `more than one` with `substantial task` on the next. A Task 6 implementer comparing against "the two lines" would see a third line that looks exactly like the defect this wave removed. Flatten first. Found by Task 4's implementer, confirmed by its reviewer.
 
 Criterion 5 (mutation proof) was executed in Task 2 Step 7 and its three results recorded in the ledger — cite them, do not re-run.
 

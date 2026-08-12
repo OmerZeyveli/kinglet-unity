@@ -11,9 +11,10 @@ Spec: `docs/superpowers/specs/2026-08-11-shipped-citations-resolve-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1, 2 and 3 are done and closed.** The guard exists, both rules pass, all sixteen citation
-sites are fixed, and the installer's dry-run now describes the program it actually runs. **Task 4 is
-next** — the fork's threshold, stated once. Nothing is dispatched.
+**Tasks 1–4 are done and closed.** The guard exists, both rules pass, all sixteen citation sites are
+fixed, the installer's dry-run describes the program it actually runs, and the fork's two branches
+agree on their threshold. **Task 5 is next** — `GETTING-STARTED.md:162` and the process-chain
+ledger's stale `RESUME HERE`. Nothing is dispatched.
 
 The wave makes every citation a shipped surface makes resolve in an installed Unity project. Eight
 `§N` markers abbreviate a citation to `docs/research/pioneer/field-notes.md`, which is tracked and
@@ -135,7 +136,7 @@ before a trailing `printf` as the plan's Step 1 implies. Reported by Task 1's im
 | 1 | Guard rule 1 (`§N`) + the eight marker sites | **done** | `c56a1fd..a4f49ea` | 1 fix round. Spec ✅, Quality Approved, 1 Important + 5 Minor, none blocking. **The implementer found the spec's premise false and said so instead of proceeding on it** — see below |
 | 2 | Guard rule 2 (repo-only paths) + the eight path sites | **done** | `909d85b..803b3d6` | 2 fix rounds. Spec ✅, 4 Important + 8 Minor, all Important ADDRESSED. **The header comment written to state true things stated two false ones, falsified by its own commit** — see below. Round 2's verification was the controller's, by stated deviation |
 | 3 | The installer's dry-run states what the real run does | **done** | `037304b..240ee6f` | 2 fix rounds. Spec ✅, 2 Important + 3 Minor. **Scope widened once by controller ruling** (`MCP-SETUP.md`), then held. The reviewer built seven fixture states; the implementer had built three |
-| 4 | The fork states its threshold once | open (brief pending) | — | Runner-provided test file — verify through the runner |
+| 4 | The fork states its threshold once | **done** | `c78c70e..42ae003` | 1 fix round. Spec ✅, 2 Important + 4 Minor. **A third statement of the threshold existed that neither plan nor spec anticipated**, and the guard's flattening read one wrap shape of six — see below |
 | 5 | The two documents that contradict themselves | open (brief pending) | — | `GETTING-STARTED.md:162`, the process-chain ledger's `RESUME HERE` |
 | 6 | Whole-wave verification | open (brief pending) | — | Cites Task 2's mutation results rather than re-running them |
 
@@ -374,6 +375,103 @@ That second check is what would catch both defects below.
    they agree, so it is not a dry-run defect — but `cp` then writes `MCP-SETUP.md/MCP-SETUP.md` and
    `sha_of` on a directory yields empty, producing a receipt row with an empty checksum. Uninstall
    degrades gracefully. Exotic and pre-existing.
+
+## What Task 4 found — and the fifth time a probe's shape decided the finding
+
+**A third statement of the threshold existed.** Neither the plan nor the spec anticipated it:
+`unity-execution/SKILL.md:10-11` restates the fork in its **body**, and it wraps mid-phrase — `:10`
+ends `more than one`, `:11` opens `substantial task`. A guard scoped to the frontmatter, which is
+what the brief specified, could never see it.
+
+The implementer widened the **negative** half to the whole flattened file and left the **positive**
+half on the frontmatter, then asked for a ruling rather than assuming one. **Verdict: keep.** The
+asymmetry is principled and both halves were proven load-bearing under mutation — by two different
+people, in two different directions:
+
+- the implementer showed the negative's whole-file scoping is needed: the loose form injected into a
+  body goes red only under the widened form;
+- the review showed the positive's frontmatter scoping is needed: deleting the qualified phrase from
+  `unity-execution`'s **description** while leaving it in the body turns the positive red and leaves
+  the negative green. **A body sentence cannot stand in for the field a reader selects on.**
+
+The positive asks *does the selection field say the right thing* — it must be narrow. The negative
+asks *does anything say the wrong thing* — it must be broad, because ambiguity returns from anywhere.
+
+### The flattening read one wrap shape of six
+
+The guard joined lines with `printf "%s ", $0` — one space appended, nothing trimmed, no runs
+collapsed. Measured across six shapes, **one was caught and five were missed**: indented
+continuation, blockquote continuation, a trailing space before the wrap, an indented YAML
+continuation inside `description:`, and a double space on one line. The shape that worked was the one
+the file happens to have today, which is why the implementer's single mutation did not surface it.
+
+Fixed by stripping leading blockquote markers to any depth and collapsing whitespace runs, **built
+once and concatenated into both awk programs** — two copies of a whitespace rule is how the two
+halves would come to disagree about what "flattened" means. Re-mutated in situ across **ten** shapes:
+ten of ten caught, control silent. Verified independently by the controller with an eleventh —
+blockquote plus indent plus wrap, injected into the *other* skill's body — which went red.
+
+**And one level down, the same defect again.** The implementer's fixture for the trailing-space shape
+had its trailing space stripped in authoring and reported *caught*. Rewritten with an explicit
+`\x20` it flipped to **missed**. A fixture for a whitespace bug that cannot hold whitespace is the
+same class as the bug it tests, and it is now written so an editor cannot silently disarm it.
+
+**Stated gaps, recorded rather than chased:** case variants (`More than one task`) and paraphrases
+(`more than a single task`) pass — the guard defends against the exact retired phrase returning, not
+against the ambiguity returning in new words. So does a phrase split by a Markdown construct that is
+neither leading whitespace nor a blockquote marker: `more than one *emphasised* task`, or a phrase
+broken by an HTML comment.
+
+### The class the brief exposed by accident, and the sweep that closed it
+
+The plan's Step 2 code used `fail_test` / `pass_test`. **Neither exists** — `run-tests.sh:167`
+exports exactly `assert_eq assert_exit_code assert_contains assert_not_contains assert_file_exists
+assert_file_executable skip_test`.
+
+That is worse than a rename. The runner does `set +e` before sourcing, so an undefined helper prints
+to stderr and continues, contributing **no `FAIL:` token at all**. The review reproduced the
+brief-shaped case: a failing positive assertion followed by the `fail_test`/`pass_test` loop, and the
+loop contributed nothing in either direction — so red-first would have shown the expected FAIL and
+the implementer would have concluded the negative half worked while it asserted nothing. **The guard
+would have shipped green on the defect it exists to catch.**
+
+The class is caught only *positionally*: as a file's last command it trips `run-tests.sh:285-289`
+with `exited 127 without reporting a failure`, a message naming no cause. Anywhere else it is silent.
+
+**The sweep came back clean.** No test file in `tests/` calls an unresolved helper, verified two
+independent ways: dynamically, sourcing all 31 files through the runner's own `( source "$f" )`
+mechanics with a `command_not_found_handle` trap (zero hits); and statically, checking every
+command-position `assert*` / `pass_*` / `fail_*` / `*_test` token against each file's local
+definitions plus the seven exported names (zero unresolved). The dynamic pass covers only branches
+taken on this host; the static pass covers untaken branches but not dynamically constructed calls.
+
+## Deferred from Task 4
+
+1. **`unity-planning:139-141` and `:186-193` — the surface that owns the fork states no threshold at
+   all**, and `:140` labels `subagent-driven-implementation` "(recommended)" unconditionally, which
+   reads against D9's preference for inline on small plans. Pre-existing and outside D9's letter, so
+   out of scope here — but it is where the corrected acceptance criterion 7 points next, and the
+   negative assertion does not reach it.
+2. **The guard's coverage limits**, listed under *Stated gaps* above. Recorded in the guard's own
+   comment as well, so a maintainer meets them where they matter.
+3. **`assert_contains "$fork_whole" "$fork_branch"`'s label overclaimed** and was reworded: it is
+   satisfied by the `name:` line, so it proves the file was opened and flattened to something, not
+   that a body was read. It still does its real job — the vacuity mutations fire, producing 3 named
+   FAILs on an emptied or deleted file rather than a green absence check.
+
+## Two controller-document defects Task 4 found, both now fixed
+
+Both were confirmed by the review before the controller acted on them.
+
+1. **Spec acceptance criterion 7 contradicted D9.** It read *"No two surfaces state the fork's
+   threshold"* while D9 four screens up says *"Both descriptions carry the same phrase afterwards,
+   verbatim, and a guard asserts they do."* Wrong on its facts as well as its logic — **three**
+   places state it. The defect was never that the threshold is stated more than once; it is that the
+   statements disagreed. Corrected in place with the correction dated.
+2. **Task 6's criterion-7 command would have read a correct fix as a failure.** `grep -h 'more than
+   one'` over the two skills prints **three** lines, and the middle one ends at a bare `more than
+   one` because of the `:10-11` wrap. Replaced with a flattened form; verified to print two unique
+   results, both `more than one substantial`.
 
 ## Controller deviations, stated so their absence is not read as an omission
 

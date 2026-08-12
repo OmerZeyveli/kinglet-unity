@@ -248,7 +248,15 @@ never as "the full pipeline", which is the one thing it is not.
    - removing `CLAUDE.md` from the allow-list → red across 26 files, proving the guard reads what it
      claims to read.
 6. `bash install.sh --dry-run` against a fixture prints no directory the real run does not create.
-7. No two surfaces state the fork's threshold.
+7. Every surface that states the fork's threshold states the **same** one, verbatim — and no surface
+   anywhere carries the retired looser form.
+
+   > **Corrected 2026-08-12, after Task 4.** This read "No two surfaces state the fork's threshold",
+   > which contradicts D9's own text four screens up: *"Both descriptions carry the same phrase
+   > afterwards, verbatim, and a guard asserts they do."* D9 is right and the criterion was wrong —
+   > and wrong on its facts as well as its logic, because **three** places state the threshold, not
+   > two: both `description:` fields and `unity-execution`'s body at `:10-11`. The defect was never
+   > that the threshold is stated more than once; it was that the statements **disagreed**.
 
 ## Out of scope, recorded
 
