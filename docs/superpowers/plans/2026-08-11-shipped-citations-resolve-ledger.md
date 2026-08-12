@@ -9,6 +9,42 @@ Spec: `docs/superpowers/specs/2026-08-11-shipped-citations-resolve-design.md`
   `bash scripts/check-provenance.sh` (must end `provenance OK`).
 - **Reports:** `.superpowers/sdd/2026-08-11-shipped-citations/` (gitignored).
 
+## THE WAVE IS CLOSED — 2026-08-12
+
+Six tasks, seven fix rounds, seven reviews, one whole-branch review and two rounds against it.
+**32 commits, 21 files, +2322/−119.** Suite `503/503`, discovery 31 = 31, `provenance OK`, guard
+7 PASS over 710 tokens, tree clean.
+
+**The branch is not merged.** `pioneer/process-chain` now stands at 87 commits from `main` (`7b18e63`),
+53 files, +8264/−680, carrying this wave and the process-chain wave before it.
+
+**Open, and deliberately so:** P1 and P3, the two owner design calls parked before this wave started;
+and the spin-out backlog at the end of this file, which grew from four items to twelve. Nothing here
+proves the toolkit behaves correctly *inside Claude Code* — only that the installer places correct
+bytes and that the surfaces say true things about themselves.
+
+### The finding that outranks the rest
+
+**Seven times, a probe's shape decided what it found, and the eighth time it was the wave auditing
+itself.** A missing filename read as a missing referent; `grep 'git log [0-9a-f]\{7\}'` blind to a
+bare SHA; a receipt-oracle blind to a receipt-less write; a flattener that read one wrap shape of
+six; a fixture for a whitespace bug whose whitespace was stripped in authoring; a `*/*` filter that
+hid `provenance.tsv`; a root-relative existence test that hid `scripts/check-provenance.sh`.
+
+And then, in the fix round for all of that: **correcting `install.sh`'s comments lengthened
+`install.sh`, invalidating the very line numbers the round was dispatched to repair.** The response
+is the wave's most durable output — load-bearing citations are now **content anchors**, because a
+line number that has already rotted once will rot again.
+
+### What the guards actually cover, stated plainly
+
+`tests/test-shipped-citations.sh` enforces two rules over every `.md` under `.claude/`, against a
+payload derived the way `install.sh` derives it. It cannot see: a path inside a multi-word backtick
+span (`` `bash tests/x.sh` ``), any token beginning with `.`, a URL that ends in the cited basename
+but points elsewhere, `scripts/<x>.sh` cited without its installed prefix, and every non-Markdown
+surface — which is how `.claude/UPSTREAM`'s four repository-only names and `scripts/studio-doctor.sh`'s
+six *"run `install.sh`"* messages both survive. All measured, all recorded in the spec.
+
 ## RESUME HERE — state for a session that has lost its context
 
 **Tasks 1–5 are done and closed.** The guard exists, both rules pass, all sixteen citation sites are
@@ -669,6 +705,67 @@ basename-suffix equality rather than resolution.
 4. **The `sourced-incidents` sweep returns 16, not the 15 the controller measured** — corrected above,
    with its cause.
 5. **`docs/HOOK-REFERENCE.md:9` says 25 hooks; the tree has 27.** Already recorded from Task 5.
+
+## The whole-branch review, and the two rounds against it
+
+Six per-task reviews found 40+ findings between them and **none of them could see what this one did**,
+because no per-task review's scope includes another task's diff.
+
+**Round A — a number or citation a later commit invalidated.** Fourteen items, and the theme was the
+wave's own: Task 3's 29-line insertion into `install.sh` invalidated every citation of the lines below
+it, **including inside the guard the wave built** — a citation the ledger had audited and recorded as
+*"measured true today"* three commits earlier. Fixed by converting to content anchors. Commits
+`93a79e8` (payload) and `5d00a58` (record).
+
+The row-count correction is worth keeping as method: three measurements of one file gave 542, 543 and
+553. `check-provenance.sh`'s own `rows()` — `grep -v '^#' | tail -n +2` — is the definition that
+matters, because the first non-comment line is the column header. The controller's count included it;
+the reviewer's 553 is reproduced by no method at any commit in the wave. **The definition now travels
+with the number.**
+
+**Round B — coverage and product.** Commit `0eea92d`.
+
+- **The fork guard implemented "no surface *anywhere*" by reading two files.** Unread: `unity-planning`
+  (the surface that *owns* the fork), `using-kinglet`, every agent, command and rule, and the four
+  sibling `.md` files inside `subagent-driven-implementation/` — **for which the same test file, a
+  thousand lines above, already records widening a different check, naming the shape.** The negative
+  half now reads all 44 shipped `.md` files, with three sentinels: a coverage floor, a
+  nothing-flattened-to-empty check, and a positive control using the same machinery on the surviving
+  phrase. Proven by injecting into a rule, an agent, a sibling, and all three at once.
+- **Rule 2's failure message was not actionable** — no line number, and no statement of the remedy,
+  so a maintainer hitting it on a legitimate citation would delete rather than link. Now reports
+  `file:line`, deduped on `(file, line, token)`, and prints the URL escape.
+- **Three documents still called the toolkit "everything-claude-unity".** Task 5 had fixed one of four
+  in the same directory. Four upstream-provenance references correctly survive.
+- **`HOOK-REFERENCE.md` said 25 hooks and omitted two** while calling itself a complete catalog. Now 27,
+  with `block-legacy-input` and `session-brief` documented.
+- **Two Source cells had lost their evidence with their paths** — *"The merged-result rule"* appeared
+  exactly once in the whole payload, in the cell citing it, and *"the runner-provided test file"* names
+  something an installed project does not have. In a skill whose thesis is *a claim without evidence is
+  not a completion*, two rows were claims without evidence. Both now carry the fact instead of the
+  pointer.
+
+## Spin-out backlog — twelve items, all measured, none closed
+
+1. The receipt disowns `MCP-SETUP.md` and `.mcp.json` on upgrade, so `uninstall.sh` leaves them behind.
+2. `Packages/manifest.json.bak` is permanent debris in non-git projects; never enters the receipt.
+3. The runner is blind to python results in both directions — 1443 results reach the total as one PASS.
+4. `unity-planning` states no threshold and labels one branch "(recommended)" unconditionally.
+5. `scripts/studio-doctor.sh` says *"run `install.sh`"* at six sites. **The controller's original ruling
+   rested on "they have it, in the clone they installed from" — and the recommended install does
+   `rm -rf` on that clone.** The ruling survives on its other leg (deleting it would make a diagnostic
+   worse); the fix is saying *from where*.
+6. Five derived counts in `docs/GETTING-STARTED.md`, true today, guarded by nothing.
+7. Nothing guards `install.sh --dry-run` at all — zero references under `tests/`.
+8. No guard resolves `file:line` citations in `tests/` and `docs/` against the tree. **A rename breaks
+   a content anchor as silently as an insertion breaks a line number.**
+9. `docs/GETTING-STARTED.md`'s "Option B: Manual Copy" describes an install `uninstall.sh` refuses to
+   touch, and which skips `CLAUDE.md` generation.
+10. `install.sh` and `scripts/generate-claude-md.sh` disagree on render-pipeline detection when a
+    project carries both URP and HDRP: two unconditional greps make HDRP win in one, `if/elif` makes URP
+    win in the other. The console line and the generated `CLAUDE.md` would name different pipelines.
+11. The surface criterion applied to hooks and `scripts/`.
+12. The unguarded closing `---` frontmatter fence across all skills.
 
 ## Controller deviations, stated so their absence is not read as an omission
 
