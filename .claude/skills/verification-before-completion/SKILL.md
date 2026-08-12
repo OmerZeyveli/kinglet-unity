@@ -33,7 +33,7 @@ times, while the tests were read every time.
 
 | Thought | Reality | Source |
 |---|---|---|
-| "The suite passed before I made this change" | A green run only proves the tree it ran on, not the one you are about to ship. | The merged-result rule, and `2b543f2` — a commit recorded as passing that did not pass its own suite |
+| "The suite passed before I made this change" | A green run only proves the tree it ran on, not the one you are about to ship. | The merged-result rule, and a commit recorded as passing that did not pass its own suite |
 | "It compiles, so it works" | Compilation is not behaviour, and in Unity it is not even proof of a valid file — the editor can write files that fail to compile without the write itself failing. | `unity-coder.md`'s Finishing section: "A file that fails to compile is still written successfully — the write itself does not fail" |
 | "The test is green, so the test is real" | A test that asserts nothing passes every time. Watch it fail first, or you are trusting a test you have never seen fail. | A guard in the toolkit's own suite, seen to fail before being trusted; and the runner-provided test file that "exits 0 having asserted nothing" |
 | "The check reported no problems" | Ask what set the check ran over before trusting silence. A check scoped to one directory of a class reads as though it covers the whole class. | A bash-compatibility check that excluded the installer, which then shipped the SIGPIPE bug the check exists to catch (2026-08-03) |
