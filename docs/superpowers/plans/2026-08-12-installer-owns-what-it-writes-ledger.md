@@ -11,10 +11,9 @@ Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md
 
 ## RESUME HERE
 
-**Tasks 1, 1b, 1c are done and closed. Task 1d has been reviewed and its fix round 1 is closed —
-all three findings ADDRESSED, verified by probes shaped differently from the implementer's.** A
-**round 2 is open**, carrying two cheap items the re-review measured (below). After it closes:
-**Task 2**.
+**Tasks 1, 1b, 1c and 1d are done and closed.** Task 1d took three fix rounds — it was reviewed after
+the fact, because its implementer had been killed mid-report. **Task 2 is the next action**, then 3,
+4, 5, 6.
 
 The wave keeps growing because each task's review finds the next instance of one root cause. The
 spec now carries **nine decisions**, and the tally is: the origin column is written in four places
@@ -130,7 +129,7 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 1 | The receipt records ownership, not this run's writes | **done** | `e6116d0..6684165` | 1 fix round. Spec ✅, Quality Approved, 5 Minor. Added state B2 after proving the upgrade path was dead code; found the `uninstall.sh` data loss |
 | 1b | `uninstall.sh` reads the origin column | **done** | `5650580..493db8a` | 1 fix round. Spec ✅, Approved, 4 Minor. Fails closed via `case`; guarded by a receipt row `install.sh` cannot produce |
 | 1c | The scripts loop respects a user edit | **done** | `a192776..2f2b820` | 1 fix round. Spec ✅, Approved. State H now edits **two** scripts — one file cannot tell "keeps edits" from "keeps THIS file" from "keeps ONE file" |
-| 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | **round 2 open** | `cfc35b9..29a8593` | Reviewed after the fact — see below. Spec ✅, Quality Needs work: 1 Important + 6 Minor. Round 1 ran on a **fresh implementer**, because the original was killed; all three findings ADDRESSED. Round 2 carries the vacuous long-list assertion and N-1's rewording |
+| 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | **done** | `cfc35b9..11ff9ee` | Reviewed after the fact — see below. Spec ✅, Quality Needs work: 1 Important + 6 Minor. **3 fix rounds**, and rounds 2 and 3 each closed a defect the previous round's own fix introduced. Round 1 ran on a fresh implementer because the original was killed |
 | 2 | A kept backup is a file the installer owns | open (brief pending) | — | Extends Task 1's test |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
 | 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |
@@ -289,6 +288,75 @@ pipe into an early-exiting reader, no `&& continue` as a loop body's last comman
 carrying a `PASS`/`FAIL`/`SKIP` token. Nothing outside the doctor and its test reads
 `Install intact` / `modified since install`.
 
+### Rounds 2 and 3 — each closed a defect the previous round's own fix introduced
+
+**That is the finding of this task, and it is worth more than either fix.** Round 1 corrected a false
+sentence and round 2's correction of *its* leftovers wrote a new false sentence. Neither implementer
+was careless; both were writing about a program whose behaviour they had measured, and both
+generalised one measurement one step too far. **The fix loop is not overhead here — it is the only
+thing that caught either.**
+
+**Round 2, two items.** The long-list assertion was *proven* vacuous rather than argued: mutation E7
+prefixes a digit (`1500 → 11500`) and the unanchored needle stayed PASS against a line reading
+`11500 file(s) modified since install`. And N-1's over-general clause was reworded.
+
+Round 2 found something the round could not have anticipated. **The missing-files line cannot take
+the same anchor**, because the doctor prints it through `fail`, so its prefix is the literal token
+`FAIL` — and `assert_contains` echoes its needle on failure while `run-tests.sh` tallies with
+`grep -cE '(^|[[:space:]])FAIL(:|[[:space:]])'`. A `FAIL`-carrying needle makes the test count itself
+as a second failure. That is the file's own *"a sentinel must not contain its own needle"* rule, one
+level in: the rule was written about assertion **messages**, and this is a needle. Measured by the
+re-review: the rejected form, forced to fail, tallies **2** and moves the total 31 → 32. **The
+direction is inflation of an existing failure, never a false green** — worth recording precisely,
+because the near-miss reads scarier than it is. The replacement (an `awk` extraction compared with
+`assert_eq`) was then attacked with that same trap — the extracted field made literally `FAIL` — and
+held, because the runner's regex needs a delimiter *after* the token and end-of-line does not supply
+one. It fails closed on zero matches, on two, and on a changed line shape.
+
+**Round 2's verification went past both sides' probes.** The re-review re-ran the **original E7 shape**
+— the case the round existed to close, and *not* the appended-digit mutation the implementer chose —
+and both long-list assertions went red. Then it attacked the **severity token** rather than the digits
+(`warn` → `pass`), which no count mutation reaches, and that went red too. So the `WARN ` anchor buys
+something beyond digit mutations, which the implementer's own honesty note had left open.
+
+**Round 3: round 2's fix put a new false measurement claim into the file.** Its comment stated that
+all three fixtures were run "each with the toolkit's own copy bumped so an overwrite would show" and
+concluded *"even the two root files do not agree."* **The precondition was false for the `.mcp.json`
+fixture and could not have been true** — `.mcp.json`'s reference copy is not a shipped file but the
+heredoc at `grep -n 'cat > "$MCP_JSON_REF"' install.sh`, regenerated byte-identically every run. The
+comparison moved two variables. Bump the heredoc between installs and the divergence vanishes:
+
+```
+[jsonA0  ] origin=clean   bumpref=no  -> KEPT
+[jsonB0  ] origin=mangled bumpref=no  -> KEPT      ← round 2's observation
+[jsonAref] origin=clean   bumpref=yes -> KEPT
+[jsonBref] origin=mangled bumpref=yes -> DROPPED   ← identical to MCP-SETUP.md
+```
+
+Same rule, same `$4 == "toolkit"` gate, one variable apart. The implementer also ran the control it
+had skipped: clean origin + drifted bytes **also** drops the row, because `$2 == have` fails first —
+so round 2's `jsonC` proved nothing about the column and had been reported as though it did. It said
+so in those words.
+
+**A load-bearing conclusion drawn from an uncontrolled comparison and then recorded in-file as
+measurement is I-1's shape exactly** — the file's own comment asserting something the measurement does
+not support. The claim was **withdrawn, not softened**, and the drifted-bytes non-result recorded so
+the next reader does not reach for that control again.
+
+**Controller ruling: no fourth review was dispatched.** Round 3 is comment-only — verified directly,
+not assumed: `git diff 99a29b9..11ff9ee` touches one file, contributes **zero** non-comment added or
+removed lines, changes no `warn`/`printf`/`pass`/`fail` line, and the withdrawn phrase is absent from
+`scripts/`, `.claude/`, `install.sh` and `uninstall.sh`. Its factual content rests on **two
+independent measurements that agree** — the re-review's and the implementer's own rerun, run
+separately and reaching the same four-row table. That is more corroboration than most of this wave's
+claims carry. Recorded as a ruling so it is auditable, not as a default.
+
+**One overstatement noted and left:** the implementer's report says "there is no `.mcp.json` in the
+toolkit tree at all". `git ls-files` finds two, under `spikes/platform/clients/` — spike artifacts,
+not payload, and not `$MCP_JSON_REF`'s source, so the claim is true where it matters and the shipped
+comment scopes it correctly ("no shipped copy"). Noted because it is the same one-step-too-far
+generalisation this task produced three times, caught here in a report rather than in a file.
+
 ## Deferred and parked findings
 
 ### From Task 1d — round 2's scope, and four deferred
@@ -337,6 +405,28 @@ carrying a `PASS`/`FAIL`/`SKIP` token. Nothing outside the doctor and its test r
    expensive test file (1500 files + 3000 receipt rows + two extra installs). Acceptable against the
    >150 s budget. `TSD_LONG` / `TSD_ORIGIN` leak 1500 files into `/tmp` if the block dies before its
    `rm -rf`; the file's existing convention is the same, so consistency rather than regression.
+
+### From Task 1d rounds 2 and 3 — four more, all deferred
+
+8. **The long-list fixture is symmetric, so that block cannot tell its two lists apart.** Both counts
+   are 1500 by construction; the re-review swapped the two counters in the doctor and **both long-list
+   assertions stayed green**. The file as a whole is not blind — the *origin* block's fixture is 1
+   modified / 0 missing and its assertion went red — and the long-list block's stated purpose is the
+   SIGPIPE regression, not counting accuracy. Fix is one line: make the fixture `N` and `N+k`.
+9. **The doctor's two unreadable-origin continuation `warn` lines are asserted by nothing**, in any
+   revision. The block's header line is anchored; the two sentences under it are not — so **the suite
+   would not notice if the sentence rounds 2 and 3 both worked to make true were deleted.** Same class
+   as M-3: the guard is shaped like the symptom.
+10. **`.mcp.json`'s reference copy is a heredoc, not a file** — so `owned_by_installer`'s
+    reference-copy arm short-circuits for it on every run where install.sh's heredoc has not changed,
+    and the receipt is never consulted. **A constant reference copy can mask a receipt problem
+    indefinitely.** Goes with item 3 above for whichever future task makes install.sh's upgrade scan a
+    `case`: the reference-copy arm masks the column read for one of the two root files and not the
+    other.
+11. **The `FAIL`-token tally trap is inflation, not concealment.** Recorded with its direction because
+    the direction is the whole of its severity: a `FAIL`-carrying needle makes one failing assertion
+    tally as two and moves the file's total by one. It cannot produce a false green. The repo already
+    documents this rule for assertion *messages*; it now also applies to needles.
 
 ### Two plan bugs Task 1d's review found — the spec was right both times
 
