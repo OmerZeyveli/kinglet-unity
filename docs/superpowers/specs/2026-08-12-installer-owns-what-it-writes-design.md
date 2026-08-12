@@ -77,7 +77,23 @@ installer change was text inside that block, and it went in with no coverage. Th
 user reads before consenting; it is the one output whose honesty is load-bearing and the one with no
 test.
 
-### 5. "Option B: Manual Copy" produces an install that cannot be uninstalled
+### 5. The dry-run announces two of the four `.gitignore` entries, unconditionally
+
+```bash
+printf '  .gitignore — add .claude/settings.local.json and .claude/state/*\n'
+```
+
+`add_ignore` is called four times; `.claude.backup.*/` and one other are unannounced. And the line
+prints whether or not the real run adds anything — a project that already ignores `/.claude/`
+wholesale is fully covered, `already_ignored` correctly skips every entry, and the dry-run still
+promises the edit.
+
+This is the third instance of the dry-run under-announcing, and the reason the shipped-citations
+wave's own check missed it is worth keeping: that check used a `find` snapshot as its oracle, and
+`.gitignore` already exists, so a path snapshot has nothing to diff. **A third oracle — file
+*content* before and after — is what sees this class.**
+
+### 6. "Option B: Manual Copy" produces an install that cannot be uninstalled
 
 `docs/GETTING-STARTED.md` offers a `cp -r` alternative to running `install.sh`. That install:
 
@@ -157,7 +173,17 @@ shipped-citations wave an implementer used the receipt alone, reported "no third
 and was structurally unable to see `manifest.json.bak` — which never enters the receipt. **A guard
 built the same way would certify the class it cannot inspect.**
 
-### D5 — "Option B: Manual Copy" is marked unsupported, not deleted
+### D5 — The `.gitignore` line names what it will add, and only when it will add it
+
+The announcement is computed from the same `already_ignored` results the real run uses, and lists the
+entries that will actually be appended. When none will be, it says so or says nothing — it does not
+promise an edit that will not happen.
+
+**The dry-run guard in D4 therefore needs a third oracle**: a `find` snapshot sees new paths, the
+receipt sees claimed ownership, and neither sees a line appended to a file that already existed. Hash
+the content of every pre-existing file the installer may touch, before and after.
+
+### D6 — "Option B: Manual Copy" is marked unsupported, not deleted
 
 It is annotated with what it costs — no receipt, so `uninstall.sh` will refuse; no generated
 `CLAUDE.md`, so `/unity-init` must be run — and kept.
@@ -179,8 +205,11 @@ defect is that it reads as an equal alternative, not that it exists.
    fixture, including one carrying both packages — proven by running both against the same fixture
    and comparing, not by reading the code.
 7. The new dry-run guard fails when a write is added without an announcement, and fails when an
-   announcement is added without a write. **Both directions, mutation-proven.**
-8. `docs/GETTING-STARTED.md`'s Option B states its two costs.
+   announcement is added without a write. **Both directions, mutation-proven**, and across all three
+   oracles — a new path, a missing receipt row, and a modified pre-existing file.
+8. Against a fixture that already ignores `/.claude/` wholesale, the dry-run does **not** promise a
+   `.gitignore` edit, and the real run makes none.
+9. `docs/GETTING-STARTED.md`'s Option B states its two costs.
 
 ## Out of scope, recorded
 
