@@ -138,7 +138,7 @@ before a trailing `printf` as the plan's Step 1 implies. Reported by Task 1's im
 | 3 | The installer's dry-run states what the real run does | **done** | `037304b..240ee6f` | 2 fix rounds. Spec ✅, 2 Important + 3 Minor. **Scope widened once by controller ruling** (`MCP-SETUP.md`), then held. The reviewer built seven fixture states; the implementer had built three |
 | 4 | The fork states its threshold once | **done** | `c78c70e..42ae003` | 1 fix round. Spec ✅, 2 Important + 4 Minor. **A third statement of the threshold existed that neither plan nor spec anticipated**, and the guard's flattening read one wrap shape of six — see below |
 | 5 | The two documents that contradict themselves | **done** | `4f9f3a8..c926969` | 1 fix round. Spec ✅, 1 Important + 6 Minor. **The implementer refused the plan's supplied wording and was right**; scope widened once more by controller ruling — see below |
-| 6 | Whole-wave verification | open (brief pending) | — | Cites Task 2's mutation results rather than re-running them |
+| 6 | Whole-wave verification | **done** | `3b74970..` (report only, no payload) | 0 fix rounds. **All seven acceptance criteria hold**, status `DONE_WITH_CONCERNS` — and the concerns are the right ones. Five new findings; two of them corrections to this ledger |
 
 ## What Task 1 found that the controller had wrong
 
@@ -295,7 +295,9 @@ discharged.
 6. **The runner's aggregation is blind to python results in both directions** — for the spin-out
    wave, with this framing rather than the narrower ERROR-only one. `run-tests.sh:278-280` matches
    `(^|[[:space:]])(PASS|FAIL)(:|[[:space:]])`, and unittest's `... ok`, `... FAIL`, `... ERROR` and
-   `FAILED (failures=3, errors=17)` all fail that pattern. `tests/test-kinglet-build.sh`'s 1308 tests
+   `FAILED (failures=3, errors=17)` all fail that pattern. `tests/test-kinglet-spike.sh`'s 1308 tests
+   (**corrected after Task 6** — this said `test-kinglet-build.sh`, which has 135; **1443 python
+   results in total reach `Total: 503` as a single PASS**, so the effect is larger than first written)
    contribute **0 PASS and 0 FAIL**; `Total: 495` excludes them entirely. A red python run reaches
    the aggregate only through the `test_rc -ne 0 && file_fail -eq 0` fallback at `:285-288`, as
    exactly one FAIL. **The suite cannot go silently green on a python failure** — this is granularity
@@ -544,9 +546,12 @@ The plan's Task 6 stands, with these changes. The first two were measured by the
 dispatch, precisely so the implementer does not have to guess at an expected result.
 
 1. **Step 2's first sweep is unsatisfiable as written.** `grep -rn 'sourced-incidents' .
-   --exclude-dir=.git || echo "clean"` returns **15 hits** today, every one of them in this wave's own
-   spec, plan and ledger. It can never print `clean`. Scope it to what ships: `.claude/` and nothing
-   else.
+   --exclude-dir=.git || echo "clean"` returns **16 hits**, every one of them in this wave's own spec,
+   plan and ledger. It can never print `clean`. Scope it to what ships: `.claude/` and nothing else.
+
+   *(This read 15 when the amendment was written, and 16 by the time Task 6 ran it — the controller's
+   own ledger commit added the sixteenth. A count written into a document about counts going stale,
+   going stale. Task 6 caught it and guessed the cause correctly before checking.)*
 2. **Step 2's real question — do shipped *non-Markdown* surfaces cite repo-only paths? — has a
    measured answer: exactly three, all in `.claude/UPSTREAM`** (`MERGE-NOTES.md`,
    `provenance-skip.tsv`, `provenance.tsv`). Both guard rules scan `find .claude -name '*.md'`, so
@@ -561,6 +566,48 @@ dispatch, precisely so the implementer does not have to guess at an expected res
    mid-phrase. The flattened replacement prints two unique results, both `more than one substantial`.
 4. **Task 2's mutation results are cited, not re-run.** They are recorded above, re-verified twice,
    and reproduced by two reviewers with differently-shaped probes.
+
+## Task 6 — all seven criteria hold, and the concerns are the right ones
+
+Verified independently rather than taken from earlier tasks. Criterion 4 was checked by running
+**today's guard against the wave base `076464b`**: rule 1 flags 8, rule 2 flags exactly D7's eight
+rows in D7's order, and `provenance.tsv` is absent at base too. Criterion 6 was checked with a
+before/after `find` snapshot rather than the dry-run's own text. Criterion 7 was flattened with
+blockquote-stripping and swept repo-wide: **zero** shipped hits for the retired form.
+
+**The status is `DONE_WITH_CONCERNS` and that is the honest one.** Criterion 4's *"each fix removes
+exactly one"* is verified only at the endpoints, and the wave's own sweep found a live instance of
+the defect class it exists to close, in a file type neither rule can read.
+
+**It re-measured the guard's four stated blind spots rather than citing them, and all four are still
+open**: command-form `` `bash tests/x.sh` `` → green; a real payload-excluded `.claude/state/session.json`
+→ green, confirming the `.claude/*` arm is genuinely unreachable; `scripts/<x>.sh` → green; and a
+repo-only path accompanied by an `example.invalid` URL ending in it → green, confirming the escape is
+basename-suffix equality rather than resolution.
+
+### Five findings no earlier task recorded
+
+1. **`scripts/studio-doctor.sh` ships and says "run `install.sh`" at six sites** (`:150`, `:203`,
+   `:208`, `:230`, `:236`, `:276`). Found because both guard rules scan `find .claude -name '*.md'`
+   and this is a `.sh`. **Seventh instance of a probe's shape deciding the finding** — and the sharpest
+   framing is the reporter's own: the ledger's only earlier mention of this file is as a *control* in
+   Task 2's mutation testing, where it was checked as a **referent** and never as a **citer**.
+
+   **Controller ruling: recorded, not fixed, and not the same defect.** Same token, different speech
+   act. Task 2 removed `install.sh` where it was cited as *evidence for a past incident*, which an
+   installed reader cannot follow. Here the user is told to *run* it — and they have it, in the clone
+   they installed from. Deleting it would make a diagnostic worse: `studio-doctor` exists to tell a
+   user how to repair a broken install, and "run the installer again" is the correct repair. What
+   would improve it is saying *from where*, which is a usability change to a diagnostic, not a
+   citation fix. **To the spin-out wave, with the surface criterion for hooks and `scripts/`.**
+2. **The dry-run announces two of the four `.gitignore` entries the real run writes** —
+   `.claude.backup.*/` is unannounced. Third instance of the dry-run under-announcing. **Task 3's
+   `find`-snapshot oracle could not see it**: `.gitignore` already exists, so a path snapshot has
+   nothing to diff. The oracle lesson again, one level in.
+3. **This ledger named the wrong file** for the python-aggregation finding — corrected above.
+4. **The `sourced-incidents` sweep returns 16, not the 15 the controller measured** — corrected above,
+   with its cause.
+5. **`docs/HOOK-REFERENCE.md:9` says 25 hooks; the tree has 27.** Already recorded from Task 5.
 
 ## Controller deviations, stated so their absence is not read as an omission
 
