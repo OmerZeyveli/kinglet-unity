@@ -1232,43 +1232,72 @@ assert_contains "$UK_INJECTED" 'Invoke the surface **before any response or acti
 #   $ grep -qF -- 'more than one task' <<< 'more than one substantial task'; echo $?
 #   1
 #
-# Frontmatter only, and FLATTENED. A `description:` is one long line in both files today, but
-# nothing enforces that: a value wrapped across two lines puts the phrase where no single-line
-# pattern can read it, and an absence check that cannot read the text reports absence for the wrong
-# reason. Scoped to the frontmatter fence because both bodies discuss the fork in prose, and a body
-# sentence must not be able to stand in for the field a reader actually selects on.
-# THE POSITIVE HALF IS SCOPED TO THE FRONTMATTER; THE NEGATIVE HALF IS NOT. `unity-execution`'s
-# BODY states the boundary a third time, and it does so wrapped — line 9 ends "…has more than one"
-# and line 10 opens "substantial task, or when…". So:
-#   - the positive is frontmatter-only, because a body sentence must not be able to stand in for the
-#     field a reader actually selects on. Scoping it there is what makes it an assertion about
-#     selection rather than about the file containing the words somewhere;
-#   - the negative reads the WHOLE file, because a looser threshold anywhere in either branch
-#     reintroduces exactly the ambiguity this block closes — including in that body sentence, which
-#     no frontmatter-scoped check can see.
-# Both haystacks are flattened for the reason above; the wrapped body sentence is the live proof
-# that the flattening is not hypothetical.
+# THE TWO HALVES ARE SCOPED DIFFERENTLY, AND THE ASYMMETRY IS THE POINT. They ask different
+# questions, so they read different amounts of the file:
+#
+#   - the POSITIVE reads the FRONTMATTER ONLY, because it asks "does the field a reader selects on
+#     say the right thing". Widen it to the body and a paragraph of prose stands in for the
+#     description, which is the one thing selection actually reads;
+#   - the NEGATIVE reads the WHOLE FILE, because it asks "does anything here say the wrong thing".
+#     Ambiguity returns from wherever it is written, and `unity-execution`'s BODY states this same
+#     boundary a third time — at :10-11, wrapped, `:10` ending "…has more than one" and `:11`
+#     opening "substantial task, or when…". Neither the spec nor the plan for this wave knew that
+#     third statement existed; a frontmatter-scoped absence check cannot see it at all.
+#
+# Both directions are measured, not argued. Rewriting only the BODY sentence to the looser form
+# leaves the positive green and turns the negative red; deleting the qualified phrase from only the
+# DESCRIPTION, leaving the body intact, turns the positive red and leaves the negative green.
+#
+# FLATTENING, AND EXACTLY WHAT IT NORMALISES. `grep` is line-oriented and prose is not: a phrase
+# split across a wrap cannot be read by any single-line pattern, and an absence check that cannot
+# read the text reports absence for the wrong reason — which is worse than no check. The first
+# version of this block joined lines with a single appended space and nothing else, and that reads
+# exactly ONE wrap shape: the unindented one this file happens to have today. Measured against six,
+# it caught one and missed five (indented, blockquoted, trailing-space-before-the-wrap, indented
+# YAML continuation, and a double space on a single line). So the normaliser now (a) strips leading
+# blockquote markers per line, to any depth, and (b) collapses every whitespace run in the joined
+# buffer to one space. Re-measured across ten shapes afterwards: all ten caught, including nested
+# blockquotes, tab indentation, a blank line mid-sentence and a list-item continuation.
+#
+# It stays a check for the exact retired phrase returning, NOT for the ambiguity returning in new
+# words: `More than one task` capitalised differently, or "more than a single task", both pass. That
+# is an accepted limit and it is recorded here rather than papered over. Near-misses were probed for
+# false positives in the same pass — "more than one. Task ownership…" and a `| more than one | task |`
+# table row both stay correctly silent, because collapsing whitespace cannot delete a `.` or a `|`.
+FORK_NORMALIZE='{ line = $0
+    while (line ~ /^[[:space:]]*>/) { sub(/^[[:space:]]*>[[:space:]]?/, "", line) }
+    buf = buf " " line }'
+FORK_COLLAPSE='END { gsub(/[[:space:]]+/, " ", buf); printf "%s", buf }'
+
+# Built by concatenation from the one normaliser above rather than written out twice — two copies of
+# a whitespace rule is precisely how the frontmatter half and the whole-file half would come to
+# disagree about what "flattened" means. Single-quoted segments throughout, so awk's `$0` reaches
+# awk instead of being expanded by the shell.
+FORK_WHOLE_AWK="$FORK_NORMALIZE
+$FORK_COLLAPSE"
+FORK_FRONTMATTER_AWK='NR == 1 && $0 == "---" { f = 1; next }
+f && $0 == "---" { exit }
+f '"$FORK_NORMALIZE
+$FORK_COLLAPSE"
+
 fork_flatten() {
   awk "$2" "$REPO_DIR/.claude/skills/$1/SKILL.md" 2>/dev/null || true
 }
-
-FORK_FRONTMATTER_AWK='
-  NR == 1 && $0 == "---" { f = 1; next }
-  f && $0 == "---" { exit }
-  f { printf "%s ", $0 }
-'
-FORK_WHOLE_AWK='{ printf "%s ", $0 }'
 
 for fork_branch in unity-execution subagent-driven-implementation; do
   fork_front="$(fork_flatten "$fork_branch" "$FORK_FRONTMATTER_AWK")"
   fork_whole="$(fork_flatten "$fork_branch" "$FORK_WHOLE_AWK")"
 
   # An empty haystack fails a positive assertion and PASSES a negative one — a green that means "the
-  # file was never read". These two are what keep the pair below honest.
+  # file was never read". These two are what keep the pair below honest. Measured: emptying either
+  # file produces 3 named failures, deleting it produces 3, and breaking the frontmatter fence
+  # produces 2 — none of them silent.
   assert_contains "$fork_front" "description:" \
     "$fork_branch's frontmatter was read at all, so the assertions below are about its text"
+  # Deliberately modest wording: the branch name appears in the frontmatter's `name:` key, so this
+  # establishes that the right file was opened and flattened to something — not that a body was read.
   assert_contains "$fork_whole" "$fork_branch" \
-    "…and its whole flattened body was read, so the absence check reads something"
+    "…and the file the absence check reads is that branch's own, flattened to something"
 
   assert_contains "$fork_front" "more than one substantial task" \
     "$fork_branch states the fork's threshold, in its description, with the qualifier intact"
