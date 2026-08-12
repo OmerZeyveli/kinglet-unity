@@ -11,9 +11,16 @@ Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md
 
 ## RESUME HERE
 
-**Tasks 1, 1b, 1c and 1d are done and closed.** Task 1d took three fix rounds — it was reviewed after
-the fact, because its implementer had been killed mid-report. **Task 2 is the next action**, then 3,
-4, 5, 6.
+**Tasks 1, 1b, 1c, 1d and 2 are done and closed.** Task 2 passed review with **no fix round** — Spec ✅,
+Quality Approved — which is the first time in this wave. **Task 2b is the next action**, then 3, 4, 5,
+6.
+
+**Task 2b was inserted 2026-08-13** because Task 2's review measured a second live member of the class
+Task 2 closes: `CLAUDE.md.generated` is created by the installer, kept, announced, and never recorded —
+permanent debris on the project root, in exactly the projects where the user already had their own
+`CLAUDE.md`. Spec **D10**, criterion 13. **D10 also declares itself the wave's last insertion**: anything
+further goes to a second wave unless it is data loss in shipped software, which is the bar D7 cleared
+and nothing since has.
 
 The wave keeps growing because each task's review finds the next instance of one root cause. The
 spec now carries **nine decisions**, and the tally is: the origin column is written in four places
@@ -130,7 +137,8 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 1b | `uninstall.sh` reads the origin column | **done** | `5650580..493db8a` | 1 fix round. Spec ✅, Approved, 4 Minor. Fails closed via `case`; guarded by a receipt row `install.sh` cannot produce |
 | 1c | The scripts loop respects a user edit | **done** | `a192776..2f2b820` | 1 fix round. Spec ✅, Approved. State H now edits **two** scripts — one file cannot tell "keeps edits" from "keeps THIS file" from "keeps ONE file" |
 | 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | **done** | `cfc35b9..11ff9ee` | Reviewed after the fact — see below. Spec ✅, Quality Needs work: 1 Important + 6 Minor. **3 fix rounds**, and rounds 2 and 3 each closed a defect the previous round's own fix introduced. Round 1 ran on a fresh implementer because the original was killed |
-| 2 | A kept backup is a file the installer owns | open (brief pending) | — | Extends Task 1's test |
+| 2 | A kept backup is a file the installer owns | **done** | `c096d1b..a8acd49` | **No fix round** — Spec ✅, Quality Approved. The implementer refused the brief's literal Step 3 and implemented the spec; the review reproduced that the brief's shape *is* the defect. Suite 645 → 674 |
+| 2b | The other file the installer keeps and does not record | open | — | Inserted 2026-08-13 from Task 2's review. `CLAUDE.md.generated`, plus an assertion for Task 2's own row placement |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
 | 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |
 | 5 | One pipeline detector, and Option B states its costs | open (brief pending) | — | `urp+hdrp` display and skill routing is the implementer's call |
@@ -357,7 +365,104 @@ not payload, and not `$MCP_JSON_REF`'s source, so the claim is true where it mat
 comment scopes it correctly ("no shipped copy"). Noted because it is the same one-step-too-far
 generalisation this task produced three times, caught here in a report rather than in a file.
 
+## Task 2 — the implementer refused the brief, and the review proved it right
+
+**The brief's Step 3 said to write the receipt row "in the branch that keeps the file". That
+instruction is the defect.** Writing there records **authorship**, and the spec's D1 governs this
+whole class explicitly: *"Ownership is a property of the file, not of the run that happened to create
+it."*
+
+The implementer measured the consequence before writing anything, and the reviewer then reproduced it
+with a **different probe shape** — the implementer had narrowed its own condition; the reviewer
+implemented the brief *literally*, relocating the `printf` into the keep branch so the only difference
+from the shipped code was where the write lives:
+
+| probe | result |
+|---|---|
+| brief-literal, `--with-mcp` → plain install → `uninstall.sh --yes`, non-git fixture | run 1 row present; **run 2 receipt has no `Packages/` row**; `.bak` still on disk after uninstall |
+| brief-literal, `--with-mcp` twice | run 2 prints `already in manifest.json.`, row gone |
+| the shipped test file against a brief-literal `install.sh` | **151 PASS / 2 FAIL**, both the second-install assertions |
+
+The chain, each link measured separately: `add_manifest_dependency` returns early once the package is
+present (`grep -n 'already in manifest.json."' install.sh`); a plain run never calls it at all, both
+flags defaulting to `0`; and the receipt is rebuilt from scratch every run
+(`grep -n 'RECEIPT_TMP=\$(mktemp)' install.sh`). **So the brief's shape reinstates the spec's defect #2
+one run later.** One piece of apparent counter-evidence had to be disposed of first: a plain run *does*
+print `ok com.unity.inputsystem already in manifest.json.`, but that comes from an advisory check, not
+from `add_manifest_dependency`.
+
+**The third plan bug, and the third time an implementer found one by checking instead of assuming.**
+Left in the plan as written, corrected here — editing a brief after its task has run rewrites the
+record of what the implementer was told.
+
+**The second deviation was also correct, and worse than it sounds.** The spec says the backup comes
+from `--with-mcp` **or** `--with-input-system`; the plan names only the first. Both can reach the keep
+branch in one run, so the implementer writes the row once *after* both callers. The reviewer built the
+duplicate directly and found the receipt carrying two rows for one path with different checksums —
+whereupon `uninstall.sh`, whose classifier is per-row, puts the stale one in `MODIFIED` and the fresh
+one in `TO_REMOVE` and prints:
+
+```
+  keep     1 file(s) you modified
+             Packages/manifest.json.bak
+ ok  Removed 88 file(s).
+after uninstall: .bak GONE
+```
+
+**It says "keep" and removes the file** — D8's exact failure shape, arriving through a receipt instead
+of through a loop.
+
+**Red-first was real, and F's pre-existing green is real coverage.** Reproduced by putting `c096d1b`'s
+`install.sh` under `a8acd49`'s test file: 149 PASS / 3 FAIL, byte-identical to the reported failures.
+All 9 of state F's assertions were green in the red run, including both preconditions that could have
+made it vacuous — its `git ls-files --error-unmatch` check, and its branch discriminator asserted in
+**both** directions.
+
+**E3 fires, and it is the only state that catches its direction.** The reviewer's mutation — claim by
+existence rather than by provenance — reddened all three E3 assertions and **left F green**, which is
+what isolation looks like. The implementer's own mutation had reddened F and G too, so it had not
+isolated anything. E3 ends `FAIL: E3: uninstall.sh deleted Packages/manifest.json.bak, which the user
+wrote` — the fail-closed direction the spec's Risks section demands.
+
 ## Deferred and parked findings
+
+### From Task 2's review — four, one of which became Task 2b
+
+12. **`CLAUDE.md.generated` is the same defect, second instance — now Task 2b.** Created by the
+    installer, kept, announced (`warn CLAUDE.md exists and has no generated markers — wrote
+    CLAUDE.md.generated instead.`), unrecorded, un-removable. Measured: the receipt's non-`.claude/`
+    rows are `.mcp.json` and `MCP-SETUP.md` only, and the file survives a full uninstall. **Not
+    deferred — promoted**, because D2's own sentence applies to it verbatim.
+13. **A read-only `Packages/manifest.json.bak` aborts the whole installer, with no receipt written at
+    all.** `cp "$MANIFEST" "$MANIFEST.bak"` under `set -euo pipefail` dies on `Permission denied`
+    *after* the payload is written, and a run with no receipt is the one state that makes
+    `uninstall.sh` refuse to run. Reproduced with `chmod 444`. Pre-existing — that `cp` is untouched by
+    Task 2 — and **reachable on a real workflow this toolkit targets**: Perforce keeps files read-only
+    until checked out, and console projects live there. The sharpest thing Task 2's review produced.
+14. **The `cp` clobbers a user's own `.bak` before anything asks whose the file is**, and Task 2 has
+    changed the consequence's shape: the user's file at that path is now *deleted* by the subsequent
+    uninstall, not merely overwritten. Measured, with a control run proving the destructive step is the
+    pre-existing `cp` and the new code is fail-closed wherever it can be. **Belongs in the spec's
+    out-of-scope list**; E3 covers only the plain-install half and the test header says so.
+15. **`MANIFEST_BAK_KEPT` is a memory one statement can invalidate.** `add_manifest_dependency`'s
+    failure arm restores the backup over the manifest (`grep -n 'mv "\$MANIFEST.bak" "\$MANIFEST"'
+    install.sh`), **deleting a `.bak` an earlier caller kept**, while the flag stays `1`. `sha_of` then
+    hashes a path that no longer exists and — because the substitution sits inside a `printf` argument,
+    where `set -e` does not reach — the row is written with an **empty checksum**. Demonstrated on a
+    scratch copy. **Latent, not live**: with the shipped flags the second caller's `sed` cannot fail
+    after the first succeeded. Downstream it is fail-closed. A `[ -f … ] &&` conjunct closes it for
+    free and would make the site match the other four, each of which hashes a file it just wrote or
+    just proved present.
+16. **No state covers "the user edits a backup we own, then reinstalls"** — the spec's Risks section's
+    fourth case, the one it calls easy to get wrong, asserted as state D for both other files. The
+    behaviour is correct (measured: `keeping yours`, no row, uninstall leaves the user's bytes); it is
+    the *assertion* that is missing. Minor because the mechanism is `owned_by_installer`'s `$2 == have`
+    conjunct, which states C and D already guard through the shared helper.
+
+**Also confirmed clean, worth recording so nobody re-checks it:** `uninstall.sh` removes a two-segment
+project-relative path (proven by hand-appending a row to a real receipt *before* any `install.sh`
+change existed), never removes `Packages/manifest.json` itself, and never prunes `Packages/` — both its
+sweep and its empty-directory prune are scoped to `$CLAUDE_DIR`.
 
 ### From Task 1d — round 2's scope, and four deferred
 

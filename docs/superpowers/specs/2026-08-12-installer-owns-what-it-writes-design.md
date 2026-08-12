@@ -273,6 +273,51 @@ the writer takes SIGPIPE, pipefail turns 141 into a failure, and `set -e` kills 
 **fires on a long list and hides on a short one**, so it passes every test written against a healthy
 project and breaks on the one that needs the diagnostic most.
 
+### D10 — `CLAUDE.md.generated` is the same defect as `manifest.json.bak`, and D2's sentence already covers it
+
+**Added 2026-08-13, after Task 2's review measured it.** D2 says *"A backup the installer keeps is a
+file the installer owns."* The reasoning was never specific to backups; it is specific to **files the
+installer creates, keeps, announces, and does not record.** Task 2 fixed the one instance the survey
+had found. There is a second, and it is on the project root where a user will see it:
+
+```
+warn  CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead.
+```
+
+Measured on a fixture whose `CLAUDE.md` is the user's own and marker-less: the receipt's non-`.claude/`
+rows are `.mcp.json` and `MCP-SETUP.md` only, and after a full `uninstall.sh --yes` the project root
+still holds `CLAUDE.md.generated`. Created by the installer, kept, announced, unrecorded,
+**un-removable — forever**, in exactly the projects where the user already had their own `CLAUDE.md`
+and the installer politely declined to overwrite it.
+
+The fix is Task 2's, applied again: write the row when the installer **owns** the file at the end of
+the run, not when this run happened to create it. The ownership test is `owned_by_installer`, which
+already exists and already fails closed.
+
+**Rejected: deleting it at the end of the run.** Same objection D2 makes about the manifest backup —
+the file exists so the user can diff it against their own `CLAUDE.md` and merge, and that is work they
+do after the installer exits.
+
+**Rejected: treating this as Task 6's sweep.** Task 6 Step 2's `grep -n 'PROJECT_DIR/'` would surface
+it, and surfacing it at the end of the wave means recording it as a known defect rather than closing
+it. D2's own sentence applies to it verbatim; a wave whose thesis is *"every claim the installer makes
+about what it owns is true"* should not ship with a measured, unfixed instance of its own subject.
+
+**Also in scope, because it guards Task 2's own placement decision:** `install.sh` calls
+`add_manifest_dependency` twice — once per `--with-*` flag — and both can reach the keep branch in one
+run. Task 2 therefore writes its row **once, after both callers**. Nothing asserts that:
+`grep -rn 'with-input-system' tests/` returns three comment lines and **no test passes the flag**.
+Moving that write back inside the branch is exactly the tidying refactor a later implementer makes,
+and the suite would stay green while the receipt carried two rows for one path — at which point
+`uninstall.sh` classifies them separately, prints `keep 1 file(s) you modified` naming the file, and
+**removes it in the same run**. That is D8's failure shape reached through a receipt rather than
+through a loop, and it is measured, not hypothetical.
+
+**Scope discipline, stated so it binds.** This wave has grown four times, each time because a task's
+review found the next instance of one root cause. D10 is the **last** insertion. Anything further goes
+to the ledger and to a second wave, unless it is data loss in shipped software — which is the bar D7
+cleared and nothing since has.
+
 ## Acceptance criteria
 
 1. `bash tests/run-tests.sh` green, ANSI-stripped header count equal to `ls tests/test-*.sh | wc -l`.
@@ -299,6 +344,11 @@ project and breaks on the one that needs the diagnostic most.
 12. **`studio-doctor.sh` names an edited file under "modified since install"** rather than counting
     it verified, and **no `| head` remains in it** — proven by running it against a project with more
     than five modified files under `set -euo pipefail`.
+13. **`CLAUDE.md.generated`, when the installer writes it, has a receipt row and `uninstall.sh` removes
+    it** — proven on a fixture whose `CLAUDE.md` is the user's own and marker-less, across two installs,
+    with a user-authored `CLAUDE.md.generated` getting **no** row and surviving. And **a single
+    `install.sh --with-mcp --with-input-system` run against a project missing both packages produces
+    exactly one `Packages/manifest.json.bak` row** — asserted, not verified by hand.
 
 ## Out of scope, recorded
 

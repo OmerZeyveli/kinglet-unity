@@ -327,6 +327,92 @@ Both gates. Commit. Baseline `--expect-drift 0 --dry-run` to confirm `install.sh
 
 ---
 
+## Task 2b: The other file the installer keeps and does not record
+
+**Inserted 2026-08-13** after Task 2's review measured it. Spec **D10**, acceptance criterion 13.
+Same defect as Task 2, second instance — and the spec's scope-discipline note makes this the wave's
+**last** insertion.
+
+**Files:** modify `install.sh` (the `CLAUDE.md.generated` block) and `tests/test-install-ownership.sh`.
+
+**Interfaces:** consumes `own_row()` and `owned_by_installer()`; produces nothing.
+
+- [ ] **Step 1: Reproduce both, red**
+
+**The unrecorded file.** Build a fixture, write a `CLAUDE.md` that is the *user's own* — real content,
+no generated markers — then install. Expected today: the run prints
+
+```
+warn  CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead.
+```
+
+the receipt's only non-`.claude/` rows are `.mcp.json` and `MCP-SETUP.md`, and after
+`uninstall.sh --yes` the project root **still holds `CLAUDE.md.generated`**. Find the write with
+`grep -n 'CLAUDE.md.generated' install.sh`.
+
+**The duplicate row.** `install.sh` calls `add_manifest_dependency` twice, once per `--with-*` flag —
+find both with `grep -n 'add_manifest_dependency "' install.sh`. Against a fixture **missing both
+packages** (`--variant builtin`), run `install.sh --with-mcp --with-input-system` once. Task 2's row is
+written after both callers, so today this produces **one** row; that is the property to lock down, and
+the way to see it is to relocate the write into the keep branch on a scratch copy and watch two rows
+appear with different checksums. Do that on `git archive HEAD | tar -x -C "$(mktemp -d)"`, not in the
+tree.
+
+**Report exactly what each produced.** If either is already correct, stop — the defect the step exists
+to close is not present and the controller needs to know before anything changes.
+
+- [ ] **Step 2: Add the states, red**
+
+Extend `tests/test-install-ownership.sh`. Follow the file's existing convention: self-contained, its
+own `pass`/`fail`, `own_row()` for row lookups, and **no runner `assert_*` helpers**.
+
+| State | Setup | Receipt row for `CLAUDE.md.generated` | `uninstall.sh --yes` |
+|---|---|---|---|
+| I | user's own marker-less `CLAUDE.md`, install once | **present** | removes it |
+| I2 | the same, installed **twice** | **present** | removes it |
+| I3 | user writes their **own** `CLAUDE.md.generated` before install 1 | **absent** | leaves it |
+| J | `--variant builtin`, one run with **both** `--with-*` flags | — | exactly **one** `Packages/manifest.json.bak` row |
+
+**I3 is the state that is easy to get wrong**, for the reason D1's Risks section gives: after the fix
+the file looks like ours. It is the only assertion that catches an ownership test that claims by
+existence rather than by provenance, so prove it can go red rather than assuming it — Task 2's review
+did exactly this for E3 and it is the pattern to copy.
+
+**J counts rows, so anchor it.** A needle like `"1 row"` matches `11 rows`; count with `awk` and
+compare with an equality test, and do not put a bare `FAIL` token in any needle — `run-tests.sh`
+tallies on that token and the test's own failure message would be counted as a second failure.
+
+- [ ] **Step 3: Record the file when the installer owns it**
+
+Write the row when the installer **owns** `CLAUDE.md.generated` at the end of the run — created this
+run, or present and still matching what the installer would have written. `owned_by_installer` already
+exists and already fails closed; use it rather than inventing a second mechanism, and rather than
+testing for existence. Task 2's review measured what an existence test costs: it deletes a file the
+user wrote.
+
+**Note what makes this file harder than `MCP-SETUP.md`.** Its content is *generated per project*, not
+copied from a fixed toolkit source, so "what the installer would have written" is not a file sitting
+in `$SCRIPT_DIR`. Establish how `owned_by_installer`'s two arms behave for a path with no reference
+copy **before** you rely on either — Task 1d found that `.mcp.json`'s reference is a heredoc
+regenerated every run, which makes its first arm always match, and a wrong assumption here is the same
+mistake one file over.
+
+For **J**: keep Task 2's write where it is. The task is to assert the property, not to move the code.
+
+- [ ] **Step 4: Green, and prove I3 did not pass by luck**
+
+All four states. Then mutate: make the ownership test claim by existence
+(`[ -f "$PROJECT_DIR/CLAUDE.md.generated" ]`) and confirm **I3 specifically** goes red. Report which
+other states also reddened — a mutation that reddens everything has not isolated anything.
+
+For **J**, mutate in the other direction: relocate Task 2's row write into the keep branch and confirm
+J goes red. That is the refactor J exists to stop.
+
+- [ ] **Step 5: Gates, commit.** `install.sh` is not under `.claude/`; confirm zero baseline drift
+rather than assuming it. No new file, so no `provenance.tsv` row — confirm via the gate.
+
+---
+
 ## Task 3: The dry-run guard, with three oracles
 
 **Files:**
