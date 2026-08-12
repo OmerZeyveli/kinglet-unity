@@ -311,15 +311,26 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # expecting one. That step exists because the summary once pointed at a file the installer never
   # installed; the install half was fixed and the consent half was left open.
   #
-  # The copy is conditional — it never overwrites a file the user already has — so an unconditional
-  # line here would promise a file the real run skips: this block's own bug in mirror image. The
-  # condition is the same one Step 8c tests, read against $PROJECT_DIR the way the CLAUDE.md branch
-  # above does ($MCP_SETUP_MD is not defined until the real-run path, which we never reach here).
+  # The copy is conditional — it never overwrites an existing file — so an unconditional line here
+  # would promise a file the real run skips: this block's own bug in mirror image. The condition is
+  # the same one Step 8c tests, read against $PROJECT_DIR the way the CLAUDE.md branch above does
+  # ($MCP_SETUP_MD is not defined until the real-run path, which we never reach here).
+  #
+  # The skip branch says "already exists", not "yours exists", and speaks only of *contents*. Both
+  # narrowings are load-bearing, and the wording above earns neither:
+  #   - This branch has no discriminator for who wrote the file. On a re-run the file present is the
+  #     toolkit's, written by the previous run, so "yours" is false in the installer's own upgrade
+  #     path. The CLAUDE.md branch may say "yours" because :274's marker test has already proved the
+  #     file is not ours; .mcp.json, which has no such test either, correctly claims nothing.
+  #   - "contents", because that is the whole of what this branch can vouch for. $RECEIPT_TMP is
+  #     rebuilt every run and Step 8c appends its row only on create, so an upgrade drops the row and
+  #     uninstall.sh then leaves the file behind. That is a real defect and it is not this line's to
+  #     fix or to describe — so the line does not reach into ownership at all.
   if [ -f "$SCRIPT_DIR/MCP-SETUP.md" ]; then
     if [ ! -f "$PROJECT_DIR/MCP-SETUP.md" ]; then
       printf '  MCP-SETUP.md (new — the MCP bridge setup guide)\n'
     else
-      printf '  MCP-SETUP.md — yours exists, so it is NOT touched\n'
+      printf '  MCP-SETUP.md already exists — its contents are NOT touched\n'
     fi
   fi
   printf '\nDry run complete — nothing written.\n'
