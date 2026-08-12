@@ -11,7 +11,13 @@ Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md
 
 ## RESUME HERE
 
-**Nothing dispatched. Task 1 is next.**
+**Task 1 is done and closed** (`e6116d0..6684165`, 1 fix round, Spec ✅, Quality Approved, 5 Minor).
+**Task 1b is next** — inserted, not appended: `uninstall.sh` deletes user-edited `.claude/` files
+without `--purge`, which is data loss in shipped software. Nothing dispatched.
+
+**Spec gained D7 and a tenth acceptance criterion** after Task 1 measured that defect and its review
+reproduced it. One root cause runs through the whole wave: **the origin column is written in three
+places and read in none.**
 
 Six defects, one shape: the installer makes a claim it does not keep. The receipt is rebuilt every
 run and two project-root files write their rows inside a *create* branch, so a second install
@@ -89,16 +95,73 @@ file. Task 5 produces `scripts/detect-pipeline.sh` printing one of `builtin`, `u
 
 | # | Task | Status | Commits | Notes |
 |---|---|---|---|---|
-| 1 | The receipt records ownership, not this run's writes | open | — | State D already passes for the wrong reason — the plan says so |
+| 1 | The receipt records ownership, not this run's writes | **done** | `e6116d0..6684165` | 1 fix round. Spec ✅, Quality Approved, 5 Minor. Added state B2 after proving the upgrade path was dead code; found the `uninstall.sh` data loss |
+| 1b | `uninstall.sh` reads the origin column | open | — | **Inserted, not appended.** Data loss in shipped software; spec D7 |
 | 2 | A kept backup is a file the installer owns | open (brief pending) | — | Extends Task 1's test |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
 | 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |
 | 5 | One pipeline detector, and Option B states its costs | open (brief pending) | — | `urp+hdrp` display and skill routing is the implementer's call |
 | 6 | Whole-wave verification | open (brief pending) | — | Criterion 6 re-run, not cited |
 
+## What Task 1 found, and the controller error it exposed
+
+**The implementer found a data-loss defect its brief did not cover and reported it rather than
+fixing it.** `uninstall.sh` deletes user-edited `.claude/` files without `--purge`. Reproduced twice
+— by the implementer and independently by its reviewer — with the plan output naming the file under
+*unchanged since install* while `--purge`'s help text promises the opposite. **Now Task 1b.**
+
+**It added state B2 because it proved the test's own coverage was a lie.** States A–D all install the
+*same* toolkit twice, so the previous-receipt half of `owned_by_installer` was dead code — shown by
+mutation: replace that branch with `return 1`, excise B2, and the file still passes. B2 installs a
+scratch "previous version" first, so the upgrade path is actually exercised. Its reviewer confirmed
+the dead-code claim independently rather than accepting M1.
+
+**The predicate fails closed on 16 inputs the four states do not cover** — malformed rows, a CRLF
+receipt, an empty argument, a broken symlink, a path that is a directory — with the only two
+fail-opens being the two D1 explicitly authorises.
+
+### The controller's error, which is the wave's own subject in its most basic form
+
+**The controller's review dispatch accused the implementer of an unflagged widening it did not
+make.** While measuring, the controller read `install.sh`'s sticky `user-modified` block, saw it in
+the region it was reading, and **inferred authorship from proximity** — without running `git log -S`
+or `git blame`. That block is `c2d27f1f`, 2026-08-03, nine days before this wave and already on
+`main`.
+
+Ten times across three waves a probe's *shape* decided a finding. This one is the floor of that
+class: **no probe was run at all.** The reviewer refuted the premise in its first section and
+answered the questions anyway.
+
 ## Deferred and parked findings
 
-None yet.
+### From Task 1's review — five Minor, four closed in round 1
+
+1. **`$4 == "toolkit"` has no mutation coverage** — dropping it while keeping `$2 == have` leaves the
+   file green. **Unfalsifiable by construction, not merely untested**: `install.sh` emits no
+   non-`toolkit` row for either path, so no fixture can build a receipt where the conjunct changes
+   the answer. It guards inputs that do not exist yet — a hand-edited receipt, Task 2's project-root
+   rows. Now named in the test's *what this cannot see* block.
+2. **The receipt-still-present enumeration omitted `mv "$CLAUDE_DIR" "$BACKUP_DIR"`** and read as
+   exhaustive. Conclusion unchanged — that path runs only in `foreign` mode, which is defined by the
+   receipt's absence — but it is now named with its disposition attached.
+3. **A shipped comment blessed the `uninstall.sh` defect** as *"defensible"*. Reworded: it is a live
+   defect, and the paragraph now names itself as the one to revisit when the classifier is fixed.
+4. **`own_row()` is defined, not exported.** Report wording; holds because Task 2 extends the same
+   file, breaks silently if that ever changes.
+5. **The `cat >` over `cp` reasoning holds only at umask 022.** On umask 002 both project-root files
+   land 664 while the row hardcodes 644. Pre-existing and harmless — `uninstall.sh` never reads the
+   mode column — but the comment's reasoning is overstated. **Not fixed.**
+
+### The sticky trade is real, unstated, and pre-existing — for the ledger, not this wave
+
+Measured by Task 1's reviewer. `user-modified` is **permanent and survives a revert**: after the user
+restores an edited file to the toolkit's exact bytes, the next install rewrites the row as
+`user-modified/<toolkit sha>`, and a toolkit v2 shipping new bytes for that file **never reaches the
+project** — while a control project that never edited it does receive v2. The run prints
+`keeping yours` about a file with no local edits.
+
+Defensible trade — never silently clobber — but `install.sh` states only the benefit, and there is no
+supported way back except deleting the row by hand. **`c2d27f1f`'s code, not this wave's.**
 
 ## Carried from the previous wave — not this wave's scope
 

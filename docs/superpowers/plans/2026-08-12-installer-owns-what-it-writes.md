@@ -123,6 +123,74 @@ Commit. No `.claude/` file was touched, so confirm zero baseline drift with `--e
 
 ---
 
+## Task 1b: `uninstall.sh` reads the origin column it is already given
+
+**Inserted 2026-08-12, not appended.** Task 1 measured this and its review reproduced it: a `.claude/`
+file the user edited is **deleted by a plain `uninstall.sh --yes`**. It goes here rather than at the
+end because it is data loss in shipped software, and because it is the same root cause as Task 1 —
+the origin column is written in three places and read in none. Spec decision **D7**.
+
+**Files:**
+- Modify: `uninstall.sh` — the classifier loop
+- Modify: `tests/test-install-ownership.sh`
+
+**Interfaces:**
+- Consumes: `own_row()` from Task 1.
+- Produces: nothing.
+
+- [ ] **Step 1: Reproduce the defect before changing anything**
+
+Build a fixture, install, edit a `.claude/` file the payload owns, install again, then
+`uninstall.sh --yes --no-backup`. Expected today: the run reports the file under
+`remove N file(s) — unchanged since install`, the `keep N file(s) you modified` branch never fires,
+and **the edited file is gone**.
+
+Capture that output verbatim. If the file survives, stop and report — the defect is absent and the
+controller needs to know before anything changes.
+
+- [ ] **Step 2: Add the three assertions, red**
+
+Extend `tests/test-install-ownership.sh` with state **G**, all three directions:
+
+| | expectation |
+|---|---|
+| `uninstall.sh --yes` | the edited file **survives** |
+| its plan output | counts the file under *modified*, not *unchanged since install* |
+| `uninstall.sh --yes --purge` | the edited file **is** removed |
+
+The third is what stops the fix from becoming "never delete anything". Run and confirm the first two
+fail and the third passes.
+
+- [ ] **Step 3: Branch on the column**
+
+`uninstall.sh`'s classifier already destructures the origin field and discards it — find it with
+`grep -n "IFS=\$'\\\\t' read -r rel recorded" uninstall.sh`. A row whose origin is `user-modified` is
+the user's file, whatever its checksum says.
+
+Keep the checksum test for `toolkit` rows: there it correctly separates *we installed it and nobody
+touched it* from *we installed it and someone did*.
+
+**Do not change what `install.sh` records.** It writes the edited sha so the next install recognises
+the file as still-edited; changing that reintroduces the defect `c2d27f1f` fixed on 2026-08-03, where
+an edit survived exactly one upgrade and the second silently overwrote it. Two consumers need
+different things from one row, and the origin column is how the row already tells them apart.
+
+- [ ] **Step 4: Green, and prove the fix did not become "keep everything"**
+
+All three of state G's assertions. Then confirm the pre-existing states still hold — in particular
+that a `toolkit` row whose file is untouched is **still removed**, or the fix has traded a
+data-loss bug for an uninstaller that does not uninstall.
+
+Mutation-prove it: make the classifier treat *every* row as `user-modified` and confirm the suite
+goes red on the untouched-file case.
+
+- [ ] **Step 5: Gates, commit**
+
+Both gates. `uninstall.sh` is not under `.claude/`, so confirm zero baseline drift rather than
+assuming it.
+
+---
+
 ## Task 2: A backup the installer keeps is a file the installer owns
 
 **Files:**

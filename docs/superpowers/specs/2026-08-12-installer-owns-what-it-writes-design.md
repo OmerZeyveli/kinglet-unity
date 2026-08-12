@@ -192,6 +192,45 @@ It is annotated with what it costs — no receipt, so `uninstall.sh` will refuse
 reason to copy by hand, and removing the option silently is worse than documenting its cost. The
 defect is that it reads as an equal alternative, not that it exists.
 
+### D7 — `uninstall.sh` reads the origin column it is already given
+
+**Added 2026-08-12, after Task 1 measured it and its review reproduced it.** This is data loss in
+shipped software and it belongs in this wave, because it is the same root cause as everything above:
+**the origin column is written in three places and read in none.**
+
+`install.sh` records a kept user-modified file with its **current** — that is, edited — checksum, so
+that the next run recognises it. `uninstall.sh`'s classifier then compares the file against that
+recorded checksum:
+
+```bash
+while IFS=$'\t' read -r rel recorded _mode _origin; do
+  …
+  if [ "$(sha_of "$abs")" = "$recorded" ]; then TO_REMOVE=…  else MODIFIED=…  fi
+```
+
+The sha matches, because install recorded the edited state. **The file lands in `TO_REMOVE` and is
+deleted without `--purge`.** `_origin` is destructured and discarded — the underscore is deliberate.
+
+Reproduced twice, independently: install → edit `.claude/rules/pc-console.md` → install →
+`uninstall.sh --yes --no-backup` reports `remove 87 file(s) — unchanged since install`, the
+`keep N file(s) you modified` branch never fires, and the edited file is gone. `--purge`'s own help
+text reads *"Also remove files you modified (default: keep and report them)"* — the default already
+removes them.
+
+**The `MODIFIED` branch only ever catches a file edited *after* the last install.** A file edited
+before it reads as untouched forever.
+
+**The fix is to branch on the column that was written for this.** `origin = user-modified` means the
+file is the user's, whatever its checksum says, and it is kept unless `--purge`. The checksum test
+stays for `toolkit` rows, where it correctly distinguishes "we installed it and nobody touched it"
+from "we installed it and someone did".
+
+**Rejected: making `install.sh` record the pristine sha instead of the edited one.** It records the
+edited sha so the *next install* recognises the file as still-edited; changing that reintroduces the
+defect `c2d27f1f` fixed on 2026-08-03, where an edit survived exactly one upgrade and was silently
+overwritten by the second. Two consumers need two different things from one row, and the origin
+column is how the row already tells them apart.
+
 ## Acceptance criteria
 
 1. `bash tests/run-tests.sh` green, ANSI-stripped header count equal to `ls tests/test-*.sh | wc -l`.
@@ -210,6 +249,9 @@ defect is that it reads as an equal alternative, not that it exists.
 8. Against a fixture that already ignores `/.claude/` wholesale, the dry-run does **not** promise a
    `.gitignore` edit, and the real run makes none.
 9. `docs/GETTING-STARTED.md`'s Option B states its two costs.
+10. **A `.claude/` file the user edited survives `uninstall.sh --yes`**, is counted under
+    `keep N file(s) you modified` rather than `unchanged since install`, and is removed by
+    `uninstall.sh --purge`. Proven on a fixture in all three directions.
 
 ## Out of scope, recorded
 
