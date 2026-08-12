@@ -5,7 +5,7 @@
 ## The problem, measured
 
 A surface that ships into a user's Unity project can only cite what that user has. Eight section
-markers in three shipped skills abbreviate a citation to a document that does not ship, and seven
+markers in three shipped skills abbreviate a citation to a document that does not ship, and eight
 more paths name files `install.sh` deliberately does not copy. One of them is a **rule** that
 instructs the reader to inspect a test file and report a regression.
 
@@ -258,6 +258,46 @@ never as "the full pipeline", which is the one thing it is not.
 - P1 (Ambiguity Score calibration against the generated block) and P3 (routing precedence between
   `unity-brainstorming`'s unconditional trigger and `/unity-ui` / `/unity-scene`). Both are product
   decisions, deferred by the owner to their own round after this one.
+
+### Four things rule 2 cannot see, measured during Task 2 and left standing
+
+Every one is latent today — no shipped surface currently trips it — and every one is a consequence
+of the frozen token expression the Risks section names. They are written down because a guard's
+silence is only as wide as what it reads, and an unrecorded blind spot reads as coverage.
+
+- **Command-form citations evade it entirely.** ``Run `bash tests/test-no-mobile.sh` to check`` leaves
+  the guard green: the expression cannot match a path inside a multi-word backtick span. This is the
+  most idiomatic way to write the exact citation this wave spent eight fixes removing, and it is the
+  sharpest of the four.
+- **The `.claude/*` case arm is unreachable.** The expression requires `[A-Za-z0-9_]` as the first
+  character, so no token beginning with `.` is ever produced. 56 backticked `.claude/…` citations in
+  shipped Markdown are invisible to rule 2. Harmless while the payload *is* `.claude/**` less
+  `state/`, but the arm reads as coverage that does not exist.
+- **The URL escape is narrowed, not closed.** Any URL whose text ends `/<token>` clears the citation
+  regardless of where it points — the property is basename-suffix equality, not resolution. D5 calls
+  text-matching what "keeps it from being a loophole"; that is accurate for the URLs this repository
+  carries and is not a general guarantee.
+- **`scripts/<x>.sh` clears against a payload entry at a different path.** The installed file is
+  under `.claude/scripts/`, so the citation as written does not literally resolve for a reader. No
+  shipped Markdown cites that form today.
+
+**And one thing outside the guard by construction:** `.claude/UPSTREAM` ships and names four
+repository-only files — `provenance.tsv`, `provenance-skip.tsv`, `MERGE-NOTES.md`,
+`check-provenance.sh`. Both rules scan `find .claude -name '*.md'`, so a non-Markdown surface is out
+of reach. D1's principle covers it; this guard does not.
+
+### One class the guard will never cover, closed by hand instead
+
+**A revision of this repository cited in a shipped surface** is exactly as unfollowable as a path
+that does not ship, and rule 2 cannot see it — a SHA is not a path. Task 2 removed the last two by
+hand: `git log 0f772a4..HEAD` and a bare `2b543f2`.
+
+The discriminator matters, because a blind sweep would have done damage. `bb28ccb`, `984023d` and
+`3dcbd5c` also appear in `NOTICE.md` and are **correctly kept**: `git cat-file -t` reports them as
+not objects in this repository — they are upstream pins — and each sits on a row carrying that
+upstream's repository URL, so a reader follows the link and resolves the SHA where it lives. That is
+D1's test passing, in a shape rule 2 does not implement. Deleting them would have broken the MIT
+attribution this branch spent Task 7 of the previous wave discharging.
 
 ## Risks
 

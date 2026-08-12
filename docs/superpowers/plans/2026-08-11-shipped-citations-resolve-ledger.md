@@ -11,9 +11,9 @@ Spec: `docs/superpowers/specs/2026-08-11-shipped-citations-resolve-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Task 1 is done and closed** (`c56a1fd..a4f49ea`, 1 fix round, Spec ✅, Quality Approved, 0 Critical).
-**Task 2 is next**, and its brief is amended — see *Task 2's brief, as amended* below. Nothing is
-dispatched.
+**Tasks 1 and 2 are done and closed.** The guard exists, both rules pass, and all sixteen citation
+sites are fixed. **Task 3 is next** — `install.sh:257`, the dry-run that promises a directory the
+real run removes. Nothing is dispatched.
 
 The wave makes every citation a shipped surface makes resolve in an installed Unity project. Eight
 `§N` markers abbreviate a citation to `docs/research/pioneer/field-notes.md`, which is tracked and
@@ -22,8 +22,8 @@ instructing the reader to inspect a test and report a regression. A new guard,
 `tests/test-shipped-citations.sh`, enforces both rules against a payload it derives rather than
 hardcodes.
 
-Suite at wave start: 488 passing, 30 test files, 544 manifest rows. **Now: 491 passing, 31 test
-files, `provenance OK`.**
+Suite at wave start: 488 passing, 30 test files, 544 manifest rows. **Now: 495 passing, 31 test
+files, `provenance OK`.** The guard prints 7 PASS lines and examines 561 backticked tokens.
 
 **Spec D3 was withdrawn mid-Task-1 and the spec is corrected on the record.** The first draft said
 the `§N` markers pointed at nothing and ruled `systematic-debugging:39`'s empty cell should stay
@@ -133,7 +133,7 @@ before a trailing `printf` as the plan's Step 1 implies. Reported by Task 1's im
 | # | Task | Status | Commits | Notes |
 |---|---|---|---|---|
 | 1 | Guard rule 1 (`§N`) + the eight marker sites | **done** | `c56a1fd..a4f49ea` | 1 fix round. Spec ✅, Quality Approved, 1 Important + 5 Minor, none blocking. **The implementer found the spec's premise false and said so instead of proceeding on it** — see below |
-| 2 | Guard rule 2 (repo-only paths) + the eight path sites | open (brief amended) | — | Extends Task 1's file. Mutation proof is Step 7 and it is the task's real deliverable. Four amendments below |
+| 2 | Guard rule 2 (repo-only paths) + the eight path sites | **done** | `909d85b..803b3d6` | 2 fix rounds. Spec ✅, 4 Important + 8 Minor, all Important ADDRESSED. **The header comment written to state true things stated two false ones, falsified by its own commit** — see below. Round 2's verification was the controller's, by stated deviation |
 | 3 | The installer's dry-run states what the real run does | open (brief pending) | — | `install.sh:257` |
 | 4 | The fork states its threshold once | open (brief pending) | — | Runner-provided test file — verify through the runner |
 | 5 | The two documents that contradict themselves | open (brief pending) | — | `GETTING-STARTED.md:162`, the process-chain ledger's `RESUME HERE` |
@@ -203,12 +203,115 @@ The plan's "Task 2" section stands, with four changes. All four come from Task 1
    this ledger's commit range, so a rewrite would invalidate references the controller had already
    taken. `ec6c889`'s message states the correction in full, so history is self-correcting for
    anyone reading it in order.
-6. **No trailing newline on a red run** (`:71`). → Task 2, amendment 4. Cosmetic; does not affect
-   the runner's PASS/FAIL aggregation.
+6. **No trailing newline on a red run** (`:71`). → Task 2, amendment 4. ~~Cosmetic; does not affect
+   the runner's PASS/FAIL aggregation.~~ **That ruling was wrong and Task 2 disproved it by
+   measurement.** `run-tests.sh:278` matches `PASS` at a line start *or after whitespace*, so the
+   un-newlined flag dump glued the next line on as `…measurement.PASS: guard examined 562 …`,
+   preceded by `.`, matching neither. **PASS lines counted: 5 before the fix, 6 after** — a pass
+   silently dropped from the tally, on exactly the runs whose numbers get read. Left struck through
+   rather than deleted: a reviewer reading this ledger should see that this class was called
+   cosmetic once and was not.
 
 ### Carried to Task 6 — its sweep as written can never report clean
 
 Plan Task 6 Step 2 greps for `sourced-incidents` and expects `clean: no reference survives`. The
-string survives by design in the spec, in the plan, and — until Task 2 — in the guard's header
-comment. **The check as written is unsatisfiable and must be rewritten in Task 6's brief** to scope
-the sweep to what ships: `.claude/` and nothing else. Reported by Task 1's implementer.
+string survives by design in the spec, in the plan, and in this ledger. **The check as written is
+unsatisfiable and must be rewritten in Task 6's brief** to scope the sweep to what ships: `.claude/`
+and nothing else. Reported by Task 1's implementer.
+
+## Task 2's mutation results — Task 6 cites these rather than re-running them
+
+Produced at Step 7, **re-verified at `472a0fd` and again after round 2's edit**, and independently
+reproduced by two reviewers using differently-shaped probes.
+
+| Mutation | Result |
+|---|---|
+| (a) `§N` injected into a shipped skill | `exit 1`, the injected line named with `file:line` |
+| (b) a repo-only path injected into a shipped skill | `exit 1`, the token named; `tokens_seen` moved 562→563, independently confirming the token was read |
+| (c) `CLAUDE.md` removed from the allow-list | **26** — matching D6 exactly |
+
+The re-review reproduced all three by injecting into a **rules file, an agent, and a command** rather
+than the skill the implementer used, so the guard is not a guard for one file. Its controls behaved:
+`scripts/studio-doctor.sh` was not flagged (it ships), and `docs/features/slug/design.md` was not
+flagged (no such file exists here, which is what keeps user-project paths from firing). It also
+extended (c): dropping `LICENSE` → 1, dropping `VERSION` → 1. **All three allow-list entries are
+load-bearing; none is dead weight.**
+
+**Step 7's method had to change, and the brief's version would have corrupted two of the three.**
+`git archive HEAD` at Step 7 archives a tree from *before* the task's commit — so it would have had
+no rule 2 — and `git checkout` cannot restore a file inside a `tar -x` directory that has no `.git`,
+so (b) and (c) would have run with (a)'s injection still in place. The implementer used
+`git stash create` plus a fresh extraction per mutation. The review verified the deviation two ways:
+the stash object still exists and `git diff --stat <stash> 54f65a6` is empty, so the mutations ran
+against exactly the committed tree.
+
+## What Task 2 found, and the one it created
+
+**The header comment rewritten to state true things stated two false ones — and both were falsified
+by the very commit that wrote them.** It said `NOTICE.md` carries five URLs; the task's own
+`CREDITS.md` fix added a sixth. It cited `test-provenance-origins.sh` as an example that "still
+fires"; the task deleted that citation. Amendment 2 existed precisely to truth-check that comment,
+and the rewrite reproduced the class it was fixing.
+
+The repair was a **method, not a patch**: state the property rather than a count and an example. The
+re-review tested that by trying to falsify the new sentence — adding a seventh URL, then deleting
+one — and the old sentence flipped true→false→true across those states while the new one held in all
+three. The added lines contain no digit and no backticked token at all.
+
+**The class the guard cannot see, closed by hand.** A revision of this repository cited in a shipped
+surface is exactly as unfollowable as a path that does not ship, and rule 2 cannot see it — a SHA is
+not a path. Two survived: `git log 0f772a4..HEAD` at `verification-before-completion:45` and a bare
+`2b543f2` at `:36`, nine rows above it in the same table. The implementer's own class probe
+(`grep 'git log [0-9a-f]\{7\}'`) returned none and was materially incomplete, because `2b543f2` is
+not a *range*. The re-review probed five other shapes and found exactly one survivor.
+
+**The discriminator is what makes this safe**, and a blind sweep would have done damage: `bb28ccb`,
+`984023d` and `3dcbd5c` also appear in `NOTICE.md` and are correctly kept. `git cat-file -t` reports
+them as not objects here — they are upstream pins — and each sits on a row carrying that upstream's
+repository URL. Deleting them would have broken the MIT attribution the previous wave's Task 7
+discharged.
+
+## Deferred from Task 2 — all real, all recorded rather than half-fixed
+
+1. **Four more rot-prone claims in the same comment block**, all measured **true today** and all
+   predating the rewrite: `NOTICE.md:140` and `install.sh:175`/`:379-390` as line citations, "cited
+   in 26 shipped files", "the count then falls to 76". Same shape as the defect findings 1–2 fixed.
+   **The block is not rot-proof end to end**, and fixing them inside the fix loop would have been the
+   scope creep that turns three rounds into six.
+2. **Four things rule 2 cannot see**, all latent today, now written into the spec's *Out of scope,
+   recorded*: command-form citations like `` `bash tests/x.sh` `` evade the expression entirely (the
+   sharpest — it is the idiomatic way to write the citation this wave removed eight of); the
+   `.claude/*` case arm is unreachable, so 56 citations are invisible; the URL escape is
+   basename-suffix equality rather than resolution; and `scripts/<x>.sh` clears against a payload
+   entry at a different path.
+3. **`.claude/UPSTREAM` ships and names four repository-only files.** Outside both rules by
+   construction — they scan `*.md`. Recorded in the spec.
+4. **Rule 1's `§3` exception is file-scoped, not line-scoped.** A future *false* `§3` anywhere in
+   `NOTICE.md` is invisible. Harmless today: `NOTICE.md` has exactly one `§` line.
+5. **The plan's `tokens_seen` estimate of "near 323" is wrong** — measured 569 pre-fix, 561 now. 323
+   was a globally-unique count; `tokens_seen` is per (file, token). Nothing depends on it; the floor
+   is 200. Fix the plan text, not the guard.
+6. **The runner's aggregation is blind to python results in both directions** — for the spin-out
+   wave, with this framing rather than the narrower ERROR-only one. `run-tests.sh:278-280` matches
+   `(^|[[:space:]])(PASS|FAIL)(:|[[:space:]])`, and unittest's `... ok`, `... FAIL`, `... ERROR` and
+   `FAILED (failures=3, errors=17)` all fail that pattern. `tests/test-kinglet-build.sh`'s 1308 tests
+   contribute **0 PASS and 0 FAIL**; `Total: 495` excludes them entirely. A red python run reaches
+   the aggregate only through the `test_rc -ne 0 && file_fail -eq 0` fallback at `:285-288`, as
+   exactly one FAIL. **The suite cannot go silently green on a python failure** — this is granularity
+   loss, not a fail-open.
+
+## Controller deviations, stated so their absence is not read as an omission
+
+1. **Round 2 of Task 2 was verified by the controller, not by a dispatched re-review.** A single-line
+   deletion whose correctness is a `grep` returning empty does not need a fresh reader, and the
+   dispatch would have cost more than it caught. Verified: `2b543f2` gone from shipped Markdown; the
+   three upstream pins still present and still not objects in this repository; no hex string in any
+   shipped `.md` resolves via `git cat-file -t`; guard `exit=0` with 7 PASS; `provenance OK`; tree
+   clean.
+2. **The controller's brief named the wrong line for the git-range fix** (`:44`; it is `:45`, and
+   `:44` is the `Light2D` row carrying no range). The implementer reported the correction rather than
+   silently retargeting, which is the distinction that matters.
+3. **Task 2's implementer did not photograph the intermediate sha256 tripwire state** between its fix
+   and baseline commits in round 2, as it had in rounds 0 and 1. It flagged the gap itself. Accepted:
+   the tool's non-zero drift is itself evidence the tripwire had something to notice, and the final
+   run is green.
