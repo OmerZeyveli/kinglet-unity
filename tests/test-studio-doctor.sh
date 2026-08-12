@@ -99,9 +99,13 @@ assert_contains "$TSD_STALE_OUT" "unity-brainstorming" \
 rm -rf "$TSD_STALE"
 
 # ── A declared provider that IS present but disabled is still a WARN ───────
-# install.sh's own definition of "installed" (line ~327) requires the plugin key's
-# value to be `true`, not merely present. Doctor's check must agree, or a provider
-# the user has switched off would be reported as usable.
+# install.sh's own definition of "installed" requires the plugin key's value to be
+# `true`, not merely present — the grep for
+# '"superpowers@claude-plugins-official"[[:space:]]*:[[:space:]]*true' against
+# $CLAUDE_USER_SETTINGS. Doctor's check must agree, or a provider the user has
+# switched off would be reported as usable. (Cited as "install.sh line ~327" until
+# 2026-08-12, by which point :327 was dry-run commentary about .mcp.json and the
+# grep was far below it. Anchors do not move; line numbers into install.sh do.)
 echo ""
 echo "--- Test: declared provider present but disabled ---"
 TSD_DISABLED="/tmp/kinglet-doctor-disabled-$$"

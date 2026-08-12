@@ -17,9 +17,18 @@ FAILURES=0
 fail() { printf 'FAIL: %s\n' "$1"; FAILURES=$((FAILURES + 1)); }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-# The installed payload, derived the way install.sh derives it — not hardcoded. install.sh:175 takes
-# every file under .claude/ except state/, and :379-390 copies scripts/*.sh into .claude/scripts/
-# with exactly one exclusion. A hardcoded list goes stale the first time the payload changes.
+# The installed payload, derived the way install.sh derives it — not hardcoded. install.sh's
+# PAYLOAD_FILES assignment takes every file under .claude/ except state/, and its `for group in
+# scripts` copy loop copies scripts/*.sh into .claude/scripts/ with exactly one exclusion,
+# check-provenance.sh. A hardcoded list goes stale the first time the payload changes.
+#
+# Cited by anchor, not by line. This comment read `install.sh:175` and `:379-390` and the second half
+# rotted three commits later inside the wave that wrote it: a 29-line insertion higher up in
+# install.sh moved the copy loop down by 29, and `:379-390` came to rest on licence prose about
+# NOTICE.md, which still reads as a plausible thing for this comment to be pointing at. The ledger
+# had listed this exact citation as rot-prone and "measured true today" — a line number cannot be
+# made durable by checking it. An anchor survives an insertion; find them with:
+#   grep -n 'PAYLOAD_FILES=\|for group in scripts' install.sh
 payload_paths() {
   ( cd "$REPO/.claude" && find . -type f ! -path './state/*' | sed 's|^\./|.claude/|' )
   for f in "$REPO"/scripts/*.sh; do
@@ -58,7 +67,7 @@ fi
 # changes, which is the failure mode this repository has recorded three times.
 STATE_LEAK="$(printf '%s\n' "$PAYLOAD" | grep -c '^\.claude/state/' || true)"
 if [ "$STATE_LEAK" -eq 0 ]; then
-  pass "payload carries no .claude/state/ path (install.sh:175's one exclusion)"
+  pass "payload carries no .claude/state/ path (PAYLOAD_FILES' one exclusion in install.sh)"
 else
   fail "payload derivation included $STATE_LEAK .claude/state/ path(s) — install.sh excludes them, so citations to state/ files have silently stopped being caught"
 fi

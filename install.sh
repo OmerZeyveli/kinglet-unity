@@ -178,8 +178,11 @@ info "Payload: $PAYLOAD_COUNT files"
 
 # Every .claude path this run will own, in receipt form. Built here rather than derived twice,
 # because the dry run and the real run must answer the same question: what belongs afterwards?
-# Keep this in step with the two write loops below (the payload loop and the scripts/tests groups)
-# — a path written but missing here would be deleted as an orphan the run after it appears.
+# Keep this in step with the two write loops below (the payload loop and the `for group in scripts`
+# loop) — a path written but missing here would be deleted as an orphan the run after it appears.
+# There is one group and it is `scripts`. This line read "the scripts/tests groups" until 2026-08-12,
+# naming a tests/ write that has never existed — the same defect as the dry-run summary's old
+# "scripts/ and tests/ into .claude/" line, which was fixed while this one was left standing.
 NEW_PATHS=$(
   printf '%s\n' "$PAYLOAD_FILES" | sed 's|^|.claude/|'
   for group in scripts; do
@@ -393,9 +396,15 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 #   1. run-tests.sh computes REPO_DIR as the parent of tests/. In this repository that is the repo
 #      root; in an installed project it is `.claude/`, so every path is off by one level and the
 #      tests look for `.claude/.claude/hooks/...`.
-#   2. Twelve of the twenty-eight test files reference install.sh, provenance.tsv, tests/fixtures/,
+#   2. A large share of the test files reference install.sh, provenance.tsv, tests/fixtures/,
 #      migration/baseline-inventory.json or tools.kinglet_build — none of which ship. Those cannot
 #      pass in a project whatever REPO_DIR says.
+#
+#      Derive that share; do not trust a number written here. This sentence carried a hardcoded pair,
+#      "twelve of the twenty-eight", and was wrong at both ends on both later measurements: 15 of 30
+#      at 076464b and 16 of 31 on 2026-08-12. The set is the claim, so the commands are the claim:
+#        grep -lE 'install\.sh|provenance\.tsv|tests/fixtures/|migration/baseline-inventory\.json|tools\.kinglet_build' tests/test-*.sh | wc -l
+#        ls tests/test-*.sh | wc -l
 #
 # The suite validates the toolkit, not the project. What a user actually needs is
 # scripts/studio-doctor.sh, which does ship, runs correctly against an installed layout, and checks
@@ -576,7 +585,9 @@ fi
 #
 # Ask git what it already ignores rather than grepping for our exact lines. A project that ignores
 # `/.claude/` wholesale — a perfectly sensible choice, and one real projects make — is already
-# covered, and appending our three entries to it is just noise in someone else's file.
+# covered, and appending our four entries to it is just noise in someone else's file. Four, not the
+# three this line claimed until 2026-08-12: `.claude.backup.*/` was added below without updating the
+# count here. Count the add_ignore calls rather than trusting this sentence.
 GITIGNORE="$PROJECT_DIR/.gitignore"
 WANT_IGNORED='.claude/settings.local.json
 .claude/state/session.json
