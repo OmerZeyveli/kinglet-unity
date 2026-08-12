@@ -318,6 +318,83 @@ review found the next instance of one root cause. D10 is the **last** insertion.
 to the ledger and to a second wave, unless it is data loss in shipped software — which is the bar D7
 cleared and nothing since has.
 
+### D11 — Two unconditional writers destroy user work, and this wave taught them to claim it was safe
+
+**Added 2026-08-13, after Task 2b's review reproduced it on three independent paths.** This is the one
+thing D10 left the door open for: **data loss in shipped software.** It clears D7's bar and then some.
+
+`install.sh` has two writers that overwrite without asking:
+
+```bash
+mv "$TMP_MD" "$PROJECT_DIR/CLAUDE.md.generated"     # the separate-file branch
+cp "$MANIFEST" "$MANIFEST.bak"                       # add_manifest_dependency, per --with-* flag
+```
+
+**The installer's own summary tells the user to edit the first one:**
+
+```
+  2. Fill in the FILL: markers in CLAUDE.md.generated, then merge what you want into your own CLAUDE.md.
+```
+
+Measured: user's marker-less `CLAUDE.md`, install, fill the 9 markers, install again — the file is
+back to 9 unfilled markers. **The edit survives zero reinstalls.** `c2d27f1f` was fixed on 2026-08-03
+because an edit survived exactly *one* upgrade; this is worse by one.
+
+Measured on a **first install ever**: a user who wrote their own `CLAUDE.md.generated` and has never
+run this installer loses it, and the receipt then claims the file as `toolkit`.
+
+And the same shape on the second file: `--with-mcp` on a project missing both packages, edit the kept
+`.bak`, then `--with-input-system` — the `cp` runs again and the edit is gone.
+
+**The aggravating half is this wave's own.** Before Task 2 and Task 2b there were no receipt rows for
+these paths, so the upgrade scan never named them. Now both have rows, so both appear in
+`MODIFIED_FILES`, and the run prints:
+
+```
+warn 1 installed file(s) have local edits — keeping yours:
+       CLAUDE.md.generated
+ ok  Installed 85 file(s).
+warn CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead.
+warn Yours was not touched. Merge by hand, or add the markers to let us refresh in place.
+```
+
+**Three surfaces speak about that file and all three say the opposite of what happens** — the dry-run's
+`is NOT touched`, the upgrade scan's `keeping yours`, and `Yours was not touched.` one line after the
+`mv`. That is **D8's exact failure shape, reproduced twice, and created by the two tasks that were
+closing D8's class.** D8's own words: *"worse than silent data loss, because the user is told the file
+is safe in the same breath."* The wave's thesis failing in the wave's own subject, for the second time.
+
+**The fix is the payload loop's shape, applied to two writers that never had it.** Before writing, ask
+`owned_by_installer`. When the answer is no, do not write.
+
+- **`CLAUDE.md.generated`** — keep the user's file, warn naming it, and **do not set the branch
+  variable that makes the row predicate claim ownership.** The generated content is not produced this
+  run; say so, and say the user can delete or rename their file to get it.
+- **`Packages/manifest.json.bak`** — **decline the manifest edit itself for that flag**, and say why.
+  A backup exists to make a risky edit recoverable; performing the edit while silently declining to
+  create the backup keeps the risk and drops the mitigation. The user is told which file is in the
+  way and that moving it lets the flag proceed.
+
+**Rejected: writing the backup under a different name** (`manifest.json.bak.1`, a timestamp). It trades
+one destroyed file for unbounded debris in a wave whose subject is debris, and every such file needs a
+receipt row of its own.
+
+**Rejected: warning and overwriting anyway.** That is what the code already effectively does, one
+sentence louder. The repository's standing rule is `keeping yours`, not `telling you before we take
+it`.
+
+**Rejected: deferring to a second wave.** Defensible only on scope, and D10 already answered scope.
+Shipping now means shipping two *fresh* instances of the defect this wave exists to eliminate, and
+acceptance criterion 13's third clause cannot honestly be signed off until the `mv` is conditional —
+on the fixture that criterion names, the user's file is destroyed before ownership is ever asked.
+
+**`.gitignore` is a third unrecorded instance of D10's class and is NOT promoted.** `--variant bare`:
+the run prints `==> Created .gitignore`, the file is kept, no row is written, and it survives uninstall
+carrying only Kinglet's four entries. It is debris, not data loss, so D10's rule holds and it goes to
+the second wave — with one exception: **Task 3's dry-run guard will see it** (a created file is exactly
+what its first oracle is for), and Task 4 owns the `.gitignore` announcement. If closing it falls
+inside those tasks' diffs naturally, close it there; do not widen them to reach it.
+
 ## Acceptance criteria
 
 1. `bash tests/run-tests.sh` green, ANSI-stripped header count equal to `ls tests/test-*.sh | wc -l`.
@@ -349,6 +426,16 @@ cleared and nothing since has.
     with a user-authored `CLAUDE.md.generated` getting **no** row and surviving. And **a single
     `install.sh --with-mcp --with-input-system` run against a project missing both packages produces
     exactly one `Packages/manifest.json.bak` row** — asserted, not verified by hand.
+    *(Its third clause was satisfiable in 2026-08-13's tree only under a narrowed reading — the two
+    shapes where the writing arm never runs — because on the fixture it names the user's file was
+    destroyed before ownership was asked. D11 closes that gap; the clause is then achievable as
+    written, and criterion 14 asserts it.)*
+14. **Neither unconditional writer destroys a file it does not own.** Proven on three fixtures, each in
+    both directions: a user-authored `CLAUDE.md.generated` before any install ever; a
+    `CLAUDE.md.generated` the installer wrote and the user then edited, across a reinstall; and a
+    `Packages/manifest.json.bak` the user edited, across a second `--with-*` flag. In each, the user's
+    bytes survive, **no run claims `keeping yours` about a file it overwrote**, and the toolkit's own
+    file is still written when the installer does own it.
 
 ## Out of scope, recorded
 

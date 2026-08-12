@@ -413,6 +413,89 @@ rather than assuming it. No new file, so no `provenance.tsv` row — confirm via
 
 ---
 
+## Task 2c: The two writers that overwrite without asking
+
+**Inserted 2026-08-13** after Task 2b's review reproduced it on three independent paths. Spec **D11**,
+acceptance criterion 14, and the amendment to criterion 13. This is **data loss in shipped software** —
+the one exemption D10 left open — and the wave itself created the half that makes it worse.
+
+**Files:** modify `install.sh` (the `CLAUDE.md.generated` branch and `add_manifest_dependency`) and
+`tests/test-install-ownership.sh`.
+
+**Interfaces:** consumes `own_row()` and `owned_by_installer()`; produces nothing.
+
+- [ ] **Step 1: Reproduce all three, red**
+
+Find the two writers with `grep -n 'mv "\$TMP_MD"' install.sh` and
+`grep -n 'cp "\$MANIFEST" "\$MANIFEST.bak"' install.sh`. Then, capturing full output each time:
+
+1. **The prescribed workflow.** Default fixture, a marker-less `CLAUDE.md` that is the user's own,
+   install, **fill in the `FILL:` markers** in `CLAUDE.md.generated` the way the run's own summary step
+   2 says, install again. Expected today: the markers are back, and the run prints `keeping yours:`
+   naming that file **and** `Yours was not touched.` in the same output.
+2. **First install ever.** Same fixture, but the user wrote their own `CLAUDE.md.generated` before any
+   install. Expected today: destroyed, and the receipt then records it as `toolkit`.
+3. **The backup.** `--variant builtin`, `install --with-mcp`, edit the kept `.bak`, then
+   `install --with-input-system` (the second package is still missing, so the `cp` runs again).
+   Expected today: `keeping yours:` names the file and the edit is gone.
+
+**If any of the three does not reproduce, stop and report** — the defect the task exists to close may
+not be present in the shape the spec describes.
+
+- [ ] **Step 2: Add the states, red**
+
+Extend `tests/test-install-ownership.sh` — self-contained, its own `pass`/`fail`, `own_row()` for row
+lookups, **no runner `assert_*` helpers**. One state per reproduction above, and each asserts **three**
+things, because two of them are what makes this D11 rather than a plain overwrite:
+
+| | expectation |
+|---|---|
+| the user's bytes | **survive** |
+| the run's output | does **not** claim `keeping yours` about that file, and does not claim `Yours was not touched` about a file it touched |
+| the toolkit's own file | is **still written** when the installer does own it |
+
+The third row is the anti-"never write anything" guard, as in Tasks 1b and 1c. Without it the fix can
+pass by refusing to install.
+
+**Also add criterion 13's third clause as it is actually written** — a marker-less `CLAUDE.md` **and** a
+user-authored `CLAUDE.md.generated`, across two installs, the file getting no row and surviving. Task
+2b could only assert a narrowed reading of that clause because the file was destroyed before ownership
+was asked; once this task lands, the clause is achievable as written. Say in the report whether it now
+is.
+
+- [ ] **Step 3: Ask before writing**
+
+Both writers consult `owned_by_installer` first. **Do not invent a second ownership mechanism** — the
+helper exists, it fails closed on 16 malformed inputs, and Task 2b established how to call it for a
+file with no fixed reference copy.
+
+For **`CLAUDE.md.generated`**: when the installer does not own it, keep the user's file, warn naming
+it, and **do not set the branch variable that makes the row predicate claim ownership** — find it with
+`grep -n 'CLAUDE_MD_BRANCH' install.sh`. Getting this wrong writes a receipt row for a file you just
+declined to write, which is the same defect pointing the other way. Tell the user what to do: the
+generated content was not produced this run, and renaming or deleting their file gets it.
+
+For **`Packages/manifest.json.bak`**: when the installer does not own it, **decline the manifest edit
+itself for that flag** and say why. A backup exists to make a risky edit recoverable; performing the
+edit while silently skipping the backup keeps the risk and drops the mitigation. Name the file that is
+in the way and say that moving it lets the flag proceed. **Return non-zero from that path or otherwise
+make sure the caller does not report success** — check what `add_manifest_dependency`'s callers do with
+its exit status before deciding, rather than assuming.
+
+- [ ] **Step 4: Green, and prove the fix did not become "never write anything"**
+
+All three states plus criterion 13's clause. Then, separately: a **clean** fixture still gets its
+`CLAUDE.md.generated` written and recorded, and a clean `--with-mcp` still edits the manifest and keeps
+its backup. Report both.
+
+Mutation-prove the declines: make each ownership test always return true and confirm the matching
+state's user-bytes assertion goes red. **Report which other states reddened** — a mutation that reddens
+everything has isolated nothing.
+
+- [ ] **Step 5: Gates, commit.** `install.sh` is not under `.claude/`; confirm zero baseline drift.
+
+---
+
 ## Task 3: The dry-run guard, with three oracles
 
 **Files:**

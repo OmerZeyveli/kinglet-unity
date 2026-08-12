@@ -17,10 +17,16 @@ Quality Approved — which is the first time in this wave. **Task 2b is the next
 
 **Task 2b was inserted 2026-08-13** because Task 2's review measured a second live member of the class
 Task 2 closes: `CLAUDE.md.generated` is created by the installer, kept, announced, and never recorded —
-permanent debris on the project root, in exactly the projects where the user already had their own
-`CLAUDE.md`. Spec **D10**, criterion 13. **D10 also declares itself the wave's last insertion**: anything
-further goes to a second wave unless it is data loss in shipped software, which is the bar D7 cleared
-and nothing since has.
+permanent debris on the project root. Spec **D10**, criterion 13. D10 declared itself the wave's last
+insertion, with one exemption: **data loss in shipped software**.
+
+**Task 2c was then inserted the same day, through that exemption, and it is the wave's most serious
+finding.** Task 2b's review reproduced on three independent paths that `install.sh` has two writers
+that overwrite without asking — and that **this wave taught both of them to claim the file was safe**
+while doing it. See the Task 2b section below. Spec **D11**, criterion 14, plus an amendment to
+criterion 13. **The exemption is now spent**: nothing further is promoted unless it is data loss, and
+the two known non-data-loss instances (`.gitignore`, and the `.bak` `cp` clobber's remaining half) are
+recorded for a second wave.
 
 The wave keeps growing because each task's review finds the next instance of one root cause. The
 spec now carries **nine decisions**, and the tally is: the origin column is written in four places
@@ -138,7 +144,8 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 1c | The scripts loop respects a user edit | **done** | `a192776..2f2b820` | 1 fix round. Spec ✅, Approved. State H now edits **two** scripts — one file cannot tell "keeps edits" from "keeps THIS file" from "keeps ONE file" |
 | 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | **done** | `cfc35b9..11ff9ee` | Reviewed after the fact — see below. Spec ✅, Quality Needs work: 1 Important + 6 Minor. **3 fix rounds**, and rounds 2 and 3 each closed a defect the previous round's own fix introduced. Round 1 ran on a fresh implementer because the original was killed |
 | 2 | A kept backup is a file the installer owns | **done** | `c096d1b..a8acd49` | **No fix round** — Spec ✅, Quality Approved. The implementer refused the brief's literal Step 3 and implemented the spec; the review reproduced that the brief's shape *is* the defect. Suite 645 → 674 |
-| 2b | The other file the installer keeps and does not record | open | — | Inserted 2026-08-13 from Task 2's review. `CLAUDE.md.generated`, plus an assertion for Task 2's own row placement |
+| 2b | The other file the installer keeps and does not record | **done** | `c4d36f3..15dfda4` | **No fix round** — Spec ✅ (criterion 13 clause 3 narrowed, disclosed), Quality Approved. Answered the open question by measurement; added I4/I5 beyond the plan, and I4 is the only state that discriminates the receipt arm. Suite 674 → 738 |
+| 2c | The two writers that overwrite without asking | open | — | Inserted 2026-08-13 from Task 2b's review. **Data loss**, D10's one exemption, and the wave created the aggravating half |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
 | 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |
 | 5 | One pipeline detector, and Option B states its costs | open (brief pending) | — | `urp+hdrp` display and skill routing is the implementer's call |
@@ -424,6 +431,79 @@ what isolation looks like. The implementer's own mutation had reddened F and G t
 isolated anything. E3 ends `FAIL: E3: uninstall.sh deleted Packages/manifest.json.bak, which the user
 wrote` — the fail-closed direction the spec's Risks section demands.
 
+## Task 2b — the wave's thesis failing in the wave's own subject, for the second time
+
+**Task 2b itself was clean.** Spec ✅, Quality Approved, no fix round, and its review verified the work
+with three mutation shapes the implementer never ran. What it found while doing so is the wave's most
+serious finding.
+
+**The open question the brief could not answer, answered by measurement.** `owned_by_installer` tries a
+**reference copy** first and the **previous receipt** second, and `CLAUDE.md.generated` is generated per
+project — it has no fixed toolkit source. The implementer passes `''`, so arm 1 is skipped **by
+construction** rather than by luck, which is the distinction Task 1d's `.mcp.json` finding made
+necessary. It then used `install.sh`'s own existing branch variable for the other half.
+
+**The reviewer verified both halves are load-bearing by deleting each, not by repeating the
+implementer's tracing:**
+
+| deletion | result |
+|---|---|
+| drop the receipt half | **2 FAIL, state I4 only** |
+| drop the branch half | **8 FAIL** — degenerates to "no row ever", identical to red-first |
+
+**I4 is the single state that discriminates the receipt arm — and the plan's four-state table did not
+have it.** The implementer added it beyond the brief. Without it, that disjunct would have been the
+`.mcp.json` failure one file over: a never-consulted arm wearing a safety argument. This is the exact
+trap the dispatch flagged, and it was avoided by an implementer widening its own task.
+
+**Criterion 13's third clause was met only under a narrowed reading, and the narrowing was disclosed
+three times** — in the report, in a `# WHAT THESE STATES CANNOT SEE` block, and in the plan-disagreement
+section. The reviewer's judgement, which is the right one: the reading is the only implementable one
+**and** the honest statement of it is that *criterion 13 as written requires the clobber to be fixed*.
+Which is now Task 2c, and criterion 13 carries an amendment saying so.
+
+### The Critical finding: two writers destroy user work, and this wave taught them to claim otherwise
+
+```bash
+mv "$TMP_MD" "$PROJECT_DIR/CLAUDE.md.generated"     # the separate-file branch
+cp "$MANIFEST" "$MANIFEST.bak"                       # add_manifest_dependency, per --with-* flag
+```
+
+Reproduced on **three independent paths**:
+
+1. **The workflow the installer prescribes.** Its own summary says *"2. Fill in the `FILL:` markers in
+   `CLAUDE.md.generated`, then merge what you want into your own `CLAUDE.md`."* Fill the 9 markers,
+   reinstall — back to 9 unfilled. **The edit survives zero reinstalls.** `c2d27f1f` was fixed on
+   2026-08-03 because an edit survived exactly *one*.
+2. **A first install ever.** A user who wrote their own `CLAUDE.md.generated` and has never run this
+   installer loses it — and the receipt then records it as `toolkit`.
+3. **The backup.** `--with-mcp`, edit the kept `.bak`, then `--with-input-system` — the `cp` runs again
+   and the edit is gone.
+
+**The destruction pre-dates the wave. The claim does not.** Before Tasks 2 and 2b there were no receipt
+rows for these paths, so the upgrade scan never named them. Now both have rows, so both land in
+`MODIFIED_FILES`:
+
+```
+warn 1 installed file(s) have local edits — keeping yours:
+       CLAUDE.md.generated
+ ok  Installed 85 file(s).
+warn CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead.
+warn Yours was not touched. Merge by hand, or add the markers to let us refresh in place.
+```
+
+**Three surfaces speak about that file and all three say the opposite of what happens** — the dry-run's
+`is NOT touched`, the upgrade scan's `keeping yours`, and `Yours was not touched.` one line after the
+`mv`. That is **D8's exact failure shape, twice, created by the two tasks that were closing D8's
+class.** Neither implementer erred: it is the unavoidable consequence of adding a correct row on top of
+an incorrect writer. **It is still a regression the wave now owns**, and Task 2's own review did not
+catch its half.
+
+**Controller ruling: fixed in this wave, as Task 2c.** D10 closed the wave *"unless it is data loss in
+shipped software."* This is data loss, in shipped software, in the workflow the installer itself
+prescribes, on three paths. Deferring would ship two *fresh* instances of the defect the wave exists to
+eliminate, and criterion 13 could not honestly be signed off. **The exemption is now spent.**
+
 ## Deferred and parked findings
 
 ### From Task 2's review — four, one of which became Task 2b
@@ -543,6 +623,26 @@ sweep and its empty-directory prune are scoped to `$CLAUDE_DIR`.
 
 Both left in the plan as written, with this ledger entry as the correction — editing a brief after its
 task has run rewrites the record of what the implementer was actually told.
+
+### From Task 2b's review — three, none promoted
+
+17. **`.gitignore` is a third unrecorded instance of D10's class.** `--variant bare`: the run prints
+    `==> Created .gitignore`, keeps it, writes no row, and it survives uninstall carrying only Kinglet's
+    four entries. Debris, **not** data loss, so D10's rule holds and this goes to the second wave —
+    with one exception: **Task 3's dry-run guard will see it**, because a created file is exactly what
+    its first oracle is for, and Task 4 owns the `.gitignore` announcement. If closing it falls inside
+    those diffs naturally, close it there; do not widen them to reach it.
+    *(A fourth candidate, `CLAUDE.md` on the `new` branch, was examined and rejected: `uninstall.sh`
+    states the exclusion — `Left alone: CLAUDE.md, docs/, and anything you wrote.` — so it is stated
+    policy, not silent debris.)*
+18. **The dry-run line names the wrong subject.** `grep -n 'yours exists and has no markers, so it is
+    NOT touched' install.sh` prints the label `CLAUDE.md.generated` followed by "it is NOT touched",
+    which is false about the file it names — its intent is "your `CLAUDE.md`". **Task 3's ground**, and
+    its third oracle only catches it if that fixture carries a pre-existing `CLAUDE.md.generated`.
+    Carry this into Task 3's dispatch.
+19. **`stat -c '%a'` is GNU-only**, now at a fifth site. On BSD `stat` the row records `644` for a
+    `600` file. Nothing reads the mode column (`uninstall.sh` destructures it as `_mode`), and mirroring
+    the four existing sites beats introducing a second idiom. **For the macOS pass.**
 
 ### From Task 1's review — five Minor, four closed in round 1
 
