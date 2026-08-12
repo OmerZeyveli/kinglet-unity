@@ -37,6 +37,13 @@
 #   * Why uninstall.sh did what it did. This reads the filesystem before and after, so "the file
 #     survived" and "the file survived because uninstall crashed" look identical — which is why
 #     every install and uninstall below asserts its exit status separately.
+#   * The `$4 == "toolkit"` conjunct in owned_by_installer's awk. Delete it, keep `$2 == have`, and
+#     every state here stays green. That is not a coverage gap this file could close: install.sh
+#     emits no non-`toolkit` row for either path, so no fixture can produce a receipt where the
+#     conjunct changes the answer. It is defence against inputs that do not exist yet — a
+#     hand-edited receipt, and the project-root rows Task 2 adds — so it is unfalsifiable by
+#     construction rather than merely untested. Read the mutation record accordingly: three of the
+#     four fail-open weakenings of that awk are caught here, and this is the fourth.
 #   * Anything about behaviour inside Claude Code. This proves the installer's bookkeeping on a
 #     synthetic project, and nothing more.
 # ============================================================================
