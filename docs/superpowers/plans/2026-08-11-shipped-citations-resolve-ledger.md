@@ -11,9 +11,9 @@ Spec: `docs/superpowers/specs/2026-08-11-shipped-citations-resolve-design.md`
 
 ## RESUME HERE — state for a session that has lost its context
 
-**Tasks 1 and 2 are done and closed.** The guard exists, both rules pass, and all sixteen citation
-sites are fixed. **Task 3 is next** — `install.sh:257`, the dry-run that promises a directory the
-real run removes. Nothing is dispatched.
+**Tasks 1, 2 and 3 are done and closed.** The guard exists, both rules pass, all sixteen citation
+sites are fixed, and the installer's dry-run now describes the program it actually runs. **Task 4 is
+next** — the fork's threshold, stated once. Nothing is dispatched.
 
 The wave makes every citation a shipped surface makes resolve in an installed Unity project. Eight
 `§N` markers abbreviate a citation to `docs/research/pioneer/field-notes.md`, which is tracked and
@@ -134,7 +134,7 @@ before a trailing `printf` as the plan's Step 1 implies. Reported by Task 1's im
 |---|---|---|---|---|
 | 1 | Guard rule 1 (`§N`) + the eight marker sites | **done** | `c56a1fd..a4f49ea` | 1 fix round. Spec ✅, Quality Approved, 1 Important + 5 Minor, none blocking. **The implementer found the spec's premise false and said so instead of proceeding on it** — see below |
 | 2 | Guard rule 2 (repo-only paths) + the eight path sites | **done** | `909d85b..803b3d6` | 2 fix rounds. Spec ✅, 4 Important + 8 Minor, all Important ADDRESSED. **The header comment written to state true things stated two false ones, falsified by its own commit** — see below. Round 2's verification was the controller's, by stated deviation |
-| 3 | The installer's dry-run states what the real run does | open (brief pending) | — | `install.sh:257` |
+| 3 | The installer's dry-run states what the real run does | **done** | `037304b..240ee6f` | 2 fix rounds. Spec ✅, 2 Important + 3 Minor. **Scope widened once by controller ruling** (`MCP-SETUP.md`), then held. The reviewer built seven fixture states; the implementer had built three |
 | 4 | The fork states its threshold once | open (brief pending) | — | Runner-provided test file — verify through the runner |
 | 5 | The two documents that contradict themselves | open (brief pending) | — | `GETTING-STARTED.md:162`, the process-chain ledger's `RESUME HERE` |
 | 6 | Whole-wave verification | open (brief pending) | — | Cites Task 2's mutation results rather than re-running them |
@@ -299,6 +299,81 @@ discharged.
    the aggregate only through the `test_rc -ne 0 && file_fail -eq 0` fallback at `:285-288`, as
    exactly one FAIL. **The suite cannot go silently green on a python failure** — this is granularity
    loss, not a fail-open.
+
+## What Task 3 found — and why its own method could not find all of it
+
+The brief was one line: `install.sh:257` printed `scripts/ and tests/ into .claude/` while the real
+run ships `scripts/` and *prunes* an installed `.claude/tests/`.
+
+**The implementer widened its check from *directories* to *anything the real run writes*, and that
+widening found a second instance:** `MCP-SETUP.md`, copied to the **project root**, recorded in the
+receipt as toolkit-owned, announced by nothing. The controller ruled it in scope — D8's principle is
+that the dry-run "does not get to describe a different program", and the block that copies it exists
+*because* the summary once pointed at a file the installer never installed. The install half had been
+fixed and the consent half left open.
+
+**The fix's own trap was live and avoided.** The real copy is conditional, so an unconditional
+announcement would promise a file the real run skips for every user who already has one — the same
+defect pointing the other way. The announcement carries Step 8c's condition verbatim.
+
+### The lesson: an oracle can be disjoint from the defect class
+
+The implementer then re-ran its widened check and reported **no third unannounced write**. The
+reviewer found one: with `--with-mcp` against a project whose `Packages/manifest.json` git does not
+track, `install.sh:623` leaves `Packages/manifest.json.bak` behind permanently.
+
+**The implementer's check could not have found it.** Its oracle was the receipt
+(`grep -v '^#' <receipt> | cut -f1`), and `manifest.json.bak` never enters the receipt. The method
+could not miss the defect — it could not *see* it. The reviewer used a `find` snapshot before and
+after a real run, diffed, with the flags exercised.
+
+This is the third time this wave that a probe's shape, not its execution, decided what it found:
+Task 2's `grep 'git log [0-9a-f]\{7\}'` could not see a bare SHA, and Task 1's spec conflated an
+absent filename with an absent referent. `verification-before-completion`'s own row —
+*"Ask what set the check ran over before trusting silence"* — has now been demonstrated three times
+inside the wave that edits it.
+
+**The guard candidate was corrected before it could ship the blind spot.** The implementer had
+recorded *"every conditional write in `install.sh` has a matching dry-run branch"*, with the receipt
+as oracle. Built that way it would have certified the very class it cannot inspect. Corrected shape,
+for the spin-out wave: **the filesystem is the primary oracle** — before/after `find` across a real
+run, flags exercised, both `MODE=fresh` and `MODE=ours` — and **the receipt is a second, different
+check** asking what the first cannot: does every write that should be owned actually get recorded.
+That second check is what would catch both defects below.
+
+## Deferred from Task 3 — two real installer defects this wave is not closing
+
+1. **The receipt disowns files on upgrade.** `$RECEIPT_TMP` is rebuilt from scratch every run, and
+   Step 8c (`install.sh:690-694`) appends its row **only on create**. So a second install drops
+   `MCP-SETUP.md`'s row 1 → 0 and `uninstall.sh` — which removes only receipt-listed paths — then
+   **leaves the file behind**. Measured, and `.mcp.json` (`:672`, `:683`) behaves identically, so it
+   is a class. The fix is to re-record the row when the existing file is receipt-owned or matches the
+   toolkit copy. **Out of this brief: an installer-ownership fix, not a dry-run fix.** Task 3's
+   round-2 wording change was scoped precisely so the announcement no longer makes a claim about
+   this.
+2. **`Packages/manifest.json.bak` is permanent debris** (`install.sh:623`, `:642`). Created with
+   `--with-mcp` against a project whose manifest git does not track; `:629` removes it only when the
+   file *is* tracked. It never enters the receipt, so `uninstall.sh` can never remove it — in exactly
+   the projects (non-git, or a manifest not yet added) least able to `git checkout` it away. Same
+   class as `MCP-SETUP.md` and worse in that one respect.
+
+### Three Minor from Task 3, recorded
+
+3. **The second definition of `$PROJECT_DIR/MCP-SETUP.md`** (`:319` against `:690`) is **accepted**,
+   with reasons. Hoisting is feasible — both variables are bound far earlier — but it is the file's
+   established convention twice over (`CLAUDE.md` inline at `:272`/`:274` and assigned at `:460`;
+   `.mcp.json` inline at `:300`/`:302` and assigned at `:660`), so hoisting only this one leaves the
+   pattern half-migrated. And the path is not the duplication that matters: what must stay in step is
+   the *condition*, and a hoisted variable does nothing for that. A shared predicate would, but the
+   dry-run needs a three-way answer (silent / new / untouched) rather than a boolean. That refactor
+   belongs with item 2's guard.
+4. **Nothing guards either installer fix.** No test exercises `install.sh --dry-run`;
+   `tests/test-install-prune.sh:33` already runs the installer against a fixture and does A/B upgrade
+   sequences, so the infrastructure exists and the guard is cheap.
+5. **`MCP-SETUP.md` as a *directory*** makes `[ ! -f ]` true, so both halves take the create branch —
+   they agree, so it is not a dry-run defect — but `cp` then writes `MCP-SETUP.md/MCP-SETUP.md` and
+   `sha_of` on a directory yields empty, producing a receipt row with an empty checksum. Uninstall
+   degrades gracefully. Exotic and pre-existing.
 
 ## Controller deviations, stated so their absence is not read as an omission
 
