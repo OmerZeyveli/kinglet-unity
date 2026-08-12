@@ -254,7 +254,7 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 if [ "$DRY_RUN" -eq 1 ]; then
   printf '\n%s\n' "${BOLD}Would install:${NC}"
   printf '  %s files into %s\n' "$PAYLOAD_COUNT" "$CLAUDE_DIR"
-  printf '  scripts/ and tests/ into .claude/\n'
+  printf '  scripts/ into .claude/\n'
   if [ "$ORPHAN_COUNT" -gt 0 ]; then
     printf '  remove %s file(s) this payload no longer ships:\n' "$ORPHAN_COUNT"
     printf '%s' "$ORPHANS" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done
