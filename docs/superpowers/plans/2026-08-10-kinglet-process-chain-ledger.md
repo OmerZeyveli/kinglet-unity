@@ -14,7 +14,8 @@ Spec: `docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`
 **This wave is closed and nothing from this plan is dispatched.** All eight tasks are done, the
 whole-branch review and its fixes are done (`e04571e..0d6cb06`), and the owner-selected product fixes
 P2/P4/P8 are done (`4660d85`, with its baseline in `66b53dc`). The wave's last commit is `a29d830`.
-The task table below carries every range.
+The task table below carries a range for each of the eight tasks and for the whole-branch review; the
+product-fix row gives only a starting point, so the three commits above are the record for it.
 
 **What it built:** `unity-brainstorming` → `unity-planning` → the fork →
 `subagent-driven-implementation` or `unity-execution`. The pool ended matching D7's arithmetic
@@ -25,7 +26,7 @@ it:** `ls .claude/agents/*.md | wc -l`, and the same for `.claude/commands/*.md`
 `docs/ARCHITECTURE.md` and `docs/SKILL-CATALOG.md`. The external obligation is discharged:
 Superpowers' MIT text is reproduced byte-identically in both credit documents, three adapted surfaces
 are named and guarded in both directions, and the unverifiable pin says so of itself
-(`.claude/NOTICE.md` §3's closing paragraph; `.claude/UPSTREAM`'s `superpowers_pin_verified=no`).
+(`.claude/NOTICE.md:149`; `.claude/UPSTREAM`'s `superpowers_pin_verified=no`).
 
 **What is still open — this is why the section exists.**
 
@@ -41,10 +42,20 @@ are named and guarded in both directions, and the unverifiable pin says so of it
     `unity-brainstorming` and *"a UI screen, or a scene to build"* to `/unity-ui` / `/unity-scene`.
     A UI screen is both. Nothing states which row wins, and `unity-brainstorming`'s boundary section
     names exactly one exemption and it is not these.
-- **The *Deferred and parked findings* sections below are a backlog, not history.** Every item there
-  was ruled on rather than closed. Two are still recorded as out of scope by the wave *after* this
-  one: the unguarded closing `---` frontmatter fence across every skill, and the surface criterion
-  applied to hooks and `scripts/`.
+- **Part of *Deferred and parked findings* below is still a backlog — and part of it is history.
+  Check an item against the tree before acting on it.** The six *"N from Task X, deferred with
+  rulings"* lists are where the live items are; two of them are still recorded as out of scope by the
+  wave *after* this one — the unguarded closing `---` frontmatter fence across every skill, and the
+  surface criterion applied to hooks and `scripts/`. But **those lists are mixed**, because Task 8,
+  the whole-branch review, the product fixes and the successor wave each closed items without coming
+  back to edit the list: Task 2's items 5 and 6, Task 4's item 5 and Task 5's item 3 are all done,
+  each verified against the tree on 2026-08-12. The other six subsections are **not** a backlog at
+  all — *Task 5 must do these* is fully discharged (neither the `provenance.tsv` parenthetical nor
+  `subagent-driven-implementation`'s `/unity-workflow` reference exists any more) and so is *Carried
+  to Task 7/8 — the Superpowers pin*, which is the same fact this block cites as discharged four
+  paragraphs up; *Two controller errors in Task 1's brief*, *`⚠️ Cannot verify from diff`* and *The
+  method that found what the deletion proof could not* are record, not work; and *`bash-gate.sh`
+  classifies on the whole command string* is open but was ruled out of scope with no owner.
 
 **A successor wave runs on the same branch and keeps its own ledger** —
 `docs/superpowers/plans/2026-08-11-shipped-citations-resolve-ledger.md`, against plan
