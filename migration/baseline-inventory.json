@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "54f65a6aee5628330f9d8c30c247657026f018ff",
+  "source_commit": "fd3b1c59e93c4519e3b43e634a5ba81057fcdad5",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 77,
@@ -258,7 +258,7 @@
       },
       {
         "path": ".claude/rules/pc-console.md",
-        "sha256": "6f7dabb02a4b89bad8219cd26cf1fc28141accc27334e03ae69554e942986037",
+        "sha256": "f7101c73127853c49caaa18f2306b388e98a652af605697eeb5ce8e2607479f8",
         "git_mode": "100644"
       },
       {
@@ -383,7 +383,7 @@
       },
       {
         "path": ".claude/skills/verification-before-completion/SKILL.md",
-        "sha256": "997d078968e8b8ffcd23d353276229d99d9fea9dbce9ee87b6afba8c1a9a3908",
+        "sha256": "f7ebd790b7be2acb5e5a8d0c4d5aaaa3b06a5359e6c239edd49f855d0bfb777a",
         "git_mode": "100644"
       },
       {
@@ -572,7 +572,7 @@
         },
         {
           "path": ".claude/skills/verification-before-completion/SKILL.md",
-          "sha256": "997d078968e8b8ffcd23d353276229d99d9fea9dbce9ee87b6afba8c1a9a3908",
+          "sha256": "f7ebd790b7be2acb5e5a8d0c4d5aaaa3b06a5359e6c239edd49f855d0bfb777a",
           "git_mode": "100644"
         }
       ]
@@ -734,7 +734,7 @@
         },
         {
           "path": ".claude/rules/pc-console.md",
-          "sha256": "6f7dabb02a4b89bad8219cd26cf1fc28141accc27334e03ae69554e942986037",
+          "sha256": "f7101c73127853c49caaa18f2306b388e98a652af605697eeb5ce8e2607479f8",
           "git_mode": "100644"
         },
         {
