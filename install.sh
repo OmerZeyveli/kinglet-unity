@@ -743,6 +743,12 @@ fi
 # One helper for every "--with-X adds a package to Packages/manifest.json" flag, so --with-mcp and
 # --with-input-system share the same surgical insert, the same backup behaviour, and the same
 # "could not edit safely" fallback rather than two hand-maintained copies drifting apart.
+#
+# Derived from $MANIFEST rather than written out again, so the receipt row and the file it claims
+# cannot disagree. A row whose path is one character off is a row uninstall.sh silently declines to
+# act on, which on disk is indistinguishable from no row at all.
+MANIFEST_BAK_REL="${MANIFEST#"$PROJECT_DIR"/}.bak"
+MANIFEST_BAK_KEPT=0
 add_manifest_dependency() {
   local pkg_name="$1" pkg_value="$2" flag_name="$3"
   if [ ! -f "$MANIFEST" ]; then
@@ -774,6 +780,12 @@ add_manifest_dependency() {
         info "To undo: git checkout Packages/manifest.json"
       fi
     else
+      # KEPT, so ours. Recorded once, after both callers have run, rather than here: --with-mcp and
+      # --with-input-system can both reach this line in one run, and the second `cp` above has
+      # already overwritten the first's backup. Two rows for one path would then disagree on the
+      # checksum, and uninstall.sh would report the stale one under "you modified" while removing
+      # the file under the fresh one.
+      MANIFEST_BAK_KEPT=1
       ok "Added $pkg_name to manifest.json (backup: manifest.json.bak)"
     fi
   else
@@ -785,6 +797,34 @@ add_manifest_dependency() {
 
 [ "$WITH_MCP" -eq 1 ] && add_manifest_dependency "$MCP_PKG_NAME" "$MCP_PKG_URL" "--with-mcp"
 [ "$WITH_INPUT_SYSTEM" -eq 1 ] && add_manifest_dependency "$INPUT_SYSTEM_PKG_NAME" "$INPUT_SYSTEM_PKG_VERSION" "--with-input-system"
+
+# A backup we keep is a file we own. Without this row uninstall.sh — which removes only what the
+# receipt lists — could never take it away, so manifest.json.bak was permanent debris in exactly the
+# projects least able to `git checkout` it back: the ones not under git, which is the only condition
+# under which it is kept at all.
+#
+# OUTSIDE THE FLAGS, NOT JUST OUTSIDE THE BRANCHES, and for the reason owned_by_installer exists.
+# `add_manifest_dependency` returns early once the package is already in the manifest, and a run
+# passing no --with-* flag never calls it — so on every install after the first, the branch that
+# makes the backup does not execute while the backup sits on disk untouched. A row written where the
+# file is created vanishes on run 2 and the debris comes straight back. Measured on a fixture:
+# --with-mcp, then a plain install, and the .bak is still there.
+#
+# Two disjuncts, and neither is redundant. The first is knowledge: this run made the copy and chose
+# to keep it. The second is the previous receipt, which is the only thing that can answer for a file
+# no branch in this run touched — and it is a checksum comparison, so a backup the user has since
+# edited stops being ours and is left alone, exactly as an edited MCP-SETUP.md is.
+#
+# It fails closed on the case that matters: a Packages/manifest.json.bak the user wrote themselves
+# satisfies neither disjunct, gets no row, and uninstall.sh never touches it. (What this cannot
+# defend against is the `cp` above overwriting such a file before anything asks whose it was — that
+# is older than this row and is not addressed here.)
+if [ "$MANIFEST_BAK_KEPT" -eq 1 ] || owned_by_installer "$MANIFEST_BAK_REL" ''; then
+  printf '%s\t%s\t%s\ttoolkit\n' \
+    "$MANIFEST_BAK_REL" \
+    "$(sha_of "$PROJECT_DIR/$MANIFEST_BAK_REL")" \
+    "$(stat -c '%a' "$PROJECT_DIR/$MANIFEST_BAK_REL" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+fi
 
 # ── Step 8b: .mcp.json — the file Claude Code actually reads MCP servers from ──
 # Project-scoped MCP servers live in .mcp.json at the project root, not in .claude/settings.json.

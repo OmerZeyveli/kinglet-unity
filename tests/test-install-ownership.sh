@@ -26,6 +26,26 @@
 # one class and the fix is one shape, so a state that passes for one and not the other is a real
 # finding rather than an inconsistency to paper over.
 #
+# States E and F are the THIRD project-root file, and it is the one the states above were structurally
+# unable to see: Packages/manifest.json.bak, written by --with-mcp / --with-input-system before the
+# manifest is edited. The installer deletes that backup when git already tracks the manifest — git is
+# then the backup — and KEEPS it, announced, when git does not. What it never did was record it, so
+# uninstall.sh could never remove it: permanent debris in exactly the projects least able to
+# `git checkout` it away.
+#
+#   E  --with-mcp, the project not under git       backup kept,    row present, uninstall removes it
+#   F  --with-mcp, the manifest tracked by git     backup deleted, NO row,      nothing to remove
+#
+# E's second install is not decoration. `add_manifest_dependency` returns early once the package is
+# in the manifest, so run 2 never reaches the branch that makes the backup — while the backup is
+# still sitting on disk. A row written on authorship therefore vanishes on run 2 and the file becomes
+# permanent debris again, one run later. Measured on this fixture before the fix. It is the same
+# defect states A–D close for the other two files, and it is why the row is a statement of ownership
+# here too rather than a log of the run that happened to create the file.
+#
+# E3 is the fail-closed direction for this file: a Packages/manifest.json.bak the USER wrote, and a
+# plain install that never asks for a manifest edit at all. No row, and uninstall leaves it.
+#
 # State G is the other side of the same column. A–D are about whether the row is WRITTEN; G is about
 # whether it is READ. A `.claude/` file the user edited gets a `user-modified` row carrying its
 # EDITED checksum — deliberately, so the next install still recognises it — and uninstall.sh's
@@ -47,8 +67,11 @@
 #      sibling is still replaced with the bytes this toolkit ships.
 #
 # WHAT THIS FILE CANNOT SEE
-#   * Only the two project-root files named above, in states A–D. A third unrecorded write at the
-#     project root — Packages/manifest.json.bak is the known one — is invisible here by construction.
+#   * Named paths, not an enumeration. A–D assert MCP-SETUP.md and .mcp.json; E and F assert
+#     Packages/manifest.json.bak. A FOURTH unrecorded project-root write would be invisible here by
+#     construction, because nothing in this file walks the project and asks what appeared — every
+#     assertion names its path in advance. Catching that class needs a guard whose oracle is the
+#     filesystem before and after a run, which is a different test from this one.
 #   * State G edits three payload files — Markdown, a hook, settings.json — because ONE was not
 #     enough: with a single .md file here, a classifier mutated to protect only `.md` passed this
 #     whole file with zero failures while deleting a user's edited hook and settings.json. What it
@@ -58,10 +81,18 @@
 #     and nothing reads it); and any payload file whose content is binary. What the INSTALLER does
 #     to a `.claude/` payload file across upgrades is tests/test-install.sh's and
 #     tests/test-install-prune.sh's ground, not this file's.
-#   * Only `--yes` installs against the default (urp) fixture. --with-mcp, --with-input-system,
-#     --dry-run and --keep-local are not exercised, and the fixture is NOT a git repository, so
-#     every branch that turns on `git -C "$PROJECT_DIR"` takes its no-git side. `--purge` is
-#     exercised in state G and nowhere else.
+#   * Every state installs against the default (urp) fixture. A–D, G and H pass no flag but `--yes`,
+#     and their fixtures are NOT git repositories, so every branch that turns on
+#     `git -C "$PROJECT_DIR"` takes its no-git side there. E and F are the only states that pass
+#     `--with-mcp`, and F the only one that builds a real git repository. `--purge` is exercised in
+#     state G and nowhere else; `--with-input-system`, `--dry-run` and `--keep-local` nowhere at all.
+#   * E and F use --with-mcp rather than --with-input-system because the urp fixture already carries
+#     com.unity.inputsystem, so that flag returns early and writes no backup. Two consequences are
+#     unmeasured here: BOTH flags in one run against a project missing both packages, where the
+#     second `cp` overwrites the first backup and the surviving .bak is no longer the pre-install
+#     manifest; and a user's own Packages/manifest.json.bak on a run that DOES pass a --with-* flag,
+#     where install.sh's `cp` overwrites it before anything asks whose it was. E3 covers only the
+#     other half of that second case — the plain install, which never reaches the `cp`.
 #   * Of the malformed receipts a mangled origin column can produce, only ONE shape is asserted
 #     (G.5: a trailing space). A fifth column and a CRLF line ending take the same catch-all branch
 #     by construction, but they are reasoned about, not measured, here.
@@ -357,6 +388,141 @@ assert_not_owned "$D" '.mcp.json'    "D (edited, then reinstalled twice)"
 run_uninstall "$D" "D"
 assert_kept "$D" 'MCP-SETUP.md' "$D_MD_SHA"   "D"
 assert_kept "$D" '.mcp.json'    "$D_JSON_SHA" "D"
+
+# ── States E and F: the manifest backup ──────────────────────────────────────
+# One file, two branches, and WHICH BRANCH A FIXTURE TAKES IS ASSERTED RATHER THAN ASSUMED. The
+# branch turns on `git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/manifest.json`, which
+# consults the whole parent chain — so a scratch directory that happens to sit inside somebody's
+# repository silently sends E down F's path, deletes the backup, and E's every assertion then passes
+# for the wrong reason on a file that is not there. The two branches print different lines and each
+# state below checks for its own, so a fixture in the wrong shape goes red instead of green.
+#
+# The paths are derived from one string each, not written twice: a row whose path disagrees with the
+# file it claims by one character is a row uninstall.sh silently declines to act on, which is
+# indistinguishable from no row at all.
+MANIFEST_REL='Packages/manifest.json'
+MANIFEST_BAK_REL="$MANIFEST_REL.bak"
+
+# The flag-passing sibling of run_install, capturing output the way run_uninstall_flags does — the
+# announcement is the only evidence of which branch ran, and it is not on the filesystem.
+INSTALL_OUT=''
+run_install_flags() {
+  local d="$1" label="$2"; shift 2
+  local rc=0 out
+  out="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+        bash "$REPO/install.sh" --project-dir "$d" --yes "$@" </dev/null 2>&1 \
+        | sed $'s/\x1b\\[[0-9;]*m//g')" || rc=$?
+  INSTALL_OUT="$out"
+  if [ "$rc" -eq 0 ]; then
+    pass "$label: install.sh exited 0"
+  else
+    fail "$label: install.sh exited $rc — every assertion after this one describes a half-installed project"
+    printf '%s\n' "$out"
+  fi
+}
+
+# ── State E: --with-mcp on a project git does not track ──────────────────────
+E="$(new_fixture state-e)"
+if git -C "$E" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  fail "E: the fixture is inside a git work tree — install.sh will delete the backup instead of keeping it, and every E assertion below would be testing F's branch"
+else
+  pass "E: the fixture is not under git, so install.sh must keep the backup it makes"
+fi
+E_MANIFEST_BEFORE="$(sha_of "$E/$MANIFEST_REL")"
+
+run_install_flags "$E" "E install 1" --with-mcp
+if grep -qF -- '(backup: manifest.json.bak)' <<< "$INSTALL_OUT"; then
+  pass "E: the run announced the backup it kept — this is the branch that keeps the file"
+else
+  fail "E: the run never announced '(backup: manifest.json.bak)' — it took the git branch, or never edited the manifest at all, and E is asserting against a branch that did not run"
+fi
+
+if [ -f "$E/$MANIFEST_BAK_REL" ]; then
+  pass "E: $MANIFEST_BAK_REL is on disk after the install"
+else
+  fail "E: $MANIFEST_BAK_REL is not on disk — there is nothing here for a receipt row to own, and the assertions below prove nothing"
+fi
+# A backup that is not the pre-edit manifest is not a backup. Asserted because E's whole premise is
+# that this file is worth keeping, and because it pins which `cp` the surviving bytes came from.
+if [ "$(sha_of "$E/$MANIFEST_BAK_REL")" = "$E_MANIFEST_BEFORE" ]; then
+  pass "E: the backup carries the manifest's bytes as they stood before the run edited it"
+else
+  fail "E: the backup does not match the pre-run manifest — it is a copy of something else"
+fi
+
+assert_owned "$E" "$MANIFEST_BAK_REL" "E (--with-mcp, no git)"
+
+# E's second install, and it is the whole point of the state. Run 2 passes NO flag, so
+# add_manifest_dependency is never called and the branch that makes the backup is never reached —
+# while the backup from run 1 is still sitting there. A row written where the file is created
+# disappears here, and the file goes back to being permanent debris.
+run_install "$E" "E install 2 (plain, no flags — the backup branch never runs)"
+assert_owned "$E" "$MANIFEST_BAK_REL" "E (after a second install that never touches the manifest)"
+
+E_MANIFEST_AFTER="$(sha_of "$E/$MANIFEST_REL")"
+run_uninstall "$E" "E"
+assert_gone "$E" "$MANIFEST_BAK_REL" "E (--with-mcp, no git)"
+# The file the backup was a copy OF is the user's, and a row for `.bak` that reached one character
+# too far would take it. Nothing in the receipt should ever claim the manifest itself.
+assert_kept "$E" "$MANIFEST_REL" "$E_MANIFEST_AFTER" "E (the manifest itself)"
+assert_not_owned "$E" "$MANIFEST_REL" "E (the manifest itself)"
+
+# ── State E3: a backup the USER wrote ────────────────────────────────────────
+# The fail-closed direction, and the one where a mistake destroys something the installer never
+# made. A plain install never calls add_manifest_dependency at all, so nothing this run knows can
+# distinguish this file from one of ours except the previous receipt — which has no row for it.
+E3="$(new_fixture state-e-userbak)"
+printf '{\n  "dependencies": {\n    "my.own.hand.rolled.backup": "1.0.0"\n  }\n}\n' > "$E3/$MANIFEST_BAK_REL"
+E3_SHA="$(sha_of "$E3/$MANIFEST_BAK_REL")"
+run_install "$E3" "E3 install 1"
+assert_not_owned "$E3" "$MANIFEST_BAK_REL" "E3 (the user's own backup, after install 1)"
+run_install "$E3" "E3 install 2"
+assert_not_owned "$E3" "$MANIFEST_BAK_REL" "E3 (the user's own backup, after install 2)"
+run_uninstall "$E3" "E3"
+assert_kept "$E3" "$MANIFEST_BAK_REL" "$E3_SHA" "E3"
+
+# ── State F: --with-mcp with the manifest tracked by git ─────────────────────
+# git is the backup, so the installer deletes its own copy and there is nothing to own. F is the
+# anti-"record everything" direction: a fix that writes the row unconditionally puts a path in the
+# receipt that does not exist, and uninstall.sh's `already gone` counter absorbs it silently.
+F="$(new_fixture state-f)"
+git -C "$F" -c init.defaultBranch=main init -q >/dev/null 2>&1 || true
+# -f, so a global core.excludesFile cannot decide whether this state runs. The precondition is
+# asserted immediately below either way.
+git -C "$F" add -f "$MANIFEST_REL" >/dev/null 2>&1 || true
+if git -C "$F" ls-files --error-unmatch "$MANIFEST_REL" >/dev/null 2>&1; then
+  pass "F: git tracks $MANIFEST_REL, so install.sh must delete its backup rather than keep it"
+else
+  fail "F: git does not track $MANIFEST_REL — the fixture never reaches the branch F exists to test, and everything below passes vacuously"
+fi
+
+run_install_flags "$F" "F install" --with-mcp
+if grep -qF -- 'To undo: git checkout Packages/manifest.json' <<< "$INSTALL_OUT"; then
+  pass "F: the run took the git branch — it points at git rather than at a backup file"
+else
+  fail "F: the run never printed the git-checkout undo line — it did not take the branch F exists to test"
+fi
+if grep -qF -- '(backup: manifest.json.bak)' <<< "$INSTALL_OUT"; then
+  fail "F: the run announced a kept backup — it took E's branch despite git tracking the manifest"
+else
+  pass "F: the run announced no kept backup"
+fi
+
+if [ -e "$F/$MANIFEST_BAK_REL" ]; then
+  fail "F: the installer left $MANIFEST_BAK_REL on disk even though git tracks the manifest"
+else
+  pass "F: the installer removed its own backup — git is the backup"
+fi
+assert_not_owned "$F" "$MANIFEST_BAK_REL" "F (git-tracked manifest)"
+
+F_MANIFEST_AFTER="$(sha_of "$F/$MANIFEST_REL")"
+run_uninstall "$F" "F"
+assert_kept "$F" "$MANIFEST_REL" "$F_MANIFEST_AFTER" "F (the manifest itself)"
+if [ -e "$F/$MANIFEST_BAK_REL" ]; then
+  fail "F: $MANIFEST_BAK_REL exists after uninstall — something created it that should not have"
+else
+  pass "F: no $MANIFEST_BAK_REL after uninstall either — nothing was there and nothing appeared"
+fi
 
 # ── State G: uninstall.sh reads the origin column ────────────────────────────
 # Data loss in shipped software, reproduced on this fixture before the fix: install, edit a payload
