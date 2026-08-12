@@ -11,9 +11,10 @@ Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md
 
 ## RESUME HERE
 
-**Tasks 1, 1b and 1c are done and closed. Task 1d's work has LANDED BUT WAS NEVER REVIEWED** — its
-implementer was stopped by the operator while writing its report, after committing. **Task 1d's
-review is the next action**, then Task 2.
+**Tasks 1, 1b, 1c are done and closed. Task 1d has been reviewed and its fix round 1 is closed —
+all three findings ADDRESSED, verified by probes shaped differently from the implementer's.** A
+**round 2 is open**, carrying two cheap items the re-review measured (below). After it closes:
+**Task 2**.
 
 The wave keeps growing because each task's review finds the next instance of one root cause. The
 spec now carries **nine decisions**, and the tally is: the origin column is written in four places
@@ -22,7 +23,7 @@ and, before this wave, read in none. Task 1 fixed the project-root rows, Task 1b
 run prints `keeping yours:` naming a file it overwrites in the same output** — and Task 1d fixes
 `studio-doctor.sh`, the last reader, which also carries two `printf | head` SIGPIPE traps.
 
-Suite: **641/641**, 32 test files, `provenance OK`, baseline zero drift, tree clean at `6a2793e`.
+Suite: **645/645**, 32 test files, `provenance OK`, baseline zero drift, tree clean at `29a8593`.
 
 Nine defects now, one shape: the installer makes a claim it does not keep. The receipt is rebuilt every
 run and two project-root files write their rows inside a *create* branch, so a second install
@@ -107,6 +108,18 @@ what makes the un-exported helper safe.
 the checksum test, **anything else keeps**. Task 1d must match that grammar rather than invent a
 second one.
 
+**The three readers of the origin column now disagree in grammar, and that asymmetry is load-bearing
+for anything that touches them.** `uninstall.sh` is a `case` (`user-modified` keeps, `toolkit` takes
+the checksum test, `*)` keeps). `scripts/studio-doctor.sh` is a `case` with the same three arms, but
+its third arm **reports separately** rather than folding into the modified bucket — a read-only
+diagnostic must not certify a row it cannot read. **`install.sh` is still an `if/else`** on
+`"$origin" = user-modified`, so an unrecognised origin falls through to the sha test. Any task that
+changes one of the three must state what it means for the other two.
+
+`tests/test-studio-doctor.sh` is **runner-provided** — the runner's `assert_*` and `$REPO_DIR`,
+neither defined locally. Standalone it exits 0 having asserted nothing. It now carries 31 assertions
+and takes ~12 s.
+
 Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp`, `hdrp`,
 `urp+hdrp`.
 
@@ -117,7 +130,7 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 1 | The receipt records ownership, not this run's writes | **done** | `e6116d0..6684165` | 1 fix round. Spec ✅, Quality Approved, 5 Minor. Added state B2 after proving the upgrade path was dead code; found the `uninstall.sh` data loss |
 | 1b | `uninstall.sh` reads the origin column | **done** | `5650580..493db8a` | 1 fix round. Spec ✅, Approved, 4 Minor. Fails closed via `case`; guarded by a receipt row `install.sh` cannot produce |
 | 1c | The scripts loop respects a user edit | **done** | `a192776..2f2b820` | 1 fix round. Spec ✅, Approved. State H now edits **two** scripts — one file cannot tell "keeps edits" from "keeps THIS file" from "keeps ONE file" |
-| 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | **landed, UNREVIEWED** | `cfc35b9..6a2793e` | Implementer stopped mid-report by the operator, after committing. **No task review ran, and no implementer report exists.** Controller verified only: suite 641/641, `provenance OK`, zero baseline drift, the `case` grammar matches `uninstall.sh`'s, and the three surviving `head -` matches are all in comments describing what was replaced. The commit says it fixed **four** pipes, not the two the brief named — unverified |
+| 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | **round 2 open** | `cfc35b9..29a8593` | Reviewed after the fact — see below. Spec ✅, Quality Needs work: 1 Important + 6 Minor. Round 1 ran on a **fresh implementer**, because the original was killed; all three findings ADDRESSED. Round 2 carries the vacuous long-list assertion and N-1's rewording |
 | 2 | A kept backup is a file the installer owns | open (brief pending) | — | Extends Task 1's test |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
 | 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |
@@ -183,38 +196,158 @@ Same family as the previous wave's finding that the runner is blind to python re
 directions. **A test file needs a completion sentinel** — the runner has no way today to tell a
 deliberate `exit 1` from a death, and that is the discriminator it lacks.
 
-## Task 1d — what is known, and what is not
+## Task 1d — reviewed after the fact, and what that cost
 
-**Stopped by the operator, not by a failure.** The commit `6a2793e` exists and the tree is clean;
-the implementer was writing its report when it was killed, so `.superpowers/sdd/…/task-1d-report.md`
-does not exist and **nothing has reviewed this work.**
+The implementer was killed by the operator mid-report, after committing `6a2793e`. No implementer
+report exists and none can be written now. `.superpowers/sdd/…/task-1d-no-report.md` stands in its
+place: a controller-written account of what was measured after the fact and, more usefully, of the
+four things the controller did **not** know. That file is what the review was dispatched against.
 
-Verified by the controller directly:
+**All four are now answered, and none of them the way the controller framed them.**
 
-- suite **641/641**, discovery 32 = 32, runner exit 0;
-- `provenance OK`; baseline `0 change(s)` at `6a2793e`;
-- `scripts/studio-doctor.sh` now reads the origin column with a `case`, matching `uninstall.sh`'s
-  grammar, and its comments name the trailing-space / CRLF / fifth-column shapes Task 1b's fix
-  covers;
-- the three remaining `head -` matches in that file are **all inside comments** describing what was
-  replaced — no live pipe survives.
+1. **There was no pipe-count discrepancy.** Brief said two, commit title said four, commit body said
+   "both list printers" — three numbers counting three different sets, all three correct.
+   `git show cfc35b9:scripts/studio-doctor.sh | grep -n '|[[:space:]]*head'` → **four**. The brief's
+   own anchor was `grep -n 'head -5'`, which *cannot* find the other two. **The plan was narrower
+   than the spec it cites** (criterion 12: "no `| head` remains in it"), and per Global Constraints
+   the spec wins and the plan is the bug. Recorded below.
+   The two the brief missed were the more dangerous ones: `SRV=$(printf … | sed … | head -1)` is a
+   **bare assignment**, where a 141 kills the script. Measured in isolation: N=100 died 0/10; N=1000,
+   5000, 200000 died **10/10**.
+2. **The catch-all's classification was right and its message was false.** See the next section — it
+   became the round's only Important finding.
+3. **The 13 new assertions are real.** The reviewer emulated `run-tests.sh`'s loop exactly: 27 PASS,
+   14 pre-existing + 13 new, accounting for 628 → 641 precisely. Six mutations, each producing
+   targeted reds; M1 and M2 separate cleanly.
+4. **SIGPIPE reproduces in both directions.** Pre-task at `cfc35b9`, 1500-row lists: **29 of 30 runs
+   exited 141** with no summary. Post-task: 10/10 completed. The fix is structurally immune, not
+   lucky — `awk '…' <<< "$1"` has no writer process and no `PIPESTATUS` for `pipefail` to promote.
 
-**Not verified, and a reviewer must:**
+**The controller's framing was wrong on the one point it was most confident about.** It wrote that
+"two or more replacements were made that nothing has examined, and the discrepancy itself is
+unexplained." There was no discrepancy. The controller had the brief's anchor in front of it and did
+not notice that the anchor could not have found what it was accusing the implementer of hiding. Same
+class as this wave's other controller error — a judgement made from proximity instead of a probe.
 
-- the commit claims **four** pipes fixed; the brief named two, so two were found beyond it and their
-  replacements are unexamined;
-- whether the origin `case`'s safe analogue for a *health check* is the right one — the plan left
-  that judgement to the implementer and required it to justify the choice, and that justification
-  was in the report that was never written;
-- whether `tests/test-studio-doctor.sh` (runner-provided) actually asserts anything new, or whether
-  the +13 assertions came from elsewhere;
-- the SIGPIPE reproduction, which the brief explicitly said might not fire and should be reported
-  honestly either way.
+**Also measured, and it corrects the plan a second time:** Task 1d Step 4 says `scripts/` ships into
+`.claude/scripts/` so expect baseline drift. Wrong for this file. `migration/baseline-inventory.json`
+covers `.claude/**` (143 paths) and `templates/` (10) only; `grep -c 'studio-doctor'
+migration/baseline-inventory.json` → **0**. The repo has no `.claude/scripts/` tree — the copy happens
+at install time into the *user's* project. Zero drift was correct, for a reason the plan does not give.
 
-**Do not treat the green suite as a review.** This wave has had a guard read as absent rather than
-red, a mutation pass 114 assertions, and a test file die mid-state — all with the suite green.
+### The Important finding, and why it is the wave's own thesis again
+
+`studio-doctor.sh`'s new catch-all filed unreadable-origin rows under
+`WARN N file(s) modified since install — install.sh will keep your versions:`. **That sentence is
+false for those rows.** `uninstall.sh`'s classifier is a `case`; **`install.sh`'s upgrade scan is an
+`if/else`** on `"$origin" = user-modified`. An unreadable origin is `!=`, falls to the sha test, the
+sha matches, the file never enters `MODIFIED_FILES`, and the payload loop overwrites it. Measured:
+origin mangled to `toolkit ` (trailing space), bytes untouched, toolkit copy bumped → no
+`keeping yours` line, file overwritten, row rewritten clean `toolkit`.
+
+**The diff introduced the false claim along with the branch** — before it, the file was silently
+counted verified and no sentence was printed about it at all. A diagnostic asserting something about
+another program's behaviour that the other program does not do is exactly what Task 1d exists to end.
+
+Fixed in round 1 by option (a): the catch-all got its own counter, its own report line, and two
+continuation lines stating only what is true of both readers. `install.sh will keep your versions`
+now covers only the two branches where it holds.
+
+### Round 1 — three findings, all ADDRESSED, and the probes that established it
+
+**Round 1 ran on a fresh implementer, not a resume.** The loop's rounds 1–3 resume the original
+because its context is intact and cheap; here the original had been killed, so there was nothing to
+resume. Recorded as a deviation, not a precedent.
+
+The re-review deliberately used probe shapes the implementer had not:
+
+- **The row class the implementer used to justify its wording.** The implementer argued its new
+  sentence avoids promising an overwrite "because the receipt also carries rows outside the payload
+  tree (`.mcp.json`, `MCP-SETUP.md`)" — but measured only on `.claude/rules/*`. The re-review built
+  four fixtures on those two paths and confirmed the claim holds, *and* found something new (below).
+- **M-2's derived count is a mirror, and mirrors drift.** The review had suggested
+  `grep -vc '^#' "$RECEIPT"`; the implementer measured it as **88 against the doctor's 87** — it keeps
+  the `path` header — and wrote an awk mirroring the doctor's own skip list instead. The re-review
+  then found three receipt shapes where even that mirror disagrees: a **tabs-only line**, `\t# …`,
+  and `\tpath\t…`. Cause: the doctor reads with `IFS=$'\t' read -r`, and tab is IFS whitespace, so
+  leading tabs are stripped before its `case`; `awk -F'\t'` sees an empty `$1` with non-zero `NF`.
+  **Every drift makes the positive assertion RED, never vacuous** — awk's skip conditions are each a
+  superset-or-equal of the doctor's, so the mirror cannot under-count and the "both pass while the
+  derivation is wrong" failure is unreachable.
+- **The `WARN ` anchor is absent on a TTY.** `warn()` emits `${YELLOW}WARN${NC}`; under a real pty the
+  bytes are `^[[0;33mWARN^[[0m 1 file(s)…`. The test never sees it because `$( … 2>&1 )` is always a
+  pipe, so `[ -t 1 ]` is false and the colour vars are empty. If that ever changed the assertion goes
+  **red, not vacuous** — the safe direction.
+
+**Assertion accounting, checked rather than assumed:** 31 call sites → 31 result lines, PASS tokens
+31, FAIL 0, no `command not found` / unbound-variable / syntax-error lines, helpers used ⊆ helpers the
+runner defines. The origin block went 7 → 11 lines, **+4**, reconciling 641 → 645 exactly.
+
+**No new breakage from the fix diff**, checked specifically: no `declare -A` / `grep -oP`, no added
+pipe into an early-exiting reader, no `&& continue` as a loop body's last command, counters written
+`X=$((X + 1))` rather than `((X++))` so a zero result cannot abort under `set -e`, and no added line
+carrying a `PASS`/`FAIL`/`SKIP` token. Nothing outside the doctor and its test reads
+`Install intact` / `modified since install`.
 
 ## Deferred and parked findings
+
+### From Task 1d — round 2's scope, and four deferred
+
+**Round 2 carries two items, both measured rather than argued:**
+
+1. **The long-list assertion is demonstrably vacuous, in the same file as the one M-1 fixed.** The
+   re-review's mutation E7 prefixes a digit to the count (`1 → 11`, `1500 → 11500`). The *anchored*
+   origin assertion goes red; `"$TSD_LONG_N file(s) modified since install"` **stays PASS against a
+   line reading `11500 file(s) modified since install`**. M-1's text named the origin block; M-1's
+   content is "an unanchored count assertion survives the miscount it exists to detect", and one
+   instance is still green under a live demonstration of that miscount. Deferring it would leave a
+   provably vacuous assertion in the suite *with the proof already on file*. One token.
+2. **N-1 — the replacement sentence over-generalises for the row class that justified it.** Anchor:
+   `grep -n 'depends on its bytes, not on that column' scripts/studio-doctor.sh`. True for `.claude/**`
+   payload rows. For `.mcp.json` / `MCP-SETUP.md`, install.sh's write is **create-only** (`[ ! -f ]`),
+   so the file outcome is identical in both byte states — it does not depend on the bytes — and the
+   column *does* decide something. A hedge that overstates uncertainty, so it cannot cause I-1's harm;
+   one clause.
+
+**Deferred to the ledger, not fixed:**
+
+3. **An unreadable origin column silently drops the `.mcp.json` / `MCP-SETUP.md` ownership row on the
+   next upgrade.** Measured by the re-review on four fixtures: `owned_by_installer`'s `$4 == "toolkit"`
+   test fails on a mangled origin, so on a real upgrade the row is dropped, the file stops being owned,
+   and **`uninstall.sh` will never remove it again**. The identical fixture with a clean origin keeps
+   its row. Pre-existing `install.sh` behaviour, outside Task 1d — but it means a future task that
+   makes install.sh's upgrade scan a `case` must revisit `owned_by_installer`'s gate too, not only the
+   classifier. New information, and the sharpest thing this task produced.
+4. **M-3 — the static `| head` guard is shaped like the symptom, not the class.** Anchor:
+   `grep -n 'TSD_HEAD_HITS' tests/test-studio-doctor.sh`. The file itself is confirmed clean —
+   `| cut -c1-70` drains (5/5 at 3 MB), the `awk … exit` reads a file argument not a pipe, every
+   `grep -q` is on a file or a here-string. The *guard* would not notice `| grep -q`, `| sed -n '…q'`
+   or `| read` arriving later. One-line widening, whenever.
+5. **M-4 — the in-file determinism claim says 30/30 where the measurement is 29/30** at N=1500 on this
+   host. Fine as a regression guard; the house convention is to write the measured number.
+6. **M-5 — the same shape survives in sibling shipped scripts, one of which Task 5 will edit.**
+   `grep -n 'head -1' scripts/generate-claude-md.sh` → `name=$(sed -n '…' "$asmdef" 2>/dev/null |
+   head -1)` under `set -euo pipefail` with **no `|| true`** — the serverInfo shape exactly, on a file
+   that can carry many `"name"` matches. `scripts/detect-missing-refs.sh` and
+   `scripts/validate-asmdefs.sh` carry several `echo "$x" | grep -q …`.
+   `scripts/validate-architecture.sh`'s many `| head -1` are **safe** — each ends `|| true` inside the
+   substitution. **Task 5's dispatch must carry this**: it edits `generate-claude-md.sh`.
+   It also answers "does the fix cover the class" honestly: it covers the file, not the repo.
+7. **M-6 — cost and cleanup.** The file went **3.3 s → 12.1 s** through the runner, now the single most
+   expensive test file (1500 files + 3000 receipt rows + two extra installs). Acceptable against the
+   >150 s budget. `TSD_LONG` / `TSD_ORIGIN` leak 1500 files into `/tmp` if the block dies before its
+   `rm -rf`; the file's existing convention is the same, so consistency rather than regression.
+
+### Two plan bugs Task 1d's review found — the spec was right both times
+
+- **Step 2's anchor undercounts its own class.** `grep -n 'head -5'` finds two; criterion 12 says "no
+  `| head` remains", which is four. Global Constraints say the spec wins; the plan is the bug.
+- **Step 4's baseline expectation is wrong for `scripts/`.** It predicts drift; the correct expectation
+  is zero, because the baseline inventory covers `.claude/**` and `templates/` only and `scripts/` is
+  copied into the *user's* project at install time.
+
+Both left in the plan as written, with this ledger entry as the correction — editing a brief after its
+task has run rewrites the record of what the implementer was actually told.
 
 ### From Task 1's review — five Minor, four closed in round 1
 
