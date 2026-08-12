@@ -1,6 +1,6 @@
 ---
 name: subagent-driven-implementation
-description: "Use when a written plan needs to be executed task by task, with a fresh implementer per task and a review gate before the next one starts. Prefer this over inline execution when the plan has more than one task, or when a task is large enough that its own context would crowd out review."
+description: "Use when a written plan needs to be executed task by task, with a fresh implementer per task and a review gate before the next one starts. Prefer this over inline execution when the plan has more than one substantial task, or when a task is large enough that its own context would crowd out review."
 ---
 
 # Subagent-Driven Implementation

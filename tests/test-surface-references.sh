@@ -1211,3 +1211,51 @@ assert_contains "$UK_INJECTED" 'Invoke the surface **before any response or acti
 # which stays true when a twelfth row is inserted ABOVE the real header and the block stops being a
 # table. Both are now positional `assert_eq`s beside the row collector, where the answer is "is this
 # the first line of the table" — see the header-and-delimiter block above.
+
+# --- The execution fork states one threshold, and both branches state the same one ---------------
+# `unity-execution` and `subagent-driven-implementation` are the two branches `unity-planning` forks
+# to, and a reader picks between them by reading their `description:` fields — that field is the
+# entire selection mechanism, and nothing else is consulted at the moment of choosing. So the
+# boundary has to appear in both descriptions, and it has to be the same boundary in both.
+#
+# It was not. The inline branch said prefer the loop above "more than one *substantial* task"; the
+# loop said prefer itself above the same phrase with the qualifier dropped. A plan of two trivial
+# tasks matched both descriptions at once, and the unqualified form routed it to the branch that
+# spends a fresh implementer and a review gate per task — against the exact reason the inline branch
+# exists. The qualified phrase survives; the unqualified one is gone.
+#
+# THE NEGATIVE HALF IS NOT SATISFIED BY THE POSITIVE ONE. The surviving phrase does not contain the
+# retired phrase as a substring — the qualifier sits between "one" and "task" — so a file carrying
+# only the survivor passes both halves, and a file that regains the looser form fails the second
+# while still passing the first. Verified rather than assumed:
+#
+#   $ grep -qF -- 'more than one task' <<< 'more than one substantial task'; echo $?
+#   1
+#
+# Frontmatter only, and FLATTENED. A `description:` is one long line in both files today, but
+# nothing enforces that: a value wrapped across two lines puts the phrase where no single-line
+# pattern can read it, and an absence check that cannot read the text reports absence for the wrong
+# reason. Scoped to the frontmatter fence because both bodies discuss the fork in prose, and a body
+# sentence must not be able to stand in for the field a reader actually selects on.
+fork_frontmatter() {
+  awk '
+    NR == 1 && $0 == "---" { f = 1; next }
+    f && $0 == "---" { exit }
+    f { printf "%s ", $0 }
+  ' "$REPO_DIR/.claude/skills/$1/SKILL.md" 2>/dev/null || true
+}
+
+for fork_branch in unity-execution subagent-driven-implementation; do
+  fork_front="$(fork_frontmatter "$fork_branch")"
+
+  # An empty haystack fails the positive assertion and PASSES the negative one — a green that means
+  # "the file was never read". This is the assertion that keeps the pair honest.
+  assert_contains "$fork_front" "description:" \
+    "$fork_branch's frontmatter was read at all, so the two assertions below are about its text"
+
+  assert_contains "$fork_front" "more than one substantial task" \
+    "$fork_branch states the fork's threshold with the *substantial* qualifier intact"
+
+  assert_not_contains "$fork_front" "more than one task" \
+    "$fork_branch carries no second, looser threshold with that qualifier dropped"
+done
