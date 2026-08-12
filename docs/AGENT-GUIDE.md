@@ -1,6 +1,6 @@
 # Agent Guide
 
-How to use, customize, and create agents for everything-claude-unity.
+How to use, customize, and create agents for Kinglet Pioneer.
 
 ---
 

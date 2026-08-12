@@ -132,8 +132,23 @@ while IFS= read -r md; do
   [ -n "$md" ] || continue
   rel="${md#"$REPO"/}"
   urls="$(grep -oE 'https?://[^ )>]+' "$md" || true)"
-  toks="$(grep -oE '`[A-Za-z0-9_][A-Za-z0-9_./-]*`' "$md" | tr -d '`' | sort -u || true)"
-  while IFS= read -r t; do
+  # `grep -n`, so every reported citation carries a line. Without it the message named a file and a
+  # token and nothing else: a hit in a 900-line skill or in NOTICE.md sends the maintainer straight
+  # back to `grep`, and a token cited twice in one file collapsed to a single report with no way to
+  # tell which occurrence was meant. Rule 1's message has given file, line and text since it was
+  # written; this is that shape.
+  #
+  # Deduped on the (line, token) PAIR, not on the token, which is what un-collapses the second case.
+  # `awk '!seen[$0]++'` rather than `sort -u` so the report comes out in line order rather than
+  # lexicographic — `:10` before `:9` is a needless stumble in a list a human reads top to bottom.
+  # A token cannot contain a colon (the character class excludes it), so `%%:` / `#*:` split the
+  # pair unambiguously. Every stage here drains its input — no `head`, no `grep -q` — so there is no
+  # SIGPIPE for pipefail to turn into a failure.
+  toks="$(grep -noE '`[A-Za-z0-9_][A-Za-z0-9_./-]*`' "$md" | tr -d '`' | awk '!seen[$0]++' || true)"
+  while IFS= read -r ln_tok; do
+    [ -n "$ln_tok" ] || continue
+    ln="${ln_tok%%:*}"
+    t="${ln_tok#*:}"
     [ -n "$t" ] || continue
     tokens_seen=$((tokens_seen + 1))
     # Only tokens that name a real file here can dangle in a user's project.
@@ -149,7 +164,7 @@ while IFS= read -r md; do
     if [ -n "$p" ] && grep -qxF -- "$p" <<< "$PAYLOAD"; then continue; fi
     esc="$(printf '%s' "$t" | sed 's/[.[\*^$]/\\&/g')"
     if [ -n "$urls" ] && grep -qE -- "/${esc}\$" <<< "$urls"; then continue; fi
-    path_bad="$path_bad       $rel: $t"$'\n'
+    path_bad="$path_bad       $rel:$ln: $t"$'\n'
     path_count=$((path_count + 1))
   done <<< "$toks"
 done <<< "$SHIPPED_MD"
@@ -165,6 +180,22 @@ if [ "$path_count" -eq 0 ]; then
 else
   fail "$path_count shipped citation(s) name a file install.sh does not copy:"
   printf '%s' "$path_bad"
+  # The remedy is not obvious from the failure, and the obvious guess is the wrong one. A maintainer
+  # who hits this on a legitimate citation deletes it, because nothing here says the citation can be
+  # kept. It can: rule 2's escape is a URL, in the same file, whose own text ends with the cited
+  # path. Printed with the failure rather than left in the comment above, because a comment in a test
+  # file is not read by the person reading the test's output.
+  printf '       Three ways out, in the order to consider them:\n'
+  printf '         1. LINK IT, if the citation is legitimate and the reader needs the file. A URL\n'
+  printf '            elsewhere in the SAME file whose own text ends with the cited path clears it —\n'
+  printf '            e.g. a repository URL ending /tests/test-no-mobile.sh clears the token\n'
+  printf '            tests/test-no-mobile.sh in that file. Only the URL naming that path clears it.\n'
+  printf '         2. REWORD IT, if the reader does not need the file — describe what it does instead\n'
+  printf '            of naming a path an installed project has no copy of.\n'
+  printf '         3. SHIP IT, if the file genuinely belongs in the payload — add it under .claude/,\n'
+  printf '            with a provenance.tsv row, and the citation resolves on its own.\n'
+  printf '       Do NOT add the token to CITATION_ALLOW: that list is for name collisions, not for\n'
+  printf '       citations, and a citation added to it stops being checked in every file at once.\n'
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1

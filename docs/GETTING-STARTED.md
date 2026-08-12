@@ -9,7 +9,7 @@ A step-by-step guide to setting up Kinglet Pioneer — a PC/console toolkit for 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | **Claude Code** | Latest | [Install guide](https://claude.ai/claude-code) |
-| **Unity** | 6 (6000.0+) | URP unless your project states otherwise; the installer detects Built-in and HDRP and records what it found |
+| **Unity** | 6 (6000.0+) | URP unless your project states otherwise. The installer looks in `Packages/manifest.json` for the URP and HDRP packages; Built-in is what it falls back to when it finds neither, or when there is no manifest — inferred, not detected. The result is recorded in the generated `CLAUDE.md`, where the fallback reads `Built-in (default)` |
 | **Python** | 3.10+ | Only needed for unity-mcp integration |
 | **uv** | Latest | Python package manager, only needed for unity-mcp |
 
@@ -142,7 +142,7 @@ The MCP bridge gives Claude direct control over the Unity Editor: creating GameO
 
 5. Start Claude Code and test the connection by asking Claude to list objects in the scene.
 
-See [MCP-SETUP.md](MCP-SETUP.md) for detailed setup and troubleshooting.
+See [MCP-SETUP.md](../MCP-SETUP.md) for detailed setup and troubleshooting.
 
 ---
 
@@ -159,7 +159,9 @@ See [MCP-SETUP.md](MCP-SETUP.md) for detailed setup and troubleshooting.
 | `/unity-scene "description"` | Builds a scene from a natural language description |
 | `/unity-test` | Writes and runs EditMode/PlayMode tests |
 
-Start with `/unity-init`, then `/unity-doctor` to get a baseline. On a project that already has code, `/unity-review` is the safe next thing to run — it reads and reports, and changes nothing. Anything you want to *build*, though, does not start with a command at all: it starts at `unity-brainstorming`, which hands to `unity-planning`, where how the work gets executed is decided. The one build that stands outside that chain is a throwaway scene made to try a mechanic — `/unity-prototype` — and that is a choice made before the work starts, never from part-way in.
+**To set the project up:** `/unity-init`, then `/unity-doctor` for a baseline. On a project that already has code, `/unity-review` is the safe next thing to run — it reads and reports, and changes nothing.
+
+**To build something:** don't type a command. Start at `unity-brainstorming`, which hands to `unity-planning`, where how the work gets executed is decided. The one exception is a throwaway scene made to try a mechanic — `/unity-prototype` — and that is a choice made before the work starts, never from part-way in.
 
 ---
 
@@ -184,7 +186,7 @@ Run `/unity-doctor` as a first troubleshooting step. It checks MCP connectivity,
 - Verify `localhost:8080` is reachable: `curl http://localhost:8080/mcp`
 - Check for port conflicts: another service on 8080
 - Ensure `.mcp.json` (project root) has the correct `mcpServers` block
-- See [MCP-SETUP.md](MCP-SETUP.md) for detailed troubleshooting
+- See [MCP-SETUP.md](../MCP-SETUP.md) for detailed troubleshooting
 
 ### Permission Issues
 

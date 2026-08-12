@@ -1238,11 +1238,24 @@ assert_contains "$UK_INJECTED" 'Invoke the surface **before any response or acti
 #   - the POSITIVE reads the FRONTMATTER ONLY, because it asks "does the field a reader selects on
 #     say the right thing". Widen it to the body and a paragraph of prose stands in for the
 #     description, which is the one thing selection actually reads;
-#   - the NEGATIVE reads the WHOLE FILE, because it asks "does anything here say the wrong thing".
-#     Ambiguity returns from wherever it is written, and `unity-execution`'s BODY states this same
-#     boundary a third time — at :10-11, wrapped, `:10` ending "…has more than one" and `:11`
-#     opening "substantial task, or when…". Neither the spec nor the plan for this wave knew that
-#     third statement existed; a frontmatter-scoped absence check cannot see it at all.
+#   - the NEGATIVE reads EVERY `.md` UNDER `.claude/`, because it asks "does anything the payload
+#     ships say the wrong thing". Ambiguity returns from wherever it is written, and
+#     `unity-execution`'s BODY states this same boundary a third time — at :10-11, wrapped, `:10`
+#     ending "…has more than one" and `:11` opening "substantial task, or when…". Neither the spec
+#     nor the plan for this wave knew that third statement existed; a frontmatter-scoped absence
+#     check cannot see it at all.
+#
+# THE NEGATIVE'S SCOPE WAS THOSE TWO SKILL.md FILES UNTIL 2026-08-12, WHICH IS A DEFECT THIS FILE
+# HAD ALREADY FIXED ONCE, HIGHER UP. The command-reference check above widened from
+# `.claude/skills/*/SKILL.md` to `.claude/skills/*/*.md` for exactly the four dispatch templates
+# `subagent-driven-implementation` ships beside its SKILL.md — see the "scanned set is not the whole
+# reality" note beside it. This block then reinstated the narrow scope a thousand lines below that
+# paragraph, under an acceptance criterion reading "no surface **anywhere** carries the retired
+# looser form". Two files is not anywhere. Unread by the old scope, and read now: `unity-planning`
+# (the surface that OWNS the fork and hands to these two), `using-kinglet` (injected at every session
+# start, so a looser threshold there reaches every session), every agent, command and rule, and those
+# same four siblings — `implementer-prompt.md`, `task-reviewer-prompt.md`, `re-review-prompt.md`,
+# `final-reviewer-prompt.md` — which are the dispatch text the loop branch actually sends.
 #
 # Both directions are measured, not argued. Rewriting only the BODY sentence to the looser form
 # leaves the positive green and turns the negative red; deleting the qualified phrase from only the
@@ -1259,11 +1272,29 @@ assert_contains "$UK_INJECTED" 'Invoke the surface **before any response or acti
 # buffer to one space. Re-measured across ten shapes afterwards: all ten caught, including nested
 # blockquotes, tab indentation, a blank line mid-sentence and a list-item continuation.
 #
-# It stays a check for the exact retired phrase returning, NOT for the ambiguity returning in new
-# words: `More than one task` capitalised differently, or "more than a single task", both pass. That
-# is an accepted limit and it is recorded here rather than papered over. Near-misses were probed for
-# false positives in the same pass — "more than one. Task ownership…" and a `| more than one | task |`
-# table row both stay correctly silent, because collapsing whitespace cannot delete a `.` or a `|`.
+# STATED GAPS — WHAT THIS CANNOT SEE, IN PHRASING AND IN SCOPE. Both halves, because a reader who
+# knows only the phrasing limits will over-trust the coverage.
+#
+# PHRASING. It stays a check for the exact retired phrase returning, NOT for the ambiguity returning
+# in new words: `More than one task` capitalised differently, or "more than a single task", both
+# pass. That is an accepted limit and it is recorded here rather than papered over. Near-misses were
+# probed for false positives in the same pass — "more than one. Task ownership…" and a
+# `| more than one | task |` table row both stay correctly silent, because collapsing whitespace
+# cannot delete a `.` or a `|`.
+#
+# SCOPE. The negative half covers every `.md` under `.claude/` — the whole shipped Markdown payload,
+# SKILL.md files and their siblings alike, found by `find` rather than by a list, so a new skill or a
+# new sibling is in scope the moment it lands. It does NOT cover: anything outside `.claude/` (this
+# repo's own `README.md`, `docs/`, `MERGE-NOTES.md` — none of which a user's project receives, so a
+# looser threshold there misroutes a maintainer rather than a session); `.claude/settings.json` and
+# the hook scripts, which are not Markdown; and `.claude/state/`, which is excluded from the payload
+# by install.sh and would be scanned here only if a stray `.md` were left in it. It also reports the
+# offending FILE and not a line — the haystack is the file flattened to one buffer, so there is no
+# line to report; `grep -n` for the phrase's words to find it.
+#
+# The positive half is deliberately NOT widened with it. It reads the two branch descriptions only,
+# because the question it asks — "does the field a reader selects on say the right thing" — has
+# exactly two files that can answer it, and that asymmetry was measured in both directions above.
 FORK_NORMALIZE='{ line = $0
     while (line ~ /^[[:space:]]*>/) { sub(/^[[:space:]]*>[[:space:]]?/, "", line) }
     buf = buf " " line }'
@@ -1280,28 +1311,82 @@ f && $0 == "---" { exit }
 f '"$FORK_NORMALIZE
 $FORK_COLLAPSE"
 
+# Takes a PATH now, not a skill name: the negative half reads files that are not SKILL.md and are
+# not under `.claude/skills/` at all, so a helper that rebuilds the path from a skill name cannot
+# express its scope.
 fork_flatten() {
-  awk "$2" "$REPO_DIR/.claude/skills/$1/SKILL.md" 2>/dev/null || true
+  awk "$2" "$1" 2>/dev/null || true
 }
 
+# The surviving phrase and the retired one, named once. The survivor does NOT contain the retired
+# form as a substring — the qualifier sits between "one" and "task" — which is what lets the survivor
+# serve as this block's positive control without being its own needle.
+FORK_SURVIVOR='more than one substantial task'
+FORK_RETIRED='more than one task'
+
+# --- The positive half: the two descriptions a reader picks between -------------------------------
 for fork_branch in unity-execution subagent-driven-implementation; do
-  fork_front="$(fork_flatten "$fork_branch" "$FORK_FRONTMATTER_AWK")"
-  fork_whole="$(fork_flatten "$fork_branch" "$FORK_WHOLE_AWK")"
+  fork_front="$(fork_flatten "$REPO_DIR/.claude/skills/$fork_branch/SKILL.md" "$FORK_FRONTMATTER_AWK")"
 
   # An empty haystack fails a positive assertion and PASSES a negative one — a green that means "the
-  # file was never read". These two are what keep the pair below honest. Measured: emptying either
-  # file produces 3 named failures, deleting it produces 3, and breaking the frontmatter fence
+  # file was never read". This is what keeps the assertion below honest. Measured: emptying either
+  # file produces 2 named failures, deleting it produces 2, and breaking the frontmatter fence
   # produces 2 — none of them silent.
   assert_contains "$fork_front" "description:" \
-    "$fork_branch's frontmatter was read at all, so the assertions below are about its text"
-  # Deliberately modest wording: the branch name appears in the frontmatter's `name:` key, so this
-  # establishes that the right file was opened and flattened to something — not that a body was read.
-  assert_contains "$fork_whole" "$fork_branch" \
-    "…and the file the absence check reads is that branch's own, flattened to something"
+    "$fork_branch's frontmatter was read at all, so the assertion below is about its text"
 
-  assert_contains "$fork_front" "more than one substantial task" \
+  assert_contains "$fork_front" "$FORK_SURVIVOR" \
     "$fork_branch states the fork's threshold, in its description, with the qualifier intact"
-
-  assert_not_contains "$fork_whole" "more than one task" \
-    "$fork_branch states no looser threshold anywhere — description or body — with it dropped"
 done
+
+# --- The negative half: every .md the payload ships -----------------------------------------------
+# `find`, not a list: a new skill, or a new sibling beside an existing SKILL.md, is in scope the
+# moment it lands rather than at the next manual widening. Read into a variable first and fed to the
+# loop by here-string, so the counters below live in THIS shell — `find | while read` puts the loop
+# in a subshell and every count comes back zero, which is the green-that-means-nothing this block
+# spends three assertions guarding against.
+FORK_MD_LIST="$(find "$REPO_DIR/.claude" -type f -name '*.md' | sort)"
+
+fork_scanned=0
+fork_unread=0
+fork_survivor_files=0
+fork_loose=""
+while IFS= read -r fork_md; do
+  [ -n "$fork_md" ] || continue
+  fork_scanned=$((fork_scanned + 1))
+  fork_flat="$(fork_flatten "$fork_md" "$FORK_WHOLE_AWK")"
+  if [ -z "$fork_flat" ]; then fork_unread=$((fork_unread + 1)); fi
+  # `case`, not `grep`: no pipe and no subprocess per file, so no SIGPIPE-under-pipefail hazard on a
+  # buffer this size. Neither needle carries a glob metacharacter, so `*"$needle"*` is a plain
+  # substring test — the same question `grep -F` asks.
+  case "$fork_flat" in *"$FORK_SURVIVOR"*) fork_survivor_files=$((fork_survivor_files + 1)) ;; esac
+  case "$fork_flat" in *"$FORK_RETIRED"*) fork_loose="$fork_loose${fork_md#"$REPO_DIR"/}"$'\n' ;; esac
+done <<< "$FORK_MD_LIST"
+
+# Coverage floor. 44 shipped .md files on 2026-08-12; 35 is that with headroom, matching the floor
+# test-shipped-citations.sh sets over the same set. Raise it when the tree grows; never lower one to
+# make a run pass. `if/then` rather than `[ … ] && x=yes`, which returns 1 when false and would kill
+# this file under the `set -e` it inherits from the runner.
+fork_floor_ok=no
+if [ "$fork_scanned" -ge 35 ]; then fork_floor_ok=yes; fi
+assert_eq "yes" "$fork_floor_ok" \
+  "the absence check read $fork_scanned .md files under .claude/ (floor 35)"
+
+# A file that flattens to nothing passes a negative assertion silently. None may.
+assert_eq "0" "$fork_unread" \
+  "every .md the absence check opened flattened to something it could read"
+
+# Positive control on the SAME machinery the negative uses — awk normaliser, whole-file buffer, `case`
+# match — with a needle that is present. Without it, a normaliser that silently produced garbage would
+# report "the retired phrase is absent" from every file and read as a clean pass. Floor 2: both fork
+# branches state the surviving phrase.
+fork_survivor_ok=no
+if [ "$fork_survivor_files" -ge 2 ]; then fork_survivor_ok=yes; fi
+assert_eq "yes" "$fork_survivor_ok" \
+  "the same scan finds the surviving phrase in $fork_survivor_files file(s) (floor 2)"
+
+if [ -n "$fork_loose" ]; then
+  printf '%s' "$fork_loose" | sed 's|^|       carries the retired threshold: |'
+fi
+assert_eq "0" "$(printf '%s' "$fork_loose" | grep -c . || true)" \
+  "no surface anywhere under .claude/ states the looser threshold with the qualifier dropped"

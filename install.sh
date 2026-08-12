@@ -197,6 +197,12 @@ NEW_PATHS=$(
 )
 NEW_PATHS=$(printf '%s\n' "$NEW_PATHS" | sort -u)
 
+# The dry run reported the payload as a file count and the scripts group as a bare name — two lines
+# in two different units, so a reader could not add them up and get the number of files this run
+# writes. Counted off NEW_PATHS rather than re-walking scripts/, so it cannot disagree with the
+# enumeration the real run and the receipt are both built from.
+SCRIPTS_COUNT=$(printf '%s\n' "$NEW_PATHS" | grep -c '^\.claude/scripts/' || true)
+
 sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 
 # On upgrade, find files the user edited so we can leave them alone.
@@ -257,7 +263,7 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 if [ "$DRY_RUN" -eq 1 ]; then
   printf '\n%s\n' "${BOLD}Would install:${NC}"
   printf '  %s files into %s\n' "$PAYLOAD_COUNT" "$CLAUDE_DIR"
-  printf '  scripts/ into .claude/\n'
+  printf '  %s files from scripts/ into %s/scripts\n' "$SCRIPTS_COUNT" "$CLAUDE_DIR"
   if [ "$ORPHAN_COUNT" -gt 0 ]; then
     printf '  remove %s file(s) this payload no longer ships:\n' "$ORPHAN_COUNT"
     printf '%s' "$ORPHANS" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done

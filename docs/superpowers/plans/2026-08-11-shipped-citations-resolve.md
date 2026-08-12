@@ -390,6 +390,8 @@ Expected: `FAIL: 8 shipped citation(s) name a file install.sh does not copy:` li
 
 *(This line read "near 323" until 2026-08-12. 323 was a count of *globally unique* tokens; `tokens_seen` increments once per (file, token) pair, so it is roughly 1.7× that. A red-first expectation off by 238 makes a broken derivation indistinguishable from a stale estimate — and the floor the guard actually enforces is 200, which both numbers clear. The ledger ruled "fix the plan text, not the guard"; this is that fix, applied.)*
 
+*(Moved again, later on 2026-08-12, by the whole-branch review's round B: rule 2 now reports a line with every citation, so its dedupe key is the (file, LINE, token) triple rather than (file, token), and `tokens_seen` counts occurrences. Measured on the tree after that change: **710**. The expectation above is kept as the record of what the wave itself measured — do not read it as a current number, and do not tune the floor to either. Derive it: `bash tests/test-shipped-citations.sh`.)*
+
 - [ ] **Step 3: Fix `.claude/rules/pc-console.md`**
 
 `:6` — drop the parenthetical entirely. Was:

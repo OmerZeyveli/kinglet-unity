@@ -1,6 +1,6 @@
 # Architecture
 
-Technical documentation for the everything-claude-unity system.
+Technical documentation for Kinglet Pioneer.
 
 ---
 
