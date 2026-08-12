@@ -3,8 +3,8 @@
 # Kinglet Pioneer — uninstaller
 #
 # Removes what install.sh wrote, and nothing else. Every removal is checked against the install
-# receipt: a file is deleted only if its checksum still matches what we recorded writing. If you
-# edited it, or it was never ours, it stays.
+# receipt: a file goes only if the receipt marks it ours AND it still carries the checksum we
+# recorded. A file the receipt marks yours stays, whatever its checksum says, unless --purge.
 #
 # Usage:
 #   ./uninstall.sh [--project-dir <path>] [--yes] [--purge] [--keep-local] [--no-backup]
@@ -72,12 +72,30 @@ fi
 sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 
 # ── Classify every receipted file before touching anything ───────────────────
+# TWO TESTS, NOT ONE, because two different questions are being asked of one row.
+#
+# `user-modified` means a previous install found your edit and kept it — and recorded the file AS
+# EDITED, deliberately, so that the NEXT install still recognises it as yours. (Without that, the
+# edit survived exactly one upgrade and the second silently overwrote it; commit c2d27f1f,
+# 2026-08-03.) So the checksum on a `user-modified` row is the checksum of YOUR file, and comparing
+# against it always matched — which is how a plain `uninstall.sh --yes` came to count an edited file
+# under "unchanged since install" and delete it. Measured on a fixture and reproduced twice
+# independently before this was written.
+#
+# The sha test is right for `toolkit` rows and only for them: there it separates "we installed it and
+# nobody touched it" from "we installed it and someone did" — an edit made AFTER the last install,
+# which is the only kind that row can express.
+#
+# The origin column had been written in three places and read in one (install.sh's own upgrade
+# scan). This is the second reader.
 TO_REMOVE=""; MODIFIED=""; ALREADY_GONE=0
-while IFS=$'\t' read -r rel recorded _mode _origin; do
+while IFS=$'\t' read -r rel recorded _mode origin; do
   case "$rel" in ''|\#*|path) continue ;; esac
   abs="$PROJECT_DIR/$rel"
   if [ ! -f "$abs" ]; then ALREADY_GONE=$((ALREADY_GONE + 1)); continue; fi
-  if [ "$(sha_of "$abs")" = "$recorded" ]; then
+  if [ "$origin" = user-modified ]; then
+    MODIFIED="${MODIFIED}${rel}"$'\n'
+  elif [ "$(sha_of "$abs")" = "$recorded" ]; then
     TO_REMOVE="${TO_REMOVE}${rel}"$'\n'
   else
     MODIFIED="${MODIFIED}${rel}"$'\n'

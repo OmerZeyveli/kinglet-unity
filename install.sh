@@ -226,20 +226,17 @@ sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 # the old receipt alone would renew it, and uninstall.sh would delete an edited file.
 #
 # No `user-modified` row is written for these two, and that is a decision rather than an omission.
-# uninstall.sh's classifier compares the recorded checksum and never reads the origin column, so a
-# `user-modified` row — which records the file AS EDITED — matches on sha and is removed.
 #
-# THAT IS A LIVE DEFECT IN uninstall.sh, NOT A CONVENTION THIS COMMENT IS ENDORSING. Measured
-# 2026-08-12: install, edit .claude/rules/pc-console.md, install again (the row becomes
-# `user-modified` carrying the EDITED checksum), then a plain `uninstall.sh --yes` counts that file
-# under "remove N file(s) — unchanged since install" and deletes it. The `keep N file(s) you
-# modified` branch never fires for it, and `--purge` — documented as "Also remove files you
-# modified (default: keep and report them)" — makes no difference, because the default already
-# removes them. The origin column is written in three places here and read in none.
+# It was once forced by a defect elsewhere: uninstall.sh's classifier compared the recorded checksum
+# and never read the origin column, so a `user-modified` row — which records the file AS EDITED —
+# matched on sha and was deleted by a plain `uninstall.sh --yes`. Measured 2026-08-12 on
+# .claude/rules/pc-console.md, and FIXED the same day: the classifier now branches on origin first,
+# and tests/test-install-ownership.sh's state G holds all three directions of it.
 #
-# So writing a `user-modified` row for a project-root file would hand that defect a file the user
-# may have written from scratch. Silence is the safe record until the classifier is fixed; when it
-# is, this paragraph is the one to revisit.
+# The decision survives the fix, for a reason that was always the better one. A `user-modified` row
+# is still a claim of ownership, and `--purge` acts on every claim. State C's MCP-SETUP.md — one the
+# user wrote before any install ever ran — is not ours to purge, and nothing at this call site can
+# tell that file apart from one of ours the user rewrote. No row, no claim.
 #
 # $RECEIPT still holds the PREVIOUS run's receipt at every call site below. Four statements could
 # have changed that and none does: Step 9 is the only writer, the payload enumeration excludes

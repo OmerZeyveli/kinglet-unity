@@ -26,14 +26,32 @@
 # one class and the fix is one shape, so a state that passes for one and not the other is a real
 # finding rather than an inconsistency to paper over.
 #
+# State G is the other side of the same column. A–D are about whether the row is WRITTEN; G is about
+# whether it is READ. A `.claude/` file the user edited gets a `user-modified` row carrying its
+# EDITED checksum — deliberately, so the next install still recognises it — and uninstall.sh's
+# classifier compared that checksum, found it matching, and deleted the user's file under
+# "unchanged since install". G asserts all three directions, and the third is what stops the fix
+# from becoming "never delete anything":
+#
+#   G  the user's edit survives `uninstall.sh --yes`, is reported under `keep ... you modified`,
+#      and IS removed by `uninstall.sh --purge` — while an untouched toolkit file beside it still
+#      goes.
+#
 # WHAT THIS FILE CANNOT SEE
-#   * Only the two project-root files named above. A third unrecorded write at the project root —
-#     Packages/manifest.json.bak is the known one — is invisible here by construction.
-#   * Nothing under .claude/. The payload loop already writes `toolkit` / `user-modified` rows and
-#     is covered by tests/test-install.sh and tests/test-install-prune.sh.
+#   * Only the two project-root files named above, in states A–D. A third unrecorded write at the
+#     project root — Packages/manifest.json.bak is the known one — is invisible here by construction.
+#   * State G touches .claude/ but only through ONE payload file (a rule document) plus one
+#     untouched sibling. A row whose origin is neither `toolkit` nor `user-modified`, a file whose
+#     mode the user changed rather than its bytes, and every non-`.md` payload class — hooks,
+#     settings.json, scripts — are not exercised. The classifier branches on the origin string
+#     alone, so one file of each origin is the whole decision surface it has; that is an argument
+#     for the coverage being sufficient, not evidence that it is. What the INSTALLER does to a
+#     `.claude/` file across upgrades is tests/test-install.sh's and tests/test-install-prune.sh's
+#     ground, not this file's.
 #   * Only `--yes` installs against the default (urp) fixture. --with-mcp, --with-input-system,
-#     --dry-run, --purge and --keep-local are not exercised, and the fixture is NOT a git
-#     repository, so every branch that turns on `git -C "$PROJECT_DIR"` takes its no-git side.
+#     --dry-run and --keep-local are not exercised, and the fixture is NOT a git repository, so
+#     every branch that turns on `git -C "$PROJECT_DIR"` takes its no-git side. `--purge` is
+#     exercised in state G and nowhere else.
 #   * Why uninstall.sh did what it did. This reads the filesystem before and after, so "the file
 #     survived" and "the file survived because uninstall crashed" look identical — which is why
 #     every install and uninstall below asserts its exit status separately.
@@ -312,6 +330,131 @@ assert_not_owned "$D" '.mcp.json'    "D (edited, then reinstalled twice)"
 run_uninstall "$D" "D"
 assert_kept "$D" 'MCP-SETUP.md' "$D_MD_SHA"   "D"
 assert_kept "$D" '.mcp.json'    "$D_JSON_SHA" "D"
+
+# ── State G: uninstall.sh reads the origin column ────────────────────────────
+# Data loss in shipped software, reproduced on this fixture before the fix: install, edit a payload
+# file, install again, `uninstall.sh --yes` — and the edit is gone, counted under `remove N file(s)
+# — unchanged since install`.
+#
+# It is unchanged only in the sense that it still matches the receipt, and it matches the receipt
+# because install.sh recorded it AS EDITED. That record is correct and must not change: it is what
+# makes the edit survive the NEXT install rather than exactly one of them (commit c2d27f1f,
+# 2026-08-03). Two consumers need different things from one row, and the origin column is how the
+# row tells them apart — install.sh has read it since c2d27f1f; uninstall.sh had never read it.
+#
+# THE THIRD DIRECTION IS NOT OPTIONAL. "Never delete anything" satisfies the first two and is a
+# worse uninstaller than the one that ate the file, because it fails in the direction nobody looks.
+# So `--purge` must still take the edited file, and — asserted separately below, because an
+# origin-blind "keep everything" would pass the purge check too — an untouched `toolkit` file
+# beside it must still be removed by the plain run.
+G_REL='.claude/rules/pc-console.md'
+G_UNTOUCHED='.claude/rules/architecture.md'
+
+# Sets G_DIR and G_SHA. A function rather than a copy, because the plain run and the --purge run
+# must start from the same state or the pair proves nothing about the flag.
+G_DIR=''; G_SHA=''
+g_setup() {
+  local label="$2"
+  G_DIR="$(new_fixture "$1")"
+  run_install "$G_DIR" "$label install 1"
+  printf '\n<!-- a line the user added by hand -->\n' >> "$G_DIR/$G_REL"
+  G_SHA="$(sha_of "$G_DIR/$G_REL")"
+  run_install "$G_DIR" "$label install 2"
+}
+
+# The precondition, asserted rather than assumed: install 2 must have written a `user-modified` row
+# carrying the EDITED checksum. If it ever records the pristine sha instead, the classifier's sha
+# test would start catching this file by itself and every assertion below would pass while proving
+# nothing about the origin column.
+assert_user_modified_row() {
+  local d="$1" rel="$2" want_sha="$3" label="$4" row origin recorded
+  row="$(own_row "$(receipt_of "$d")" "$rel")"
+  if [ -z "$row" ]; then
+    fail "$label: no receipt row for $rel after the edit — uninstall.sh cannot classify what it is not told about"
+    return
+  fi
+  origin="$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$row")"
+  recorded="$(awk -F'\t' 'NR == 1 { print $2 }' <<< "$row")"
+  if [ "$origin" = user-modified ]; then
+    pass "$label: $rel is recorded as user-modified"
+  else
+    fail "$label: $rel is recorded with origin '$origin', not 'user-modified'"
+  fi
+  if [ "$recorded" = "$want_sha" ]; then
+    pass "$label: the row carries the EDITED checksum — which is exactly why a sha-only classifier calls the file unchanged"
+  else
+    fail "$label: the row records $recorded, not the edited file's $want_sha — install.sh's record changed, and state G no longer tests what it was written to test"
+  fi
+}
+
+# Data rows only: the header line `path<TAB>sha256...` is not a row, and uninstall.sh skips it.
+receipt_rows() {
+  local n
+  n=$(grep -vc '^#' "$(receipt_of "$1")" || true)
+  printf '%s' "$((n - 1))"
+}
+
+# Captured with the ANSI escapes stripped. uninstall.sh only colours when stdout is a tty and this
+# capture is not one, so today the sed changes nothing — it is there so that a future change to
+# that guard cannot turn these assertions silently green-or-red on an invisible byte.
+UNINSTALL_OUT=''
+run_uninstall_flags() {
+  local d="$1" label="$2"; shift 2
+  local rc=0 out
+  out="$(bash "$REPO/uninstall.sh" --project-dir "$d" --yes --no-backup "$@" </dev/null 2>&1 \
+        | sed $'s/\x1b\\[[0-9;]*m//g')" || rc=$?
+  UNINSTALL_OUT="$out"
+  if [ "$rc" -eq 0 ]; then
+    pass "$label: uninstall.sh exited 0"
+  else
+    fail "$label: uninstall.sh exited $rc — the file outcomes below may describe a crash rather than a decision"
+    printf '%s\n' "$out"
+  fi
+}
+
+# G.1 / G.2 — plain `uninstall.sh --yes`.
+g_setup state-g-plain "G plain"
+G_PLAIN="$G_DIR"; G_PLAIN_SHA="$G_SHA"
+assert_user_modified_row "$G_PLAIN" "$G_REL" "$G_PLAIN_SHA" "G (precondition)"
+G_ROWS="$(receipt_rows "$G_PLAIN")"
+
+run_uninstall_flags "$G_PLAIN" "G plain"
+assert_kept "$G_PLAIN" "$G_REL" "$G_PLAIN_SHA" "G (plain --yes)"
+
+if grep -qF -- "$G_REL" <<< "$UNINSTALL_OUT"; then
+  pass "G (plain --yes): the plan names $G_REL among the files it is keeping"
+else
+  fail "G (plain --yes): the plan never names $G_REL — it is counted under 'unchanged since install', not under 'you modified'"
+fi
+
+G_KEEP_LINE="$(awk '/file\(s\) you modified/ { print; exit }' <<< "$UNINSTALL_OUT")"
+if [ -n "$G_KEEP_LINE" ]; then
+  pass "G (plain --yes): the plan reports a keep-modified line — '$(printf '%s' "$G_KEEP_LINE" | sed 's/^ *//')'"
+else
+  fail "G (plain --yes): the 'keep N file(s) you modified' branch never fired"
+fi
+
+# The count is the guard against the fix becoming "keep everything": one file moves out of the
+# remove bucket and every other receipted file stays in it.
+G_REMOVE_COUNT="$(awk '/unchanged since install/ { print $2; exit }' <<< "$UNINSTALL_OUT")"
+if [ "${G_REMOVE_COUNT:-}" = "$((G_ROWS - 1))" ]; then
+  pass "G (plain --yes): removed $G_REMOVE_COUNT of $G_ROWS receipted files — exactly the edited one held back"
+else
+  fail "G (plain --yes): the plan says '$G_REMOVE_COUNT' unchanged of $G_ROWS receipted files; expected $((G_ROWS - 1)). More than one file held back means the classifier stopped removing what it should"
+fi
+
+# G.3 — the untouched sibling. An uninstaller that keeps everything is as broken as one that
+# deletes the user's work, and it fails in the direction nobody checks.
+assert_gone "$G_PLAIN" "$G_UNTOUCHED" "G (plain --yes, untouched toolkit file)"
+
+# G.4 — `--purge` still takes it.
+g_setup state-g-purge "G purge"
+G_PURGE="$G_DIR"; G_PURGE_SHA="$G_SHA"
+assert_user_modified_row "$G_PURGE" "$G_REL" "$G_PURGE_SHA" "G purge (precondition)"
+
+run_uninstall_flags "$G_PURGE" "G purge" --purge
+assert_gone "$G_PURGE" "$G_REL"       "G (--purge)"
+assert_gone "$G_PURGE" "$G_UNTOUCHED" "G (--purge, untouched toolkit file)"
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-ownership assertions passed\n'
