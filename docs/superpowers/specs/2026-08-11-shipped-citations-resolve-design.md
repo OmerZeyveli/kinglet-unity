@@ -4,12 +4,25 @@
 
 ## The problem, measured
 
-A surface that ships into a user's Unity project can only cite what that user has. Eight citations
-in four shipped skills point at `sourced-incidents.md`, and seven more paths point at files
-`install.sh` deliberately does not copy. One of them is a **rule** that instructs the reader to
-inspect a test file and report a regression.
+A surface that ships into a user's Unity project can only cite what that user has. Eight section
+markers in three shipped skills abbreviate a citation to a document that does not ship, and seven
+more paths name files `install.sh` deliberately does not copy. One of them is a **rule** that
+instructs the reader to inspect a test file and report a regression.
 
-### The `§N` class — a document that has never existed
+> **Corrected 2026-08-12, after Task 1.** This paragraph originally read "eight citations in four
+> shipped skills point at `sourced-incidents.md`", and the section below claimed the markers
+> resolved to nothing. Both halves were wrong. It is **three** skills, not four — the spec said four
+> while listing three. And the numbers **do** resolve, against `docs/research/pioneer/field-notes.md`,
+> which is tracked, 172 KB, and carries `## 75.` through `## 86.` as real headings. Only the
+> *filename* `sourced-incidents.md`, named once at `urp-pipeline:363`, has never existed.
+>
+> The action is unchanged for seven of the eight, because `docs/` is not in the installed payload and
+> the marker fails for an installed reader whatever it resolves to here. **D3 was derived from the
+> wrong half and is withdrawn below.** Found by Task 1's implementer, confirmed by the controller
+> against the file itself. The wrong text is corrected in place rather than silently replaced,
+> because a spec that quietly rewrites its own premise teaches the next reader to trust it less.
+
+### The `§N` class — markers that resolve only for someone holding this repository
 
 ```
 .claude/skills/verification-before-completion/SKILL.md   §80  §84  §86  §82
@@ -17,19 +30,36 @@ inspect a test file and report a regression.
 .claude/skills/urp-pipeline/SKILL.md                     §82 in `sourced-incidents.md`
 ```
 
-Eight citations. `urp-pipeline:363` names the target file; the other seven are bare section numbers
-with no antecedent anywhere in the tree.
+Eight markers across three files. `urp-pipeline:363` names a target file; the other seven are bare
+section numbers with no antecedent in anything that ships.
 
-`sourced-incidents.md` is absent from the working tree, from `provenance.tsv`, and from
-`provenance-skip.tsv`. `git log --all --diff-filter=D -- '*sourced-incidents*'` returns nothing — it
-was never deleted, because **it never existed**. These citations were born pointing at nothing.
+Two separate facts, which the first draft of this spec conflated:
+
+- **The filename is dead.** `sourced-incidents.md` is absent from the working tree, from
+  `provenance.tsv`, and from `provenance-skip.tsv`, and
+  `git log --all --diff-filter=D -- '*sourced-incidents*'` returns nothing — it was never deleted,
+  because it never existed. Exactly one citation names it.
+- **The numbers are live.** All six distinct numbers — 75, 77, 80, 82, 84, 86 — are headings in
+  `docs/research/pioneer/field-notes.md`, tracked and 172441 bytes. `## 75. You can verify an MCP
+  server without restarting the session`, and so on.
+
+`docs/` is not in the installed payload, so the distinction changes the *explanation* and not the
+*action*: a reader with only the installed project cannot follow `§80` either way. What it does
+change is D3, below, which was reasoned from the dead half.
+
+It also reclassifies the finding. This is not a separate defect class from the paths in the next
+section — it is the same one, abbreviated. A `§N` marker is a citation to a repository-only document
+with the document's name left out. One rule covers both, which is why the guard has two rules rather
+than two guards.
 
 A ninth match, `NOTICE.md:25`'s `§3`, refers to a section of `NOTICE.md` itself. It resolves and is
-not in scope.
+not in scope. Four further `§Heading` cross-references in `state-machine` and `save-system` name
+headings in `architecture.md` and `unity-specifics.md`, both of which ship — they resolve for an
+installed reader and are correctly untouched.
 
-`systematic-debugging:39` is the worst of the eight: its entire Source cell is the string `§75`.
-There is no prose. `git log --all -S'§75'` returns exactly one commit — `86db3fd`, the commit that
-introduced the line. Nothing was lost; nothing was ever there.
+`systematic-debugging:39` is the odd one of the eight: its entire Source cell is the string `§75`,
+with no prose. That is what made the first draft conclude nothing was recoverable. Field note 75 is
+substantial and is precisely that row's incident, so the cell is filled from it rather than emptied.
 
 ### The path class — files `install.sh` does not copy
 
@@ -89,20 +119,34 @@ Seven of the eight sites are pure deletions of a marker. The Source cell already
 incident — `§80 — a guard correctly refused a git add of engine-settings YAML; …` loses four
 characters and reads identically.
 
-**Rejected: writing and shipping `sourced-incidents.md`.** The only incidents with content are the
-six already written out in full in the Source columns that cite them. A document would be a second
-definition of the same text — the precise defect this branch exists to remove. Doing it inside this
-wave would be self-refuting.
+**Rejected: shipping the source document so the markers resolve.** The document exists — it is
+`docs/research/pioneer/field-notes.md` — so this was a live option, not a hypothetical. It loses on
+two counts. It is 172 KB of internal research written for maintainers of this repository, and adding
+it to the payload puts that in every user's project to satisfy eight table cells. And its numbering
+is positional: a note inserted at 74 renumbers everything after it, so every citation would rot
+silently the next time the document grew. The prose in each Source cell is the durable form of the
+same evidence.
 
-### D3 — `systematic-debugging:39`'s Source cell becomes `—`
+### D3 — **Withdrawn.** `systematic-debugging:39`'s cell is filled from field note 75, not emptied
 
-It has no prose to keep and no incident to recover; `86db3fd` created it bare. No incident will be
-invented to fill it.
+The original ruling read: *"It has no prose to keep and no incident to recover; `86db3fd` created it
+bare… A single empty cell in a table where every other row carries measured evidence is itself
+informative: it marks that row as reasoning rather than measurement."*
 
-A single empty cell in a table where every other row carries measured evidence is itself
-informative: it marks that row as reasoning rather than measurement. The Reality column already
-carries the full argument — the bridge's health is checkable over HTTP independently of whether this
-session can call its tools, and those two states have different remedies.
+**Every load-bearing clause of that is false.** Field note 75 exists, is substantial, and is exactly
+that row's incident — its title, *"You can verify an MCP server without restarting the session"*,
+restates the Reality cell it sits beside. The row is measurement, not reasoning. `git log --all
+-S'§75'` returns four commits, not the one the first draft reported.
+
+The cell carries a compressed statement of the measured incident, in the same shape as its
+neighbours: no marker, no path, no URL, standing on its own for a reader who has only the installed
+project. What earns its place is the concrete part — the server is reachable over HTTP independently
+of the session's tool list, and a probe against it returns the live tool set rather than a yes/no.
+
+**The general lesson, which is why this is corrected rather than deleted:** the first draft measured
+two things correctly (`sourced-incidents.md` never existed; `§75`'s cell was bare) and drew a
+conclusion neither supported. An absent *filename* is not an absent *referent*. A spec about
+citations that fail to resolve mis-resolved its own.
 
 ### D4 — The guard derives its payload; it does not hardcode one
 
