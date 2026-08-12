@@ -267,7 +267,9 @@ else
   # under `modified since install — install.sh will keep your versions`. Half of that is false. The
   # two readers do NOT agree about an unreadable-origin row, because only one of them classifies with
   # a `case`. Measured 2026-08-13 on a fixture whose origin column was mangled to `toolkit ` (trailing
-  # space), the toolkit's own copy of the file bumped so an overwrite would be visible:
+  # space) on a `.claude/rules/*.md` PAYLOAD row — see the report block below for the root-file rows,
+  # which the same mangling costs their ownership rather than their contents — with the toolkit's own
+  # copy of the file bumped so an overwrite would be visible:
   #
   #   uninstall.sh — a `case` whose `*)` branch keeps. Kept the file, printed `keep 1 file(s) you
   #                  modified`. True whatever the bytes say.
@@ -333,13 +335,31 @@ else
     print_first_5 "$MODIFIED_LIST"
   fi
   if [ "$UNREADABLE" -gt 0 ]; then
-    # Also not a failure, and deliberately not a claim about what happens next: the two readers
-    # disagree about these rows and install.sh decides on the bytes rather than the column, so the
-    # only honest thing to print is what this check did and did not do with them.
+    # Also not a failure, and deliberately not a claim about what happens to the file next. The
+    # receipt carries more than one class of row and they do not share an outcome — measured
+    # 2026-08-13, three fixtures, each with the toolkit's own copy bumped so an overwrite would show:
+    #
+    #   .claude/** payload rows      — Step 5's payload loops write them unconditionally unless
+    #                                  is_modified says otherwise, so the upgrade scan's sha test
+    #                                  decides: bytes unchanged → overwritten, bytes drifted → kept.
+    #   MCP-SETUP.md, .mcp.json      — Step 8b/8c write them ONLY when absent (`[ ! -f ]`), so the
+    #                                  file is untouched either way. What the column costs there is the
+    #                                  ROW: `owned_by_installer`'s `$4 == "toolkit"` test fails on a
+    #                                  mangled origin, and MCP-SETUP.md's row was dropped entirely
+    #                                  while the identical fixture with a clean origin kept it. The
+    #                                  file silently stops being owned, so uninstall.sh stops removing
+    #                                  it. (.mcp.json survived the same mangling, because
+    #                                  owned_by_installer's reference-copy test matched first — even
+    #                                  the two root files do not agree.)
+    #
+    # The one thing true across all of them is that install.sh's upgrade scan classifies by bytes and
+    # not by this column; the consequence depends on the write path. Repairing that asymmetry is
+    # install.sh's job, not this file's.
     warn "$UNREADABLE file(s) have a receipt origin this check does not recognise — reported, not verified:"
     print_first_5 "$UNREADABLE_LIST"
     warn "     Neither toolkit nor user-modified in the receipt's fourth column. uninstall.sh keeps"
-    warn "     such a file; what install.sh does with one depends on its bytes, not on that column."
+    warn "     such a file; install.sh classifies it by bytes and not by that column, and what that"
+    warn "     means for the file depends on which write path its row is on."
   fi
 fi
 

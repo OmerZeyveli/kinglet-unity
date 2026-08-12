@@ -261,10 +261,27 @@ TSD_LONG_I=0
 
 TSD_LONG_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_LONG" 2>&1)
 TSD_LONG_RC=$?
-assert_contains "$TSD_LONG_OUT" "$TSD_LONG_N receipted file(s) missing" \
-    "the fixture reaches the state under test — the missing list is long"
-assert_contains "$TSD_LONG_OUT" "$TSD_LONG_N file(s) modified since install" \
-    "…and so is the modified list"
+# Both counts are anchored, and they are anchored by two different means on purpose.
+#
+# `assert_contains` is a substring test, so an unanchored count needle accepts any output whose
+# number merely CONTAINS it. That was not theoretical here: measured 2026-08-13 against a doctor
+# mutated to prefix a digit to the count, the old needle `1500 file(s) modified since install`
+# stayed green against a line reading `11500 file(s) modified since install`. The modified line
+# takes the same `WARN ` prefix the origin block above uses.
+#
+# The missing line is printed by the doctor's `fail`, so its prefix is the literal token FAIL — and
+# the runner tallies each file's results by grepping its output for
+# `(^|[[:space:]])FAIL(:|[[:space:]])` (anchor: `grep -n 'file_fail=' tests/run-tests.sh`).
+# assert_contains echoes the needle in its failure branch, so a needle carrying that token would be
+# counted as a SECOND failure — the trap this file already records for assertion MESSAGES, one level
+# further in. So that count is extracted and compared exactly, which is stricter than any substring:
+# `awk` with no `exit`, so two matching lines would print two numbers and fail loudly rather than
+# silently taking the first.
+assert_contains "$TSD_LONG_OUT" "WARN $TSD_LONG_N file(s) modified since install" \
+    "the fixture reaches the state under test — the modified list is long"
+TSD_LONG_MISSING_N=$(awk '/receipted file\(s\) missing/ { print $2 }' <<< "$TSD_LONG_OUT")
+assert_eq "$TSD_LONG_N" "$TSD_LONG_MISSING_N" \
+    "…and so is the missing list, counted exactly rather than by substring"
 assert_contains "$TSD_LONG_OUT" "NOTICE.md present" \
     "doctor runs the checks that come AFTER both list printers"
 assert_contains "$TSD_LONG_OUT" "passed ·" \
