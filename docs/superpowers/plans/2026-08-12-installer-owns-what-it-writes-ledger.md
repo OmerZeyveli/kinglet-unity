@@ -11,7 +11,7 @@ Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md
 
 ## RESUME HERE
 
-**Tasks 1 and 1b are done and closed.** **Task 1c is next.**
+**Tasks 1, 1b and 1c are done and closed.** **Task 1d is next.**
 
 The wave keeps growing because each task's review finds the next instance of one root cause. The
 spec now carries **nine decisions**, and the tally is: the origin column is written in four places
@@ -20,7 +20,7 @@ and, before this wave, read in none. Task 1 fixed the project-root rows, Task 1b
 run prints `keeping yours:` naming a file it overwrites in the same output** — and Task 1d fixes
 `studio-doctor.sh`, the last reader, which also carries two `printf | head` SIGPIPE traps.
 
-Suite: **602/602**, 32 test files, `provenance OK`.
+Suite: **628/628**, 32 test files, `provenance OK`.
 
 Nine defects now, one shape: the installer makes a claim it does not keep. The receipt is rebuilt every
 run and two project-root files write their rows inside a *create* branch, so a second install
@@ -114,7 +114,7 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 |---|---|---|---|---|
 | 1 | The receipt records ownership, not this run's writes | **done** | `e6116d0..6684165` | 1 fix round. Spec ✅, Quality Approved, 5 Minor. Added state B2 after proving the upgrade path was dead code; found the `uninstall.sh` data loss |
 | 1b | `uninstall.sh` reads the origin column | **done** | `5650580..493db8a` | 1 fix round. Spec ✅, Approved, 4 Minor. Fails closed via `case`; guarded by a receipt row `install.sh` cannot produce |
-| 1c | The scripts loop respects a user edit | open | — | **Inserted.** Data loss **and** the run contradicts itself in one output; spec D8 |
+| 1c | The scripts loop respects a user edit | **done** | `a192776..2f2b820` | 1 fix round. Spec ✅, Approved. State H now edits **two** scripts — one file cannot tell "keeps edits" from "keeps THIS file" from "keeps ONE file" |
 | 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | open (brief pending) | — | **Inserted.** Last reader; plus two documented SIGPIPE traps; spec D9 |
 | 2 | A kept backup is a file the installer owns | open (brief pending) | — | Extends Task 1's test |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
@@ -150,6 +150,36 @@ or `git blame`. That block is `c2d27f1f`, 2026-08-03, nine days before this wave
 Ten times across three waves a probe's *shape* decided a finding. This one is the floor of that
 class: **no probe was run at all.** The reviewer refuted the premise in its first section and
 answered the questions anyway.
+
+## Carried to Task 3 — its oracle must expect a subtraction that did not exist before
+
+The dry run's scripts line now **overstates the real run's `WRITTEN`** by the number of kept scripts:
+`76 + 9 − 4 = 81`, with `keep 4 file(s) you modified` printed separately. Internally consistent, and
+identical in shape to the pre-existing payload line — but Task 3's dry-run/real-run oracle did not
+have to model that subtraction before Task 1c, and now does.
+
+## A finding that becomes its own task — the runner cannot see a test file die mid-way
+
+Measured by Task 1c's reviewer with two synthetic files:
+
+```
+--- test-dies-clean.sh ---     PASS: only assertion
+  FAIL  exited 1 without reporting a failure          ← backstop fires
+--- test-dies-midway.sh ---    PASS: first assertion
+FAIL: an unrelated red                                 ← dies here, silently
+```
+
+`run-tests.sh`'s backstop is `[ "$test_rc" -ne 0 ] && [ "$file_fail" -eq 0 ]`. A file that printed
+one `FAIL:` and *then* died satisfies neither branch. **The death is invisible, the suite is red for
+an incomplete reason, and every assertion after the death reads as absent rather than unrun.**
+
+This is not hypothetical here: Task 1c's `sha_of` trap killed the test file mid-state, and the
+anti-"keep everything" guard printed *nothing* while the exit status was already 1 from something
+else. The guard read as absent rather than red.
+
+Same family as the previous wave's finding that the runner is blind to python results in both
+directions. **A test file needs a completion sentinel** — the runner has no way today to tell a
+deliberate `exit 1` from a death, and that is the discriminator it lacks.
 
 ## Deferred and parked findings
 
