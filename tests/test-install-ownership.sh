@@ -37,17 +37,27 @@
 #      and IS removed by `uninstall.sh --purge` — while an untouched toolkit file beside it still
 #      goes.
 #
+# State H is the third loop in install.sh. A–D and G are about `.claude/` payload files and the two
+# project-root files; H is about `.claude/scripts/*`, which a SECOND write loop puts there — one
+# that tested nothing before 2026-08-12, so a run announced `keeping yours: .claude/scripts/...` and
+# overwrote the file in the same output.
+#
+#   H  the user's edit survives a REINSTALL, gets a `user-modified` row carrying its edited bytes,
+#      appears in the run's `keeping yours` list and nowhere else — while a stale, untouched
+#      sibling is still replaced with the bytes this toolkit ships.
+#
 # WHAT THIS FILE CANNOT SEE
 #   * Only the two project-root files named above, in states A–D. A third unrecorded write at the
 #     project root — Packages/manifest.json.bak is the known one — is invisible here by construction.
 #   * State G edits three payload files — Markdown, a hook, settings.json — because ONE was not
 #     enough: with a single .md file here, a classifier mutated to protect only `.md` passed this
 #     whole file with zero failures while deleting a user's edited hook and settings.json. What it
-#     still does not cover: `.claude/scripts/*`, which a different loop in install.sh writes; a
-#     file whose MODE the user changed rather than its bytes (the receipt records mode and nothing
-#     reads it); and any payload file whose content is binary. What the INSTALLER does to a
-#     `.claude/` file across upgrades is tests/test-install.sh's and tests/test-install-prune.sh's
-#     ground, not this file's.
+#     still does not cover: `.claude/scripts/*`, which a different loop in install.sh writes — state
+#     H covers what the INSTALLER does to those, and nothing here covers what UNINSTALL does to an
+#     edited one; a file whose MODE the user changed rather than its bytes (the receipt records mode
+#     and nothing reads it); and any payload file whose content is binary. What the INSTALLER does
+#     to a `.claude/` payload file across upgrades is tests/test-install.sh's and
+#     tests/test-install-prune.sh's ground, not this file's.
 #   * Only `--yes` installs against the default (urp) fixture. --with-mcp, --with-input-system,
 #     --dry-run and --keep-local are not exercised, and the fixture is NOT a git repository, so
 #     every branch that turns on `git -C "$PROJECT_DIR"` takes its no-git side. `--purge` is
@@ -99,7 +109,21 @@ own_row() {
 }
 
 receipt_of() { printf '%s' "$1/.claude/state/install-receipt.tsv"; }
-sha_of()     { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+
+# A missing file hashes to the empty string. It used to take the whole test down instead:
+# `sha256sum` exits 1 on a missing path, `set -o pipefail` promotes that through the `| cut`, and
+# `set -e` then kills the file at the assignment — with no message, mid-state, every later assertion
+# gone, and an exit status indistinguishable from an ordinary red.
+#
+# Measured 2026-08-12 while mutation-proving state H. Mutating install.sh's scripts loop to keep
+# every file made install 1 write no scripts at all; H.4 then hashed a path that did not exist and
+# this line ended the run there. H.4 and H.5 printed nothing, and the file reported exactly the one
+# unrelated failure it had already collected — the anti-"keep everything" guard reading as absent
+# rather than as red. A probe that dies is a probe that reports nothing.
+sha_of() {
+  [ -f "$1" ] || return 0
+  sha256sum "$1" | cut -d' ' -f1
+}
 
 # ── Fixture / invocation helpers ─────────────────────────────────────────────
 new_fixture() {
@@ -555,6 +579,188 @@ fi
 run_uninstall_flags "$G_ODD" "G odd-origin"
 assert_kept "$G_ODD" "$G_ODD_REL" "$G_ODD_SHA" "G (unreadable origin)"
 assert_gone "$G_ODD" "$G_UNTOUCHED2" "G (unreadable origin, a well-formed toolkit row beside it)"
+
+# ── State H: the scripts loop respects a user edit ───────────────────────────
+# install.sh has TWO write loops and they disagreed about what a user edit means. The payload loop
+# tests `is_modified` before writing, keeps the file, and records a `user-modified` row carrying the
+# file's current bytes. The `for group in scripts` loop beside it did neither: `cp` was
+# unconditional and the row said `toolkit` regardless. One run therefore printed
+#
+#   warn 1 installed file(s) have local edits — keeping yours:
+#          .claude/scripts/studio-doctor.sh
+#   ok   Installed 85 file(s).
+#
+# and replaced the file with the shipped bytes in the same output. MODIFIED_FILES is computed from
+# the receipt BEFORE either loop runs, so the warning was accurate about what the installer knew and
+# false about what it then did. That is worse than silent data loss: the user is told the file is
+# safe in the breath that destroys it.
+#
+# States A–D and G are about the receipt; H is about the WRITE. It is the only state here that
+# asserts anything about `.claude/scripts/*`, which the file header listed as a known blind spot.
+#
+# H.4 IS THE ANTI-"KEEP EVERYTHING" DIRECTION, AND IT NEEDS A STALE FILE TO BE WORTH ANYTHING. If
+# the untouched sibling already carried the bytes the current toolkit ships, "it still holds the
+# shipped bytes" would pass for a loop that wrote nothing at all — the assertion would be satisfied
+# by the previous run. So H installs a PREVIOUS toolkit first, one whose validate-architecture.sh
+# carries an extra line, and requires the current run to replace it. A fix that keeps everything
+# leaves the old bytes there and goes red.
+#
+# H.5 guards the arithmetic rather than a number: a kept script must increment KEPT and not WRITTEN,
+# or the summary line reports a write the run did not make — the same class of false claim.
+#
+# WHAT STATE H CANNOT SEE
+#   * One edited script and one stale sibling. `.claude/scripts/` is nine files and the loop is
+#     name-blind, but a fix keyed on a filename would still pass here.
+#   * The `keeping yours` list is compared against the `user-modified` rows the receipt ends up
+#     with. Those two sets can legitimately differ when a file the user edited was DROPPED from the
+#     payload — install.sh announces it and writes no row, by design. This fixture installs the same
+#     payload twice, so it produces no such file, and the equality is exact only for that reason.
+#   * Nothing about uninstall. H stops at the end of install 2.
+H_UNTOUCHED_BASE='validate-architecture.sh'
+H_EDITED=".claude/scripts/studio-doctor.sh"
+H_UNTOUCHED=".claude/scripts/$H_UNTOUCHED_BASE"
+
+# The "previous version": the payload and scripts as they stand, with one shipped script carrying an
+# extra line. That is the whole of what makes a version different from the perspective of this loop.
+OLDH="$SCRATCH/old-toolkit-h"
+mkdir -p "$OLDH"
+cp -R "$REPO/.claude" "$OLDH/.claude"
+cp -R "$REPO/scripts" "$OLDH/scripts"
+cp "$REPO/install.sh" "$OLDH/install.sh"
+cp "$REPO/MCP-SETUP.md" "$OLDH/MCP-SETUP.md"
+printf '\n# shipped by the previous toolkit version\n' >> "$OLDH/scripts/$H_UNTOUCHED_BASE"
+
+H="$(new_fixture state-h)"
+H_RC1=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$OLDH/install.sh" --project-dir "$H" --yes >/dev/null 2>&1 </dev/null || H_RC1=$?
+if [ "$H_RC1" -eq 0 ]; then
+  pass "H install 1 (previous version): install.sh exited 0"
+else
+  fail "H install 1 (previous version): install.sh exited $H_RC1"
+fi
+
+# Sanity: the stale sibling really is stale. Without this, H.4 could pass because the two versions
+# shipped identical bytes, which would make the anti-"keep everything" guard unfalsifiable.
+if [ "$(sha_of "$H/$H_UNTOUCHED")" = "$(sha_of "$REPO/scripts/$H_UNTOUCHED_BASE")" ]; then
+  fail "H: the previous version installed the CURRENT $H_UNTOUCHED_BASE — H.4 cannot distinguish a loop that overwrites from one that does nothing"
+else
+  pass "H: the previous version installed different bytes for $H_UNTOUCHED"
+fi
+
+# The user's edit. A comment line, so the script still runs — a fixture that is not what it claims
+# to be proves nothing.
+printf '\n# a line the user added by hand\n' >> "$H/$H_EDITED"
+H_EDITED_SHA="$(sha_of "$H/$H_EDITED")"
+
+# Every .claude file as it stands immediately before install 2 — the baseline "what was actually
+# kept" is measured against. Taken AFTER the edit, because the user's bytes are the bytes that must
+# survive. state/ is excluded: install.sh rewrites the receipt there on every run by design.
+H_PRE="$SCRATCH/h-pre.tsv"
+( cd "$H" && find .claude -type f ! -path '.claude/state/*' | sort | xargs sha256sum ) > "$H_PRE"
+h_pre_sha() { awk -v want="$1" '$2 == want { print $1 }' "$H_PRE"; }
+
+H_RC2=0
+H_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$REPO/install.sh" --project-dir "$H" --yes </dev/null 2>&1 \
+  | sed $'s/\x1b\\[[0-9;]*m//g')" || H_RC2=$?
+if [ "$H_RC2" -eq 0 ]; then
+  pass "H install 2 (current version): install.sh exited 0"
+else
+  fail "H install 2 (current version): install.sh exited $H_RC2 — every assertion below describes a half-installed project"
+  printf '%s\n' "$H_OUT"
+fi
+
+# H.1 — the bytes.
+H_AFTER_SHA="$(sha_of "$H/$H_EDITED")"
+if [ "$H_AFTER_SHA" = "$H_EDITED_SHA" ]; then
+  pass "H.1: the reinstall kept the user's bytes in $H_EDITED"
+else
+  fail "H.1: the reinstall overwrote $H_EDITED after announcing it under 'keeping yours' — data loss, contradicted by the same run's own output ($H_EDITED_SHA -> $H_AFTER_SHA)"
+fi
+
+# H.2 — the row. Reuses state G's precondition assertion: origin `user-modified`, checksum the
+# EDITED one, so the next install still recognises the file as the user's.
+assert_user_modified_row "$H" "$H_EDITED" "$H_EDITED_SHA" "H.2"
+
+# H.3 — the announcement and the writes agree.
+#
+# The list is printed with seven leading spaces by install.sh's warn block; `ok`/`warn` lines carry
+# one. Anchoring on the exact indent keeps the following ok-line out of the block, and the count
+# cross-check below fires if that formatting ever drifts, rather than letting a silently empty list
+# pass every assertion that reads it.
+h_announced() {
+  awk '
+    /installed file\(s\) have local edits/ { inblock = 1; next }
+    inblock && /^       [^ ]/ { sub(/^ +/, ""); print; next }
+    inblock { exit }
+  ' <<< "$H_OUT"
+}
+H_ANNOUNCED="$(h_announced | sort)"
+H_ANNOUNCED_COUNT="$(printf '%s' "$H_ANNOUNCED" | grep -c . || true)"
+H_WARN_COUNT="$(sed -n 's/^warn \([0-9][0-9]*\) installed file(s) have local edits.*/\1/p' <<< "$H_OUT" | sort -u)"
+if [ "$H_ANNOUNCED_COUNT" = "${H_WARN_COUNT:-0}" ] && [ "$H_ANNOUNCED_COUNT" -gt 0 ]; then
+  pass "H.3: the run announced $H_ANNOUNCED_COUNT kept file(s), matching its own warn count"
+else
+  fail "H.3: parsed $H_ANNOUNCED_COUNT announced path(s) against a warn line claiming '${H_WARN_COUNT:-<none>}' — the list below is not being read, and every H.3 assertion is vacuous"
+fi
+
+while IFS= read -r h_rel; do
+  [ -n "$h_rel" ] || continue
+  h_want="$(h_pre_sha "$h_rel")"
+  h_have="$(sha_of "$H/$h_rel")"
+  if [ -z "$h_want" ]; then
+    fail "H.3: the run announced $h_rel as kept, but no such file existed before the run"
+  elif [ "$h_have" = "$h_want" ]; then
+    pass "H.3: $h_rel was announced as kept and its bytes are unchanged"
+  else
+    fail "H.3: $h_rel was announced under 'keeping yours' and then rewritten ($h_want -> $h_have)"
+  fi
+done <<< "$H_ANNOUNCED"
+
+H_UM_ROWS="$(awk -F'\t' '$4 == "user-modified" { print $1 }' "$(receipt_of "$H")" | sort)"
+if [ "$H_UM_ROWS" = "$H_ANNOUNCED" ]; then
+  pass "H.3: the receipt's user-modified rows are exactly the paths the run announced as kept"
+else
+  fail "H.3: announced [$(printf '%s' "$H_ANNOUNCED" | tr '\n' ' ')] but recorded user-modified [$(printf '%s' "$H_UM_ROWS" | tr '\n' ' ')] — the run's claim and its record disagree"
+fi
+
+# H.4 — the untouched sibling is still overwritten, and still recorded toolkit.
+#
+# Presence is asserted separately from content, because the two fail for different reasons and one
+# of them is a loop that stopped writing entirely rather than one that wrote the wrong bytes.
+H_SHIPPED_SHA="$(sha_of "$REPO/scripts/$H_UNTOUCHED_BASE")"
+if [ -f "$H/$H_UNTOUCHED" ]; then
+  pass "H.4: $H_UNTOUCHED is on disk after the reinstall"
+else
+  fail "H.4: $H_UNTOUCHED is not on disk — the scripts loop wrote nothing at all"
+fi
+H_UNTOUCHED_SHA="$(sha_of "$H/$H_UNTOUCHED")"
+if [ -n "$H_SHIPPED_SHA" ] && [ "$H_UNTOUCHED_SHA" = "$H_SHIPPED_SHA" ]; then
+  pass "H.4: the untouched $H_UNTOUCHED was replaced with the bytes this toolkit ships"
+else
+  fail "H.4: $H_UNTOUCHED still carries the previous version's bytes — the loop stopped writing files nobody edited, which is an installer that does not install"
+fi
+assert_owned "$H" "$H_UNTOUCHED" "H.4 (untouched sibling)"
+
+# H.5 — kept is counted as kept. `Installed N file(s), kept M of yours.` drops the second clause
+# when M is 0, so an absent clause reads as 0. Both numbers are checked against things derived from
+# the receipt rather than written down here.
+H_WRITTEN="$(sed -n 's/.*Installed \([0-9][0-9]*\) file(s).*/\1/p' <<< "$H_OUT" | sort -u)"
+H_KEPT="$(sed -n 's/.*Installed [0-9][0-9]* file(s), kept \([0-9][0-9]*\) of yours.*/\1/p' <<< "$H_OUT" | sort -u)"
+H_KEPT="${H_KEPT:-0}"
+H_UM_COUNT="$(printf '%s' "$H_UM_ROWS" | grep -c . || true)"
+H_CLAUDE_ROWS="$(awk -F'\t' '$1 ~ /^\.claude\// { n++ } END { print n + 0 }' "$(receipt_of "$H")")"
+if [ "$H_KEPT" = "$H_UM_COUNT" ]; then
+  pass "H.5: the summary reports $H_KEPT kept, matching the $H_UM_COUNT user-modified row(s) it wrote"
+else
+  fail "H.5: the summary reports $H_KEPT kept against $H_UM_COUNT user-modified row(s) — a kept file counted as written, or the reverse"
+fi
+if [ -n "$H_WRITTEN" ] && [ "$((H_WRITTEN + H_KEPT))" = "$H_CLAUDE_ROWS" ]; then
+  pass "H.5: written $H_WRITTEN + kept $H_KEPT = $H_CLAUDE_ROWS .claude rows — every path is accounted for exactly once"
+else
+  fail "H.5: written '${H_WRITTEN:-<unparsed>}' + kept $H_KEPT does not equal the $H_CLAUDE_ROWS .claude receipt rows — a file was counted twice or not at all"
+fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-ownership assertions passed\n'

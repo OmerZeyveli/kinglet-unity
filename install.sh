@@ -482,6 +482,24 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 # So: scripts/ ships, tests/ does not. An installed project that already has .claude/tests/ from an
 # earlier version gets it removed by the payload-prune above, which is the behaviour that exists for
 # exactly this.
+# This loop is the payload loop's twin and must stay its twin. It did not: the payload loop tested
+# is_modified before writing, and this one's `cp` was unconditional with a `toolkit` row regardless.
+# So a user who edited .claude/scripts/studio-doctor.sh got, in ONE run:
+#
+#   warn 1 installed file(s) have local edits — keeping yours:
+#          .claude/scripts/studio-doctor.sh
+#   ok   Installed 85 file(s).
+#
+# and the edit was gone. MODIFIED_FILES is computed at Step 4, before either loop runs, so the
+# warning was accurate about what the installer knew and false about what it then did — the one
+# failure worse than silent data loss, because the user is told the file is safe in the same breath.
+# Measured on a fixture 2026-08-12; tests/test-install-ownership.sh's state H holds all four
+# directions of it, including the one that stops the fix becoming "keep everything".
+#
+# The path form is load-bearing and is not a coincidence: MODIFIED_FILES is built from receipt
+# field 1, these rows are written as `.claude/scripts/<name>`, and is_modified matches whole lines
+# (`grep -qxF`). Change either form and the test below silently never matches — a no-op that reads
+# as a fix.
 for group in scripts; do
   [ -d "$SCRIPT_DIR/$group" ] || continue
   mkdir -p "$CLAUDE_DIR/$group"
@@ -489,9 +507,18 @@ for group in scripts; do
     [ -f "$f" ] || continue
     b=$(basename "$f")
     [ "$b" = "check-provenance.sh" ] && continue
-    cp "$f" "$CLAUDE_DIR/$group/$b"
-    chmod +x "$CLAUDE_DIR/$group/$b"
-    printf '.claude/%s/%s\t%s\t%s\ttoolkit\n' "$group" "$b" "$(sha_of "$CLAUDE_DIR/$group/$b")" "755" >> "$RECEIPT_TMP"
+    dest="$CLAUDE_DIR/$group/$b"
+    if is_modified ".claude/$group/$b"; then
+      # Kept, so counted as kept: WRITTEN and KEPT both appear in the summary line, and a kept file
+      # counted as written is a write the run did not make. Recorded as the file now stands, so the
+      # NEXT install still recognises it — the same reason the payload loop records the edited sha.
+      KEPT=$((KEPT + 1))
+      printf '.claude/%s/%s\t%s\t%s\tuser-modified\n' "$group" "$b" "$(sha_of "$dest")" "$(stat -c '%a' "$dest" 2>/dev/null || echo 755)" >> "$RECEIPT_TMP"
+      continue
+    fi
+    cp "$f" "$dest"
+    chmod +x "$dest"
+    printf '.claude/%s/%s\t%s\t%s\ttoolkit\n' "$group" "$b" "$(sha_of "$dest")" "755" >> "$RECEIPT_TMP"
     WRITTEN=$((WRITTEN + 1))
   done
 done
