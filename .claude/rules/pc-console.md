@@ -3,9 +3,8 @@
 *Written against Unity 6000.0, current as of 2026-08-04.*
 
 The platform spec for this toolkit. Kinglet Pioneer ships **no mobile content** — the mobile skill
-and the mobile genre skills were removed at build time, not disabled, and
-the agents' mobile guidance was rewritten. So this file does not neutralize anything; it states what
-we target.
+and the mobile genre skills were removed at build time, not disabled, and the agents' mobile
+guidance was rewritten. So this file does not neutralize anything; it states what we target.
 
 Precedence: `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`, and
 `unity-specifics.md` are the binding spine. This file adds platform specifics on top of them — it

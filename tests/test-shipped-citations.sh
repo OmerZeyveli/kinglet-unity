@@ -4,7 +4,7 @@
 # A surface that ships into a user's Unity project can only cite what that user has. Eight section
 # markers across three shipped skills abbreviated a citation to a repository-only document — the
 # numbers resolve, against docs/research/pioneer/field-notes.md, which is tracked and does not ship —
-# and seven backticked paths named files install.sh does not copy, one of them a rule instructing the
+# and eight backticked paths named files install.sh does not copy, one of them a rule instructing the
 # reader to inspect a test and report a regression.
 set -euo pipefail
 
@@ -103,8 +103,10 @@ fi
 # block-scoped: NOTICE.md is one document, and a reader who meets "linked at the top of this file"
 # scrolls up and finds the link. Block-scoped would force a URL into NOTICE.md:140's table header,
 # `| How `provenance.tsv` records it |`, which names the manifest rather than pointing at it.
-# Matching the URL's *text* is what stops it being a loophole: NOTICE.md carries five URLs and none
-# ends in test-provenance-origins.sh, so that citation still fires.
+# Matching the URL's *text* is what stops it being a loophole: a URL clears a token only when the
+# URL's own text ends with that token's path, so a file's other links — however many it carries —
+# leave every citation they do not name still flagged. Stated as a property on purpose: a count of a
+# file's URLs, or a named example, is a number this wave's own edits move.
 #
 # Three tokens are allowed. Each is a name collision the measurement turned up, not a citation of a
 # repository-only artifact. If this list grows, rule 2 is wrong — re-examine it, do not append.
