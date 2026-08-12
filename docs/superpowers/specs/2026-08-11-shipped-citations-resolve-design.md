@@ -63,10 +63,20 @@ substantial and is precisely that row's incident, so the cell is filled from it 
 
 ### The path class — files `install.sh` does not copy
 
-`install.sh:175` derives the payload as every file under `.claude/` except `state/`. `install.sh:379`
-then copies `scripts/*.sh` into `.claude/scripts/`, and `:384` excludes exactly one file,
-`check-provenance.sh`. `tests/` is copied by nothing; the comment at `:370-378` says so explicitly and
-adds that an installed `.claude/tests/` left by an older version is **pruned**.
+`install.sh`'s `PAYLOAD_FILES` assignment derives the payload as every file under `.claude/` except
+`state/`. Its `for group in scripts` copy loop then copies `scripts/*.sh` into `.claude/scripts/`,
+excluding exactly one file, `check-provenance.sh`. `tests/` is copied by nothing; the comment block
+that opens *"Validation scripts ship alongside the payload. The test suite does not."* — immediately
+above that loop — says so explicitly and adds that an installed `.claude/tests/` left by an older
+version is **pruned**.
+
+> **Cited by anchor, not by line — corrected 2026-08-12.** This paragraph read `install.sh:175`,
+> `:379`, `:384` and `:370-378`. Task 3 of this wave inserted 29 lines into `install.sh`'s dry-run
+> block, above every one of them, and all but `:175` went stale; the fix round that repaired them
+> moved them again by 11.
+> Measured on 2026-08-12 after that round: `PAYLOAD_FILES` at `:175`, the copy loop at `:417`, the
+> exclusion at `:423`, the comment block at `:385-416`. Those numbers are a snapshot, not the
+> citation — `grep -n 'PAYLOAD_FILES=\|for group in scripts' install.sh` is.
 
 Against that payload, seven live citations do not resolve:
 
@@ -150,10 +160,14 @@ citations that fail to resolve mis-resolved its own.
 
 ### D4 — The guard derives its payload; it does not hardcode one
 
-`tests/test-shipped-citations.sh` computes the installed set the same way `install.sh:175` and
-`:379-390` do: every file under `.claude/` except `state/`, plus `scripts/*.sh` less
-`check-provenance.sh`. A hardcoded list would go stale the first time the payload changes, which is
-the failure mode this repository has recorded three times.
+`tests/test-shipped-citations.sh` computes the installed set the same way `install.sh`'s
+`PAYLOAD_FILES` assignment and its `for group in scripts` copy loop do: every file under `.claude/`
+except `state/`, plus `scripts/*.sh` less `check-provenance.sh`. A hardcoded list would go stale the
+first time the payload changes, which is the failure mode this repository has recorded three times.
+
+D4 named those two by line (`install.sh:175` and `:379-390`) until 2026-08-12, and the second went
+stale inside this wave — the derivation was rot-proof and its *citation* was not, which is the same
+defect one level up. Both are named by anchor now, here and in the guard's own comment.
 
 ### D5 — The guard has exactly two rules
 

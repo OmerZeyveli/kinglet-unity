@@ -87,9 +87,14 @@ FAILURES=0
 fail() { printf 'FAIL: %s\n' "$1"; FAILURES=$((FAILURES + 1)); }
 pass() { printf 'PASS: %s\n' "$1"; }
 
-# The installed payload, derived the way install.sh derives it — not hardcoded. install.sh:175 takes
-# every file under .claude/ except state/, and :379-390 copies scripts/*.sh into .claude/scripts/
-# with exactly one exclusion. A hardcoded list goes stale the first time the payload changes.
+# The installed payload, derived the way install.sh derives it — not hardcoded. install.sh's
+# PAYLOAD_FILES assignment takes every file under .claude/ except state/, and its `for group in
+# scripts` copy loop copies scripts/*.sh into .claude/scripts/ with exactly one exclusion,
+# check-provenance.sh. A hardcoded list goes stale the first time the payload changes.
+#
+# (Corrected 2026-08-12. This block was written as `install.sh:175` and `:379-390`; Task 3 of this
+# same wave inserted 29 lines above the copy loop and `:379-390` came to rest on licence prose. The
+# shipped guard now carries the anchor form above — keep this listing in step with it.)
 payload_paths() {
   ( cd "$REPO/.claude" && find . -type f ! -path './state/*' | sed 's|^\./|.claude/|' )
   for f in "$REPO"/scripts/*.sh; do
@@ -381,7 +386,9 @@ Expected: `FAIL: 8 shipped citation(s) name a file install.sh does not copy:` li
 
 `provenance.tsv` must **not** appear — it is cited four times in `NOTICE.md` and cleared by the URL at `:12`. If it appears, the URL escape is broken; stop and report rather than editing `NOTICE.md:29`, `:135` or `:140`, which the spec explicitly leaves alone.
 
-`PASS: guard examined <n> backticked tokens` must also print, with `n` near 323.
+`PASS: guard examined <n> backticked tokens` must also print, with `n` in the mid-500s — **561** measured on 2026-08-12 (`bash tests/test-shipped-citations.sh`), 569 before the fixes.
+
+*(This line read "near 323" until 2026-08-12. 323 was a count of *globally unique* tokens; `tokens_seen` increments once per (file, token) pair, so it is roughly 1.7× that. A red-first expectation off by 238 makes a broken derivation indistinguishable from a stale estimate — and the floor the guard actually enforces is 200, which both numbers clear. The ledger ruled "fix the plan text, not the guard"; this is that fix, applied.)*
 
 - [ ] **Step 3: Fix `.claude/rules/pc-console.md`**
 
@@ -572,7 +579,9 @@ bash install.sh --project-dir /tmp/citefix-p --dry-run 2>&1 | grep -A4 'Would in
 
 Expected: the output contains `scripts/ and tests/ into .claude/`.
 
-Then confirm the real run does not do that — read `install.sh:370-390`. The comment there states `tests/` deliberately does not ship and that an installed `.claude/tests/` is **pruned** by the payload-prune above it; the loop is `for group in scripts`.
+Then confirm the real run does not do that — read the comment block in `install.sh` that opens *"Validation scripts ship alongside the payload. The test suite does not."*, immediately above the `for group in scripts` copy loop (`grep -n 'Validation scripts ship alongside' install.sh`; `:385-416` on 2026-08-12). It states `tests/` deliberately does not ship and that an installed `.claude/tests/` is **pruned** by the payload-prune above it; the loop is `for group in scripts`.
+
+*(This step read "`install.sh:370-390`" until 2026-08-12. This task's own +29-line insertion moved that block, so the instruction sent a later reader to the paragraph about `provenance.tsv` not shipping and to licence prose — a step whose own edit invalidated its own citation.)*
 
 - [ ] **Step 2: Fix the line**
 
@@ -825,11 +834,14 @@ The instances are fixed; the question is whether the class is closed. Run the gu
 
 ```bash
 # Does anything outside .claude/*.md cite a repo-only path in a shipped context?
-grep -rn 'sourced-incidents' . --exclude-dir=.git || echo "clean: no reference survives"
+# Scoped to .claude/ — the payload — because that is what the question is about.
+grep -rn 'sourced-incidents' .claude/ || echo "clean: no reference survives in the shipped payload"
 
 # Do the hooks and shipped scripts cite paths that do not ship?
 grep -n 'tests/' .claude/hooks/*.sh .claude/scripts/*.sh 2>/dev/null || echo "clean"
 ```
+
+*(The first sweep was `grep -rn 'sourced-incidents' . --exclude-dir=.git` until 2026-08-12, and it could never print clean: every hit is in this wave's own spec, plan and ledger — documents that must name the string in order to discuss it, and that do not ship. The ledger's Task 6 amendment ruled it be scoped to `.claude/` and rewrote it in the ledger only; this is that ruling applied to the plan. The repo-wide count is unstable by construction — it rises by one every time a document discusses the sweep, because discussing it means naming the string — which is the second reason not to write the check that way. The scoped form returns nothing, stably.)*
 
 Record both results in the ledger. A hit in the second is a real finding for the spin-out wave, not for this one.
 

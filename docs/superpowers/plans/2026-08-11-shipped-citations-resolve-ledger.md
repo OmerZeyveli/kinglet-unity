@@ -23,8 +23,22 @@ instructing the reader to inspect a test and report a regression. A new guard,
 `tests/test-shipped-citations.sh`, enforces both rules against a payload it derives rather than
 hardcodes.
 
-Suite at wave start: 488 passing, 30 test files, 544 manifest rows. **Now: 495 passing, 31 test
-files, `provenance OK`.** The guard prints 7 PASS lines and examines 561 backticked tokens.
+Suite at wave start: 488 passing, 30 test files, 542 manifest rows. **Now: 503 passing, 31 test
+files, 545 manifest rows, `provenance OK`.** The guard prints 7 PASS lines and examines 561
+backticked tokens.
+
+*(Corrected 2026-08-12. "544 manifest rows" and "495 passing" were both wrong, in the first paragraph
+a context-lost session reads. **The row count depends entirely on the method, so the method is the
+finding.** `check-provenance.sh`'s `rows()` helper defines a row —
+`rows() { grep -v '^#' "$MANIFEST" | tail -n +2; }` — non-comment lines less the first, because the
+first non-comment line is the column header
+`path<TAB>origin<TAB>…`, not a row. By that definition: **542 at the wave base `076464b`, 545 at
+HEAD**, and the gate prints the second itself as `no ghost rows (545 rows resolve to files)`. The
+controller's `grep -vc '^#'` gives 543 and 546 — one too many at each end, because it counts that
+column header. The reviewer's 553 is reproduced by no method at any commit in the wave: `rows()`
+walks 542 → 543 → 544 → 545 across `99c18a2..HEAD` and never reaches it, and `wc -l` never exceeds
+557. Two measurements of one file disagreeing three ways is the argument for quoting the definition
+alongside the number.)*
 
 **Spec D3 was withdrawn mid-Task-1 and the spec is corrected on the record.** The first draft said
 the `§N` markers pointed at nothing and ruled `systematic-debugging:39`'s empty cell should stay
@@ -298,10 +312,14 @@ discharged.
    `FAILED (failures=3, errors=17)` all fail that pattern. `tests/test-kinglet-spike.sh`'s 1308 tests
    (**corrected after Task 6** — this said `test-kinglet-build.sh`, which has 135; **1443 python
    results in total reach `Total: 503` as a single PASS**, so the effect is larger than first written)
-   contribute **0 PASS and 0 FAIL**; `Total: 495` excludes them entirely. A red python run reaches
+   contribute **0 PASS and 0 FAIL**; `Total: 503` excludes them entirely. A red python run reaches
    the aggregate only through the `test_rc -ne 0 && file_fail -eq 0` fallback at `:285-288`, as
    exactly one FAIL. **The suite cannot go silently green on a python failure** — this is granularity
    loss, not a fail-open.
+
+   *(Corrected 2026-08-12: this sentence stated the runner's Total as **both** 503 and 495. The
+   correction to 503 was spliced into the parenthetical and the clause outside it left at the old
+   value, so one sentence carried two answers to the same question. It is 503 at both mentions.)*
 
 ## What Task 3 found — and why its own method could not find all of it
 
@@ -323,7 +341,8 @@ defect pointing the other way. The announcement carries Step 8c's condition verb
 
 The implementer then re-ran its widened check and reported **no third unannounced write**. The
 reviewer found one: with `--with-mcp` against a project whose `Packages/manifest.json` git does not
-track, `install.sh:623` leaves `Packages/manifest.json.bak` behind permanently.
+track, `add_manifest_dependency`'s `cp "$MANIFEST" "$MANIFEST.bak"` leaves `Packages/manifest.json.bak`
+behind permanently.
 
 **The implementer's check could not have found it.** Its oracle was the receipt
 (`grep -v '^#' <receipt> | cut -f1`), and `manifest.json.bak` never enters the receipt. The method
@@ -346,19 +365,31 @@ That second check is what would catch both defects below.
 
 ## Deferred from Task 3 — two real installer defects this wave is not closing
 
+**Coordinates below are anchors, not line numbers — corrected 2026-08-12.** They were written as
+`install.sh:623`, `:629`, `:642` and `:690-694`, measured mid-wave; Task 3's insertion had already
+moved them by 11 before the wave closed, and the fix round that noticed moved them another 11 while
+correcting them. A citation into `install.sh` cannot survive an edit to `install.sh`, which is the
+one thing the spin-out wave is certain to do. Line numbers are given as a dated snapshot only —
+`grep -n 'MANIFEST.bak\|Step 8c\|MCP_JSON_RECEIPT_LINE' install.sh` is the citation.
+
 1. **The receipt disowns files on upgrade.** `$RECEIPT_TMP` is rebuilt from scratch every run, and
-   Step 8c (`install.sh:690-694`) appends its row **only on create**. So a second install drops
-   `MCP-SETUP.md`'s row 1 → 0 and `uninstall.sh` — which removes only receipt-listed paths — then
-   **leaves the file behind**. Measured, and `.mcp.json` (`:672`, `:683`) behaves identically, so it
-   is a class. The fix is to re-record the row when the existing file is receipt-owned or matches the
-   toolkit copy. **Out of this brief: an installer-ownership fix, not a dry-run fix.** Task 3's
-   round-2 wording change was scoped precisely so the announcement no longer makes a claim about
-   this.
-2. **`Packages/manifest.json.bak` is permanent debris** (`install.sh:623`, `:642`). Created with
-   `--with-mcp` against a project whose manifest git does not track; `:629` removes it only when the
-   file *is* tracked. It never enters the receipt, so `uninstall.sh` can never remove it — in exactly
-   the projects (non-git, or a manifest not yet added) least able to `git checkout` it away. Same
-   class as `MCP-SETUP.md` and worse in that one respect.
+   Step 8c — `MCP_SETUP_MD="$PROJECT_DIR/MCP-SETUP.md"` through its `fi` (`:707-717` on 2026-08-12) —
+   appends its row **only on create**, inside the `[ ! -f "$MCP_SETUP_MD" ]` branch (the append is at
+   `:716`). So a second install drops `MCP-SETUP.md`'s row 1 → 0 and `uninstall.sh` — which removes
+   only receipt-listed paths — then **leaves the file behind**. Measured, and `.mcp.json` behaves
+   identically: `MCP_JSON_RECEIPT_LINE` is assigned only in the `cat > "$MCP_JSON"` create branch
+   (`:683` and `:694`), so it is a class. The fix is to re-record the row when the existing file is
+   receipt-owned or matches the toolkit copy. **Out of this brief: an installer-ownership fix, not a
+   dry-run fix.** Task 3's round-2 wording change was scoped precisely so the announcement no longer
+   makes a claim about this.
+2. **`Packages/manifest.json.bak` is permanent debris.** Created inside `add_manifest_dependency` by
+   `cp "$MANIFEST" "$MANIFEST.bak"` (`:645` on 2026-08-12) with `--with-mcp` against a project whose
+   manifest git does not track; the `rm -f "$MANIFEST.bak"` that would clean it up (`:651`) sits
+   inside the `git ls-files --error-unmatch` branch and so runs only when the file *is* tracked, and
+   the untracked branch merely announces it as `(backup: manifest.json.bak)` (`:664`). It never
+   enters the receipt, so `uninstall.sh` can never remove it — in exactly the projects (non-git, or a
+   manifest not yet added) least able to `git checkout` it away. Same class as `MCP-SETUP.md` and
+   worse in that one respect.
 
 ### Three Minor from Task 3, recorded
 
@@ -546,21 +577,51 @@ The plan's Task 6 stands, with these changes. The first two were measured by the
 dispatch, precisely so the implementer does not have to guess at an expected result.
 
 1. **Step 2's first sweep is unsatisfiable as written.** `grep -rn 'sourced-incidents' .
-   --exclude-dir=.git || echo "clean"` returns **16 hits**, every one of them in this wave's own spec,
-   plan and ledger. It can never print `clean`. Scope it to what ships: `.claude/` and nothing else.
+   --exclude-dir=.git || echo "clean"` returned **16 hits when Task 6 ran it**, and more since (see
+   the note below) — every one of them in this wave's own spec, plan and ledger. It can never print
+   `clean`. Scope it to what ships: `.claude/` and nothing else.
 
-   *(This read 15 when the amendment was written, and 16 by the time Task 6 ran it — the controller's
-   own ledger commit added the sixteenth. A count written into a document about counts going stale,
-   going stale. Task 6 caught it and guessed the cause correctly before checking.)*
+   *(This read 15 when the amendment was written, 16 by the time Task 6 ran it — the controller's own
+   ledger commit added the sixteenth — 17 when the 2026-08-12 fix round measured it, and 18 once that
+   round finished writing this paragraph. **Do not repair the number here.** It cannot be held still:
+   every document that discusses this sweep has to name the string in order to discuss it, so the
+   repo-wide count rises by one each time anyone writes about it, including now. A count written into
+   a document about counts going stale, going stale, on every pass. That is the second reason the
+   sweep is scoped to `.claude/` — where it returns nothing, stably.)*
 2. **Step 2's real question — do shipped *non-Markdown* surfaces cite repo-only paths? — has a
-   measured answer: exactly three, all in `.claude/UPSTREAM`** (`MERGE-NOTES.md`,
-   `provenance-skip.tsv`, `provenance.tsv`). Both guard rules scan `find .claude -name '*.md'`, so
-   `UPSTREAM` is outside them by construction; the spec records this under *Out of scope*.
+   measured answer: exactly four, all in `.claude/UPSTREAM`** (`provenance.tsv` at `:2` and `:11`,
+   `MERGE-NOTES.md` and `provenance-skip.tsv` at `:20`, and **`check-provenance.sh` at `:17`**).
+   Both guard rules scan `find .claude -name '*.md'`, so `UPSTREAM` is outside them by construction;
+   the spec records this under *Out of scope*, and the spec's list of four is the correct one.
 
-   **The sweep must not require a `/` in the token.** The controller's first attempt filtered on
-   `*/*` and returned **zero**, which reads as clean — `provenance.tsv` has no slash in it. That is
-   the wave's own subject applied to the controller mid-measurement, and it is why the expected
-   number is written down here rather than left to the implementer's probe to discover.
+   **This entry read "exactly three" until 2026-08-12 and the spec read four.** The spec was right.
+   `check-provenance.sh` is repo-only for the most explicit reason any file in this tree is: the copy
+   loop names it as its single exclusion. It sits unbackticked and mid-sentence in
+   `superpowers_pin_note=` — *"check-provenance.sh --online never reaches it"* — where `UPSTREAM` is
+   `key=value` and nothing in it is backticked at all.
+
+   **Both probes were defeated by their own shape, and that is the finding.** The controller's first
+   attempt filtered on `*/*` and returned **zero**, which reads as clean — `provenance.tsv` has no
+   slash in it. The replacement dropped the slash requirement but kept resolving each candidate token
+   against the **repository root**, and `check-provenance.sh` does not exist at the root; it exists at
+   `scripts/check-provenance.sh`. So the existence test failed and the one name that is repo-only *by
+   the installer's own explicit exclusion* was discarded as "not a file here". The second probe's own
+   text is not preserved in this ledger, so what follows is a reconstruction — but it reproduces the
+   recorded result exactly, and the root-only existence test is the only shape that does:
+
+   ```bash
+   grep -oE '[A-Za-z0-9_.-]+\.[A-Za-z]+' .claude/UPSTREAM | sort -u | while read -r t; do
+     [ -f "$t" ] && echo "root:  $t"
+     [ -f "scripts/$t" ] && echo "under scripts/: $t"
+   done
+   ```
+
+   The root test alone yields exactly the three this entry recorded; adding one directory yields the
+   fourth. First probe: required a separator the target lacks. Second probe: required a location the
+   target does not occupy. Same class, one turn apart — **a probe's shape decides what it finds**.
+   The section above already records this class three times over; this is another, and it landed
+   inside a measurement written *to protect* an implementer from having to guess. Recorded without an
+   ordinal on purpose: a running tally of instances is a count, and counts in this wave went stale.
 3. **Criterion 7's command is already fixed in the plan.** The line-oriented `grep -h 'more than one'`
    printed three lines with the middle one ending bare, because `unity-execution:10-11` wraps
    mid-phrase. The flattened replacement prints two unique results, both `more than one substantial`.
