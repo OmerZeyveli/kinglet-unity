@@ -203,7 +203,25 @@ NEW_PATHS=$(printf '%s\n' "$NEW_PATHS" | sort -u)
 # enumeration the real run and the receipt are both built from.
 SCRIPTS_COUNT=$(printf '%s\n' "$NEW_PATHS" | grep -c '^\.claude/scripts/' || true)
 
-sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+# A missing file hashes to the empty string, and the guard lives HERE rather than at each call site.
+#
+# The old body was `sha256sum "$1" 2>/dev/null | cut -d' ' -f1`, which is safe only for as long as
+# every caller happens to check existence first. They all do today — owned_by_installer returns
+# early, the upgrade scan `continue`s, and both write loops hash a file they just wrote or just
+# proved present — so this changes no behaviour now. It is the asymmetry that is the defect: the
+# helper's contract was "the caller has already checked", enforced nowhere.
+#
+# Two different failures were one edit away. Under `set -euo pipefail` sha256sum exits 1 on a
+# missing path, pipefail promotes that through the `| cut`, and at an ASSIGNMENT site set -e kills
+# the installer with no message. At the four receipt-row sites the substitution sits inside a printf
+# argument, where set -e does not reach, so the same miss instead writes a row with an EMPTY
+# checksum — a receipt that uninstall.sh will silently decline to act on, which is worse. Measured
+# in tests/test-install-ownership.sh, where the identical helper took the whole test file down
+# mid-state and the assertions after it read as absent rather than red.
+sha_of() {
+  [ -f "$1" ] || return 0
+  sha256sum "$1" | cut -d' ' -f1
+}
 
 # ── Ownership, not authorship ────────────────────────────────────────────────
 # A receipt row says "this file is ours to remove", not "this run wrote it". Those were the same

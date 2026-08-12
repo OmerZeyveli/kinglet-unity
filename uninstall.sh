@@ -69,7 +69,17 @@ if [ ! -f "$RECEIPT" ]; then
   exit 1
 fi
 
-sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+# A missing file hashes to the empty string. Same helper, same reasoning, same day as install.sh's:
+# the old body was safe only because the one caller below checks `[ ! -f "$abs" ]` first, so the
+# contract "existence is the caller's problem" was enforced nowhere. sha256sum exits 1 on a missing
+# path and pipefail promotes it through the `| cut`.
+#
+# The direction is fail-closed either way: an empty checksum never equals a recorded one, so the row
+# lands in MODIFIED and the file is KEPT rather than removed.
+sha_of() {
+  [ -f "$1" ] || return 0
+  sha256sum "$1" | cut -d' ' -f1
+}
 
 # ── Classify every receipted file before touching anything ───────────────────
 # TWO TESTS, NOT ONE, because two different questions are being asked of one row.

@@ -608,27 +608,47 @@ assert_gone "$G_ODD" "$G_UNTOUCHED2" "G (unreadable origin, a well-formed toolki
 # H.5 guards the arithmetic rather than a number: a kept script must increment KEPT and not WRITTEN,
 # or the summary line reports a write the run did not make — the same class of false claim.
 #
+# TWO EDITED SCRIPTS AND TWO STALE SIBLINGS, AND THE SECOND OF EACH IS NOT REDUNDANCY. With one
+# edited script here, two different broken fixes passed this whole file with zero failures — measured
+# 2026-08-12, 114 PASS / 0 FAIL each:
+#
+#   * keyed on the NAME  — `[ "$b" = studio-doctor.sh ]`, the gap this comment used to merely declare;
+#   * keyed on the COUNT — keep the first edited script and overwrite the rest, which nobody declared.
+#
+# One file cannot tell "keeps the user's edits" from "keeps THIS file" or from "keeps ONE file". Two
+# can tell all three apart, and it is the same move state G made by varying the file TYPE: the loop
+# reads a set-membership test, so nothing about a file's name or its ordinal should reach its
+# decision, and the only way to assert that is to vary them and watch the answer not change.
+#
 # WHAT STATE H CANNOT SEE
-#   * One edited script and one stale sibling. `.claude/scripts/` is nine files and the loop is
-#     name-blind, but a fix keyed on a filename would still pass here.
+#   * Two of nine scripts, in one arrangement. A fix keyed on the two names together, or on "the
+#     first two", is not distinguishable here from a correct one.
 #   * The `keeping yours` list is compared against the `user-modified` rows the receipt ends up
 #     with. Those two sets can legitimately differ when a file the user edited was DROPPED from the
 #     payload — install.sh announces it and writes no row, by design. This fixture installs the same
 #     payload twice, so it produces no such file, and the equality is exact only for that reason.
 #   * Nothing about uninstall. H stops at the end of install 2.
-H_UNTOUCHED_BASE='validate-architecture.sh'
-H_EDITED=".claude/scripts/studio-doctor.sh"
-H_UNTOUCHED=".claude/scripts/$H_UNTOUCHED_BASE"
+# Newline-separated, not arrays: bash 3.2 is the floor. Written pre-sorted, because every set
+# comparison below goes through `sort` and a mis-sorted literal would fail for the wrong reason.
+H_EDITED='.claude/scripts/analyze-build-size.sh
+.claude/scripts/studio-doctor.sh'
+H_EDITED_COUNT=2
+H_UNTOUCHED='.claude/scripts/validate-architecture.sh
+.claude/scripts/validate-serialization.sh'
 
-# The "previous version": the payload and scripts as they stand, with one shipped script carrying an
-# extra line. That is the whole of what makes a version different from the perspective of this loop.
+# The "previous version": the payload and scripts as they stand, with the untouched siblings each
+# carrying an extra line. That is the whole of what makes a version different from this loop's
+# perspective — and it is what lets H.4 tell a loop that overwrites from one that does nothing.
 OLDH="$SCRATCH/old-toolkit-h"
 mkdir -p "$OLDH"
 cp -R "$REPO/.claude" "$OLDH/.claude"
 cp -R "$REPO/scripts" "$OLDH/scripts"
 cp "$REPO/install.sh" "$OLDH/install.sh"
 cp "$REPO/MCP-SETUP.md" "$OLDH/MCP-SETUP.md"
-printf '\n# shipped by the previous toolkit version\n' >> "$OLDH/scripts/$H_UNTOUCHED_BASE"
+while IFS= read -r h_rel; do
+  [ -n "$h_rel" ] || continue
+  printf '\n# shipped by the previous toolkit version\n' >> "$OLDH/scripts/$(basename "$h_rel")"
+done <<< "$H_UNTOUCHED"
 
 H="$(new_fixture state-h)"
 H_RC1=0
@@ -640,22 +660,29 @@ else
   fail "H install 1 (previous version): install.sh exited $H_RC1"
 fi
 
-# Sanity: the stale sibling really is stale. Without this, H.4 could pass because the two versions
+# Sanity: the stale siblings really are stale. Without this, H.4 could pass because the two versions
 # shipped identical bytes, which would make the anti-"keep everything" guard unfalsifiable.
-if [ "$(sha_of "$H/$H_UNTOUCHED")" = "$(sha_of "$REPO/scripts/$H_UNTOUCHED_BASE")" ]; then
-  fail "H: the previous version installed the CURRENT $H_UNTOUCHED_BASE — H.4 cannot distinguish a loop that overwrites from one that does nothing"
-else
-  pass "H: the previous version installed different bytes for $H_UNTOUCHED"
-fi
+while IFS= read -r h_rel; do
+  [ -n "$h_rel" ] || continue
+  if [ "$(sha_of "$H/$h_rel")" = "$(sha_of "$REPO/scripts/$(basename "$h_rel")")" ]; then
+    fail "H: the previous version installed the CURRENT $h_rel — H.4 cannot distinguish a loop that overwrites from one that does nothing"
+  else
+    pass "H: the previous version installed different bytes for $h_rel"
+  fi
+done <<< "$H_UNTOUCHED"
 
-# The user's edit. A comment line, so the script still runs — a fixture that is not what it claims
-# to be proves nothing.
-printf '\n# a line the user added by hand\n' >> "$H/$H_EDITED"
-H_EDITED_SHA="$(sha_of "$H/$H_EDITED")"
+# The user's edits. A comment line each, so the scripts still run — a fixture that is not what it
+# claims to be proves nothing. Different text per file, so no two edited scripts can hash alike and
+# an assertion cannot pass by comparing the wrong pair.
+while IFS= read -r h_rel; do
+  [ -n "$h_rel" ] || continue
+  printf '\n# a line the user added by hand to %s\n' "$(basename "$h_rel")" >> "$H/$h_rel"
+done <<< "$H_EDITED"
 
 # Every .claude file as it stands immediately before install 2 — the baseline "what was actually
-# kept" is measured against. Taken AFTER the edit, because the user's bytes are the bytes that must
-# survive. state/ is excluded: install.sh rewrites the receipt there on every run by design.
+# kept" is measured against, and the source of every expected checksum below. Taken AFTER the edits,
+# because the user's bytes are the bytes that must survive. state/ is excluded: install.sh rewrites
+# the receipt there on every run by design.
 H_PRE="$SCRATCH/h-pre.tsv"
 ( cd "$H" && find .claude -type f ! -path '.claude/state/*' | sort | xargs sha256sum ) > "$H_PRE"
 h_pre_sha() { awk -v want="$1" '$2 == want { print $1 }' "$H_PRE"; }
@@ -671,17 +698,25 @@ else
   printf '%s\n' "$H_OUT"
 fi
 
-# H.1 — the bytes.
-H_AFTER_SHA="$(sha_of "$H/$H_EDITED")"
-if [ "$H_AFTER_SHA" = "$H_EDITED_SHA" ]; then
-  pass "H.1: the reinstall kept the user's bytes in $H_EDITED"
-else
-  fail "H.1: the reinstall overwrote $H_EDITED after announcing it under 'keeping yours' — data loss, contradicted by the same run's own output ($H_EDITED_SHA -> $H_AFTER_SHA)"
-fi
+# H.1 — the bytes. Every edited script, not one of them: a fix that keeps the first and overwrites
+# the rest is indistinguishable from a correct one when only one file is asserted.
+while IFS= read -r h_rel; do
+  [ -n "$h_rel" ] || continue
+  h_want="$(h_pre_sha "$h_rel")"
+  h_have="$(sha_of "$H/$h_rel")"
+  if [ "$h_have" = "$h_want" ]; then
+    pass "H.1: the reinstall kept the user's bytes in $h_rel"
+  else
+    fail "H.1: the reinstall overwrote $h_rel after announcing it under 'keeping yours' — data loss, contradicted by the same run's own output ($h_want -> $h_have)"
+  fi
+done <<< "$H_EDITED"
 
-# H.2 — the row. Reuses state G's precondition assertion: origin `user-modified`, checksum the
+# H.2 — the rows. Reuses state G's precondition assertion: origin `user-modified`, checksum the
 # EDITED one, so the next install still recognises the file as the user's.
-assert_user_modified_row "$H" "$H_EDITED" "$H_EDITED_SHA" "H.2"
+while IFS= read -r h_rel; do
+  [ -n "$h_rel" ] || continue
+  assert_user_modified_row "$H" "$h_rel" "$(h_pre_sha "$h_rel")" "H.2"
+done <<< "$H_EDITED"
 
 # H.3 — the announcement and the writes agree.
 #
@@ -718,6 +753,17 @@ while IFS= read -r h_rel; do
   fi
 done <<< "$H_ANNOUNCED"
 
+# The announced set must be exactly the set edited — neither short (a file kept silently) nor long
+# (a file announced and then written). Checked against the literal list as well as against the
+# receipt, because the two failures those catch are different: this one catches an announcement that
+# lost a file, the next catches a record that disagrees with the announcement.
+H_EDITED_SORTED="$(sort <<< "$H_EDITED")"
+if [ "$H_ANNOUNCED" = "$H_EDITED_SORTED" ]; then
+  pass "H.3: the run announced exactly the $H_EDITED_COUNT script(s) the user edited"
+else
+  fail "H.3: announced [$(printf '%s' "$H_ANNOUNCED" | tr '\n' ' ')] against $H_EDITED_COUNT edited script(s) [$(printf '%s' "$H_EDITED_SORTED" | tr '\n' ' ')]"
+fi
+
 H_UM_ROWS="$(awk -F'\t' '$4 == "user-modified" { print $1 }' "$(receipt_of "$H")" | sort)"
 if [ "$H_UM_ROWS" = "$H_ANNOUNCED" ]; then
   pass "H.3: the receipt's user-modified rows are exactly the paths the run announced as kept"
@@ -725,23 +771,25 @@ else
   fail "H.3: announced [$(printf '%s' "$H_ANNOUNCED" | tr '\n' ' ')] but recorded user-modified [$(printf '%s' "$H_UM_ROWS" | tr '\n' ' ')] — the run's claim and its record disagree"
 fi
 
-# H.4 — the untouched sibling is still overwritten, and still recorded toolkit.
+# H.4 — the untouched siblings are still overwritten, and still recorded toolkit.
 #
 # Presence is asserted separately from content, because the two fail for different reasons and one
 # of them is a loop that stopped writing entirely rather than one that wrote the wrong bytes.
-H_SHIPPED_SHA="$(sha_of "$REPO/scripts/$H_UNTOUCHED_BASE")"
-if [ -f "$H/$H_UNTOUCHED" ]; then
-  pass "H.4: $H_UNTOUCHED is on disk after the reinstall"
-else
-  fail "H.4: $H_UNTOUCHED is not on disk — the scripts loop wrote nothing at all"
-fi
-H_UNTOUCHED_SHA="$(sha_of "$H/$H_UNTOUCHED")"
-if [ -n "$H_SHIPPED_SHA" ] && [ "$H_UNTOUCHED_SHA" = "$H_SHIPPED_SHA" ]; then
-  pass "H.4: the untouched $H_UNTOUCHED was replaced with the bytes this toolkit ships"
-else
-  fail "H.4: $H_UNTOUCHED still carries the previous version's bytes — the loop stopped writing files nobody edited, which is an installer that does not install"
-fi
-assert_owned "$H" "$H_UNTOUCHED" "H.4 (untouched sibling)"
+while IFS= read -r h_rel; do
+  [ -n "$h_rel" ] || continue
+  h_shipped="$(sha_of "$REPO/scripts/$(basename "$h_rel")")"
+  if [ -f "$H/$h_rel" ]; then
+    pass "H.4: $h_rel is on disk after the reinstall"
+  else
+    fail "H.4: $h_rel is not on disk — the scripts loop wrote nothing at all"
+  fi
+  if [ -n "$h_shipped" ] && [ "$(sha_of "$H/$h_rel")" = "$h_shipped" ]; then
+    pass "H.4: the untouched $h_rel was replaced with the bytes this toolkit ships"
+  else
+    fail "H.4: $h_rel still carries the previous version's bytes — the loop stopped writing files nobody edited, which is an installer that does not install"
+  fi
+  assert_owned "$H" "$h_rel" "H.4 (untouched sibling)"
+done <<< "$H_UNTOUCHED"
 
 # H.5 — kept is counted as kept. `Installed N file(s), kept M of yours.` drops the second clause
 # when M is 0, so an absent clause reads as 0. Both numbers are checked against things derived from
@@ -755,6 +803,14 @@ if [ "$H_KEPT" = "$H_UM_COUNT" ]; then
   pass "H.5: the summary reports $H_KEPT kept, matching the $H_UM_COUNT user-modified row(s) it wrote"
 else
   fail "H.5: the summary reports $H_KEPT kept against $H_UM_COUNT user-modified row(s) — a kept file counted as written, or the reverse"
+fi
+# Against the fixture too, not only against the receipt: the pair above agrees with itself when the
+# loop keeps one of two edited files and records one row, which is exactly the cardinality-keyed
+# failure this state was widened to catch.
+if [ "$H_KEPT" = "$H_EDITED_COUNT" ]; then
+  pass "H.5: the summary reports all $H_EDITED_COUNT edited script(s) as kept"
+else
+  fail "H.5: the summary reports $H_KEPT kept against $H_EDITED_COUNT edited script(s) — the loop kept some of them and wrote the rest"
 fi
 if [ -n "$H_WRITTEN" ] && [ "$((H_WRITTEN + H_KEPT))" = "$H_CLAUDE_ROWS" ]; then
   pass "H.5: written $H_WRITTEN + kept $H_KEPT = $H_CLAUDE_ROWS .claude rows — every path is accounted for exactly once"
