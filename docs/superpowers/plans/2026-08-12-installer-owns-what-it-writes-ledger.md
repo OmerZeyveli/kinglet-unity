@@ -11,15 +11,18 @@ Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md
 
 ## RESUME HERE
 
-**Task 1 is done and closed** (`e6116d0..6684165`, 1 fix round, Spec ✅, Quality Approved, 5 Minor).
-**Task 1b is next** — inserted, not appended: `uninstall.sh` deletes user-edited `.claude/` files
-without `--purge`, which is data loss in shipped software. Nothing dispatched.
+**Tasks 1 and 1b are done and closed.** **Task 1c is next.**
 
-**Spec gained D7 and a tenth acceptance criterion** after Task 1 measured that defect and its review
-reproduced it. One root cause runs through the whole wave: **the origin column is written in three
-places and read in none.**
+The wave keeps growing because each task's review finds the next instance of one root cause. The
+spec now carries **nine decisions**, and the tally is: the origin column is written in four places
+and, before this wave, read in none. Task 1 fixed the project-root rows, Task 1b fixed
+`uninstall.sh`, **Task 1c fixes the scripts loop — which does not check `is_modified` at all, so the
+run prints `keeping yours:` naming a file it overwrites in the same output** — and Task 1d fixes
+`studio-doctor.sh`, the last reader, which also carries two `printf | head` SIGPIPE traps.
 
-Six defects, one shape: the installer makes a claim it does not keep. The receipt is rebuilt every
+Suite: **602/602**, 32 test files, `provenance OK`.
+
+Nine defects now, one shape: the installer makes a claim it does not keep. The receipt is rebuilt every
 run and two project-root files write their rows inside a *create* branch, so a second install
 silently disowns them and `uninstall.sh` leaves them behind. `manifest.json.bak` is kept without a
 row, so uninstall can never remove it. Two pipeline detectors disagree when both packages are
@@ -27,13 +30,15 @@ present, and neither has a both-installed state. The dry-run announces two of fo
 entries, unconditionally. And "Option B: Manual Copy" produces an install `uninstall.sh` refuses to
 touch.
 
-State at wave start: suite **503/503**, 31 test files, `provenance OK`, tree clean at `f8cd590`.
+Three of those nine were found *by this wave's own reviews*, not by the survey that opened it —
+D7, D8 and D9, each surfaced by the task before it. State at wave start: suite **503/503**, 31 test
+files, tree clean at `f8cd590`.
 
 ## Controller decisions, made at setup
 
 1. **The controller owns this ledger.** Created before the first dispatch — a recovery map that a
    task was going to write does not exist if that task dies. The plan does not assign it to anyone.
-2. **All six tasks get a general implementer and a general reviewer.** This is the toolkit
+2. **Every task gets a general implementer and a general reviewer.** This is the toolkit
    repository: no Editor, no MCP bridge, no C#. Routing shell work to an agent built to drive the
    Unity Editor measures the dispatch rather than the task.
 3. **The brief for each task is that task's section in the plan, cited by heading.** Copying it into
@@ -52,7 +57,8 @@ State at wave start: suite **503/503**, 31 test files, `provenance OK`, tree cle
   `bash tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed]`.
   Make fixtures realistic — a one-line `ProjectVersion.txt` once hid a real bug, because Unity writes
   two lines and both match the version regex.
-- **Gates, both, before reporting done.** Current: `Total: 503  Passed: 503  Failed: 0`, 31 files.
+- **Gates, both, before reporting done.** Current: `Total: 602  Passed: 602  Failed: 0`, 32 files.
+  *(This line is copied into dispatches and goes stale every task — re-measure before quoting it.)*
 - **Strip ANSI before counting suite headers.** `grep -c '^--- test-.*\.sh ---'` on raw output
   returns **0** on a healthy suite — the exact signal of the catastrophe the count detects. Use
   `sed $'s/\x1b\\[[0-9;]*m//g'` first.
@@ -87,8 +93,19 @@ State at wave start: suite **503/503**, 31 test files, `provenance OK`, tree cle
 
 ## Interfaces produced so far
 
-Nothing yet. Task 1 produces `own_row()` in `tests/test-install-ownership.sh`; Task 2 extends that
-file. Task 5 produces `scripts/detect-pipeline.sh` printing one of `builtin`, `urp`, `hdrp`,
+**`tests/test-install-ownership.sh`** exists — self-contained, states A–D plus B2 and G, and it
+defines (does **not** `export -f`) `own_row()`: takes a receipt path and a project-relative path,
+prints the matching receipt line or nothing. Tasks 1b, 1c and 2 all extend this same file, which is
+what makes the un-exported helper safe.
+
+**`install.sh` has `owned_by_installer()`** — the conjunction `path == want && sha == have && origin
+== toolkit`, failing closed on every malformed input tested.
+
+**`uninstall.sh`'s classifier is a `case`**, not an `if/elif`: `user-modified` keeps, `toolkit` takes
+the checksum test, **anything else keeps**. Task 1d must match that grammar rather than invent a
+second one.
+
+Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp`, `hdrp`,
 `urp+hdrp`.
 
 ## Tasks
@@ -96,7 +113,9 @@ file. Task 5 produces `scripts/detect-pipeline.sh` printing one of `builtin`, `u
 | # | Task | Status | Commits | Notes |
 |---|---|---|---|---|
 | 1 | The receipt records ownership, not this run's writes | **done** | `e6116d0..6684165` | 1 fix round. Spec ✅, Quality Approved, 5 Minor. Added state B2 after proving the upgrade path was dead code; found the `uninstall.sh` data loss |
-| 1b | `uninstall.sh` reads the origin column | open | — | **Inserted, not appended.** Data loss in shipped software; spec D7 |
+| 1b | `uninstall.sh` reads the origin column | **done** | `5650580..493db8a` | 1 fix round. Spec ✅, Approved, 4 Minor. Fails closed via `case`; guarded by a receipt row `install.sh` cannot produce |
+| 1c | The scripts loop respects a user edit | open | — | **Inserted.** Data loss **and** the run contradicts itself in one output; spec D8 |
+| 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | open (brief pending) | — | **Inserted.** Last reader; plus two documented SIGPIPE traps; spec D9 |
 | 2 | A kept backup is a file the installer owns | open (brief pending) | — | Extends Task 1's test |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
 | 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |

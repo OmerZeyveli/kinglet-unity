@@ -231,6 +231,48 @@ defect `c2d27f1f` fixed on 2026-08-03, where an edit survived exactly one upgrad
 overwritten by the second. Two consumers need two different things from one row, and the origin
 column is how the row already tells them apart.
 
+### D8 — The scripts loop respects a user edit, and the run stops contradicting itself
+
+**Added 2026-08-12, after Task 1b's review measured it.** `install.sh`'s payload loop checks
+`is_modified` before writing and records `user-modified` when it keeps. **Its `for group in scripts`
+loop does neither** — `cp` is unconditional and the receipt row is `toolkit` regardless.
+
+So a user who edits `.claude/scripts/studio-doctor.sh` gets, in **one run**:
+
+```
+warn  5 installed file(s) have local edits — keeping yours:
+        .claude/scripts/studio-doctor.sh
+ok    Installed 81 file(s), kept 4 of yours.
+```
+
+— and the edit is gone. `MODIFIED_FILES` was computed from the receipt *before* the loop ran, so the
+warning is accurate about what the installer knew and false about what it then did.
+
+**This is the wave's own thesis failing in the wave's own subject**: every claim `install.sh` makes
+about what it owns should be true, and here it makes the right claim and does the opposite. It is
+also worse than silent data loss, because the user is told the file is safe in the same breath.
+
+The fix is the payload loop's shape, applied to the loop beside it: check `is_modified`, keep the
+user's file, record `user-modified` with its current bytes.
+
+**Task 1b could not have caught this.** The row never reaches `user-modified`, so a classifier that
+reads the origin column correctly still sees `toolkit` and correctly deletes.
+
+### D9 — `studio-doctor.sh` reads the origin column, and stops piping into `head`
+
+Two defects in the third reader, one of each kind.
+
+**It discards `_origin`.** A `user-modified` file matches its recorded (edited) checksum, so the
+health check counts it as verified: `PASS Install intact: 87 file(s) verified against the receipt`,
+with the edited file never named under "modified since install". The diagnostic tells the user
+nothing has changed, about a file they changed.
+
+**And it pipes into an early-exiting reader, twice** — `printf '%s' "$LIST" | head -5` — under
+`set -euo pipefail`. That is the trap `CLAUDE.md` documents in full: `head` exits after five lines,
+the writer takes SIGPIPE, pipefail turns 141 into a failure, and `set -e` kills the script. It
+**fires on a long list and hides on a short one**, so it passes every test written against a healthy
+project and breaks on the one that needs the diagnostic most.
+
 ## Acceptance criteria
 
 1. `bash tests/run-tests.sh` green, ANSI-stripped header count equal to `ls tests/test-*.sh | wc -l`.
@@ -252,6 +294,11 @@ column is how the row already tells them apart.
 10. **A `.claude/` file the user edited survives `uninstall.sh --yes`**, is counted under
     `keep N file(s) you modified` rather than `unchanged since install`, and is removed by
     `uninstall.sh --purge`. Proven on a fixture in all three directions.
+11. **An edited `.claude/scripts/*.sh` survives a reinstall**, and the run's `keeping yours` list and
+    its actual writes agree. Proven by editing a shipped script, reinstalling, and comparing bytes.
+12. **`studio-doctor.sh` names an edited file under "modified since install"** rather than counting
+    it verified, and **no `| head` remains in it** — proven by running it against a project with more
+    than five modified files under `set -euo pipefail`.
 
 ## Out of scope, recorded
 

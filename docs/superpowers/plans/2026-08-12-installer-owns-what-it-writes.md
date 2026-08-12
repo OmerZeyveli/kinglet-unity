@@ -191,6 +191,99 @@ assuming it.
 
 ---
 
+## Task 1c: The scripts loop respects a user edit
+
+**Inserted 2026-08-12** after Task 1b's review measured it. Spec **D8**, acceptance criterion 11.
+Data loss, and the run says the opposite of what it does in the same output.
+
+**Files:** modify `install.sh` (the `for group in scripts` loop) and `tests/test-install-ownership.sh`.
+
+**Interfaces:** consumes `own_row()`; produces nothing.
+
+- [ ] **Step 1: Reproduce the contradiction**
+
+Install into a fixture, edit `.claude/scripts/studio-doctor.sh`, install again. Expected today: the
+run prints `keeping yours:` **naming that file**, then reports files installed, and **the edit is
+gone**. Capture both the warning and the byte comparison.
+
+If the edit survives, stop and report.
+
+- [ ] **Step 2: Add state H, red**
+
+| | expectation |
+|---|---|
+| after reinstall | the edited `.claude/scripts/*.sh` **keeps the user's bytes** |
+| its receipt row | origin is `user-modified`, sha is the **edited** one |
+| the run's `keeping yours` list | matches what was actually kept |
+| an **untouched** shipped script | is still overwritten and still recorded `toolkit` |
+
+The last row is the anti-"keep everything" guard, as in Task 1b.
+
+- [ ] **Step 3: Give the loop the payload loop's shape**
+
+Find both with `grep -n 'for group in scripts\|is_modified' install.sh`. The payload loop checks
+`is_modified ".claude/$rel"`, keeps the file, increments `KEPT`, and writes a `user-modified` row
+carrying the file's **current** bytes. Apply that shape here. The path form for these rows is
+`.claude/scripts/<name>`, matching what `MODIFIED_FILES` is computed against — **verify that rather
+than assuming it**, or the check silently never matches.
+
+Mind `WRITTEN` and `KEPT`: the summary line reports both, and a kept script must not be counted as
+written.
+
+- [ ] **Step 4: Green, and prove the warning and the writes now agree**
+
+All four of state H. Then re-run Step 1's recipe and confirm the `keeping yours` list and the files
+actually kept are the same set.
+
+- [ ] **Step 5: Gates, commit.** `install.sh` is not under `.claude/`; confirm zero baseline drift.
+
+---
+
+## Task 1d: `studio-doctor.sh` reads the origin column, and stops piping into `head`
+
+**Inserted 2026-08-12.** Spec **D9**, acceptance criterion 12. Two defects, one of each kind.
+
+**Files:** modify `scripts/studio-doctor.sh`, and `tests/test-studio-doctor.sh`.
+
+**Note:** `tests/test-studio-doctor.sh` is **runner-provided** — it uses the runner's helpers and
+`$REPO_DIR` and defines neither. Run standalone it **exits 0 having asserted nothing**. Verify
+through the runner, reading its section:
+`bash tests/run-tests.sh 2>&1 | sed -n '/--- test-studio-doctor/,/^--- test-/p'`.
+
+- [ ] **Step 1: Reproduce both, red**
+
+**The origin blindness:** install into a fixture, edit a `.claude/` payload file, install again, then
+run `studio-doctor.sh`. Expected today: `PASS Install intact: N file(s) verified against the
+receipt`, with the edited file never named. It matches its recorded (edited) sha, so it reads as
+verified.
+
+**The SIGPIPE trap:** `grep -n 'head -5' scripts/studio-doctor.sh` finds two
+`printf '%s' "$LIST" | head -5` calls under `set -euo pipefail`. Build a project with **more than
+five** modified files and run the script. It **fires on a long list and hides on a short one** —
+which is why every test written against a healthy project passes.
+
+Report what each actually did. If the pipe does not fail on your fixture, say so and say how many
+files you used — the failure depends on `PIPE_BUF` and timing, and "did not reproduce" is a finding,
+not a reason to skip the fix.
+
+- [ ] **Step 2: Read the column, and drop the pipes**
+
+The classifier destructures `_origin` and discards it. Give it the shape Task 1b gave
+`uninstall.sh`'s — and match that one deliberately, so one grammar covers both readers.
+
+For the pipes: `head` is the documented case, and the fix is a form with no pipe. `awk 'NR<=5'` on a
+here-string, or a counter in the existing `while` loop, both work. **Whichever you pick, the writer
+must not be a `printf` on the left of a pipe.**
+
+- [ ] **Step 3: Green, both**
+
+The edited file is named under "modified since install", and the long-list run completes.
+
+- [ ] **Step 4: Gates, commit.** `scripts/` **ships** into `.claude/scripts/`, so this is a payload
+change: expect baseline drift, `--dry-run` first, use the tool's number, commit / regenerate / commit.
+
+---
+
 ## Task 2: A backup the installer keeps is a file the installer owns
 
 **Files:**
