@@ -88,18 +88,40 @@ sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 #
 # The origin column had been written in three places and read in one (install.sh's own upgrade
 # scan). This is the second reader.
+#
+# AN ORIGIN WE CANNOT READ IS KEPT, NOT DELETED. `case` with an explicit catch-all, rather than an
+# if/elif that lets anything unrecognised fall through to the sha test: a row carrying a trailing
+# space, a CRLF line ending, or a fifth column is no longer byte-equal to `user-modified`, and under
+# a fall-through it would be deleted — the exact data loss this block was written to stop, arriving
+# through a typo instead of through a design decision. A file whose provenance cannot be read is not
+# ours to delete.
+#
+# Failing closed costs nothing real here. `git show 5e0bf23:install.sh` — the commit that introduced
+# the receipt at all — already writes four columns ending in `toolkit`, so no three-column legacy
+# receipt has ever existed and no shipped receipt has ever carried an origin outside these two
+# values. The catch-all defends against a hand-edited or transport-mangled receipt, and its cost is
+# a file left on disk and reported, which the user can delete, instead of a file deleted, which they
+# cannot undelete.
 TO_REMOVE=""; MODIFIED=""; ALREADY_GONE=0
 while IFS=$'\t' read -r rel recorded _mode origin; do
   case "$rel" in ''|\#*|path) continue ;; esac
   abs="$PROJECT_DIR/$rel"
   if [ ! -f "$abs" ]; then ALREADY_GONE=$((ALREADY_GONE + 1)); continue; fi
-  if [ "$origin" = user-modified ]; then
-    MODIFIED="${MODIFIED}${rel}"$'\n'
-  elif [ "$(sha_of "$abs")" = "$recorded" ]; then
-    TO_REMOVE="${TO_REMOVE}${rel}"$'\n'
-  else
-    MODIFIED="${MODIFIED}${rel}"$'\n'
-  fi
+  case "$origin" in
+    user-modified)
+      MODIFIED="${MODIFIED}${rel}"$'\n'
+      ;;
+    toolkit)
+      if [ "$(sha_of "$abs")" = "$recorded" ]; then
+        TO_REMOVE="${TO_REMOVE}${rel}"$'\n'
+      else
+        MODIFIED="${MODIFIED}${rel}"$'\n'
+      fi
+      ;;
+    *)
+      MODIFIED="${MODIFIED}${rel}"$'\n'
+      ;;
+  esac
 done < <(grep -v '^#' "$RECEIPT")
 
 REMOVE_COUNT=$(printf '%s' "$TO_REMOVE" | grep -c . || true)
