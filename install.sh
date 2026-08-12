@@ -205,6 +205,49 @@ SCRIPTS_COUNT=$(printf '%s\n' "$NEW_PATHS" | grep -c '^\.claude/scripts/' || tru
 
 sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 
+# ── Ownership, not authorship ────────────────────────────────────────────────
+# A receipt row says "this file is ours to remove", not "this run wrote it". Those were the same
+# sentence while the project-root rows were written inside their create branches, and they part
+# company on the second install: the branch is skipped, $RECEIPT_TMP is rebuilt from scratch, and
+# the rebuilt receipt disowns a file the installer put there. uninstall.sh — which removes only
+# receipt-listed paths, deliberately, because a previous version deleted by filename — then leaves
+# it behind forever. Two installs, the same files, a different ownership record, and the second
+# record is the wrong one.
+#
+# THE TEST MUST FAIL CLOSED. Claiming a file we do not own means uninstall.sh deletes the user's
+# work, which is the whole reason the uninstaller is receipt-driven. So ownership is proved, never
+# assumed, by one of two checksum comparisons, and a file that satisfies neither gets no row:
+#
+#   1. it is byte-for-byte the copy this toolkit ships, or
+#   2. a previous run recorded it as `toolkit` AND it still carries that run's checksum.
+#
+# The second half of (2) is what makes "the user edits a file we installed" come out right. The row
+# is there and says `toolkit`; the bytes have moved; we do not renew the claim. Reading presence in
+# the old receipt alone would renew it, and uninstall.sh would delete an edited file.
+#
+# No `user-modified` row is written for these two, and that is a decision rather than an omission.
+# uninstall.sh's classifier compares the recorded checksum and never reads the origin column, so a
+# `user-modified` row — which records the file AS EDITED — matches on sha and is removed. That is
+# defensible for a .claude/ payload file the toolkit installed and then kept; it is exactly wrong
+# for a project-root file the user may have written themselves. Silence is the safe record here.
+#
+# $RECEIPT still holds the PREVIOUS run's receipt at every call site below: Step 9 is the only
+# writer, the payload enumeration excludes state/, and the orphan sweep skips .claude/state/*.
+owned_by_installer() {
+  # $1 project-relative path; $2 the toolkit's copy of it ('' when there is none on disk).
+  local rel="$1" ref="${2:-}" abs have
+  abs="$PROJECT_DIR/$rel"
+  [ -f "$abs" ] || return 1
+  have=$(sha_of "$abs")
+  if [ -n "$ref" ] && [ -f "$ref" ] && [ "$have" = "$(sha_of "$ref")" ]; then
+    return 0
+  fi
+  [ -f "$RECEIPT" ] || return 1
+  awk -F'\t' -v want="$rel" -v have="$have" '
+    $1 == want && $2 == have && $4 == "toolkit" { found = 1 }
+    END { exit !found }' "$RECEIPT"
+}
+
 # On upgrade, find files the user edited so we can leave them alone.
 MODIFIED_FILES=""
 if [ "$MODE" = ours ]; then
@@ -331,10 +374,14 @@ if [ "$DRY_RUN" -eq 1 ]; then
   #     toolkit's, written by the previous run, so "yours" is false in the installer's own upgrade
   #     path. The CLAUDE.md branch may say "yours" because :274's marker test has already proved the
   #     file is not ours; .mcp.json, which has no such test either, correctly claims nothing.
-  #   - "contents", because that is the whole of what this branch can vouch for. $RECEIPT_TMP is
-  #     rebuilt every run and Step 8c appends its row only on create, so an upgrade drops the row and
-  #     uninstall.sh then leaves the file behind. That is a real defect and it is not this line's to
-  #     fix or to describe — so the line does not reach into ownership at all.
+  #   - "contents", because that is the whole of what this branch can vouch for. It cannot speak to
+  #     ownership: Step 8c decides that by comparing the file on disk against the toolkit's copy and
+  #     against the previous receipt's checksum, and doing either here would be a second copy of
+  #     that decision living in the announcement — the drift this file has already paid for twice.
+  #     (Until 2026-08-12 this bullet said ownership was unknowable because the row was written only
+  #     on create, so an upgrade dropped it and uninstall.sh left the file behind. That defect is
+  #     closed; see owned_by_installer. The line still does not reach into ownership, now because it
+  #     should not rather than because it cannot.)
   if [ -f "$SCRIPT_DIR/MCP-SETUP.md" ]; then
     if [ ! -f "$PROJECT_DIR/MCP-SETUP.md" ]; then
       printf '  MCP-SETUP.md (new — the MCP bridge setup guide)\n'
@@ -354,7 +401,12 @@ fi
 
 WRITTEN=0; KEPT=0
 RECEIPT_TMP=$(mktemp)
-trap 'rm -f "$RECEIPT_TMP"' EXIT
+# The canonical .mcp.json, written once at Step 8b and read twice: the create branch copies it out,
+# and owned_by_installer compares against it. A second copy of that JSON — one to write, one to
+# compare — is a second definition that drifts, which is the failure this whole change is about.
+# Created here, beside RECEIPT_TMP, so both are set before the trap that removes them.
+MCP_JSON_REF=$(mktemp)
+trap 'rm -f "$RECEIPT_TMP" "$MCP_JSON_REF"' EXIT
 
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
@@ -684,9 +736,7 @@ add_manifest_dependency() {
 # Claude Code silently ignores an mcpServers key there, so writing it was the whole defect: the
 # unity-* agents had no tools to call. See MCP-SETUP.md for the approval step this still requires.
 MCP_JSON="$PROJECT_DIR/.mcp.json"
-MCP_JSON_RECEIPT_LINE=""
-if [ ! -f "$MCP_JSON" ]; then
-  cat > "$MCP_JSON" <<'MCPJSON'
+cat > "$MCP_JSON_REF" <<'MCPJSON'
 {
   "mcpServers": {
     "UnityMCP": {
@@ -696,8 +746,12 @@ if [ ! -f "$MCP_JSON" ]; then
   }
 }
 MCPJSON
+if [ ! -f "$MCP_JSON" ]; then
+  # `cat > ` rather than `cp`, so the file is created under the caller's umask the way the heredoc
+  # that used to sit here did. `cp` would carry mktemp's 0600 across and contradict the 644 the
+  # receipt row records.
+  cat "$MCP_JSON_REF" > "$MCP_JSON"
   ok "Wrote .mcp.json (UnityMCP → http://localhost:8080/mcp)"
-  MCP_JSON_RECEIPT_LINE=$(printf '.mcp.json\t%s\t644\ttoolkit' "$(sha_of "$MCP_JSON")")
 elif grep -Eq '"(unityMCP|UnityMCP)"' "$MCP_JSON" 2>/dev/null; then
   ok ".mcp.json already has a unityMCP/UnityMCP entry — left alone."
 else
@@ -708,7 +762,13 @@ else
   warn '      "url": "http://localhost:8080/mcp"'
   warn '    }'
 fi
-[ -n "$MCP_JSON_RECEIPT_LINE" ] && printf '%s\n' "$MCP_JSON_RECEIPT_LINE" >> "$RECEIPT_TMP"
+# Outside the branches on purpose — see owned_by_installer. The "already has a UnityMCP entry" arm
+# above is exactly where the two cases are indistinguishable by inspection: our own file from the
+# previous run, and a user's file that happens to name the same server. Only the checksum tells
+# them apart, so only the checksum decides.
+if owned_by_installer '.mcp.json' "$MCP_JSON_REF"; then
+  printf '.mcp.json\t%s\t644\ttoolkit\n' "$(sha_of "$MCP_JSON")" >> "$RECEIPT_TMP"
+fi
 
 # ── Step 8c: MCP-SETUP.md — the setup guide the "Next steps" summary points at ──
 # It used to point a freshly installed project at MCP-SETUP.md while never installing it: the
@@ -719,7 +779,11 @@ MCP_SETUP_MD="$PROJECT_DIR/MCP-SETUP.md"
 if [ -f "$SCRIPT_DIR/MCP-SETUP.md" ] && [ ! -f "$MCP_SETUP_MD" ]; then
   cp "$SCRIPT_DIR/MCP-SETUP.md" "$MCP_SETUP_MD"
   ok "Installed MCP-SETUP.md"
-  printf '%s\n' "$(printf 'MCP-SETUP.md\t%s\t644\ttoolkit' "$(sha_of "$MCP_SETUP_MD")")" >> "$RECEIPT_TMP"
+fi
+# Same shape as .mcp.json's row above, and for the same reason: the row states what we own at the
+# end of the run, not what this run happened to write.
+if owned_by_installer 'MCP-SETUP.md' "$SCRIPT_DIR/MCP-SETUP.md"; then
+  printf 'MCP-SETUP.md\t%s\t644\ttoolkit\n' "$(sha_of "$MCP_SETUP_MD")" >> "$RECEIPT_TMP"
 fi
 
 # ── Step 9: Write the receipt ────────────────────────────────────────────────
