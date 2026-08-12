@@ -1,12 +1,18 @@
 # Hook Reference
 
-Complete catalog of hooks in everything-claude-unity.
+Complete catalog of hooks in Kinglet Pioneer.
 
 ---
 
 ## Overview
 
-everything-claude-unity includes 25 hooks that provide safety enforcement, quality gates, session management, and learning. Hooks are bash scripts in `.claude/hooks/` configured in `.claude/settings.json`. All hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, state paths, and utility functions.
+Kinglet Pioneer includes 27 hooks that provide safety enforcement, quality gates, session management, and learning. Hooks are bash scripts in `.claude/hooks/` configured in `.claude/settings.json`. All hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, state paths, and utility functions.
+
+`_lib.sh` is that shared library and not itself a hook, which is why the count is one less than the number of `.sh` files in the directory. Derive it rather than trusting this sentence — nothing in the test suite guards the number:
+
+```bash
+ls .claude/hooks/*.sh | grep -v '_lib\.sh' | wc -l
+```
 
 ---
 
@@ -76,6 +82,14 @@ These hooks run before any Edit or Write tool invocation. Blocking hooks (exit 2
 - **Profile:** minimal
 - **Type:** Blocking (exit 2)
 - **What it does:** Blocks usage of the `UnityEditor` namespace in runtime code (files outside `Editor/` folders) without `#if UNITY_EDITOR` guards. Code using `UnityEditor` compiles in the Editor but fails on player build.
+- **Environment variables:** None
+
+#### block-legacy-input
+
+- **File:** `block-legacy-input.sh`
+- **Profile:** minimal
+- **Type:** Blocking (exit 2)
+- **What it does:** Blocks the legacy Input Manager API (`Input.GetKey`, `Input.GetAxis`, `Input.GetButton`, `Input.mousePosition`, `Input.touches`) in first-party runtime C#. Three rule files stated that legacy input was "BLOCKED by hooks" before any such hook existed; this is the hook that makes the statement true. Third-party and vendored code is exempt — a hook that fires on files you must never edit trains you to ignore the hook.
 - **Environment variables:** None
 
 #### guard-project-config
@@ -244,6 +258,15 @@ These hooks run after every Edit or Write tool invocation. They warn but do not 
 - **What it does:** Restores prior session state on conversation start. Loads branch context, previously modified files, workflow phase, plan steps, and last agent so the agent can resume where it left off. Clears stale gateguard state from previous sessions. Respects a configurable TTL for session expiry.
 - **Environment variables:** `UNITY_SESSION_TTL_HOURS` (default: 4) -- sessions older than this are discarded
 
+#### session-brief
+
+- **File:** `session-brief.sh`
+- **Matcher:** `startup|clear|compact` (the only hook in this file with a SessionStart matcher — the others run on every SessionStart)
+- **Profile:** minimal
+- **Type:** Advisory (exit 0)
+- **What it does:** Injects the `using-kinglet` skill into the session at start, with its YAML frontmatter stripped, so a fresh session opens knowing which surface handles which situation. Prints nothing and exits 0 when the skill file is absent — a session must never fail to start because a brief is missing.
+- **Environment variables:** Reads `CLAUDE_PROJECT_DIR` to locate the skill; falls back to the working directory
+
 ---
 
 ### Stop
@@ -305,6 +328,7 @@ These hooks run when the agent stops (conversation ends or user exits).
 | block-scene-edit | PreToolUse | Edit\|Write | minimal | Blocking | Block .unity/.prefab/.asset edits |
 | block-meta-edit | PreToolUse | Edit\|Write | minimal | Blocking | Block .meta edits |
 | guard-editor-runtime | PreToolUse | Edit\|Write | minimal | Blocking | Block UnityEditor without #if guard |
+| block-legacy-input | PreToolUse | Edit\|Write | minimal | Blocking | Block legacy Input.* in first-party C# |
 | guard-project-config | PreToolUse | Edit\|Write | standard | Blocking | Block quality config weakening |
 | gateguard | PreToolUse | Edit\|Write | strict | Blocking | Require Read before Edit |
 | block-projectsettings | PreToolUse | Bash | minimal | Blocking | Block git add ProjectSettings/ |
@@ -322,6 +346,7 @@ These hooks run when the agent stops (conversation ends or user exits).
 | cost-tracker | PostToolUse | (all) | strict | Advisory | Log tool calls for metrics |
 | pre-compact | PreCompact | (all) | minimal | Advisory | Save state before compaction |
 | session-restore | SessionStart | (all) | standard | Advisory | Restore session state |
+| session-brief | SessionStart | startup\|clear\|compact | minimal | Advisory | Inject using-kinglet at session start |
 | stop-validate | Stop | (all) | standard | Advisory | Validate all modified C# files |
 | session-save | Stop | (all) | standard | Advisory | Persist session state |
 | auto-learn | Stop | (all) | strict | Advisory | Extract session patterns |

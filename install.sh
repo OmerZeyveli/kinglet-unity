@@ -178,8 +178,11 @@ info "Payload: $PAYLOAD_COUNT files"
 
 # Every .claude path this run will own, in receipt form. Built here rather than derived twice,
 # because the dry run and the real run must answer the same question: what belongs afterwards?
-# Keep this in step with the two write loops below (the payload loop and the scripts/tests groups)
-# — a path written but missing here would be deleted as an orphan the run after it appears.
+# Keep this in step with the two write loops below (the payload loop and the `for group in scripts`
+# loop) — a path written but missing here would be deleted as an orphan the run after it appears.
+# There is one group and it is `scripts`. This line read "the scripts/tests groups" until 2026-08-12,
+# naming a tests/ write that has never existed — the same defect as the dry-run summary's old
+# "scripts/ and tests/ into .claude/" line, which was fixed while this one was left standing.
 NEW_PATHS=$(
   printf '%s\n' "$PAYLOAD_FILES" | sed 's|^|.claude/|'
   for group in scripts; do
@@ -193,6 +196,12 @@ NEW_PATHS=$(
   done
 )
 NEW_PATHS=$(printf '%s\n' "$NEW_PATHS" | sort -u)
+
+# The dry run reported the payload as a file count and the scripts group as a bare name — two lines
+# in two different units, so a reader could not add them up and get the number of files this run
+# writes. Counted off NEW_PATHS rather than re-walking scripts/, so it cannot disagree with the
+# enumeration the real run and the receipt are both built from.
+SCRIPTS_COUNT=$(printf '%s\n' "$NEW_PATHS" | grep -c '^\.claude/scripts/' || true)
 
 sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
 
@@ -254,7 +263,7 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 if [ "$DRY_RUN" -eq 1 ]; then
   printf '\n%s\n' "${BOLD}Would install:${NC}"
   printf '  %s files into %s\n' "$PAYLOAD_COUNT" "$CLAUDE_DIR"
-  printf '  scripts/ and tests/ into .claude/\n'
+  printf '  %s files from scripts/ into %s/scripts\n' "$SCRIPTS_COUNT" "$CLAUDE_DIR"
   if [ "$ORPHAN_COUNT" -gt 0 ]; then
     printf '  remove %s file(s) this payload no longer ships:\n' "$ORPHAN_COUNT"
     printf '%s' "$ORPHANS" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done
@@ -303,6 +312,35 @@ if [ "$DRY_RUN" -eq 1 ]; then
     printf '  .mcp.json already has a unityMCP/UnityMCP entry — would leave alone\n'
   else
     printf '  .mcp.json exists without unityMCP/UnityMCP — would print the block, not rewrite\n'
+  fi
+
+  # Report the MCP-SETUP.md branch too, and for the reason directly above: Step 8c copies it into the
+  # project root, records it in the receipt as toolkit-owned, and this block said nothing about it —
+  # so the dry run silently under-described a write landing outside .claude/, where a user is least
+  # expecting one. That step exists because the summary once pointed at a file the installer never
+  # installed; the install half was fixed and the consent half was left open.
+  #
+  # The copy is conditional — it never overwrites an existing file — so an unconditional line here
+  # would promise a file the real run skips: this block's own bug in mirror image. The condition is
+  # the same one Step 8c tests, read against $PROJECT_DIR the way the CLAUDE.md branch above does
+  # ($MCP_SETUP_MD is not defined until the real-run path, which we never reach here).
+  #
+  # The skip branch says "already exists", not "yours exists", and speaks only of *contents*. Both
+  # narrowings are load-bearing, and the wording above earns neither:
+  #   - This branch has no discriminator for who wrote the file. On a re-run the file present is the
+  #     toolkit's, written by the previous run, so "yours" is false in the installer's own upgrade
+  #     path. The CLAUDE.md branch may say "yours" because :274's marker test has already proved the
+  #     file is not ours; .mcp.json, which has no such test either, correctly claims nothing.
+  #   - "contents", because that is the whole of what this branch can vouch for. $RECEIPT_TMP is
+  #     rebuilt every run and Step 8c appends its row only on create, so an upgrade drops the row and
+  #     uninstall.sh then leaves the file behind. That is a real defect and it is not this line's to
+  #     fix or to describe — so the line does not reach into ownership at all.
+  if [ -f "$SCRIPT_DIR/MCP-SETUP.md" ]; then
+    if [ ! -f "$PROJECT_DIR/MCP-SETUP.md" ]; then
+      printf '  MCP-SETUP.md (new — the MCP bridge setup guide)\n'
+    else
+      printf '  MCP-SETUP.md already exists — its contents are NOT touched\n'
+    fi
   fi
   printf '\nDry run complete — nothing written.\n'
   exit 0
@@ -364,9 +402,15 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 #   1. run-tests.sh computes REPO_DIR as the parent of tests/. In this repository that is the repo
 #      root; in an installed project it is `.claude/`, so every path is off by one level and the
 #      tests look for `.claude/.claude/hooks/...`.
-#   2. Twelve of the twenty-eight test files reference install.sh, provenance.tsv, tests/fixtures/,
+#   2. A large share of the test files reference install.sh, provenance.tsv, tests/fixtures/,
 #      migration/baseline-inventory.json or tools.kinglet_build — none of which ship. Those cannot
 #      pass in a project whatever REPO_DIR says.
+#
+#      Derive that share; do not trust a number written here. This sentence carried a hardcoded pair,
+#      "twelve of the twenty-eight", and was wrong at both ends on both later measurements: 15 of 30
+#      at 076464b and 16 of 31 on 2026-08-12. The set is the claim, so the commands are the claim:
+#        grep -lE 'install\.sh|provenance\.tsv|tests/fixtures/|migration/baseline-inventory\.json|tools\.kinglet_build' tests/test-*.sh | wc -l
+#        ls tests/test-*.sh | wc -l
 #
 # The suite validates the toolkit, not the project. What a user actually needs is
 # scripts/studio-doctor.sh, which does ship, runs correctly against an installed layout, and checks
@@ -547,7 +591,9 @@ fi
 #
 # Ask git what it already ignores rather than grepping for our exact lines. A project that ignores
 # `/.claude/` wholesale — a perfectly sensible choice, and one real projects make — is already
-# covered, and appending our three entries to it is just noise in someone else's file.
+# covered, and appending our four entries to it is just noise in someone else's file. Four, not the
+# three this line claimed until 2026-08-12: `.claude.backup.*/` was added below without updating the
+# count here. Count the add_ignore calls rather than trusting this sentence.
 GITIGNORE="$PROJECT_DIR/.gitignore"
 WANT_IGNORED='.claude/settings.local.json
 .claude/state/session.json

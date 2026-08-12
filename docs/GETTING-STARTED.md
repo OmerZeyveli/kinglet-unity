@@ -1,6 +1,6 @@
 # Getting Started
 
-A step-by-step guide to setting up everything-claude-unity in your Unity project.
+A step-by-step guide to setting up Kinglet Pioneer — a PC/console toolkit for Unity 6 — in your Unity project.
 
 ---
 
@@ -9,7 +9,7 @@ A step-by-step guide to setting up everything-claude-unity in your Unity project
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | **Claude Code** | Latest | [Install guide](https://claude.ai/claude-code) |
-| **Unity** | 2021.3 LTS+ | Any render pipeline (Built-in, URP, HDRP) |
+| **Unity** | 6 (6000.0+) | URP unless your project states otherwise. The installer looks in `Packages/manifest.json` for the URP and HDRP packages; Built-in is what it falls back to when it finds neither, or when there is no manifest — inferred, not detected. The result is recorded in the generated `CLAUDE.md`, where the fallback reads `Built-in (default)` |
 | **Python** | 3.10+ | Only needed for unity-mcp integration |
 | **uv** | Latest | Python package manager, only needed for unity-mcp |
 
@@ -24,9 +24,9 @@ Claude Code is the only hard requirement. Python and uv are only needed if you w
 From your Unity project root:
 
 ```bash
-git clone https://github.com/<user>/everything-claude-unity.git /tmp/ecu
-/tmp/ecu/install.sh --project-dir .
-rm -rf /tmp/ecu
+git clone https://github.com/OmerZeyveli/kinglet-unity.git /tmp/kinglet
+/tmp/kinglet/install.sh --project-dir .
+rm -rf /tmp/kinglet
 ```
 
 The installer copies the `.claude/` directory into your project and validates the structure.
@@ -34,8 +34,8 @@ The installer copies the `.claude/` directory into your project and validates th
 ### Option B: Manual Copy
 
 ```bash
-git clone https://github.com/<user>/everything-claude-unity.git
-cp -r everything-claude-unity/.claude your-unity-project/.claude
+git clone https://github.com/OmerZeyveli/kinglet-unity.git
+cp -r kinglet-unity/.claude your-unity-project/.claude
 ```
 
 Make sure the hooks are executable:
@@ -66,16 +66,12 @@ After installation, your project contains:
 
 ```
 .claude/
-  agents/          28 specialized sub-agents (coder, reviewer, verifier, scene-builder, game-designer, etc.)
-  commands/        36 slash commands (/unity-workflow, /unity-prototype, /unity-doctor, etc.)
-  hooks/           26 hooks + _lib.sh (safety, quality, session, learning) — 8 of them blocking
+  agents/           8 specialized sub-agents (coder, reviewer, scene-builder, prototyper, etc.)
+  commands/         9 slash commands (/unity-prototype, /unity-fix, /unity-doctor, etc.)
+  hooks/           27 hooks + _lib.sh (safety, quality, session, learning) — 8 of them blocking
   rules/            6 always-loaded coding standards (C# style, performance, architecture, PC/console)
-  skills/          39 knowledge modules, one directory each (flat — see below)
-    core/            Assembly definitions, event systems, object pooling, MCP patterns
-    gameplay/        Character controllers, inventory, dialogue, save systems
-    genre/           Genre-specific patterns (RPG, platformer, top-down, match-3, puzzle, idle)
-    systems/         Unity subsystems (Input System, Addressables, Cinemachine, etc.)
-    third-party/     Third-party integrations (DOTween, UniTask, VContainer, etc.)
+  skills/          16 knowledge modules, one directory each — flat, never nested, because one level
+                   is the only depth Claude Code discovers (see below)
   settings.json    Permissions, hook definitions
 ```
 
@@ -146,7 +142,7 @@ The MCP bridge gives Claude direct control over the Unity Editor: creating GameO
 
 5. Start Claude Code and test the connection by asking Claude to list objects in the scene.
 
-See [MCP-SETUP.md](MCP-SETUP.md) for detailed setup and troubleshooting.
+See [MCP-SETUP.md](../MCP-SETUP.md) for detailed setup and troubleshooting.
 
 ---
 
@@ -158,12 +154,14 @@ See [MCP-SETUP.md](MCP-SETUP.md) for detailed setup and troubleshooting.
 | `/unity-init` | Scans your project and generates a tailored CLAUDE.md |
 | `/unity-review` | Reviews your C# code for Unity-specific issues |
 | `/unity-prototype "description"` | Creates a playable prototype from a text description |
-| `/unity-workflow "description"` | Full pipeline: clarify requirements → plan → execute → verify |
+| `unity-brainstorming` (a skill, not a command) | The chain's entry for anything new: clarify requirements → plan → execute → verify, one skill handing to the next |
 | `/unity-fix` | Diagnoses and fixes bugs using console errors |
 | `/unity-scene "description"` | Builds a scene from a natural language description |
 | `/unity-test` | Writes and runs EditMode/PlayMode tests |
 
-Start with `/unity-init`, then `/unity-doctor` to get a baseline. From there, try `/unity-review` on existing code or `/unity-prototype` to see the full pipeline in action.
+**To set the project up:** `/unity-init`, then `/unity-doctor` for a baseline. On a project that already has code, `/unity-review` is the safe next thing to run — it reads and reports, and changes nothing.
+
+**To build something:** don't type a command. Start at `unity-brainstorming`, which hands to `unity-planning`, where how the work gets executed is decided. The one exception is a throwaway scene made to try a mechanic — `/unity-prototype` — and that is a choice made before the work starts, never from part-way in.
 
 ---
 
@@ -188,7 +186,7 @@ Run `/unity-doctor` as a first troubleshooting step. It checks MCP connectivity,
 - Verify `localhost:8080` is reachable: `curl http://localhost:8080/mcp`
 - Check for port conflicts: another service on 8080
 - Ensure `.mcp.json` (project root) has the correct `mcpServers` block
-- See [MCP-SETUP.md](MCP-SETUP.md) for detailed troubleshooting
+- See [MCP-SETUP.md](../MCP-SETUP.md) for detailed troubleshooting
 
 ### Permission Issues
 

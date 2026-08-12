@@ -1,6 +1,6 @@
 # Agent Guide
 
-How to use, customize, and create agents for everything-claude-unity.
+How to use, customize, and create agents for Kinglet Pioneer.
 
 ---
 
@@ -18,7 +18,7 @@ none of these passed that test. See `provenance-skip.tsv` and `MERGE-NOTES.md`.
 
 | Agent | Model | Description |
 |-------|-------|-------------|
-| `unity-coder` | opus | Feature work that touches existing architecture — new Model/System/View split, VContainer registration, cross-system messaging. Invoked by `/unity-feature`. |
+| `unity-coder` | opus | Feature work that touches existing architecture — new Model/System/View split, VContainer registration, cross-system messaging. Dispatched by whichever execution branch the plan recorded — `subagent-driven-implementation` or `unity-execution`. |
 | `unity-fixer` | opus | A bug whose cause isn't obvious yet — investigates across execution order, coroutine lifecycle, destroyed-object access, live API behavior. Invoked by `/unity-fix`. |
 | `unity-optimizer` | opus | Profiles and fixes CPU/GPU bottlenecks, GC spikes, draw-call issues, shader variant bloat via the MCP profiler. Invoked by `/unity-optimize`. |
 | `unity-prototyper` | opus | Builds a new, disposable test scene end-to-end from a mechanic description — scripts, physics, camera, wiring — via MCP. Invoked by `/unity-prototype`. |
@@ -51,9 +51,13 @@ What do you need?
       +-- Write and run tests? ----------------> unity-test-runner
 ```
 
-Each agent is invoked by exactly one command of the same shape (`unity-coder` ↔ `/unity-feature`,
-`unity-fixer` ↔ `/unity-fix`, etc.) — see `docs/MODEL-ROUTING.md`. Most users go through the command,
-not the agent name.
+Seven of the eight are invoked by exactly one command of the same shape (`unity-fixer` ↔
+`/unity-fix`, `unity-reviewer` ↔ `/unity-review`, etc.) — see `docs/MODEL-ROUTING.md`. Most users go
+through the command, not the agent name.
+
+`unity-coder` is the exception since 2026-08-10: the command that routed to it only sequenced other
+surfaces and was deleted with the rest of the chain-duplicating commands, so the agent is now
+dispatched by whichever execution branch the plan recorded. It is still selectable by name.
 
 ---
 

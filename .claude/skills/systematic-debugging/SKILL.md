@@ -35,9 +35,9 @@ identity problems that reading the code does not reveal.
 
 | Thought | Reality | Source |
 |---|---|---|
-| "The bridge reports connected, so I can call its tools" | `claude mcp add` reporting `✔ Connected` means the server is reachable over HTTP — not that a tool for it exists in this session's tool list. A freshly spawned subagent inherits the freeze and gets the same empty result. | §77 — the MCP tool table is frozen at session start; if `read_console` is not in your tool list, retrying will not make it appear in this session |
-| "I should restart the session to get the bridge back" | The server's health is checkable over HTTP independently of whether this session can call it — "is the bridge up" and "can I reach it" have different remedies, and only one of them needs a restart. | §75 |
-| "Zero references in the project — I grepped and found none" | In Unity, source is not the project. Scenes, prefabs, and ScriptableObjects hold state no `grep` over `.cs` will find. | §82 — "zero `Light2D` references" asserted from a `.cs` grep; the type was authored in 52 scenes and 26 prefabs, invalidating the conclusion built on it |
+| "The bridge reports connected, so I can call its tools" | `claude mcp add` reporting `✔ Connected` means the server is reachable over HTTP — not that a tool for it exists in this session's tool list. A freshly spawned subagent inherits the freeze and gets the same empty result. | The MCP tool table is frozen at session start; if `read_console` is not in your tool list, retrying will not make it appear in this session |
+| "I should restart the session to get the bridge back" | The server's health is checkable over HTTP independently of whether this session can call it — "is the bridge up" and "can I reach it" have different remedies, and only one of them needs a restart. | A `tools/list` probe over HTTP returned the live 48-tool set with schemas, not a yes/no, from a session whose tool table held none of them |
+| "Zero references in the project — I grepped and found none" | In Unity, source is not the project. Scenes, prefabs, and ScriptableObjects hold state no `grep` over `.cs` will find. | "zero `Light2D` references" asserted from a `.cs` grep; the type was authored in 52 scenes and 26 prefabs, invalidating the conclusion built on it |
 
 ## When it is fixed
 

@@ -6,7 +6,7 @@ One-page reference for all skills in Kinglet Pioneer.
 
 ## Overview
 
-14 skills, one directory each at `.claude/skills/<name>/SKILL.md`. The model selects one by reading
+16 skills, one directory each at `.claude/skills/<name>/SKILL.md`. The model selects one by reading
 its `description` and invoking it with the `Skill` tool. That is the whole mechanism — there is no
 glob matching, no preloading, and no always-apply.
 
@@ -15,7 +15,12 @@ The 2026-08-03 surface cut reduced the skill set from 39 (already flat, per the 
 rewritten for an agent reader; three (`systematic-debugging`, `using-kinglet`,
 `verification-before-completion`) are original, written in the same wave to carry the process chain —
 see `provenance.tsv`. A fourteenth, `subagent-driven-implementation`, was added afterward in the same
-wave that built the execution loop it documents — see below.
+wave that built the execution loop it documents — see below. The 2026-08-10 process-chain wave added
+two more, `unity-planning` and `unity-execution`, and renamed the discovery skill to
+`unity-brainstorming`: the chain that used to be sequenced by a command is now skills that name each
+other, and the two commands that only sequenced them were deleted. The rename's full history — every
+note clause, oldest first — is in `MERGE-NOTES.md` under "unity-brainstorming ... the full note
+history".
 
 **Correction (2026-08-03) — the important one.** Every skill in this catalog was once unreachable for
 the toolkit's entire life. They were filed under `core/`, `gameplay/`, `genre/`, `systems/` and
@@ -52,11 +57,11 @@ see `.claude/agents/unity-coder.md` for the shape.
 | `assembly-definitions` | Assembly definition management -- when to create asmdefs, reference rules, Editor/Runtime/Test separation, platform filters, compilation speed optimization. |
 | `unity-mcp-patterns` | Activating unity-mcp tool groups, `batch_execute` for speed, `read_console` for verification, resource queries for project state. |
 | `object-pooling` | Object pooling patterns -- Unity `ObjectPool<T>`, custom ComponentPool, warm-up strategies, return-to-pool lifecycle. |
-| `deep-interview` | Ambiguity gating -- detects vague feature requests and forces structured requirements gathering before planning or code. |
+| `unity-brainstorming` | Ambiguity gating -- detects vague feature requests and forces structured requirements gathering before planning or code. Renamed on 2026-08-10; see `MERGE-NOTES.md`. |
 
 ---
 
-## Current Skills (14, flat)
+## Current Skills (16, flat)
 
 No categories — Claude Code only discovers `.claude/skills/<name>/SKILL.md`, one level deep, so the
 old `core/` / `gameplay/` / `genre/` / `systems/` / `third-party/` split shown in the corrections above
@@ -73,11 +78,13 @@ is history, not a live grouping. Loosely by subject, for a maintainer's orientat
 | `state-machine` | Generic state machine patterns -- `IState` interface, `StateMachine<T>`, game state management, enemy AI states, hierarchical FSM. |
 | `unity-mcp-patterns` | Activating unity-mcp tool groups (only core is on by default), `batch_execute` for speed, `read_console` for verification, resource queries for project state. |
 | `urp-pipeline` | Universal Render Pipeline -- URP asset configuration, renderer features, 2D renderer, lighting, shadows, post-processing volumes, SRP Batcher. |
-| `deep-interview` | Ambiguity gating for vague feature requests -- e.g. "add a jump," "make an inventory system" -- before writing a plan or touching code. |
+| `unity-brainstorming` | The chain's entry point. Ambiguity gating for anything new -- e.g. "add a jump," "make an inventory system" -- then 2-3 approaches weighed and the chosen one written to `docs/features/<slug>/design.md`, before a plan exists or C# is touched. **(process chain, 2026-08-10; renamed in that wave)** |
+| `unity-planning` | Turns a design decision, a written spec, or an adopted plan path into a task-by-task plan at `docs/features/<slug>/plan.md`, and is where the execution branch is chosen and recorded. **(process chain, 2026-08-10)** |
+| `unity-execution` | Executes an approved plan inline, in this session, with a bounded verify loop and the Deslop Pass. The other branch of `unity-planning`'s fork. **(process chain, 2026-08-10)** |
 | `systematic-debugging` | For a bug whose cause is not yet known -- read the real console, reproduce, inspect the live API, then change one thing, before proposing a fix. **(process chain, Task 5)** |
 | `using-kinglet` | Session-start orientation -- which Kinglet surface handles which situation, and that a process surface is chosen before code is written. **(process chain, Task 5)** |
 | `verification-before-completion` | What counts as evidence a code change works, before reporting it done -- a claim without evidence is not a completion. **(process chain, Task 5)** |
-| `subagent-driven-implementation` | Executes a written plan task by task, a fresh implementer per task with a review gate before the next one starts -- offered by `/unity-workflow` as an alternative to inline execution. |
+| `subagent-driven-implementation` | Executes a written plan task by task, a fresh implementer per task with a review gate before the next one starts. One of the two branches `unity-planning` forks to; `unity-execution` is the other. |
 
 ### Removed in the 2026-08-03 surface cut
 

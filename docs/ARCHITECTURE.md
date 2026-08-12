@@ -1,6 +1,6 @@
 # Architecture
 
-Technical documentation for the everything-claude-unity system.
+Technical documentation for Kinglet Pioneer.
 
 ---
 
@@ -22,19 +22,24 @@ This project follows the architecture established by [everything-claude-code](ht
 .claude/
   settings.json      Configuration: permissions, hook definitions
   agents/             8 agent definitions (.md files with frontmatter)
-  commands/          11 user-invocable slash commands
+  commands/           9 user-invocable slash commands
   hooks/             27 registered shell scripts + _lib.sh (safety, quality, session, learning)
   rules/              6 always-loaded coding standards
-  skills/            14 knowledge modules, flat — one directory per skill, no categories
+  skills/            16 knowledge modules, flat — one directory per skill, no categories
   state/             Session state directory (session.json, tracking files)
   VERSION            Installed version for upgrade tracking
 ```
 
-(Agent/command/hook/rule counts are as of the 2026-08-03 surface cut, which reduced a 103-surface pool
-to 32 on the criterion "a surface survives only if it does something the model cannot do unaided." The
-skill count moved to 14 afterward, in the `process-layer-2` wave that added `subagent-driven-implementation`
-— see `docs/SKILL-CATALOG.md`. Nothing enforces these exact numbers in text — cross-check against
-`ls .claude/agents/*.md | wc -l` etc. if they look stale.)
+(The agent, command and skill counts above are **derived and guarded**: `tests/test-derived-counts.sh`
+counts `.claude/agents/*.md`, `.claude/commands/*.md` and `.claude/skills/*/SKILL.md` in the tree and
+fails when this block, `README.md` or `docs/SKILL-CATALOG.md` drifts from it. Do not "cross-check if
+they look stale" — the suite does it on every run. That is the correction this parenthetical needed:
+it used to say nothing enforced these numbers, and while it said so, four of them went stale at once.
+The pool itself came from the 2026-08-03 surface cut, which reduced 103 surfaces — agents, commands,
+skills and hooks — to 32 on the criterion "a surface survives only if it does something the model
+cannot do unaided"; the `process-layer-2` wave then added a fourteenth skill, and the 2026-08-10
+process-chain wave traded two commands for two skills. The **hook and rule counts are still
+hand-maintained and unguarded** — that gap is named here rather than implied.)
 
 Supporting files outside `.claude/`:
 
@@ -111,7 +116,7 @@ skills/
   assembly-definitions/SKILL.md
   input-system/SKILL.md
   physics/SKILL.md
-  ...                              13 in total, flat
+  ...                              16 in total, flat
 ```
 
 **Flat, and it has to be.** Claude Code discovers skills at `.claude/skills/<name>/SKILL.md` and
@@ -150,8 +155,9 @@ the second, and also showed why the first probe's conclusion — "selected by de
 other skill" — was still too generous. They were not being selected at all. Nested under category
 directories, none of them was registered.
 
-Both keys are now stripped from every skill (13, after the 2026-08-03 surface cut reduced the 39
-that existed at flattening time), and `tests/test-no-mobile.sh` asserts they stay gone.
+Both keys are now stripped from every skill — all 16 of them: the 13 that survived the 2026-08-03
+surface cut out of the 39 that existed at flattening time, plus the three the process-chain work has
+added since — and `tests/test-no-mobile.sh` asserts they stay gone.
 A key that reads as a safety control but controls nothing is worse than no key: it gets believed. If
 guidance genuinely must reach every session, it belongs in `.claude/rules/`, which CLAUDE.md loads
 unconditionally — that mechanism is real, and it is where the serialization and performance rules
@@ -416,21 +422,33 @@ Sessions expire after a configurable time-to-live. Set via `UNITY_SESSION_TTL_HO
 
 ## Workflow Pipeline
 
-The `/unity-workflow` command implements a staged pipeline inspired by modern AI coding orchestrators:
+The process chain implements a staged pipeline inspired by modern AI coding orchestrators:
 
 ```
 Clarify → Plan → Execute → Verify
 ```
 
-1. **Clarify** -- interview the user about requirements, constraints, and acceptance criteria
-2. **Plan** -- analyze the project, identify subsystems, choose agents, present an implementation plan
-3. **Execute** -- route to appropriate agent(s) (coder, prototyper, UI builder, etc.)
-4. **Verify** -- perform a verify-fix loop directly in the command body (no dedicated verifier
-   agent — that agent was removed 2026-08-03; see `provenance-skip.tsv`)
+Until 2026-08-10 the pipeline was a single command that sequenced the stages. It is now a chain of
+skills, each naming the next: a command that only sequences other surfaces is a second definition of
+the chain, and the two that did were deleted (see `provenance-skip.tsv`, and D7 in
+`docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md`). Every stage can therefore be
+entered directly, and no stage is reachable only by typing a command name nobody remembers.
+
+1. **Clarify** -- `unity-brainstorming` interviews the user about requirements, constraints and
+   acceptance criteria, weighs 2-3 approaches, and writes the decision to
+   `docs/features/<slug>/design.md`
+2. **Plan** -- `unity-planning` analyzes the project, identifies subsystems, and writes a
+   task-by-task plan to `docs/features/<slug>/plan.md`. It also adopts a plan written elsewhere, and
+   it is where the execution branch is chosen and recorded
+3. **Execute** -- the recorded branch runs the plan and routes to the agents (coder, prototyper, UI
+   builder, etc.): `subagent-driven-implementation` with a fresh implementer per task and a review
+   gate between tasks, or `unity-execution` inline in this session
+4. **Verify** -- `unity-execution` performs a verify-fix loop directly in its own body (no dedicated
+   verifier agent — that agent was removed 2026-08-03; see `provenance-skip.tsv`)
 
 ### Verify-Fix Loop
 
-`/unity-workflow` Phase 4 runs a bounded loop (max 3 iterations) directly, without a dedicated agent:
+`unity-execution` runs a bounded loop (max 3 iterations) directly, without a dedicated agent:
 
 ```
 Invoke unity-reviewer (read-only) → Auto-fix safe issues → Run tests → Re-verify

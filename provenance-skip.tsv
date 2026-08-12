@@ -4,13 +4,18 @@
 # silently reinstating content we removed on purpose. scripts/check-provenance.sh enforces it:
 # every rule=absent path must stay absent, and every rule=ours-wins path must be origin=original.
 #
+# The first column is the path AS IT WOULD EXIST IN THIS REPOSITORY, not upstream's path for it —
+# check-provenance.sh resolves it from the repo root, so anything else records a prohibition it
+# cannot enforce. The two read the same for most ECU rows only because ECU's layout matches ours.
+# Where they differ, the upstream path goes in the reason column.
+#
 # rule:
 #   absent     — this path must NOT exist in the repo. check-provenance.sh fails if it reappears.
 #                This is what makes the mobile strip stick.
 #   ours-wins  — upstream has this path; we ship our own file there instead. The path exists, but
 #                its content is ours and provenance.tsv marks it origin=original.
 #
-# upstream_path<TAB>upstream<TAB>rule<TAB>reason
+# upstream_path<TAB>upstream<TAB>rule<TAB>reason   (upstream_path is OUR path — see the note above)
 benchmarks/	ecu	absent	ECU's own agent-benchmarking harness; meaningless for this toolkit, pure maintenance load
 upgrade.sh	ecu	absent	ECU-specific upgrade flow; superseded by our receipt-driven re-install
 .claude-plugin/	ecu	absent	single-installer distribution only; upstream copy was stale (1.3.0, counts 20/22/41/22)
@@ -109,3 +114,8 @@ examples/CLAUDE.md.mobile-casual	ecu	absent	mobile example
 .claude/templates/game-design-document.md	donchitos	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it
 .claude/templates/sprint-plan.md	donchitos	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it
 .claude/templates/systems-index.md	donchitos	absent	orphaned 2026-08-03; producer removed in the design/production track cut and no surviving agent/command produces it
+.claude/skills/using-git-worktrees/	superpowers	absent	a git worktree does not share Library/; every one triggers a full asset reimport and .meta GUIDs diverge across trees, which is the failure the payload's rules spend the most effort preventing. Refused in the Pioneer design with this reason and never recorded here, so no guard enforced it until now. Upstream path: skills/using-git-worktrees/
+.claude/skills/unity-brainstorming/visual-companion.md	superpowers	absent	browser-based mockup companion; shipping a local server into a user's Unity project is separate work with its own consent question. Declined for this wave, not overlooked. Upstream path: skills/brainstorming/visual-companion.md
+.claude/commands/unity-workflow.md	ecu	absent	removed 2026-08-10: a command that only sequences other surfaces is a second definition of the chain. Its phases moved to unity-brainstorming (Clarify), unity-planning (Phase 1a plan adoption, and Plan), and unity-execution (Execute, the bounded verify loop, the Deslop Pass and the Final Summary), each guarded by its own test. See docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md D7
+.claude/commands/unity-feature.md	ecu	absent	removed 2026-08-10: same criterion as /unity-workflow — a sequencer, not a router to an agent. A scoped addition now runs the chain at depth 1, entering at unity-brainstorming; unity-coder is reached from the execution branch instead. See docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md D7
+.claude/skills/deep-interview/SKILL.md	ecu	absent	renamed to unity-brainstorming 2026-08-10 (design D2): the path must stay gone, not merely unused. Claude Code discovers a skill by its directory, so a resurrected deep-interview/ would register a second skill answering the same trigger as unity-brainstorming, with no error of any kind. Content, history and the origin=ecu claim moved to .claude/skills/unity-brainstorming/SKILL.md. Upstream path: .claude/skills/core/deep-interview/SKILL.md; the nested form needs no row of its own because tests/test-skill-discovery.sh fails any SKILL.md below one level. See docs/superpowers/specs/2026-08-10-kinglet-process-chain-design.md

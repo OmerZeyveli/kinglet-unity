@@ -50,4 +50,5 @@ Report the complete scene structure when done.
 
 When this command finishes, name the next step and offer it. Do not take it.
 
-Offer `/unity-prototype` or `/unity-feature` depending on whether the scene is throwaway.
+Offer `/unity-prototype` if the scene is throwaway; otherwise offer
+`.claude/skills/unity-brainstorming/SKILL.md`, which is where work on the real project starts.

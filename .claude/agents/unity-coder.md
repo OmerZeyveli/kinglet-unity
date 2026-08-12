@@ -1,6 +1,6 @@
 ---
 name: unity-coder
-description: "Use for feature work that touches the project's existing architecture — a new gameplay system, a multi-script feature, or anything requiring an architectural decision (new Model/System/View split, new VContainer registration, cross-system messaging). Writes C# with correct namespace/asmdef placement and wires it into the scene via MCP. Invoked by `/unity-feature`; also selectable directly when a dispatching agent needs full architectural reasoning for a non-trivial addition, not a one-line change."
+description: "Use for feature work that touches the project's existing architecture — a new gameplay system, a multi-script feature, or anything requiring an architectural decision (new Model/System/View split, new VContainer registration, cross-system messaging). Writes C# with correct namespace/asmdef placement and wires it into the scene via MCP. Dispatched by whichever branch `unity-planning`'s fork chose — `subagent-driven-implementation` or `unity-execution`; also selectable directly when a dispatching agent needs full architectural reasoning for a non-trivial addition, not a one-line change."
 model: opus
 color: green
 tools: Skill, Read, Write, Edit, Glob, Grep, Bash, Agent, mcp__UnityMCP__*

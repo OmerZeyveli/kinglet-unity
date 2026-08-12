@@ -371,10 +371,23 @@ logical next step rather than requiring the user to already know the chain.
 **A fourteenth skill, added afterward.** `subagent-driven-implementation` (adapted from Superpowers'
 `subagent-driven-development`) shipped in the `process-layer-2` wave that built the execution loop
 (`implementer-prompt.md`, `task-reviewer-prompt.md`, `re-review-prompt.md`) it documents. It is
-`/unity-workflow`'s alternative to inline execution. Current count: 33 surfaces — 8 agents, 11
-commands, 14 skills — the same 27 registered hooks and 6 rules unchanged. `docs/SKILL-CATALOG.md`,
-`README.md`, and `docs/ARCHITECTURE.md` carry the updated skill count; this section is left at its
-original 13/32 above because it is a record of what Task 4's cut produced, not a running total.
+that wave's alternative to executing a plan inline, offered at the time by the `/unity-workflow`
+command. That command was deleted on 2026-08-10 (see `provenance-skip.tsv`), and the skill is now one
+of the two branches `unity-planning` forks to; the other is `unity-execution`. Count at the close of
+that wave: 33 surfaces — 8 agents, 11 commands, 14 skills — the same 27 registered hooks and 6 rules
+unchanged. After the 2026-08-10 process-chain wave it is still 33, differently composed: 8 agents, 9
+commands, 16 skills, hooks and rules again unchanged.
+
+Both figures in this section are **records of what a wave produced on a date**, not running totals,
+which is why the 13/32 above is left where it stands. That distinction used to be the reason this
+section was allowed to stay stale, delegating the live count to `docs/SKILL-CATALOG.md`, `README.md`
+and `docs/ARCHITECTURE.md` — and on 2026-08-11 a whole-branch review measured that only
+`SKILL-CATALOG.md` had actually followed: `README.md` still said 11 commands and 14 skills, and
+`docs/ARCHITECTURE.md` said the same, all four correct at `7b18e63` and wrong from the moment this
+wave landed. A delegation to documents nobody checks is not a delegation. The live count now has a
+guard — `tests/test-derived-counts.sh` derives it from `.claude/agents/*.md`,
+`.claude/commands/*.md` and `.claude/skills/*/SKILL.md` and fails when any of those three files
+drifts — and *that* is what lets this section stay historical.
 
 ## The gap this plan corrected
 
@@ -410,3 +423,73 @@ history; both are benign in direction, so neither was fixed.
   `provenance.tsv`; the edits those rows describe didn't land until the next commit, `bbad983`. The
   manifest under-claims fidelity for one commit rather than over-claiming it, which is the safe
   direction for this kind of drift.
+
+## unity-brainstorming (was deep-interview): the full note history
+
+`provenance.tsv`'s `note` column is free text that `scripts/check-provenance.sh` never reads. This
+row's note had accumulated five unrelated historical clauses — they are numbered 1 to 5 below, so
+that count is checkable by reading rather than by trust — and the 2026-08-03 ledger deferred the
+readability question with an explicit trigger — *"may need a rethink if another wave adds a fifth."*
+The 2026-08-10 process-chain wave was the trigger. The note now carries one summary clause plus a
+pointer here; the prose history it used to carry is below, unchanged in substance.
+
+The file is `origin=ecu` and stays so. ECU 1.5.0's Ambiguity Score survives the 2026-08-10 rewrite:
+the 0–2 scale, the five dimensions, the `>= 6` threshold, the interview protocol's first three steps
+and both scoring examples — **32 of ECU's 69 substantive lines**, verbatim.
+
+One ECU line was deliberately not kept. Its interview protocol's fourth step ended by allowing the
+user to opt out explicitly, which was the deleted `--skip-interview` exemption in other clothes and
+contradicted the Handoff in the same file: an opt-out permitted at one heading and forbidden at
+another. The step's stem survives and now proceeds *to* presenting the design rather than past it.
+That is the whole of the difference between 33 and 32.
+
+Both halves are checked rather than asserted, and this paragraph deliberately states no figure it
+cannot check. Each named block — the 0–2 table, the dimensions, the threshold and its gloss, the
+protocol, and both scoring examples — is located **by its heading** and compared **whole** in
+`tests/test-surface-references.sh`. Three weaker forms were tried and each let a mutation through
+with the suite green: a per-line needle let whole sections vanish; a needle satisfied by a duplicate
+elsewhere in the file could not detect either copy being lost; and a content-anchored extractor
+asserted that the text existed *somewhere*, so the score table could be moved to an appendix and a
+sixth dimension appended, both green. A whole-section comparison is the only form that catches
+deletion, relocation and insertion at once, which is why the skill gained a `### Threshold` heading:
+one claimed block, one section, one comparison.
+
+The **number** is re-derived in `tests/test-derived-counts.sh` — a line-by-line comparison against
+`git show 45eada9:.claude/skills/core/deep-interview/SKILL.md` — and checked against every file that
+quotes it, this one included. It therefore cannot go stale the way the five-row claim in clause 5
+below did.
+
+The Superpowers adaptation is recorded in the note and discharged in `CREDITS.md` and
+`.claude/NOTICE.md`, which is where licence obligations belong; the schema has one origin column and
+the lineage begins at ECU.
+
+Clause by clause, oldest first:
+
+1. **`mobile-strip`** — the initial vendoring removed ECU's mobile-targeted guidance from this file
+   along with every other, per `tests/test-no-mobile.sh`. The one surviving trace was the question-style
+   example, which asked "Is this for mobile (touch input, limited GPU) or desktop?"; it was rewritten
+   to a keyboard/gamepad and min-spec-60fps question.
+2. **`flattened-for-discovery+inert-frontmatter-stripped`** — moved from
+   `.claude/skills/core/deep-interview/SKILL.md` to the flat path Claude Code actually scans, and
+   `alwaysApply: true` was deleted from the frontmatter as an inert Cursor key.
+3. **`task-5-process-chain`** — appended a Handoff section routing a passed gate to `/unity-workflow`
+   or `/unity-feature` and a failed gate to stop and ask. Both of those commands are deleted in the
+   2026-08-10 wave and the handoff now names `unity-planning` and forbids the alternatives.
+4. **`task-5-r1-finding-1`** — the description was rewritten into the trigger-condition form from
+   `docs/superpowers/plans/2026-07-30-kinglet-pioneer-wave-1b2-make-it-findable.md:70`. It is the
+   chain's entry point and it stated what it did rather than when it applied, so it could not be
+   selected from a vague request. That form was superseded on 2026-08-10 by the category trigger:
+   the surface no longer decides whether the request is vague enough to warrant it.
+5. **`task-2-process-layer-2`** — added "the thought that means you are about to treat vague as
+   clear", sourced from that wave's own record (repeatedly re-asked questions; briefs followed
+   exactly still producing findings clustered where the brief was vague). The note still says "five
+   rows" and the file has carried two since `e994779` ("cut unsourced citations"), which dropped
+   *"I can infer which file/system this means"*, *"Asking is slower than doing"* and *"The brief
+   didn't say, so it must not matter"* for citing sources that could not be produced. The two that
+   survive are measured and the 2026-08-10 rewrite keeps both. That drift — a note asserting a count
+   the file stopped matching two commits later — is a second argument for collapsing this column: a
+   number in free text is a number nothing checks.
+6. **`2026-08-10 process chain`** — the rename and the rewrite the current note summarises.
+
+The claims this file makes about its own content are asserted in `tests/test-surface-references.sh`,
+which is what stops the summary above becoming another sentence nobody can falsify.

@@ -180,16 +180,74 @@ echo -e "${CYAN}Kinglet Pioneer test suite${NC}"
 echo "========================================"
 echo ""
 
+# DISCOVERY IS CHECKED, NOT ASSUMED.
+#
+# `nullglob` is off by default, so an unmatched glob leaves the PATTERN ITSELF in the array as one
+# literal string. `${#test_files[@]}` was therefore 1 and never 0 — which made the `-eq 0` guard
+# below, and its "No test files found." message, unreachable code from the day they were written.
+# The `[ ! -f "$test_file" ]` check inside the loop then skipped the literal, and the runner printed
+# a green zero. Measured 2026-08-11 with a copy of this file alone in an otherwise empty directory:
+#
+#   $ ls -1 /tmp/emptyrun/tests/
+#   run-tests.sh
+#   $ bash /tmp/emptyrun/tests/run-tests.sh; echo "RC=$?"
+#   Kinglet Pioneer test suite
+#   ========================================
+#   ========================================
+#   Total: 0  Passed: 0  Failed: 0  Skipped: 0
+#   ========================================
+#   RC=0
+#
+# That is strictly worse than the sourcing bug documented in the loop below — that one at least ran
+# one file. CLAUDE.md's remedy for it ("confirm the number of `--- test-*.sh ---` headers equals
+# `ls tests/test-*.sh | wc -l`") is an instruction to a human, executed by nothing. It is executed
+# here now.
+#
+# `shopt -p nullglob` EXITS 1 when the option is off, so the obvious save-and-restore —
+# `_prev="$(shopt -p nullglob)"` — dies on its own first line under `set -e`, before printing
+# anything. Measured, and the reason for the `|| true`:
+#
+#   $ bash -c 'set -euo pipefail; prev="$(shopt -p nullglob)"; echo "saved: $prev"'; echo "RC=$?"
+#   RC=1                                     # no output at all
+#   $ bash -c 'set -euo pipefail; prev="$(shopt -p nullglob || true)"; echo "saved: [$prev]"'
+#   saved: [shopt -u nullglob]
+#
+# Restored rather than left on, because every test file is sourced into a subshell that inherits
+# this shell's shopt settings and none of them was written against nullglob.
+_prev_nullglob="$(shopt -p nullglob || true)"
+shopt -s nullglob
 test_files=("$SCRIPT_DIR"/test-*.sh)
-if [ ${#test_files[@]} -eq 0 ]; then
-    echo "No test files found."
-    exit 0
+eval "$_prev_nullglob"
+
+# Counted a second time by a different mechanism. The glob and `find` agreeing proves discovery
+# happened; RAN below proves the files were actually executed, which is the number that matters and
+# the one no glob can report.
+DISCOVERED=$(find "$SCRIPT_DIR" -maxdepth 1 -type f -name 'test-*.sh' | grep -c . || true)
+RAN=0
+
+if [ "${#test_files[@]}" -eq 0 ] || [ "$DISCOVERED" -eq 0 ]; then
+    echo -e "${RED}No test files found${NC} — ${SCRIPT_DIR}/test-*.sh matched nothing."
+    echo "A suite that discovers nothing must not report success."
+    exit 1
+fi
+if [ "${#test_files[@]}" -ne "$DISCOVERED" ]; then
+    echo -e "${RED}Test discovery is inconsistent${NC} — glob found ${#test_files[@]}, find found ${DISCOVERED}."
+    exit 1
 fi
 
 for test_file in "${test_files[@]}"; do
     if [ ! -f "$test_file" ]; then
+        # A backstop, not the primary check: the two entries the glob can hold that are not regular
+        # files — a directory and a symlink named test-*.sh — are both counted by the glob and not by
+        # `find -type f`, so the consistency check above rejects them first. Measured with a
+        # directory named test-notafile.sh: "Test discovery is inconsistent — glob found 2, find
+        # found 1", RC=1, before the loop starts. This branch exists so that a future edit which
+        # relaxes that check cannot restore the silent `continue` it replaced.
+        echo -e "  ${RED}FAIL${NC} $(basename "$test_file") matched the glob but is not a regular file"
+        FAIL=$((FAIL + 1))
         continue
     fi
+    RAN=$((RAN + 1))
     CURRENT_TEST_FILE="$(basename "$test_file")"
     echo -e "${CYAN}--- ${CURRENT_TEST_FILE} ---${NC}"
 
@@ -233,6 +291,17 @@ for test_file in "${test_files[@]}"; do
 done
 
 # --- Summary ---
+
+# The header count CLAUDE.md asks a human to eyeball, executed. Nothing in the loop above can reach
+# it today — the pre-loop consistency check already rejects every glob entry that would be skipped —
+# and that is the point: it is the assertion that a future `continue` in this loop has to get past.
+# A file that is discovered but never reaches its section shows up here as a named shortfall rather
+# than as a smaller Total that nobody has a baseline for.
+if [ "$RAN" -ne "$DISCOVERED" ]; then
+    echo -e "  ${RED}FAIL${NC} ran ${RAN} test files but ${DISCOVERED} match ${SCRIPT_DIR}/test-*.sh"
+    FAIL=$((FAIL + 1))
+fi
+
 TOTAL=$((PASS + FAIL + SKIP))
 echo "========================================"
 echo -e "Total: ${TOTAL}  ${GREEN}Passed: ${PASS}${NC}  ${RED}Failed: ${FAIL}${NC}  ${YELLOW}Skipped: ${SKIP}${NC}"

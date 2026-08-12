@@ -3,9 +3,8 @@
 *Written against Unity 6000.0, current as of 2026-08-04.*
 
 The platform spec for this toolkit. Kinglet Pioneer ships **no mobile content** — the mobile skill
-and the mobile genre skills were removed at build time, not disabled (see `provenance-skip.tsv`), and
-the agents' mobile guidance was rewritten. So this file does not neutralize anything; it states what
-we target.
+and the mobile genre skills were removed at build time, not disabled, and the agents' mobile
+guidance was rewritten. So this file does not neutralize anything; it states what we target.
 
 Precedence: `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`, and
 `unity-specifics.md` are the binding spine. This file adds platform specifics on top of them — it
@@ -40,8 +39,7 @@ the contradiction is a bug in this file; report it.
 Compute shaders and VFX Graph are **fully available on PC and console** and are encouraged where they
 beat CPU-side work: particles, culling, post-processing, GPU-side simulation. Shader Model 5.0+ is a
 safe baseline on both. (The mobile-targeted guidance that once forbade these is gone — deleted, not
-disabled — and `tests/test-no-mobile.sh` keeps it out. If you find any, that test has regressed;
-treat it as a bug and report it.)
+disabled — and the toolkit's own suite keeps it out. If you find any, report it as a bug.)
 
 MSAA, HDR, higher shadow-cascade counts, and real-time shadows are all affordable. Budget them rather
 than avoiding them.

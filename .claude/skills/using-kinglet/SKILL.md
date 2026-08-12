@@ -12,15 +12,24 @@ bind: `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`
 **Which of those rules apply to this project is stated in `CLAUDE.md`'s generated block.** It is
 detected from the project's own code, not assumed. Read it before asserting that a rule binds.
 
+## The rule
+
+Invoke the surface **before any response or action** — including clarifying questions, reading files,
+and exploring the code. Then announce `Using [skill] to [purpose]` and follow it. If it turns out
+wrong for the situation, route to the right surface — but you have to have looked, and "wrong
+surface" never means "no surface". A surface that states it has no opt-out is not made optional by
+this line.
+
 ## The chain
 
 | Situation | Surface |
 |---|---|
 | Kinglet was just installed and `CLAUDE.md` still has unfilled `FILL:` markers | `/unity-init` |
-| The request is vague and has no file, type, or acceptance criterion | `deep-interview` — ask, do not guess |
-| A feature, taken end to end, or an existing written plan to execute | `/unity-workflow` |
+| Anything to build in this project — a whole feature or one scoped addition | `unity-brainstorming`, then `unity-planning` |
+| A tweak — a named field or value in something that already works | `verification-before-completion` |
+| A written plan handed over to be executed | `unity-planning` first |
 | A written plan to execute, task by task, with review between | `subagent-driven-implementation` |
-| One scoped addition to code that already exists | `/unity-feature` |
+| A plan small enough to execute inline, in this session | `unity-execution` |
 | A mechanic to try, in a new throwaway scene | `/unity-prototype` |
 | Something is broken and the cause is not yet known | `systematic-debugging`, then `/unity-fix` |
 | Code was just written and is not yet verified | `verification-before-completion`, then `/unity-review` or `/unity-test` |
@@ -28,11 +37,28 @@ detected from the project's own code, not assumed. Read it before asserting that
 | A UI screen, or a scene to build | `/unity-ui`, `/unity-scene` |
 | The setup itself may be wrong | `/unity-doctor` |
 
-A question that the rules already answer needs no surface. Answer it.
+A question about what the rules already state is answered from the rules — that is not work, and it
+selects no surface. A request to build, change, or fix something is work, and work always selects a
+surface.
 
-`deep-interview`, `systematic-debugging`, and `verification-before-completion` each carry a
-"the thought that means you are about to skip this" section — read it when the situation feels
-like an exception, because that feeling is what it names.
+`unity-brainstorming`, `systematic-debugging` and `verification-before-completion` each carry a "the
+thought that means you are about to…" section — read it when the situation feels like an exception,
+because that feeling is what it names. `unity-brainstorming`'s is titled for its own failure mode:
+**the thought that means you are about to treat vague as clear**.
+
+What `unity-brainstorming` does not keep is a *list* of exemptions. It has exactly one — a throwaway
+scene built to try an idea goes to `/unity-prototype` — and that choice is made before a round
+starts, never from inside one.
+
+## The thoughts that mean you are about to skip a surface
+
+| Thought | Reality |
+|---|---|
+| "This request is already clear" | That judgment is made by a model that has just read six rule files and a generated block. It is exactly the one miss that was measured. |
+| "The table already tells me what to do" | The table names the file. It is not the file. Twice, the chain was executed without ever loading it. |
+| "I am resuming from a ledger, the decision is made" | A ledger records the **mode**. It does not record the design of a new task. |
+| "I remember this skill" | You have read this block at the start of every session, and the skill perhaps once. Confidence that strong is evidence of the block, not of the skill. |
+| "Let me look at the code first" | The surface is the thing that tells you how to look at it. |
 
 ## Offer the next step
 

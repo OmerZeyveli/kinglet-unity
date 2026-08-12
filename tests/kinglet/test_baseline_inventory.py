@@ -19,8 +19,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_PATH = REPOSITORY_ROOT / "migration" / "baseline-inventory.json"
 EXPECTED_COUNTS = {
     "agents": 8,
-    "commands": 11,
-    "skills": 14,
+    "commands": 9,
+    "skills": 16,
     "hooks": 27,
     "rules": 6,
     "claude_templates": 0,

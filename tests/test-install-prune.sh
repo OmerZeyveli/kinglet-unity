@@ -105,8 +105,10 @@ assert_eq "1" "$(grep -c 'a line the user added' "$STICKY" 2>/dev/null || echo 0
 # environment it ships to trains people to ignore checks. Measured 2026-08-04, that argument had been
 # applied to one script and not to the class: the shipped suite gives 143 failures out of 229
 # assertions in a real installed project, and always has — run-tests.sh resolves REPO_DIR to the
-# parent of tests/, which is `.claude/` there rather than a repo root, and twelve of the files
-# reference install.sh, provenance.tsv, tests/fixtures/ or the baseline, none of which ship.
+# parent of tests/, which is `.claude/` there rather than a repo root, and a large share of the files
+# reference install.sh, provenance.tsv, tests/fixtures/ or the baseline, none of which ship. (Read
+# "twelve of the files" until 2026-08-12 — a second copy of the same hardcoded count install.sh
+# carried, stale in both places at once. Derive it; install.sh's Step 5 comment has the command.)
 #
 # scripts/studio-doctor.sh is what a project actually needs and it does ship.
 assert_eq "absent" "$([ -d "$PRUNE_DIR/.claude/tests" ] && echo present || echo absent)" \

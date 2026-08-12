@@ -1,12 +1,12 @@
 ---
 name: subagent-driven-implementation
-description: "Use when a written plan needs to be executed task by task, with a fresh implementer per task and a review gate before the next one starts — offered by `/unity-workflow` as an alternative to executing inline. Prefer this over inline execution when the plan has more than one task, or when a task is large enough that its own context would crowd out review."
+description: "Use when a written plan needs to be executed task by task, with a fresh implementer per task and a review gate before the next one starts. Prefer this over inline execution when the plan has more than one substantial task, or when a task is large enough that its own context would crowd out review."
 ---
 
 # Subagent-Driven Implementation
 
-`/unity-workflow` Phase 3 today is a document: it dispatches and that is all. This skill is the loop
-that ran on this repository yesterday instead — fresh implementer per task, review gating on spec
+Dispatching each task and taking its report at face value is a document, not a loop. This skill is
+the loop that ran on this repository instead — fresh implementer per task, review gating on spec
 *and* quality, a bounded fix loop, a ledger, one whole-branch review at the end — and what it found
 is the argument for running it rather than executing inline: an installer that overwrote user files
 under SIGPIPE, an installer that never removed what a shrinking payload had dropped, a skill whose
@@ -22,10 +22,27 @@ built on Kinglet's own surfaces and carries rules a generic loop does not need.
 
 ## The loop
 
-**Setup.** Create a ledger file (`<plan-slug>-ledger.md` next to the plan). Line one is the plan's
-path. Add one open item per task in the plan, in order. Record the base commit the branch started
-from — the whole-branch review needs a range to diff against, and "since we started" is not a
-range once the session that remembers "started" is gone.
+**Setup.** **Look for the ledger before creating one.** The plan's own handoff line routes a fresh
+session straight to this skill, bypassing `unity-planning`, so starting a plan and resuming a
+half-finished one arrive by the same door and look identical from here. If a ledger already exists at
+the address below, this is a resume: read it, do not overwrite it, and pick up at the first open item.
+**If it already records a mode, do not ask** — a decision already written down is not reopened, and it
+does not matter which surface wrote it. Only create a ledger when there is none.
+
+**A ledger lives beside its plan** — the pairing is what makes it
+findable, and every address below is that one rule applied. A plan written by `unity-planning` sits
+at `docs/features/<slug>/plan.md`, so its ledger is `docs/features/<slug>/ledger.md`: the third file
+beside the `design.md` and `plan.md` this work came from, so one directory holds what was decided,
+what was planned, and where the work stopped, and a later session opens it and reads the three in
+order. A plan that lives anywhere else — a provider's plan under `docs/superpowers/plans/`, say —
+takes `<plan-slug>-ledger.md` next to it, by the same rule.
+
+Line one is the plan's path. **Line two is the execution mode**, written exactly as
+`**Execution mode:** subagent-driven`, because this run took that branch of `unity-planning`'s fork.
+It is what makes the choice survive the session that made it: a controller resuming this ledger reads
+that line and does not reopen the decision. Add one open item per task in the plan, in order. Record
+the base commit the branch started from — the whole-branch review needs a range to diff against, and
+"since we started" is not a range once the session that remembers "started" is gone.
 
 Then open two sections the ledger keeps for the whole run:
 

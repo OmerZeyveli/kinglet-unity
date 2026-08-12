@@ -73,4 +73,6 @@ Suggest: "Prototype ready! Want me to run a quick verification pass?"
 
 When this command finishes, name the next step and offer it. Do not take it.
 
-Offer `/unity-feature` to move the mechanic into the real project, once the prototype proves it.
+Offer `.claude/skills/unity-brainstorming/SKILL.md` to move the mechanic into the real project, once
+the prototype proves it. That is the chain's entry point, and a scoped addition runs it at depth 1 —
+the round is short, not skipped.

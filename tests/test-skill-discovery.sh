@@ -124,6 +124,92 @@ if [ -n "$BAD_REFS" ]; then
 fi
 assert_eq "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "0" "every skill named by an agent or command exists"
 
+# --- 6. Skills named by OTHER SKILLS exist ---------------------------------
+# Section 5 covers agents and commands. Nothing covered skill -> skill until
+# 2026-08-11, and that is the direction the process chain is built out of:
+# unity-brainstorming names unity-planning, unity-planning names both branches
+# of the fork, unity-execution names its predecessors and the standard it is
+# measured against. Nine references, six distinct targets, all by path.
+#
+# Measured during the 2026-08-10 wave: three surfaces named each other by path
+# BEFORE the targets existed, across three tasks, and nothing in the suite went
+# red at any point. test-skill-discovery.sh scanned .claude/agents and
+# .claude/commands only; test-surface-references.sh scans skill bodies only for
+# /unity-* COMMAND tokens. Had the later tasks not landed, the toolkit would
+# have shipped green with a user-facing chain whose next step resolved to
+# nothing — the same silent-load failure this file exists for, in the one
+# direction it did not look.
+#
+# The FILE is tested, not the directory: these references promise a document to
+# read, and a directory that survives its SKILL.md is section 2's business.
+#
+# Same placeholder skip as section 5, and it matches the same character class
+# deliberately — a pattern that could not match `.claude/skills/[name]/x.md` at
+# all would make this `case` look like dead code to the next reader, who would
+# delete it, at which point the guard starts crying wolf on a correct file.
+S2S_REFS="$(
+  grep -rhoE '\.claude/skills/[A-Za-z0-9<[][A-Za-z0-9<>_.-]*/[A-Za-z0-9<[][A-Za-z0-9<>_.-]*\.md' \
+    .claude/skills 2>/dev/null | sort -u || true
+)"
+S2S_DANGLING=""
+S2S_CHECKED=0
+S2S_READ=""
+while IFS= read -r REF; do
+  [ -n "$REF" ] || continue
+  case "$REF" in
+    *[\[\]\<\>\*]* ) continue ;;
+  esac
+  # Incremented AFTER the skip, so the floor and the sentinels below describe
+  # the set actually inspected. Counting before the skip is how a guard keeps
+  # its numbers green while a `case` entry quietly removes a file from view.
+  S2S_CHECKED=$((S2S_CHECKED + 1))
+  S2S_READ="${S2S_READ}${REF}
+"
+  [ -f "$REF" ] || S2S_DANGLING="${S2S_DANGLING}${REF}
+"
+done <<< "$S2S_REFS"
+if [ -n "$S2S_DANGLING" ]; then
+  echo "--- skill references to files that do not exist ---"; printf '%s' "$S2S_DANGLING"
+fi
+assert_eq "$(printf '%s' "$S2S_DANGLING" | grep -c . || true)" "0" "every skill named by path inside another skill exists"
+
+# Anti-vacuity, two mechanisms, because they fail differently — a floor cannot
+# see a sweep that still returns files but no longer the right ones.
+#
+# The floor is a FLOOR, not a count: six distinct targets exist today and five
+# is below that on purpose. It is calibrated against the cheapest narrowing —
+# restricting the sweep to a single skill directory yields at most four, so any
+# such edit trips it. Dropping legitimately below five means the chain has been
+# rewired, which is a deliberate change and should have to say so here.
+S2S_FLOOR_STATE="ok"
+[ "$S2S_CHECKED" -ge 5 ] || S2S_FLOOR_STATE="only ${S2S_CHECKED} skill->skill references inspected"
+assert_eq "$S2S_FLOOR_STATE" "ok" "the skill->skill sweep still reads the chain, rather than passing on an empty set"
+
+# The sentinels are the chain itself: its entry point, the skill both of its
+# neighbours name, and the two branches that skill forks between. If the sweep
+# above stops seeing these, it has stopped seeing the thing it was written for.
+#
+# unity-brainstorming was NOT in this list until 2026-08-11 — the fork was
+# guarded and the door into it was not. It is where a user arrives and where
+# unity-planning sends a caller back to when no design exists, so a sweep that
+# stopped reaching it would break the chain at its only entrance while the three
+# sentinels below still reported "seen".
+#
+# These strings appear in this test file, and that is safe by construction
+# rather than by luck: the sweep reads .claude/skills only, so a copy living in
+# tests/ can never satisfy its own needle.
+while IFS= read -r SENTINEL; do
+  [ -n "$SENTINEL" ] || continue
+  S2S_SEEN="missing"
+  grep -qxF -- "$SENTINEL" <<< "$S2S_READ" && S2S_SEEN="seen"
+  assert_eq "$S2S_SEEN" "seen" "the skill->skill sweep still reaches: $SENTINEL"
+done <<'S2S_SENTINELS'
+.claude/skills/unity-brainstorming/SKILL.md
+.claude/skills/unity-planning/SKILL.md
+.claude/skills/unity-execution/SKILL.md
+.claude/skills/subagent-driven-implementation/SKILL.md
+S2S_SENTINELS
+
 # --- Summary ---------------------------------------------------------------
 echo ""
 echo "test-skill-discovery: $TESTS_PASSED/$TESTS_RUN passed"

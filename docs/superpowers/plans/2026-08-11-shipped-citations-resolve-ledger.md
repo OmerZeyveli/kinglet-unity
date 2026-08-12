@@ -1,0 +1,784 @@
+# Ledger — plan: `docs/superpowers/plans/2026-08-11-shipped-citations-resolve.md`
+
+Spec: `docs/superpowers/specs/2026-08-11-shipped-citations-resolve-design.md`
+
+- **Branch:** `pioneer/process-chain`
+- **Base commit (the whole-branch review diffs against this):** `7f4b9f3`
+- **Gates:** `bash tests/run-tests.sh` (needs a timeout above 150000 ms; the `--- test-*.sh ---`
+  header count, **ANSI-stripped**, must equal `ls tests/test-*.sh | wc -l`) and
+  `bash scripts/check-provenance.sh` (must end `provenance OK`).
+- **Reports:** `.superpowers/sdd/2026-08-11-shipped-citations/` (gitignored).
+
+## THE WAVE IS CLOSED — 2026-08-12
+
+Six tasks, seven fix rounds, seven reviews, one whole-branch review and two rounds against it.
+**32 commits, 21 files, +2322/−119.** Suite `503/503`, discovery 31 = 31, `provenance OK`, guard
+7 PASS over 710 tokens, tree clean.
+
+**The branch is not merged.** `pioneer/process-chain` now stands at 87 commits from `main` (`7b18e63`),
+53 files, +8264/−680, carrying this wave and the process-chain wave before it.
+
+**Open, and deliberately so:** P1 and P3, the two owner design calls parked before this wave started;
+and the spin-out backlog at the end of this file, which grew from four items to twelve. Nothing here
+proves the toolkit behaves correctly *inside Claude Code* — only that the installer places correct
+bytes and that the surfaces say true things about themselves.
+
+### The finding that outranks the rest
+
+**Seven times, a probe's shape decided what it found, and the eighth time it was the wave auditing
+itself.** A missing filename read as a missing referent; `grep 'git log [0-9a-f]\{7\}'` blind to a
+bare SHA; a receipt-oracle blind to a receipt-less write; a flattener that read one wrap shape of
+six; a fixture for a whitespace bug whose whitespace was stripped in authoring; a `*/*` filter that
+hid `provenance.tsv`; a root-relative existence test that hid `scripts/check-provenance.sh`.
+
+And then, in the fix round for all of that: **correcting `install.sh`'s comments lengthened
+`install.sh`, invalidating the very line numbers the round was dispatched to repair.** The response
+is the wave's most durable output — load-bearing citations are now **content anchors**, because a
+line number that has already rotted once will rot again.
+
+### What the guards actually cover, stated plainly
+
+`tests/test-shipped-citations.sh` enforces two rules over every `.md` under `.claude/`, against a
+payload derived the way `install.sh` derives it. It cannot see: a path inside a multi-word backtick
+span (`` `bash tests/x.sh` ``), any token beginning with `.`, a URL that ends in the cited basename
+but points elsewhere, `scripts/<x>.sh` cited without its installed prefix, and every non-Markdown
+surface — which is how `.claude/UPSTREAM`'s four repository-only names and `scripts/studio-doctor.sh`'s
+six *"run `install.sh`"* messages both survive. All measured, all recorded in the spec.
+
+## RESUME HERE — state for a session that has lost its context
+
+**Tasks 1–5 are done and closed.** The guard exists, both rules pass, all sixteen citation sites are
+fixed, the installer's dry-run describes the program it actually runs, the fork's two branches agree
+on their threshold, and the getting-started page no longer clones a different repository. **Task 6 is
+next** — whole-wave verification, with its brief amended below. Nothing is dispatched.
+
+The wave makes every citation a shipped surface makes resolve in an installed Unity project. Eight
+`§N` markers abbreviate a citation to `docs/research/pioneer/field-notes.md`, which is tracked and
+does not ship; eight backticked paths name files `install.sh` does not copy, one of them a **rule**
+instructing the reader to inspect a test and report a regression. A new guard,
+`tests/test-shipped-citations.sh`, enforces both rules against a payload it derives rather than
+hardcodes.
+
+Suite at wave start: 488 passing, 30 test files, 542 manifest rows. **Now: 503 passing, 31 test
+files, 545 manifest rows, `provenance OK`.** The guard prints 7 PASS lines and examines 561
+backticked tokens.
+
+*(Corrected 2026-08-12. "544 manifest rows" and "495 passing" were both wrong, in the first paragraph
+a context-lost session reads. **The row count depends entirely on the method, so the method is the
+finding.** `check-provenance.sh`'s `rows()` helper defines a row —
+`rows() { grep -v '^#' "$MANIFEST" | tail -n +2; }` — non-comment lines less the first, because the
+first non-comment line is the column header
+`path<TAB>origin<TAB>…`, not a row. By that definition: **542 at the wave base `076464b`, 545 at
+HEAD**, and the gate prints the second itself as `no ghost rows (545 rows resolve to files)`. The
+controller's `grep -vc '^#'` gives 543 and 546 — one too many at each end, because it counts that
+column header. The reviewer's 553 is reproduced by no method at any commit in the wave: `rows()`
+walks 542 → 543 → 544 → 545 across `99c18a2..HEAD` and never reaches it, and `wc -l` never exceeds
+557. Two measurements of one file disagreeing three ways is the argument for quoting the definition
+alongside the number.)*
+
+**Spec D3 was withdrawn mid-Task-1 and the spec is corrected on the record.** The first draft said
+the `§N` markers pointed at nothing and ruled `systematic-debugging:39`'s empty cell should stay
+empty. The numbers resolve — against a repo-only document — so the cell was filled from field note 75
+instead. The action for the other seven is unchanged, because `docs/` does not ship. Read the
+correction block at the top of the spec before reasoning about the `§` class.
+
+## Controller decisions, made at setup
+
+1. **The controller owns this ledger, not Task 1.** The plan assigned its creation to Task 1 Step 6
+   and its provenance row to Step 7. That is wrong in a way the skill is explicit about: the ledger
+   is the recovery map and must exist *before* the first dispatch — if Task 1's implementer dies,
+   a ledger that Task 1 was going to write does not exist. Created and committed at setup, before
+   any round opened. **Task 1's brief drops Step 6 and drops the ledger row from Step 7.**
+2. **All six tasks get a general implementer and a general reviewer, not `unity-coder` /
+   `unity-reviewer`.** This is the toolkit repository: no Editor, no MCP bridge, no C#. Every file
+   here is bash, Markdown or TSV. Routing shell and documentation work to an agent built to drive
+   the Unity Editor measures the dispatch rather than the task.
+3. **The brief for each task is that task's section in the plan, cited by heading** — not a separate
+   brief file. The plan was written by `writing-plans` specifically to be executed task by task, with
+   full code blocks and no placeholders. Copying each section into a second file would create two
+   definitions of the same requirement, which is the exact defect this branch exists to remove.
+4. **The controller does not commit while a round is open.** Carried from the previous wave, where
+   an implementer's `git commit --amend` amended the controller's ledger commit. A round is open from
+   dispatch until the re-review's verdict.
+
+## Standing facts for every dispatch
+
+Copied into every dispatch. A fresh subagent inherits none of the controller's reading of the repo.
+
+- **Spec:** `docs/superpowers/specs/2026-08-11-shipped-citations-resolve-design.md` at `99c18a2`.
+  Where the plan and the spec disagree, the spec wins and the disagreement is a bug in the plan —
+  report it rather than resolving it silently.
+- **This is not a Unity project.** `kinglet-unity` is the toolkit repository. No Editor, no MCP, no
+  C#. `read_console` does not apply; there is no console.
+- **Gates, both, before reporting done:** `bash tests/run-tests.sh` (timeout above 150000 ms) and
+  `bash scripts/check-provenance.sh` ending `provenance OK`.
+- **Strip ANSI before counting suite headers.** The runner colours `--- test-*.sh ---`, so
+  `grep -c '^--- test-.*\.sh ---'` on raw output returns **0** on a completely healthy suite — the
+  exact signal of the catastrophe the count exists to detect. Use
+  `sed $'s/\x1b\\[[0-9;]*m//g'` first.
+- **bash 3.2 compatible.** No `declare -A`, no `grep -oP`. A macOS pass is planned.
+- **Never pipe into a reader that can exit early** under `set -euo pipefail`. `grep -q` exits on
+  first match without draining stdin; SIGPIPE plus pipefail kills the script on large inputs and
+  passes on small ones. Use a here-string: `grep -qF -- "$needle" <<< "$haystack"`.
+- **`[ x = y ] && continue` is a `set -e` trap** as the last command in a loop body — the false test
+  makes the AND-list exit 1 and kills the script. Write `if [ x = y ]; then continue; fi`.
+- **Two test idioms, and mixing them fails silently.** *Self-contained*: sets its own
+  `set -euo pipefail`, defines its own helpers, `bash tests/<file>.sh` is valid.
+  *Runner-provided*: uses the runner's `assert_contains` / `assert_eq` / `$REPO_DIR`, defines
+  neither, and run standalone **exits 0 having asserted nothing**.
+  `tests/test-shipped-citations.sh` is self-contained. `tests/test-surface-references.sh` is
+  runner-provided — verify it **through the runner**, reading its section.
+- **Print `PASS:` / `FAIL:`, not `ok:`.** `run-tests.sh` aggregates by grepping for those tokens; a
+  file printing anything else contributes 0 and is indistinguishable from one that never ran.
+- **Baseline discipline.** `.claude/` content changes trip `tests/kinglet/test_baseline_inventory.py`
+  sha256 tripwires. Order is **commit, regenerate, commit** — the reverse is circular, because the
+  test reads `git ls-files` while the regenerator reads `git ls-tree`. Entry point is the
+  **package**: `python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD --expect-drift <n>`;
+  `python3 -m tools.kinglet_build.cli` silently no-ops with exit 0. `--dry-run` first, **use the
+  tool's numbers, not the plan's estimate**, and report a disagreement instead of tuning the flag
+  until it passes. A categorised file counts twice. The tool updates the JSON but **not** the
+  hand-maintained constants in `test_baseline_inventory.py` — fold those into the same commit.
+- **Every new tracked file needs a `provenance.tsv` row** — seven tab-separated columns: path,
+  origin, upstream_version, upstream_path, upstream_sha256, status, note. Files originating here:
+  `original	-	-	-	original	<note>`. A file with no row fails as an orphan.
+- **`grep` is line-oriented and prose is not.** Flatten before asserting a phrase is absent: a
+  sentence wrapping across two lines cannot be read by any single-line pattern. This repository has
+  shipped two stale claims for exactly this reason.
+- **A needle that passes for the wrong reason is worse than no needle**, and **a red-first step that
+  starts green is worse than no red-first step** — it reads as "the work is already done". Every
+  "watch it fail" step means observe the *specific* failure named.
+- **A sentinel must not contain its own needle.** A note or comment carrying the string a guard
+  searches for satisfies that guard by itself.
+- **One implementer at a time.** The Unity rationale does not apply here, but the shared working tree
+  does: this repo has already had a controller's untracked probe file mistaken for a concurrent
+  agent's leftovers.
+- **Probe on a scratch copy, never the working tree.** `git archive HEAD | tar -x -C "$(mktemp -d)"`.
+  The controller broke this rule itself in the previous wave.
+
+## Interfaces produced so far
+
+**`tests/test-shipped-citations.sh` exists** (self-contained, 71 lines at `a4f49ea`) and exports to
+Task 2, by these exact names:
+
+- `payload_paths()` — no arguments, prints one payload-relative path per line. Verified byte-exact
+  against a real fixture install: the only difference from the installed `.claude/` tree is
+  `state/install-receipt.tsv`, which install generates and the derivation correctly excludes.
+- `PAYLOAD` — its output, **85 entries** (76 under `.claude/` plus 9 shipped scripts). The brief's
+  comment said 86; the implementer measured 85 and wrote 85.
+- `SHIPPED_MD` — `find "$REPO/.claude" -name '*.md' | sort`, currently 44 files.
+- `FAILURES`, `pass()`, `fail()` — the counter and the two token-printing helpers.
+
+**The file's closing two lines are reversed from what the plan shows.** Controller resolution 3
+replaced the brief's footer with the house idiom, so the file now ends:
+
+```bash
+[ "$FAILURES" -eq 0 ] || exit 1
+printf 'all shipped-citation assertions passed\n'
+```
+
+**Task 2's rule-2 block must therefore be inserted before `[ "$FAILURES" -eq 0 ] || exit 1`**, not
+before a trailing `printf` as the plan's Step 1 implies. Reported by Task 1's implementer.
+
+## Tasks
+
+| # | Task | Status | Commits | Notes |
+|---|---|---|---|---|
+| 1 | Guard rule 1 (`§N`) + the eight marker sites | **done** | `c56a1fd..a4f49ea` | 1 fix round. Spec ✅, Quality Approved, 1 Important + 5 Minor, none blocking. **The implementer found the spec's premise false and said so instead of proceeding on it** — see below |
+| 2 | Guard rule 2 (repo-only paths) + the eight path sites | **done** | `909d85b..803b3d6` | 2 fix rounds. Spec ✅, 4 Important + 8 Minor, all Important ADDRESSED. **The header comment written to state true things stated two false ones, falsified by its own commit** — see below. Round 2's verification was the controller's, by stated deviation |
+| 3 | The installer's dry-run states what the real run does | **done** | `037304b..240ee6f` | 2 fix rounds. Spec ✅, 2 Important + 3 Minor. **Scope widened once by controller ruling** (`MCP-SETUP.md`), then held. The reviewer built seven fixture states; the implementer had built three |
+| 4 | The fork states its threshold once | **done** | `c78c70e..42ae003` | 1 fix round. Spec ✅, 2 Important + 4 Minor. **A third statement of the threshold existed that neither plan nor spec anticipated**, and the guard's flattening read one wrap shape of six — see below |
+| 5 | The two documents that contradict themselves | **done** | `4f9f3a8..c926969` | 1 fix round. Spec ✅, 1 Important + 6 Minor. **The implementer refused the plan's supplied wording and was right**; scope widened once more by controller ruling — see below |
+| 6 | Whole-wave verification | **done** | `3b74970..` (report only, no payload) | 0 fix rounds. **All seven acceptance criteria hold**, status `DONE_WITH_CONCERNS` — and the concerns are the right ones. Five new findings; two of them corrections to this ledger |
+
+## What Task 1 found that the controller had wrong
+
+**The implementer reported the spec's premise false rather than implementing it.** The brief told it
+to empty a table cell because "there is no incident to recover". It ran `git log --all -S'§75'`,
+got four commits rather than the one the spec claimed, followed them to
+`docs/research/pioneer/field-notes.md`, and found all six cited numbers as real headings. It then
+did the work anyway *for the seven sites the finding did not affect*, and flagged the eighth.
+
+That is the behaviour the loop's rule 5 exists to produce, and it is worth naming because the
+alternative was invisible: a brief carrying the controller's authority said "empty this cell", the
+diff would have been small and tidy, and the review would have approved it against a spec that was
+wrong. The measured cost of not catching it is one row of real evidence deleted from a shipped skill.
+
+**The transferable half:** an absent *filename* is not an absent *referent*. Both of the controller's
+measurements were correct — `sourced-incidents.md` never existed, and `§75`'s cell was bare — and the
+conclusion drawn from them was not supported by either.
+
+## Task 2's brief, as amended
+
+The plan's "Task 2" section stands, with four changes. All four come from Task 1's review or report.
+
+1. **Insertion point.** Rule 2's block goes before `[ "$FAILURES" -eq 0 ] || exit 1`, not before a
+   trailing `printf`. See *Interfaces produced so far*.
+2. **Rewrite the guard's header comment at `tests/test-shipped-citations.sh:4-7`.** It is the
+   withdrawn narrative, verbatim, in a tracked file: it says "four shipped skills" (it is three) and
+   "eight citations… pointed at `sourced-incidents.md`" (exactly one did). Review finding 1,
+   Important, deferred here rather than fixed in Task 1 because Task 2 already modifies this file and
+   a fifth commit there is more expensive than one line here. **It must not be deferred past Task 2**
+   — Task 6's sweep greps for `sourced-incidents` and will force the ruling anyway.
+3. **Two guard hardenings, from review finding 3.** The coverage floors are lower bounds, so a
+   derivation that *over-*includes passes them silently — and over-inclusion is the dangerous
+   direction, because a payload with extra entries makes rule 2 stop flagging genuinely unshipped
+   paths. Add two property assertions, which do not go stale the way an exact count would:
+   `PAYLOAD` contains no path under `.claude/state/`, and `PAYLOAD` contains at least one
+   `.claude/scripts/` entry. The second catches the `scripts/*.sh` loop silently matching nothing,
+   which today would drop the count to 76 and still clear the floor of 70.
+4. **Two one-line corrections in the same file**, from review findings 2 and 6: the rule-1 pass
+   message says "carries a § section marker" when the rule is `§[0-9]` — four legitimate `§Heading`
+   cross-references in `state-machine` and `save-system` are correctly unflagged, and the message
+   should say `§N` so a maintainer does not read it as covering them. And `:71` prints without a
+   trailing newline on a red run.
+
+## Deferred and parked findings
+
+### From Task 1's review — one Important, deferred with a reason
+
+1. **The guard's header comment carries the withdrawn narrative** (`tests/test-shipped-citations.sh:4-7`).
+   Deferred to **Task 2**, which already modifies the file. Not deferrable further. See amendment 2
+   above.
+
+### From Task 1's review — five Minor, four closed by amendment
+
+2. **The rule-1 pass message overclaims its scope.** → Task 2, amendment 4.
+3. **The coverage floors are lower bounds only.** → Task 2, amendment 3. Note the reviewer
+   established the derivation is exact *today* by installing into a fixture and diffing; the gap is
+   drift detection, not current correctness.
+4. **`provenance.tsv`'s note describes rule 2, which does not exist until Task 2.** No action —
+   self-correcting one task from now, and the row is the plan's prescribed text.
+5. **`f7adc86`'s commit message is wrong and wider than the implementer reported** — its subject
+   line, not only its closing sentence, carries the withdrawn premise. **No action, and not
+   amending was right**: `a7b1dfd`'s hash is already recorded in `.claude/state/session.json` and in
+   this ledger's commit range, so a rewrite would invalidate references the controller had already
+   taken. `ec6c889`'s message states the correction in full, so history is self-correcting for
+   anyone reading it in order.
+6. **No trailing newline on a red run** (`:71`). → Task 2, amendment 4. ~~Cosmetic; does not affect
+   the runner's PASS/FAIL aggregation.~~ **That ruling was wrong and Task 2 disproved it by
+   measurement.** `run-tests.sh:278` matches `PASS` at a line start *or after whitespace*, so the
+   un-newlined flag dump glued the next line on as `…measurement.PASS: guard examined 562 …`,
+   preceded by `.`, matching neither. **PASS lines counted: 5 before the fix, 6 after** — a pass
+   silently dropped from the tally, on exactly the runs whose numbers get read. Left struck through
+   rather than deleted: a reviewer reading this ledger should see that this class was called
+   cosmetic once and was not.
+
+### Carried to Task 6 — its sweep as written can never report clean
+
+Plan Task 6 Step 2 greps for `sourced-incidents` and expects `clean: no reference survives`. The
+string survives by design in the spec, in the plan, and in this ledger. **The check as written is
+unsatisfiable and must be rewritten in Task 6's brief** to scope the sweep to what ships: `.claude/`
+and nothing else. Reported by Task 1's implementer.
+
+## Task 2's mutation results — Task 6 cites these rather than re-running them
+
+Produced at Step 7, **re-verified at `472a0fd` and again after round 2's edit**, and independently
+reproduced by two reviewers using differently-shaped probes.
+
+| Mutation | Result |
+|---|---|
+| (a) `§N` injected into a shipped skill | `exit 1`, the injected line named with `file:line` |
+| (b) a repo-only path injected into a shipped skill | `exit 1`, the token named; `tokens_seen` moved 562→563, independently confirming the token was read |
+| (c) `CLAUDE.md` removed from the allow-list | **26** — matching D6 exactly |
+
+The re-review reproduced all three by injecting into a **rules file, an agent, and a command** rather
+than the skill the implementer used, so the guard is not a guard for one file. Its controls behaved:
+`scripts/studio-doctor.sh` was not flagged (it ships), and `docs/features/slug/design.md` was not
+flagged (no such file exists here, which is what keeps user-project paths from firing). It also
+extended (c): dropping `LICENSE` → 1, dropping `VERSION` → 1. **All three allow-list entries are
+load-bearing; none is dead weight.**
+
+**Step 7's method had to change, and the brief's version would have corrupted two of the three.**
+`git archive HEAD` at Step 7 archives a tree from *before* the task's commit — so it would have had
+no rule 2 — and `git checkout` cannot restore a file inside a `tar -x` directory that has no `.git`,
+so (b) and (c) would have run with (a)'s injection still in place. The implementer used
+`git stash create` plus a fresh extraction per mutation. The review verified the deviation two ways:
+the stash object still exists and `git diff --stat <stash> 54f65a6` is empty, so the mutations ran
+against exactly the committed tree.
+
+## What Task 2 found, and the one it created
+
+**The header comment rewritten to state true things stated two false ones — and both were falsified
+by the very commit that wrote them.** It said `NOTICE.md` carries five URLs; the task's own
+`CREDITS.md` fix added a sixth. It cited `test-provenance-origins.sh` as an example that "still
+fires"; the task deleted that citation. Amendment 2 existed precisely to truth-check that comment,
+and the rewrite reproduced the class it was fixing.
+
+The repair was a **method, not a patch**: state the property rather than a count and an example. The
+re-review tested that by trying to falsify the new sentence — adding a seventh URL, then deleting
+one — and the old sentence flipped true→false→true across those states while the new one held in all
+three. The added lines contain no digit and no backticked token at all.
+
+**The class the guard cannot see, closed by hand.** A revision of this repository cited in a shipped
+surface is exactly as unfollowable as a path that does not ship, and rule 2 cannot see it — a SHA is
+not a path. Two survived: `git log 0f772a4..HEAD` at `verification-before-completion:45` and a bare
+`2b543f2` at `:36`, nine rows above it in the same table. The implementer's own class probe
+(`grep 'git log [0-9a-f]\{7\}'`) returned none and was materially incomplete, because `2b543f2` is
+not a *range*. The re-review probed five other shapes and found exactly one survivor.
+
+**The discriminator is what makes this safe**, and a blind sweep would have done damage: `bb28ccb`,
+`984023d` and `3dcbd5c` also appear in `NOTICE.md` and are correctly kept. `git cat-file -t` reports
+them as not objects here — they are upstream pins — and each sits on a row carrying that upstream's
+repository URL. Deleting them would have broken the MIT attribution the previous wave's Task 7
+discharged.
+
+## Deferred from Task 2 — all real, all recorded rather than half-fixed
+
+1. **Four more rot-prone claims in the same comment block**, all measured **true today** and all
+   predating the rewrite: `NOTICE.md:140` and `install.sh:175`/`:379-390` as line citations, "cited
+   in 26 shipped files", "the count then falls to 76". Same shape as the defect findings 1–2 fixed.
+   **The block is not rot-proof end to end**, and fixing them inside the fix loop would have been the
+   scope creep that turns three rounds into six.
+2. **Four things rule 2 cannot see**, all latent today, now written into the spec's *Out of scope,
+   recorded*: command-form citations like `` `bash tests/x.sh` `` evade the expression entirely (the
+   sharpest — it is the idiomatic way to write the citation this wave removed eight of); the
+   `.claude/*` case arm is unreachable, so 56 citations are invisible; the URL escape is
+   basename-suffix equality rather than resolution; and `scripts/<x>.sh` clears against a payload
+   entry at a different path.
+3. **`.claude/UPSTREAM` ships and names four repository-only files.** Outside both rules by
+   construction — they scan `*.md`. Recorded in the spec.
+4. **Rule 1's `§3` exception is file-scoped, not line-scoped.** A future *false* `§3` anywhere in
+   `NOTICE.md` is invisible. Harmless today: `NOTICE.md` has exactly one `§` line.
+5. **The plan's `tokens_seen` estimate of "near 323" is wrong** — measured 569 pre-fix, 561 now. 323
+   was a globally-unique count; `tokens_seen` is per (file, token). Nothing depends on it; the floor
+   is 200. Fix the plan text, not the guard.
+6. **The runner's aggregation is blind to python results in both directions** — for the spin-out
+   wave, with this framing rather than the narrower ERROR-only one. `run-tests.sh:278-280` matches
+   `(^|[[:space:]])(PASS|FAIL)(:|[[:space:]])`, and unittest's `... ok`, `... FAIL`, `... ERROR` and
+   `FAILED (failures=3, errors=17)` all fail that pattern. `tests/test-kinglet-spike.sh`'s 1308 tests
+   (**corrected after Task 6** — this said `test-kinglet-build.sh`, which has 135; **1443 python
+   results in total reach `Total: 503` as a single PASS**, so the effect is larger than first written)
+   contribute **0 PASS and 0 FAIL**; `Total: 503` excludes them entirely. A red python run reaches
+   the aggregate only through the `test_rc -ne 0 && file_fail -eq 0` fallback at `:285-288`, as
+   exactly one FAIL. **The suite cannot go silently green on a python failure** — this is granularity
+   loss, not a fail-open.
+
+   *(Corrected 2026-08-12: this sentence stated the runner's Total as **both** 503 and 495. The
+   correction to 503 was spliced into the parenthetical and the clause outside it left at the old
+   value, so one sentence carried two answers to the same question. It is 503 at both mentions.)*
+
+## What Task 3 found — and why its own method could not find all of it
+
+The brief was one line: `install.sh:257` printed `scripts/ and tests/ into .claude/` while the real
+run ships `scripts/` and *prunes* an installed `.claude/tests/`.
+
+**The implementer widened its check from *directories* to *anything the real run writes*, and that
+widening found a second instance:** `MCP-SETUP.md`, copied to the **project root**, recorded in the
+receipt as toolkit-owned, announced by nothing. The controller ruled it in scope — D8's principle is
+that the dry-run "does not get to describe a different program", and the block that copies it exists
+*because* the summary once pointed at a file the installer never installed. The install half had been
+fixed and the consent half left open.
+
+**The fix's own trap was live and avoided.** The real copy is conditional, so an unconditional
+announcement would promise a file the real run skips for every user who already has one — the same
+defect pointing the other way. The announcement carries Step 8c's condition verbatim.
+
+### The lesson: an oracle can be disjoint from the defect class
+
+The implementer then re-ran its widened check and reported **no third unannounced write**. The
+reviewer found one: with `--with-mcp` against a project whose `Packages/manifest.json` git does not
+track, `add_manifest_dependency`'s `cp "$MANIFEST" "$MANIFEST.bak"` leaves `Packages/manifest.json.bak`
+behind permanently.
+
+**The implementer's check could not have found it.** Its oracle was the receipt
+(`grep -v '^#' <receipt> | cut -f1`), and `manifest.json.bak` never enters the receipt. The method
+could not miss the defect — it could not *see* it. The reviewer used a `find` snapshot before and
+after a real run, diffed, with the flags exercised.
+
+This is the third time this wave that a probe's shape, not its execution, decided what it found:
+Task 2's `grep 'git log [0-9a-f]\{7\}'` could not see a bare SHA, and Task 1's spec conflated an
+absent filename with an absent referent. `verification-before-completion`'s own row —
+*"Ask what set the check ran over before trusting silence"* — has now been demonstrated three times
+inside the wave that edits it.
+
+**The guard candidate was corrected before it could ship the blind spot.** The implementer had
+recorded *"every conditional write in `install.sh` has a matching dry-run branch"*, with the receipt
+as oracle. Built that way it would have certified the very class it cannot inspect. Corrected shape,
+for the spin-out wave: **the filesystem is the primary oracle** — before/after `find` across a real
+run, flags exercised, both `MODE=fresh` and `MODE=ours` — and **the receipt is a second, different
+check** asking what the first cannot: does every write that should be owned actually get recorded.
+That second check is what would catch both defects below.
+
+## Deferred from Task 3 — two real installer defects this wave is not closing
+
+**Coordinates below are anchors, not line numbers — corrected 2026-08-12.** They were written as
+`install.sh:623`, `:629`, `:642` and `:690-694`, measured mid-wave; Task 3's insertion had already
+moved them by 11 before the wave closed, and the fix round that noticed moved them another 11 while
+correcting them. A citation into `install.sh` cannot survive an edit to `install.sh`, which is the
+one thing the spin-out wave is certain to do. Line numbers are given as a dated snapshot only —
+`grep -n 'MANIFEST.bak\|Step 8c\|MCP_JSON_RECEIPT_LINE' install.sh` is the citation.
+
+1. **The receipt disowns files on upgrade.** `$RECEIPT_TMP` is rebuilt from scratch every run, and
+   Step 8c — `MCP_SETUP_MD="$PROJECT_DIR/MCP-SETUP.md"` through its `fi` (`:707-717` on 2026-08-12) —
+   appends its row **only on create**, inside the `[ ! -f "$MCP_SETUP_MD" ]` branch (the append is at
+   `:716`). So a second install drops `MCP-SETUP.md`'s row 1 → 0 and `uninstall.sh` — which removes
+   only receipt-listed paths — then **leaves the file behind**. Measured, and `.mcp.json` behaves
+   identically: `MCP_JSON_RECEIPT_LINE` is assigned only in the `cat > "$MCP_JSON"` create branch
+   (`:683` and `:694`), so it is a class. The fix is to re-record the row when the existing file is
+   receipt-owned or matches the toolkit copy. **Out of this brief: an installer-ownership fix, not a
+   dry-run fix.** Task 3's round-2 wording change was scoped precisely so the announcement no longer
+   makes a claim about this.
+2. **`Packages/manifest.json.bak` is permanent debris.** Created inside `add_manifest_dependency` by
+   `cp "$MANIFEST" "$MANIFEST.bak"` (`:645` on 2026-08-12) with `--with-mcp` against a project whose
+   manifest git does not track; the `rm -f "$MANIFEST.bak"` that would clean it up (`:651`) sits
+   inside the `git ls-files --error-unmatch` branch and so runs only when the file *is* tracked, and
+   the untracked branch merely announces it as `(backup: manifest.json.bak)` (`:664`). It never
+   enters the receipt, so `uninstall.sh` can never remove it — in exactly the projects (non-git, or a
+   manifest not yet added) least able to `git checkout` it away. Same class as `MCP-SETUP.md` and
+   worse in that one respect.
+
+### Three Minor from Task 3, recorded
+
+3. **The second definition of `$PROJECT_DIR/MCP-SETUP.md`** (`:319` against `:690`) is **accepted**,
+   with reasons. Hoisting is feasible — both variables are bound far earlier — but it is the file's
+   established convention twice over (`CLAUDE.md` inline at `:272`/`:274` and assigned at `:460`;
+   `.mcp.json` inline at `:300`/`:302` and assigned at `:660`), so hoisting only this one leaves the
+   pattern half-migrated. And the path is not the duplication that matters: what must stay in step is
+   the *condition*, and a hoisted variable does nothing for that. A shared predicate would, but the
+   dry-run needs a three-way answer (silent / new / untouched) rather than a boolean. That refactor
+   belongs with item 2's guard.
+4. **Nothing guards either installer fix.** No test exercises `install.sh --dry-run`;
+   `tests/test-install-prune.sh:33` already runs the installer against a fixture and does A/B upgrade
+   sequences, so the infrastructure exists and the guard is cheap.
+5. **`MCP-SETUP.md` as a *directory*** makes `[ ! -f ]` true, so both halves take the create branch —
+   they agree, so it is not a dry-run defect — but `cp` then writes `MCP-SETUP.md/MCP-SETUP.md` and
+   `sha_of` on a directory yields empty, producing a receipt row with an empty checksum. Uninstall
+   degrades gracefully. Exotic and pre-existing.
+
+## What Task 4 found — and the fifth time a probe's shape decided the finding
+
+**A third statement of the threshold existed.** Neither the plan nor the spec anticipated it:
+`unity-execution/SKILL.md:10-11` restates the fork in its **body**, and it wraps mid-phrase — `:10`
+ends `more than one`, `:11` opens `substantial task`. A guard scoped to the frontmatter, which is
+what the brief specified, could never see it.
+
+The implementer widened the **negative** half to the whole flattened file and left the **positive**
+half on the frontmatter, then asked for a ruling rather than assuming one. **Verdict: keep.** The
+asymmetry is principled and both halves were proven load-bearing under mutation — by two different
+people, in two different directions:
+
+- the implementer showed the negative's whole-file scoping is needed: the loose form injected into a
+  body goes red only under the widened form;
+- the review showed the positive's frontmatter scoping is needed: deleting the qualified phrase from
+  `unity-execution`'s **description** while leaving it in the body turns the positive red and leaves
+  the negative green. **A body sentence cannot stand in for the field a reader selects on.**
+
+The positive asks *does the selection field say the right thing* — it must be narrow. The negative
+asks *does anything say the wrong thing* — it must be broad, because ambiguity returns from anywhere.
+
+### The flattening read one wrap shape of six
+
+The guard joined lines with `printf "%s ", $0` — one space appended, nothing trimmed, no runs
+collapsed. Measured across six shapes, **one was caught and five were missed**: indented
+continuation, blockquote continuation, a trailing space before the wrap, an indented YAML
+continuation inside `description:`, and a double space on one line. The shape that worked was the one
+the file happens to have today, which is why the implementer's single mutation did not surface it.
+
+Fixed by stripping leading blockquote markers to any depth and collapsing whitespace runs, **built
+once and concatenated into both awk programs** — two copies of a whitespace rule is how the two
+halves would come to disagree about what "flattened" means. Re-mutated in situ across **ten** shapes:
+ten of ten caught, control silent. Verified independently by the controller with an eleventh —
+blockquote plus indent plus wrap, injected into the *other* skill's body — which went red.
+
+**And one level down, the same defect again.** The implementer's fixture for the trailing-space shape
+had its trailing space stripped in authoring and reported *caught*. Rewritten with an explicit
+`\x20` it flipped to **missed**. A fixture for a whitespace bug that cannot hold whitespace is the
+same class as the bug it tests, and it is now written so an editor cannot silently disarm it.
+
+**Stated gaps, recorded rather than chased:** case variants (`More than one task`) and paraphrases
+(`more than a single task`) pass — the guard defends against the exact retired phrase returning, not
+against the ambiguity returning in new words. So does a phrase split by a Markdown construct that is
+neither leading whitespace nor a blockquote marker: `more than one *emphasised* task`, or a phrase
+broken by an HTML comment.
+
+### The class the brief exposed by accident, and the sweep that closed it
+
+The plan's Step 2 code used `fail_test` / `pass_test`. **Neither exists** — `run-tests.sh:167`
+exports exactly `assert_eq assert_exit_code assert_contains assert_not_contains assert_file_exists
+assert_file_executable skip_test`.
+
+That is worse than a rename. The runner does `set +e` before sourcing, so an undefined helper prints
+to stderr and continues, contributing **no `FAIL:` token at all**. The review reproduced the
+brief-shaped case: a failing positive assertion followed by the `fail_test`/`pass_test` loop, and the
+loop contributed nothing in either direction — so red-first would have shown the expected FAIL and
+the implementer would have concluded the negative half worked while it asserted nothing. **The guard
+would have shipped green on the defect it exists to catch.**
+
+The class is caught only *positionally*: as a file's last command it trips `run-tests.sh:285-289`
+with `exited 127 without reporting a failure`, a message naming no cause. Anywhere else it is silent.
+
+**The sweep came back clean.** No test file in `tests/` calls an unresolved helper, verified two
+independent ways: dynamically, sourcing all 31 files through the runner's own `( source "$f" )`
+mechanics with a `command_not_found_handle` trap (zero hits); and statically, checking every
+command-position `assert*` / `pass_*` / `fail_*` / `*_test` token against each file's local
+definitions plus the seven exported names (zero unresolved). The dynamic pass covers only branches
+taken on this host; the static pass covers untaken branches but not dynamically constructed calls.
+
+## Deferred from Task 4
+
+1. **`unity-planning:139-141` and `:186-193` — the surface that owns the fork states no threshold at
+   all**, and `:140` labels `subagent-driven-implementation` "(recommended)" unconditionally, which
+   reads against D9's preference for inline on small plans. Pre-existing and outside D9's letter, so
+   out of scope here — but it is where the corrected acceptance criterion 7 points next, and the
+   negative assertion does not reach it.
+2. **The guard's coverage limits**, listed under *Stated gaps* above. Recorded in the guard's own
+   comment as well, so a maintainer meets them where they matter.
+3. **`assert_contains "$fork_whole" "$fork_branch"`'s label overclaimed** and was reworded: it is
+   satisfied by the `name:` line, so it proves the file was opened and flattened to something, not
+   that a body was read. It still does its real job — the vacuity mutations fire, producing 3 named
+   FAILs on an emptied or deleted file rather than a green absence check.
+
+## Two controller-document defects Task 4 found, both now fixed
+
+Both were confirmed by the review before the controller acted on them.
+
+1. **Spec acceptance criterion 7 contradicted D9.** It read *"No two surfaces state the fork's
+   threshold"* while D9 four screens up says *"Both descriptions carry the same phrase afterwards,
+   verbatim, and a guard asserts they do."* Wrong on its facts as well as its logic — **three**
+   places state it. The defect was never that the threshold is stated more than once; it is that the
+   statements disagreed. Corrected in place with the correction dated.
+2. **Task 6's criterion-7 command would have read a correct fix as a failure.** `grep -h 'more than
+   one'` over the two skills prints **three** lines, and the middle one ends at a bare `more than
+   one` because of the `:10-11` wrap. Replaced with a flattened form; verified to print two unique
+   results, both `more than one substantial`.
+
+## What Task 5 found — including in the plan's own supplied wording
+
+**The implementer refused the wording the plan handed it, and it was right on three counts.** The
+plan's replacement for `GETTING-STARTED.md:162` called `/unity-review` and `/unity-prototype` "the
+two entry points that stand outside that chain". Measured against the payload:
+
+- `using-kinglet:35` places `/unity-review` **inside** the chain, at the verify end;
+- `unity-brainstorming:41` says **"One real exemption"**, not two;
+- `:21-22` explicitly refuses to keep an exemption list — *"a list of exemptions is a list of ways to
+  talk yourself out of the round"*.
+
+So the plan manufactured a second exemption in a sentence describing the document that refuses to
+keep a list of them. The review confirmed the deviation independently and checked every claim the
+shipped sentence makes — including that `/unity-review` "reads and reports, and changes nothing",
+which holds: `unity-reviewer.md:6` is `tools: Skill, Read, Glob, Grep`, and `unity-review.md:74` says
+*"offer to fix them. Do not fix them unasked."*
+
+### The rewritten RESUME HERE declared closed work open — and the §N irony
+
+The first attempt at the previous wave's `RESUME HERE` said *"The Deferred and parked findings
+sections below are a backlog, not history. Every item there was ruled on rather than closed."* At
+least two subsections were closed, and **the same block cited one of them as discharged seventeen
+lines above**.
+
+**The implementer then corrected the controller's fix instruction in both directions**, which is the
+part worth keeping. The review said thirteen subsections; it is twelve. The review suggested scoping
+the sentence to the *"deferred with rulings"* lists; that would still have been wrong, because **four
+items inside those lists are also closed** — Task 2 #5, Task 2 #6, Task 4 #5 and Task 5 #3 all shipped
+— while Task 2 #1 is genuinely open. The lists are *mixed*, not uniformly stale, so the replacement
+leads with the instruction rather than a classification: **check an item against the tree before
+acting on it.**
+
+**And the block introduced a `§N` citation** — in the wave that removes them — that landed off-target:
+*"`NOTICE.md` §3's closing paragraph"*, where §3 runs from `:117` to end of file through two more
+subheadings and the pin paragraph closes a *subsection*. Now cites `.claude/NOTICE.md:149`. This is
+the sixth time in the wave that a document failed to apply its own subject to itself.
+
+### Scope widened a second time, by controller ruling
+
+`docs/GETTING-STARTED.md` told a new user to `git clone …/everything-claude-unity.git` at three
+places, and `:12` promised *"Unity 2021.3 LTS+ / Any render pipeline"* for a Unity-6, URP-first,
+PC/console toolkit. Widened with the reason stated: **D8's principle in a document rather than an
+installer — a file does not get to describe a different program.** Fixed against `README.md:107` and
+`install.sh:111-115`, which really does detect all three pipelines, so `:12` now says so rather than
+overclaiming in either direction.
+
+## Deferred from Task 5
+
+1. **`docs/GETTING-STARTED.md:34-45`, "Option B: Manual Copy", describes an install `uninstall.sh`
+   refuses to touch.** Verified: `uninstall.sh` hard-fails without the receipt only `install.sh`
+   writes. A `cp -r` install also skips `CLAUDE.md` generation, which `/unity-init` and
+   `architecture.md`'s "detected, not assumed" block both depend on. **Same class as the wrong clone
+   URL and larger than it** — reported and stopped, per the brief's one-widening limit.
+2. **`GETTING-STARTED.md:162` silently takes a position on parked decision P3** — which surface owns
+   "a scene to build". The position is the one the payload supports (`unity-brainstorming`'s
+   `description:` names a scene; `unity-scene.md:54` offers `unity-brainstorming` as *"where work on
+   the real project starts"*), so it is not wrong — but the table row at `:159` reads as a
+   counter-example. **For the P1/P3 round**, so Task 6 does not rediscover it as a fresh
+   contradiction.
+3. **Five derived counts at `docs/GETTING-STARTED.md:69-74`** — 8 agents, 9 commands, 16 skills, 27
+   hooks, 6 rules. All true today; none guarded. `test-derived-counts.sh` reads only `README.md`,
+   `CREDITS.md`, `docs/ARCHITECTURE.md` and `docs/SKILL-CATALOG.md`.
+4. **`docs/HOOK-REFERENCE.md:9` says 25 hooks; the tree has 27**, and `GETTING-STARTED:71` says 27.
+   Two shipped-adjacent documents disagreeing, one of them wrong, guarded by nothing.
+
+## Task 6's brief, as amended — with measurements, not estimates
+
+The plan's Task 6 stands, with these changes. The first two were measured by the controller before
+dispatch, precisely so the implementer does not have to guess at an expected result.
+
+1. **Step 2's first sweep is unsatisfiable as written.** `grep -rn 'sourced-incidents' .
+   --exclude-dir=.git || echo "clean"` returned **16 hits when Task 6 ran it**, and more since (see
+   the note below) — every one of them in this wave's own spec, plan and ledger. It can never print
+   `clean`. Scope it to what ships: `.claude/` and nothing else.
+
+   *(This read 15 when the amendment was written, 16 by the time Task 6 ran it — the controller's own
+   ledger commit added the sixteenth — 17 when the 2026-08-12 fix round measured it, and 18 once that
+   round finished writing this paragraph. **Do not repair the number here.** It cannot be held still:
+   every document that discusses this sweep has to name the string in order to discuss it, so the
+   repo-wide count rises by one each time anyone writes about it, including now. A count written into
+   a document about counts going stale, going stale, on every pass. That is the second reason the
+   sweep is scoped to `.claude/` — where it returns nothing, stably.)*
+2. **Step 2's real question — do shipped *non-Markdown* surfaces cite repo-only paths? — has a
+   measured answer: exactly four, all in `.claude/UPSTREAM`** (`provenance.tsv` at `:2` and `:11`,
+   `MERGE-NOTES.md` and `provenance-skip.tsv` at `:20`, and **`check-provenance.sh` at `:17`**).
+   Both guard rules scan `find .claude -name '*.md'`, so `UPSTREAM` is outside them by construction;
+   the spec records this under *Out of scope*, and the spec's list of four is the correct one.
+
+   **This entry read "exactly three" until 2026-08-12 and the spec read four.** The spec was right.
+   `check-provenance.sh` is repo-only for the most explicit reason any file in this tree is: the copy
+   loop names it as its single exclusion. It sits unbackticked and mid-sentence in
+   `superpowers_pin_note=` — *"check-provenance.sh --online never reaches it"* — where `UPSTREAM` is
+   `key=value` and nothing in it is backticked at all.
+
+   **Both probes were defeated by their own shape, and that is the finding.** The controller's first
+   attempt filtered on `*/*` and returned **zero**, which reads as clean — `provenance.tsv` has no
+   slash in it. The replacement dropped the slash requirement but kept resolving each candidate token
+   against the **repository root**, and `check-provenance.sh` does not exist at the root; it exists at
+   `scripts/check-provenance.sh`. So the existence test failed and the one name that is repo-only *by
+   the installer's own explicit exclusion* was discarded as "not a file here". The second probe's own
+   text is not preserved in this ledger, so what follows is a reconstruction — but it reproduces the
+   recorded result exactly, and the root-only existence test is the only shape that does:
+
+   ```bash
+   grep -oE '[A-Za-z0-9_.-]+\.[A-Za-z]+' .claude/UPSTREAM | sort -u | while read -r t; do
+     [ -f "$t" ] && echo "root:  $t"
+     [ -f "scripts/$t" ] && echo "under scripts/: $t"
+   done
+   ```
+
+   The root test alone yields exactly the three this entry recorded; adding one directory yields the
+   fourth. First probe: required a separator the target lacks. Second probe: required a location the
+   target does not occupy. Same class, one turn apart — **a probe's shape decides what it finds**.
+   The section above already records this class three times over; this is another, and it landed
+   inside a measurement written *to protect* an implementer from having to guess. Recorded without an
+   ordinal on purpose: a running tally of instances is a count, and counts in this wave went stale.
+3. **Criterion 7's command is already fixed in the plan.** The line-oriented `grep -h 'more than one'`
+   printed three lines with the middle one ending bare, because `unity-execution:10-11` wraps
+   mid-phrase. The flattened replacement prints two unique results, both `more than one substantial`.
+4. **Task 2's mutation results are cited, not re-run.** They are recorded above, re-verified twice,
+   and reproduced by two reviewers with differently-shaped probes.
+
+## Task 6 — all seven criteria hold, and the concerns are the right ones
+
+Verified independently rather than taken from earlier tasks. Criterion 4 was checked by running
+**today's guard against the wave base `076464b`**: rule 1 flags 8, rule 2 flags exactly D7's eight
+rows in D7's order, and `provenance.tsv` is absent at base too. Criterion 6 was checked with a
+before/after `find` snapshot rather than the dry-run's own text. Criterion 7 was flattened with
+blockquote-stripping and swept repo-wide: **zero** shipped hits for the retired form.
+
+**The status is `DONE_WITH_CONCERNS` and that is the honest one.** Criterion 4's *"each fix removes
+exactly one"* is verified only at the endpoints, and the wave's own sweep found a live instance of
+the defect class it exists to close, in a file type neither rule can read.
+
+**It re-measured the guard's four stated blind spots rather than citing them, and all four are still
+open**: command-form `` `bash tests/x.sh` `` → green; a real payload-excluded `.claude/state/session.json`
+→ green, confirming the `.claude/*` arm is genuinely unreachable; `scripts/<x>.sh` → green; and a
+repo-only path accompanied by an `example.invalid` URL ending in it → green, confirming the escape is
+basename-suffix equality rather than resolution.
+
+### Five findings no earlier task recorded
+
+1. **`scripts/studio-doctor.sh` ships and says "run `install.sh`" at six sites** (`:150`, `:203`,
+   `:208`, `:230`, `:236`, `:276`). Found because both guard rules scan `find .claude -name '*.md'`
+   and this is a `.sh`. **Seventh instance of a probe's shape deciding the finding** — and the sharpest
+   framing is the reporter's own: the ledger's only earlier mention of this file is as a *control* in
+   Task 2's mutation testing, where it was checked as a **referent** and never as a **citer**.
+
+   **Controller ruling: recorded, not fixed, and not the same defect.** Same token, different speech
+   act. Task 2 removed `install.sh` where it was cited as *evidence for a past incident*, which an
+   installed reader cannot follow. Here the user is told to *run* it — and they have it, in the clone
+   they installed from. Deleting it would make a diagnostic worse: `studio-doctor` exists to tell a
+   user how to repair a broken install, and "run the installer again" is the correct repair. What
+   would improve it is saying *from where*, which is a usability change to a diagnostic, not a
+   citation fix. **To the spin-out wave, with the surface criterion for hooks and `scripts/`.**
+2. **The dry-run announces two of the four `.gitignore` entries the real run writes** —
+   `.claude.backup.*/` is unannounced. Third instance of the dry-run under-announcing. **Task 3's
+   `find`-snapshot oracle could not see it**: `.gitignore` already exists, so a path snapshot has
+   nothing to diff. The oracle lesson again, one level in.
+3. **This ledger named the wrong file** for the python-aggregation finding — corrected above.
+4. **The `sourced-incidents` sweep returns 16, not the 15 the controller measured** — corrected above,
+   with its cause.
+5. **`docs/HOOK-REFERENCE.md:9` says 25 hooks; the tree has 27.** Already recorded from Task 5.
+
+## The whole-branch review, and the two rounds against it
+
+Six per-task reviews found 40+ findings between them and **none of them could see what this one did**,
+because no per-task review's scope includes another task's diff.
+
+**Round A — a number or citation a later commit invalidated.** Fourteen items, and the theme was the
+wave's own: Task 3's 29-line insertion into `install.sh` invalidated every citation of the lines below
+it, **including inside the guard the wave built** — a citation the ledger had audited and recorded as
+*"measured true today"* three commits earlier. Fixed by converting to content anchors. Commits
+`93a79e8` (payload) and `5d00a58` (record).
+
+The row-count correction is worth keeping as method: three measurements of one file gave 542, 543 and
+553. `check-provenance.sh`'s own `rows()` — `grep -v '^#' | tail -n +2` — is the definition that
+matters, because the first non-comment line is the column header. The controller's count included it;
+the reviewer's 553 is reproduced by no method at any commit in the wave. **The definition now travels
+with the number.**
+
+**Round B — coverage and product.** Commit `0eea92d`.
+
+- **The fork guard implemented "no surface *anywhere*" by reading two files.** Unread: `unity-planning`
+  (the surface that *owns* the fork), `using-kinglet`, every agent, command and rule, and the four
+  sibling `.md` files inside `subagent-driven-implementation/` — **for which the same test file, a
+  thousand lines above, already records widening a different check, naming the shape.** The negative
+  half now reads all 44 shipped `.md` files, with three sentinels: a coverage floor, a
+  nothing-flattened-to-empty check, and a positive control using the same machinery on the surviving
+  phrase. Proven by injecting into a rule, an agent, a sibling, and all three at once.
+- **Rule 2's failure message was not actionable** — no line number, and no statement of the remedy,
+  so a maintainer hitting it on a legitimate citation would delete rather than link. Now reports
+  `file:line`, deduped on `(file, line, token)`, and prints the URL escape.
+- **Three documents still called the toolkit "everything-claude-unity".** Task 5 had fixed one of four
+  in the same directory. Four upstream-provenance references correctly survive.
+- **`HOOK-REFERENCE.md` said 25 hooks and omitted two** while calling itself a complete catalog. Now 27,
+  with `block-legacy-input` and `session-brief` documented.
+- **Two Source cells had lost their evidence with their paths** — *"The merged-result rule"* appeared
+  exactly once in the whole payload, in the cell citing it, and *"the runner-provided test file"* names
+  something an installed project does not have. In a skill whose thesis is *a claim without evidence is
+  not a completion*, two rows were claims without evidence. Both now carry the fact instead of the
+  pointer.
+
+## Spin-out backlog — twelve items, all measured, none closed
+
+1. The receipt disowns `MCP-SETUP.md` and `.mcp.json` on upgrade, so `uninstall.sh` leaves them behind.
+2. `Packages/manifest.json.bak` is permanent debris in non-git projects; never enters the receipt.
+3. The runner is blind to python results in both directions — 1443 results reach the total as one PASS.
+4. `unity-planning` states no threshold and labels one branch "(recommended)" unconditionally.
+5. `scripts/studio-doctor.sh` says *"run `install.sh`"* at six sites. **The controller's original ruling
+   rested on "they have it, in the clone they installed from" — and the recommended install does
+   `rm -rf` on that clone.** The ruling survives on its other leg (deleting it would make a diagnostic
+   worse); the fix is saying *from where*.
+6. Five derived counts in `docs/GETTING-STARTED.md`, true today, guarded by nothing.
+7. Nothing guards `install.sh --dry-run` at all — zero references under `tests/`.
+8. No guard resolves `file:line` citations in `tests/` and `docs/` against the tree. **A rename breaks
+   a content anchor as silently as an insertion breaks a line number.**
+9. `docs/GETTING-STARTED.md`'s "Option B: Manual Copy" describes an install `uninstall.sh` refuses to
+   touch, and which skips `CLAUDE.md` generation.
+10. `install.sh` and `scripts/generate-claude-md.sh` disagree on render-pipeline detection when a
+    project carries both URP and HDRP: two unconditional greps make HDRP win in one, `if/elif` makes URP
+    win in the other. The console line and the generated `CLAUDE.md` would name different pipelines.
+11. The surface criterion applied to hooks and `scripts/`.
+12. The unguarded closing `---` frontmatter fence across all skills.
+
+## Controller deviations, stated so their absence is not read as an omission
+
+1. **Round 2 of Task 2 was verified by the controller, not by a dispatched re-review.** A single-line
+   deletion whose correctness is a `grep` returning empty does not need a fresh reader, and the
+   dispatch would have cost more than it caught. Verified: `2b543f2` gone from shipped Markdown; the
+   three upstream pins still present and still not objects in this repository; no hex string in any
+   shipped `.md` resolves via `git cat-file -t`; guard `exit=0` with 7 PASS; `provenance OK`; tree
+   clean.
+2. **The controller's brief named the wrong line for the git-range fix** (`:44`; it is `:45`, and
+   `:44` is the `Light2D` row carrying no range). The implementer reported the correction rather than
+   silently retargeting, which is the distinction that matters.
+3. **Task 2's implementer did not photograph the intermediate sha256 tripwire state** between its fix
+   and baseline commits in round 2, as it had in rounds 0 and 1. It flagged the gap itself. Accepted:
+   the tool's non-zero drift is itself evidence the tripwire had something to notice, and the final
+   run is green.
