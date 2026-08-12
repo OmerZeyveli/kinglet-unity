@@ -26,6 +26,24 @@ pass() { printf '%s\n' "${GREEN}PASS${NC} $*"; PASS_C=$((PASS_C + 1)); }
 warn() { printf '%s\n' "${YELLOW}WARN${NC} $*"; WARN_C=$((WARN_C + 1)); }
 fail() { printf '%s\n' "${RED}FAIL${NC} $*"; FAIL_C=$((FAIL_C + 1)); }
 
+# Print at most the first five entries of a newline-separated list, indented.
+#
+# NOT `printf '%s' "$LIST" | head -5`, which is what this replaced in both callers. Under
+# `set -euo pipefail` head exits the instant it has five lines, without draining stdin; the writer
+# takes SIGPIPE; pipefail promotes 141 to a pipeline failure; and `set -e` kills the script — before
+# the payload-sanity checks, before the process-provider check, before the summary line, on exactly
+# the long list that made the diagnostic worth printing. Measured 2026-08-12 on a receipt carrying
+# 1200 modified rows: five paths printed, then exit 141 and nothing else. At 87 rows it survived,
+# which is why every test written against a healthy project passed it.
+#
+# awk here reads its whole input and exits at EOF — there is no early exit to race with — and the
+# here-string is a redirection, not a pipeline, so no writer process exists to receive a SIGPIPE and
+# no pipeline status exists for pipefail to promote. The `NF` guard drops the trailing empty field
+# the list's final newline produces.
+print_first_5() {
+  awk 'NF && NR <= 5 { printf "       %s\n", $0 }' <<< "$1"
+}
+
 usage() { sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 PROJECT_DIR="$(pwd)"
@@ -64,7 +82,11 @@ fi
 
 # ── Environment: uv ──────────────────────────────────────────────────────────
 if command -v uv >/dev/null 2>&1; then
-  pass "uv present ($(uv --version 2>/dev/null | head -1))"
+  # First line only, via parameter expansion rather than `| head -1` — see print_first_5. `uv
+  # --version` prints one line today, so this pipe was unlikely to fire, but the shape is the same
+  # one and the spec's criterion 12 admits no `| head` in this file.
+  UV_VER=$(uv --version 2>/dev/null || true); UV_VER=${UV_VER%%$'\n'*}
+  pass "uv present ($UV_VER)"
 else
   warn "uv not found — the MCP bridge runs under it. See https://docs.astral.sh/uv/"
 fi
@@ -127,7 +149,17 @@ else
   if [ -z "$MCP_RESP" ]; then
     warn "Nothing answered at $MCP_URL — open Unity and start the bridge (Window > MCP for Unity)."
   elif grep -q '"jsonrpc"' <<< "$MCP_RESP"; then
-    SRV=$(printf '%s' "$MCP_RESP" | sed -n 's/.*"serverInfo"[^{]*{[^}]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    # sed reads a here-string to EOF and the first line is taken by parameter expansion. This was
+    # `printf '%s' "$MCP_RESP" | sed -n '...' | head -1`, and it is the worst of the four instances of
+    # that shape in this file, because it is a bare assignment: a 141 from the pipeline becomes the
+    # assignment's status and `set -e` kills the script here, at the bridge check, so every check
+    # below — .mcp.json, the input package, install integrity, payload sanity, the process provider,
+    # the summary — never runs. It fires when sed emits more lines than head will read, which an
+    # Accept of text/event-stream invites: a streamed reply is many `data:` lines, each carrying
+    # serverInfo. Measured 2026-08-12: 3 matching lines survived 5/5, 100 survived 5/5, 1000 died
+    # 5/5. Whether a real bridge sends a thousand is not the point — the failure is silent and total.
+    SRV=$(sed -n 's/.*"serverInfo"[^{]*{[^}]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' <<< "$MCP_RESP")
+    SRV=${SRV%%$'\n'*}
     pass "MCP bridge answered at $MCP_URL${SRV:+ (${SRV})}"
   else
     # Something is listening, but it is not an MCP server. Say so — do not call it a bridge.
@@ -210,31 +242,69 @@ elif [ ! -f "$RECEIPT" ]; then
   warn "No install receipt. .claude/ exists but Kinglet did not write it here"
   warn "     (a teammate's git clone will look like this — the receipt is machine-local)."
 else
+  # TWO TESTS, NOT ONE — the same grammar uninstall.sh's classifier uses, deliberately, so that one
+  # reading of the origin column covers both readers instead of two that drift apart.
+  #
+  # `user-modified` means a previous install found your edit and kept it, recording the file AS
+  # EDITED so the NEXT install still recognises it as yours. The checksum on such a row is therefore
+  # the checksum of YOUR file, and a sha-only comparison always matches. That is how this check came
+  # to report `PASS Install intact: 87 file(s) verified against the receipt` about a project whose
+  # rules file the user had rewritten — the diagnostic telling them nothing had changed about the one
+  # file they changed. Reproduced on a fixture 2026-08-12 before this was written.
+  #
+  # The sha test is right for `toolkit` rows and only for them: there it separates "we installed it
+  # and nobody touched it" from an edit made AFTER the last install, which is the only kind a
+  # `toolkit` row can express.
+  #
+  # AN ORIGIN WE CANNOT READ IS REPORTED, NOT COUNTED VERIFIED. `case` with an explicit catch-all
+  # rather than an if/elif that lets anything unrecognised fall through to the sha test: a row with a
+  # trailing space, a CRLF ending or a fifth column is no longer byte-equal to `user-modified`, and
+  # under a fall-through it would be silently certified. uninstall.sh keeps such a file rather than
+  # deleting it; the health-check analogue of keeping is naming — install.sh and uninstall.sh will
+  # both leave that file alone, so folding it into a PASS count would have doctor contradict what the
+  # other two readers are actually going to do. A file whose provenance cannot be read is not ours to
+  # certify.
+  #
+  # The sha comparison stays fail-closed the same way uninstall.sh's `sha_of` is: an unreadable file
+  # yields the empty string, which never equals a recorded checksum, so the row lands in MODIFIED and
+  # is reported rather than silently passed.
   VERIFIED=0; MODIFIED=0; MISSING=0
   MODIFIED_LIST=""; MISSING_LIST=""
-  while IFS=$'\t' read -r rel recorded _mode _origin; do
+  while IFS=$'\t' read -r rel recorded _mode origin; do
     case "$rel" in ''|\#*|path) continue ;; esac
     abs="$PROJECT_DIR/$rel"
     if [ ! -f "$abs" ]; then
       MISSING=$((MISSING + 1)); MISSING_LIST="${MISSING_LIST}${rel}"$'\n'
-    elif [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
-      VERIFIED=$((VERIFIED + 1))
-    else
-      MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+      continue
     fi
+    case "$origin" in
+      user-modified)
+        MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+        ;;
+      toolkit)
+        if [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
+          VERIFIED=$((VERIFIED + 1))
+        else
+          MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+        fi
+        ;;
+      *)
+        MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+        ;;
+    esac
   done < <(grep -v '^#' "$RECEIPT")
 
   if [ "$MISSING" -eq 0 ]; then
     pass "Install intact: $VERIFIED file(s) verified against the receipt"
   else
     fail "$MISSING receipted file(s) missing — re-run install.sh"
-    printf '%s' "$MISSING_LIST" | head -5 | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+    print_first_5 "$MISSING_LIST"
   fi
   if [ "$MODIFIED" -gt 0 ]; then
     # Not a failure. Editing the toolkit in place is legitimate; you just want to know you did,
     # because re-install will keep these and upstream fixes will not reach them.
     warn "$MODIFIED file(s) modified since install — install.sh will keep your versions:"
-    printf '%s' "$MODIFIED_LIST" | head -5 | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+    print_first_5 "$MODIFIED_LIST"
   fi
 fi
 
