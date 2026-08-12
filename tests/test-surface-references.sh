@@ -1237,25 +1237,42 @@ assert_contains "$UK_INJECTED" 'Invoke the surface **before any response or acti
 # pattern can read it, and an absence check that cannot read the text reports absence for the wrong
 # reason. Scoped to the frontmatter fence because both bodies discuss the fork in prose, and a body
 # sentence must not be able to stand in for the field a reader actually selects on.
-fork_frontmatter() {
-  awk '
-    NR == 1 && $0 == "---" { f = 1; next }
-    f && $0 == "---" { exit }
-    f { printf "%s ", $0 }
-  ' "$REPO_DIR/.claude/skills/$1/SKILL.md" 2>/dev/null || true
+# THE POSITIVE HALF IS SCOPED TO THE FRONTMATTER; THE NEGATIVE HALF IS NOT. `unity-execution`'s
+# BODY states the boundary a third time, and it does so wrapped — line 9 ends "…has more than one"
+# and line 10 opens "substantial task, or when…". So:
+#   - the positive is frontmatter-only, because a body sentence must not be able to stand in for the
+#     field a reader actually selects on. Scoping it there is what makes it an assertion about
+#     selection rather than about the file containing the words somewhere;
+#   - the negative reads the WHOLE file, because a looser threshold anywhere in either branch
+#     reintroduces exactly the ambiguity this block closes — including in that body sentence, which
+#     no frontmatter-scoped check can see.
+# Both haystacks are flattened for the reason above; the wrapped body sentence is the live proof
+# that the flattening is not hypothetical.
+fork_flatten() {
+  awk "$2" "$REPO_DIR/.claude/skills/$1/SKILL.md" 2>/dev/null || true
 }
 
-for fork_branch in unity-execution subagent-driven-implementation; do
-  fork_front="$(fork_frontmatter "$fork_branch")"
+FORK_FRONTMATTER_AWK='
+  NR == 1 && $0 == "---" { f = 1; next }
+  f && $0 == "---" { exit }
+  f { printf "%s ", $0 }
+'
+FORK_WHOLE_AWK='{ printf "%s ", $0 }'
 
-  # An empty haystack fails the positive assertion and PASSES the negative one — a green that means
-  # "the file was never read". This is the assertion that keeps the pair honest.
+for fork_branch in unity-execution subagent-driven-implementation; do
+  fork_front="$(fork_flatten "$fork_branch" "$FORK_FRONTMATTER_AWK")"
+  fork_whole="$(fork_flatten "$fork_branch" "$FORK_WHOLE_AWK")"
+
+  # An empty haystack fails a positive assertion and PASSES a negative one — a green that means "the
+  # file was never read". These two are what keep the pair below honest.
   assert_contains "$fork_front" "description:" \
-    "$fork_branch's frontmatter was read at all, so the two assertions below are about its text"
+    "$fork_branch's frontmatter was read at all, so the assertions below are about its text"
+  assert_contains "$fork_whole" "$fork_branch" \
+    "…and its whole flattened body was read, so the absence check reads something"
 
   assert_contains "$fork_front" "more than one substantial task" \
-    "$fork_branch states the fork's threshold with the *substantial* qualifier intact"
+    "$fork_branch states the fork's threshold, in its description, with the qualifier intact"
 
-  assert_not_contains "$fork_front" "more than one task" \
-    "$fork_branch carries no second, looser threshold with that qualifier dropped"
+  assert_not_contains "$fork_whole" "more than one task" \
+    "$fork_branch states no looser threshold anywhere — description or body — with it dropped"
 done
