@@ -46,7 +46,7 @@ job is to state copyright holders. It was then given a count, and the count went
 the sentence above it still read "at the time of writing". A number that moves every time an
 original file is added carries no signal a reader would act on, so the table enumerates instead. If
 you add an original file under `.claude/`, add its manifest row and a row here; the first is what
-makes it attributable and `tests/test-provenance-origins.sh` fails until the second exists.
+makes it attributable and the toolkit's suite fails until the second exists.
 
 The [CoplayDev Unity MCP bridge](https://github.com/CoplayDev/unity-mcp) is **not** included here.
 `.mcp.json` merely points at it on `localhost`; install it yourself via Package Manager.
@@ -146,7 +146,7 @@ remembered.
 All three are `status=modified`: every one was rewritten for Unity 6 and for this toolkit's surfaces,
 and none is a copy. That is a statement about how much changed, not a reduction of the obligation.
 
-**No automated check in the toolkit verifies the Superpowers pin.** `scripts/check-provenance.sh`
+**No automated check in the toolkit verifies the Superpowers pin.** The manifest checker
 compares checksums only for rows marked `status=verbatim`, and its `--online` pass additionally only
 for rows from everything-claude-unity — so both skip every row above. The `6.2.0` / `3dcbd5c` pin in
 `provenance.tsv` is a record kept by hand, and it is worth saying so rather than letting the presence
@@ -194,4 +194,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-See the toolkit repository's `CREDITS.md` for the same record at more detail.
+See the toolkit repository's `CREDITS.md` for the same record at more detail:
+
+> https://github.com/OmerZeyveli/kinglet-unity/blob/main/CREDITS.md
