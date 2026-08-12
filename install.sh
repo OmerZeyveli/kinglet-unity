@@ -694,6 +694,48 @@ if [ -f "$GEN" ]; then
   fi
 fi
 
+# CLAUDE.md.generated is the second file this installer creates, keeps, announces — and, until
+# 2026-08-13, never recorded. Same defect as Packages/manifest.json.bak one step earlier, on the
+# project root where the user sees it: written by the `separate` branch above, pointed at by the
+# "Next steps" summary, and absent from every receipt, so uninstall.sh — which removes only what the
+# receipt lists — could never take it away. Permanent debris in exactly the projects that already had
+# a CLAUDE.md of their own and where the installer politely declined to overwrite it.
+#
+# OUTSIDE THE BRANCH, for the reason the manifest-backup row is outside the flags. Exactly one of
+# the block's arms writes this file, and a project leaves that arm for good the moment the user
+# takes the block's own advice and adds the markers to their CLAUDE.md: every run from then on takes
+# `refreshed`, the file run 1 wrote is still sitting on disk, and a row written where the file is
+# created would vanish on run 2 and never come back.
+#
+# THERE IS NO REFERENCE COPY, so the ref argument is '' and owned_by_installer's first arm — compare
+# against the toolkit's shipped copy — is skipped by construction. This file has no shipped copy: it
+# is generated per project from that project's Unity version, packages and provider. What answers
+# for it instead is the pair below, and both halves were measured on a fixture 2026-08-13:
+#
+#   `separate` — this run generated the file and moved it into place. The only thing that can speak
+#                for install 1, where there is no previous receipt to consult (`arms=branch`).
+#   the receipt — the only thing that can speak for a run that did not touch the file at all
+#                (`arms=receipt` on a second install taking `refreshed`), and it is a checksum
+#                comparison, so a CLAUDE.md.generated the user has since edited stops being ours and
+#                is left alone (`arms=none`), exactly as an edited MCP-SETUP.md is.
+#
+# It fails closed on the case that matters: a CLAUDE.md.generated the user wrote, in a project whose
+# CLAUDE.md is absent or already carries the markers, satisfies neither half, gets no row, and
+# uninstall.sh never touches it. What this cannot defend against — as with the `cp` behind
+# manifest.json.bak — is the `mv` above overwriting such a file before anything asks whose it was.
+# That is older than this row and is not addressed here; by the time ownership is decided the user's
+# bytes are already gone and the file on disk is byte-for-byte ours.
+#
+# The mode is read off the file rather than written down as 644: `mv` from mktemp carries 0600
+# across, so this row records 600 where .mcp.json's records 644, and a hardcoded 644 here would be a
+# receipt that disagrees with its own file. (Nothing reads the column today; that is not a reason to
+# write something false into it.)
+if [ "$CLAUDE_MD_BRANCH" = separate ] || owned_by_installer 'CLAUDE.md.generated' ''; then
+  printf 'CLAUDE.md.generated\t%s\t%s\ttoolkit\n' \
+    "$(sha_of "$PROJECT_DIR/CLAUDE.md.generated")" \
+    "$(stat -c '%a' "$PROJECT_DIR/CLAUDE.md.generated" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+fi
+
 # ── Step 7: .gitignore ───────────────────────────────────────────────────────
 #
 # Ask git what it already ignores rather than grepping for our exact lines. A project that ignores

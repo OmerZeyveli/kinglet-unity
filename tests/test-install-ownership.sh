@@ -66,12 +66,26 @@
 #      appears in the run's `keeping yours` list and nowhere else — while a stale, untouched
 #      sibling is still replaced with the bytes this toolkit ships.
 #
+# States I–I5 are the FOURTH project-root file, CLAUDE.md.generated, and they are the first here
+# whose subject has no shipped copy to compare against — it is generated per project, so only the
+# previous receipt and the knowledge that this run wrote it can answer for it. J is not a new file:
+# it is E's file, asserting that a single run passing BOTH --with-* flags produces exactly one row.
+# Their own header sits above the states; this list is the index.
+#
+#   I   the `separate` branch writes it          row present, uninstall removes it
+#   I2  the same, installed twice                row present, uninstall removes it
+#   I3  the user's own, branch never runs        NO row,      uninstall leaves it
+#   I4  ours, then a run that never touches it   row present, uninstall removes it
+#   I5  the user edits ours, then such a run     NO row,      uninstall leaves it
+#   J   both --with-* flags, one run             exactly ONE Packages/manifest.json.bak row
+#
 # WHAT THIS FILE CANNOT SEE
-#   * Named paths, not an enumeration. A–D assert MCP-SETUP.md and .mcp.json; E and F assert
-#     Packages/manifest.json.bak. A FOURTH unrecorded project-root write would be invisible here by
-#     construction, because nothing in this file walks the project and asks what appeared — every
-#     assertion names its path in advance. Catching that class needs a guard whose oracle is the
-#     filesystem before and after a run, which is a different test from this one.
+#   * Named paths, not an enumeration. A–D assert MCP-SETUP.md and .mcp.json; E, F and J assert
+#     Packages/manifest.json.bak; I–I5 assert CLAUDE.md.generated. A FIFTH unrecorded project-root
+#     write would be invisible here by construction, because nothing in this file walks the project
+#     and asks what appeared — every assertion names its path in advance. Catching that class needs
+#     a guard whose oracle is the filesystem before and after a run, which is a different test from
+#     this one.
 #   * State G edits three payload files — Markdown, a hook, settings.json — because ONE was not
 #     enough: with a single .md file here, a classifier mutated to protect only `.md` passed this
 #     whole file with zero failures while deleting a user's edited hook and settings.json. What it
@@ -81,18 +95,20 @@
 #     and nothing reads it); and any payload file whose content is binary. What the INSTALLER does
 #     to a `.claude/` payload file across upgrades is tests/test-install.sh's and
 #     tests/test-install-prune.sh's ground, not this file's.
-#   * Every state installs against the default (urp) fixture. A–D, G and H pass no flag but `--yes`,
-#     and their fixtures are NOT git repositories, so every branch that turns on
-#     `git -C "$PROJECT_DIR"` takes its no-git side there. E and F are the only states that pass
-#     `--with-mcp`, and F the only one that builds a real git repository. `--purge` is exercised in
-#     state G and nowhere else; `--with-input-system`, `--dry-run` and `--keep-local` nowhere at all.
+#   * Every state but J installs against the default (urp) fixture; J is the only one that builds a
+#     `--variant builtin` project, and the only one that passes `--with-input-system`. A–D, G, H and
+#     I–I5 pass no flag but `--yes`, and no fixture here is a git repository except F's, so every
+#     branch that turns on `git -C "$PROJECT_DIR"` takes its no-git side everywhere else. `--purge`
+#     is exercised in state G and nowhere else; `--dry-run` and `--keep-local` nowhere at all.
 #   * E and F use --with-mcp rather than --with-input-system because the urp fixture already carries
-#     com.unity.inputsystem, so that flag returns early and writes no backup. Two consequences are
-#     unmeasured here: BOTH flags in one run against a project missing both packages, where the
-#     second `cp` overwrites the first backup and the surviving .bak is no longer the pre-install
-#     manifest; and a user's own Packages/manifest.json.bak on a run that DOES pass a --with-* flag,
-#     where install.sh's `cp` overwrites it before anything asks whose it was. E3 covers only the
-#     other half of that second case — the plain install, which never reaches the `cp`.
+#     com.unity.inputsystem, so that flag returns early and writes no backup. J is the state where
+#     both callers do reach the backup branch, and it asserts the ROW CARDINALITY only. What is
+#     still unmeasured there: the second `cp` overwrites the first backup, so the surviving .bak is
+#     the manifest as it stood after the first edit rather than before the run — measured by hand
+#     2026-08-13, asserted nowhere. Also unmeasured: a user's own Packages/manifest.json.bak on a run
+#     that DOES pass a --with-* flag, where install.sh's `cp` overwrites it before anything asks
+#     whose it was. E3 covers only the other half of that case — the plain install, which never
+#     reaches the `cp`.
 #   * Of the malformed receipts a mangled origin column can produce, only ONE shape is asserted
 #     (G.5: a trailing space). A fifth column and a CRLF line ending take the same catch-all branch
 #     by construction, but they are reasoned about, not measured, here.
@@ -983,6 +999,255 @@ if [ -n "$H_WRITTEN" ] && [ "$((H_WRITTEN + H_KEPT))" = "$H_CLAUDE_ROWS" ]; then
 else
   fail "H.5: written '${H_WRITTEN:-<unparsed>}' + kept $H_KEPT does not equal the $H_CLAUDE_ROWS .claude receipt rows — a file was counted twice or not at all"
 fi
+
+# ── States I…I5: CLAUDE.md.generated ─────────────────────────────────────────
+# The fourth project-root file, and the one states A–F were structurally unable to see: every
+# assertion above names its path in advance, and nothing here walks the project asking what
+# appeared. It is written by ONE of the four paths through install.sh's CLAUDE.md block — the one
+# taken when the user already has a CLAUDE.md of their own with no generated markers — announced
+# by `wrote CLAUDE.md.generated instead`, pointed at by the "Next steps" summary, and until
+# 2026-08-13 recorded by nothing. uninstall.sh removes only receipt-listed paths, so it was
+# permanent debris in exactly the projects that already had a CLAUDE.md worth not overwriting.
+#
+# WHICH BRANCH EACH FIXTURE TAKES IS ASSERTED, NOT ASSUMED, for the reason E and F assert theirs:
+# the four paths differ only in the content of a file the fixture sets up, and a fixture that drifts
+# into the wrong one turns every assertion below it green against a branch that never ran.
+#
+# THIS FILE HAS NO SHIPPED COPY. MCP-SETUP.md and .mcp.json are compared against the toolkit's own
+# bytes; CLAUDE.md.generated is generated per project from that project's Unity version, packages
+# and provider, so install.sh passes '' as the reference and owned_by_installer's first arm is
+# skipped by construction. Two things answer for it instead, and the states below are split so that
+# each one is exercised alone:
+#
+#   I    fresh install, the `separate` branch          row present, uninstall removes it
+#   I2   the same, installed twice                     row present, uninstall removes it
+#   I3   the user's own file, the branch never runs    NO row,      uninstall leaves it
+#   I4   ours, then a run that does NOT touch it       row present, uninstall removes it
+#   I5   the user edits ours, then such a run          NO row,      uninstall leaves it
+#
+# I4 is B's shape for this file and it is the only state here that reaches the receipt half of the
+# ownership test alone: install 1 takes `separate` with no previous receipt to consult, so run 1 is
+# answered by the branch and nothing else, and a second install taking `separate` again is answered
+# by the branch again. Only a run that leaves the file alone — the user took the block's own advice
+# and added the markers to their CLAUDE.md, so every later run takes `refreshed` — can ask the
+# receipt. Delete the receipt half and I4 is the state that goes red.
+#
+# I5 is D's shape: the row is renewed only while the file still carries the checksum the receipt
+# recorded. The user filling in the FILL: markers is not a hypothetical edit here — it is step 2 of
+# the summary this installer prints.
+#
+# WHAT THESE STATES CANNOT SEE
+#   * The `mv` that writes this file overwrites whatever was at that path, so a CLAUDE.md.generated
+#     the user wrote is destroyed BEFORE any ownership question is asked — and the row that follows
+#     then correctly claims a file that is byte-for-byte ours. I3 therefore fixes its fixture in the
+#     two shapes where the branch does not run at all; the shape where it does run is the same
+#     unaddressed overwrite as the `cp` behind manifest.json.bak, one file over, and no assertion
+#     here can distinguish it from an ordinary fresh write.
+#   * The generator's own output. Every state below treats it as opaque bytes; that it is
+#     deterministic for a fixed project is relied on by I2 (which expects the same checksum twice)
+#     and asserted nowhere.
+#   * A generation FAILURE on run 2, where the block prints `CLAUDE.md generation failed — skipped.`
+#     and leaves run 1's file in place. That path reaches the same receipt half I4 covers, by a
+#     different route, and is not built here.
+CLAUDE_GEN_REL='CLAUDE.md.generated'
+SEPARATE_NEEDLE='wrote CLAUDE.md.generated instead'
+MARKED_CLAUDE_MD='# My Own Game
+
+SENTINEL-USER-PROSE-I
+
+<!-- kinglet:generated:begin -->
+<!-- kinglet:generated:end -->'
+
+assert_separate_branch() {
+  local label="$1"
+  if grep -qF -- "$SEPARATE_NEEDLE" <<< "$INSTALL_OUT"; then
+    pass "$label: the run took the branch that writes $CLAUDE_GEN_REL"
+  else
+    fail "$label: the run never announced '$SEPARATE_NEEDLE' — it took one of the other three CLAUDE.md paths, and every assertion below it is about a file this run did not write"
+  fi
+}
+
+assert_not_separate_branch() {
+  local label="$1"
+  if grep -qF -- "$SEPARATE_NEEDLE" <<< "$INSTALL_OUT"; then
+    fail "$label: the run announced '$SEPARATE_NEEDLE' — it wrote over the user's own $CLAUDE_GEN_REL, so this state is no longer testing a file the installer did not write"
+  else
+    pass "$label: the run did not take the branch that writes $CLAUDE_GEN_REL"
+  fi
+}
+
+# ── State I: the user's own marker-less CLAUDE.md, one install ───────────────
+I="$(new_fixture state-i)"
+printf '# My Own Game\n\nSENTINEL-USER-PROSE-I\n' > "$I/CLAUDE.md"
+I_MD_SHA="$(sha_of "$I/CLAUDE.md")"
+run_install_flags "$I" "I install 1"
+assert_separate_branch "I (fresh install)"
+if [ -f "$I/$CLAUDE_GEN_REL" ]; then
+  pass "I: $CLAUDE_GEN_REL is on disk after the install"
+else
+  fail "I: $CLAUDE_GEN_REL is not on disk — there is nothing here for a receipt row to own"
+fi
+assert_owned "$I" "$CLAUDE_GEN_REL" "I (fresh install)"
+# The user's own CLAUDE.md is the file this whole branch exists to protect, and a row that reached
+# one dot-suffix too far would take it.
+assert_not_owned "$I" 'CLAUDE.md' "I (the user's own CLAUDE.md)"
+run_uninstall "$I" "I"
+assert_gone "$I" "$CLAUDE_GEN_REL" "I (fresh install)"
+assert_kept "$I" 'CLAUDE.md' "$I_MD_SHA" "I (the user's own CLAUDE.md)"
+
+# ── State I2: the same, installed twice ──────────────────────────────────────
+I2="$(new_fixture state-i2)"
+printf '# My Own Game\n\nSENTINEL-USER-PROSE-I\n' > "$I2/CLAUDE.md"
+I2_MD_SHA="$(sha_of "$I2/CLAUDE.md")"
+run_install_flags "$I2" "I2 install 1"
+assert_separate_branch "I2 (install 1)"
+run_install_flags "$I2" "I2 install 2"
+assert_separate_branch "I2 (install 2)"
+assert_owned "$I2" "$CLAUDE_GEN_REL" "I2 (second install)"
+run_uninstall "$I2" "I2"
+assert_gone "$I2" "$CLAUDE_GEN_REL" "I2 (second install)"
+assert_kept "$I2" 'CLAUDE.md' "$I2_MD_SHA" "I2 (the user's own CLAUDE.md)"
+
+# ── State I3: a CLAUDE.md.generated the USER wrote ───────────────────────────
+# The fail-closed direction, and the one where a mistake deletes something the installer never made.
+# Two shapes, because the branch must not run in either and it is skipped for two different reasons:
+#
+#   absent   — no CLAUDE.md at all, so the installer writes CLAUDE.md and never looks at .generated
+#   markers  — a CLAUDE.md carrying the markers, so the installer refreshes it in place
+#
+# In both, nothing this run knows can distinguish the user's file from one of ours except the
+# previous receipt, which has no row for it. Two installs each, because "no row" is also what the
+# unfixed installer produces, and a state that is right for the wrong reason on run 1 is
+# indistinguishable from one that is right.
+for i3_shape in absent markers; do
+  I3="$(new_fixture "state-i3-$i3_shape")"
+  if [ "$i3_shape" = absent ]; then
+    rm -f "$I3/CLAUDE.md"
+  else
+    printf '%s\n' "$MARKED_CLAUDE_MD" > "$I3/CLAUDE.md"
+  fi
+  printf 'My own notes, in a file I named myself. SENTINEL-I3-MINE\n' > "$I3/$CLAUDE_GEN_REL"
+  I3_SHA="$(sha_of "$I3/$CLAUDE_GEN_REL")"
+
+  run_install_flags "$I3" "I3/$i3_shape install 1"
+  assert_not_separate_branch "I3/$i3_shape (install 1)"
+  assert_not_owned "$I3" "$CLAUDE_GEN_REL" "I3/$i3_shape (after install 1)"
+
+  run_install_flags "$I3" "I3/$i3_shape install 2"
+  assert_not_separate_branch "I3/$i3_shape (install 2)"
+  assert_not_owned "$I3" "$CLAUDE_GEN_REL" "I3/$i3_shape (after install 2)"
+
+  run_uninstall "$I3" "I3/$i3_shape"
+  assert_kept "$I3" "$CLAUDE_GEN_REL" "$I3_SHA" "I3/$i3_shape"
+done
+
+# ── State I4: ours, then a run that never touches it ─────────────────────────
+# The user does exactly what install.sh told them to — "add the markers to let us refresh in place"
+# — so run 2 takes `refreshed` and the file run 1 wrote is not touched by anything. The branch
+# cannot answer for it; only the previous receipt can.
+I4="$(new_fixture state-i4)"
+printf '# My Own Game\n\nSENTINEL-USER-PROSE-I\n' > "$I4/CLAUDE.md"
+run_install_flags "$I4" "I4 install 1"
+assert_separate_branch "I4 (install 1)"
+assert_owned "$I4" "$CLAUDE_GEN_REL" "I4 (after install 1)"
+I4_GEN_SHA="$(sha_of "$I4/$CLAUDE_GEN_REL")"
+printf '%s\n' "$MARKED_CLAUDE_MD" > "$I4/CLAUDE.md"
+
+run_install_flags "$I4" "I4 install 2"
+assert_not_separate_branch "I4 (install 2 refreshes CLAUDE.md in place)"
+if [ "$(sha_of "$I4/$CLAUDE_GEN_REL")" = "$I4_GEN_SHA" ]; then
+  pass "I4: install 2 left $CLAUDE_GEN_REL byte-for-byte as install 1 wrote it"
+else
+  fail "I4: install 2 rewrote $CLAUDE_GEN_REL — the state's premise is that nothing touched it, and the receipt half of the ownership test is not what answered here"
+fi
+assert_owned "$I4" "$CLAUDE_GEN_REL" "I4 (a run that never touched the file)"
+run_uninstall "$I4" "I4"
+assert_gone "$I4" "$CLAUDE_GEN_REL" "I4 (a run that never touched the file)"
+
+# ── State I5: the user edits ours, then such a run ───────────────────────────
+# Filling in the FILL: markers is step 2 of the summary this installer prints. After install 1 the
+# receipt records the file as `toolkit`, so an ownership test that reads only "was it in the last
+# receipt?" renews the claim and uninstall.sh deletes the work the installer asked for.
+I5="$(new_fixture state-i5)"
+printf '# My Own Game\n\nSENTINEL-USER-PROSE-I\n' > "$I5/CLAUDE.md"
+run_install_flags "$I5" "I5 install 1"
+assert_separate_branch "I5 (install 1)"
+assert_owned "$I5" "$CLAUDE_GEN_REL" "I5 (before the user's edit)"
+printf '\nI filled these in by hand. SENTINEL-I5-MY-WORK\n' >> "$I5/$CLAUDE_GEN_REL"
+I5_SHA="$(sha_of "$I5/$CLAUDE_GEN_REL")"
+printf '%s\n' "$MARKED_CLAUDE_MD" > "$I5/CLAUDE.md"
+
+run_install_flags "$I5" "I5 install 2"
+assert_not_separate_branch "I5 (install 2 refreshes CLAUDE.md in place)"
+assert_not_owned "$I5" "$CLAUDE_GEN_REL" "I5 (edited, then reinstalled)"
+run_install_flags "$I5" "I5 install 3"
+assert_not_owned "$I5" "$CLAUDE_GEN_REL" "I5 (edited, then reinstalled twice)"
+run_uninstall "$I5" "I5"
+assert_kept "$I5" "$CLAUDE_GEN_REL" "$I5_SHA" "I5"
+
+# ── State J: both --with-* flags in one run, one backup, one row ─────────────
+# Not a new file — this is E's file and Task 2's placement decision, asserted. install.sh calls
+# add_manifest_dependency once per --with-* flag, and BOTH can reach the branch that keeps the
+# backup in a single run against a project missing both packages. The row is therefore written once,
+# after both callers, rather than inside the branch. Moving it back inside is the tidying refactor a
+# later reader makes, and nothing measured the consequence: two rows for one path, disagreeing on
+# the checksum, at which point uninstall.sh classifies them separately, prints `keep 1 file(s) you
+# modified` naming the file, and removes it in the same run. Measured on a scratch copy 2026-08-13.
+#
+# Nothing else in this file passes --with-input-system, and nothing else uses the builtin variant:
+# the urp fixture already carries com.unity.inputsystem, so that flag returns early there and only
+# one caller ever reaches the backup.
+new_fixture_variant() {
+  local d="$SCRATCH/$1"
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" --variant "$2" >/dev/null
+  printf '%s' "$d"
+}
+
+J="$(new_fixture_variant state-j builtin)"
+if git -C "$J" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  fail "J: the fixture is inside a git work tree — install.sh would delete the backup instead of keeping it, and 'exactly one row' would hold because there are none"
+else
+  pass "J: the fixture is not under git, so install.sh must keep the backup it makes"
+fi
+# Both packages absent is the precondition. With either already present its caller returns early,
+# only one reaches the backup branch, and the cardinality below is one for a reason that has nothing
+# to do with where the row is written.
+# `if`, not `cmd && var=1`: a false test makes the whole AND-list exit 1, and as a top-level command
+# under `set -e` that ends the file rather than setting the variable to 0 it already holds.
+J_PRE_MCP=0; J_PRE_INPUT=0
+if grep -qF -- 'com.coplaydev.unity-mcp' "$J/$MANIFEST_REL"; then J_PRE_MCP=1; fi
+if grep -qF -- 'com.unity.inputsystem' "$J/$MANIFEST_REL"; then J_PRE_INPUT=1; fi
+if [ "$J_PRE_MCP" -eq 0 ] && [ "$J_PRE_INPUT" -eq 0 ]; then
+  pass "J: the fixture's manifest carries neither package, so both callers reach the backup branch"
+else
+  fail "J: the fixture's manifest already carries one of the two packages (mcp=$J_PRE_MCP inputsystem=$J_PRE_INPUT) — one caller returns early and this state proves nothing about two"
+fi
+
+run_install_flags "$J" "J install" --with-mcp --with-input-system
+# Two announcements, one per caller. Counted rather than matched, because one is what the state is
+# trying to tell apart from two — and `grep -c` on no match exits 1, which under `set -e` would end
+# the file here rather than report.
+J_ANNOUNCED="$(grep -cF -- '(backup: manifest.json.bak)' <<< "$INSTALL_OUT" || true)"
+if [ "$J_ANNOUNCED" = "2" ]; then
+  pass "J: both callers reached the branch that keeps the backup (2 announcements)"
+else
+  fail "J: the run announced a kept backup $J_ANNOUNCED time(s), not 2 — only one caller reached the keep branch, so one row would be correct here for the wrong reason"
+fi
+if [ -f "$J/$MANIFEST_BAK_REL" ]; then
+  pass "J: $MANIFEST_BAK_REL is on disk after the run"
+else
+  fail "J: $MANIFEST_BAK_REL is not on disk — nothing here for a row to claim"
+fi
+# The count is extracted and compared as a number. A needle like '1 row' also matches '11 rows'.
+J_ROWS="$(awk -F'\t' -v want="$MANIFEST_BAK_REL" '$1 == want { n++ } END { print n + 0 }' "$(receipt_of "$J")")"
+if [ "$J_ROWS" = "1" ]; then
+  pass "J: the receipt carries exactly one $MANIFEST_BAK_REL row"
+else
+  fail "J: the receipt carries $J_ROWS rows for $MANIFEST_BAK_REL — one path claimed more than once, and uninstall.sh reads them as separate files"
+fi
+# Cardinality alone would be satisfied by one STALE row. The surviving row must describe the file
+# that survived.
+assert_owned "$J" "$MANIFEST_BAK_REL" "J (both flags in one run)"
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-ownership assertions passed\n'
