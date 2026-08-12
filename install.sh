@@ -304,6 +304,24 @@ if [ "$DRY_RUN" -eq 1 ]; then
   else
     printf '  .mcp.json exists without unityMCP/UnityMCP — would print the block, not rewrite\n'
   fi
+
+  # Report the MCP-SETUP.md branch too, and for the reason directly above: Step 8c copies it into the
+  # project root, records it in the receipt as toolkit-owned, and this block said nothing about it —
+  # so the dry run silently under-described a write landing outside .claude/, where a user is least
+  # expecting one. That step exists because the summary once pointed at a file the installer never
+  # installed; the install half was fixed and the consent half was left open.
+  #
+  # The copy is conditional — it never overwrites a file the user already has — so an unconditional
+  # line here would promise a file the real run skips: this block's own bug in mirror image. The
+  # condition is the same one Step 8c tests, read against $PROJECT_DIR the way the CLAUDE.md branch
+  # above does ($MCP_SETUP_MD is not defined until the real-run path, which we never reach here).
+  if [ -f "$SCRIPT_DIR/MCP-SETUP.md" ]; then
+    if [ ! -f "$PROJECT_DIR/MCP-SETUP.md" ]; then
+      printf '  MCP-SETUP.md (new — the MCP bridge setup guide)\n'
+    else
+      printf '  MCP-SETUP.md — yours exists, so it is NOT touched\n'
+    fi
+  fi
   printf '\nDry run complete — nothing written.\n'
   exit 0
 fi
