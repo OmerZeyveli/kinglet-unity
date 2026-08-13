@@ -63,12 +63,11 @@
 #   * ANYTHING OUTSIDE THE FOUR ROOTS. tests/ is unswept — including tests/fixtures/mkproject.sh,
 #     which the same commit as this file makes match the needle, and which is an INPUT rather than a
 #     verdict producer. templates/, tools/, docs/ and every other repo-root file are unswept too.
-#   * ANYTHING UNDER .claude/state/, excluded by name. That is machine-local runtime state the
-#     installer writes and .gitignore excludes, and it is a live hazard rather than a theoretical
-#     one: measured 2026-08-13, the untracked .claude/state/session-edits.txt and session.json on
-#     this machine ALREADY match sweep B's needle. Without the exclusion sweep B would be red here
-#     and green on a fresh clone — a flake whose obvious "fix" is to widen the allow-list, which
-#     would then hide the thing the allow-list exists to surface.
+#   * A NEW IMPLEMENTATION FILE THAT HAS NEVER BEEN `git add`ed. All three sweeps index by
+#     `git ls-files`, so an untracked file is outside them — deliberately, and see the long note at
+#     `sweep` for why the working-tree walk this replaced was worse. The window is "written but never
+#     staged", it closes the moment the file is staged, and it is the same window
+#     check-provenance.sh's orphan check has.
 #
 # SWEEP B (closed caller set):
 #   * A CALLER THAT KEEPS THE NAME AND DROPS THE CALL. A comment or a stale doc line mentioning
@@ -85,18 +84,14 @@
 #     voice, and the voice's accuracy is the subject of detect-pipeline.sh's own header.
 #   * ONLY THE PIPELINE NAMES ARE READ. A surface could reword its sentence into nonsense and stay
 #     green so long as it still names the right pipelines and no others.
-#   * IT CANNOT SEE THE ROUTING'S *SOURCE*, ONLY ITS OUTCOME — measured, not assumed. Reverting
-#     suggest_skills to the `case "$RENDER_PIPELINE" in *URP*)` prose glob the shared detector
-#     removed produces ZERO reds here: against today's four display strings that glob happens to
-#     give the same answer as the token for all four tokens, so the coupling is invisible while the
-#     prose agrees. It becomes visible the moment the prose diverges — the same mutation plus one
-#     innocent rewording of the HDRP string to "…(HDRP), not URP" reddens the hdrp fixture twice,
-#     on the cell and on the routing. So this file catches the CONSEQUENCE of prose coupling and not
-#     the coupling itself, which is the very "agreement on the easy case is worth nothing" problem
-#     it was written about, one level up. Asserting the source would mean asserting the SHAPE of one
-#     line of generate-claude-md.sh — a change-detector that reddens on innocent refactors — and the
-#     judgement recorded here is that the outcome guard plus that script's own comment is the better
-#     trade. It is recorded rather than closed so the next person can retake the decision.
+#   * THE ROUTING ASSERTION HAS NO INDEPENDENT POWER AGAINST PROSE COUPLING — measured, and this is
+#     a correction to what this comment said when the file was written. It claimed Part C caught the
+#     "consequence" of the coupling if not the coupling itself. It does not catch even that: the
+#     routing check can never fire ALONE, because `assert_names` reads which pipeline names the cell
+#     string contains and the `*URP*` glob tests the same string, so anything that breaks the glob
+#     has already moved the cell's name set. Three measurements: glob alone → 0; the HDRP reword
+#     alone → 1, on the CELL; both → 2, of which one is the cell's. Sweep C above is what actually
+#     guards this, and it exists because of that measurement rather than instead of it.
 #   * ONLY `--dry-run --yes` IS EXERCISED. No --with-mcp, no --with-input-system, no interactive
 #     branch. install.sh computes RENDER_PIPELINE once, before the dry-run block, so the real run
 #     reaches the same value — but that is read off the code, not asserted here, and a SECOND
@@ -143,25 +138,84 @@ trap 'rm -rf "$SCRATCH"' EXIT
 # `grep`, not `/usr/bin/grep`. The ugrep-wrapping shell FUNCTION that makes an unescaped `$`
 # mid-pattern behave differently is an INTERACTIVE-shell thing; run-tests.sh sources this file into
 # a subshell of a non-interactive `bash tests/run-tests.sh`, which loads no rc file, so `grep` here
-# is the binary. -F besides, so the needle is a literal and no regex dialect can differ over it.
+# is the binary. -F besides, so the needle is a literal and no regex dialect can differ over it —
+# which also matters for sweep C, whose needle carries a `$` mid-pattern.
+#
+# THE FILE LIST COMES FROM `git ls-files`, NOT FROM `grep -r`, and that is a correction rather than a
+# preference. A recursive walk reads the WORKING TREE, so any untracked or gitignored file under the
+# roots can flip the verdict on one machine and not another. The first instance was found by
+# measurement (.claude/state/session-edits.txt matches sweep B's needle on this machine) and was
+# patched with `--exclude-dir=state`; the SECOND instance showed that patch was treating an instance
+# as if it were the class. Measured: writing
+#     {"permissions":{"allow":["Bash(bash scripts/detect-pipeline.sh:*)"]}}
+# to .claude/settings.local.json — ignored at .gitignore:43, so invisible to review, and exactly the
+# permission entry this wave's own work invites — reddened sweep B while the repository was
+# unchanged. Indexing by `git ls-files` closes the class, and retires the state/ exclusion with it:
+# the only tracked path under .claude/state/ is .gitkeep.
+#
+# WHAT THAT TRADE COSTS, stated because it is real. The sweep now enumerates TRACKED PATHS and reads
+# their WORKING-TREE CONTENT, so a tracked file edited but not committed IS seen — which is what a
+# pre-commit guard must do. What is now invisible is a NEW implementation file that has never been
+# `git add`ed. That is the same blind spot every other guard in this repository has:
+# check-provenance.sh's orphan check reads `git ls-files` too, so an unstaged new file is outside the
+# whole apparatus, not just this test. The window is "written but never staged", and it closes the
+# moment the file is staged — `git ls-files` lists staged-but-uncommitted paths.
 SWEEP_ERR="$SCRATCH/sweep.err"
+SWEEP_LIST="$SCRATCH/sweep.list"
 SWEEP_OUT=""
 SWEEP_RC=0
+
+# Reserved rc values above grep's own 0/1/2, so a broken index is distinguishable from a broken grep.
+SWEEP_RC_NO_INDEX=90
+SWEEP_RC_EMPTY_INDEX=91
+
 sweep() {
   SWEEP_RC=0
-  # `cd "$REPO" && grep … | sort` parses as `cd && (grep | sort)`: `|` binds tighter than `&&`.
-  # `sort` drains its input to the end, so it cannot SIGPIPE the grep under pipefail.
-  SWEEP_OUT="$(cd "$REPO" && grep -rlF --exclude-dir=state -- "$1" \
-      .claude/ scripts/ install.sh uninstall.sh 2>"$SWEEP_ERR" | LC_ALL=C sort)" || SWEEP_RC=$?
+  SWEEP_OUT=""
+  # NUL-delimited, so a path containing a space or a newline cannot split. The list goes to a FILE
+  # rather than through `$(...)`: command substitution strips NUL bytes, which would silently undo
+  # the -z that makes this safe.
+  if ! ( cd "$REPO" && git ls-files -z -- .claude/ scripts/ install.sh uninstall.sh ) \
+       > "$SWEEP_LIST" 2>"$SWEEP_ERR"; then
+    SWEEP_RC=$SWEEP_RC_NO_INDEX
+    return 0
+  fi
+  if [ ! -s "$SWEEP_LIST" ]; then
+    SWEEP_RC=$SWEEP_RC_EMPTY_INDEX
+    return 0
+  fi
+
+  # NOT `xargs -0 grep`. Measured: xargs exits 123 when its child exits non-zero, so a perfectly
+  # ordinary "this needle matches nothing" comes back as 123 and is indistinguishable from a real
+  # error in the rc>=2 branch below — sweep C, whose correct answer IS no match, would have been
+  # permanently misreported. Build the argv in bash instead. 91 tracked paths is nowhere near
+  # ARG_MAX, and `${files[@]}` is guarded from `set -u` by the -s test above.
+  local files=() f
+  while IFS= read -r -d '' f; do files+=("$f"); done < "$SWEEP_LIST"
+
+  # `--` before the needle ends option parsing, so neither the needle nor any path starting with a
+  # dash is read as a flag. `sort` drains its input to the end, so it cannot SIGPIPE the grep under
+  # pipefail. A tracked path deleted from disk makes grep exit 2 here, which is the loud direction.
+  SWEEP_OUT="$(cd "$REPO" && grep -lF -- "$1" "${files[@]}" 2>"$SWEEP_ERR" | LC_ALL=C sort)" \
+    || SWEEP_RC=$?
 }
 
-# $1 = human label, $2 = needle, $3 = newline-separated allow-list.
+# $1 = human label, $2 = needle, $3 = newline-separated allow-list (EMPTY means "no file may match").
 assert_sweep() {
   local label="$1" needle="$2" allow="$3" want got
   sweep "$needle"
-  # rc 0 = matched, 1 = matched nothing, 2+ = the sweep itself broke (a renamed root, an
-  # --exclude-dir this grep does not support, no grep at all). A broken sweep must be loud: silently
-  # treating it as "no matches" is how a guard becomes a no-op that reports green.
+  # rc 0 = matched, 1 = matched nothing, 2+ = the sweep itself broke: a renamed root, a tracked path
+  # missing from disk, no git, no grep. A broken sweep must be loud — silently treating it as "no
+  # matches" is how a guard becomes a no-op that reports green, and with an empty allow-list that
+  # no-op would report green FOR THE RIGHT-LOOKING REASON.
+  if [ "$SWEEP_RC" -eq "$SWEEP_RC_NO_INDEX" ]; then
+    fail "$label: could not list tracked files under the roots, so the sweep for '$needle' read nothing and its silence means nothing: $(tr '\n' ' ' < "$SWEEP_ERR")"
+    return 0
+  fi
+  if [ "$SWEEP_RC" -eq "$SWEEP_RC_EMPTY_INDEX" ]; then
+    fail "$label: git tracks no files at all under .claude/ scripts/ install.sh uninstall.sh — the roots this guard is named for do not exist in the index, so the sweep for '$needle' certified nothing"
+    return 0
+  fi
   if [ "$SWEEP_RC" -ge 2 ]; then
     fail "$label: the sweep for '$needle' exited $SWEEP_RC instead of searching — it read nothing, so its silence means nothing: $(tr '\n' ' ' < "$SWEEP_ERR")"
     return 0
@@ -169,7 +223,11 @@ assert_sweep() {
   want="$(printf '%s\n' "$allow" | LC_ALL=C sort)"
   got="$SWEEP_OUT"
   if [ "$got" = "$want" ]; then
-    pass "$label: exactly the allow-listed path(s) name '$needle' under the four roots — $(printf '%s' "$got" | tr '\n' ' ')"
+    if [ -z "$want" ]; then
+      pass "$label: no tracked file under the four roots contains '$needle'"
+    else
+      pass "$label: exactly the allow-listed path(s) name '$needle' under the four roots — $(printf '%s' "$got" | tr '\n' ' ')"
+    fi
   else
     fail "$label: the set of files naming '$needle' is not the allow-list. Expected [$(printf '%s' "$want" | tr '\n' ' ')] and observed [$(printf '%s' "$got" | tr '\n' ' ')]. A path that appeared is a second implementation or a new caller and needs a decision; a path that vanished means this guard just stopped reading what it claims to."
   fi
@@ -197,6 +255,35 @@ assert_sweep 'closed caller set' 'detect-pipeline' '.claude/commands/unity-init.
 install.sh
 scripts/detect-pipeline.sh
 scripts/generate-claude-md.sh'
+
+# ── Sweep C: no decision is derived from the DISPLAY STRING ──────────────────
+#
+# ALLOW-LIST C IS EMPTY. No tracked file under the roots may branch on $RENDER_PIPELINE, because that
+# variable is PROSE — a display string a maintainer may reword — while $RENDER_PIPELINE_ID is the
+# decision. generate-claude-md.sh routed the urp-pipeline skill off `case "$RENDER_PIPELINE" in
+# *URP*)` until the shared detector landed, so rewording a sentence silently rerouted a skill.
+#
+# WHY THIS SWEEP EXISTS RATHER THAN THE OUTCOME CHECK ALONE, and it is a correction to what this file
+# claimed on 2026-08-13. The header used to record that Part C "catches the CONSEQUENCE of prose
+# coupling and not the coupling itself". Measured, that was too generous: Part C's routing assertion
+# has NO INDEPENDENT POWER against this defect at all. `assert_names` reads which pipeline names the
+# cell string contains, and the glob is `*URP*` over that same string — so every divergence that
+# breaks the glob necessarily changes the name set the cell assertion already reads. Reverting the
+# routing to the glob ALONE reddens nothing (measured: 0); rewording the HDRP string alone reddens
+# the CELL (measured: 1); the two together redden 2, of which exactly one is the routing. The routing
+# assertion can never fire alone, so its contribution against prose coupling is zero, not late.
+#
+# The needle is the literal `case "$RENDER_PIPELINE" in`. It does NOT match
+# `case "$RENDER_PIPELINE_ID" in`, which is the correct form and appears in both callers — verified
+# rather than reasoned: the longer needle matches install.sh and generate-claude-md.sh, the shorter
+# one matches nothing.
+#
+# WHAT IT CANNOT SEE, and it is the same cost every sweep here carries: it matches ONE SPELLING of
+# the mistake. `[[ $RENDER_PIPELINE == *URP* ]]`, an `if` chain, a `case` with different spacing, a
+# grep over the display string, or any decision derived from $RENDER_PIPELINE by another route all
+# evade it. It buys the one form the codebase actually had, which is the form a revert or a
+# copy-paste from history would reintroduce.
+assert_sweep 'no prose-derived routing' 'case "$RENDER_PIPELINE" in' ''
 
 # ── Part C: three surfaces, one token ────────────────────────────────────────
 
