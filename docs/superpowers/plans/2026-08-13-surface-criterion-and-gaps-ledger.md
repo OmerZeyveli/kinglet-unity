@@ -204,6 +204,20 @@ stands. It has now gone stale twice.
 - **The interactive `find` is a `bfs 4.1.1` wrapper, the same trap as `grep`→`ugrep`.** Use
   `/usr/bin/find` (GNU 4.9.0) for any behaviour or absence claim. Discovered 2026-08-14 by a
   reviewer measuring real file damage.
+- **`pgrep -f <pattern>` is not a usable wait condition when several agents share a session.** It
+  matches **the waiter's own command line** (which contains the pattern) and **every other agent
+  running the same command**. Measured 2026-08-14: three `until ! pgrep -f 'run-tests.sh'` loops that
+  could never exit, while two other agents' suites ran in their own scratch directories. **A wait
+  that can never finish looks identical to a command that never finished.** Block on the command's
+  own completion, never on a process-name probe.
+- **"A probe that dies reports nothing" has now been measured three times this wave, in three
+  different disguises**, and every one produced a **clean zero** that a careless reader would have
+  believed: a reviewer's `perl -pi -e` without `/g` landing in a comment (`325 PASS / 0 FAIL` —
+  reads as *the guard is hollow*); an implementer's helper killed by `set -u` because **bash expands
+  all `local` arguments before performing any assignment**, so `local name="$1" d="$SCRATCH/$name"`
+  took `$name` from the enclosing scope (`374 PASS, 0 FAIL, exit 1`, with two whole states simply
+  absent); and a guard dying `rc=128` in an archive copy having asserted 14 of 47 with **no `FAIL`
+  token at all**. **The exit code is the only one of the three signals that survives all three.**
 - **Every dispatch gets its own `mktemp -d` scratch root, and no shared temp path.** Round 5 of Task 2
   had its `probe.sh` and `mutate.sh` replaced mid-task by another agent writing to a shared
   scratchpad, and the measurements it took afterwards were of the other agent's harness.
