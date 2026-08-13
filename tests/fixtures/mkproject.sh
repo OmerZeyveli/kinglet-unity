@@ -6,7 +6,7 @@
 # the installer scans is plain text, so a directory with the right shape exercises it fully.
 #
 # Usage:
-#   ./tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed]
+#   ./tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed|hdrp|both]
 #
 #   urp      (default) URP + Input System + UniTask + VContainer, one asmdef, one scene
 #   builtin  Built-in pipeline, minimal packages
@@ -14,11 +14,21 @@
 #   dirty    urp + a pre-existing CLAUDE.md and .claude/, for the upgrade/guard paths
 #   legacy   URP, no VContainer/MessagePipe/UniTask, coroutine-using scripts — the "does not bind" path
 #   async-mixed  UniTask named once (in a doc spec) against two coroutine users — the "takes no side" path
+#   hdrp     HDRP only — the pipeline token no fixture produced until 2026-08-13
+#   both     URP *and* HDRP present — the token neither pre-detector implementation had at all
+#
+# WHY `hdrp` AND `both` EXIST. Until 2026-08-13 every fixture here produced one of two pipeline
+# tokens, `urp` or `builtin`. install.sh and scripts/generate-claude-md.sh each carried their own
+# copy of the detection, and the two DISAGREED — install.sh's unconditional greps let HDRP win,
+# generate-claude-md.sh's if/elif let URP win — yet the whole suite stayed green, because no
+# fixture ever reached a manifest where the two could differ. The fixture set, not the code, was
+# what made the defect invisible. These two are the discriminating inputs: `hdrp` separates the two
+# single-pipeline answers, and `both` is the state neither implementation had.
 #
 set -euo pipefail
 
 DIR="${1:-}"; shift || true
-[ -n "$DIR" ] || { echo "usage: mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed]" >&2; exit 2; }
+[ -n "$DIR" ] || { echo "usage: mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed|hdrp|both]" >&2; exit 2; }
 
 VARIANT=urp
 while [ $# -gt 0 ]; do
@@ -91,6 +101,54 @@ public sealed class GameLifetimeScope : LifetimeScope
 }
 CS
     fi
+    ;;
+  hdrp|both)
+    # The pipeline line is the ONLY axis these two vary. Everything else — the Unity version, the
+    # asmdef, the scene, the Input System and VContainer packages, the one first-party .cs file — is
+    # held identical to `urp` on purpose, so a verdict that differs between `urp`, `hdrp` and `both`
+    # can only have come from the pipeline packages. A fixture that varied two things at once could
+    # not carry that inference.
+    #
+    # Deliberately NO com.cysharp.unitask here. The `urp` fixture is the only one that reaches the
+    # generator's `manifest-only` stack state (UniTask in the manifest, absent from source), and its
+    # own comment says so; giving these two the same mix would quietly make that note false.
+    if [ "$VARIANT" = both ]; then
+      # Real, and more common than it sounds: a project renders with one pipeline and carries the
+      # other because a sample, an asset-store package or a half-finished migration pulled it in.
+      # Which one actually renders is recorded in ProjectSettings/GraphicsSettings.asset, which
+      # nothing in this repository reads — so `both` is exactly the case where package presence
+      # cannot answer the question, and the detector says so rather than guessing.
+      PIPELINE_DEPS='    "com.unity.render-pipelines.universal": "17.0.3",
+    "com.unity.render-pipelines.high-definition": "17.0.3",'
+    else
+      PIPELINE_DEPS='    "com.unity.render-pipelines.high-definition": "17.0.3",'
+    fi
+    # Unquoted heredoc delimiter, because $PIPELINE_DEPS must expand. Nothing else in the body is
+    # $-bearing, so there is nothing else to escape.
+    cat > "$DIR/Packages/manifest.json" <<JSON
+{
+  "dependencies": {
+$PIPELINE_DEPS
+    "com.unity.inputsystem": "1.8.2",
+    "jp.hadashikick.vcontainer": "1.16.0"
+  }
+}
+JSON
+    # Same first-party VContainer use the urp fixture carries, for the same reason: with zero .cs
+    # files the generator takes its greenfield early exit and never consults the manifest, so the
+    # stack-detection half of the document would be untested here too.
+    cat > "$DIR/Assets/Scripts/GameLifetimeScope.cs" <<'CS'
+using VContainer;
+using VContainer.Unity;
+
+public sealed class GameLifetimeScope : LifetimeScope
+{
+    protected override void Configure(IContainerBuilder builder)
+    {
+        builder.Register<object>(Lifetime.Singleton);
+    }
+}
+CS
     ;;
   builtin)
     cat > "$DIR/Packages/manifest.json" <<'JSON'
