@@ -76,7 +76,22 @@ if grep -qE "${CMD_START}rm[[:space:]]+-[rRf]+[[:space:]]+${SAME_CMD}(Library|Te
 fi
 
 # .meta deletion/mass-rename — verb must start a command; path must be its argument.
-if grep -qE "${CMD_START}(rm|find)[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
+#
+# `rm` and `find` were one alternation here, and that made every `find` naming `.meta` a
+# deletion. `find` is a search verb: on its own it prints paths and changes nothing.
+# Measured 2026-08-13 — `find Assets -name "*.meta" | wc -l`, a count, was classified
+# meta-deletion and blocked. Command position was never the problem for this pattern; the
+# verb was. `find` deletes only through an action, so require one: -delete, -exec/-execdir/-ok
+# rm, or a pipe into xargs rm. The action is looked for anywhere in the command rather than
+# inside SAME_CMD, because `find … | xargs rm` puts it in the *next* segment by construction.
+DELETE_ACTION='(-delete([[:space:]]|$)|-(exec|execdir|ok)[[:space:]]+rm|xargs[^;&|]*[[:space:]]rm([[:space:]]|$))'
+
+if grep -qE "${CMD_START}rm[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
+    DANGER_KIND="meta-deletion"
+    DANGER_MSG=".meta files hold GUIDs — deleting them silently breaks every reference (scenes, prefabs, ScriptableObjects, AssetReferences)."
+fi
+if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND" \
+    && grep -qE "$DELETE_ACTION" <<< "$COMMAND"; then
     DANGER_KIND="meta-deletion"
     DANGER_MSG=".meta files hold GUIDs — deleting them silently breaks every reference (scenes, prefabs, ScriptableObjects, AssetReferences)."
 fi
@@ -105,15 +120,33 @@ if grep -qE "${CMD_START}(rm|mv|truncate)[[:space:]]+${SAME_CMD}Packages/(manife
 fi
 
 # git destructive ops
-if grep -qE 'git\s+reset\s+--hard' <<< "$COMMAND"; then
+#
+# These three matched their verb ANYWHERE in the command string, which is why the gate
+# blocked the discussion of a destructive command as readily as the command. Measured
+# 2026-08-13: `echo "never run git reset --hard here"` and
+# `git commit -m "docs: warn about git reset --hard"` were both blocked. Anchor them to a
+# command position with the same CMD_START this file already uses for its verb patterns.
+#
+# Deliberately NOT using the permissive SAME_CMD gap between `git` and its subcommand: the
+# commit-message case has `git` in real command position, so `git${SAME_CMD}reset` would
+# match `git commit -m "… about git reset --hard"` and re-open the exact defect. The words
+# allowed between them are flag-shaped only.
+#
+# `git -C <dir>` and `git -c key=value` are the two option forms that legitimately sit
+# before a subcommand. Allowing them closes a false negative (`git -C /repo reset --hard`
+# was permitted) without re-opening the prose one — prose reaching `reset --hard` has
+# ordinary words in that gap, not flags.
+GIT_OPTS='([[:space:]]+-[cC][[:space:]]*[^[:space:];&|]+)*'
+
+if grep -qE "${CMD_START}git${GIT_OPTS}[[:space:]]+reset[[:space:]]+--hard" <<< "$COMMAND"; then
     DANGER_KIND="git-reset-hard"
     DANGER_MSG="git reset --hard discards uncommitted edits AND Unity-generated cached artifacts (.asset cache files). Cannot be undone."
 fi
-if grep -qE 'git\s+clean\s+-[fFdDxX]+' <<< "$COMMAND"; then
+if grep -qE "${CMD_START}git${GIT_OPTS}[[:space:]]+clean[[:space:]]+-[fFdDxX]+" <<< "$COMMAND"; then
     DANGER_KIND="git-clean"
     DANGER_MSG="git clean -fdx deletes untracked files including Library/, potentially .meta files, and local-only assets the team may have asked you to keep."
 fi
-if grep -qE 'git\s+push\s+.*--force(\s|$)|git\s+push\s+.*-f(\s|$)' <<< "$COMMAND"; then
+if grep -qE "${CMD_START}git${GIT_OPTS}[[:space:]]+push${SAME_CMD}(--force|-f)([[:space:]]|$)" <<< "$COMMAND"; then
     if grep -qE '\b(main|master|develop|release)\b' <<< "$COMMAND"; then
         DANGER_KIND="git-force-push-protected"
         DANGER_MSG="Force-pushing to a protected branch rewrites shared history — every teammate's local copy becomes inconsistent."
@@ -124,13 +157,43 @@ if grep -qE 'git\s+push\s+.*--force(\s|$)|git\s+push\s+.*-f(\s|$)' <<< "$COMMAND
 fi
 
 # DB/SQL destructive ops (occasionally used in tooling)
-if grep -qiE '\b(drop\s+table|truncate\s+table|drop\s+database)\b' <<< "$COMMAND"; then
+#
+# CMD_START is the wrong anchor here and applying it would have been worse than leaving the
+# pattern alone: SQL is never in shell command position. Every real invocation passes it as
+# an argument (`psql -c "DROP TABLE users"`) or on stdin, so anchoring the SQL to a command
+# position would have silently turned this classification off — a false negative dressed up
+# as a fix, which is the specific trap this change is guarded against.
+#
+# What separates the act from the text about it is the client. Require a database client to
+# be named somewhere in the command as well. Two independent greps rather than one pattern:
+# the command may be multi-line (a heredoc into psql puts the client and the SQL on
+# different lines), and grep is line-oriented, so a single regex would only match when both
+# halves sit on one line.
+SQL_CLIENT='(^|[^A-Za-z0-9_.-])(psql|mysql|mysqladmin|mariadb|sqlite3|sqlcmd|cockroach|clickhouse-client|duckdb)([^A-Za-z0-9_-]|$)'
+
+if grep -qiE '(drop[[:space:]]+table|truncate[[:space:]]+table|drop[[:space:]]+database)' <<< "$COMMAND" \
+    && grep -qE "$SQL_CLIENT" <<< "$COMMAND"; then
     DANGER_KIND="db-destructive"
     DANGER_MSG="Schema-level destructive SQL. Data loss is immediate and irreversible."
 fi
 
 # PlayerPrefs wipes
-if grep -qE 'defaults\s+delete.*unity|PlayerPrefs\.DeleteAll' <<< "$COMMAND"; then
+#
+# `PlayerPrefs.DeleteAll` was matched anywhere in the command and has been removed, because
+# it is a C# member expression and not a shell command: there is no command position it can
+# occupy, so every Bash command containing it is text ABOUT the wipe — a grep for it, an
+# echo, a commit message. Measured 2026-08-13: `grep -rn 'PlayerPrefs.DeleteAll' Assets/`
+# was blocked as a data wipe, and so was the probe script written to reproduce that, on the
+# strength of the string appearing in a heredoc. Nothing was ever blocked from actually
+# erasing preferences by this alternative, so nothing is lost by dropping it.
+#
+# What replaces it is the two shapes that do erase them from a shell, both anchored:
+#   - macOS: `defaults delete <domain>` where the domain names unity
+#   - Linux: an `rm` under ~/.config/unity3d/<Company>/<Product>/prefs, which is where
+#     PlayerPrefs live on the only host .claude/UPSTREAM claims this toolkit ships for
+# (Windows keeps them in the registry; `reg delete` is not covered.)
+if grep -qE "${CMD_START}defaults[[:space:]]+delete${SAME_CMD}[Uu]nity" <<< "$COMMAND" \
+    || grep -qE "${CMD_START}rm[[:space:]]+${SAME_CMD}unity3d" <<< "$COMMAND"; then
     DANGER_KIND="playerprefs-wipe"
     DANGER_MSG="Wipes persistent user data (saves, settings). Use targeted DeleteKey unless you specifically intend a full reset."
 fi

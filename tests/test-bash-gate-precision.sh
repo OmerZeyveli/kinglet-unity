@@ -69,3 +69,101 @@ assert_eq "2" "$(tbg_run '(rm -rf Library/)')" \
     "still blocks rm -rf Library/ inside a subshell"
 assert_eq "2" "$(tbg_run 'echo x | xargs -I{} rm -f Assets/Player.cs.meta')" \
     "still blocks a .meta deletion reached through xargs"
+
+# ============================================================================================
+# 2026-08-13 — the O1 probes, both directions for every row.
+#
+# WHY THIS FILE DID NOT CATCH THEM. Everything above is one shape: a PATH appearing as data
+# rather than as a target (ProjectSettings/…, *.meta). That is the family that was fixed when
+# this file was written, and it is the only family this file ever sent a payload for. The five
+# patterns that leaked were about a VERB — `git reset --hard`, `git clean`, `git push --force`,
+# destructive SQL, a PlayerPrefs wipe — and not one of them had ever been fed a command here,
+# in either direction. The file was not weak on its subject; its subject was narrower than the
+# hook. A guard's silence is only as wide as what it read.
+#
+# WHY EVERY ROW IS ASSERTED TWICE. An assertion that only proves the prose passes is also
+# satisfied by a gate that blocks nothing whatsoever — deleting the pattern, or the whole
+# hook, would leave it green. The paired "still blocks" assertion is what makes the fix
+# provable rather than merely plausible, because an anchor that is slightly wrong turns a
+# false positive into a false negative and that is the more expensive direction.
+#
+# Every command below is a distinct string on purpose: bash-gate is a two-stage gate keyed on
+# a hash of the whole command, so re-using a string that an earlier assertion already tripped
+# would make the second one pass by memory rather than by classification.
+# ============================================================================================
+
+# --- O1 row 1: prose about the hard reset ---------------------------------------------------
+assert_eq "0" "$(tbg_run 'echo "never run git reset --hard here"')" \
+    "does not block an echo warning against the hard reset"
+assert_eq "2" "$(tbg_run 'git reset --hard HEAD~1')" \
+    "still blocks the hard reset itself"
+assert_eq "2" "$(tbg_run 'cd Assets && git reset --hard')" \
+    "still blocks the hard reset after a control operator"
+assert_eq "2" "$(tbg_run 'git -C /repo reset --hard')" \
+    "still blocks the hard reset behind a git -C option"
+
+# --- O1 row 2: a commit message quoting it --------------------------------------------------
+# The repository's own plans carry a standing instruction to write commit messages to a file
+# and use `git commit -F`, because of this. `git` is in real command position here, which is
+# why the anchor must not put a permissive gap between `git` and its subcommand.
+assert_eq "0" "$(tbg_run 'git commit -m "docs: warn about git reset --hard"')" \
+    "does not block a commit message that quotes the hard reset"
+assert_eq "0" "$(tbg_run 'git commit -m "chore: describe git clean -fdx in the runbook"')" \
+    "does not block a commit message that quotes git clean"
+assert_eq "2" "$(tbg_run 'git clean -fdx')" \
+    "still blocks git clean itself"
+assert_eq "0" "$(tbg_run 'echo "never git push --force to main"')" \
+    "does not block an echo warning against a force push"
+assert_eq "2" "$(tbg_run 'git push --force origin main')" \
+    "still blocks a force push to a protected branch"
+assert_eq "2" "$(tbg_run 'git push -f origin spike/x')" \
+    "still blocks a short-flag force push"
+
+# --- O1 row 3: a grep for the prefs-wipe API ------------------------------------------------
+# `PlayerPrefs.DeleteAll` is a C# member expression. No shell command position exists for it,
+# so every Bash command containing it was text about the wipe; the acts that do erase
+# preferences from a shell are the two below.
+assert_eq "0" "$(tbg_run 'grep -rn PlayerPrefs.DeleteAll Assets/')" \
+    "does not block a grep for the prefs-wipe API"
+assert_eq "0" "$(tbg_run 'git commit -m "fix: stop calling PlayerPrefs.DeleteAll on load"')" \
+    "does not block a commit message naming the prefs-wipe API"
+assert_eq "2" "$(tbg_run 'defaults delete unity.Acme.Game')" \
+    "still blocks the macOS defaults delete of a unity domain"
+assert_eq "2" "$(tbg_run 'rm -rf ~/.config/unity3d/Acme/Game')" \
+    "still blocks deleting the Linux unity3d prefs directory"
+
+# --- O1 row 3b: destructive SQL -------------------------------------------------------------
+# Anchoring SQL to a command position would have switched this classification off entirely —
+# `psql -c "DROP TABLE x"` never has the SQL in command position. What separates the act from
+# the text is that a database client is named too.
+assert_eq "0" "$(tbg_run 'grep -rn "DROP TABLE" migrations/')" \
+    "does not block a grep for destructive SQL"
+assert_eq "2" "$(tbg_run 'psql -c "DROP TABLE users"')" \
+    "still blocks destructive SQL passed to a client"
+assert_eq "2" "$(tbg_run 'sqlite3 save.db "drop database main"')" \
+    "still blocks destructive SQL passed to sqlite3"
+
+# --- O1 row 4: a find that counts rather than deletes ---------------------------------------
+# `find` is a search verb: on its own it prints paths and changes nothing. It was in the same
+# alternation as `rm`, so every find naming .meta was classified a deletion.
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" | wc -l')" \
+    "does not block a find that counts .meta files"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -newer Assets/Player.cs -print')" \
+    "does not block a find that lists .meta files"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -delete')" \
+    "still blocks find -delete on .meta files"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec rm {} \;')" \
+    "still blocks find -exec rm on .meta files"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 rm')" \
+    "still blocks find piped into xargs rm on .meta files"
+
+# --- O1 rows 5 and 6: block-projectsettings.sh was removed in this wave ----------------------
+# Its true positive was `git add ProjectSettings/…`, which stages a file and mutates nothing;
+# its false positive was any sentence containing that phrase, and `git add -A` — the command
+# that actually stages the directory — was permitted throughout. Both are permitted now, by
+# ruling. What must not change is that the ACT of writing that directory is still gated here,
+# so these two assertions stand in for the removed hook's only defensible half.
+assert_eq "2" "$(tbg_run 'cp /tmp/staged.asset ProjectSettings/ProjectSettings.asset')" \
+    "still blocks copying over a ProjectSettings asset"
+assert_eq "2" "$(tbg_run 'rm -f ProjectSettings/QualitySettings.asset')" \
+    "still blocks deleting a ProjectSettings asset"

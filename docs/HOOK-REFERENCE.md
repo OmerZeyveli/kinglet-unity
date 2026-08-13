@@ -136,7 +136,7 @@ These hooks run before any Edit or Write tool invocation. Blocking hooks (exit 2
 - **File:** `block-legacy-input.sh`
 - **Profile:** minimal
 - **Type:** Blocking (exit 2)
-- **What it does:** Blocks the legacy Input Manager API (`Input.GetKey`, `Input.GetAxis`, `Input.GetButton`, `Input.mousePosition`, `Input.touches`) in first-party runtime C#. Three rule files stated that legacy input was "BLOCKED by hooks" before any such hook existed; this is the hook that makes the statement true. Third-party and vendored code is exempt — a hook that fires on files you must never edit trains you to ignore the hook.
+- **What it does:** Blocks the legacy Input Manager API (`Input.GetKey`, `Input.GetAxis`, `Input.GetButton`, `Input.mousePosition`, `Input.touches`) in first-party runtime C#. Three rule files stated that legacy input was "BLOCKED by hooks" before any such hook existed; this is the hook that makes the statement true. Exempt: third-party and vendored code (a hook that fires on files you must never edit trains you to ignore the hook), and `Editor/` and `Tests/` folders, which are not runtime code. It matches the API on a word boundary, so a wrapper whose name merely ends in `Input` — `MyInput.GetKey`, `XRInput.GetAxis` — is not mistaken for it.
 - **Environment variables:** None
 
 #### guard-project-config

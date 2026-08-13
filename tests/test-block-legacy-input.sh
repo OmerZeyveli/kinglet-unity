@@ -81,6 +81,55 @@ assert_eq "$(verdict /proj/Assets/Scripts/notes.md 'Input.GetKey is banned')" "0
 # `_playerInput` / `inputAction` must not trip a naive /Input\./ match.
 assert_eq "$(verdict /proj/Assets/Scripts/View.cs 'private PlayerInput _playerInput; void A(){ _playerInput.enabled = true; }')" "0" "does not false-positive on PlayerInput members"
 
+# ============================================================================
+# 2026-08-13 — the gate must block the act and permit the prose.
+#
+# `Input\.` had no left boundary, so it matched inside any identifier ending in
+# "Input". The assertion above about `_playerInput` passed for the wrong reason:
+# it never names a legacy METHOD, so the pattern could not have fired on it
+# whatever the boundary. A wrapper that does — MyInput.GetKey, XRInput.GetAxis —
+# was blocked, and those are the files a real project is full of.
+#
+# Both directions for each, because a boundary that is slightly wrong turns a
+# false positive into a false negative, and a gate that stops blocking the act is
+# worse than one that blocks prose. rules/unity-specifics.md states in bold that
+# this API is BLOCKED by hooks; the "still blocks" half is what keeps that true.
+# ============================================================================
+
+WRAPPED='using UnityEngine;
+public class P : MonoBehaviour { void Update(){ if (MyInput.GetKeyDown(KeyCode.A)) {} } }'
+assert_eq "$(verdict /proj/Assets/Scripts/P.cs "$WRAPPED")" "0" "does not block MyInput.GetKeyDown — a wrapper, not the legacy API"
+assert_eq "$(verdict /proj/Assets/Scripts/X.cs 'void U(){ var v = XRInput.GetAxis("Move"); }')" "0" "does not block XRInput.GetAxis"
+assert_eq "$(verdict /proj/Assets/Scripts/S.cs 'void U(){ if (SteamInput.GetButton(0)) {} }')" "0" "does not block SteamInput.GetButton"
+
+# Editor and test folders. Editor/ is Unity's own semantics — a folder of that
+# name at any depth compiles into the Editor assembly and ships in no player
+# build. Tests/ is convention, and is the weaker of the two: Unity excludes test
+# ASSEMBLIES, not folders named Tests. Both are exempt because this hook's scope
+# is first-party RUNTIME code, which is what its header and HOOK-REFERENCE.md say.
+LEGACY_CALL='void U(){ if (Input.GetKeyDown(KeyCode.F9)) {} }'
+assert_eq "$(verdict /proj/Assets/Editor/BuildTool.cs "$LEGACY_CALL")" "0" "does not block editor-only tooling under Editor/"
+assert_eq "$(verdict /proj/Assets/Scripts/Editor/Win.cs "$LEGACY_CALL")" "0" "does not block a nested Editor/ folder"
+assert_eq "$(verdict /proj/Assets/Tests/PlayMode/InputTests.cs "$LEGACY_CALL")" "0" "does not block test code under Tests/"
+
+# The skip is a path SEGMENT, not a substring: EditorTools/ is runtime code.
+assert_eq "$(verdict /proj/Assets/Scripts/EditorTools/Live.cs "$LEGACY_CALL")" "2" "still blocks EditorTools/ — a segment named Editor is not a prefix of one"
+assert_eq "$(verdict /proj/Assets/Scripts/Q.cs 'void U(){ var v = UnityEngine.Input.GetAxis("Horizontal"); }')" "2" "still blocks the fully-qualified UnityEngine.Input.GetAxis"
+MIXED='void U(){ var a = MyInput.GetKey(KeyCode.A); var b = Input.GetAxis("Horizontal"); }'
+assert_eq "$(verdict /proj/Assets/Scripts/M.cs "$MIXED")" "2" "still blocks a real call sharing a file with a wrapper call"
+
+# The report names the API, not the character the boundary had to consume.
+found_of() {  # $1 = file path, $2 = content — prints the reported API list
+  local out
+  set +e
+  out=$(printf '{"tool_input":{"file_path":%s,"new_string":%s}}' \
+        "$(printf '%s' "$1" | jq -Rs .)" "$(printf '%s' "$2" | jq -Rs .)" \
+        | bash "$HOOK" 2>&1 >/dev/null | grep 'Legacy Input Manager API:')
+  set -e
+  printf '%s' "${out##*API: }"
+}
+assert_eq "$(found_of /proj/Assets/Scripts/M2.cs "$MIXED")" "Input.GetAxis " "reports the API alone, and only the call that is really it"
+
 # --- the claim the rules make must stay true -------------------------------
 assert_eq "$(grep -c 'block-legacy-input.sh' "$PROJECT_ROOT/.claude/settings.json" || true)" "1" "hook is wired into settings.json"
 

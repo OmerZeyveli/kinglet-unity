@@ -43,7 +43,33 @@ case "$FILE_PATH" in
         exit 0 ;;
 esac
 
-LEGACY='Input\.(GetKey|GetKeyDown|GetKeyUp|GetAxis|GetAxisRaw|GetButton|GetButtonDown|GetButtonUp|GetMouseButton|GetMouseButtonDown|GetMouseButtonUp|mousePosition|mouseScrollDelta|touches|touchCount|GetTouch|anyKey|anyKeyDown)'
+# Editor and test code is not runtime code, which is the scope this hook's header claims and
+# the scope HOOK-REFERENCE.md documents. The two entries are not equally solid and the
+# difference is worth knowing before either is widened:
+#
+#   Editor/  — Unity's own semantics. A folder named Editor at any depth compiles into the
+#              Editor assembly and is excluded from every player build, so legacy input there
+#              cannot ship. guard-editor-runtime.sh (removed 2026-08-13) skipped the same
+#              paths for the same reason.
+#   Tests/   — convention only. Unity excludes TEST ASSEMBLIES from builds, not folders
+#              called Tests; a Tests/ folder with no test asmdef compiles into the runtime
+#              assembly and does ship. This entry trades a real hole for a false-positive
+#              class, and it is the one to revisit first if a legacy-input call is ever found
+#              shipping from a path this hook waved through.
+case "$FILE_PATH" in
+    Editor/*|*/Editor/*|Tests/*|*/Tests/*)
+        exit 0 ;;
+esac
+
+# LEGACY_API is the call itself; LEGACY is the call in a position where it IS that call.
+# Without a left boundary, `Input\.` matched inside any identifier ending in "Input" —
+# MyInput.GetKey, XRInput.GetAxis, SteamInput.GetButton, a project's own GameInput facade —
+# none of which are the legacy Input Manager. The boundary is written as an explicit
+# character class rather than \b: \b is a GNU extension and .claude/UPSTREAM plans a macOS
+# host pass, where grep is BSD. `UnityEngine.Input.GetKey` still matches, because `.` is not
+# a word character and so is a boundary.
+LEGACY_API='Input\.(GetKey|GetKeyDown|GetKeyUp|GetAxis|GetAxisRaw|GetButton|GetButtonDown|GetButtonUp|GetMouseButton|GetMouseButtonDown|GetMouseButtonUp|mousePosition|mouseScrollDelta|touches|touchCount|GetTouch|anyKey|anyKeyDown)'
+LEGACY='(^|[^A-Za-z0-9_])'"$LEGACY_API"
 
 grep -qE "$LEGACY" <<< "$NEW_CONTENT" || exit 0
 
@@ -56,7 +82,11 @@ if grep -qE '#if\s+(ENABLE_LEGACY_INPUT_MANAGER|UNITY_EDITOR)' <<< "$NEW_CONTENT
     exit 0
 fi
 
-FOUND=$(echo "$NEW_CONTENT" | grep -oE "$LEGACY" | sort -u | tr '\n' ' ')
+# Two greps: the first finds the calls in a real call position, the second strips the
+# boundary character the first had to consume so the report reads `Input.GetKey`, not
+# `(Input.GetKey`. Neither exits early — `grep -o` must read to the end to print every
+# match — so this pipeline cannot SIGPIPE its writer under pipefail.
+FOUND=$(echo "$NEW_CONTENT" | grep -oE "$LEGACY" | grep -oE "$LEGACY_API" | sort -u | tr '\n' ' ')
 
 echo "" >&2
 echo "  File: $FILE_PATH" >&2
