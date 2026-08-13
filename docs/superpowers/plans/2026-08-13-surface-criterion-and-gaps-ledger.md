@@ -12,12 +12,62 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-**Nothing dispatched yet.** State at wave start: suite **1022/1022** over 35 files, `provenance OK`,
-baseline drift 0, tree clean at `7fe61c8`. 27 hooks, 11 repo scripts (10 install), 16 skills, 8 agents,
-9 commands.
+**STOPPED BY THE OPERATOR mid-round, and the tree is RED. Read this before running anything.**
 
-**Task 1 is the next action.** Stages run in order; the suite is green at every stage boundary, which
-makes them the natural stopping points if the owner wants to break for the real-project trial.
+Task 1's implementer was killed while running its closing gates, after committing. **It committed its
+work** — `6cd80bd` (the round-1 fixes) and `8e216b2` (the baseline) — so nothing is lost, but it never
+reached the check that would have caught what it left.
+
+### State, measured by the controller after the stop
+
+- **HEAD `8e216b2`. Working tree clean.**
+- **`bash scripts/check-provenance.sh` FAILS — 2 problems**, and this is the thing to fix first:
+
+  ```
+  FAIL status=verbatim but the file differs from its recorded upstream: .claude/hooks/session-restore.sh
+  FAIL status=verbatim but the file differs from its recorded upstream: .claude/hooks/track-edits.sh
+  ```
+
+  Round 1 edited both (`git diff --stat 48d42bb..8e216b2 --` those paths → 11 insertions, 5 deletions)
+  to fix the stale comments naming cut hooks, and **did not flip their `provenance.tsv` status from
+  `verbatim` to `modified`.** That is the identical class the implementer's own third commit
+  (`48d42bb`) fixed for two other files one round earlier. It hit it again and was stopped before the
+  gate ran.
+
+  **Do not fix this in the controller session.** Resume the implementer; it is one round's leftover.
+
+- **`bash tests/run-tests.sh` → `Total: 1015  Passed: 1014  Failed: 1`.** The failure is in
+  `tests/test-kinglet-spike.sh`'s embedded python suite (`FAILED (failures=1, errors=17, skipped=3)`),
+  and **it does not reproduce in a clean clone of the same commit** — measured both ways:
+
+  | | rc |
+  |---|---|
+  | `git clone` → checkout `48d42bb` → run the file | **0**, 18/18 |
+  | `git clone` → checkout `8e216b2` → run the file | **0**, 18/18 |
+  | the same file in the main working tree | **1** |
+
+  Clearing `__pycache__` under `tests/` and `tools/` did **not** change it. So it is environmental to
+  this working tree, not a regression from round 1 — **but the cause was not established**, and
+  "environmental" is a hypothesis, not a finding. One error reads
+  `E_CANDIDATE: failed to launch candidate '/tmp/tmpXXXX/does_not_exist'`, which is a test that expects
+  a failure, so the 17 "errors" may be reporting noise around one real failure.
+
+  **This is also the file the wave's own D4 names**: the runner is blind to python results, 1443 of
+  them contributing 1 to the total. Task 10 owns that.
+
+- **`migration/baseline-inventory.json` was left modified** and the controller reverted it. The change
+  was the regenerator bumping `source_commit` from `6cd80bd` to `8e216b2` — **circular**, because
+  `8e216b2` *is* the baseline commit. The committed state points at the content commit, which is what
+  the commit → regenerate → commit discipline produces. Baseline reports `0 change(s)` either way.
+
+### The next action
+
+**Resume Task 1's implementer for the provenance leftover**, then let round 1's re-review run. Do not
+start Task 2 until the gate is green — everything after Task 1 works against the tree it leaves.
+
+Round 1's six findings and the three-script measurement were dispatched and are in the implementer's
+context; its report at `.superpowers/sdd/2026-08-13-surface-criterion/task-1-report.md` has a
+`# Round 1` section only if it got that far — **check before assuming.**
 
 ## Controller decisions, made at setup
 
