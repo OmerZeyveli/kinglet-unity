@@ -117,11 +117,14 @@ the examples below; in an initialised project whose block reports a networking p
 has not gained a single word.
 
 **A fact the generated block supplies is context for answering a dimension. It is never points.** The
-block says the same thing to every request in the project, and a constant cannot discriminate between
-requests: it lifts "Add multiplayer" and a fully specified feature by the identical amount while
-consuming 2 of the 10 points and 2 of the 6 required. The dimension is not asking whether the Unity
-version is knowable. It is asking whether this request has been pinned down, and that answer comes
-from the user or it does not exist yet.
+block says the same thing to every request in the project, and because each dimension clamps at 2 it
+does not lift them equally — it lifts the vaguest request furthest. "Add multiplayer" gains 2 on
+Platform and 1 on Integration; the 7/10 example below gains 1 on Platform and nothing on Integration,
+which was already 2 on the strength of the request alone. The gap between the two closes from 4
+points to 2. A constant that lifts hardest exactly the requests the score exists to catch is worse
+than no signal at all. The dimension is not asking whether the Unity version is knowable. It is
+asking whether this request has been pinned down, and that answer comes from the user or it does not
+exist yet.
 
 So score each dimension on what the request settled, and use the block for what it is good at —
 answering the questions you would otherwise have had to spend the interview budget on. A dimension
