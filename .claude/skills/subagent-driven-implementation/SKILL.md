@@ -70,11 +70,20 @@ is a brief that gets withdrawn — and by step 5 below, a withdrawn brief costs 
 also lets the brief carry what the Interfaces section learned in the meantime. A task whose brief is
 not written yet is marked *(brief pending)* in the ledger, which is a state, not an omission.
 
-**Cite by name, not by line number.** In dispatches and re-review prompts, name the test, the method
-or the symbol — `SkinRulesSpec.ClampsAtZero`, not `SkinRulesSpec.cs:410-423`. Line numbers passed
-from a report into a dispatch go stale between the two, and a stale citation that gets repeated is
-how a document starts describing a file that no longer exists. Measured: a controller forwarded a
-range citing lines 410–423 of a 378-line file.
+**Cite by anchor, not by line number.** In dispatches and re-review prompts, name the test, the
+method or the symbol — `SkinRulesSpec.ClampsAtZero`, not `SkinRulesSpec.cs:410-423`. Line numbers
+passed from a report into a dispatch go stale between the two, and a stale citation that gets
+repeated is how a document starts describing a file that no longer exists. Measured: a controller
+forwarded a range citing lines 410–423 of a 378-line file.
+
+This does not excuse a finding with no location, and it is not in tension with the reviewer's
+demand for one — they are the same rule, and `task-reviewer-prompt.md` now states it that way: **an
+anchor is the file plus a symbol, heading, function or the exact text to search for**, and a line
+number is permitted alongside one of those and never instead of one. The two documents shipped
+saying opposite things for a wave — this one said *not by line number* while its sibling required
+every finding *at file:line* — and the same wave then rotted two line-number self-citations of its
+own, one of them born wrong in the commit that moved its target. A rule stated in one file and
+contradicted in the file beside it is a rule nobody is following.
 
 **Per task, in plan order:**
 
@@ -84,6 +93,18 @@ range citing lines 410–423 of a 378-line file.
    writes C# and drives the Editor measures the dispatch rather than the task. Use a general
    implementer for them, and record the choice in the ledger so the run stays readable. One implementer. Never two, and never this task's implementer running
    while another task's is still active — see the Unity-specific rules below.
+
+   **If the task changes the *shape* of what ships — a file added, removed or renamed; a serialized
+   field, an addressable group, a package manifest entry — the brief must name an upgrade fixture,
+   not only a fresh-install one.** Every guard you have runs against a tree this repository builds.
+   The tree that actually breaks is the one a user already has, produced by the previous version and
+   then updated, and no round ever constructs that state. Measured on this toolkit: a wave removed 15
+   hook files, every guard and every task review passed, and updating a project whose
+   `.claude/settings.json` had ever been edited — one appended newline is enough — left 15
+   registrations pointing at files that no longer exist, with no self-healing. Two independent
+   readers found it after the wave closed, by running the upgrade. The fixture is: install the base
+   version, modify the one file the update is documented to preserve, install the change, then assert
+   the **resulting tree is internally consistent** — not merely that files were written.
 2. **Handle the report.** The implementer returns one of four statuses — see `implementer-prompt.md`
    for what each means and what you do with it. Do not read the implementer's tool-call transcript to
    second-guess a DONE; the report is the contract, and if the report is wrong that is what review is
@@ -114,10 +135,34 @@ range citing lines 410–423 of a 378-line file.
    the controller declining to make a decision. Either park the finding in the ledger with a ruling
    (why it is safe to carry forward, and to whom) or stop the loop entirely if the finding is load-
    bearing — a security gate, a data-loss path, anything the plan cannot be shipped without.
-7. **Complete.** Mark the ledger item done with its commit range (first commit of the task through
-   its last, inclusive — the range the whole-branch review will diff). Record every deferred Minor
-   finding and every parked finding with its ruling. Record scene and prefab state if the task touched
-   either — see below.
+7. **Complete — two sweeps first, and neither of them is in the diff.** The review that just passed
+   read one brief and one diff, so it was not positioned to ask either question below. Both are about
+   files the round never opened, which is precisely why they have to be asked here, by you, before the
+   round is written down as done.
+
+   *Sweep the blast radius, not the diff.* If the task removed or renamed anything, sweep by the
+   removed **name** — and then sweep again by the **aggregate**: re-derive every count, category list
+   and capability sentence the removed thing contributed to, across the whole tree. A bare numeral, a
+   category word and a scope claim contain no removed name, so a name-keyed sweep is structurally
+   blind to all three, and the aggregate sweep is the one that never gets run. Measured in this wave:
+   the suite's wall clock outgrew the timeout written into the plan's own constraints — 150000 ms
+   against four later measurements of 191–255 seconds — and every round that made the suite slower
+   passed without opening that sentence. A truncated run reads as red, so the constraint did not
+   understate a number, it manufactured a failure; four implementers were dispatched under it before
+   anyone measured.
+
+   *Ask what became false because of what you just made true.* Prose is written in the present tense,
+   so a round can falsify a sentence it never opened. Grep for the prose that describes the absence
+   you just filled — "unguarded", "hand-maintained", "not yet", "open question", "we do not" — and
+   for the prose that describes the state you just left. Measured in this wave: a ruling correctly
+   forbade implementers from regenerating a generated baseline, and thereby made every brief's
+   "finish with two green gates" impossible for any task that drifts that baseline. Nobody re-read
+   the briefs, so the next implementer's only two options were a false green and a stall.
+
+   Then mark the ledger item done with its commit range (first commit of the task through its last,
+   inclusive — the range the whole-branch review will diff). Record every deferred Minor finding and
+   every parked finding with its ruling. Record scene and prefab state if the task touched either —
+   see below.
 
 **Final review.** After every task in the plan is complete, dispatch one review of the *whole branch*
 — base commit to current HEAD — on the most capable model available, using `final-reviewer-prompt.md`.

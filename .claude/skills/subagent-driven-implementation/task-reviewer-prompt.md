@@ -42,7 +42,13 @@ it. Not a bare checkmark.
 - **Important** — should fix; can be deferred to the ledger only with an explicit reason.
 - **Minor** — worth noting, safe to carry to the ledger as deferred.
 
-Each finding at `file:line`. A finding with no location is not actionable — send it back for one.
+Each finding located by an **anchor**: the file, plus the symbol, heading, function name or the exact
+text to search for. A line number is permitted alongside an anchor and never instead of one. Your
+verdict is read by a dispatch written after the fix round has already edited the file, so a bare line
+number is a pointer into a document that has moved — measured here twice, once as a controller
+forwarding a finding at lines 410–423 of a 378-line file, once as a shipped comment's own line-range
+self-citation coming to rest on an unrelated assertion after an earlier round inserted 43 lines above
+its target. A finding with no location at all is not actionable — send it back for one.
 
 **`⚠️ Cannot verify from diff`** for anything the reviewer cannot confirm by reading the diff alone —
 behavior that depends on unchanged code, a runtime property, anything that needs the Editor running
