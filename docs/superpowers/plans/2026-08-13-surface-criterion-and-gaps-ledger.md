@@ -182,6 +182,16 @@ stands. It has now gone stale twice.
   controller's merge step**, `commit → regenerate → commit`, with `--expect-drift` derived on the
   merged tree. Implementers instead **list the files they changed under `.claude/` or `templates/`**,
   as a measured statement rather than as silence.
+- **A task that drifts the baseline reports a RED suite by construction, and that is correct.**
+  Discovered on Task 9, 2026-08-14, and not anticipated when R6 was written. R6 forbids the
+  implementer from regenerating, so `migration/baseline-inventory.json` still holds the pre-edit
+  checksum and the baseline assertion reds until the controller regenerates at the merge. Task 9
+  reported `1189/1191, rc=1` with **both** failures being one file's sha drift, reported twice.
+  **The gate contract for such a task is therefore: green everywhere except the baseline
+  assertions, and the implementer must show that the failures are ONLY that.** A brief that says
+  "both gates green" without this carve-out asks for something the ruling makes impossible, and the
+  implementer either reports a false green or stalls. **Say it in the dispatch, and have the
+  reviewer confirm the failure set rather than accept the claim.**
 - **Every dispatch gets its own `mktemp -d` scratch root, and no shared temp path.** Round 5 of Task 2
   had its `probe.sh` and `mutate.sh` replaced mid-task by another agent writing to a shared
   scratchpad, and the measurements it took afterwards were of the other agent's harness.
