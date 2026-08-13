@@ -193,6 +193,25 @@ assert_eq "0" "$(printf '%s' "$RF_MISSING" | grep -c . || true)" \
 
 # An untracked file under .claude/ is live for Claude Code and invisible to check-provenance.sh
 # (git ls-files) and to baseline-regenerate (ls-tree against a commit). Nothing else asserts this.
+#
+# THE SILENCE HAS TO MEAN SOMETHING, and until 2026-08-14 it did not. `2>/dev/null || true` over
+# `git ls-files` makes "no untracked payload" and "no git at all" the same empty string, and the
+# assertion below passes on both. Measured on a `git archive HEAD | tar -x` extraction — this
+# repository's documented probe method, which has no index — this whole file reported 110 passed and
+# 0 failed, with this check among them. For an ABSENCE check that is the worst case: its success
+# condition and its broken condition are byte-identical.
+#
+# So the index is proved readable first, with a floor, and only then is its emptiness read as good
+# news. Confined to this check on purpose: the rest of this file reads the working tree by path and
+# does not depend on git at all.
+TSR_UNTRACKED_ERR="$(mktemp "${TMPDIR:-/tmp}/tsr-untracked-err.XXXXXX")"
+TSR_INDEX_N=$( ( cd "$REPO_DIR" && git ls-files -- .claude ) 2>"$TSR_UNTRACKED_ERR" | grep -c . || true)
+TSR_INDEX_STATE="ok"
+[ "$TSR_INDEX_N" -ge 30 ] || TSR_INDEX_STATE="git listed $TSR_INDEX_N tracked path(s) under .claude/, so the untracked check below cannot mean anything: $(tr '\n' ' ' < "$TSR_UNTRACKED_ERR")"
+rm -f "$TSR_UNTRACKED_ERR"
+assert_eq "ok" "$TSR_INDEX_STATE" \
+  "git can read this repository's index, so an empty untracked list below is a finding rather than a failure to look"
+
 UNTRACKED_PAYLOAD=$(cd "$REPO_DIR" && git ls-files --others --exclude-standard -- .claude 2>/dev/null || true)
 
 if [ -n "$UNTRACKED_PAYLOAD" ]; then

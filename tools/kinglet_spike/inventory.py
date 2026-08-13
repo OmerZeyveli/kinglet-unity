@@ -116,8 +116,22 @@ def dirty_foundation_files(repo_root: Path) -> tuple[str, ...]:
 
     An inventory generated over a dirty tree records blob ids that do not match
     what anybody else will check out, which makes every row unverifiable.
+
+    ``diff HEAD``, not a bare ``diff``. A bare ``git diff`` compares the working
+    tree against the INDEX, so ``git add`` silences this guard completely: the
+    file is modified, its blob id is about to change, and the refusal never
+    fires. That is not an unlikely sequence — the workflow this repository
+    prescribes is commit, regenerate, commit, and staging is what sits between
+    the first two. ``--cached`` alone has the mirror defect (it sees the staged
+    change and misses the unstaged one); ``HEAD`` is the single form that sees
+    both, which is what "uncommitted" means.
+
+    Still invisible: an UNTRACKED file under a foundation root. It has no blob
+    id to disagree with, so it cannot make an existing row unverifiable — but it
+    can mean the inventory is missing a file, which is the exhaustiveness
+    property ``tracked_foundation_files`` covers rather than this function.
     """
-    output = _git(repo_root, "diff", "--name-only", "--", *FOUNDATION_ROOTS)
+    output = _git(repo_root, "diff", "--name-only", "HEAD", "--", *FOUNDATION_ROOTS)
     return tuple(sorted(line for line in output.splitlines() if line))
 
 

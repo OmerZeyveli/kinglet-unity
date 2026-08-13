@@ -27,6 +27,45 @@ echo "--- mcp naming ---"
 # this guards was two files disagreeing about one string.
 SHIPPED_SERVER=$(awk -F'"' '/^ *"[A-Za-z]*MCP": \{/ {print $2; exit}' "$REPO_DIR/install.sh")
 
+# ── The scan must have scanned something ─────────────────────────────────────
+#
+# THE MEASUREMENT THIS BLOCK EXISTS FOR. With a violation planted in
+# .claude/agents/unity-coder.md (`tools: …, mcp__unityMCP__manage_scene`), this file reported:
+#
+#   with a git index      1 PASS, 1 FAIL   ← the violation, caught
+#   without a git index    2 PASS, 0 FAIL   ← a HIGHER pass count, on the same violation
+#
+# The file list below comes from `git ls-files`. With no index, git writes `fatal: not a git
+# repository` to stderr, the substitution yields nothing, `for f in` iterates zero times, `BAD` is
+# empty, and both assertions pass. Two green results over a payload nobody opened, reported as a
+# cleaner run than the one that found the bug. That is not a hypothetical configuration: `git
+# archive HEAD | tar -x` into a scratch directory is this repository's documented probe method, and
+# it produces exactly that state.
+#
+# The rc is captured rather than promoted, and the list is counted. An unreadable index is a named
+# failure; a list that is merely SHORT is a floor failure. Measured 2026-08-14, the pathspecs list
+# 82 tracked paths: `.claude/*` 62, `scripts/*` 8, `docs/*` (less research/ and superpowers/) 6, and
+# the six named root files. The floor is 40 — below `.claude/*` alone, so no plausible surface
+# removal trips it, and above every other root combined, so a pathspec typo that drops `.claude/*`
+# (the root carrying the agents whose `tools:` lines are the original defect) does.
+TMN_LIST="$(mktemp "${TMPDIR:-/tmp}/kinglet-mcp-naming.XXXXXX")"
+TMN_ERR="$(mktemp "${TMPDIR:-/tmp}/kinglet-mcp-naming-err.XXXXXX")"
+TMN_RC=0
+( cd "$REPO_DIR" && git ls-files '.claude/*' 'scripts/*' 'docs/*' install.sh uninstall.sh \
+      CLAUDE.md CONTRIBUTING.md README.md MCP-SETUP.md \
+      ':!docs/research/*' ':!docs/superpowers/*' ) > "$TMN_LIST" 2>"$TMN_ERR" || TMN_RC=$?
+TMN_COUNT=$(awk 'END {print NR+0}' "$TMN_LIST")
+
+TMN_SCAN_STATE="ok"
+if [ "$TMN_RC" -ne 0 ]; then
+  TMN_SCAN_STATE="git could not list the shipped payload (exit $TMN_RC): $(tr '\n' ' ' < "$TMN_ERR")"
+elif [ "$TMN_COUNT" -lt 40 ]; then
+  TMN_SCAN_STATE="only $TMN_COUNT tracked path(s) matched the pathspecs below, which is fewer than this payload can have — the scan is reading a fraction of the tree it certifies"
+fi
+assert_eq "ok" "$TMN_SCAN_STATE" \
+  "the scan below has a payload to read — an empty file list must not certify the same green as a clean one"
+rm -f "$TMN_ERR"
+
 # Scope is the whole shipped payload, not just agent frontmatter.
 #
 # The first version of this guard read only `tools:` lines in .claude/agents/*.md. It passed while
@@ -62,9 +101,8 @@ SHIPPED_SERVER=$(awk -F'"' '/^ *"[A-Za-z]*MCP": \{/ {print $2; exit}' "$REPO_DIR
 # adapters/ and tests/kinglet/ are excluded: they are the platform spike's own role schema, a
 # different data model that ships into no project. Named here so the exclusion is a decision.
 BAD=$(
-  for f in $(cd "$REPO_DIR" && git ls-files '.claude/*' 'scripts/*' 'docs/*' install.sh uninstall.sh \
-                 CLAUDE.md CONTRIBUTING.md README.md MCP-SETUP.md \
-                 ':!docs/research/*' ':!docs/superpowers/*'); do
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
     [ -f "$REPO_DIR/$f" ] || continue
     case "$f" in
       *.md) SCAN_MODE=toolsline ;;
@@ -86,8 +124,9 @@ BAD=$(
         }
       }
     ' "$REPO_DIR/$f"
-  done | sort -u
+  done < "$TMN_LIST" | sort -u
 )
+rm -f "$TMN_LIST"
 
 if [ -n "$BAD" ]; then
   printf '%s\n' "$BAD" | while IFS="$(printf '\t')" read -r src tok; do

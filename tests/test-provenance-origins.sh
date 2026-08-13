@@ -199,7 +199,23 @@ done
 #
 # The skip is one file and stays one file. Wanting to add a second is the signal that a sentence
 # needs rewriting into the past tense, not that the guard needs loosening.
-dead_scan="$(git -C "$REPO" ls-files '.claude/*' 'scripts/*' ':(glob)docs/*.md' 'README.md')"
+# The rc is captured, not promoted. This file sets `set -euo pipefail` of its own, so a bare
+# `dead_scan="$(git …)"` in a tree with no index kills it where it stands: measured 2026-08-14 on a
+# `git archive HEAD | tar -x` extraction — this repository's documented probe method — it exited 128
+# having printed 14 PASS lines and no failure, with the remaining 33 assertions never reached. The
+# runner notices the exit code, but the message it prints names a number, not a cause, and the
+# floors and sentinels below (the machinery that exists precisely to catch a scan that read nothing)
+# are among the assertions that never run.
+dead_scan_err="$(mktemp "${TMPDIR:-/tmp}/kinglet-dead-scan-err.XXXXXX")"
+dead_scan_rc=0
+dead_scan="$(git -C "$REPO" ls-files '.claude/*' 'scripts/*' ':(glob)docs/*.md' 'README.md' 2>"$dead_scan_err")" \
+  || dead_scan_rc=$?
+if [ "$dead_scan_rc" -eq 0 ]; then
+  pass "the dead-name scan's file list came from a readable git index"
+else
+  fail "the dead-name scan could not list tracked files (git exited $dead_scan_rc), so every 'clean' result below is a report about an empty set: $(tr '\n' ' ' < "$dead_scan_err")"
+fi
+rm -f "$dead_scan_err"
 
 # The needles are matched BARE, without a leading slash.
 #
@@ -216,6 +232,55 @@ dead_scan="$(git -C "$REPO" ls-files '.claude/*' 'scripts/*' ':(glob)docs/*.md' 
 dead_needles='unity-workflow
 unity-feature
 deep-interview'
+
+# ── The 19 surfaces the 2026-08-13 cut retired, matched by PATH rather than bare ─────────────────
+#
+# The three needles above are matched BARE because those names are retired outright and reusing one
+# is the thing being prevented. Applying that same rule to the hooks and scripts the surface
+# criterion removed does not work, and the reason is measured rather than argued. Adding all 19 as
+# bare needles reddens the suite on TEN mentions across five files, and eight of the ten are exactly
+# what the comment above prescribes as the correct repair — past-tense records:
+#
+#   .claude/hooks/session-save.sh   "pre-compact.sh was its only writer and was removed on 2026-08-13"
+#   .claude/hooks/track-edits.sh    "listed stop-validate.sh and cost-tracker.sh as readers too;
+#                                    both were removed"
+#   .claude/hooks/_lib.sh           "unity_track_read's only caller was track-reads.sh"
+#   scripts/validate-asmdefs.sh     a comment about what the removed scripts would have needed
+#   docs/ARCHITECTURE.md            the paragraph documenting the leftover state paths
+#
+# A guard that forbids a file from recording its own history is mis-specified, not strict (field
+# note 81), and this repository has already ruled on that class once.
+#
+# The other two hits are not prose: `_lib.sh` still defines `UNITY_READS_FILE` (gateguard-reads.txt)
+# and `UNITY_NOTIFY_EVENT_FILE` (notify-event.json) for hooks that no longer exist. That is a KNOWN,
+# recorded, deferred decision — `_lib.sh` states it at the dead function pair, `docs/ARCHITECTURE.md`
+# states it in prose, and `tests/test-state.sh` reads `UNITY_READS_FILE`, so retiring it is a change
+# to this library's surface rather than a leftover to sweep up. Not this guard's call to force.
+#
+# So the forbidden thing for these 19 is not the NAME, it is a LIVE POINTER: a path that says "run
+# this", in code or in a document. Matched as `.claude/hooks/<name>.sh` / `scripts/<name>.sh`, on
+# non-comment lines of shell files and anywhere in Markdown — the same scan-mode split
+# tests/test-mcp-naming.sh uses, and for the same reason: in shell a comment is commentary and a
+# non-comment line is a use, while in Markdown a path is a pointer wherever it appears.
+#
+# Measured 2026-08-14: zero hits on this tree, and it catches every real instance of the class — a
+# `settings.json` registration pointing at a deleted hook, or `docs/GETTING-STARTED.md` naming
+# `scripts/validate-code-quality.sh`, which it did until the cut.
+#
+# DERIVED FROM provenance-skip.tsv, NEVER TYPED. A twentieth retirement joins this list by being
+# recorded as `rule=absent`, which is where the decision already has to be written down. Typing the
+# names here would put the membership in a second place, which is the defect this wave is about.
+dead_paths="$(awk -F'\t' '$3 == "absent" && $1 ~ /\.sh$/ && ($1 ~ /^\.claude\/hooks\// || $1 ~ /^scripts\//) { print $1 }' \
+              "$REPO/provenance-skip.tsv" | LC_ALL=C sort -u)"
+dead_paths_n=$(printf '%s' "$dead_paths" | grep -c . || true)
+
+# Anti-vacuity before use: a `rule=absent` schema change, a renamed column or a moved file empties
+# this list, and an empty needle list finds nothing in a tree full of violations.
+if [ "$dead_paths_n" -ge 15 ]; then
+  pass "derived $dead_paths_n retired hook/script path(s) from provenance-skip.tsv to scan for live pointers"
+else
+  fail "provenance-skip.tsv yielded only $dead_paths_n retired hook/script path(s), so the live-pointer scan below has almost nothing to look for and its silence means nothing"
+fi
 
 dead_scanned=0
 dead_payload=0
@@ -259,6 +324,20 @@ while IFS= read -r dead_f; do
       fail "names retired surface '$dead_n': $dead_f"
     fi
   done <<< "$dead_needles"
+
+  # The live-pointer half. `dead_live` is the same bytes with whole-line shell comments stripped in
+  # `.sh` files and left intact everywhere else — so a comment reminiscing about a removed hook
+  # survives and a line that RUNS one does not.
+  case "$dead_f" in
+    *.sh) dead_live="$(grep -v '^[[:space:]]*#' <<< "$dead_body" || true)" ;;
+    *)    dead_live="$dead_body" ;;
+  esac
+  while IFS= read -r dead_p; do
+    [ -n "$dead_p" ] || continue
+    if grep -qF -- "$dead_p" <<< "$dead_live"; then
+      fail "points at retired surface '$dead_p', which provenance-skip.tsv records as rule=absent: $dead_f"
+    fi
+  done <<< "$dead_paths"
 done <<< "$dead_scan"
 
 # Anti-vacuity, per glob and by sentinel — NOT as one total.

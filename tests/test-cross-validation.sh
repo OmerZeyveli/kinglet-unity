@@ -17,13 +17,49 @@ echo ""
 
 # ── Test 1: Every hook in settings.json exists on disk ────────────────────
 echo "--- Test: settings.json hook references exist ---"
+# THE EXTRACTION IS PROVED BEFORE ITS SILENCE IS BELIEVED.
+#
+# This test's entire input is one `jq` invocation with `2>/dev/null`. When jq is absent, or the
+# filter stops matching because settings.json changes shape, the substitution yields nothing, the
+# loop iterates zero times, MISSING stays 0 and the assertion PASSES. Nothing in this repository
+# guarded that: `/usr/bin/grep -rl 'command -v jq' tests/` returned 0 while eight test files call jq.
+#
+# Measured 2026-08-14, with a dangling registration ADDED to settings.json (an existing
+# `session-brief.sh` command prefixed with `.claude/hooks/gateguard.sh; bash `, so the violation is
+# isolated to this jq-fed sweep and removes nothing the grep-fed Test 2 would notice):
+#
+#   assertion                                        jq working   jq shimmed to exit 127
+#   all hook paths in settings.json exist on disk     FAIL         PASS  ← vacuous
+#   all hook scripts are referenced in settings.json  PASS         PASS
+#   file total                                        4/1, rc=1    5/0, rc=0
+#
+# A HIGHER pass count and a clean exit, on a settings.json registering a hook that does not exist.
+# The SHAPE of the violation matters and is worth recording: a REPLACEMENT (a live registration
+# swapped for a dead one) is visible from both directions, so Test 2 reds either way and the file
+# measures 4/1 with jq broken as well. Only an ADDED dangling registration isolates this sweep — and
+# that is the shape an upgrade across the surface cut actually produces.
+#
+# The floor is 8 against 12 registrations today — below any plausible hook removal, far enough above
+# zero that a missing jq, a filter that stops matching, or a settings.json rewritten into a shape
+# this filter cannot walk is caught rather than read as a clean bill of health.
+HOOK_PATHS=$(jq -r '.. | .command? // empty' "$PROJECT_ROOT/.claude/settings.json" 2>/dev/null | sort -u || true)
+HOOK_PATHS_N=$(printf '%s' "$HOOK_PATHS" | grep -c . || true)
+EXTRACTION="ok"
+if ! command -v jq > /dev/null 2>&1; then
+    EXTRACTION="jq is not installed, so the hook registrations were never read"
+elif [ "$HOOK_PATHS_N" -lt 8 ]; then
+    EXTRACTION="jq extracted $HOOK_PATHS_N command(s) from .claude/settings.json, fewer than it registers"
+fi
+assert_eq "$EXTRACTION" "ok" "the hook registrations were actually extracted — an empty extraction must not certify the same green as a clean settings.json"
+
 MISSING=0
-for hook_path in $(jq -r '.. | .command? // empty' "$PROJECT_ROOT/.claude/settings.json" 2>/dev/null | sort -u); do
+while IFS= read -r hook_path; do
+    [ -n "$hook_path" ] || continue
     if [ ! -f "$PROJECT_ROOT/$hook_path" ]; then
         echo "  MISSING: $hook_path"
         MISSING=$((MISSING + 1))
     fi
-done
+done <<< "$HOOK_PATHS"
 assert_eq "$MISSING" "0" "all hook paths in settings.json exist on disk"
 
 # ── Test 2: Every .sh in hooks/ (except _lib.sh) is in settings.json ─────

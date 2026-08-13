@@ -258,6 +258,59 @@ class DirtyTreeRefusalTests(unittest.TestCase):
             report = build_inventory(REPO, "rust", allow_dirty=True)
         self.assertTrue(report.rows)
 
+    def test_a_staged_modification_is_still_dirty(self):
+        """`git add` must not silence the refusal.
+
+        Both tests above patch `dirty_foundation_files` out, so neither has ever
+        run the git command it wraps. It read `git diff --name-only`, which
+        compares the working tree against the INDEX — so staging a modified
+        foundation file made the function return empty and the inventory
+        proceeded over a tree whose blob ids were about to change. That is not a
+        contrived sequence: the workflow this repository prescribes is commit,
+        regenerate, commit, and staging sits between the first two.
+
+        This is the only test here that exercises the real git call, so it
+        builds a throwaway repository rather than mutating the one it runs in. A
+        test that staged a file in the working repository would leave the
+        developer's index changed whether it passed or failed.
+        """
+        import tempfile
+
+        from tools.kinglet_spike.inventory import dirty_foundation_files
+
+        def git(cwd, *args):
+            subprocess.run(
+                ("git", *args), cwd=cwd, check=True, capture_output=True, text=True
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "tools" / "kinglet_build" / "probe.py"
+            target.parent.mkdir(parents=True)
+            target.write_text("original\n")
+            git(root, "init", "-q", ".")
+            git(root, "config", "user.email", "probe@example.invalid")
+            git(root, "config", "user.name", "probe")
+            git(root, "add", "-A")
+            git(root, "commit", "-qm", "base")
+
+            self.assertEqual((), dirty_foundation_files(root))
+
+            target.write_text("edited\n")
+            self.assertEqual(
+                ("tools/kinglet_build/probe.py",),
+                dirty_foundation_files(root),
+                "an unstaged modification is dirty",
+            )
+
+            git(root, "add", "tools/kinglet_build/probe.py")
+            self.assertEqual(
+                ("tools/kinglet_build/probe.py",),
+                dirty_foundation_files(root),
+                "a staged modification is still uncommitted; `git add` must not "
+                "make the foundation look clean",
+            )
+
 
 class CliTests(unittest.TestCase):
     """The runtime must be named on the command line, never guessed.
