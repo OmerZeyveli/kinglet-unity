@@ -21,12 +21,12 @@ EXPECTED_COUNTS = {
     "agents": 8,
     "commands": 9,
     "skills": 16,
-    "hooks": 27,
+    "hooks": 12,
     "rules": 6,
     "claude_templates": 0,
     "code_templates": 10,
 }
-FULL_CLAUDE_TREE_COUNT = 77
+FULL_CLAUDE_TREE_COUNT = 62
 OMITTED_FROM_SEVEN_CATEGORIES = {
     ".claude/NOTICE.md",
     ".claude/UPSTREAM",

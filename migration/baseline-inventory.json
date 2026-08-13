@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "451673bb09a3a49e6b28c0e4aaab71db5ba9f282",
+  "source_commit": "818b2bd4d7dbb075f53476a026e899f753376778",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
-    "expected_count": 77,
+    "expected_count": 62,
     "files": [
       {
         "path": ".claude/NOTICE.md",
@@ -33,7 +33,7 @@
       },
       {
         "path": ".claude/agents/unity-optimizer.md",
-        "sha256": "85d0679db3dc31558e0c92791c61cbf7ddbf6fb8a3689b906364235de6755023",
+        "sha256": "107daad7349f09c01b5aa8b683cacb8ba4936b2dad564b8613c84d0ac99afef2",
         "git_mode": "100644"
       },
       {
@@ -78,7 +78,7 @@
       },
       {
         "path": ".claude/commands/unity-optimize.md",
-        "sha256": "22561a6b94d490cff0cfcb59eda341290d7275c4c33848daa745d4f1d5388b69",
+        "sha256": "60a27544b384032fe5bafae3f0c84ee0d83a1dfaac8533c0667fe93d254e73cc",
         "git_mode": "100644"
       },
       {
@@ -112,11 +112,6 @@
         "git_mode": "100755"
       },
       {
-        "path": ".claude/hooks/auto-learn.sh",
-        "sha256": "f76428a5cda957f378e42def8e9a3b5b7aa3c08e638055a6dced0b251ff9b6ea",
-        "git_mode": "100755"
-      },
-      {
         "path": ".claude/hooks/bash-gate.sh",
         "sha256": "f151e9945ff09f1971538d2321cbf678c2cf78919df19852da54482c6db5bf45",
         "git_mode": "100755"
@@ -132,63 +127,13 @@
         "git_mode": "100755"
       },
       {
-        "path": ".claude/hooks/block-projectsettings.sh",
-        "sha256": "c46822e169255114fb7a01df21214aad10aa4fdf8efb6b3ed838adc5655b990d",
-        "git_mode": "100755"
-      },
-      {
         "path": ".claude/hooks/block-scene-edit.sh",
         "sha256": "7eb9ae2cecb238ba786ac33af1833fd842ceb55362bf7d10b2aee56da21d71b6",
         "git_mode": "100755"
       },
       {
-        "path": ".claude/hooks/build-analyze.sh",
-        "sha256": "e1c54028721dd6d9c102a4c4dbc660b8af077cb035144041a94ab51fe9fca334",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/cost-tracker.sh",
-        "sha256": "09c6b79d80214e0a1686eddbd0f825be459c28c0e76ec0733331bbbd77636d90",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/gateguard.sh",
-        "sha256": "66c5dc1a2af35fb22869f176010faf265bfc7d9607486ad2e92859d82b45a16d",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/guard-editor-runtime.sh",
-        "sha256": "f31ec6a7cf6927a1a5eeaa212c765fceaa7c0146398dcb7c49dca0320d15283e",
-        "git_mode": "100755"
-      },
-      {
         "path": ".claude/hooks/guard-project-config.sh",
         "sha256": "069b0f239fa34ff317e03cba96aebd8d8a877da0c588ad38b063a68c19cfe1ac",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/instinct-capture.sh",
-        "sha256": "9065b7a00ffd86ea538023fd7077c5ec87005d7a130eb738d330005d3e7b3bcb",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/instinct-distill.sh",
-        "sha256": "823e798c2872755741bb9c049b7ce176537ec72dbe5e68a28543f222188ec44d",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/notify.sh",
-        "sha256": "7f240df05bfe0fcb1f9bb711f01be630089ea23b285de63a1234839e820fe0e5",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/pre-compact.sh",
-        "sha256": "b17c7e4ce26cf6b23f72530f62f3f68218d55ee7bb1963ab29dd835baa8a9a75",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/quality-gate.sh",
-        "sha256": "71701943b4889aa14f85827182506a64d163fc24e1048d36bb66346ddd06dcbe",
         "git_mode": "100755"
       },
       {
@@ -207,28 +152,8 @@
         "git_mode": "100755"
       },
       {
-        "path": ".claude/hooks/stop-validate.sh",
-        "sha256": "8d1a4755f262c769c2233a341729be44aa78a3b1f40835db4f8645fe4bdf8251",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/suggest-verify.sh",
-        "sha256": "f4f00021b86c7a166fdd5b6e5ad8b3802bf84f0d68f8b4c9c5ab1c58b3a14c94",
-        "git_mode": "100755"
-      },
-      {
         "path": ".claude/hooks/track-edits.sh",
         "sha256": "fb3d2e9ba0116065cc73e4c5106cde68aae76c32e3ffec9b19addb1bb7c6f791",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/track-reads.sh",
-        "sha256": "47b4e734ee145bb9d36620302209879786f819de7fde933142733f69f8eef211",
-        "git_mode": "100755"
-      },
-      {
-        "path": ".claude/hooks/validate-commit.sh",
-        "sha256": "0d0a6efb382a1d94a1d046a89fb10d2d6fba1065a1436436936cce0eb785b345",
         "git_mode": "100755"
       },
       {
@@ -278,12 +203,12 @@
       },
       {
         "path": ".claude/settings.json",
-        "sha256": "3d466a02bc2f63c8474d8dad3035658104999d9310e47b29940418fcb66cc93d",
+        "sha256": "6fa5992ff098acd32539e1475439b4f1985f403aea7ea1b35b62e360368a3e2e",
         "git_mode": "100644"
       },
       {
         "path": ".claude/settings.local.json.template",
-        "sha256": "6f7ce8c899a2a1696c46160deee234ba20a9ded615bcc1da505a6b68f3333149",
+        "sha256": "9005191f58d6a143455aa3a4b3517333f912ea6bcd35d96f45706457694caad6",
         "git_mode": "100644"
       },
       {
@@ -410,7 +335,7 @@
         },
         {
           "path": ".claude/agents/unity-optimizer.md",
-          "sha256": "85d0679db3dc31558e0c92791c61cbf7ddbf6fb8a3689b906364235de6755023",
+          "sha256": "107daad7349f09c01b5aa8b683cacb8ba4936b2dad564b8613c84d0ac99afef2",
           "git_mode": "100644"
         },
         {
@@ -461,7 +386,7 @@
         },
         {
           "path": ".claude/commands/unity-optimize.md",
-          "sha256": "22561a6b94d490cff0cfcb59eda341290d7275c4c33848daa745d4f1d5388b69",
+          "sha256": "60a27544b384032fe5bafae3f0c84ee0d83a1dfaac8533c0667fe93d254e73cc",
           "git_mode": "100644"
         },
         {
@@ -579,13 +504,8 @@
     },
     "hooks": {
       "description": "All tracked policy hooks under .claude/hooks/, excluding _lib.sh; every entry is executable.",
-      "expected_count": 27,
+      "expected_count": 12,
       "files": [
-        {
-          "path": ".claude/hooks/auto-learn.sh",
-          "sha256": "f76428a5cda957f378e42def8e9a3b5b7aa3c08e638055a6dced0b251ff9b6ea",
-          "git_mode": "100755"
-        },
         {
           "path": ".claude/hooks/bash-gate.sh",
           "sha256": "f151e9945ff09f1971538d2321cbf678c2cf78919df19852da54482c6db5bf45",
@@ -602,63 +522,13 @@
           "git_mode": "100755"
         },
         {
-          "path": ".claude/hooks/block-projectsettings.sh",
-          "sha256": "c46822e169255114fb7a01df21214aad10aa4fdf8efb6b3ed838adc5655b990d",
-          "git_mode": "100755"
-        },
-        {
           "path": ".claude/hooks/block-scene-edit.sh",
           "sha256": "7eb9ae2cecb238ba786ac33af1833fd842ceb55362bf7d10b2aee56da21d71b6",
           "git_mode": "100755"
         },
         {
-          "path": ".claude/hooks/build-analyze.sh",
-          "sha256": "e1c54028721dd6d9c102a4c4dbc660b8af077cb035144041a94ab51fe9fca334",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/cost-tracker.sh",
-          "sha256": "09c6b79d80214e0a1686eddbd0f825be459c28c0e76ec0733331bbbd77636d90",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/gateguard.sh",
-          "sha256": "66c5dc1a2af35fb22869f176010faf265bfc7d9607486ad2e92859d82b45a16d",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/guard-editor-runtime.sh",
-          "sha256": "f31ec6a7cf6927a1a5eeaa212c765fceaa7c0146398dcb7c49dca0320d15283e",
-          "git_mode": "100755"
-        },
-        {
           "path": ".claude/hooks/guard-project-config.sh",
           "sha256": "069b0f239fa34ff317e03cba96aebd8d8a877da0c588ad38b063a68c19cfe1ac",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/instinct-capture.sh",
-          "sha256": "9065b7a00ffd86ea538023fd7077c5ec87005d7a130eb738d330005d3e7b3bcb",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/instinct-distill.sh",
-          "sha256": "823e798c2872755741bb9c049b7ce176537ec72dbe5e68a28543f222188ec44d",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/notify.sh",
-          "sha256": "7f240df05bfe0fcb1f9bb711f01be630089ea23b285de63a1234839e820fe0e5",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/pre-compact.sh",
-          "sha256": "b17c7e4ce26cf6b23f72530f62f3f68218d55ee7bb1963ab29dd835baa8a9a75",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/quality-gate.sh",
-          "sha256": "71701943b4889aa14f85827182506a64d163fc24e1048d36bb66346ddd06dcbe",
           "git_mode": "100755"
         },
         {
@@ -677,28 +547,8 @@
           "git_mode": "100755"
         },
         {
-          "path": ".claude/hooks/stop-validate.sh",
-          "sha256": "8d1a4755f262c769c2233a341729be44aa78a3b1f40835db4f8645fe4bdf8251",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/suggest-verify.sh",
-          "sha256": "f4f00021b86c7a166fdd5b6e5ad8b3802bf84f0d68f8b4c9c5ab1c58b3a14c94",
-          "git_mode": "100755"
-        },
-        {
           "path": ".claude/hooks/track-edits.sh",
           "sha256": "fb3d2e9ba0116065cc73e4c5106cde68aae76c32e3ffec9b19addb1bb7c6f791",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/track-reads.sh",
-          "sha256": "47b4e734ee145bb9d36620302209879786f819de7fde933142733f69f8eef211",
-          "git_mode": "100755"
-        },
-        {
-          "path": ".claude/hooks/validate-commit.sh",
-          "sha256": "0d0a6efb382a1d94a1d046a89fb10d2d6fba1065a1436436936cce0eb785b345",
           "git_mode": "100755"
         },
         {
