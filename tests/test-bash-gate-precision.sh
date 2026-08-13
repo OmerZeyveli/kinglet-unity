@@ -418,9 +418,9 @@ assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec openssl rand -out {} 
 
 # ============================================================================================
 # Four commands are read-only in the form you meet them and destructive in one other form.
-# Each arm reads the haystack in which BEING WRONG BLOCKS: the flag arms read the whole
-# command line (a wider haystack finds `-i` more easily), git reads only the token straight
-# after it (a wider one would let an unrelated `git status` vouch for an earlier `git rm`).
+# The write flag is decided from the command's OWN argument tokens, bounded by its clause —
+# not by regexing the whole command line, which is what let ten quoted and attached spellings
+# through (see the positional block at the end of this file).
 # ============================================================================================
 assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec sed -n /guid/p {} \;')" \
     "does not block a sed that only prints"
@@ -466,3 +466,96 @@ assert_contains "$(tbg_stderr 'find Assets/Art -name "*.meta" -delete')" \
 assert_contains "$(tbg_stderr 'find Assets/Art -name "*.meta" -newer x -delete')" \
     "Write a one-line rollback procedure" \
     "still demands a rollback plan for a deletion"
+
+# ============================================================================================
+# 2026-08-13 round 5 — THE FLAG IS A POSITION TOO.
+#
+# The first cut of the second stage above decided `-i` by regexing the WHOLE RAW COMMAND with
+# a right boundary of `([[:space:]]|=|\.|$)`. Shell quoting and attached suffixes walk past
+# that boundary, so ten spellings that rewrite every .meta file they are handed were permitted
+# — including `sed -i''`, which is the canonical cross-platform spelling and the one someone
+# writes in THIS repository, because a macOS host pass is planned. Five were verified against
+# real files with GNU sed 4.9 and gawk 5.2.1. Round 3 blocked all ten, because its allowlist
+# had no second stage at all; the fix for one false-positive class opened a false-negative one.
+#
+# It is the same defect as the backslash and the xargs argument, one level up: a token judged
+# by its SHAPE in a wide haystack instead of by the POSITION it occupies — while the function
+# next door was already holding the tokenised argument list.
+#
+# SO THESE ASSERT THE CLASS, NOT THE TEN SPELLINGS. Ten spellings is the shape that has been
+# wrong five times in this task. What is asserted is that the flag is found when it is an
+# ARGUMENT OF THE EXEC'D COMMAND — bare, attached, quoted away to nothing, or a separate pair —
+# and not found when the same characters belong to something else on the line.
+# ============================================================================================
+
+# --- a token that IS the flag, however it is spelled ----------------------------------------
+assert_eq "2" "$(tbg_run "find Assets -name '*.meta' -exec sed -i'' -e s/guid/x/ {} \\;")" \
+    "blocks sed -i'' — the cross-platform spelling, quoted away to nothing"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sed -i"" s/guid/x/ {} \;')" \
+    "blocks sed -i with an empty double-quoted suffix"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sed "-i" s/guid/x/ {} \;')" \
+    "blocks sed when the flag itself is quoted"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sed -ibak s/guid/x/ {} \;')" \
+    "blocks sed -ibak, whose suffix is attached with no separator at all"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sed -i~ s/guid/x/ {} \;')" \
+    "blocks sed -i~, whose suffix is not a word character"
+assert_eq "2" "$(tbg_run "find Assets -name '*.meta' -exec sed -i'.bak' s/guid/x/ {} \\;")" \
+    "blocks sed -i with a quoted suffix"
+assert_eq "2" "$(tbg_run "find Assets -name '*.meta' -exec gsed -i'' s/guid/x/ {} \\;")" \
+    "blocks the same spelling under the GNU-on-macOS name"
+assert_eq "2" "$(tbg_run "find Assets -name '*.meta' -exec yq -i'' .guid=1 {} \\;")" \
+    "blocks the same spelling for yq"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec gawk -i inplace "{print}" {} \;')" \
+    "blocks gawk -i inplace, where the flag and its value are a separate pair"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec awk -i inplace "{print $0}" {} \;')" \
+    "blocks awk -i inplace under the unprefixed name"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sort -o{} {} \;')" \
+    "blocks sort with its output file attached to the flag"
+
+# --- the same characters, belonging to something else on the line ---------------------------
+# Each of these was blocked by the whole-line regex. The exec'd command's own arguments contain
+# no write flag, and that is the only thing that decides now.
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec sed -n /guid/p {} \; | grep -i guid')" \
+    "does not read a later grep -i as sed's in-place flag"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 -i sed -n 1p {}')" \
+    "does not read xargs' own -i as sed's in-place flag"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec awk "{print}" {} \; > /tmp/o.txt')" \
+    "does not read a shell redirect after the clause as awk's"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec awk "{print}" {} \; 2>/dev/null')" \
+    "does not read a stderr redirect after the clause as awk's"
+assert_eq "0" "$(tbg_run 'find Assets \( -name "*.meta" -o -name "*.asset" \) -exec sort {} \;')" \
+    "does not read find's own -o as sort's output flag"
+assert_eq "0" "$(tbg_run 'find Assets -ipath "*/Art/*.meta" -exec sed -n 1p {} \;')" \
+    "does not read find's -ipath as sed's in-place flag"
+assert_eq "0" "$(tbg_run 'find Assets -not -name "*.cs" -name "*.meta" -exec sort {} \;')" \
+    "does not read find's -not as an output flag"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -print0 -follow -exec sed -n 1p {} \;')" \
+    "does not read find's -follow or -print0 as a write flag"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec git -C /repo log --oneline {} \;')" \
+    "does not lose git's subcommand behind a global option with its own argument"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec git --git-dir=/r/.git log {} \;')" \
+    "does not lose git's subcommand behind an attached global option"
+
+# Skipping a global option's argument must not become a way to hide the subcommand behind it,
+# and a write flag counts wherever it sits among the command's own arguments — not only first.
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec git -C /repo rm {} \;')" \
+    "still blocks git rm reached past a global option"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sed -e s/a/b/ -i {} \;')" \
+    "blocks sed -i when the flag comes after the expression"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sort -u -o {} {} \;')" \
+    "blocks sort -o when another flag comes first"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec yq --inplace .guid=1 {} \;')" \
+    "blocks the long spelling of yq's in-place flag"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec gawk --include=inplace "{print}" {} \;')" \
+    "blocks gawk's long spelling of the in-place include"
+
+# --- the clause boundary must not become a vouching direction -------------------------------
+# The bound is what keeps an unrelated command out of the decision. It must not also let one
+# clause speak for another: the reader stops at the FIRST command that is not read-only,
+# whichever end of the line it sits at.
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec grep -l guid {} \; -exec gzip -9 {} \;')" \
+    "blocks the second clause when the first one is read-only"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec gzip -1 {} \; -exec grep -l guid {} \;')" \
+    "blocks the first clause when the second one is read-only"
+assert_eq "2" "$(tbg_run 'git status && find Assets -name "*.meta" -exec git rm {} \;')" \
+    "does not let a git status ahead of the find vouch for the git rm inside it"

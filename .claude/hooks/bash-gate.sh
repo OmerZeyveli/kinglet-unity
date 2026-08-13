@@ -147,9 +147,11 @@ fi
 # reason: its man page says old-file mode "overwrite[s] output to it. The program defaults to
 # run in this mode", so `-exec dos2unix {} \;` rewrites every .meta file it is handed.
 #
-# $1 is the command name, $2 the token straight after it, $3 the whole command line.
+# $1 is the command name; $2 is that command's OWN argument tokens, already dequoted and
+# space-joined by find_exec_commands, bounded by its clause.
 find_exec_is_read_only() {
-    case "$1" in
+    local _cmd="$1" _args="${2:-}" _tok _skip=0
+    case "$_cmd" in
         grep|egrep|fgrep|rg|ag|ack|stat|file|wc|cksum|md5sum|sha1sum|sha256sum|sha512sum|\
         b2sum|shasum|cat|head|tail|less|more|od|xxd|strings|nl|ls|basename|dirname|realpath|\
         readlink|echo|printf|true|false|test|'['|diff|cmp|uniq|cut|tr|comm|column|jq|du|\
@@ -158,44 +160,83 @@ find_exec_is_read_only() {
     esac
 
     # --- second stage: read-only in the form you meet them, destructive in one other one ----
-    # A table of four arms, deliberately not a mechanism. Each names the shape that writes,
-    # and each reads the haystack in which BEING WRONG BLOCKS RATHER THAN PERMITS:
-    #   - the flag arms read the WHOLE command line ($3), because a wider haystack finds `-i`
-    #     more easily, so a miss costs one first-attempt block on a read;
-    #   - `git` reads ONLY the token straight after it ($2), because a wider haystack would let
-    #     an unrelated `git status` later on the line vouch for an earlier `git rm`.
-    # The cost of the wide haystack, accepted: an unrelated `grep -i` or find's own `-o`
-    # elsewhere on the line makes the read form block once. `openssl` joins `sort` rather than
-    # the flat list because it is the same shape — `-out FILE` writes a named file.
-    case "$1" in
-        sed|gsed|yq)
-            if grep -qE '(^|[[:space:]])(-[A-Za-z]*i([[:space:]]|=|\.|$)|--in-?place)' <<< "$3"; then
-                return 1
-            fi
-            return 0 ;;
-        sort|openssl)
-            if grep -qE '(^|[[:space:]])(-[A-Za-z]*o([[:space:]]|=|$)|--output|-out([[:space:]]|=|$))' <<< "$3"; then
-                return 1
-            fi
-            return 0 ;;
-        awk|gawk|mawk)
-            if grep -qE '(>|system[[:space:]]*\()' <<< "$3"; then
-                return 1
-            fi
-            return 0 ;;
-        git)
-            case "$2" in
-                log|blame|ls-files|check-ignore|show|diff|status|cat-file|grep) return 0 ;;
-            esac
-            return 1 ;;
+    # A table of four arms, deliberately not a mechanism. Each names the shape that writes.
+    #
+    # THE FLAG IS READ AS A POSITION, NOT AS A SHAPE IN A WIDE HAYSTACK. The first cut of this
+    # table regexed the whole raw command string with a right boundary of `([[:space:]]|=|\.|$)`,
+    # and shell quoting walked straight past it: `sed -i''` — the canonical cross-platform
+    # spelling, and the one someone writes HERE because a macOS host pass is planned — was
+    # permitted, along with `-ibak`, `-i~`, `"-i"` and `gawk -i inplace`. Five of them were
+    # verified against real files: they rewrite every .meta they are handed. Round 3 blocked all
+    # of them, because its allowlist had no second stage at all.
+    #
+    # That is this round's own defect class one level up: a token classified by its shape
+    # instead of by the position it occupies — thrown away by a function that was already
+    # holding the tokenised argument list. Deciding from the command's own arguments closes it
+    # and four false positives with it (`grep -i` or `xargs -i` later on the line, a shell
+    # redirect after the clause, find's own `-o`, and `git -C`), and it removes a
+    # clauses × command-length cost that was measurable at 500 exec groups.
+    #
+    # The negative condition is preserved, so there is still no vouching direction: an arm asks
+    # whether a write flag is present among ITS OWN arguments, and a spelling this table has not
+    # thought of costs one first-attempt block on a read, never a pass on a write.
+    case "$_cmd" in
+        sed|gsed|yq|sort|openssl|awk|gawk|mawk|git) ;;
+        *) return 1 ;;
     esac
-    return 1
+    set -f
+    # shellcheck disable=SC2086 -- deliberate word splitting over an already-tokenised list
+    set -- $_args
+    set +f
+    while [ "$#" -gt 0 ]; do
+        _tok="$1"; shift
+        if [ "$_skip" = "1" ]; then _skip=0; continue; fi
+        case "$_cmd" in
+            sed|gsed|yq)
+                # -i, -i.bak, -ibak, -i~, -i'' (dequoted to -i'), bundles like -ni, and the
+                # long spellings. A `case` glob is anchored at both ends, which is why find's
+                # own -iname can never reach this and an attached suffix can never escape it.
+                case "$_tok" in
+                    -i|-i[!-]*|-[A-Za-z]*i|--in-place|--in-place=*|--inplace|--inplace=*)
+                        return 1 ;;
+                esac ;;
+            sort|openssl)
+                case "$_tok" in
+                    -o|-o[!-]*|-[A-Za-z]*o|--output|--output=*) return 1 ;;
+                esac ;;
+            awk|gawk|mawk)
+                # `-i inplace` is gawk's in-place extension; any -i loads a library that can
+                # write, so all of them count. A redirect or system() inside the program is the
+                # other write form.
+                case "$_tok" in
+                    -i|-i[!-]*|--include|--include=*) return 1 ;;
+                    *'>'*|*'system('*) return 1 ;;
+                esac ;;
+            git)
+                case "$_tok" in
+                    -C|-c|--git-dir|--work-tree|--namespace|--exec-path|--config-env)
+                        _skip=1 ;;                 # a global option with a separate argument
+                    -*) ;;
+                    log|blame|ls-files|check-ignore|show|diff|status|cat-file|grep) return 0 ;;
+                    *) return 1 ;;                 # any other subcommand
+                esac ;;
+        esac
+    done
+    case "$_cmd" in
+        git) return 1 ;;                           # no subcommand reached at all
+        *) return 0 ;;
+    esac
 }
 
-# find_exec_commands — prints, one per line, `<command><TAB><the token after it>` for every
-# command that find's -exec/-execdir/-ok(dir) or a pipeline's xargs would actually run.
+# find_exec_commands — prints, one per line, `<command><TAB><its own argument tokens>` for
+# every command that find's -exec/-execdir/-ok(dir) or a pipeline's xargs would actually run.
 # Tokenised in bash rather than matched with a regex, because "the word after the introducer"
 # is a position, and the regex attempts to express that position are what kept missing verbs.
+#
+# The argument list is bounded by the command's own CLAUSE: find's `\;` or `+`, a shell
+# operator for an xargs pipeline, or the next -exec/xargs introducer. That bound is what keeps
+# `grep -i` after a pipe, a `2>/dev/null` after the terminator, and an unrelated later
+# `git status` out of the decision about the command that actually touches the .meta files.
 #
 # EVERY BUG THIS FUNCTION HAS HAD IS THE SAME BUG: a token classified by its shape rather than
 # by its position, so the real command was stepped over. Three of them, kept here because the
@@ -213,18 +254,43 @@ find_exec_is_read_only() {
 #     skipping their next word would step over the command in `xargs -i rm {}`.
 #   - the same class in `CMD_START` above, for the direct arm.
 find_exec_commands() {
-    local tok cmd want=0
+    local tok cmd want=0 pend="" args=""
     # `set -f` matters: the command line being tokenised contains globs (`*.meta` is the whole
     # point), and unquoted word splitting would otherwise expand them against the real cwd.
     set -f
     # shellcheck disable=SC2086 -- deliberate word splitting; this IS the tokeniser
     set -- $1
     set +f
-    # `while`/`shift` rather than `for`, so that $1 is the token after the current one and the
-    # command's own next word is available without a second pass.
     while [ "$#" -gt 0 ]; do
         tok="$1"; shift
-        tok="${tok#\\}"                            # \rm -> rm, \xargs -> xargs, \; -> ;
+        # Strip one layer of shell quoting, and the alias-bypass backslash with it.
+        #
+        # GUARDED, because `${var#pat}` is the one pathological operation here. Measured on
+        # this host, bash 5.2 in en_US.UTF-8, against a single 122 880-character token:
+        # ONE `${x#\\}` costs 432 ms and the five steps below cost 2098 ms, while a `case`
+        # against the same token — literal, `*/xargs`, or `*>*` — costs 3–4 ms. It is the
+        # multibyte-aware scan, and it is why a long command line was seconds rather than
+        # milliseconds. The guard is exact rather than a length cap: every step below is a
+        # no-op unless the token starts with a backslash or a quote, or ends with a quote.
+        case "$tok" in
+            '\'*|"'"*|'"'*|*"'"|*'"')
+                tok="${tok#\\}"                    # \rm -> rm, \xargs -> xargs, \; -> ;
+                tok="${tok%\'}"; tok="${tok#\'}"   # 'rm -> rm, -i'' -> -i'
+                tok="${tok%\"}"; tok="${tok#\"}"   # "-i" -> -i
+                ;;
+        esac
+        if [ -n "$pend" ]; then
+            # Collecting the pending command's own arguments. The clause ends at find's
+            # terminator, at a shell operator, or at the next introducer.
+            case "$tok" in
+                ';'|'+'|'|'|'||'|'&&'|'&')
+                    printf '%s\t%s\n' "$pend" "$args"; pend=""; args=""; continue ;;
+                -exec|-execdir|-ok|-okdir|xargs|*/xargs)
+                    printf '%s\t%s\n' "$pend" "$args"; pend=""; args=""; want=1; continue ;;
+            esac
+            args="$args $tok"
+            continue
+        fi
         if [ "$want" = "1" ]; then
             case "$tok" in
                 -a|-E|-I|-d|-L|-n|-P|-s|--arg-file|--delimiter|--max-args|--max-chars|--max-procs)
@@ -233,13 +299,12 @@ find_exec_commands() {
                 -*|*=*|'{}'*|';'|'+') continue ;;
             esac
             cmd="${tok##*/}"                       # /usr/bin/rm -> rm
-            cmd="${cmd%\'}"; cmd="${cmd#\'}"       # 'rm -> rm
-            cmd="${cmd%\"}"; cmd="${cmd#\"}"
             case "$cmd" in
                 # The same prefix vocabulary CMD_START uses: these run the NEXT word.
                 env|sudo|doas|nice|nohup|command|time|exec|'') continue ;;
             esac
-            printf '%s\t%s\n' "$cmd" "${1:-}"
+            pend="$cmd"
+            args=""
             want=0
             continue
         fi
@@ -247,6 +312,12 @@ find_exec_commands() {
             -exec|-execdir|-ok|-okdir|xargs|*/xargs) want=1 ;;
         esac
     done
+    # A clause that runs to the end of the line has no terminator to flush it. An `if`, not an
+    # AND-list: under `set -e` a trailing `[ -n "$x" ] && printf` fails the function when the
+    # test is false.
+    if [ -n "$pend" ]; then
+        printf '%s\t%s\n' "$pend" "$args"
+    fi
     return 0
 }
 
@@ -259,9 +330,9 @@ if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
         META_EXEC=""
         # A here-string, not a pipe: `break` in a piped `while` would leave the writer to die
         # of SIGPIPE, which under pipefail + set -e kills the hook and fails it OPEN.
-        while IFS=$'\t' read -r _mc _mnext; do
+        while IFS=$'\t' read -r _mc _margs; do
             [ -n "$_mc" ] || continue
-            if ! find_exec_is_read_only "$_mc" "${_mnext:-}" "$COMMAND"; then
+            if ! find_exec_is_read_only "$_mc" "${_margs:-}"; then
                 META_EXEC="$_mc"
                 break
             fi
