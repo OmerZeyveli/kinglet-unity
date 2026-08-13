@@ -75,73 +75,136 @@ if grep -qE "${CMD_START}rm[[:space:]]+-[rRf]+[[:space:]]+${SAME_CMD}(Library|Te
     DANGER_MSG="Deleting Library/Temp/Logs/obj/Build triggers a full Unity reimport (minutes to hours) and can corrupt GUIDs if done while editor is open."
 fi
 
-# .meta deletion/mass-rename — verb must start a command; path must be its argument.
+# .meta deletion/mass-rename.
 #
-# `rm` and `find` were one alternation here, and that made every `find` naming `.meta` a
-# deletion. `find` is a search verb: on its own it prints paths and changes nothing.
-# Measured 2026-08-13 — `find Assets -name "*.meta" | wc -l`, a count, was classified
-# meta-deletion and blocked. Command position was never the problem for this pattern; the
-# verb was. `find` acts only through an action, so require one. The action is looked for
-# anywhere in the command rather than inside SAME_CMD, because `find … | xargs rm` puts it in
-# the *next* segment by construction.
+# TWO SHAPES, TWO DISCRIMINATORS, AND THEY POINT OPPOSITE WAYS. This is the part to understand
+# before editing anything below.
 #
-# BOTH verbs, and the rename is not decoration: this file's own header and
-# docs/HOOK-REFERENCE.md have always said "mass .meta deletion OR RENAME", and the first cut
-# of this clause required a deletion verb only — so `find … -exec mv {} /tmp \;`, the find
-# route to exactly that mass rename, went from blocked to allowed and left two shipped
-# sentences claiming otherwise. Found in review, measured, and fixed here rather than by
-# narrowing the sentences: the claim is worth keeping true.
+# The DIRECT shape (`rm Assets/Player.cs.meta`) names the file as the verb's own argument.
+# Anything at all can name a path — `cat`, `git log`, `stat` — so there is no allowlist of
+# harmless commands to write here, and a denylist of destructive verbs is the correct tool. It
+# is incomplete by construction and always will be; adding a verb is a one-line change.
 #
-# The verb is matched as a token bounded by non-identifier characters instead of `[[:space:]]+`,
-# because the four measured routes to it do not all put a space there: `-exec /bin/rm` (a path
-# prefix), `-exec git rm` (a wrapper), `-exec sh -c 'rm "$1"'` (a quote). A find whose -exec
-# merely passes the word `rm` to something harmless is a false positive here, accepted
-# deliberately: this is a two-stage gate, so the cost is one retry, and the plan is explicit
-# that a false negative on a mass .meta operation is the more expensive direction.
-# The verbs are enumerated because narrowing this clause is what un-blocked them. Before this
-# task ANY `find` naming `.meta` was classified — indiscriminate, which is why a count was
-# blocked, and also why every destructive verb was covered for free. Requiring an action
-# restored the counts and dropped the verbs with them. Measured at be2a582 and after: `-exec`
-# with each of these was 2 and became 0. They are not a wish list; each one is an act this
-# task broke.
+# The FIND shape (`find Assets -name '*.meta' -exec X {} \;`) is the opposite. `find` supplies
+# the paths and X does the work, so the question is not "is X on a list of dangerous things"
+# but "is X something that cannot hurt these files". That set is small, closed and knowable;
+# the dangerous set is every binary on the machine.
 #
-#   deletion:  rm (the common one), unlink (literally deletion), shred (overwrite then
-#              unlink), truncate (destroys the contents in place, which for a .meta file is
-#              the GUID)
-#   rename:    mv, rename and prename (the canonical mass-rename tools; prename is spelled
-#              separately because the left boundary makes `rename` not match inside it), mmv
-#              (literally mass-move)
-DEL_VERB='(rm|unlink|shred|truncate)'
-MV_VERB='(mv|rename|prename|mmv)'
-FIND_RM='-(exec|execdir|ok)[^;&|]*[^A-Za-z0-9_.-]'"${DEL_VERB}"'([^A-Za-z0-9_-]|$)'
-FIND_MV='-(exec|execdir|ok)[^;&|]*[^A-Za-z0-9_.-]'"${MV_VERB}"'([^A-Za-z0-9_-]|$)'
-XARGS_RM='xargs[^;&|]*[^A-Za-z0-9_.-]'"${DEL_VERB}"'([^A-Za-z0-9_-]|$)'
-XARGS_MV='xargs[^;&|]*[^A-Za-z0-9_.-]'"${MV_VERB}"'([^A-Za-z0-9_-]|$)'
-# Single-quoted around the interpolations: `$)` inside double quotes is left literal by bash,
-# but relying on that to carry a regex anchor is not something the next reader should have to
-# verify.
-FIND_DELETES='(-delete([[:space:]]|$)|'"${FIND_RM}"'|'"${XARGS_RM}"')'
-FIND_RENAMES='('"${FIND_MV}"'|'"${XARGS_MV}"')'
+# We learned that the expensive way. Before this wave the pattern was `(rm|find)…\.meta` —
+# indiscriminate, which is why `find Assets -name "*.meta" | wc -l` (a COUNT) was blocked as a
+# deletion, and also why every destructive verb was covered for free. Requiring an action
+# restored the counts and dropped every unlisted verb with them. The denylist was then written
+# out by hand three times: rm; then mv after review; then unlink/shred/truncate/rename/prename/
+# mmv after re-review — and a mechanical sweep still found 49 misses out of 58 binaries. The
+# decisive one was `perl-rename`/`file-rename`: the SAME tool as `prename`, under its other two
+# standard names, missed by the same left-boundary mechanism the comment above it explained.
+# A hand-written denylist of harmful verbs was wrong every single time it was written.
+#
+# So the find shape is inverted: keep the action requirement — that is what lets a count and a
+# bare `-print` through, and it must not change — but once there IS an exec'd command,
+# classify UNLESS that command is on a small allowlist of read-only ones.
+#
+# The failure direction flips with it. An unlisted read-only command now costs one first-attempt
+# block on a two-stage gate; under the old shape an unlisted destructive command silently broke
+# every asset reference in the project. The plan is explicit that this is the cheaper direction.
 
 META_DEL_MSG=".meta files hold GUIDs — deleting them silently breaks every reference (scenes, prefabs, ScriptableObjects, AssetReferences)."
 META_MV_MSG="Renaming .meta files without their asset sibling orphans references. Unity will not recover from this automatically."
 
-if grep -qE "${CMD_START}rm[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
+# --- the direct shape: a denylist, by ruling ---------------------------------------------
+# Incomplete by construction. These are the verbs known today; `unlink Assets/Player.cs.meta`
+# passed until this line was widened, and `unlink` is literally what the classification is named
+# after. The find shape below no longer needs a list like this one.
+DIRECT_DEL='(rm|unlink|shred|truncate)'
+DIRECT_MV='(mv|rename|prename|perl-rename|file-rename|mmv)'
+
+if grep -qE "${CMD_START}${DIRECT_DEL}[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
     DANGER_KIND="meta-deletion"
     DANGER_MSG="$META_DEL_MSG"
 fi
-if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
-    if grep -qE "$FIND_DELETES" <<< "$COMMAND"; then
-        DANGER_KIND="meta-deletion"
-        DANGER_MSG="$META_DEL_MSG"
-    elif grep -qE "$FIND_RENAMES" <<< "$COMMAND"; then
-        DANGER_KIND="meta-rename"
-        DANGER_MSG="$META_MV_MSG"
-    fi
-fi
-if grep -qE "${CMD_START}(mv|rename)[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
+if grep -qE "${CMD_START}${DIRECT_MV}[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
     DANGER_KIND="meta-rename"
     DANGER_MSG="$META_MV_MSG"
+fi
+
+# --- the find shape: an allowlist of read-only commands ------------------------------------
+# Commands that cannot modify the files find hands them. Deliberately NOT here: `sed` (`-i`
+# rewrites in place), `awk` and any general-purpose interpreter (`sh`, `bash`, `python3`,
+# `perl`, `ruby`) — they can write, and a wrapper is exactly how a destructive verb hides.
+# `git` is out for the same reason: `git rm` and `git mv` are two of its subcommands.
+# Extending this list is safe in a way that extending a denylist never was: the worst a missing
+# entry does is block a read.
+find_exec_is_read_only() {
+    case "$1" in
+        grep|egrep|fgrep|rg|ag|ack|stat|file|wc|cksum|md5sum|sha1sum|sha256sum|shasum|\
+        cat|head|tail|less|more|od|xxd|strings|nl|ls|basename|dirname|realpath|readlink|\
+        echo|printf|true|false|test|diff|cmp|sort|uniq|cut|tr|comm|column|jq|touch|date)
+            return 0 ;;
+    esac
+    return 1
+}
+
+# find_exec_commands — prints, one per line, the name of every command that find's
+# -exec/-execdir/-ok(dir) or a pipeline's xargs would actually run. Tokenised in bash rather
+# than matched with a regex, because "the word after the introducer" is a position, and the
+# regex attempts to express that position are what kept missing verbs.
+find_exec_commands() {
+    local tok cmd want=0
+    # `set -f` matters: the command line being tokenised contains globs (`*.meta` is the whole
+    # point), and unquoted word splitting would otherwise expand them against the real cwd.
+    set -f
+    # shellcheck disable=SC2086 -- deliberate word splitting; this IS the tokeniser
+    set -- $1
+    set +f
+    for tok in "$@"; do
+        if [ "$want" = "1" ]; then
+            case "$tok" in
+                -*|*=*|'{}'*|';'*|'\'*|'+') continue ;;
+            esac
+            cmd="${tok##*/}"                       # /usr/bin/rm -> rm
+            cmd="${cmd%\'}"; cmd="${cmd#\'}"       # 'rm -> rm
+            cmd="${cmd%\"}"; cmd="${cmd#\"}"
+            case "$cmd" in
+                # The same prefix vocabulary CMD_START uses: these run the NEXT word.
+                env|sudo|doas|nice|nohup|command|time|exec|'') continue ;;
+            esac
+            printf '%s\n' "$cmd"
+            want=0
+            continue
+        fi
+        case "$tok" in
+            -exec|-execdir|-ok|-okdir|xargs|*/xargs) want=1 ;;
+        esac
+    done
+    return 0
+}
+
+if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
+    if grep -qE '(^|[^A-Za-z0-9_-])-delete([[:space:]]|$)' <<< "$COMMAND"; then
+        # find's own flag. Unambiguous, so the precise message is free here.
+        DANGER_KIND="meta-deletion"
+        DANGER_MSG="$META_DEL_MSG"
+    else
+        META_EXEC=""
+        # A here-string, not a pipe: `break` in a piped `while` would leave the writer to die
+        # of SIGPIPE, which under pipefail + set -e kills the hook and fails it OPEN.
+        while IFS= read -r _mc; do
+            [ -n "$_mc" ] || continue
+            if ! find_exec_is_read_only "$_mc"; then
+                META_EXEC="$_mc"
+                break
+            fi
+        done <<< "$(find_exec_commands "$COMMAND")"
+        if [ -n "$META_EXEC" ]; then
+            # ONE classification, and the message names the command rather than guessing its
+            # category. Once the decision stops depending on knowing the verb, a message that
+            # says "deleting" or "renaming" would be asserting knowledge the gate no longer
+            # has — and a category list kept only for wording would rot exactly as the denylist
+            # did, but silently, because a wrong sentence is less visible than a missed block.
+            DANGER_KIND="meta-mutation"
+            DANGER_MSG="This find runs '${META_EXEC}' over .meta files, and '${META_EXEC}' is not a read-only command. .meta files hold the GUIDs every scene, prefab and ScriptableObject reference resolves through — deleting, renaming or rewriting them breaks those references silently."
+        fi
+    fi
 fi
 
 # ProjectSettings direct mutation.
@@ -295,7 +358,7 @@ case "$DANGER_KIND" in
         echo "     - Confirm Unity editor is closed (otherwise reimport may race)." >&2
         echo "     - Note the expected reimport duration." >&2
         ;;
-    meta-deletion|meta-rename)
+    meta-deletion|meta-rename|meta-mutation)
         echo "     - List the asset files these .meta files belong to." >&2
         echo "     - Confirm the sibling assets are being handled identically." >&2
         ;;

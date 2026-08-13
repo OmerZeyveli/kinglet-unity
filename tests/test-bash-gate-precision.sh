@@ -176,27 +176,96 @@ assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sh -c "rm \$1" _ {} \
 assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec stat {} \;')" \
     "does not block find -exec with a read-only command"
 
-# Re-review finding: restoring `mv` restored one verb out of a family. Before this task ANY find
-# naming .meta was classified — indiscriminate, which blocked a count, and which also covered every
-# destructive verb for free. Requiring an action gave back the counts and dropped the verbs with
-# them. All six below were measured at be2a582 as blocked and had become allowed; each is an act
-# this task broke, not a shape nobody had thought of.
-assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec rename .meta .meta.bak {} \;')" \
-    "still blocks find -exec rename — the canonical mass-rename tool"
-assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec prename s/meta/bak/ {} \;')" \
-    "still blocks find -exec prename, which the left boundary makes a separate token"
-assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec mmv {} "#1.bak" \;')" \
-    "still blocks find -exec mmv — literally mass-move"
-assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec unlink {} \;')" \
-    "still blocks find -exec unlink — literally deletion"
-assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec shred -u {} \;')" \
-    "still blocks find -exec shred"
-assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec truncate -s 0 {} \;')" \
-    "still blocks find -exec truncate, which destroys the GUID in place"
-assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 mmv')" \
-    "still blocks a mass rename reached through xargs"
+# ============================================================================================
+# The find route is decided by an ALLOWLIST of read-only commands, not a denylist of harmful
+# ones — and these assertions are what hold that shape in place.
+#
+# The denylist was written out by hand three times and was wrong every time: `rm`; then `mv`
+# after review; then unlink/shred/truncate/rename/prename/mmv after re-review — and a mechanical
+# sweep still found 49 misses in 58 binaries. The decisive miss was `perl-rename`, the SAME tool
+# as `prename` under another standard name, missed by the same left-boundary mechanism the
+# hook's comment had just finished explaining.
+#
+# `gzip` is the probe verb below on purpose: it appeared on no denylist this task ever wrote,
+# it destroys a .meta file completely, and nothing about it is exotic.
+# ============================================================================================
+
+# The verbs that were on the denylist must still block — now for a different reason.
+for tbg_verb in rm unlink shred truncate mv rename prename mmv; do
+    assert_eq "2" "$(tbg_run "find Assets -name '*.meta' -exec $tbg_verb {} \\;")" \
+        "still blocks find -exec $tbg_verb"
+done
+
+# The aliases and verbs no denylist had. Each was blocked at be2a582, allowed under the denylist.
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec perl-rename s/meta/bak/ {} \;')" \
+    "blocks find -exec perl-rename — the alias that proved a denylist cannot be finished"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec file-rename s/meta/bak/ {} \;')" \
+    "blocks find -exec file-rename, the same tool under its third name"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec gzip {} \;')" \
+    "blocks find -exec gzip, which no denylist this task wrote contained"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec dd if=/dev/null of={} \;')" \
+    "blocks find -exec dd"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sed -i s/guid/x/ {} \;')" \
+    "blocks find -exec sed, which rewrites in place and is deliberately not allowlisted"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec python3 wipe.py {} \;')" \
+    "blocks find -exec python3 — an interpreter is not a read-only command"
+
+# Every route to an exec'd command, on a verb the denylist never had.
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -execdir gzip {} \;')" \
+    "blocks the -execdir route"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -ok gzip {} \;')" \
+    "blocks the -ok route"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec gzip {} +')" \
+    "blocks the -exec {} + route"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 gzip')" \
+    "blocks the xargs -0 route"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" | xargs -I{} gzip {}')" \
+    "blocks the xargs -I route, whose placeholder must not be read as the command"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec /usr/bin/gzip {} \;')" \
+    "blocks a path-prefixed command"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec env gzip {} \;')" \
+    "blocks a command behind an env prefix"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sh -c "gzip \$1" _ {} \;')" \
+    "blocks a command behind a shell wrapper, because sh is not read-only"
+
+# The allowlist itself. These must pass, and O1 probe 4 depends on the first two.
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec stat {} \;')" \
+    "does not block find -exec stat"
 assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec grep -l guid {} \;')" \
     "does not block find -exec grep, which reads the GUIDs it names"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec /usr/bin/grep -l guid {} \;')" \
+    "does not block a path-prefixed read-only command"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec md5sum {} \;')" \
+    "does not block find -exec md5sum"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec basename {} \;')" \
+    "does not block find -exec basename"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 grep -l guid')" \
+    "does not block a read-only command reached through xargs"
+
+# The inversion's own dividend: these two were declared-and-accepted false positives under the
+# denylist, because a destructive verb NAMED as an argument tripped it. The exec'd command is
+# `grep`, so they are now correct passes rather than tolerated ones.
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec grep -l rm {} \;')" \
+    "does not block a grep whose PATTERN is a destructive verb"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec grep -l mv {} \;')" \
+    "does not block a grep searching for the other one"
+
+# --- the direct shape stays a denylist, by ruling -------------------------------------------
+# You cannot allowlist every harmless command that might name a .meta path, so this arm needs
+# verbs and is incomplete by construction. These five passed until this round; all five are
+# pre-existing gaps (identical at be2a582), not regressions from this task.
+assert_eq "2" "$(tbg_run 'unlink Assets/Player.cs.meta')" \
+    "blocks a direct unlink — the verb the classification is named after"
+assert_eq "2" "$(tbg_run 'shred -u Assets/Player.cs.meta')" \
+    "blocks a direct shred"
+assert_eq "2" "$(tbg_run 'truncate -s 0 Assets/Player.cs.meta')" \
+    "blocks a direct truncate"
+assert_eq "2" "$(tbg_run 'perl-rename s/meta/bak/ Assets/Player.cs.meta')" \
+    "blocks a direct perl-rename"
+assert_eq "2" "$(tbg_run 'mmv "Assets/*.cs.meta" "Assets/#1.bak"')" \
+    "blocks a direct mmv"
+assert_eq "0" "$(tbg_run 'cat Assets/Player.cs.meta')" \
+    "does not block reading a .meta file"
 
 # --- classifications with no probe at all before this task ----------------------------------
 # meta-rename and manifest-wipe had zero assertions here, and unity-dir-wipe had three blocking
