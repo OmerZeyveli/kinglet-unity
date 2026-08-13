@@ -350,7 +350,22 @@ owned_by_installer() {
 }
 
 # On upgrade, find files the user edited so we can leave them alone.
+#
+# THREE LISTS, AND THE SPLIT IS NOT COSMETIC. `MODIFIED_FILES` is the UNION and it is what
+# `is_modified` reads, so every path this run declines to overwrite has to be in it. `EDITED_FILES`
+# and `UNREADABLE_ORIGINS` partition that union by WHY, and they are what the run PRINTS.
+#
+# One list for both was wrong in the direction that matters: an unedited payload file whose receipt
+# row carries an unreadable origin was reported under `installed file(s) have local edits — keeping
+# yours` and named again two lines later under the unreadable block. Printed twice, counted once in
+# a number describing two different situations, and `have local edits` is simply false about a file
+# nobody edited. Measured 2026-08-14 on a --variant urp fixture with an unedited
+# .claude/rules/pc-console.md and its origin column mangled to `toolkit<TAB>deadbeef`.
+#
+# The comment below this one already argued that "kept-because-yours and kept-because-unreadable are
+# different futures, and a single count would describe neither" — and then the count described both.
 MODIFIED_FILES=""
+EDITED_FILES=""
 UNREADABLE_ORIGINS=""
 if [ "$MODE" = ours ]; then
   while IFS=$'\t' read -r rel recorded _mode origin; do
@@ -393,6 +408,7 @@ if [ "$MODE" = ours ]; then
     case "$origin_clean" in
       user-modified)
         MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+        EDITED_FILES="${EDITED_FILES}${rel}"$'\n'
         continue
         ;;
       toolkit)
@@ -404,12 +420,17 @@ if [ "$MODE" = ours ]; then
         ;;
     esac
     actual=$(sha_of "$PROJECT_DIR/$rel")
-    [ "$actual" = "$recorded" ] || MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+    if [ "$actual" != "$recorded" ]; then
+      MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+      EDITED_FILES="${EDITED_FILES}${rel}"$'\n'
+    fi
   done < <(grep -v '^#' "$RECEIPT" 2>/dev/null | tail -n +2 || true)
-  MOD_COUNT=$(printf '%s' "$MODIFIED_FILES" | grep -c . || true)
+  # EDITED_FILES, not MODIFIED_FILES — see the three-list note above. `have local edits` has to be
+  # true of every path under it.
+  MOD_COUNT=$(printf '%s' "$EDITED_FILES" | grep -c . || true)
   if [ "$MOD_COUNT" -gt 0 ]; then
     warn "$MOD_COUNT installed file(s) have local edits — keeping yours:"
-    printf '%s' "$MODIFIED_FILES" | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+    printf '%s' "$EDITED_FILES" | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
   fi
   # `if`, not `[ -n "$u" ] && printf`, inside the loop body: a false test as a loop body's last
   # command is a `set -e` kill, and this block is new enough not to inherit the older idiom's luck.
@@ -419,7 +440,25 @@ if [ "$MODE" = ours ]; then
     printf '%s' "$UNREADABLE_ORIGINS" | while IFS= read -r u; do
       if [ -n "$u" ]; then printf '       %s\n' "$u"; fi
     done
-    warn "Their provenance cannot be established, so they are neither replaced nor claimed."
+    # THIS SENTENCE USED TO END `so they are neither replaced nor claimed`, AND THE SECOND HALF WAS
+    # FALSE. The file is kept, which puts it in MODIFIED_FILES, which sends the payload loop down its
+    # `user-modified` arm — and that arm writes a receipt row. This file's own header says what such a
+    # row means: "a `user-modified` row is still a claim of ownership, and `--purge` acts on every
+    # claim." Measured 2026-08-14: after the run printed `nor claimed`, `uninstall.sh --yes --purge`
+    # REMOVED the file. A sentence that tells the user a file is unclaimed, immediately before
+    # claiming it, is the false-reassurance half of a defect rather than a report of one.
+    #
+    # WRITING NO ROW AT ALL WAS THE OTHER CANDIDATE AND IT IS MEASURABLY WORSE. A kept file with no
+    # row is invisible to the NEXT run's loop above — nothing puts it in MODIFIED_FILES, so the
+    # payload loop overwrites it. Measured on the same fixture by deleting the row and re-running:
+    # the file was replaced, with no `keeping yours` line and no unreadable-origin line. That is the
+    # data-loss path this task closed, delayed by one run and made silent. So the row stays and the
+    # sentence changes.
+    #
+    # THE TEST THE WORDING HAS TO PASS is whether a reader who has just read it predicts what
+    # `--purge` does. Both halves are therefore stated, and both are asserted in state Q.
+    warn "Their provenance cannot be established, so they are kept rather than replaced — and"
+    warn "recorded as yours. Plain 'uninstall.sh' will leave them; 'uninstall.sh --purge' removes them."
   fi
 fi
 
@@ -609,10 +648,24 @@ if [ "$DRY_RUN" -eq 1 ]; then
     printf '%s' "$ORPHANS" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done
   fi
   [ "$ORPHAN_KEPT_COUNT" -gt 0 ] && printf '  keep %s removed-from-payload file(s) you edited\n' "$ORPHAN_KEPT_COUNT"
-  # MODIFIED_FILES is always set; KEPT/MOD_COUNT are not defined until Step 5 and would be an
-  # unbound-variable death under `set -u`.
-  DRY_MOD=$(printf '%s' "$MODIFIED_FILES" | grep -c . || true)
+  # MODIFIED_FILES / EDITED_FILES / UNREADABLE_ORIGINS are always set; KEPT/MOD_COUNT are not defined
+  # until Step 5 and would be an unbound-variable death under `set -u`.
+  #
+  # COUNTED OFF EDITED_FILES, NOT THE UNION, for the reason the real run's line is: `you modified` has
+  # to be true of every file in the number. The union includes the unreadable-origin bucket, which is
+  # kept for a different reason and gets its own line here too — an announcement that folded them
+  # together would be the dry run restating a claim the real run had just stopped making, which is
+  # exactly the drift this block exists to prevent.
+  #
+  # NEITHER LINE CARRIES A PATH, so neither mints a claim in tests/test-install-dryrun.sh's parser:
+  # that parser reads the first field, and `keep` has neither a dot nor a slash, so it classifies as
+  # prose rather than as a promise about a path.
+  DRY_MOD=$(printf '%s' "$EDITED_FILES" | grep -c . || true)
   [ "$DRY_MOD" -gt 0 ] && printf '  keep %s file(s) you modified\n' "$DRY_MOD"
+  DRY_UNREADABLE=$(printf '%s' "$UNREADABLE_ORIGINS" | grep -c . || true)
+  [ "$DRY_UNREADABLE" -gt 0 ] && \
+    printf '  keep %s file(s) whose receipt origin cannot be read — kept, and recorded as yours\n' \
+      "$DRY_UNREADABLE"
 
   # Report the CLAUDE.md branch we would actually take. This said "CLAUDE.md (generated)"
   # unconditionally, which is a lie in the one case that matters: against a project that already has

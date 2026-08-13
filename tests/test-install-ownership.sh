@@ -1902,6 +1902,24 @@ fi
 #   * The trim is asserted through install.sh's OUTPUT and the file's bytes. Nothing here reads the
 #     parameter expansion, so a rewrite that trimmed by some other means would pass.
 
+# warn_block <output> <header substring> — the indented path lines printed under a warn header.
+# Shared by states P and Q. `awk` over a here-string: it drains its input, and there is no pipe to
+# SIGPIPE. `index()` rather than a regex, because the headers carry an em dash.
+#
+# install.sh prints kept files under TWO headers, and which one a path lands under is a claim in its
+# own right — `have local edits` says the installer knows the user edited it; the unreadable-origin
+# header says it knows only that it cannot tell. Asserting on the whole output cannot distinguish
+# them, which is how P4's `keeping yours` assertion came to encode the pre-split behaviour.
+warn_block() {
+  awk -v needle="$2" '
+    index($0, needle) { inb = 1; next }
+    inb && /^       / { print; next }
+    inb { inb = 0 }
+  ' <<< "$1"
+}
+EDITS_HDR='have local edits'
+UNREAD_HDR='origin this installer cannot read'
+
 # p_setup <name> <field-4 value> [post-filter] — install, edit a payload file, install again so the
 # row is a genuine `user-modified` one carrying the EDITED checksum, then mangle only that column.
 # That checksum is the whole point: it is the shape a sha-only fall-through misreads as "untouched".
@@ -1949,10 +1967,30 @@ p_assert() {
   else
     fail "$name: the user's edit was destroyed — the origin column was not read, the sha test concluded the file was untouched, and the payload loop overwrote it"
   fi
-  if grep -qF -- 'keeping yours' <<< "$P_OUT"; then
-    pass "$name: the run said it was keeping the user's file"
+  # NAMED IN THE RIGHT BLOCK, not merely mentioned somewhere. Which header a path appears under is
+  # itself a claim: `have local edits` asserts the installer knows the user edited the file, and it
+  # can only know that from a readable `user-modified` row. On the fifth-column state it does NOT
+  # know — the row's provenance is exactly what it cannot read — so reporting it there would be a
+  # claim beyond the evidence. This assertion was `grep -qF 'keeping yours'` over the whole output
+  # until 2026-08-14, which passed for either block and so encoded the behaviour of a single
+  # undifferentiated list.
+  local want_hdr other_hdr want_label other_label
+  if [ "$want_report" = yes ]; then
+    want_hdr="$UNREAD_HDR";  want_label='the unreadable-origin block'
+    other_hdr="$EDITS_HDR";  other_label='the local-edits block'
   else
-    fail "$name: the run kept nothing and said nothing — the user is not told a file of theirs was at stake"
+    want_hdr="$EDITS_HDR";   want_label='the local-edits block'
+    other_hdr="$UNREAD_HDR"; other_label='the unreadable-origin block'
+  fi
+  if grep -qxF -- "       $P_REL" <<< "$(warn_block "$P_OUT" "$want_hdr")"; then
+    pass "$name: $want_label names the file, so the user is told it was kept and on what grounds"
+  else
+    fail "$name: $want_label does not name the file — the user is not told a file of theirs was at stake, or is told on the wrong grounds"
+  fi
+  if grep -qxF -- "       $P_REL" <<< "$(warn_block "$P_OUT" "$other_hdr")"; then
+    fail "$name: $other_label ALSO names the file — one kept file is being reported under two different explanations"
+  else
+    pass "$name: $other_label does not also name the file"
   fi
   # The discriminator. `no` means the TRIM accepted the value; `yes` means the trim declined it and
   # the catch-all kept the file. Both outcomes leave the edit intact, and only this line separates
@@ -1991,6 +2029,189 @@ p_assert "P4 (a fifth column)" yes
 # a future change to that IFS cannot move this shape into the broken set unnoticed.
 p_setup state-p5 "$(printf '\t')user-modified"
 p_assert "P5 (leading tab)" no
+
+# ── States Q…Q2: an UNEDITED file with an unreadable origin ──────────────────
+#
+# P1–P5 cannot see any of this by construction: every one of them edits the file for real, so
+# `installed file(s) have local edits — keeping yours` is legitimately true there and both of the
+# run's warn blocks are entitled to name it. Only an UNEDITED file with a mangled origin separates
+# them, and that state exposed two defects in the block P added.
+#
+# Measured 2026-08-14 before this fix, on an unedited .claude/rules/pc-console.md whose origin column
+# was mangled to `toolkit` + TAB + `deadbeef`:
+#
+#   * the file was named TWICE — once under `have local edits`, which is false about a file nobody
+#     edited, and once under the unreadable block — and counted in a MODIFIED number describing two
+#     different situations at once;
+#   * the run printed `Their provenance cannot be established, so they are neither replaced nor
+#     claimed`, and then wrote the row back as a clean `user-modified`. That IS a claim: this file's
+#     header says `--purge` acts on every claim, and `uninstall.sh --yes --purge` removed the file.
+#     A sentence telling the user a file is unclaimed, immediately before claiming it.
+#
+# WHY THE ROW STAYS AND ONLY THE SENTENCE CHANGED. Writing no row was the other candidate and it is
+# measurably worse: a kept file with no row is invisible to the NEXT run's MODIFIED_FILES loop, so
+# the payload loop overwrites it. Measured by deleting the row and re-running — the file was
+# replaced, with neither warn block printed. That is this task's own data-loss path, delayed one run
+# and made silent. Q4/Q5 assert that the sentence and the behaviour agree instead.
+#
+# WHAT Q CANNOT SEE
+#   * One mangled row, and in Q2 one edited file. A receipt with several of each is untested.
+#   * Q reads the two warn blocks by their headers and by the 7-space indent the run prints paths
+#     with. A rewrite that changed that indent would make the extractor silently return nothing — so
+#     Q2 asserts each block is NON-EMPTY as well as asserting what is in it.
+#   * Nothing here covers the ledger item: an unreadable origin becomes a plain `user-modified` row
+#     after one run, so run B and every run after it are silent. Q asserts run A only.
+
+Q_REL='.claude/rules/pc-console.md'
+Q_EDIT_REL='.claude/rules/performance.md'
+Q_MANGLE="toolkit$(printf '\t')deadbeef"
+
+# q_setup <name> <edit-a-second-file: yes|no> — install, leave $Q_REL UNTOUCHED, mangle its origin.
+Q_DIR=''; Q_OUT=''; Q_SHA=''; Q_EDIT_SHA=''
+q_setup() {
+  # TWO `local` LINES, and the split is not style. bash expands every argument to `local` BEFORE it
+  # performs any of the assignments, so `d="$SCRATCH/$name"` on the same line reads $name from the
+  # ENCLOSING scope — unset here, which under `set -u` ends the whole file with `name: unbound
+  # variable`, no FAIL token, and every state below it simply absent. That is the silent-death shape
+  # this file's own sha_of comment warns about, and it happened here on the first run: 350 PASS, 0
+  # FAIL, exit 1, with Q and Q2 never executed. p_setup above splits them; this one did not.
+  local name="$1" also_edit="$2" rc=0
+  local d="$SCRATCH/$name" rcpt row
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" >/dev/null
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  Q_DIR="$d"; Q_OUT=''; Q_SHA=''; Q_EDIT_SHA=''
+  if [ ! -f "$d/$Q_REL" ] || [ ! -f "$d/$Q_EDIT_REL" ]; then
+    fail "$name: the payload did not install both $Q_REL and $Q_EDIT_REL — this state cannot run"
+    return 0
+  fi
+  # UNEDITED, and asserted so: the whole state turns on the file being byte-identical to the copy
+  # this toolkit ships, because that is what makes `have local edits` a false statement about it.
+  Q_SHA="$(sha_of "$d/$Q_REL")"
+  if [ "$Q_SHA" = "$(sha_of "$REPO/$Q_REL")" ]; then
+    pass "$name: $Q_REL is byte-for-byte the toolkit's copy — nobody edited it"
+  else
+    fail "$name: $Q_REL already differs from the toolkit's copy, so 'have local edits' would be TRUE about it and this state proves nothing"
+  fi
+  if [ "$also_edit" = yes ]; then
+    printf '\n<!-- the user really did edit this one -->\n' >> "$d/$Q_EDIT_REL"
+    Q_EDIT_SHA="$(sha_of "$d/$Q_EDIT_REL")"
+  fi
+  rcpt="$(receipt_of "$d")"
+  row="$(own_row "$rcpt" "$Q_REL")"
+  if [ "$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$row")" = toolkit ]; then
+    pass "$name: the control row for $Q_REL is a clean 'toolkit' row"
+  else
+    fail "$name: the control row for $Q_REL is not 'toolkit' — the mangling would decorate the wrong thing. Row: $row"
+  fi
+  awk -F'\t' -v OFS='\t' -v want="$Q_REL" -v v="$Q_MANGLE" '$1 == want { $4 = v } { print }' "$rcpt" \
+    > "$SCRATCH/$name-receipt.tsv"
+  mv "$SCRATCH/$name-receipt.tsv" "$rcpt"
+  Q_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+        bash "$REPO/install.sh" --project-dir "$d" --yes </dev/null 2>&1 \
+        | sed $'s/\x1b\\[[0-9;]*m//g')" || rc=$?
+  return 0
+}
+
+# ── Q: the unedited file, alone ──────────────────────────────────────────────
+q_setup state-q no
+
+# Still kept — the fix must not have become "overwrite what you cannot classify".
+if [ -n "$Q_SHA" ] && [ "$(sha_of "$Q_DIR/$Q_REL")" = "$Q_SHA" ]; then
+  pass "Q: the file with the unreadable origin was kept, not replaced"
+else
+  fail "Q: the file with the unreadable origin was replaced — an origin we cannot read is not ours to overwrite"
+fi
+# N2. Nothing was edited, so the edits block must not exist at all.
+if grep -qF -- 'have local edits' <<< "$Q_OUT"; then
+  fail "Q: the run claimed 'have local edits' with nothing edited — the unreadable row is being counted as an edit"
+else
+  pass "Q: the run made no 'have local edits' claim, because nothing was edited"
+fi
+Q_UNREAD="$(warn_block "$Q_OUT" "$UNREAD_HDR")"
+if grep -qxF -- "       $Q_REL" <<< "$Q_UNREAD"; then
+  pass "Q: the unreadable-origin block names $Q_REL"
+else
+  fail "Q: the unreadable-origin block does not name $Q_REL — the run kept a file it never reported"
+fi
+# N1, first half: the sentence has to let a reader predict --purge, so it has to say the word.
+if grep -qF -- '--purge' <<< "$Q_OUT"; then
+  pass "Q: the run tells the user that --purge will remove these files"
+else
+  fail "Q: the run does not mention --purge, so a reader cannot predict what --purge does to a file it just said was kept"
+fi
+if grep -qF -- 'nor claimed' <<< "$Q_OUT"; then
+  fail "Q: the run still says the file is not claimed, and the row below shows that it is"
+else
+  pass "Q: the run does not tell the user the file is unclaimed"
+fi
+# N1, and the reason the sentence had to change rather than the row: the row IS a claim.
+Q_ROW="$(own_row "$(receipt_of "$Q_DIR")" "$Q_REL")"
+Q_ORIGIN="$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$Q_ROW")"
+if [ "$Q_ORIGIN" = user-modified ]; then
+  pass "Q: the row is rewritten as 'user-modified' — which is what 'recorded as yours' means, and why --purge acts on it"
+else
+  fail "Q: the row's origin is '$Q_ORIGIN'; the run's wording describes a 'user-modified' row and this is not one"
+fi
+
+# ── Q, second half: the two uninstall directions the sentence promises ───────
+# Two fixtures, because one project cannot be uninstalled twice. state-q-purge is built by the same
+# q_setup, so the two differ only in the uninstall flag.
+run_uninstall "$Q_DIR" "Q plain"
+assert_kept "$Q_DIR" "$Q_REL" "$Q_SHA" "Q (plain uninstall, as the run said)"
+
+q_setup state-q-purge no
+Q_PURGE_DIR="$Q_DIR"
+run_uninstall_flags "$Q_PURGE_DIR" "Q purge" --purge
+assert_gone "$Q_PURGE_DIR" "$Q_REL" "Q (--purge, as the run said)"
+
+# ── Q2: an edited file AND an unreadable one, in the same run ────────────────
+# The anti-"just suppress the edits block" direction. Q alone would stay green if the fix were to
+# stop printing edits at all; here both blocks must appear and each must name only its own file.
+q_setup state-q2 yes
+Q2_EDITS="$(warn_block "$Q_OUT" "$EDITS_HDR")"
+Q2_UNREAD="$(warn_block "$Q_OUT" "$UNREAD_HDR")"
+if [ -n "$Q2_EDITS" ]; then
+  pass "Q2: the edits block is present and non-empty"
+else
+  fail "Q2: the edits block is empty or missing — either a genuinely edited file is no longer reported, or the block's layout changed and this state can no longer read it"
+fi
+if [ -n "$Q2_UNREAD" ]; then
+  pass "Q2: the unreadable-origin block is present and non-empty"
+else
+  fail "Q2: the unreadable-origin block is empty or missing"
+fi
+if grep -qxF -- "       $Q_EDIT_REL" <<< "$Q2_EDITS"; then
+  pass "Q2: the edits block names the file the user actually edited"
+else
+  fail "Q2: the edits block does not name $Q_EDIT_REL, which the user edited"
+fi
+if grep -qxF -- "       $Q_REL" <<< "$Q2_EDITS"; then
+  fail "Q2: the edits block also names $Q_REL, which nobody edited — the two buckets are still one list"
+else
+  pass "Q2: the edits block does not name $Q_REL, which nobody edited"
+fi
+if grep -qxF -- "       $Q_REL" <<< "$Q2_UNREAD"; then
+  pass "Q2: the unreadable-origin block names $Q_REL"
+else
+  fail "Q2: the unreadable-origin block does not name $Q_REL"
+fi
+if grep -qxF -- "       $Q_EDIT_REL" <<< "$Q2_UNREAD"; then
+  fail "Q2: the unreadable-origin block also names $Q_EDIT_REL, whose origin reads fine — the two buckets are still one list"
+else
+  pass "Q2: the unreadable-origin block does not name $Q_EDIT_REL, whose origin reads fine"
+fi
+# Both files are still kept: the split is a DISPLAY fix, and is_modified must still see both.
+if [ -n "$Q_EDIT_SHA" ] && [ "$(sha_of "$Q_DIR/$Q_EDIT_REL")" = "$Q_EDIT_SHA" ]; then
+  pass "Q2: the edited file survived"
+else
+  fail "Q2: the edited file was overwritten — splitting the display lists changed what is_modified reads"
+fi
+if [ -n "$Q_SHA" ] && [ "$(sha_of "$Q_DIR/$Q_REL")" = "$Q_SHA" ]; then
+  pass "Q2: the unreadable-origin file survived"
+else
+  fail "Q2: the unreadable-origin file was overwritten — splitting the display lists changed what is_modified reads"
+fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-ownership assertions passed\n'
