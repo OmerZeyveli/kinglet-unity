@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "c2ad42d5b29944ad4700964cadc2360abc473e8d",
+  "source_commit": "728b25dcffeffb2edac2c17bfcda29ed5accc25c",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 62,
@@ -43,7 +43,7 @@
       },
       {
         "path": ".claude/agents/unity-reviewer.md",
-        "sha256": "0814d2093d6e928da96556fa238e38946ec0c41d7e6117cec6e625e45a25b7fa",
+        "sha256": "637529e01b0ee4a78442e774389626f8e9577e478fb30719b8634a3a8abb213b",
         "git_mode": "100644"
       },
       {
@@ -88,7 +88,7 @@
       },
       {
         "path": ".claude/commands/unity-review.md",
-        "sha256": "7c3f3192e38159b7ba80dd29b055ce6bfccb49e0cae607b63e592b1de7839e51",
+        "sha256": "95f031ae2564e2c25b4434367e6cbb594060dc09b91e194e0ede1267a8cabb1a",
         "git_mode": "100644"
       },
       {
@@ -248,12 +248,12 @@
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
-        "sha256": "8f8c2d57efaebbc9281f6054dd3754c0fd47be02410044cfd72f5f701659d84a",
+        "sha256": "8e1362639946504e2c02a0096d6e0e6ea85514c046c7314ed96b86d8c536124a",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/final-reviewer-prompt.md",
-        "sha256": "0477719fa1348a58041675cde0236275f3aab47e2de52e3034f58edae55b39fc",
+        "sha256": "4a3c6b82fe89b43a45b4a001f52647a2f17f2da5103c8ab7867325cf01adab6d",
         "git_mode": "100644"
       },
       {
@@ -263,12 +263,12 @@
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/re-review-prompt.md",
-        "sha256": "281921b6374f7285f0e83ff0cbafcc5936911498eb43d62f39a80d8d64749283",
+        "sha256": "0235f44e1268f317441f2114aca6585de8c05d873b698694bf37cfbd1b6ac683",
         "git_mode": "100644"
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/task-reviewer-prompt.md",
-        "sha256": "c6037a40deea0bdc66eb88f54355ea1caa8aa60bf88e64c010acbf854c563b3a",
+        "sha256": "29d65506bc9881127e66f111072c32b3d282e2d0a305b2a5064ba39020ed1855",
         "git_mode": "100644"
       },
       {
@@ -278,7 +278,7 @@
       },
       {
         "path": ".claude/skills/unity-brainstorming/SKILL.md",
-        "sha256": "153018aebda1c6d21ac58bfd65e8d638b77fe02151d035d240dbd9ad32a16e66",
+        "sha256": "b8bd6d1fa2a2c288753d016663e237e777c2f97936546d5825c2fcb6868cf767",
         "git_mode": "100644"
       },
       {
@@ -345,7 +345,7 @@
         },
         {
           "path": ".claude/agents/unity-reviewer.md",
-          "sha256": "0814d2093d6e928da96556fa238e38946ec0c41d7e6117cec6e625e45a25b7fa",
+          "sha256": "637529e01b0ee4a78442e774389626f8e9577e478fb30719b8634a3a8abb213b",
           "git_mode": "100644"
         },
         {
@@ -396,7 +396,7 @@
         },
         {
           "path": ".claude/commands/unity-review.md",
-          "sha256": "7c3f3192e38159b7ba80dd29b055ce6bfccb49e0cae607b63e592b1de7839e51",
+          "sha256": "95f031ae2564e2c25b4434367e6cbb594060dc09b91e194e0ede1267a8cabb1a",
           "git_mode": "100644"
         },
         {
@@ -457,7 +457,7 @@
         },
         {
           "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
-          "sha256": "8f8c2d57efaebbc9281f6054dd3754c0fd47be02410044cfd72f5f701659d84a",
+          "sha256": "8e1362639946504e2c02a0096d6e0e6ea85514c046c7314ed96b86d8c536124a",
           "git_mode": "100644"
         },
         {
@@ -467,7 +467,7 @@
         },
         {
           "path": ".claude/skills/unity-brainstorming/SKILL.md",
-          "sha256": "153018aebda1c6d21ac58bfd65e8d638b77fe02151d035d240dbd9ad32a16e66",
+          "sha256": "b8bd6d1fa2a2c288753d016663e237e777c2f97936546d5825c2fcb6868cf767",
           "git_mode": "100644"
         },
         {
