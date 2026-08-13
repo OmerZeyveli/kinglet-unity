@@ -12,7 +12,35 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-**Stage 1 is closed. Task 2 was adjudicated at its cap into Task 2b. Batch 1 is the next dispatch.**
+### IN FLIGHT as of 2026-08-14 00:45 — four implementers, four worktrees
+
+All four are based on `5b636d3` and commit to their own branches. **Nothing of theirs is merged.**
+If this session is lost, `git worktree list` is the recovery map and each report path below is the
+verdict.
+
+| task | worktree | branch | scratch root | report |
+|---|---|---|---|---|
+| 2b | `/home/riive/Documents/Github/kinglet-wt/task-2b` | `task/2b-tokeniser-quote-model` | `/tmp/kinglet-2b-NprXPW` | `.superpowers/sdd/2026-08-13-surface-criterion/task-2b-report.md` |
+| 4 | `…/kinglet-wt/task-4` | `task/4` | `/tmp/kinglet-t4-WuaZVF` | `…/task-4-report.md` |
+| 9 | `…/kinglet-wt/task-9` | `task/9` | `/tmp/kinglet-t9-cqGTgD` | `…/task-9-report.md` |
+| 10 | `…/kinglet-wt/task-10` | `task/10` | `/tmp/kinglet-t10-p8ZTUf` | `…/task-10-report.md` |
+
+**Merge order at the boundary: 4, then 9, then 10 last** — Task 10 changes `run-tests.sh`'s tally
+arithmetic and invalidates every quoted total the moment it lands (H4). Task 2b merges independently
+of the three; it shares no file with any of them.
+
+**After merging: re-run `tests/test-surface-references.sh` on the merged tree** — Task 9's approach
+depends on a property of a file Task 10 may touch, and that collision is invisible in either
+worktree (H2).
+
+A figure re-derivation workflow was also dispatched for Batch 1 (three derive agents plus a
+synthesis) writing to `.superpowers/sdd/2026-08-13-surface-criterion/batch1-facts.md`. It is
+**advisory** — every brief already tells its implementer to derive its own figures — so a missing
+facts sheet does not block anything.
+
+---
+
+**Stage 1 is closed. Task 2 was adjudicated at its cap into Task 2b. Batch 1 is dispatched.**
 
 - **HEAD `3fd22dc`** plus this ledger/plan commit. Working tree clean.
 - `bash tests/run-tests.sh` → **1190/1190**, rc=0, **35** ANSI-stripped headers == `ls tests/test-*.sh
