@@ -449,7 +449,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 10 | Six guards see the class | open | — | **R9**: the deliverable is the CLASS. "Nine files, not two". Changes `run-tests.sh` tally arithmetic → invalidates every quoted suite total |
 | 11 | Claims are re-derived or removed | open | — | **R4**: sole owner of `tests/test-derived-counts.sh`. **R12**: pointers vs historical narrative. **F9**: `CLAUDE.md` joins its file list. **F11**: widen Step 1's pattern *before* it runs |
 | 12 | The early-exit-reader trap leaves the shipped scripts | open | — | **R1**: leaves `install.sh` entirely. **R2**: gains the six `--help` texts |
-| 13 | The loop learns the five shapes a scoped review cannot see | open | — | **New**, from Task 1's audit. Payload skill — drifts the baseline |
+| 13 | The loop learns the five shapes a scoped review cannot see | **done** | `234fa85`…`222e40e` | **New**, from Task 1's audit. Payload skill — drifts the baseline |
 
 ---
 
@@ -776,6 +776,53 @@ shapes applied to the task that wrote them down.**
 44. **The tracker's awk is portable.** Byte-identical output under **gawk 5.2.1, mawk and busybox
     awk** across 12 probe shapes, and `\047` works under mawk — no finding for the planned macOS
     pass, though this is the file that introduces `\047` to the repository.
+
+**From Task 13's closing re-review (2026-08-14). Task 13 is COMPLETE at `222e40e`; every finding
+ADDRESSED, none returned to the fix loop.**
+
+45. **The demonstrated blindness is not 167 assertions. It is 1189 — the whole suite.** The reviewer
+    did not repeat the implementer's probe: it reverted **all six** payload files to their pre-task
+    content (revert proved applied by `cmp` on all six plus marker-absence) and ran the **entire
+    suite**: **`Total: 1189  Passed: 1189  Failed: 0`, rc=0.** Every word this task added across six
+    shipped surfaces — now including an agent definition and a command, which **more** guards read
+    than read the skill directory — can be deleted with the whole suite green. **The finding did not
+    grow by two files; it grew from "four guards do not see this" to "nothing in the repository sees
+    this."** *(That run also settles the one item marked unverified in round 0: the clean-tree tally
+    at `234fa85` is 1189/1189 rc=0.)*
+46. **`.claude/skills/unity-planning/SKILL.md`'s `**Files:**` template teaches the defect the anchor
+    rule forbids** — `- Modify: \`Assets/Scripts/Existing.cs:123-145\``. It is **chained to this
+    loop**: `subagent-driven-implementation/SKILL.md` states a plan written by `unity-planning` sits
+    at `docs/features/<slug>/plan.md`, so that range is written into a plan, carried into a brief,
+    and read after other tasks have moved the file — the exact rot path the rule describes. **Found
+    only by a third probe shape** (a generic path-with-line-number pattern; the token sweep and the
+    bare-`:NNN` sweep both miss it), and the reviewer filed it as **its own round-0 miss**: its first
+    sweep was token-shaped too, *"the identical defect one level up from the one I filed."* One
+    template line. **→ Task 11, and add the file to its Files list.**
+47. **The three review requirements now live in two files at two fidelities with nothing guarding
+    their agreement** — `task-reviewer-prompt.md` compressed, `re-review-prompt.md` full. **A new
+    two-file agreement obligation, of exactly the class Step 0 existed to close, created in the
+    commit that closes Step 0.** The same commit applied *point-don't-restate* to the four-shapes
+    Minor and *restate-compressed* here; the asymmetry is defensible — a reviewer that must open a
+    second file before it knows what to do will not open it — but the pair must be edited together
+    and no test says so. **→ a later loop pass.**
+48. **`final-reviewer-prompt.md`'s bare-numeral regex is narrower than its own prose, in the one
+    direction this repository has already been bitten.** Judged by **executing** it: for
+    `NOUN=hooks` over `README.md` + `docs/ARCHITECTURE.md`, the shipped
+    `grep -rniE '[0-9]+[^0-9]{0,40}hooks|hooks[^0-9]{0,40}[0-9]+'` returns **7 lines**; the plain
+    noun search its own sentence prescribes returns **26**. It discards 19 of 26, and **a count
+    separated from its noun by a line wrap is in the discarded set** — the exact failure
+    `tests/test-derived-counts.sh`'s own note records (README's "71 of 101", line-wrapped, thirteen
+    lines below its own correct 99). Dropping the digit half makes the recipe match its sentence.
+    **→ a later loop pass.**
+49. **One observation on the delegation, not a finding.** Of the three ways a mutation lies, the one
+    named **inline** in `task-reviewer-prompt.md` is the one that manufactures a **false Critical**;
+    the wrong-shape mutation — the one that makes a first reviewer **drop a real finding** — is only
+    in the sibling. **That is the more expensive direction for a review that gates every task.**
+50. **A no-regression signal worth keeping: `Passed` constant across a moving `Total` is valid, and
+    here is why.** A passing python test emits no `PASS:` token; a failing one emits `FAIL:`. So
+    `Total` rises by exactly the number of *failing* python assertions — 1189 → 1191 (2 drift) →
+    1193 (4 drift) — while `Passed` is untouched. **A regressed bash assertion would drop `Passed`.**
+    Constant 1189 across a moving `Total` is therefore evidence, not a coincidence.
 
 **Inherited from earlier waves, still open:**
 
