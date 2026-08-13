@@ -828,6 +828,10 @@ fi
 # act on, which on disk is indistinguishable from no row at all.
 MANIFEST_BAK_REL="${MANIFEST#"$PROJECT_DIR"/}.bak"
 MANIFEST_BAK_KEPT=0
+# Newline-terminated, one flag per line, in the idiom MODIFIED_FILES and ORPHANS already use here.
+# Set unconditionally so the summary's `[ -n ... ]` test is not an unbound-variable death under
+# `set -u` on the ordinary run that passes no --with-* flag at all.
+MANIFEST_DECLINED=""
 add_manifest_dependency() {
   local pkg_name="$1" pkg_value="$2" flag_name="$3"
   if [ ! -f "$MANIFEST" ]; then
@@ -856,18 +860,35 @@ add_manifest_dependency() {
   # would find the first caller's backup, fail to recognise it, and decline. That is state J's shape,
   # and MANIFEST_BAK_KEPT is what the row below already uses to answer it.
   #
-  # RETURNS ZERO. The callers are `[ "$WITH_MCP" -eq 1 ] && add_manifest_dependency ...` — AND-lists
-  # in which the function is the command after the final `&&`, so `set -e` DOES apply to it. Measured
-  # on a scratch copy 2026-08-13: a `return 1` from this path exits the installer right here with
-  # status 1, before Step 8b, Step 8c and Step 9 — so the project keeps 85 installed files and NO
-  # RECEIPT, and uninstall.sh, which removes only receipt-listed paths, can then never clean any of
-  # it up. That is a worse failure than the one this guard closes. Nothing reads the exit status;
-  # the function is the only thing that reports success, and this path reports none.
+  # RETURNS ZERO, AND RECORDS THE DECLINE FOR THE SUMMARY. Two separate decisions; the second exists
+  # because the first, alone, let a run end green about work it did not do.
+  #
+  # The status: the callers are `[ "$WITH_MCP" -eq 1 ] && add_manifest_dependency ...` — AND-lists in
+  # which the function is the command after the final `&&`, so `set -e` DOES apply to it. Measured on
+  # a scratch copy 2026-08-13: a `return 1` here exits the installer at the call site with status 1,
+  # before Step 8b, Step 8c and Step 9 — so the project keeps 85 installed files and NO RECEIPT, and
+  # uninstall.sh, which removes only receipt-listed paths, can then never clean any of it up. That is
+  # a worse failure than the one this guard closes.
+  #
+  # This path is also a member of an existing family. Three other outcomes already mean "the flag did
+  # not happen": no manifest, package already present, and `Could not edit manifest.json safely` —
+  # which prints the same "add this under \"dependencies\" yourself" block this one does. All three
+  # return zero and let the run exit zero, because install.sh's status answers "did the installation
+  # happen", and it did: the payload is written, the receipt is written, uninstall.sh works. Making
+  # one of four such outcomes non-zero would leave the status meaning different things on different
+  # flag failures, which is a new inconsistency in place of the one being fixed.
+  #
+  # What the status genuinely cannot carry, the summary must. MANIFEST_DECLINED is global on purpose
+  # — the function is called once per flag — and drives a `Not done:` block beside the green banner,
+  # the same mechanism CLAUDE_MD_BRANCH uses one writer over: set where the decision is made, read
+  # where the run speaks to the user. Without it the only trace of an abandoned flag was four warn
+  # lines a dozen lines above `Installation complete.` and an exit status of 0.
   if [ -e "$MANIFEST.bak" ] && [ "$MANIFEST_BAK_KEPT" -ne 1 ] && ! owned_by_installer "$MANIFEST_BAK_REL" ''; then
     warn "$MANIFEST_BAK_REL exists and is not ours — declining $flag_name rather than overwriting it."
     warn "That file is the backup this edit needs to stay undoable. Move it aside and re-run with"
     warn "$flag_name, or add this under \"dependencies\" yourself:"
     warn "    \"$pkg_name\": \"$pkg_value\""
+    MANIFEST_DECLINED="${MANIFEST_DECLINED}${flag_name}"$'\n'
     return 0
   fi
   # Surgical insert. The old installer round-tripped the JSON through a re-indenting dump, which
@@ -1044,6 +1065,25 @@ case "$CLAUDE_MD_BRANCH" in
     CLAUDE_MD_STEP='CLAUDE.md generation was skipped — see the warning above.'
     ;;
 esac
+# Work this run was asked for and did not do. `Installation complete.` is true — the payload landed,
+# the receipt is written — but on its own it read as "everything you asked for happened", and a
+# declined --with-* flag left no trace down here at all: four warn lines a dozen lines up, above the
+# green banner, and an exit status of 0. This block is the manifest side of what the `kept-yours`
+# arm below does for CLAUDE.md.generated, so the two writers' declines end the run the same way.
+#
+# `while read` over a here-string rather than a pipe: the loop drains its input, so there is no
+# SIGPIPE hazard either way, but a here-string keeps the body out of a subshell. `if`, not
+# `[ -n "$f" ] && printf`, because a false test as a loop body's last command is a `set -e` kill.
+if [ -n "$MANIFEST_DECLINED" ]; then
+  printf '\n%s\n' "${BOLD}${YELLOW}Not done:${NC}"
+  while IFS= read -r f; do
+    if [ -n "$f" ]; then
+      printf '  %s — declined: %s is not ours to overwrite.\n' "$f" "$MANIFEST_BAK_REL"
+    fi
+  done <<< "$MANIFEST_DECLINED"
+  printf '  Move that file aside and re-run with the flag, or add the package to\n'
+  printf '  Packages/manifest.json by hand. The manifest was not edited.\n'
+fi
 cat <<EOF
 
 Next steps:

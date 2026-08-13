@@ -1400,8 +1400,23 @@ if [ "$K_MARKERS_BEFORE" -gt 0 ]; then
 else
   fail "K: install 1's $CLAUDE_GEN_REL carries no FILL: markers — the edit below is not the one the installer asks for"
 fi
-sed -i 's/FILL:/FILLED-IN-BY-HAND:/g' "$K/$CLAUDE_GEN_REL"
-printf '\nSENTINEL-K-MY-WORK\n' >> "$K/$CLAUDE_GEN_REL"
+# THE EDIT IS THE STATE'S PREMISE AND MUST NOT BE THE STATE'S DEATH. Guarded, because under a
+# "never write anything" regression install 1 leaves nothing here: `sed -i` on a missing path exits
+# 2, `set -e` ends the FILE at this line, and K2 and K3 — 38 assertions, including both
+# anti-"never write anything" halves — never run. Measured 2026-08-13 with the CLAUDE.md.generated
+# guard mutated to `if true` (always decline). That is this file's own sha_of hazard one helper
+# over: "A probe that dies is a probe that reports nothing."
+#
+# `printf >>` is inside the guard too, and not for symmetry: on a missing path it CREATES the file,
+# and every assertion below would then be measuring bytes this test wrote rather than the
+# installer's.
+if [ -f "$K/$CLAUDE_GEN_REL" ]; then
+  sed -i 's/FILL:/FILLED-IN-BY-HAND:/g' "$K/$CLAUDE_GEN_REL"
+  printf '\nSENTINEL-K-MY-WORK\n' >> "$K/$CLAUDE_GEN_REL"
+  pass "K: the user's edit was applied to the file install 1 wrote"
+else
+  fail "K: install 1 left no $CLAUDE_GEN_REL to edit — K's premise is absent, and every assertion below describes a file that was never there"
+fi
 K_SHA="$(sha_of "$K/$CLAUDE_GEN_REL")"
 
 run_install_flags "$K" "K install 2"
@@ -1482,7 +1497,15 @@ else
   fail "K3: install 1 did not add $K3_MCP_PKG — the flag did no work, and the backup below is not the one this state is about"
 fi
 assert_owned "$K3" "$MANIFEST_BAK_REL" "K3 (install 1, the backup is ours)"
-printf '\n// SENTINEL-K3-MY-EDIT-TO-THE-BACKUP\n' >> "$K3/$MANIFEST_BAK_REL"
+# Guarded for K's reason, in the direction this file is exposed to: `>>` on a missing path CREATES
+# it, so under a regression where install 1 makes no backup the state would go on to measure a file
+# the TEST wrote — and the `mv` further down would then be moving the test's own bytes.
+if [ -f "$K3/$MANIFEST_BAK_REL" ]; then
+  printf '\n// SENTINEL-K3-MY-EDIT-TO-THE-BACKUP\n' >> "$K3/$MANIFEST_BAK_REL"
+  pass "K3: the user's edit was applied to the backup install 1 kept"
+else
+  fail "K3: install 1 kept no $MANIFEST_BAK_REL to edit — K3's premise is absent, and every assertion below describes a file that was never there"
+fi
 K3_SHA="$(sha_of "$K3/$MANIFEST_BAK_REL")"
 K3_MANIFEST_SHA="$(sha_of "$K3/$MANIFEST_REL")"
 
@@ -1510,7 +1533,14 @@ assert_not_owned "$K3" "$MANIFEST_BAK_REL" "K3 (the user's backup, after install
 # Anti-"never write anything", half 2, and the decline message's promise: move the file aside and the
 # flag proceeds.
 K3_MINE="$MANIFEST_BAK_REL.mine"
-mv "$K3/$MANIFEST_BAK_REL" "$K3/$K3_MINE"
+# Same guard, third instance: `mv` on a missing source exits 1 and `set -e` would end the file here,
+# taking install 3 — this state's whole anti-"never write anything" half — with it.
+if [ -e "$K3/$MANIFEST_BAK_REL" ]; then
+  mv "$K3/$MANIFEST_BAK_REL" "$K3/$K3_MINE"
+  pass "K3: the user's backup was moved aside, so nothing is in the flag's way any more"
+else
+  fail "K3: there is no $MANIFEST_BAK_REL to move aside — install 3 below cannot show that moving it lets the flag proceed"
+fi
 run_install_flags "$K3" "K3 install 3" --with-input-system
 if grep -qF -- "$K3_INPUT_PKG" "$K3/$MANIFEST_REL"; then
   pass "K3: install 3 added $K3_INPUT_PKG once the user's backup was moved aside"
