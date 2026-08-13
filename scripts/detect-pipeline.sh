@@ -49,7 +49,7 @@
 #   urp+hdrp  EXPLICITLY UNDECIDED. Both are installed; which one renders is
 #             not knowable from the manifest, and this script does not guess.
 #
-# Three more blind spots, named so a caller does not over-read the token:
+# Four more blind spots, named so a caller does not over-read the token:
 #
 #   - It greps the manifest as TEXT. A package listed in a comment, in
 #     "testables", or behind a scoped registry counts as present; a pipeline
@@ -58,6 +58,16 @@
 #   - It reads only Packages/manifest.json. Packages/packages-lock.json,
 #     Library/, and every ProjectSettings/ file are unread.
 #   - It says nothing about VERSION. URP 12 and URP 17 are both `urp` here.
+#   - An UNREADABLE manifest reads as `builtin`. A manifest that exists but
+#     cannot be opened (chmod 000, a bad ACL, a directory in its place) fails
+#     the greps, so both flags stay 0 and the token is `builtin` — which is the
+#     fail-closed direction and is right, but it is a GUESS wearing the one
+#     token this header calls reliable. grep's own `Permission denied` goes to
+#     stderr and is the only signal a caller gets; it is NOT suppressed here,
+#     deliberately, because a silent confident `builtin` is worse than noise.
+#     Measured 2026-08-13: identical line counts before and after this script
+#     existed (3 through install.sh, 27 through generate-claude-md.sh), so the
+#     leak is pre-existing and this file neither created nor widened it.
 
 set -euo pipefail
 

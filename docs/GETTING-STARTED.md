@@ -72,8 +72,18 @@ Each cost below was measured against a manual copy, not assumed:
 - **No `.claude/scripts/`.** That directory does not exist in this repository — Option A builds it
   by copying the repo-root `scripts/`. A manual copy of `.claude/` therefore has no
   `.claude/scripts/validate-code-quality.sh`, which `/unity-optimize` and the `unity-optimizer`
-  agent both invoke by that exact path. Copy `kinglet-unity/scripts/*.sh` to
-  `your-unity-project/.claude/scripts/` yourself if you go this route.
+  agent both invoke by that exact path. To match Option A, copy them yourself — **all except
+  `check-provenance.sh`**, which Option A deliberately skips in both its announcement and its write
+  loop, because it validates *this repository's* `provenance.tsv` and expects the repo's layout. The
+  repo has 11 scripts; an installed project has 10:
+
+  ```bash
+  mkdir -p your-unity-project/.claude/scripts
+  for f in kinglet-unity/scripts/*.sh; do
+    [ "$(basename "$f")" = check-provenance.sh ] || cp "$f" your-unity-project/.claude/scripts/
+  done
+  chmod +x your-unity-project/.claude/scripts/*.sh
+  ```
 
 ---
 
