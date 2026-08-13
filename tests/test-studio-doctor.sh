@@ -126,4 +126,182 @@ assert_not_contains "$TSD_DISABLED_OUT" "declared process provider 'superpowers'
     "doctor does not pass a disabled provider as installed"
 rm -rf "$TSD_DISABLED" "$TSD_DISABLED_SETTINGS"
 
+# ── The receipt's origin column is READ, not discarded ─────────────────────
+#
+# install.sh writes a fourth column, `toolkit` or `user-modified`. A `user-modified` row carries the
+# checksum of the file AS EDITED — deliberately, so the next install still recognises the edit as
+# yours — so a sha-only comparison always matched and the file was counted under
+# `PASS Install intact: N file(s) verified against the receipt`, never named. The diagnostic told the
+# user nothing had changed about the one file they had changed. Reproduced 2026-08-12 on a fixture:
+# `87 file(s) verified`, and no "modified since install" line printed at all.
+#
+# Two rows, because the classifier has two non-verifying branches and they exist for different
+# reasons: `user-modified` (the real case) and an origin that is neither legal value — the catch-all
+# uninstall.sh's classifier grew on 2026-08-12 for the same reason. A row whose provenance cannot be
+# read is not ours to delete there, and not ours to certify here.
+#
+# The two branches also report SEPARATELY, and that is asserted below rather than assumed. They were
+# one bucket until 2026-08-13, printed under `install.sh will keep your versions` — a sentence
+# measured false for the unreadable-origin row on that date: with its bytes still matching the
+# recorded sha, install.sh printed no `keeping yours` line, overwrote the file, and rewrote the row as
+# a clean `toolkit`. install.sh's upgrade scan classifies with an `if/else` on `user-modified`, not
+# with a `case`, so an origin it cannot read falls to the sha test and the bytes decide.
+echo ""
+echo "--- Test: the receipt's origin column is read ---"
+TSD_ORIGIN="/tmp/kinglet-doctor-origin-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_ORIGIN" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_ORIGIN" --yes >/dev/null 2>&1
+
+# (a) Edit a payload file and reinstall. install.sh keeps the edit and rewrites the row.
+printf '\n<!-- a rule this project rewrote -->\n' >> "$TSD_ORIGIN/.claude/rules/pc-console.md"
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_ORIGIN" --yes >/dev/null 2>&1
+TSD_ORIGIN_RECEIPT="$TSD_ORIGIN/.claude/state/install-receipt.tsv"
+TSD_ORIGIN_ROW=$(grep -F '.claude/rules/pc-console.md' "$TSD_ORIGIN_RECEIPT" || true)
+TSD_ORIGIN_SHA=$(sha256sum "$TSD_ORIGIN/.claude/rules/pc-console.md" | cut -d' ' -f1)
+# Assert the fixture actually reached the state under test. Without these two, a change to
+# install.sh that stopped writing `user-modified` at all would leave the assertions below passing
+# for a reason that has nothing to do with what they are guarding.
+assert_contains "$TSD_ORIGIN_ROW" "user-modified" \
+    "the fixture reaches the state under test — install.sh rewrote the row as user-modified"
+assert_contains "$TSD_ORIGIN_ROW" "$TSD_ORIGIN_SHA" \
+    "…recording the EDITED checksum, which is exactly why a sha-only comparison matched"
+
+# (b) An origin that is neither legal value, on a file that still matches its recorded checksum.
+#     A trailing space is the realistic shape: hand-editing or transport, not a design decision.
+#     Under the old if/elif this reached the sha test and was certified; the case's catch-all
+#     reports it instead.
+awk -F'\t' 'BEGIN { OFS = "\t" }
+    $1 == ".claude/rules/performance.md" { $4 = "toolkit " }
+    { print }' "$TSD_ORIGIN_RECEIPT" > "${TSD_ORIGIN_RECEIPT}.probe"
+mv "${TSD_ORIGIN_RECEIPT}.probe" "$TSD_ORIGIN_RECEIPT"
+
+TSD_ORIGIN_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_ORIGIN" 2>&1)
+TSD_ORIGIN_RC=$?
+# The counts are anchored on the `WARN ` prefix the doctor prints. Unanchored, `grep -F` substring
+# matching accepts `11`, `21`, … `81 file(s) modified since install` as a match for `1 file(s) …`,
+# so the assertion would survive the very miscount it exists to detect.
+assert_contains "$TSD_ORIGIN_OUT" "WARN 1 file(s) modified since install" \
+    "doctor counts the user-modified row as modified, and only it"
+assert_contains "$TSD_ORIGIN_OUT" ".claude/rules/pc-console.md" \
+    "doctor NAMES the edited file rather than folding it into the verified count"
+assert_contains "$TSD_ORIGIN_OUT" "WARN 1 file(s) have a receipt origin this check does not recognise" \
+    "the unreadable-origin row is reported on its OWN line, not merged into the modified count"
+assert_contains "$TSD_ORIGIN_OUT" ".claude/rules/performance.md" \
+    "doctor names the origin it cannot read rather than certifying it, as uninstall.sh keeps such a file"
+# WHICH list a path lands in is the whole point, and a substring test over the full output cannot see
+# it — both paths are present either way. So extract the indented block that follows the
+# `keep your versions` header (print_first_5 indents by seven spaces) and test membership there.
+# The two assertions are a pair on purpose: if the extraction ever yields nothing, the assert_contains
+# goes red, so the assert_not_contains cannot quietly pass on an empty haystack.
+TSD_ORIGIN_KEPT=$(awk '
+    /file\(s\) modified since install/ { in_block = 1; next }
+    in_block && /^       / { print; next }
+    in_block { in_block = 0 }' <<< "$TSD_ORIGIN_OUT")
+assert_contains "$TSD_ORIGIN_KEPT" ".claude/rules/pc-console.md" \
+    "…listed under the header promising install.sh keeps it, which for a user-modified row is true"
+assert_not_contains "$TSD_ORIGIN_KEPT" ".claude/rules/performance.md" \
+    "…and the unreadable-origin row is NOT under that header: measured 2026-08-13, install.sh overwrote such a file whose bytes still matched its recorded sha"
+# Derived, not hardcoded. This read `Install intact: 87 file(s)` until 2026-08-13; 87 is this
+# payload's receipt row count today, so the assertion would have gone permanently vacuous — with no
+# signal — the day the payload gained or lost a file. The expression mirrors the doctor's own skip
+# list (`case "$rel" in ''|\#*|path`). Note `grep -vc '^#' "$RECEIPT"` does NOT work here: measured
+# 2026-08-13 it returns 88 against the doctor's 87, because it keeps the `path` header row.
+TSD_ORIGIN_ROWS=$(awk -F'\t' '!/^#/ && NF && $1 != "path" { rows++ } END { print rows + 0 }' \
+    "$TSD_ORIGIN_RECEIPT")
+assert_contains "$TSD_ORIGIN_OUT" "Install intact: $((TSD_ORIGIN_ROWS - 2)) file(s) verified against the receipt" \
+    "the verified count is every receipt row less the two unverifiable ones"
+assert_not_contains "$TSD_ORIGIN_OUT" "Install intact: $TSD_ORIGIN_ROWS file(s)" \
+    "…and specifically not the full row count, which is what a classifier that certifies them prints"
+# The message deliberately avoids a bare `FAIL` token. The runner tallies results by grepping its
+# subshell's output for `(^|[[:space:]])(PASS|FAIL|SKIP)(:|[[:space:]])`, so an assertion MESSAGE
+# containing one is counted as a result in its own right: the first draft of this line read
+# "…is a WARN, not a FAIL — …" and turned a green suite into `Total: 642  Passed: 641  Failed: 1`,
+# with the single reported failure being the text of a passing assertion.
+assert_eq "0" "$TSD_ORIGIN_RC" \
+    "an edited payload file warns rather than failing — editing the toolkit in place is legitimate"
+rm -rf "$TSD_ORIGIN"
+
+# ── A long list must not kill the script ───────────────────────────────────
+#
+# Both list printers were `printf '%s' "$LIST" | head -5` under `set -euo pipefail`. head exits the
+# instant it has five lines without draining stdin, the printf takes SIGPIPE, pipefail promotes 141,
+# and `set -e` kills the script — after printing five paths and before the payload-sanity checks, the
+# process-provider check and the summary line. It fires on a long list and hides on a short one,
+# which is why every assertion above this one passed while the defect stood: measured 2026-08-12,
+# 87 modified rows survived, 1200 exited 141 with no summary printed.
+#
+# BOTH lists are made long in ONE run deliberately. The missing-list printer runs first, so reaching
+# the summary is only possible if neither printer aborted — one assertion covering both call sites.
+echo ""
+echo "--- Test: a long modified/missing list does not kill the script ---"
+TSD_LONG="/tmp/kinglet-doctor-long-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_LONG" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_LONG" --yes >/dev/null 2>&1
+# 1500 rows of ~46 bytes puts each list near 69 KB. The failure is a race between the writer's
+# chunked writes and the reader's exit, so it is probabilistic near the boundary — measured on this
+# host, 400 entries died 2/10 and 500 died 3/10, while 1000 and 2000 died 10/10. The size is chosen
+# to sit well inside the deterministic region, not just past the first failure seen.
+TSD_LONG_N=1500
+TSD_LONG_SHA=0000000000000000000000000000000000000000000000000000000000000000
+mkdir -p "$TSD_LONG/.claude/generated"
+TSD_LONG_I=0
+{
+  while [ "$TSD_LONG_I" -lt "$TSD_LONG_N" ]; do
+    # One row whose file exists but whose checksum cannot match  → the modified list.
+    # One row whose file was never created                       → the missing list.
+    printf 'generated payload %s\n' "$TSD_LONG_I" \
+      > "$TSD_LONG/.claude/generated/present-payload-file-$TSD_LONG_I.md"
+    printf '%s\t%s\t664\ttoolkit\n' \
+      ".claude/generated/present-payload-file-$TSD_LONG_I.md" "$TSD_LONG_SHA"
+    printf '%s\t%s\t664\ttoolkit\n' \
+      ".claude/generated/absent-payload-file-$TSD_LONG_I.md" "$TSD_LONG_SHA"
+    TSD_LONG_I=$((TSD_LONG_I + 1))
+  done
+} >> "$TSD_LONG/.claude/state/install-receipt.tsv"
+
+TSD_LONG_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_LONG" 2>&1)
+TSD_LONG_RC=$?
+# Both counts are anchored, and they are anchored by two different means on purpose.
+#
+# `assert_contains` is a substring test, so an unanchored count needle accepts any output whose
+# number merely CONTAINS it. That was not theoretical here: measured 2026-08-13 against a doctor
+# mutated to prefix a digit to the count, the old needle `1500 file(s) modified since install`
+# stayed green against a line reading `11500 file(s) modified since install`. The modified line
+# takes the same `WARN ` prefix the origin block above uses.
+#
+# The missing line is printed by the doctor's `fail`, so its prefix is the literal token FAIL — and
+# the runner tallies each file's results by grepping its output for
+# `(^|[[:space:]])FAIL(:|[[:space:]])` (anchor: `grep -n 'file_fail=' tests/run-tests.sh`).
+# assert_contains echoes the needle in its failure branch, so a needle carrying that token would be
+# counted as a SECOND failure — the trap this file already records for assertion MESSAGES, one level
+# further in. So that count is extracted and compared exactly, which is stricter than any substring:
+# `awk` with no `exit`, so two matching lines would print two numbers and fail loudly rather than
+# silently taking the first.
+assert_contains "$TSD_LONG_OUT" "WARN $TSD_LONG_N file(s) modified since install" \
+    "the fixture reaches the state under test — the modified list is long"
+TSD_LONG_MISSING_N=$(awk '/receipted file\(s\) missing/ { print $2 }' <<< "$TSD_LONG_OUT")
+assert_eq "$TSD_LONG_N" "$TSD_LONG_MISSING_N" \
+    "…and so is the missing list, counted exactly rather than by substring"
+assert_contains "$TSD_LONG_OUT" "NOTICE.md present" \
+    "doctor runs the checks that come AFTER both list printers"
+assert_contains "$TSD_LONG_OUT" "passed ·" \
+    "doctor reaches its summary line with both lists long — the assertion the pipes used to fail"
+assert_eq "1" "$TSD_LONG_RC" \
+    "doctor exits 1 on the missing files, not 141 from a SIGPIPE it never intended to take"
+rm -rf "$TSD_LONG"
+
+# ── No `| head` survives in the script ─────────────────────────────────────
+#
+# Spec criterion 12: no `| head` remains in this file. The two `head -5` list printers were the ones
+# the plan named; `uv --version | head -1` and the serverInfo `sed | head -1` are the same shape and
+# the second is worse — a bare assignment, so a 141 there kills the script at the bridge check and
+# every check below it never runs.
+#
+# Whole-line comments are stripped first, because the fix's own commentary quotes the bad form
+# verbatim and an explanation of a trap has to be able to name it. A `| head` in a TRAILING comment
+# on a code line would still trip this, which is the conservative direction.
+TSD_HEAD_HITS=$(grep -v '^[[:space:]]*#' "$TSD_DOCTOR" | grep -c '|[[:space:]]*head' || true)
+assert_eq "0" "$TSD_HEAD_HITS" \
+    'no `| head` remains in studio-doctor.sh outside its comments (spec criterion 12)'
+
 rm -rf "$TSD_MOCK"

@@ -9,7 +9,7 @@ A step-by-step guide to setting up Kinglet Pioneer — a PC/console toolkit for 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
 | **Claude Code** | Latest | [Install guide](https://claude.ai/claude-code) |
-| **Unity** | 6 (6000.0+) | URP unless your project states otherwise. The installer looks in `Packages/manifest.json` for the URP and HDRP packages; Built-in is what it falls back to when it finds neither, or when there is no manifest — inferred, not detected. The result is recorded in the generated `CLAUDE.md`, where the fallback reads `Built-in (default)` |
+| **Unity** | 6 (6000.0+) | URP unless your project states otherwise. `scripts/detect-pipeline.sh` looks in `Packages/manifest.json` for the URP and HDRP packages, and the installer and the `CLAUDE.md` generator both read that one answer. Built-in is the fallback when it finds neither, or when there is no manifest — inferred, not detected; in the generated `CLAUDE.md` it reads `Built-in (default)`. If **both** packages are present it says so rather than picking one: package presence cannot tell you which pipeline is active, and `ProjectSettings/GraphicsSettings.asset` — where Unity records that — is deliberately not read |
 | **Python** | 3.10+ | Only needed for unity-mcp integration |
 | **uv** | Latest | Python package manager, only needed for unity-mcp |
 
@@ -31,7 +31,10 @@ rm -rf /tmp/kinglet
 
 The installer copies the `.claude/` directory into your project and validates the structure.
 
-### Option B: Manual Copy
+### Option B: Manual Copy — unsupported, and here is what it costs
+
+Kept for the case it exists for: an air-gapped or vendored checkout where running the installer is
+not an option. It is **not** an equal alternative to Option A.
 
 ```bash
 git clone https://github.com/OmerZeyveli/kinglet-unity.git
@@ -43,6 +46,44 @@ Make sure the hooks are executable:
 ```bash
 chmod +x your-unity-project/.claude/hooks/*.sh
 ```
+
+Each cost below was measured against a manual copy, not assumed:
+
+- **No install receipt, so `uninstall.sh` refuses to run.** The receipt at
+  `.claude/state/install-receipt.tsv` is what records which files are the toolkit's and what their
+  checksums were; a `cp -r` writes none. Run against a manual copy, the uninstaller prints
+  `No install receipt at .claude/state/install-receipt.tsv.`, explains that it cannot tell your
+  files from ours, and ends:
+
+  ```
+  err  Refusing to guess which files are ours. Remove .claude/ by hand if you are sure.
+  ```
+
+  It exits 1 and removes nothing. Undoing a manual copy is `rm -rf .claude/`, by hand, including
+  anything you added under it.
+
+- **No generated `CLAUDE.md`, so run `/unity-init` afterwards.** Option A runs
+  `scripts/generate-claude-md.sh`, which writes your Unity version, render pipeline, packages,
+  assembly definitions and scenes into `CLAUDE.md` — and with them the *"Architecture stack —
+  detected, not assumed"* block that decides which of `.claude/rules/` binds in this project.
+  `cp -r .claude` produces no `CLAUDE.md` at all, so until `/unity-init` runs, the rules apply on
+  assumption rather than on detection.
+
+- **No `.claude/scripts/`.** That directory does not exist in this repository — Option A builds it
+  by copying the repo-root `scripts/`. A manual copy of `.claude/` therefore has no
+  `.claude/scripts/validate-code-quality.sh`, which `/unity-optimize` and the `unity-optimizer`
+  agent both invoke by that exact path. To match Option A, copy them yourself — **all except
+  `check-provenance.sh`**, which Option A deliberately skips in both its announcement and its write
+  loop, because it validates *this repository's* `provenance.tsv` and expects the repo's layout. The
+  repo has 11 scripts; an installed project has 10:
+
+  ```bash
+  mkdir -p your-unity-project/.claude/scripts
+  for f in kinglet-unity/scripts/*.sh; do
+    [ "$(basename "$f")" = check-provenance.sh ] || cp "$f" your-unity-project/.claude/scripts/
+  done
+  chmod +x your-unity-project/.claude/scripts/*.sh
+  ```
 
 ---
 

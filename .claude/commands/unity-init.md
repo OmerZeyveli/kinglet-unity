@@ -20,7 +20,11 @@ Scan this Unity project and generate a tailored CLAUDE.md configuration.
 1. **Read project info** via MCP `project_info` resource to get Unity version, platform, and state.
 
 2. **Scan Packages/manifest.json** to detect installed packages:
-   - Render pipeline (URP, HDRP, or Built-in)
+   - Render pipeline — **four** states, not three: URP, HDRP, Built-in, or *both packages present*.
+     `.claude/scripts/detect-pipeline.sh` is the one detector and reports that fourth state as its
+     own rather than picking a winner. Report it the same way; do not resolve it to one pipeline.
+     Package presence is evidence, not the active pipeline — Unity records that in
+     `ProjectSettings/GraphicsSettings.asset`, which nothing in this toolkit reads.
    - Input System, Addressables, Cinemachine, Timeline, TextMeshPro
    - Networking (Netcode, Mirror, Photon, Fish-Net)
    - Third-party (DOTween, UniTask, VContainer, Zenject, Odin)

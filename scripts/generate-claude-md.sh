@@ -38,7 +38,15 @@ info()  { echo "${CYAN}[INFO]${RESET}  $*" >&2; }
 warn()  { echo "${YELLOW}[WARN]${RESET}  $*" >&2; }
 error() { echo "${RED}[ERROR]${RESET} $*" >&2; }
 
-usage() { sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+# 3,24 is the header block between its two `# ====` rules, and both numbers are derived from the
+# file rather than guessed at: the first line that is neither a comment nor blank is 27
+# (`set -euo pipefail`), the last comment line before it is the closing rule at 25, and the slice
+# already starts one past the opening rule at 2 — so it ends one before the closing one, at 24.
+# It read `3,17` until 2026-08-13, which is the FIRST line of the eight-line paragraph below, so the
+# shipped `--help` stopped at "…had this script write" and the sentence never finished. This script
+# is one of the ones install.sh copies into $PROJECT_DIR/.claude/scripts/, so that reached users.
+# tests/test-help-ranges.sh now renders this `--help` and every other one built the same way.
+usage() { sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 # ---------------------------------------------------------------------------
 # Args
@@ -87,13 +95,33 @@ fi
 # ---------------------------------------------------------------------------
 # 2. Render pipeline
 # ---------------------------------------------------------------------------
-RENDER_PIPELINE="Built-in (default)"
+# ONE detector, shared with install.sh. This block used to be its own if/elif with URP first, so
+# URP won; install.sh ran two unconditional greps with HDRP last, so HDRP won. A project carrying
+# both packages got URP in this document and HDRP on the installer's console from one install, and
+# the urp-pipeline skill was routed off this side of the disagreement.
+#
+# The detector sits beside this script — in the repo at scripts/, and in an installed project at
+# .claude/scripts/, because install.sh copies the whole group. Resolve it from THIS FILE's location,
+# never from the caller's cwd: the documented invocation is `generate-claude-md.sh <project-dir>`
+# from anywhere.
+#
+# `|| { ...; exit 1; }`, not a bare assignment: under `set -e` a bare X="$(...)" dies with no
+# message. install.sh runs this script with 2>/dev/null and treats a non-zero exit as
+# "CLAUDE.md generation failed — skipped", so a silent death here is a silently missing document.
+GEN_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RENDER_PIPELINE_ID="$(bash "$GEN_SCRIPT_DIR/detect-pipeline.sh" "$PROJECT_DIR")" || {
+    error "Render-pipeline detection failed — $GEN_SCRIPT_DIR/detect-pipeline.sh did not run."
+    exit 1
+}
+case "$RENDER_PIPELINE_ID" in
+    builtin)  RENDER_PIPELINE="Built-in (default)" ;;
+    urp)      RENDER_PIPELINE="Universal Render Pipeline (URP)" ;;
+    hdrp)     RENDER_PIPELINE="High Definition Render Pipeline (HDRP)" ;;
+    # Its own state, named as such. No `|` in this string — it lands in a Markdown table cell.
+    urp+hdrp) RENDER_PIPELINE="URP and HDRP packages both present — active pipeline undetermined (see ProjectSettings/GraphicsSettings.asset)" ;;
+    *)        RENDER_PIPELINE="undetermined (detector said \`$RENDER_PIPELINE_ID\`)" ;;
+esac
 if [ -f "$MANIFEST" ]; then
-    if grep -q 'com.unity.render-pipelines.universal' "$MANIFEST"; then
-        RENDER_PIPELINE="Universal Render Pipeline (URP)"
-    elif grep -q 'com.unity.render-pipelines.high-definition' "$MANIFEST"; then
-        RENDER_PIPELINE="High Definition Render Pipeline (HDRP)"
-    fi
     info "Render pipeline: $RENDER_PIPELINE"
 else
     warn "Packages/manifest.json not found."
@@ -266,8 +294,20 @@ suggest_skills() {
             "Addressables")            out="${out}addressables"$'\n' ;;
         esac
     done <<< "$DETECTED_PACKAGES"
-    case "$RENDER_PIPELINE" in
-        *URP*) out="${out}urp-pipeline"$'\n' ;;
+    # Routed off the DETECTOR TOKEN, not off $RENDER_PIPELINE's prose. The prose is a display
+    # string a maintainer may reword; the routing is a decision. `*URP*` over the prose coupled the
+    # two — and the both-installed string now contains "URP", so that glob would have routed a
+    # URP-only skill for a project that may be rendering with HDRP, silently, as a side effect of
+    # how a sentence was worded. Same "two definitions of one fact" shape the shared detector removes.
+    #
+    # `urp+hdrp` DOES suggest urp-pipeline, deliberately. The URP package is genuinely present, and
+    # this block is a suggestion about which knowledge is relevant — its heading says so, and says
+    # nothing loads it for you — not a verdict about which pipeline renders. The verdict is the
+    # Render Pipeline row above, and there it reads "undetermined". There is no hdrp-pipeline skill
+    # to balance against, so withholding the one that exists would leave a both-installed project
+    # with no pipeline guidance at all: a worse trade than an advisory the reader can decline.
+    case "$RENDER_PIPELINE_ID" in
+        urp|urp+hdrp) out="${out}urp-pipeline"$'\n' ;;
     esac
     printf '%s' "$out" | sort -u
 }

@@ -2,9 +2,9 @@
 #
 # Kinglet Pioneer — uninstaller
 #
-# Removes what install.sh wrote, and nothing else. Every removal is checked against the install
-# receipt: a file is deleted only if its checksum still matches what we recorded writing. If you
-# edited it, or it was never ours, it stays.
+# Removes what install.sh owns, and nothing else. Every removal is checked against the install
+# receipt: a file goes only if the receipt marks it ours AND it still carries the checksum we
+# recorded. A file the receipt marks yours stays, whatever its checksum says, unless --purge.
 #
 # Usage:
 #   ./uninstall.sh [--project-dir <path>] [--yes] [--purge] [--keep-local] [--no-backup]
@@ -69,19 +69,69 @@ if [ ! -f "$RECEIPT" ]; then
   exit 1
 fi
 
-sha_of() { sha256sum "$1" 2>/dev/null | cut -d' ' -f1; }
+# A missing file hashes to the empty string. Same helper, same reasoning, same day as install.sh's:
+# the old body was safe only because the one caller below checks `[ ! -f "$abs" ]` first, so the
+# contract "existence is the caller's problem" was enforced nowhere. sha256sum exits 1 on a missing
+# path and pipefail promotes it through the `| cut`.
+#
+# The direction is fail-closed either way: an empty checksum never equals a recorded one, so the row
+# lands in MODIFIED and the file is KEPT rather than removed.
+sha_of() {
+  [ -f "$1" ] || return 0
+  sha256sum "$1" | cut -d' ' -f1
+}
 
 # ── Classify every receipted file before touching anything ───────────────────
+# TWO TESTS, NOT ONE, because two different questions are being asked of one row.
+#
+# `user-modified` means a previous install found your edit and kept it — and recorded the file AS
+# EDITED, deliberately, so that the NEXT install still recognises it as yours. (Without that, the
+# edit survived exactly one upgrade and the second silently overwrote it; commit c2d27f1f,
+# 2026-08-03.) So the checksum on a `user-modified` row is the checksum of YOUR file, and comparing
+# against it always matched — which is how a plain `uninstall.sh --yes` came to count an edited file
+# under "unchanged since install" and delete it. Measured on a fixture and reproduced twice
+# independently before this was written.
+#
+# The sha test is right for `toolkit` rows and only for them: there it separates "we installed it and
+# nobody touched it" from "we installed it and someone did" — an edit made AFTER the last install,
+# which is the only kind that row can express.
+#
+# The origin column had been written in three places and read in one (install.sh's own upgrade
+# scan). This is the second reader.
+#
+# AN ORIGIN WE CANNOT READ IS KEPT, NOT DELETED. `case` with an explicit catch-all, rather than an
+# if/elif that lets anything unrecognised fall through to the sha test: a row carrying a trailing
+# space, a CRLF line ending, or a fifth column is no longer byte-equal to `user-modified`, and under
+# a fall-through it would be deleted — the exact data loss this block was written to stop, arriving
+# through a typo instead of through a design decision. A file whose provenance cannot be read is not
+# ours to delete.
+#
+# Failing closed costs nothing real here. `git show 5e0bf23:install.sh` — the commit that introduced
+# the receipt at all — already writes four columns ending in `toolkit`, so no three-column legacy
+# receipt has ever existed and no shipped receipt has ever carried an origin outside these two
+# values. The catch-all defends against a hand-edited or transport-mangled receipt, and its cost is
+# a file left on disk and reported, which the user can delete, instead of a file deleted, which they
+# cannot undelete.
 TO_REMOVE=""; MODIFIED=""; ALREADY_GONE=0
-while IFS=$'\t' read -r rel recorded _mode _origin; do
+while IFS=$'\t' read -r rel recorded _mode origin; do
   case "$rel" in ''|\#*|path) continue ;; esac
   abs="$PROJECT_DIR/$rel"
   if [ ! -f "$abs" ]; then ALREADY_GONE=$((ALREADY_GONE + 1)); continue; fi
-  if [ "$(sha_of "$abs")" = "$recorded" ]; then
-    TO_REMOVE="${TO_REMOVE}${rel}"$'\n'
-  else
-    MODIFIED="${MODIFIED}${rel}"$'\n'
-  fi
+  case "$origin" in
+    user-modified)
+      MODIFIED="${MODIFIED}${rel}"$'\n'
+      ;;
+    toolkit)
+      if [ "$(sha_of "$abs")" = "$recorded" ]; then
+        TO_REMOVE="${TO_REMOVE}${rel}"$'\n'
+      else
+        MODIFIED="${MODIFIED}${rel}"$'\n'
+      fi
+      ;;
+    *)
+      MODIFIED="${MODIFIED}${rel}"$'\n'
+      ;;
+  esac
 done < <(grep -v '^#' "$RECEIPT")
 
 REMOVE_COUNT=$(printf '%s' "$TO_REMOVE" | grep -c . || true)
@@ -159,5 +209,11 @@ fi
 [ -n "$SAVED_LOCAL" ] && ok "Preserved settings.local.json → $(basename "$SAVED_LOCAL")"
 
 printf '\n%s\n' "${BOLD}${GREEN}Uninstalled.${NC}"
-printf 'Left alone: CLAUDE.md, docs/, and anything you wrote.\n'
+# CLAUDE.md.generated is NOT in this list, and naming it is the whole point of the parenthesis. It
+# used to be absent from the receipt entirely, so it survived every uninstall and the line was
+# accidentally right about it; once install.sh started claiming it, a plain uninstall began removing
+# it while this line still read as a promise covering the whole CLAUDE.md family. The promise is
+# narrowed rather than turned into an outcome claim: an edited one is reported under "keep N file(s)
+# you modified" in the plan above and stays, so "it is removed" would be false in that direction.
+printf 'Left alone: CLAUDE.md (not CLAUDE.md.generated), docs/, and anything you wrote.\n'
 exit 0

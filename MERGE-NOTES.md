@@ -217,16 +217,19 @@ Upstream's own test only asserted that `CLAUDE.md` *exists*, which is why it shi
 document goes to stdout, every log to stderr, and the caller owns the destination — the generator
 opens no output file at all, so it cannot do this even in principle. `install.sh` decides: no
 `CLAUDE.md` → write it; markers present → refresh only the fenced region and leave your prose
-byte-identical; markers absent → write `.generated` and touch nothing.
+byte-identical; markers absent → write `.generated` beside it and leave yours alone. That last arm
+has since grown a decline of its own: if a `CLAUDE.md.generated` is already there that the installer
+did not write, nothing is generated at all and both files are left as they stand.
 
 **The uninstall-by-name bug.** `uninstall.sh` removed files by filename with no provenance check,
 while `install.sh` *skipped* on a name clash — so install would correctly leave your file alone and
 uninstall would then delete it. It printed "ECU is untouched", which was asserted, not enforced.
 Latent at 23 files; a 145-file payload makes it live. Fix: `install.sh` writes
-`.claude/state/install-receipt.tsv` (path, sha256, mode, origin), and uninstall removes a file only
-if its checksum still matches what we recorded writing. With no receipt it refuses rather than
-guessing — a teammate's `git clone` carries `.claude/` but not the receipt, because the receipt
-records what was written to *this* filesystem.
+`.claude/state/install-receipt.tsv` (path, sha256, mode, origin), and uninstall reads the last two
+columns together: a `user-modified` row is yours and stays whatever its checksum says, a `toolkit`
+row goes only if the file still carries the checksum we recorded, and a row whose origin it cannot
+read is kept. With no receipt it refuses rather than guessing — a teammate's `git clone` carries
+`.claude/` but not the receipt, because the receipt records what was written to *this* filesystem.
 
 **Smaller ones, same sweep:**
 
@@ -241,7 +244,7 @@ records what was written to *this* filesystem.
   `_lib.sh`, which is a library, not a hook.
 - `--with-mcp` round-tripped the user's whole `Packages/manifest.json` through a re-indenting JSON
   dump to add one line. Now a surgical insert with a `.bak`.
-- `.gitignore` was only updated if it already existed.
+- `.gitignore` was only updated if it already existed. It is created when it isn't there.
 - **macOS portability:** `declare -A` needs bash 4 (macOS ships 3.2) and `grep -oP` is GNU-only.
   `.gitattributes` says we target macOS, so both are now portable.
 - Skill suggestions named `unity-input-system` and `unity-general` — paths that match nothing. Now

@@ -22,9 +22,34 @@ else
   RED=''; GREEN=''; YELLOW=''; BOLD=''; NC=''
 fi
 PASS_C=0; WARN_C=0; FAIL_C=0
+# A newline held in a variable, so no `$'…'` appears inside a parameter-expansion pattern below.
+# install.sh carries the reasoning at its own `NL=`: bash 3.2's parser cannot be exercised from this
+# host, a macOS pass is planned, and `"$NL"` inside the pattern is unambiguous in every bash. This
+# file used to be install.sh's cited precedent for the risky spelling; both of its two sites were
+# written on 2026-08-12 in the same wave that then chose against it, so the citation was to the
+# wave's own code. Same idiom in both files now.
+NL=$'\n'
 pass() { printf '%s\n' "${GREEN}PASS${NC} $*"; PASS_C=$((PASS_C + 1)); }
 warn() { printf '%s\n' "${YELLOW}WARN${NC} $*"; WARN_C=$((WARN_C + 1)); }
 fail() { printf '%s\n' "${RED}FAIL${NC} $*"; FAIL_C=$((FAIL_C + 1)); }
+
+# Print at most the first five entries of a newline-separated list, indented.
+#
+# NOT `printf '%s' "$LIST" | head -5`, which is what this replaced in both callers. Under
+# `set -euo pipefail` head exits the instant it has five lines, without draining stdin; the writer
+# takes SIGPIPE; pipefail promotes 141 to a pipeline failure; and `set -e` kills the script — before
+# the payload-sanity checks, before the process-provider check, before the summary line, on exactly
+# the long list that made the diagnostic worth printing. Measured 2026-08-12 on a receipt carrying
+# 1200 modified rows: five paths printed, then exit 141 and nothing else. At 87 rows it survived,
+# which is why every test written against a healthy project passed it.
+#
+# awk here reads its whole input and exits at EOF — there is no early exit to race with — and the
+# here-string is a redirection, not a pipeline, so no writer process exists to receive a SIGPIPE and
+# no pipeline status exists for pipefail to promote. The `NF` guard drops the trailing empty field
+# the list's final newline produces.
+print_first_5() {
+  awk 'NF && NR <= 5 { printf "       %s\n", $0 }' <<< "$1"
+}
 
 usage() { sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
@@ -64,7 +89,11 @@ fi
 
 # ── Environment: uv ──────────────────────────────────────────────────────────
 if command -v uv >/dev/null 2>&1; then
-  pass "uv present ($(uv --version 2>/dev/null | head -1))"
+  # First line only, via parameter expansion rather than `| head -1` — see print_first_5. `uv
+  # --version` prints one line today, so this pipe was unlikely to fire, but the shape is the same
+  # one and the spec's criterion 12 admits no `| head` in this file.
+  UV_VER=$(uv --version 2>/dev/null || true); UV_VER=${UV_VER%%"$NL"*}
+  pass "uv present ($UV_VER)"
 else
   warn "uv not found — the MCP bridge runs under it. See https://docs.astral.sh/uv/"
 fi
@@ -127,7 +156,17 @@ else
   if [ -z "$MCP_RESP" ]; then
     warn "Nothing answered at $MCP_URL — open Unity and start the bridge (Window > MCP for Unity)."
   elif grep -q '"jsonrpc"' <<< "$MCP_RESP"; then
-    SRV=$(printf '%s' "$MCP_RESP" | sed -n 's/.*"serverInfo"[^{]*{[^}]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+    # sed reads a here-string to EOF and the first line is taken by parameter expansion. This was
+    # `printf '%s' "$MCP_RESP" | sed -n '...' | head -1`, and it is the worst of the four instances of
+    # that shape in this file, because it is a bare assignment: a 141 from the pipeline becomes the
+    # assignment's status and `set -e` kills the script here, at the bridge check, so every check
+    # below — .mcp.json, the input package, install integrity, payload sanity, the process provider,
+    # the summary — never runs. It fires when sed emits more lines than head will read, which an
+    # Accept of text/event-stream invites: a streamed reply is many `data:` lines, each carrying
+    # serverInfo. Measured 2026-08-12: 3 matching lines survived 5/5, 100 survived 5/5, 1000 died
+    # 5/5. Whether a real bridge sends a thousand is not the point — the failure is silent and total.
+    SRV=$(sed -n 's/.*"serverInfo"[^{]*{[^}]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' <<< "$MCP_RESP")
+    SRV=${SRV%%"$NL"*}
     pass "MCP bridge answered at $MCP_URL${SRV:+ (${SRV})}"
   else
     # Something is listening, but it is not an MCP server. Say so — do not call it a bridge.
@@ -210,31 +249,134 @@ elif [ ! -f "$RECEIPT" ]; then
   warn "No install receipt. .claude/ exists but Kinglet did not write it here"
   warn "     (a teammate's git clone will look like this — the receipt is machine-local)."
 else
-  VERIFIED=0; MODIFIED=0; MISSING=0
-  MODIFIED_LIST=""; MISSING_LIST=""
-  while IFS=$'\t' read -r rel recorded _mode _origin; do
+  # TWO TESTS, NOT ONE — the same grammar uninstall.sh's classifier uses, deliberately, so that one
+  # reading of the origin column covers both readers instead of two that drift apart.
+  #
+  # `user-modified` means a previous install found your edit and kept it, recording the file AS
+  # EDITED so the NEXT install still recognises it as yours. The checksum on such a row is therefore
+  # the checksum of YOUR file, and a sha-only comparison always matches. That is how this check came
+  # to report `PASS Install intact: 87 file(s) verified against the receipt` about a project whose
+  # rules file the user had rewritten — the diagnostic telling them nothing had changed about the one
+  # file they changed. Reproduced on a fixture 2026-08-12 before this was written.
+  #
+  # The sha test is right for `toolkit` rows and only for them: there it separates "we installed it
+  # and nobody touched it" from an edit made AFTER the last install, which is the only kind a
+  # `toolkit` row can express.
+  #
+  # AN ORIGIN WE CANNOT READ IS REPORTED, NOT COUNTED VERIFIED — AND REPORTED ON ITS OWN LINE. `case`
+  # with an explicit catch-all rather than an if/elif that lets anything unrecognised fall through to
+  # the sha test: a row with a trailing space, a CRLF ending or a fifth column is no longer byte-equal
+  # to `user-modified`, and under a fall-through it would be silently certified. A file whose
+  # provenance cannot be read is not ours to certify.
+  #
+  # It is not ours to summarise, either, and this comment claimed otherwise until 2026-08-13: it said
+  # install.sh and uninstall.sh would "both leave that file alone", and the third bucket was printed
+  # under `modified since install — install.sh will keep your versions`. Half of that is false. The
+  # two readers do NOT agree about an unreadable-origin row, because only one of them classifies with
+  # a `case`. Measured 2026-08-13 on a fixture whose origin column was mangled to `toolkit ` (trailing
+  # space) on a `.claude/rules/*.md` PAYLOAD row — see the report block below for the root-file rows,
+  # which the same mangling costs their ownership rather than their contents — with the toolkit's own
+  # copy of the file bumped so an overwrite would be visible:
+  #
+  #   uninstall.sh — a `case` whose `*)` branch keeps. Kept the file, printed `keep 1 file(s) you
+  #                  modified`. True whatever the bytes say.
+  #   install.sh   — NOT a `case`. `grep -n 'if \[ "$origin" = user-modified \]' install.sh` finds an
+  #                  if/else, so an unreadable origin falls straight to the sha test and the BYTES
+  #                  decide, not the column:
+  #                    bytes still match the recorded sha → the row never enters MODIFIED_FILES, no
+  #                      `keeping yours` line is printed, the payload loop OVERWRITES the file, and the
+  #                      row is rewritten as a clean `toolkit`;
+  #                    bytes drifted → the sha test catches it and the file is kept.
+  #
+  # So `install.sh will keep your versions` is true of `user-modified` rows and of `toolkit` rows whose
+  # bytes drifted, and false for exactly the sub-case above — the one a mangled column most likely
+  # produces, since mangling the column does not touch the file. These rows therefore get their own
+  # line, which also keeps them out of a MODIFIED count that would then be describing two different
+  # futures. Fixing install.sh's asymmetry is a separate change; this file describes install.sh as it
+  # is.
+  #
+  # The sha comparison stays fail-closed the same way uninstall.sh's `sha_of` is: an unreadable file
+  # yields the empty string, which never equals a recorded checksum, so the row lands in MODIFIED and
+  # is reported rather than silently passed.
+  VERIFIED=0; MODIFIED=0; MISSING=0; UNREADABLE=0
+  MODIFIED_LIST=""; MISSING_LIST=""; UNREADABLE_LIST=""
+  while IFS=$'\t' read -r rel recorded _mode origin; do
     case "$rel" in ''|\#*|path) continue ;; esac
     abs="$PROJECT_DIR/$rel"
     if [ ! -f "$abs" ]; then
       MISSING=$((MISSING + 1)); MISSING_LIST="${MISSING_LIST}${rel}"$'\n'
-    elif [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
-      VERIFIED=$((VERIFIED + 1))
-    else
-      MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+      continue
     fi
+    case "$origin" in
+      user-modified)
+        MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+        ;;
+      toolkit)
+        if [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
+          VERIFIED=$((VERIFIED + 1))
+        else
+          MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+        fi
+        ;;
+      *)
+        UNREADABLE=$((UNREADABLE + 1)); UNREADABLE_LIST="${UNREADABLE_LIST}${rel}"$'\n'
+        ;;
+    esac
   done < <(grep -v '^#' "$RECEIPT")
 
   if [ "$MISSING" -eq 0 ]; then
     pass "Install intact: $VERIFIED file(s) verified against the receipt"
   else
     fail "$MISSING receipted file(s) missing — re-run install.sh"
-    printf '%s' "$MISSING_LIST" | head -5 | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+    print_first_5 "$MISSING_LIST"
   fi
   if [ "$MODIFIED" -gt 0 ]; then
     # Not a failure. Editing the toolkit in place is legitimate; you just want to know you did,
     # because re-install will keep these and upstream fixes will not reach them.
+    #
+    # The sentence is true of both branches that feed this list, and of neither more than the other:
+    # a `user-modified` row is kept by install.sh's first test, a `toolkit` row whose bytes drifted is
+    # kept by its second. The third bucket used to be here too and is not kept — see the classifier's
+    # comment above.
     warn "$MODIFIED file(s) modified since install — install.sh will keep your versions:"
-    printf '%s' "$MODIFIED_LIST" | head -5 | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+    print_first_5 "$MODIFIED_LIST"
+  fi
+  if [ "$UNREADABLE" -gt 0 ]; then
+    # Also not a failure, and deliberately not a claim about what happens to the file next. The
+    # receipt carries more than one class of row and the write paths differ — measured 2026-08-13 on
+    # fixtures whose receipt row was mangled to `toolkit ` after the first install:
+    #
+    #   .claude/** payload rows      — Step 5's payload loops write them unless is_modified says
+    #                                  otherwise, so the upgrade scan's sha test decides: bytes
+    #                                  unchanged → overwritten, bytes drifted → kept. (Measured with
+    #                                  the toolkit's own copy of the file bumped between the two
+    #                                  installs, so an overwrite would show.)
+    #   MCP-SETUP.md, .mcp.json      — Step 8b/8c write them ONLY when absent (`[ ! -f ]`), so the
+    #                                  file is untouched either way. What the column costs there is
+    #                                  the ROW: `owned_by_installer` tries the toolkit's reference
+    #                                  copy first and the receipt second, and its `$4 == "toolkit"`
+    #                                  test fails on a mangled origin, so the row is dropped. The file
+    #                                  silently stops being owned and uninstall.sh stops removing it.
+    #
+    # BOTH root files behave that way, and an earlier revision of this comment said they did not.
+    # That claim came from a two-variable comparison and is withdrawn: MCP-SETUP.md's reference IS a
+    # shipped file, so bumping it is what forces owned_by_installer past its first arm, while
+    # .mcp.json has no shipped copy at all — its reference is the heredoc at
+    # `grep -n 'cat > "$MCP_JSON_REF"' install.sh`, regenerated byte-identically every run, so that
+    # first arm kept matching and the receipt was never consulted. Bump the heredoc between the two
+    # installs and .mcp.json drops its row exactly as MCP-SETUP.md does: clean origin KEPT, mangled
+    # origin DROPPED, one variable apart. A drifted-bytes fixture proves nothing about the column
+    # either way, because `$2 == have` fails first and drops the row on a clean origin too.
+    #
+    # Two different readers, and only one of them ignores the column: install.sh's UPGRADE SCAN
+    # classifies by bytes and not by this column, which is what the line below says; owned_by_installer
+    # does read it, which is what costs root rows their ownership. Repairing that asymmetry is
+    # install.sh's job, not this file's.
+    warn "$UNREADABLE file(s) have a receipt origin this check does not recognise — reported, not verified:"
+    print_first_5 "$UNREADABLE_LIST"
+    warn "     Neither toolkit nor user-modified in the receipt's fourth column. uninstall.sh keeps"
+    warn "     such a file; install.sh classifies it by bytes and not by that column, and what that"
+    warn "     means for the file depends on which write path its row is on."
   fi
 fi
 

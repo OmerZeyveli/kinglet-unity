@@ -119,9 +119,11 @@ the payload into `.claude/`, and generates a `CLAUDE.md` with a vision section f
 an auto-detected facts section. Use `--dry-run` to see what it would do, `--yes` for
 non-interactive.
 
-**Re-installing is safe.** Every file written is recorded in `.claude/state/install-receipt.tsv` with
-its checksum. On upgrade, files you edited are reported and kept. In `CLAUDE.md`, only the region
-between the `kinglet:generated` markers is refreshed — your prose is left byte-for-byte.
+**Re-installing is safe.** `.claude/state/install-receipt.tsv` records every file the toolkit owns,
+with its checksum — what is ours to remove again, rather than a log of what any one run wrote. Your
+`.gitignore` is not in it: the installer creates or appends to that file and never claims it. On
+upgrade, files you edited are reported and kept. In `CLAUDE.md`, only the region between the
+`kinglet:generated` markers is refreshed — your prose is left byte-for-byte.
 
 ### Then set up the MCP bridge
 
@@ -136,9 +138,9 @@ in the current scene?"* (Python 3.10+ and `uv` required; no API key.)
 ./uninstall.sh --project-dir /path/to/your/UnityProject
 ```
 
-`uninstall.sh` removes only files listed in the receipt whose checksum still matches — so anything
-you edited, and anything you wrote yourself, stays. Without a receipt it refuses rather than
-guessing.
+`uninstall.sh` removes a file only when the receipt marks it ours *and* it still carries the checksum
+we recorded — so anything you edited stays *unless you pass `--purge`*, and anything you wrote
+yourself stays either way. Without a receipt it refuses rather than guessing.
 
 ---
 
