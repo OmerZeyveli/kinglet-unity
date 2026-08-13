@@ -34,11 +34,39 @@ them reappears.
 
 | Profile | Level | Active Hooks | Best For |
 |---------|-------|-------------|----------|
-| `minimal` | 1 | Safety hooks and the session brief (4) | Maximum speed, minimal interference |
-| `standard` | 2 | Safety + quality warnings + session, the standard profile being all 12 hooks | Default -- recommended for most work |
-| `strict` | 3 | Identical to `standard` (12) -- no hook declares `strict` | No longer distinct |
+| `minimal` | 1 | runs 4 of the 12 | Nothing, without reading the next paragraph first |
+| `standard` | 2 | all 12 hooks run | Default -- recommended for all work |
+| `strict` | 3 | the same 12 hooks as `standard` | Nothing; no hook declares `strict` |
 
 Set via: `UNITY_HOOK_PROFILE=standard` in environment or `settings.local.json`.
+
+### What `minimal` actually costs
+
+**It drops 8 of the 12 hooks, and both of the gates that survived the surface criterion on merit are
+among them.** "Maximum speed, minimal interference" is what this row used to say, and it was
+describing the profile by its intent rather than by its effect.
+
+<!-- kinglet:minimal-drops:begin -->
+- `bash-gate` — **the gate on destructive Bash commands.** `minimal` turns it off. This is the one
+  to know about: the profile reads as a performance setting and is in fact a safety setting.
+- `guard-project-config` — blocks weakening analyzer and code-quality configuration
+- `session-restore` — no prior-session context at startup
+- `session-save` — nothing is persisted for the next session
+- `track-edits` — `session-save` then has no list of modified files even if re-enabled
+- `warn-filename` — no warning when a C# file name stops matching its type
+- `warn-platform-defines` — no warning on a platform `#if` with no `#else`
+- `warn-serialization` — **no warning when a `[SerializeField]` rename drops
+  `[FormerlySerializedAs]`**, which is the silent-data-loss case `.claude/rules/serialization.md`
+  opens with
+<!-- kinglet:minimal-drops:end -->
+
+What `minimal` keeps is the three file-extension blockers — `block-scene-edit`, `block-meta-edit`,
+`block-legacy-input` — plus `session-brief`, which declares no `HOOK_PROFILE_LEVEL` and therefore
+runs under every profile including this one.
+
+Both the count and the membership of that list are derived and guarded by
+`tests/test-derived-counts.sh`, which reads the marked region above and compares it, as a set, with
+the levels declared in the hook files themselves.
 
 The `standard` profile is the default. Each profile includes all hooks from lower levels plus its own.
 

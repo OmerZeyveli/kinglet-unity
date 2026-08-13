@@ -10,9 +10,10 @@
 #   UNITY_HOOK_PROFILE=standard    — hook profile: minimal|standard|strict (default: standard)
 #
 # Hook profiles control which hooks are active:
-#   minimal  — only critical safety hooks (block scene/meta corruption)
-#   standard — safety + quality warnings (default)
-#   strict   — everything, including gateguard, learning, cost tracking
+#   minimal  — the file-extension blockers and the session brief ONLY. Drops bash-gate, so the
+#              destructive-command gate is off; drops warn-serialization. A safety setting.
+#   standard — every hook (default)
+#   strict   — no hook declares this level, so it is identical to standard (see HOOK-REFERENCE.md)
 #
 # Usage in hook scripts (add after set -euo pipefail):
 #   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -118,7 +119,9 @@ unity_track_edit() {
     fi
 }
 
-# unity_track_read — record a file read for gateguard tracking
+# unity_track_read / unity_was_read — DEAD as of 2026-08-13. Their only caller was gateguard.sh,
+# removed by the surface criterion. Kept because tests/test-lib.sh and tests/test-state.sh assert on
+# them and on UNITY_READS_FILE; retiring the pair is its own change, not a side effect of the cut.
 unity_track_read() {
     local file_path="$1"
     if [ -n "$file_path" ]; then

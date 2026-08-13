@@ -74,9 +74,7 @@ manage_graphics action:"get_rendering_stats" → draw calls, batches, triangles,
 ### Step 3: Code-Level Analysis
 
 Scan for common performance anti-patterns — **led by what the profiler said in Step 1**, not by a
-whole-project sweep. A text scan cannot tell which method a call sits in, so it flags the cached
-`GetComponent` in `Awake` that `.claude/rules/performance.md` mandates just as loudly as the one in
-`Update`. Narrow to the files the profiler named, then Grep for:
+whole-project sweep. Narrow to the files the profiler named, then Grep for:
 
 - `GetComponent` in Update methods
 - `Camera.main` without caching

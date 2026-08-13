@@ -19,7 +19,9 @@ source "${SCRIPT_DIR}/_lib.sh"
 # Initialize session start time
 date +%s > "${UNITY_HOOK_STATE_DIR}/session-start-time"
 
-# Clear stale gateguard state from previous sessions
+# Clear stale tracking state from previous sessions. Of the four paths below only UNITY_EDITS_FILE
+# still has a writer (track-edits.sh); the other three were written by hooks removed on 2026-08-13
+# and are cleared anyway so an upgraded project does not carry their leftovers forever.
 rm -f "$UNITY_READS_FILE" "$UNITY_EDITS_FILE" "$UNITY_COST_FILE" "$UNITY_LEARNING_FILE"
 
 # Check if we have a saved session state

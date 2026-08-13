@@ -32,7 +32,12 @@ if [ -f "$UNITY_EDITS_FILE" ]; then
     MODIFIED_FILES=$(sort -u "$UNITY_EDITS_FILE" | jq -Rs 'split("\n") | map(select(length > 0))')
 fi
 
-# Detect workflow phase from pre-compact state if available
+# Workflow phase, if anything ever writes precompact-state.md.
+#
+# Nothing does. pre-compact.sh was its only writer and was removed on 2026-08-13 (it died under
+# `set -euo pipefail` whenever the session touched no C# file). This branch is therefore dead and
+# WORKFLOW_PHASE is permanently "" — kept as a guarded read rather than deleted so the schema stays
+# stable for session-restore.sh, which already treats the field as optional.
 WORKFLOW_PHASE=""
 PRECOMPACT="${UNITY_HOOK_STATE_DIR}/precompact-state.md"
 if [ -f "$PRECOMPACT" ]; then
@@ -50,7 +55,8 @@ if [ -f "${UNITY_HOOK_STATE_DIR}/session-start-time" ]; then
     SESSION_DURATION="${MINUTES}m ${SECONDS}s"
 fi
 
-# Count tool calls from cost tracking
+# Tool calls, if anything ever writes session-cost.jsonl. Nothing does: cost-tracker.sh was its
+# only writer and was strict-gated (so it never ran) before it was removed on 2026-08-13. Reports 0.
 TOOL_CALLS=0
 if [ -f "$UNITY_COST_FILE" ]; then
     TOOL_CALLS=$(wc -l < "$UNITY_COST_FILE" | tr -d ' ')

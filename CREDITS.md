@@ -8,7 +8,7 @@ an obligation, not a courtesy.
 `provenance.tsv` at the repo root records, for every tracked file, which upstream it came from,
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
 is asserted on trust. The manifest's 17/64 split is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
-$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 25 `verbatim` and 76 `modified` rows
+$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 17 `verbatim` and 64 `modified` rows
 across the whole manifest. The table below states each upstream's own footprint instead, in wording
 that cannot be mistaken for this repo-wide number — see the next paragraph for why that matters.
 

@@ -179,8 +179,14 @@ the active profile via `UNITY_HOOK_PROFILE=standard`.
 **No hook declares `strict` any more**, so `standard` and `strict` are the same set. That is a
 consequence of the 2026-08-13 cut, not an oversight: every strict-declared hook was removed, because
 `UNITY_HOOK_PROFILE` is set nowhere in `settings.json`, `install.sh` or `scripts/`, so `standard` is
-the only profile that has ever been active and seven hooks had never run. The tier that is left doing
-work is `minimal`, which drops the three standard-profile warning hooks and the session pair.
+the only profile that has ever been active and seven hooks had never run.
+
+The tier that is left doing work is `minimal`, and **it drops 8 of the 12 — including `bash-gate`,
+the gate on destructive Bash commands, and `warn-serialization`.** It reads as a performance setting
+and is in fact a safety setting. `docs/HOOK-REFERENCE.md` lists the full dropped set, which is
+derived from the hook files and guarded as a set by `tests/test-derived-counts.sh`; this file
+deliberately does not restate the membership, because two documents listing the same set by hand is
+how the list goes stale in one of them.
 
 ### Event Types
 

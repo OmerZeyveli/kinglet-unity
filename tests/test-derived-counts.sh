@@ -61,7 +61,50 @@ while IFS= read -r rel; do
       DC_BAD="${DC_BAD}${rel} claims ${claimed_v}/${claimed_m} split — provenance.tsv has ${DC_VERBATIM}/${DC_MODIFIED}"$'\n'
     fi
   done <<< "$(grep -oE '[0-9]+/[0-9]+ split' "$REPO_DIR/$rel" || true)"
+
+  # THIRD PHRASING, added 2026-08-13, and the reason it exists is that it was the half of an edit
+  # that did not land. CREDITS.md states the split twice in one sentence: once as "17/64 split",
+  # which the loop above reads, and once as "counts 17 `verbatim` and 64 `modified` rows", which
+  # NEITHER of the two loops above could see — the backticks and the "and" put it outside both
+  # patterns. The cut wave moved the first and left the second reading 25 and 76, so the sentence
+  # contradicted itself across a single clause boundary while this guard reported clean.
+  #
+  # That is verbatim the recurrence this file's own header records at :9-13 ("a fix wave corrected
+  # it to 30/71, and that wave's own NEXT commit ... made it 29/72 without re-deriving the prose"),
+  # and the same shape as the round-1 finding recorded in the ECU-footprint block at :113-118: one
+  # correct occurrence and one stale occurrence in a DIFFERENT phrasing, guard calls it clean.
+  #
+  # The sentence is the one that tells the reader the number is derived and hands them the command
+  # to derive it, which makes a stale number there worse than anywhere else in the file.
+  while IFS= read -r claim; do
+    [ -n "$claim" ] || continue
+    claimed_v=$(printf '%s' "$claim" | grep -oE '[0-9]+' | sed -n 1p)
+    claimed_m=$(printf '%s' "$claim" | grep -oE '[0-9]+' | sed -n 2p)
+    if [ "$claimed_v" != "$DC_VERBATIM" ] || [ "$claimed_m" != "$DC_MODIFIED" ]; then
+      DC_BAD="${DC_BAD}${rel} claims 'counts ${claimed_v} verbatim and ${claimed_m} modified' — provenance.tsv has ${DC_VERBATIM} and ${DC_MODIFIED}"$'\n'
+    fi
+  done <<< "$(grep -oE 'counts [0-9]+ .verbatim. and [0-9]+ .modified.' "$REPO_DIR/$rel" || true)"
 done <<< "$DC_QUOTING_FILES"
+
+# A PER-PAIR floor for the phrasing added above, separate from the per-file floor below.
+#
+# The per-file check that follows is satisfied for CREDITS.md by its "17/64 split" occurrence alone,
+# so it cannot see this third phrasing being reworded out of reach — which is precisely how the
+# phrasing came to be unguarded in the first place. Only CREDITS.md carries it, so the pair is
+# named rather than looped.
+DC_PAIR_VACUOUS=""
+if [ -f "$REPO_DIR/CREDITS.md" ]; then
+  dc_pair_hits=$(grep -ocE 'counts [0-9]+ .verbatim. and [0-9]+ .modified.' "$REPO_DIR/CREDITS.md" 2>/dev/null || true)
+  [ -n "$dc_pair_hits" ] || dc_pair_hits=0
+  if [ "$dc_pair_hits" -lt 1 ]; then
+    DC_PAIR_VACUOUS="CREDITS.md no longer states 'counts N verbatim and M modified' in a form this guard can read"$'\n'
+  fi
+fi
+if [ -n "$DC_PAIR_VACUOUS" ]; then
+  printf '%s' "$DC_PAIR_VACUOUS"
+fi
+assert_eq "0" "$(printf '%s' "$DC_PAIR_VACUOUS" | grep -c . || true)" \
+  "CREDITS.md still states the split in the second, prose phrasing this guard reads"
 
 # The original-row count is deliberately NOT quoted in prose any more, and so is not checked here.
 # It moves on every commit that adds a tracked file — this guard's own commit shifted it from 434 to
@@ -468,6 +511,40 @@ while IFS= read -r dck_h; do
 done <<< "$DCK_DISK"
 DCK_STANDARD=$((DCK_MINIMAL + DCK_STANDARD))
 DCK_STRICT=$((DCK_STANDARD + DCK_STRICT))
+DCK_DROPPED_MINIMAL=$((DCK_HOOKS - DCK_MINIMAL))
+
+# The SET a `minimal` profile drops, by name, derived from the hook files.
+#
+# A count cannot carry this. `docs/HOOK-REFERENCE.md` told a user that `minimal` meant "maximum
+# speed, minimal interference" while it silently switched off `bash-gate` -- the gate on destructive
+# Bash commands, and one of only two hooks the 2026-08-13 surface criterion kept on merit -- and
+# `warn-serialization`, whose absence is the silent-data-loss case serialization.md opens with. Three
+# shipped documents described that profile by its intent instead of its effect, and each named a
+# different, wrong subset (5, 4, and one that implied session-brief was dropped when it survives).
+#
+# So the document now LISTS the set inside a marked region, and this compares the two as sets. A
+# hook whose declared level changes moves it between the lists and fails here by name.
+DCK_DROPPED_DERIVED=$(
+  while IFS= read -r dck_h; do
+    [ -n "$dck_h" ] || continue
+    dck_l=$(grep -m1 '^HOOK_PROFILE_LEVEL=' "$REPO_DIR/.claude/hooks/$dck_h" 2>/dev/null \
+            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/')
+    case "$dck_l" in
+      ''|minimal) ;;
+      *) printf '%s\n' "${dck_h%.sh}" ;;
+    esac
+  done <<< "$DCK_DISK" | sort
+)
+
+# The marked region in the document. awk, not sed -n '/a/,/b/p' piped anywhere: nothing downstream
+# can exit early, and the markers are matched as whole fixed strings.
+DCK_DROPPED_DOC=$(
+  awk '
+    /kinglet:minimal-drops:begin/ { inblock = 1; next }
+    /kinglet:minimal-drops:end/   { inblock = 0 }
+    inblock && /^- `/            { line = $0; sub(/^- `/, "", line); sub(/`.*$/, "", line); print line }
+  ' "$REPO_DIR/docs/HOOK-REFERENCE.md" 2>/dev/null | sort
+)
 
 # Scripts. install.sh writes `scripts/*.sh` into `.claude/scripts/` and skips exactly one file,
 # check-provenance.sh, because it validates THIS repository. The two numbers therefore always differ
@@ -512,7 +589,37 @@ fi
 assert_eq "0" "$(printf '%s' "$DCK_MISSING" | grep -c . || true)" \
   "every hook registered in settings.json exists on disk ($DCK_REGISTERED registrations)"
 
+# --- The minimal-profile dropped set, both directions, by name. ---
+#
+# The derivation must not be vacuous: if the marked region disappears or the awk stops matching,
+# DCK_DROPPED_DOC is empty, and an empty list would otherwise be reported as "nothing undocumented"
+# in one direction while the other direction carries the whole failure. Asserted non-empty first.
+assert_eq "yes" "$([ -n "$DCK_DROPPED_DOC" ] && echo yes || echo no)" \
+  "docs/HOOK-REFERENCE.md still carries a readable kinglet:minimal-drops region"
+
+DCK_DROP_UNDOC=$(comm -23 <(printf '%s\n' "$DCK_DROPPED_DERIVED") <(printf '%s\n' "$DCK_DROPPED_DOC"))
+DCK_DROP_PHANTOM=$(comm -13 <(printf '%s\n' "$DCK_DROPPED_DERIVED") <(printf '%s\n' "$DCK_DROPPED_DOC"))
+
+if [ -n "$DCK_DROP_UNDOC" ]; then
+  printf '%s\n' "$DCK_DROP_UNDOC" | sed 's|^|     minimal switches this hook off and HOOK-REFERENCE.md does not say so: |'
+fi
+assert_eq "0" "$(printf '%s' "$DCK_DROP_UNDOC" | grep -c . || true)" \
+  "every hook the minimal profile drops is listed in docs/HOOK-REFERENCE.md ($DCK_DROPPED_MINIMAL dropped)"
+
+if [ -n "$DCK_DROP_PHANTOM" ]; then
+  printf '%s\n' "$DCK_DROP_PHANTOM" | sed 's|^|     HOOK-REFERENCE.md says minimal drops this and it does not: |'
+fi
+assert_eq "0" "$(printf '%s' "$DCK_DROP_PHANTOM" | grep -c . || true)" \
+  "docs/HOOK-REFERENCE.md lists no hook the minimal profile actually keeps"
+
 # --- The quoted numbers. Same table shape, same flattening, same per-pair floors as above. ---
+#
+# NOTE ON THE TWO `of the` PATTERNS. `runs N of the M` (the minimal row) and `drops N of the M`
+# (the cost paragraph) describe the SAME profile from opposite sides and must stay lexically
+# disjoint. Round 1 of this block used a bare `[0-9]+ of the [0-9]+ hooks`, which matched the
+# `drops 8 of the 12 hooks` sentence and reported the tree as having 4 where the doc said 8 -- a
+# guard failing on a correct document because two of its own patterns overlapped. If either
+# sentence is reworded, keep the leading verb.
 #
 # docs/ARCHITECTURE.md   "hooks/ 12 registered shell scripts"          total
 # docs/ARCHITECTURE.md   "All 12 registered hooks source"              total
@@ -533,7 +640,12 @@ docs/GETTING-STARTED.md	hooks/ [0-9]+ hooks [+] _lib.sh	$DCK_HOOKS	-
 docs/GETTING-STARTED.md	[0-9]+ of them blocking	$DCK_BLOCKING	-
 docs/GETTING-STARTED.md	repo has [0-9]+ scripts; an installed project has [0-9]+	$DCK_REPO_SCRIPTS	$DCK_INSTALLED_SCRIPTS
 docs/HOOK-REFERENCE.md	includes [0-9]+ hooks	$DCK_HOOKS	-
-docs/HOOK-REFERENCE.md	standard profile [^.]* [0-9]+ hooks	$DCK_STANDARD	-"
+docs/HOOK-REFERENCE.md	runs [0-9]+ of the [0-9]+	$DCK_MINIMAL	$DCK_HOOKS
+docs/HOOK-REFERENCE.md	all [0-9]+ hooks run	$DCK_STANDARD	-
+docs/HOOK-REFERENCE.md	same [0-9]+ hooks as	$DCK_STRICT	-
+docs/HOOK-REFERENCE.md	drops [0-9]+ of the [0-9]+	$DCK_DROPPED_MINIMAL	$DCK_HOOKS
+docs/ARCHITECTURE.md	drops [0-9]+ of the [0-9]+	$DCK_DROPPED_MINIMAL	$DCK_HOOKS
+.claude/settings.local.json.template	drops [0-9]+ of the [0-9]+	$DCK_DROPPED_MINIMAL	$DCK_HOOKS"
 
 DCK_BAD=""
 DCK_VACUOUS=""
