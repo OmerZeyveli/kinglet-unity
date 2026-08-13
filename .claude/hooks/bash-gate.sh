@@ -98,10 +98,25 @@ fi
 # merely passes the word `rm` to something harmless is a false positive here, accepted
 # deliberately: this is a two-stage gate, so the cost is one retry, and the plan is explicit
 # that a false negative on a mass .meta operation is the more expensive direction.
-FIND_RM='-(exec|execdir|ok)[^;&|]*[^A-Za-z0-9_.-]rm([^A-Za-z0-9_-]|$)'
-FIND_MV='-(exec|execdir|ok)[^;&|]*[^A-Za-z0-9_.-]mv([^A-Za-z0-9_-]|$)'
-XARGS_RM='xargs[^;&|]*[^A-Za-z0-9_.-]rm([^A-Za-z0-9_-]|$)'
-XARGS_MV='xargs[^;&|]*[^A-Za-z0-9_.-]mv([^A-Za-z0-9_-]|$)'
+# The verbs are enumerated because narrowing this clause is what un-blocked them. Before this
+# task ANY `find` naming `.meta` was classified — indiscriminate, which is why a count was
+# blocked, and also why every destructive verb was covered for free. Requiring an action
+# restored the counts and dropped the verbs with them. Measured at be2a582 and after: `-exec`
+# with each of these was 2 and became 0. They are not a wish list; each one is an act this
+# task broke.
+#
+#   deletion:  rm (the common one), unlink (literally deletion), shred (overwrite then
+#              unlink), truncate (destroys the contents in place, which for a .meta file is
+#              the GUID)
+#   rename:    mv, rename and prename (the canonical mass-rename tools; prename is spelled
+#              separately because the left boundary makes `rename` not match inside it), mmv
+#              (literally mass-move)
+DEL_VERB='(rm|unlink|shred|truncate)'
+MV_VERB='(mv|rename|prename|mmv)'
+FIND_RM='-(exec|execdir|ok)[^;&|]*[^A-Za-z0-9_.-]'"${DEL_VERB}"'([^A-Za-z0-9_-]|$)'
+FIND_MV='-(exec|execdir|ok)[^;&|]*[^A-Za-z0-9_.-]'"${MV_VERB}"'([^A-Za-z0-9_-]|$)'
+XARGS_RM='xargs[^;&|]*[^A-Za-z0-9_.-]'"${DEL_VERB}"'([^A-Za-z0-9_-]|$)'
+XARGS_MV='xargs[^;&|]*[^A-Za-z0-9_.-]'"${MV_VERB}"'([^A-Za-z0-9_-]|$)'
 # Single-quoted around the interpolations: `$)` inside double quotes is left literal by bash,
 # but relying on that to carry a regex anchor is not something the next reader should have to
 # verify.

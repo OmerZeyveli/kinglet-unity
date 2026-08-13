@@ -176,6 +176,28 @@ assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sh -c "rm \$1" _ {} \
 assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec stat {} \;')" \
     "does not block find -exec with a read-only command"
 
+# Re-review finding: restoring `mv` restored one verb out of a family. Before this task ANY find
+# naming .meta was classified — indiscriminate, which blocked a count, and which also covered every
+# destructive verb for free. Requiring an action gave back the counts and dropped the verbs with
+# them. All six below were measured at be2a582 as blocked and had become allowed; each is an act
+# this task broke, not a shape nobody had thought of.
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec rename .meta .meta.bak {} \;')" \
+    "still blocks find -exec rename — the canonical mass-rename tool"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec prename s/meta/bak/ {} \;')" \
+    "still blocks find -exec prename, which the left boundary makes a separate token"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec mmv {} "#1.bak" \;')" \
+    "still blocks find -exec mmv — literally mass-move"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec unlink {} \;')" \
+    "still blocks find -exec unlink — literally deletion"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec shred -u {} \;')" \
+    "still blocks find -exec shred"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec truncate -s 0 {} \;')" \
+    "still blocks find -exec truncate, which destroys the GUID in place"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 mmv')" \
+    "still blocks a mass rename reached through xargs"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec grep -l guid {} \;')" \
+    "does not block find -exec grep, which reads the GUIDs it names"
+
 # --- classifications with no probe at all before this task ----------------------------------
 # meta-rename and manifest-wipe had zero assertions here, and unity-dir-wipe had three blocking
 # probes and no prose probe. Both halves of each, because a classification nothing sends a
