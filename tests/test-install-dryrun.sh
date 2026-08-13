@@ -63,13 +63,37 @@
 #     shape for CLAUDE.md.generated: it passes because nothing happened, and "nothing happened" is
 #     all it can establish. Whether the DECLINE happened, and for the right reason, is
 #     tests/test-install-ownership.sh's states I3/K–K3, whose oracle is the user's bytes.
-#   * NO --with-* FLAG IS EXERCISED. Measured by hand 2026-08-13 and NOT asserted here:
-#     `install.sh --with-mcp` against a project git does not track creates
-#     `Packages/manifest.json.bak`, and the dry run's `--with-mcp:` line names only
-#     Packages/manifest.json — so that backup is an unannounced project-root write, D4's own
-#     canonical example, live in the tree. It is not asserted because closing it means teaching the
-#     dry-run block the git-tracking test and the ownership test the real run uses, which is a
-#     second surface's worth of shared computation and a task of its own. Recorded, not guarded.
+#   * ONLY --with-mcp IS EXERCISED, and only in its keep-the-backup shape. `--with-input-system` is
+#     never passed: the urp fixture already carries com.unity.inputsystem, so the flag returns early
+#     and writes nothing, and no fixture here is missing the package. Nor is the git-tracked shape
+#     covered, where install.sh deletes its own backup and there is no created path to announce.
+#     A single run passing BOTH flags — the two-callers case tests/test-install-ownership.sh's
+#     state J exists for — is not exercised either.
+#   * INSTALL MODE `foreign` IS NEVER REACHED. install.sh has three (`grep -n 'MODE=fresh' install.sh`):
+#     `fresh`, `ours` — the `upgrade` fixture — and `foreign`, which is a .claude/ with no receipt and
+#     which contains `mv "$CLAUDE_DIR" "$BACKUP_DIR"`, the most destructive operation in the
+#     installer. `mkproject.sh --variant dirty` builds exactly that project and NO fixture here uses
+#     it. Measured 2026-08-13: the real run moves `.claude/agents/theirs.md` to
+#     `.claude.backup.<ts>/agents/theirs.md`, which does not match this file's `^\.claude/` filter
+#     and so lands among the project-root writes, while the dry run's only line about it is
+#     `backup: <dir>` — first field `backup:`, unreadable as a claim. It is deliberately NOT a
+#     fixture here: BACKUP_DIR is `.claude.backup.$(date +%Y%m%d%H%M%S)`, computed fresh in each
+#     invocation, so the dry run structurally CANNOT name the path the real run will create, and a
+#     path-set oracle would be permanently red on something that is not a defect. Certifying that
+#     branch needs a different assertion — compare the backup directory's CONTENTS against the
+#     pre-run `.claude/` snapshot, and read `backup:` as a claim about a directory — which is a
+#     different guard, not a seventh fixture in this one.
+#   * ON THE `upgrade` FIXTURE, `.claude/` IS CHECKED BY NOTHING. `written` filters `^\.claude/`
+#     out, and the N + M count equality is gated on `fresh`, so an unannounced write or edit
+#     ANYWHERE under `.claude/` on a second install is invisible here. Probed with per-run-unique
+#     writes: all five fresh fixtures reddened on the count and `upgrade` produced zero. That is the
+#     path every user is on after install 1. Closing it needs a per-path expectation for `.claude/`
+#     rather than a count, which is a different oracle from the two count lines the dry run prints.
+#   * A WRITE TO A PATH OUTSIDE THE FIXTURE DIRECTORY. Every snapshot is rooted at $PROJECT_DIR, so
+#     anything the installer wrote elsewhere — $HOME, /tmp, a sibling directory — would be invisible.
+#     Vacuous in this tree: install.sh's only path outside $PROJECT_DIR is the read-only
+#     $CLAUDE_USER_SETTINGS probe, and $SCRIPT_DIR, which it never writes to. Recorded because a
+#     disclosure list that only names live gaps stops being read as a list of what was not looked at.
 #   * ONLY THE FIRST FIELD IS READ. A line whose subject is not its first field is invisible: the
 #     `--with-mcp:`/`--with-input-system:` lines, `backup: <dir>`, and the `remove`/`keep` counters.
 #     A promise buried mid-line would not be read as a promise.
@@ -190,14 +214,35 @@ dry_claims() {
 # The verdict for one path, or nothing when the block never named it. Field equality, not substring.
 claim_of() { awk -F'\t' -v want="$1" '$1 == want { print $2; exit }' "$2"; }
 
+# ── Fixture construction, asserted rather than assumed ───────────────────────
+# mkproject.sh under `set -euo pipefail` is one uncaught failure away from ending this file. The
+# runner catches that as `exited N without reporting a failure`, so it is not a silent green — but
+# every assertion after it is MISSING rather than red, and a missing assertion reads like coverage
+# that ran and was satisfied. Same antidote the `wholesale` fixture already applies to its own
+# shape: prove the thing is what it claims to be before measuring against it.
+mkfixture() {
+  local label="$1" d="$2"; shift 2
+  local rc=0
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" "$@" >/dev/null 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ] && [ -d "$d/Assets" ] && [ -d "$d/ProjectSettings" ]; then
+    pass "$label: the fixture built, and has the Assets/ + ProjectSettings/ shape install.sh gates on"
+  else
+    fail "$label: mkproject.sh exited $rc without producing Assets/ + ProjectSettings/ — every assertion below for this fixture describes a project that was never built"
+  fi
+}
+
 # ── The probe ────────────────────────────────────────────────────────────────
-# $1 label, $2 project dir, $3 `fresh` or `upgrade`.
+# $1 label, $2 project dir, $3 `fresh` or `upgrade`, then any install.sh flags to pass to BOTH runs.
+#
+# The flags reach the dry run and the real run identically, which is the only way the comparison
+# means anything: D4's oracle is the filesystem "with the flags exercised", and a guard that passes
+# none is answering an easier question than the one it was chartered with.
 #
 # `fresh` is not decoration: the N + M count equality below holds only for a run that creates every
 # payload file. On an upgrade the files are already there, nothing is new, and asserting equality
 # would fail for a reason that has nothing to do with honesty.
 probe() {
-  local label="$1" d="$2" kind="$3"
+  local label="$1" d="$2" kind="$3"; shift 3
   local before="$SCRATCH/$label.before" afterdry="$SCRATCH/$label.afterdry" after="$SCRATCH/$label.after"
   local dryfile="$SCRATCH/$label.dry" block="$SCRATCH/$label.block" claims="$SCRATCH/$label.claims"
   local realfile="$SCRATCH/$label.real" written="$SCRATCH/$label.written"
@@ -208,7 +253,7 @@ probe() {
   # ── The dry run itself ─────────────────────────────────────────────────────
   rc=0
   KINGLET_USER_SETTINGS="$ABSENT_SETTINGS" \
-    bash "$REPO/install.sh" --project-dir "$d" --yes --dry-run </dev/null 2>&1 \
+    bash "$REPO/install.sh" --project-dir "$d" --yes --dry-run "$@" </dev/null 2>&1 \
     | sed $'s/\x1b\\[[0-9;]*m//g' > "$dryfile" || rc=$?
   if [ "$rc" -eq 0 ]; then
     pass "$label: install.sh --dry-run exited 0"
@@ -238,7 +283,7 @@ probe() {
   # ── The real run ───────────────────────────────────────────────────────────
   rc=0
   KINGLET_USER_SETTINGS="$ABSENT_SETTINGS" \
-    bash "$REPO/install.sh" --project-dir "$d" --yes </dev/null > "$realfile" 2>&1 || rc=$?
+    bash "$REPO/install.sh" --project-dir "$d" --yes "$@" </dev/null > "$realfile" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     pass "$label: install.sh exited 0"
   else
@@ -339,7 +384,7 @@ probe() {
 # The urp variant, untouched. Its `.gitignore` exists and is EMPTY, so the real run appends to a
 # pre-existing file — oracle 3's live subject, invisible to a find snapshot and to the receipt.
 F_DEFAULT="$SCRATCH/default"
-bash "$REPO/tests/fixtures/mkproject.sh" "$F_DEFAULT" >/dev/null
+mkfixture default "$F_DEFAULT"
 probe default "$F_DEFAULT" fresh
 
 # ── Fixture: wholesale-ignore ────────────────────────────────────────────────
@@ -351,7 +396,7 @@ probe default "$F_DEFAULT" fresh
 # runs, and all four entries are appended. Measured 2026-08-13. A fixture carrying only `/.claude/`
 # would put this state on the wrong side of the branch it exists to test.
 F_IGNORED="$SCRATCH/wholesale"
-bash "$REPO/tests/fixtures/mkproject.sh" "$F_IGNORED" >/dev/null
+mkfixture wholesale "$F_IGNORED"
 git -C "$F_IGNORED" -c init.defaultBranch=main init -q >/dev/null 2>&1 || true
 printf '/.claude/\n.claude.backup.*/\n' > "$F_IGNORED/.gitignore"
 # Asserted rather than assumed: without a git dir, `already_ignored` returns 1 for everything and
@@ -378,7 +423,7 @@ probe wholesale "$F_IGNORED" fresh
 # data loss. Oracle 2 asks "is everything CLAIMED announced", not "is everything WRITTEN claimed",
 # so the gap is outside this file by design and not by accident.
 F_BARE="$SCRATCH/bare"
-bash "$REPO/tests/fixtures/mkproject.sh" "$F_BARE" --variant bare >/dev/null
+mkfixture bare "$F_BARE" --variant bare
 if [ -e "$F_BARE/.gitignore" ]; then
   fail "bare: the fixture already has a .gitignore — the create branch this state exists to watch will not run"
 else
@@ -396,7 +441,7 @@ probe bare "$F_BARE" fresh
 # "yours" and "NOT touched" are true of CLAUDE.md. The line's first field is the file this arm
 # CREATES. Oracle 1 sees the creation; the claim set says the run promised to leave it alone.
 F_USERMD="$SCRATCH/usermd"
-bash "$REPO/tests/fixtures/mkproject.sh" "$F_USERMD" >/dev/null
+mkfixture usermd "$F_USERMD"
 printf '# My Game\n\nProse I wrote by hand. SENTINEL-KEEP-ME.\n' > "$F_USERMD/CLAUDE.md"
 probe usermd "$F_USERMD" fresh
 
@@ -405,7 +450,7 @@ probe usermd "$F_USERMD" fresh
 # fixture is where the guard's own blindness is at its widest: it passes because nothing happened,
 # and nothing happened is the whole of what it can establish. See the header.
 F_USERGEN="$SCRATCH/usergen"
-bash "$REPO/tests/fixtures/mkproject.sh" "$F_USERGEN" >/dev/null
+mkfixture usergen "$F_USERGEN"
 printf '# My Game\n\nProse I wrote by hand. SENTINEL-KEEP-ME.\n' > "$F_USERGEN/CLAUDE.md"
 printf '# Notes I keep in a file that happens to be named this\n\nSENTINEL-KEEP-ME-TOO.\n' \
   > "$F_USERGEN/CLAUDE.md.generated"
@@ -430,7 +475,7 @@ fi
 # finds all four entries already present and appends nothing, while the dry run promises the edit.
 # An announcement computed from `already_ignored` alone would still be wrong here.
 F_UPGRADE="$SCRATCH/upgrade"
-bash "$REPO/tests/fixtures/mkproject.sh" "$F_UPGRADE" >/dev/null
+mkfixture upgrade "$F_UPGRADE"
 UPGRADE_RC=0
 KINGLET_USER_SETTINGS="$ABSENT_SETTINGS" \
   bash "$REPO/install.sh" --project-dir "$F_UPGRADE" --yes >/dev/null 2>&1 </dev/null || UPGRADE_RC=$?
@@ -440,6 +485,70 @@ else
   fail "upgrade: the first install exited $UPGRADE_RC — the second run below is not an upgrade of anything"
 fi
 probe upgrade "$F_UPGRADE" upgrade
+
+# ── Fixture: --with-mcp ──────────────────────────────────────────────────────
+# THE FLAGS, WHICH D4 ASKS FOR LITERALLY — its oracle is the filesystem "with the flags exercised".
+# And the file this fixture reaches is D4's own worked example: the previous wave's receipt-only
+# check reported "no third unannounced write" and was STRUCTURALLY UNABLE TO SEE
+# Packages/manifest.json.bak, because that path never entered the receipt. It does now — Task 2 gave
+# it a row — so the file that motivated the second oracle is finally something the second oracle can
+# answer for.
+#
+# `--with-mcp` on a project git does not track makes THREE writes in one run, one per oracle:
+#
+#   Packages/manifest.json.bak   created                → oracle 1
+#   Packages/manifest.json       edited in place        → oracle 3
+#   the .bak's receipt row       ownership claimed      → oracle 2
+#
+# and the dry run's only line about any of it is
+#
+#   --with-mcp: add com.coplaydev.unity-mcp to Packages/manifest.json
+#
+# whose first field is `--with-mcp:` and is therefore not a claim about a path at all. The backup is
+# never mentioned in any form, and the manifest is named only inside a line this parser cannot read.
+#
+# LEFT RED ON PURPOSE. Asserting the gap is this file's charter; closing it means teaching the
+# dry-run block the git-tracking test and the ownership test the real run uses, which belongs with
+# the .gitignore announcement in Task 4.
+#
+# THE PRECONDITIONS ARE ASSERTED, because three separate branches make this run write nothing at
+# all, and a run that writes nothing is invisible to all three oracles at once: no manifest, the
+# package already present, or a Packages/manifest.json.bak the installer does not own (D11's
+# decline). Any of them would turn this fixture green while proving nothing.
+F_WITHMCP="$SCRATCH/withmcp"
+mkfixture withmcp "$F_WITHMCP"
+WITHMCP_MANIFEST='Packages/manifest.json'
+WITHMCP_BAK="$WITHMCP_MANIFEST.bak"
+WITHMCP_PKG='com.coplaydev.unity-mcp'
+if [ -f "$F_WITHMCP/$WITHMCP_MANIFEST" ] && ! grep -qF -- "$WITHMCP_PKG" "$F_WITHMCP/$WITHMCP_MANIFEST"; then
+  pass "withmcp: the fixture has a manifest that does not yet name $WITHMCP_PKG, so --with-mcp reaches the edit"
+else
+  fail "withmcp: the fixture has no manifest, or already names $WITHMCP_PKG — add_manifest_dependency returns early and this fixture measures a run that writes nothing"
+fi
+if [ -e "$F_WITHMCP/$WITHMCP_BAK" ]; then
+  fail "withmcp: $WITHMCP_BAK is already on disk — install.sh declines the flag rather than editing, and this fixture measures a run that writes nothing"
+else
+  pass "withmcp: no $WITHMCP_BAK in the way, so the flag proceeds and the backup is the installer's own"
+fi
+probe withmcp "$F_WITHMCP" fresh --with-mcp
+# The three writes, asserted directly, so the reds above cannot be satisfied by a run that simply
+# did less. Without these, a future install.sh that stopped keeping the backup would turn this whole
+# fixture green and the disclosure would quietly become false.
+if [ -f "$F_WITHMCP/$WITHMCP_BAK" ]; then
+  pass "withmcp: the real run created $WITHMCP_BAK — oracle 1 has a subject"
+else
+  fail "withmcp: the real run kept no $WITHMCP_BAK — oracle 1's subject is absent and its silence above means nothing"
+fi
+if grep -qF -- "$WITHMCP_PKG" "$F_WITHMCP/$WITHMCP_MANIFEST"; then
+  pass "withmcp: the real run edited $WITHMCP_MANIFEST in place — oracle 3 has a subject"
+else
+  fail "withmcp: the real run did not add $WITHMCP_PKG to the manifest — oracle 3's subject is absent"
+fi
+if [ -n "$(awk -F'\t' -v want="$WITHMCP_BAK" '$1 == want { print }' "$F_WITHMCP/$RECEIPT_REL" 2>/dev/null)" ]; then
+  pass "withmcp: the receipt claims $WITHMCP_BAK — oracle 2 has a subject, and it is the one D4 was written about"
+else
+  fail "withmcp: the receipt does not claim $WITHMCP_BAK — oracle 2's subject is absent, and this is the exact blindness D4 exists to correct"
+fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-dryrun assertions passed\n'
