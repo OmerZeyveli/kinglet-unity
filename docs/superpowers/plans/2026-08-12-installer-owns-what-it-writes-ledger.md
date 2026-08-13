@@ -16,9 +16,10 @@ added mid-wave, so re-read it rather than working from an earlier reading.
 **Tasks 1, 1b, 1c, 1d, 2, 2b, 2c and 3 are done and closed. Task 4 is the next action**, then 5 and 6,
 then the whole-branch review.
 
-**Tasks 1 through 5 are done and closed. Task 6 is the next action**, then the whole-branch review.
+**Every task in the plan is done and closed. The whole-branch review is the next and last action** —
+base `c5280c4` to HEAD.
 
-**Suite green: `Total: 960  Passed: 960  Failed: 0`, 33 files, tree clean at `13812a7`.**
+**Suite green: `Total: 996  Passed: 996  Failed: 0`, 34 files, tree clean at `ca30a1c`.**
 `provenance OK`, baseline zero drift. Task 3 left seven deliberate reds and **Task 4 closed all
 seven**; the dry-run guard went 138/7 → **165/0**.
 
@@ -168,7 +169,7 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 3 | The dry-run guard, three oracles | **done** | `9710ae6..82b806a` | Spec ✅, Quality Approved, **3 fix rounds**. Grew from 6 fixtures to 9. Leaves **7 deliberate reds** — the suite is red on purpose until Task 4 |
 | 4 | The dry run announces what the run will actually do | **done** | `6ad42eb..82dc293` | Spec ✅, 1 fix round. Brief rewritten before dispatch. **Suite green again: 960/960**, guard 138/7 → 165/0. `add_ignore` no longer exists — the decision moved up rather than being copied |
 | 5 | One pipeline detector, and Option B states its costs | **done** | `85b6a2e..13812a7` | Spec ✅, Quality Approved, 1 fix round. **16/16 fixtures agree**, eight of them hostile shapes the report's table could not see. Two commits in round 1 — the second is the baseline regeneration `unity-init.md` required |
-| 6 | Whole-wave verification | open | — | **Brief rewritten 2026-08-13**: fourteen criteria not nine, and the sweep becomes an *assertion* — the defect that actually happened was two implementations agreeing until one grew a state |
+| 6 | Whole-wave verification | **done** | `991418e..ca30a1c` | Spec ✅, Quality Approved, 1 fix round. Fourteen criteria run and recorded. The sweep became **three** assertions; criterion 13's parenthetical discharged |
 
 ## What Task 1 found, and the controller error it exposed
 
@@ -768,6 +769,70 @@ Asked what the smallest honest guard would assert, it gave the answer the contro
 **Task 6 Step 2 already ran almost exactly that sweep and only recorded its output.** Recording is what
 let the defect survive. Task 6's brief is rewritten to make it an assertion with an explicit allow-list.
 
+## Task 6 — the verification record, and a count that came from two different runs
+
+**Fourteen criteria run and recorded**, each with its command and actual output. The review re-derived
+**nine** independent things from the report and **eight matched to the character**; the ninth was a
+count, not a conclusion, and its root cause is worth keeping.
+
+**Criterion 13's parenthetical is discharged.** The reviewer rebuilt the K2 fixture by hand rather than
+reading the suite: marker-less `CLAUDE.md` with a sentinel, a user-authored `CLAUDE.md.generated`, two
+installs → `keeping yours, untouched.` both runs, md5 unchanged, zero receipt rows, user's bytes still
+present after `uninstall.sh --yes`. Clause 3 holds **as written**. The spec now says so.
+
+### The sweep became three assertions, and each strengthening was earned
+
+1. **Set equality, not "nothing outside the allow-list".** A subset check **passes on empty output**,
+   so the guard's most likely end is not a false green on a re-fork but *silently certifying a tree it
+   can no longer read*. The reviewer then built the case nobody had: neuter the needle in **both**
+   allow-listed files, and **every Part-C fixture stays green** — all three surfaces still agree,
+   because they all route through the one broken detector. Only the coverage assertion catches it.
+2. **A positive sweep asserting the caller set is closed**, because the negative sweep cannot see a
+   caller that stops routing through the detector and hardcodes a verdict — that names neither needle.
+   A hardcoded `urp` reddens exactly **4 of 8** fixtures; the other four stay green because `urp` is
+   right for them. Task 5's thesis on live code.
+3. **Sweep C, an empty allow-list over `case "$RENDER_PIPELINE" in`** — added in round 1, and the
+   reason is the sharpest measurement of the task. See below.
+
+### The routing guard contributed nothing, and only running the mutations apart showed it
+
+Round 0 reported M5 (revert routing to the `*URP*` prose glob) as **0 reds**, honestly, and recorded
+that the guard catches the *consequence* of prose coupling rather than the coupling. The review ran the
+reword **alone**, with routing left on the token: **1 red, from the cell assertion.** So of M5b's two
+reds exactly one is attributable to the glob — and not by accident of that reword. `assert_names` reads
+which pipeline names the cell contains; the glob tests `*URP*` over the same string. **Every divergence
+that breaks the glob necessarily changes the name set the cell assertion reads, so the routing check
+can never fire alone. Its independent power is zero, not late.**
+
+Sweep C costs one assertion and turns M5 from 0 into 1. Its own limit is recorded: it matches one
+spelling, so `*Universal*` or `[[ … == *URP* ]]` evade it.
+
+### Why the count was wrong, which is a better finding than the count
+
+M3c was reported as **9** and measures **8** — and `both`'s routing *cannot* redden under a hardcoded
+`urp`, since token `urp+hdrp` wants the skill and a hardcoded `urp` supplies it. The root cause: the
+round-0 harness had `red()` and `show()` **each re-running the test**, so the count and the enumeration
+came from two different invocations. The round-0 output printed 8 lines under a count that said 9.
+Fixed by running once and deriving both from the same bytes.
+
+### And the index, not the working tree
+
+`--exclude-dir=state` was measured and correct, and it closed **one instance of a class**: the sweeps
+read the working tree, so any untracked or gitignored file under the four roots can flip the verdict
+per-machine. The reviewer built the next instance — a `.claude/settings.local.json` carrying
+`Bash(bash scripts/detect-pipeline.sh:*)`, gitignored, invisible to review, machine-local — exactly what
+this wave's own work invites. Now swept off `git ls-files`.
+
+Three hazards were measured rather than assumed in doing it. **`xargs -0 grep` was rejected**: xargs
+returns **123** when its child exits non-zero, so an ordinary no-match is indistinguishable from an
+error in the `rc>=2` branch — which would have *permanently misreported sweep C*, whose correct answer
+is no match. The file list goes to a file rather than through `$(...)`, because command substitution
+strips NUL and silently undoes `-z`. And two new arms fire loudly on no-index and empty-index.
+
+**What it cannot see:** a new implementation file never `git add`ed. Accepted, because that window is
+already universal here — `check-provenance.sh`'s orphan check reads `git ls-files` too, so an unstaged
+file is outside the whole apparatus rather than just this test.
+
 ## Deferred and parked findings
 
 ### From Task 2c — five, plus a class worth naming
@@ -993,6 +1058,26 @@ task has run rewrites the record of what the implementer was actually told.
 36. **D3 says "source it"; the implementation executes it as a subprocess.** D3's substance — one
     implementation, reachable by both, before the payload is installed — is met, and the subprocess form
     is safer (no variable collisions, no `set -e` coupling). Recorded as a choice, not a drift.
+
+### From Task 6 — two carried, plus the plan's own stalenesses
+
+37. **Sweep C matches one spelling.** `*Universal*`, `[[ $RENDER_PIPELINE == *URP* ]]`, or a `grep`
+    over the display string all evade it. Recorded at the point of decision, retakeable.
+38. **The shape that would hide in `tests/`** — a future test computing its expected verdict by
+    grepping the manifest itself instead of calling `detect-pipeline.sh`. That is a second
+    implementation in a directory nothing sweeps. `tests/test-pipeline-detector.sh` avoids it (Surface
+    0 takes the token from the detector and every `want_*` derives from it), but **the avoidance is a
+    convention, not an assertion.**
+39. **Four stalenesses in the plan's own front matter**, left in place per this wave's standing rule
+    that editing a plan after its tasks have run rewrites the record of what implementers were told:
+    Self-Review says "criteria 1–9" where the spec has fourteen; the Global Constraints block quotes
+    `Total: 503 … 31 test files` and a fixture-variant list that predates `hdrp` and `both`; and the
+    File Structure table lists neither Task 6 file and says "Rows for three new files" where four now
+    exist. Task 6's implementer caught two, its reviewer the other two.
+40. **The plan's two "cannot see" disclosures were attached to the wrong sweeps** — sweep 1 (`-rln`) is
+    *file*-oriented and matches a package *name*; sweep 2 (`-n` over `install.sh`) is the
+    *line*-oriented one. Copying them verbatim would have put two false statements into the wave's own
+    verification record. Caught before it happened.
 
 ### From Task 1's review — five Minor, four closed in round 1
 

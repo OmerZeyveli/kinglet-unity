@@ -477,8 +477,12 @@ inside those tasks' diffs naturally, close it there; do not widen them to reach 
     exactly one `Packages/manifest.json.bak` row** — asserted, not verified by hand.
     *(Its third clause was satisfiable in 2026-08-13's tree only under a narrowed reading — the two
     shapes where the writing arm never runs — because on the fixture it names the user's file was
-    destroyed before ownership was asked. D11 closes that gap; the clause is then achievable as
-    written, and criterion 14 asserts it.)*
+    destroyed before ownership was asked. **D11 closed that gap, and the parenthetical is discharged:**
+    Task 6's review rebuilt the fixture by hand rather than reading the suite — marker-less `CLAUDE.md`
+    carrying a sentinel, a user-authored `CLAUDE.md.generated`, two installs — and measured
+    `warn CLAUDE.md.generated exists and is not ours — keeping yours, untouched.` on both runs, md5
+    unchanged across both, **zero** receipt rows for the path, and the user's bytes still on disk after
+    `uninstall.sh --yes`. The clause holds **as written**.)*
 14. **Neither unconditional writer destroys a file it does not own.** Proven on three fixtures, each in
     both directions: a user-authored `CLAUDE.md.generated` before any install ever; a
     `CLAUDE.md.generated` the installer wrote and the user then edited, across a reinstall; and a
