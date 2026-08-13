@@ -7,8 +7,8 @@ an obligation, not a courtesy.
 
 `provenance.tsv` at the repo root records, for every tracked file, which upstream it came from,
 which version, and whether we modified it. Everything below is verifiable against it; nothing here
-is asserted on trust. The manifest's 15/66 split is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
-$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 15 `verbatim` and 66 `modified` rows
+is asserted on trust. The manifest's 15/67 split is derived, not typed by hand: `awk -F'\t' '$0 !~ /^#/ &&
+$1 != "path" {print $6}' provenance.tsv | sort | uniq -c` counts 15 `verbatim` and 67 `modified` rows
 across the whole manifest. The table below states each upstream's own footprint instead, in wording
 that cannot be mistaken for this repo-wide number — see the next paragraph for why that matters.
 
@@ -26,7 +26,7 @@ moved from `verbatim` to `modified`. Nothing asserts it, so nothing will tell yo
 
 | Project | Relationship | In this repo? |
 |---------|--------------|---------------|
-| [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (XeldarAlz) | **Vendored** at v1.5.0 — the engineering layer | **Yes** — 79 files; 15 of them still byte-identical to upstream, the rest rewritten |
+| [everything-claude-unity](https://github.com/XeldarAlz/everything-claude-unity) (XeldarAlz) | **Vendored** at v1.5.0 — the engineering layer | **Yes** — 80 files; 15 of them still byte-identical to upstream, the rest rewritten |
 | [Claude-Code-Game-Studios](https://github.com/Donchitos/Claude-Code-Game-Studios) (Donchitos) | **Adapted** at `984023d` — the design/production layer, removed 2026-08-03 | **No** — 0 files; see §2 for why the notice is retained anyway |
 | [Superpowers](https://github.com/obra/superpowers) (Jesse Vincent) | **Adapted** at 6.2.0 on 2026-08-10 — the process chain, at the expression level | **Yes** — the skills listed in §4, all rewritten for Unity |
 | [unity-mcp](https://github.com/CoplayDev/unity-mcp) (CoplayDev) | **Targeted** — the MCP editor bridge | No — install it yourself |

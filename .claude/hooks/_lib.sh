@@ -119,9 +119,16 @@ unity_track_edit() {
     fi
 }
 
-# unity_track_read / unity_was_read — DEAD as of 2026-08-13. Their only caller was gateguard.sh,
-# removed by the surface criterion. Kept because tests/test-lib.sh and tests/test-state.sh assert on
-# them and on UNITY_READS_FILE; retiring the pair is its own change, not a side effect of the cut.
+# unity_track_read / unity_was_read — DEAD as of 2026-08-13, with NO caller and NO test coverage.
+#
+# unity_track_read's only caller was track-reads.sh; unity_was_read's only caller was gateguard.sh.
+# Both hooks were removed by the surface criterion, and `grep -rn 'unity_track_read\|unity_was_read'
+# tests/` returns nothing — no test references either function, so deleting the pair would break
+# nothing this suite asserts.
+#
+# They are retained only because retiring them is a decision about this library's surface rather than
+# a side effect of the hook cut, and nothing forced it. UNITY_READS_FILE below is a separate case:
+# tests/test-state.sh does read it, so that variable is not free to remove alongside them.
 unity_track_read() {
     local file_path="$1"
     if [ -n "$file_path" ]; then

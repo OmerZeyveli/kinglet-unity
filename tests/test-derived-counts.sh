@@ -612,6 +612,130 @@ fi
 assert_eq "0" "$(printf '%s' "$DCK_DROP_PHANTOM" | grep -c . || true)" \
   "docs/HOOK-REFERENCE.md lists no hook the minimal profile actually keeps"
 
+# --- The minimal-KEEPS complement, as a set. ---
+#
+# The drops list and the keeps list are complements, and a hand-written complement drifts
+# independently of the thing it complements: a hook can be missing from BOTH lists and each list, read
+# alone, still looks coherent.
+DCK_KEEPS_DERIVED=$(
+  while IFS= read -r dck_h; do
+    [ -n "$dck_h" ] || continue
+    dck_l=$(grep -m1 '^HOOK_PROFILE_LEVEL=' "$REPO_DIR/.claude/hooks/$dck_h" 2>/dev/null \
+            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/')
+    case "$dck_l" in ''|minimal) printf '%s\n' "${dck_h%.sh}" ;; esac
+  done <<< "$DCK_DISK" | sort
+)
+DCK_KEEPS_DOC=$(
+  awk '
+    /kinglet:minimal-keeps:begin/ { inblock = 1; next }
+    /kinglet:minimal-keeps:end/   { inblock = 0 }
+    inblock && /^- `/ { l = $0; sub(/^- `/, "", l); sub(/`.*$/, "", l); print l }
+  ' "$REPO_DIR/docs/HOOK-REFERENCE.md" 2>/dev/null | sort
+)
+assert_eq "yes" "$([ -n "$DCK_KEEPS_DOC" ] && echo yes || echo no)" \
+  "docs/HOOK-REFERENCE.md still carries a readable kinglet:minimal-keeps region"
+assert_eq "$DCK_KEEPS_DERIVED" "$DCK_KEEPS_DOC" \
+  "the documented minimal-keeps list is exactly the hooks minimal keeps"
+
+# ============================================================================
+# THE FOUR HAND-WRITTEN RESTATEMENTS OF HOOK MEMBERSHIP.
+#
+# The set assertions above cover ONE marked region of ONE file. Four other places restated the same
+# membership by hand, each proved silent when wrong:
+#
+#   1. docs/HOOK-REFERENCE.md's twelve per-hook `- **Profile:** X` lines — flipping one made the file
+#      contradict its own marked region eleven lines above, suite green.
+#   2. docs/HOOK-REFERENCE.md's Summary Table profile column — the same value a third time.
+#   3. that table's Event and Matcher columns — correct against settings.json, asserted by nothing.
+#   4. docs/ARCHITECTURE.md's Hook Summary table — all three again, in a second file.
+#
+# (4) was DELETED rather than guarded: it duplicated this document wholesale, and ARCHITECTURE.md's
+# own paragraph argues that two documents listing one set by hand is how the list goes stale in one of
+# them. The file was contradicting itself twenty lines apart. The remaining three are guarded here,
+# because a per-hook reference page that does not state each hook's profile is not a reference page.
+#
+# Profile label convention: a hook that declares no HOOK_PROFILE_LEVEL runs under every profile, and
+# the documents call that `always`. session-brief is the only one, and both places used to call it
+# `minimal` — true only in the sense that minimal is the lowest profile that runs it, which is not
+# what the column means anywhere else in the table.
+echo "--- derived counts: hook membership restated by hand ---"
+
+# hook -> declared level (or `always`), from the files.
+DCK_LEVELS=$(
+  while IFS= read -r dck_h; do
+    [ -n "$dck_h" ] || continue
+    dck_l=$(grep -m1 '^HOOK_PROFILE_LEVEL=' "$REPO_DIR/.claude/hooks/$dck_h" 2>/dev/null \
+            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/')
+    printf '%s\t%s\n' "${dck_h%.sh}" "${dck_l:-always}"
+  done <<< "$DCK_DISK" | sort
+)
+
+# hook -> event, matcher, from settings.json. `(all)` is how the documents spell an empty matcher.
+DCK_REG_TRIPLES=$(
+  awk '
+    /"[A-Za-z]+": \[/ && !/"hooks": \[/ { l=$0; sub(/^[^"]*"/,"",l); sub(/".*/,"",l); ev=l; matcher=""; next }
+    /"matcher":/ { l=$0; sub(/^[^:]*:[[:space:]]*"/,"",l); sub(/".*/,"",l); matcher=l; next }
+    /"command":[[:space:]]*"\.claude\/hooks\// {
+        l=$0; sub(/^.*\.claude\/hooks\//,"",l); sub(/\.sh".*/,"",l)
+        print l "\t" ev "\t" (matcher == "" ? "(all)" : matcher)
+    }
+  ' "$REPO_DIR/.claude/settings.json" 2>/dev/null | sort
+)
+
+# 1. The per-hook `- **Profile:** X` lines. Only the first word is compared: session-brief's carries a
+#    parenthetical explaining why it is `always`, and that prose is not the claim.
+DCK_PERHOOK_DOC=$(
+  awk '
+    /^#### / { h = $2; next }
+    /^- \*\*Profile:\*\*/ && h != "" {
+        l = $0; sub(/^- \*\*Profile:\*\*[[:space:]]*/, "", l); split(l, a, " "); print h "\t" a[1]; h = ""
+    }
+  ' "$REPO_DIR/docs/HOOK-REFERENCE.md" 2>/dev/null | sort
+)
+assert_eq "yes" "$([ -n "$DCK_PERHOOK_DOC" ] && echo yes || echo no)" \
+  "docs/HOOK-REFERENCE.md still has readable per-hook Profile lines"
+assert_eq "$DCK_LEVELS" "$DCK_PERHOOK_DOC" \
+  "every per-hook Profile line matches the level its hook file declares"
+
+# 2 and 3. The Summary Table: `| hook | Event | Matcher | Profile | Type | Purpose |`.
+#
+#    NOT `awk -F'|'`. Markdown escapes the matcher's alternation as `Edit\|Write`, and with `|` as
+#    the field separator awk splits INSIDE that cell before any unescaping can run — the matcher
+#    column comes out as `Edit\` and every subsequent column shifts left by one, so the profile
+#    column is read out of the matcher's position. Round 1 of this block did exactly that and failed
+#    against a correct document, printing two lines that looked identical because the first row
+#    (`bash-gate`, matcher `Bash`, no escape) was the only one that survived the split intact.
+#
+#    So: protect the escaped pipes with a byte that cannot occur in the source, split on the real
+#    separators, then restore.
+DCK_TABLE_DOC=$(
+  awk '
+    /^\| [a-z0-9-]+ \| (PreToolUse|PostToolUse|PreCompact|SessionStart|Stop) \|/ {
+        line = $0
+        gsub(/\\\|/, "\001", line)
+        split(line, f, "|")
+        h=f[2]; ev=f[3]; ma=f[4]; pr=f[5]
+        gsub(/^[ \t]+|[ \t]+$/, "", h); gsub(/^[ \t]+|[ \t]+$/, "", ev)
+        gsub(/^[ \t]+|[ \t]+$/, "", ma); gsub(/^[ \t]+|[ \t]+$/, "", pr)
+        gsub(/\001/, "|", ma)
+        print h "\t" ev "\t" ma "\t" pr
+    }
+  ' "$REPO_DIR/docs/HOOK-REFERENCE.md" 2>/dev/null | sort
+)
+assert_eq "yes" "$([ -n "$DCK_TABLE_DOC" ] && echo yes || echo no)" \
+  "docs/HOOK-REFERENCE.md still has a readable hook Summary Table"
+
+# The expected table, joined from the two derivations rather than typed.
+DCK_TABLE_DERIVED=$(
+  while IFS="$(printf '\t')" read -r dck_h dck_ev dck_ma; do
+    [ -n "$dck_h" ] || continue
+    dck_pr=$(printf '%s\n' "$DCK_LEVELS" | awk -F'\t' -v k="$dck_h" '$1 == k { print $2 }')
+    printf '%s\t%s\t%s\t%s\n' "$dck_h" "$dck_ev" "$dck_ma" "$dck_pr"
+  done <<< "$DCK_REG_TRIPLES" | sort
+)
+assert_eq "$DCK_TABLE_DERIVED" "$DCK_TABLE_DOC" \
+  "the Summary Table's event, matcher and profile columns match settings.json and the hook files"
+
 # --- The quoted numbers. Same table shape, same flattening, same per-pair floors as above. ---
 #
 # NOTE ON THE TWO `of the` PATTERNS. `runs N of the M` (the minimal row) and `drops N of the M`

@@ -72,11 +72,12 @@ Each cost below was measured against a manual copy, not assumed:
 - **No `.claude/scripts/`.** That directory does not exist in this repository — Option A builds it
   by copying the repo-root `scripts/`. A manual copy of `.claude/` therefore has no
   `.claude/scripts/`, which this guide points at by that exact path and which `install.sh` writes.
-  (No agent, command or skill names any of those scripts today — that gap is recorded, not fixed
-  here.) To match Option A, copy them yourself — **all except
+  (Exactly one shipped surface names exactly one of those scripts — `/unity-init` names
+  `detect-pipeline.sh`. The other five are named by no agent, command or skill. That gap is
+  recorded, not fixed here.) To match Option A, copy them yourself — **all except
   `check-provenance.sh`**, which Option A deliberately skips in both its announcement and its write
   loop, because it validates *this repository's* `provenance.tsv` and expects the repo's layout. The
-  repo has 6 scripts; an installed project has 5:
+  repo has 7 scripts; an installed project has 6:
 
   ```bash
   mkdir -p your-unity-project/.claude/scripts

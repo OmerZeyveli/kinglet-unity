@@ -200,20 +200,15 @@ how the list goes stale in one of them.
 
 ### Hook Summary
 
-| Hook | Event | Matcher | Profile | Type |
-|------|-------|---------|---------|------|
-| `block-scene-edit` | PreToolUse | Edit\|Write | minimal | Blocking |
-| `block-meta-edit` | PreToolUse | Edit\|Write | minimal | Blocking |
-| `block-legacy-input` | PreToolUse | Edit\|Write | minimal | Blocking |
-| `guard-project-config` | PreToolUse | Edit\|Write | standard | Blocking |
-| `bash-gate` | PreToolUse | Bash | standard | Blocking |
-| `warn-serialization` | PostToolUse | Edit\|Write | standard | Advisory |
-| `warn-filename` | PostToolUse | Edit\|Write | standard | Advisory |
-| `warn-platform-defines` | PostToolUse | Edit\|Write | standard | Advisory |
-| `track-edits` | PostToolUse | Edit\|Write | standard | Advisory |
-| `session-restore` | SessionStart | (all) | standard | Advisory |
-| `session-brief` | SessionStart | startup\|clear\|compact | always (no `HOOK_PROFILE_LEVEL`) | Advisory |
-| `session-save` | Stop | (all) | standard | Advisory |
+**Deliberately not here.** The per-hook table that used to sit at this point restated every hook's
+event, matcher and profile by hand — the same membership `docs/HOOK-REFERENCE.md` states, in a second
+place, kept in step by nothing. A wrong value in it was silent, and this file's own paragraph above
+argues against exactly that duplication; it was contradicting itself twenty lines apart.
+
+**[HOOK-REFERENCE.md](HOOK-REFERENCE.md) holds the membership, and it is guarded**:
+`tests/test-derived-counts.sh` compares that document's per-hook `Profile:` lines, its summary
+table's profile column, and its event and matcher columns against the hook files and
+`.claude/settings.json` — by name, in both directions.
 
 There is no `PreCompact` or `PostToolUse`-on-`Bash` registration left. Fifteen hooks were removed on
 2026-08-13 when the surface criterion — *does it do something the model cannot do unaided?* — was

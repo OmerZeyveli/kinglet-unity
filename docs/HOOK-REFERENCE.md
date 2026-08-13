@@ -42,9 +42,10 @@ Set via: `UNITY_HOOK_PROFILE=standard` in environment or `settings.local.json`.
 
 ### What `minimal` actually costs
 
-**It drops 8 of the 12 hooks, and both of the gates that survived the surface criterion on merit are
-among them.** "Maximum speed, minimal interference" is what this row used to say, and it was
-describing the profile by its intent rather than by its effect.
+**It drops 8 of the 12 hooks, and `bash-gate` is one of them.** O2 kept two hooks on merit —
+`bash-gate` and `block-legacy-input` — and `minimal` disarms the first while keeping the second,
+which declares `minimal` itself. "Maximum speed, minimal interference" is what this row used to say,
+and it was describing the profile by its intent rather than by its effect.
 
 <!-- kinglet:minimal-drops:begin -->
 - `bash-gate` — **the gate on destructive Bash commands.** `minimal` turns it off. This is the one
@@ -60,9 +61,14 @@ describing the profile by its intent rather than by its effect.
   opens with
 <!-- kinglet:minimal-drops:end -->
 
-What `minimal` keeps is the three file-extension blockers — `block-scene-edit`, `block-meta-edit`,
-`block-legacy-input` — plus `session-brief`, which declares no `HOOK_PROFILE_LEVEL` and therefore
-runs under every profile including this one.
+What `minimal` keeps:
+
+<!-- kinglet:minimal-keeps:begin -->
+- `block-scene-edit` — blocks Edit/Write on `.unity` / `.prefab` / `.asset`
+- `block-meta-edit` — blocks Edit/Write on `.meta`
+- `block-legacy-input` — blocks legacy `Input.*` in first-party C#
+- `session-brief` — declares no `HOOK_PROFILE_LEVEL`, so every profile runs it
+<!-- kinglet:minimal-keeps:end -->
 
 Both the count and the membership of that list are derived and guarded by
 `tests/test-derived-counts.sh`, which reads the marked region above and compares it, as a set, with
@@ -203,7 +209,7 @@ These hooks run after every Edit or Write tool invocation. They warn but do not 
 
 - **File:** `session-brief.sh`
 - **Matcher:** `startup|clear|compact` (the only hook in this file with a SessionStart matcher — the others run on every SessionStart)
-- **Profile:** minimal
+- **Profile:** always (declares no `HOOK_PROFILE_LEVEL`, so every profile runs it)
 - **Type:** Advisory (exit 0)
 - **What it does:** Injects the `using-kinglet` skill into the session at start, with its YAML frontmatter stripped, so a fresh session opens knowing which surface handles which situation. Prints nothing and exits 0 when the skill file is absent — a session must never fail to start because a brief is missing.
 - **Environment variables:** Reads `CLAUDE_PROJECT_DIR` to locate the skill; falls back to the working directory
@@ -236,7 +242,7 @@ These hooks run when the agent stops (conversation ends or user exits).
 | warn-platform-defines | PostToolUse | Edit\|Write | standard | Advisory | Warn on platform #if without #else |
 | track-edits | PostToolUse | Edit\|Write | standard | Advisory | Track edited files for session |
 | session-restore | SessionStart | (all) | standard | Advisory | Restore session state |
-| session-brief | SessionStart | startup\|clear\|compact | minimal | Advisory | Inject using-kinglet at session start |
+| session-brief | SessionStart | startup\|clear\|compact | always | Advisory | Inject using-kinglet at session start |
 | session-save | Stop | (all) | standard | Advisory | Persist session state |
 
 ---
