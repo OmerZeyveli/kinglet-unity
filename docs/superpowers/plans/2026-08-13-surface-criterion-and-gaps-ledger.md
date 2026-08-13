@@ -43,8 +43,13 @@ facts sheet does not block anything.
 **Stage 1 is closed. Task 2 was adjudicated at its cap into Task 2b. Batch 1 is dispatched.**
 
 - **HEAD `3fd22dc`** plus this ledger/plan commit. Working tree clean.
-- `bash tests/run-tests.sh` → **1190/1190**, rc=0, **35** ANSI-stripped headers == `ls tests/test-*.sh
-  | wc -l` = 35. Measured by the round-5 re-reviewer at `3fd22dc`.
+- `bash tests/run-tests.sh` → **1189/1189**, rc=0, **35** ANSI-stripped headers == `ls tests/test-*.sh
+  | wc -l` = 35. ~~1190~~ was a transcription slip in this ledger, caught by a figure
+  re-derivation wave: **four independent measurements at three different commits all say 1189**,
+  and this ledger already disagreed with itself, since Task 9's expected end state below is built
+  on 1189. **The wall clock is 191–255 s** depending on concurrent load, so the plan's
+  `timeout above 150000 ms` truncates every real run and a truncated run reads as red —
+  **use 400000 ms**.
 - `bash scripts/check-provenance.sh` → **`provenance OK`**.
 - **Every figure below is pinned to the commit beside it. Re-derive before quoting one in a brief.**
 
