@@ -271,29 +271,32 @@ else
   #
   # It is not ours to summarise, either, and this comment claimed otherwise until 2026-08-13: it said
   # install.sh and uninstall.sh would "both leave that file alone", and the third bucket was printed
-  # under `modified since install — install.sh will keep your versions`. Half of that is false. The
-  # two readers do NOT agree about an unreadable-origin row, because only one of them classifies with
-  # a `case`. Measured 2026-08-13 on a fixture whose origin column was mangled to `toolkit ` (trailing
-  # space) on a `.claude/rules/*.md` PAYLOAD row — see the report block below for the root-file rows,
-  # which the same mangling costs their ownership rather than their contents — with the toolkit's own
-  # copy of the file bumped so an overwrite would be visible:
+  # under `modified since install — install.sh will keep your versions`. Half of that was false, and
+  # the block that replaced it described install.sh as an if/else that let an unreadable origin fall
+  # through to the sha test, so a mangled column on a file whose bytes still matched meant the
+  # payload loop OVERWROTE the user's edit with no `keeping yours` line. That was measured, and it
+  # was true until 2026-08-14. **It is no longer true, and this paragraph is the correction rather
+  # than the finding** — the citation it carried, `grep -n 'if \[ "$origin" = user-modified \]'
+  # install.sh`, now returns nothing.
   #
-  #   uninstall.sh — a `case` whose `*)` branch keeps. Kept the file, printed `keep 1 file(s) you
-  #                  modified`. True whatever the bytes say.
-  #   install.sh   — NOT a `case`. `grep -n 'if \[ "$origin" = user-modified \]' install.sh` finds an
-  #                  if/else, so an unreadable origin falls straight to the sha test and the BYTES
-  #                  decide, not the column:
-  #                    bytes still match the recorded sha → the row never enters MODIFIED_FILES, no
-  #                      `keeping yours` line is printed, the payload loop OVERWRITES the file, and the
-  #                      row is rewritten as a clean `toolkit`;
-  #                    bytes drifted → the sha test catches it and the file is kept.
+  # WHERE THE FOUR READERS OF THIS COLUMN STAND TODAY. Two of them trim surrounding whitespace before
+  # comparing; two do not and are fail-closed by a `case` catch-all instead:
   #
-  # So `install.sh will keep your versions` is true of `user-modified` rows and of `toolkit` rows whose
-  # bytes drifted, and false for exactly the sub-case above — the one a mangled column most likely
-  # produces, since mangling the column does not touch the file. These rows therefore get their own
-  # line, which also keeps them out of a MODIFIED count that would then be describing two different
-  # futures. Fixing install.sh's asymmetry is a separate change; this file describes install.sh as it
-  # is.
+  #   install.sh, owned_by_installer      — TRIMS, then requires exactly `toolkit` to re-claim a file.
+  #   install.sh, the MODIFIED_FILES loop — TRIMS, then a `case`. `user-modified` keeps the file;
+  #                                         anything unreadable ALSO keeps it and is reported on its
+  #                                         own line. This is the reader that used to destroy edits.
+  #   uninstall.sh's classifier           — DOES NOT TRIM. `case` with a keeping `*)`, so a mangled
+  #                                         `user-modified` is safe — but a mangled `toolkit ` on an
+  #                                         UNEDITED file is classified as the user's and never
+  #                                         removed. That mirror is still open on that side.
+  #   this file                           — DOES NOT TRIM. Same `case` shape, reporting only.
+  #
+  # So `install.sh will keep your versions` is now true of every bucket this loop can produce. These
+  # rows still get their own line, for the reason that outlives the fix: this file writes nothing and
+  # cannot certify a provenance it cannot read, and folding them into MODIFIED would put two
+  # different situations under one count. What changed is that the separation is no longer reporting
+  # a disagreement between the two writers — they agree now.
   #
   # The sha comparison stays fail-closed the same way uninstall.sh's `sha_of` is: an unreadable file
   # yields the empty string, which never equals a recorded checksum, so the row lands in MODIFIED and

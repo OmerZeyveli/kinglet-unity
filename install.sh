@@ -312,6 +312,33 @@ owned_by_installer() {
   # which the user can delete; the cost of the other answer is a file deleted, which they cannot
   # undelete. States N and N2 assert both directions across an upgrade, which is the only shape
   # where this awk is the whole decision (the reference-copy arm above answers otherwise).
+  #
+  # WHICH READERS OF THIS COLUMN TRIM, AND WHICH DO NOT. There are four, and the sentence above is
+  # about ONE of them, so it is stated here for the column rather than left to be read off whichever
+  # reader you happened to open. This paragraph shipped for one round saying "a CRLF line ending" is
+  # handled without saying handled BY WHOM, and the next three tasks to open this file would have
+  # read it as a property of the receipt format:
+  #
+  #   install.sh, this awk                       — TRIMS. Deciding whether to re-claim a file.
+  #   install.sh, the MODIFIED_FILES loop below  — TRIMS. Deciding whether to overwrite the user's
+  #                                                edit. This is the reader where being wrong costs
+  #                                                work that cannot be recovered, and it was the
+  #                                                untrimmed one until 2026-08-14: `user-modified `,
+  #                                                ` user-modified` and a CRLF receipt each silently
+  #                                                destroyed the edit and rewrote the row `toolkit`.
+  #   uninstall.sh's classifier                  — DOES NOT TRIM. It is fail-closed by a different
+  #                                                mechanism: a `case` whose `*)` keeps the file. So
+  #                                                a mangled `user-modified` is safe there, but a
+  #                                                mangled `toolkit ` on an UNEDITED file is
+  #                                                classified as yours and never removed — this
+  #                                                defect's mirror image, unfixed, on that side.
+  #   scripts/studio-doctor.sh                   — DOES NOT TRIM. Same `case` shape; reports an
+  #                                                unreadable origin on its own line rather than
+  #                                                counting it verified. Diagnostic only, writes
+  #                                                nothing, so it cannot destroy anything.
+  #
+  # Keep this list in step with the file if you add a reader, and do not shorten it to "the origin
+  # column is trimmed" — that sentence is true of two readers and false of four.
   awk -F'\t' -v want="$rel" -v have="$have" '
     $1 == want && $2 == have {
       origin = $4
@@ -324,6 +351,7 @@ owned_by_installer() {
 
 # On upgrade, find files the user edited so we can leave them alone.
 MODIFIED_FILES=""
+UNREADABLE_ORIGINS=""
 if [ "$MODE" = ours ]; then
   while IFS=$'\t' read -r rel recorded _mode origin; do
     case "$rel" in ''|\#*) continue ;; esac
@@ -333,10 +361,48 @@ if [ "$MODE" = ours ]; then
     # file is untouched and overwrites it. Your edit survived exactly one upgrade and then vanished,
     # silently. Measured twice on the same file in one day. The origin column was already written
     # for this; it was just never read.
-    if [ "$origin" = user-modified ]; then
-      MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
-      continue
-    fi
+    #
+    # TRIMMED, AND THIS IS THE READER WHERE GETTING IT WRONG COSTS THE USER'S WORK. `[ "$origin" =
+    # user-modified ]` is byte equality, and everything that reaches it has already survived a `read`
+    # that strips only IFS whitespace — which here is the TAB, not the space. So a receipt whose
+    # origin column carries one trailing space, or one leading space, or a `\r` from a Windows editor
+    # saving the file with CRLF endings, is not `user-modified` to that test. Measured 2026-08-14 on
+    # a --variant urp fixture, install → edit .claude/rules/pc-console.md → install: with any of
+    # those three bytes present the edit is GONE, no `keeping yours` line is printed, and the row is
+    # rewritten as a clean `toolkit`. The one shape that already survived is a LEADING TAB, and it
+    # survived by accident rather than by care — `read` strips it as IFS whitespace before this test
+    # ever sees it. All four are asserted in tests/test-install-ownership.sh's state P.
+    #
+    # THE TRIM IS NARROW ON PURPOSE: surrounding whitespace only, then exact equality. It must not
+    # become a prefix or substring match. A row carrying a genuine fifth column reaches this loop as
+    # `user-modified<TAB>deadbeef` — the tab is INTERNAL, so `read` does not strip it — and that is a
+    # row whose provenance we cannot read, not a `user-modified` row with decoration. State P4
+    # asserts it takes the `*)` branch below and not this one.
+    #
+    # Pure parameter expansion rather than a `sed`/`tr` per row: this loop runs once per receipt row,
+    # and bash 3.2 has to parse it, so no `${x//…}` with a class and no `$'…'` inside the pattern.
+    origin_clean="${origin#"${origin%%[![:space:]]*}"}"
+    origin_clean="${origin_clean%"${origin_clean##*[![:space:]]}"}"
+    # A `case` with an explicit catch-all, which is the grammar uninstall.sh's classifier and
+    # scripts/studio-doctor.sh both already use. The if/else this replaces let anything unrecognised
+    # fall THROUGH to the sha test, and on a mangled row the sha still matches — the row records the
+    # edited file — so the fall-through concluded "untouched" and the payload loop overwrote it. A
+    # file whose provenance we cannot read is not ours to overwrite, so it is kept and SAID ALOUD on
+    # its own line: kept-because-yours and kept-because-unreadable are different futures, and a
+    # single count would describe neither.
+    case "$origin_clean" in
+      user-modified)
+        MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+        continue
+        ;;
+      toolkit)
+        ;;
+      *)
+        UNREADABLE_ORIGINS="${UNREADABLE_ORIGINS}${rel}"$'\n'
+        MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+        continue
+        ;;
+    esac
     actual=$(sha_of "$PROJECT_DIR/$rel")
     [ "$actual" = "$recorded" ] || MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
   done < <(grep -v '^#' "$RECEIPT" 2>/dev/null | tail -n +2 || true)
@@ -344,6 +410,16 @@ if [ "$MODE" = ours ]; then
   if [ "$MOD_COUNT" -gt 0 ]; then
     warn "$MOD_COUNT installed file(s) have local edits — keeping yours:"
     printf '%s' "$MODIFIED_FILES" | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+  fi
+  # `if`, not `[ -n "$u" ] && printf`, inside the loop body: a false test as a loop body's last
+  # command is a `set -e` kill, and this block is new enough not to inherit the older idiom's luck.
+  UNREADABLE_COUNT=$(printf '%s' "$UNREADABLE_ORIGINS" | grep -c . || true)
+  if [ "$UNREADABLE_COUNT" -gt 0 ]; then
+    warn "$UNREADABLE_COUNT receipt row(s) carry an origin this installer cannot read — keeping those files:"
+    printf '%s' "$UNREADABLE_ORIGINS" | while IFS= read -r u; do
+      if [ -n "$u" ]; then printf '       %s\n' "$u"; fi
+    done
+    warn "Their provenance cannot be established, so they are neither replaced nor claimed."
   fi
 fi
 

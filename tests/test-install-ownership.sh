@@ -1865,5 +1865,132 @@ else
   pass "O2: a run that installed nothing left no receipt"
 fi
 
+# ── States P1…P5: the origin column has four readers, and this is the one ────
+# ── whose being wrong costs the user's work ──────────────────────────────────
+#
+# N and N2 fixed the trim in owned_by_installer, which decides whether to RE-CLAIM a file. This is
+# the other install-side reader — the MODIFIED_FILES loop that decides whether to OVERWRITE the
+# user's edit — and it was left byte-exact. The two failures are not symmetric: owned_by_installer
+# getting it wrong leaves a file on disk, which the user can delete; this one getting it wrong
+# destroys an edit, which they cannot get back.
+#
+# Everything reaching that test has already survived `read -r … origin` with `IFS=$'\t'`, and TAB is
+# the only IFS whitespace there — so `read` strips a leading tab and nothing else. Measured
+# 2026-08-14 on the tree before this fix, install → edit → install → mangle → install:
+#
+#   trailing space   `user-modified `         edit DESTROYED, no `keeping yours`, row → `toolkit`
+#   leading space    ` user-modified`         edit DESTROYED, ditto
+#   CRLF receipt     `user-modified` + \r     edit DESTROYED, ditto
+#   fifth column     `user-modified` + TAB…   edit DESTROYED, ditto
+#   leading tab      TAB + `user-modified`    edit survived — by accident; `read` ate the tab
+#
+# THE NEGATIVE DIRECTION IS P4 AND IT IS THE POINT OF THE PAIR. The fix must be a whitespace trim
+# followed by EXACT equality, never a prefix or substring match. A fifth column is not a
+# `user-modified` row with decoration; it is a row whose provenance cannot be read. So P1–P3 and P5
+# assert the edit survives WITHOUT the unreadable-origin report (the trim accepted the value), and
+# P4 asserts it survives WITH that report (the trim declined it, and the `*)` branch kept the file).
+# A greedy trim would make P4 silent and go red there — which is why both halves are asserted on the
+# run's output and not on the file alone.
+#
+# WHAT P CANNOT SEE
+#   * One payload file, one mangling per state. A receipt with several mangled rows at once, and any
+#     interaction with the `.claude/scripts/` loop, are untested.
+#   * uninstall.sh and scripts/studio-doctor.sh read this column too and do NOT trim. Their
+#     fail-closed mechanism is a `case` catch-all instead, and nothing here exercises either. The
+#     uninstall-side mirror of this defect — a mangled `toolkit ` on an UNEDITED file, classified as
+#     the user's and therefore never removed — is unasserted anywhere.
+#   * The trim is asserted through install.sh's OUTPUT and the file's bytes. Nothing here reads the
+#     parameter expansion, so a rewrite that trimmed by some other means would pass.
+
+# p_setup <name> <field-4 value> [post-filter] — install, edit a payload file, install again so the
+# row is a genuine `user-modified` one carrying the EDITED checksum, then mangle only that column.
+# That checksum is the whole point: it is the shape a sha-only fall-through misreads as "untouched".
+P_REL='.claude/rules/pc-console.md'
+P_DIR=''; P_WANT=''; P_OUT=''
+p_setup() {
+  local name="$1" v="$2" post="${3:-cat}"
+  local d="$SCRATCH/$name" f rc=0 rcpt row
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" >/dev/null
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  P_DIR="$d"; P_WANT=''; P_OUT=''
+  f="$d/$P_REL"
+  if [ ! -f "$f" ]; then
+    fail "$name: the payload did not install $P_REL — this state cannot mangle a row for a file that is not there"
+    return 0
+  fi
+  printf '\n<!-- the user edited this -->\n' >> "$f"
+  P_WANT="$(sha_of "$f")"
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  rcpt="$(receipt_of "$d")"
+  row="$(own_row "$rcpt" "$P_REL")"
+  if [ "$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$row")" = user-modified ] \
+     && [ "$(awk -F'\t' 'NR == 1 { print $2 }' <<< "$row")" = "$P_WANT" ]; then
+    pass "$name: the control row is 'user-modified' and carries the edited checksum"
+  else
+    fail "$name: the control row is not a user-modified row carrying the edited checksum — the mangling below would decorate the wrong thing. Row: $row"
+  fi
+  awk -F'\t' -v OFS='\t' -v want="$P_REL" -v v="$v" '$1 == want { $4 = v } { print }' "$rcpt" \
+    | $post > "$SCRATCH/$name-receipt.tsv"
+  mv "$SCRATCH/$name-receipt.tsv" "$rcpt"
+  P_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+        bash "$REPO/install.sh" --project-dir "$d" --yes </dev/null 2>&1 \
+        | sed $'s/\x1b\\[[0-9;]*m//g')" || rc=$?
+  return 0
+}
+
+# p_assert <name> <expect-unreadable-report: yes|no>
+p_assert() {
+  local name="$1" want_report="$2" have
+  have="$(sha_of "$P_DIR/$P_REL")"
+  if [ -n "$P_WANT" ] && [ "$have" = "$P_WANT" ]; then
+    pass "$name: the user's edit survived the install"
+  else
+    fail "$name: the user's edit was destroyed — the origin column was not read, the sha test concluded the file was untouched, and the payload loop overwrote it"
+  fi
+  if grep -qF -- 'keeping yours' <<< "$P_OUT"; then
+    pass "$name: the run said it was keeping the user's file"
+  else
+    fail "$name: the run kept nothing and said nothing — the user is not told a file of theirs was at stake"
+  fi
+  # The discriminator. `no` means the TRIM accepted the value; `yes` means the trim declined it and
+  # the catch-all kept the file. Both outcomes leave the edit intact, and only this line separates
+  # them — which is what makes a too-greedy trim detectable at all.
+  if grep -qF -- 'origin this installer cannot read' <<< "$P_OUT"; then
+    if [ "$want_report" = yes ]; then
+      pass "$name: reported as unreadable, so the trim declined it rather than accepting it"
+    else
+      fail "$name: reported as unreadable — surrounding whitespace should have been trimmed and the value accepted"
+    fi
+  else
+    if [ "$want_report" = no ]; then
+      pass "$name: not reported as unreadable — the trim accepted the value"
+    else
+      fail "$name: a malformed origin was accepted as 'user-modified' — the trim is matching more than surrounding whitespace"
+    fi
+  fi
+}
+
+p_setup state-p1 'user-modified '
+p_assert "P1 (trailing space)" no
+
+p_setup state-p2 ' user-modified'
+p_assert "P2 (leading space)" no
+
+# Every line gets a \r, not just the row under test — that is what a receipt saved by a Windows
+# editor actually looks like, and it is why this is a whole-file filter rather than a field value.
+p_setup state-p3 'user-modified' "sed s/\$/$(printf '\r')/"
+p_assert "P3 (CRLF receipt)" no
+
+p_setup state-p4 "user-modified$(printf '\t')deadbeef"
+p_assert "P4 (a fifth column)" yes
+
+# P5 passed before the fix too, and the reason is worth an assertion rather than a green line: the
+# tab is IFS whitespace to the loop's `read`, so it is gone before the comparison. Asserted so that
+# a future change to that IFS cannot move this shape into the broken set unnoticed.
+p_setup state-p5 "$(printf '\t')user-modified"
+p_assert "P5 (leading tab)" no
+
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-ownership assertions passed\n'
