@@ -596,6 +596,55 @@ broken guard look sound *and* a sound guard look broken. The remedy is not "chec
 `cmp` plus an explicit `MUTANT DID NOT APPLY` marker, because **a zero means nothing until you know
 which zero it is.** Third measured instance in this repository. **→ Task 13** (already sent).
 
+**From Task 10's review (2026-08-14). Task 10 is in fix round 1.**
+
+23. **The three-way membership disagreement is settled, and all three numbers were right for
+    different criteria — none had been written down.** **Nine** of the 35 test files change verdict
+    with vs without a git index. **Five** of those change it *unsafely* (die silently, or report
+    green/greener over a violation). The **vacuous-green** class — green because the sweep was empty,
+    whatever emptied it — is **eight**, and **5 ∩ 8 = exactly 3**. The task title's "six" corresponds
+    to nothing. *Sharper still:* the implementer's own nine-row table overlapped the true nine in
+    only **six** places, because it enumerated candidates instead of sweeping all 35 — it omitted
+    three that change verdict loudly (`test-derived-counts.sh`, `test-kinglet-build.sh`,
+    `test-lib.sh`) and included three that do not change verdict at all (`mcp-naming`,
+    `mcp-doc-instructions`, `surface-references`) — **which is precisely why those three are the
+    interesting ones.** *(Third time this wave that two careful readers produced different
+    memberships for one class, and the third time the cause was a question never pinned to a
+    definition.)*
+24. **Four latent `tests/run-tests.sh` arithmetic issues, all fail-closed, none reachable today.**
+    The 0-discovery guard aggregates `ran`/`suites` across suites, so it cannot fire when a sibling
+    suite ran; `match($0, /failures=[0-9]+/)` also matches inside `expected failures=N` (no
+    `@unittest.expectedFailure` in the tree today); `/^(OK|FAILED)/` fires on any line starting with
+    those words, so a shell probe printing `OK: the tool reported success` yields *"ran a python
+    suite that discovered 0 tests"*; and `file_pass=$((file_pass + py_ran - py_skip - py_bad))` is
+    unclamped, so `Ran 1 test` + `FAILED (failures=3)` subtracts **2 from global Passed** (rc still
+    1, so no failure hides — but Total and Passed go wrong). **→ a later runner pass.**
+25. **`scripts/check-provenance.sh`'s new arm cannot say *why* the index was unreadable.**
+    `git ls-files 2>/dev/null | sort` discards stderr and `$TRACKED_RC` is never printed, so "no git
+    at all" and "a real repo with an empty index" produce byte-identical output. Both fail closed.
+    **Every sibling guard added in the same commit captures the exit code and git's stderr; the one
+    on the gate does not.** **→ Task 12.**
+26. **`scripts/check-provenance.sh`'s `--online` branch drops `$TRACKED_LIST` from cleanup** — the
+    `trap 'rm -f "$TMP_PATHS"; rm -rf "$TMP_ECU"' EXIT` replaces the trap installed for the new temp
+    file, leaking one `mktemp` per `--online` run. **→ Task 12.**
+27. **`.claude/hooks/_lib.sh`'s new derivation is anchored, so it can still misclassify in the
+    unsafe direction.** The three commands key on `^HOOK_PROFILE_LEVEL=` and `="minimal"`; a hook
+    that **indents** the declaration or **single-quotes** the value lands in the *runs at minimal*
+    list while `_lib.sh` itself reads it correctly — and 1+3+8 still totals 12, so the header's own
+    partition tripwire stays silent. **→ a later hook pass.**
+28. **`tests/test-install-dryrun.sh` is insensitive to an emptied `.claude/*.md` payload** (`165/0`
+    both ways) — but it is a dry-run-vs-real *differential* and its own header already names *"A RUN
+    THAT WRITES NOTHING IS INVISIBLE TO ALL THREE ORACLES AT ONCE"*. **A documented adjacent case,
+    not a missed member.** Settling it needs the criterion applied **per assertion**, which no task
+    in this wave scoped. **→ open question, no owner.**
+29. **`tests/test-surface-references.sh`'s `.gitignore` residual is not closed and does not claim to
+    be.** With `.claude/` gitignored and a real untracked payload file present, the new floor
+    **passes** (the files are still tracked, so the index count holds) and the untracked payload
+    stays invisible. Named in the guard's own blind-spot list. **Not a regression. → open.**
+30. **Two `provenance.tsv` notes run on without a separator** (`…adopt Also: the profile header…`
+    on the `_lib.sh` row; `…without word splitting Also: the single assertion…` on the
+    `test-skills.sh` row). Every other multi-clause note uses `; ` or `. `. **→ Task 11.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
