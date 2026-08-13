@@ -612,7 +612,18 @@ which zero it is.** Third measured instance in this repository. **→ Task 13** 
     three that change verdict loudly (`test-derived-counts.sh`, `test-kinglet-build.sh`,
     `test-lib.sh`) and included three that do not change verdict at all (`mcp-naming`,
     `mcp-doc-instructions`, `surface-references`) — **which is precisely why those three are the
-    interesting ones.** *(Third time this wave that two careful readers produced different
+    interesting ones.**
+
+    **Finished form, from the closing re-review — this is the statement to carry:** the
+    with/without-index derivation is blind to the **entire** eight-member class, for **two distinct
+    reasons.** The three git-fed members are invisible *because they are vacuous* — being
+    vacuous-green **is** the property of producing the same verdict either way, so the differential's
+    own signal is the thing they suppress. The other five never enter the differential's domain at
+    all: `test-skills.sh` via `find`, `test-no-mobile.sh` via `grep -r`, `test-cross-validation.sh`
+    via `jq`, `test-skill-discovery.sh` via globs, and `scripts/check-provenance.sh`, **which is not
+    a test file at all.** So "nine" is not a different count of the same thing — **the derivation
+    that produced it is structurally incapable of finding a single member of the class R9's decisive
+    measurement demonstrates.** *(Third time this wave that two careful readers produced different
     memberships for one class, and the third time the cause was a question never pinned to a
     definition.)*
 24. **Four latent `tests/run-tests.sh` arithmetic issues, all fail-closed, none reachable today.**
@@ -729,6 +740,28 @@ shapes applied to the task that wrote them down.**
     exactly like `grep`→`ugrep`. Task 2b's reviewer used `/usr/bin/find` (GNU 4.9.0) for every
     damage measurement. **Add it to the standing facts** — an absence or a behaviour claim made with
     the interactive `find` is the same silent-false-negative class.
+
+**From Task 10's closing re-review (2026-08-14). Both findings ADDRESSED; one comment fix in round 2.**
+
+42. **`dead_body="$(cat "$REPO/$dead_f")"` is the same unguarded `set -e` shape, three lines above
+    the `case` the fix round edited, in the loop body that round rewrote.** Measured: one tracked
+    scanned file made unreadable → **rc=1, PASS=16, FAIL=0** — the file asserts 16 of 49, reports no
+    failure of its own, and the live-pointer scan never runs for the remaining files. Predates both
+    commits, so it is not new breakage and did not extend the loop. **The habit recurring in the same
+    block is the finding**; the repair is the one-line arm now used twice in that file. **→ a later
+    guard pass.**
+43. **Four holes in the new heredoc tracker, with measured directions and measured unreachability.**
+    Lax (payload silently dropped as commentary — the hole this round closes): a **variable
+    delimiter** (`cat <<$D`), where `match()` finds no introducer so the tracker never enters; and
+    **two heredocs on one line** (`cat <<A <<B`), where only `A` is followed. Strict (a genuine
+    comment stops being exempt): `x=$((1<<n))` latches on `n`, and a `<<EOF` inside a **trailing
+    comment** latches. **None is reachable on this tree** — all 7 real introducers use a literal or
+    quoted delimiter, one per line, independently re-derived over 20 files. *A limitation with a
+    measured reachability is a different object from one without, which is why this row records
+    both.*
+44. **The tracker's awk is portable.** Byte-identical output under **gawk 5.2.1, mawk and busybox
+    awk** across 12 probe shapes, and `\047` works under mawk — no finding for the planned macOS
+    pass, though this is the file that introduces `\047` to the repository.
 
 **Inherited from earlier waves, still open:**
 
