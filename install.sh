@@ -683,7 +683,42 @@ if [ -f "$GEN" ]; then
       rm -f "$TMP_MD"; warn "CLAUDE.md refresh failed — left as-is."
     fi
   else
-    if bash "$GEN" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
+    # ASK BEFORE WRITING. The `mv` below used to be unconditional, and this is the arm where that
+    # cost the user work — twice over, on two different fixtures:
+    #
+    #   * The installer's own summary says "Fill in the FILL: markers in CLAUDE.md.generated". A user
+    #     who does that and reinstalls got the nine unfilled markers back. The edit survived ZERO
+    #     reinstalls, and once Task 2b gave the file a receipt row, run 2 printed
+    #     `keeping yours: CLAUDE.md.generated` four lines before destroying it.
+    #   * A user who wrote their own CLAUDE.md.generated and had never run this installer lost it on
+    #     the first install ever — and the row below then recorded the replacement as `toolkit`, so
+    #     uninstall.sh would take what was left.
+    #
+    # The condition is a disjunction, not `owned_by_installer` alone: that helper opens with
+    # `[ -f "$abs" ] || return 1`, so on the ordinary case — nothing at that path yet — it correctly
+    # answers "not ours" and a bare call would decline every fresh install. Absence is the case where
+    # there is nothing to lose.
+    #
+    # `-e`, not `-f`: a directory or a symlink at that path is not ours to clobber either, and `mv`
+    # onto a directory moves the file INSIDE it rather than replacing it.
+    #
+    # There is no reference copy to pass — this file is generated per project from that project's
+    # Unity version, packages and provider — so the ref argument is '' and owned_by_installer's first
+    # arm is skipped by construction. What answers is the previous receipt, and it is a checksum
+    # comparison, so the file we wrote last run is ours and the same file after the user edits it is
+    # not. See the row below for the rest of that reasoning.
+    if [ -e "$PROJECT_DIR/CLAUDE.md.generated" ] && ! owned_by_installer 'CLAUDE.md.generated' ''; then
+      rm -f "$TMP_MD"
+      warn "CLAUDE.md.generated exists and is not ours — keeping yours, untouched."
+      warn "No generated file was produced this run. Rename or delete CLAUDE.md.generated and"
+      warn "re-run to get one."
+      # NOT `separate`. That value is the row predicate's first disjunct, and setting it here would
+      # write a receipt row claiming a file this branch just refused to write — the same defect
+      # pointing the other way, with uninstall.sh deleting the user's file instead of the installer.
+      # It also drives the Next-steps summary, which would otherwise send the user to FILL: markers
+      # in a file that does not contain any.
+      CLAUDE_MD_BRANCH="kept-yours"
+    elif bash "$GEN" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       mv "$TMP_MD" "$PROJECT_DIR/CLAUDE.md.generated"
       warn "CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead."
       warn "Yours was not touched. Merge by hand, or add the markers to let us refresh in place."
@@ -719,12 +754,14 @@ fi
 #                comparison, so a CLAUDE.md.generated the user has since edited stops being ours and
 #                is left alone (`arms=none`), exactly as an edited MCP-SETUP.md is.
 #
-# It fails closed on the case that matters: a CLAUDE.md.generated the user wrote, in a project whose
-# CLAUDE.md is absent or already carries the markers, satisfies neither half, gets no row, and
-# uninstall.sh never touches it. What this cannot defend against — as with the `cp` behind
-# manifest.json.bak — is the `mv` above overwriting such a file before anything asks whose it was.
-# That is older than this row and is not addressed here; by the time ownership is decided the user's
-# bytes are already gone and the file on disk is byte-for-byte ours.
+# It fails closed on the case that matters: a CLAUDE.md.generated the user wrote satisfies neither
+# half, gets no row, and uninstall.sh never touches it.
+#
+# Until 2026-08-13 that held only where the writing arm never ran — a project whose CLAUDE.md is
+# absent or already carries the markers. Where it DID run, the `mv` had already replaced the user's
+# file with our bytes before anything asked whose it was, and this row then correctly claimed a file
+# that was byte-for-byte ours. The arm asks first now (see the disjunction above it), so the two
+# halves below answer for a file that is still the one whose ownership is in question.
 #
 # The mode is read off the file rather than written down as 644: `mv` from mktemp carries 0600
 # across, so this row records 600 where .mcp.json's records 644, and a hardcoded 644 here would be a
@@ -801,6 +838,38 @@ add_manifest_dependency() {
     ok "$pkg_name already in manifest.json."
     return
   fi
+  # ASK BEFORE WRITING, and decline THE EDIT — not just the backup. The `cp` below used to be
+  # unconditional: --with-mcp on a project missing both packages keeps a backup, the user edits it,
+  # and --with-input-system in a later run overwrote it while the same run printed
+  # `keeping yours: Packages/manifest.json.bak`.
+  #
+  # THE ASYMMETRY WITH CLAUDE.md.generated IS DELIBERATE. There the installer keeps the user's file
+  # and proceeds; here it abandons the flag. A backup exists to make a risky edit recoverable, so
+  # making the edit while skipping the backup keeps the risk and drops the mitigation — and this
+  # project is by definition not under git, which is the only reason the backup is kept at all, so
+  # there is no second copy to fall back on. Writing the backup under another name was rejected: it
+  # trades one destroyed file for unbounded debris, and each such file needs a receipt row of its own.
+  #
+  # THREE DISJUNCTS, and the middle one is this run's own knowledge. `owned_by_installer` consults
+  # the PREVIOUS receipt, which cannot know about a backup THIS run just made — so on a single
+  # `--with-mcp --with-input-system` run against a project missing both packages, the second caller
+  # would find the first caller's backup, fail to recognise it, and decline. That is state J's shape,
+  # and MANIFEST_BAK_KEPT is what the row below already uses to answer it.
+  #
+  # RETURNS ZERO. The callers are `[ "$WITH_MCP" -eq 1 ] && add_manifest_dependency ...` — AND-lists
+  # in which the function is the command after the final `&&`, so `set -e` DOES apply to it. Measured
+  # on a scratch copy 2026-08-13: a `return 1` from this path exits the installer right here with
+  # status 1, before Step 8b, Step 8c and Step 9 — so the project keeps 85 installed files and NO
+  # RECEIPT, and uninstall.sh, which removes only receipt-listed paths, can then never clean any of
+  # it up. That is a worse failure than the one this guard closes. Nothing reads the exit status;
+  # the function is the only thing that reports success, and this path reports none.
+  if [ -e "$MANIFEST.bak" ] && [ "$MANIFEST_BAK_KEPT" -ne 1 ] && ! owned_by_installer "$MANIFEST_BAK_REL" ''; then
+    warn "$MANIFEST_BAK_REL exists and is not ours — declining $flag_name rather than overwriting it."
+    warn "That file is the backup this edit needs to stay undoable. Move it aside and re-run with"
+    warn "$flag_name, or add this under \"dependencies\" yourself:"
+    warn "    \"$pkg_name\": \"$pkg_value\""
+    return 0
+  fi
   # Surgical insert. The old installer round-tripped the JSON through a re-indenting dump, which
   # reformatted the user's whole manifest to add one line.
   cp "$MANIFEST" "$MANIFEST.bak"
@@ -858,9 +927,10 @@ add_manifest_dependency() {
 # edited stops being ours and is left alone, exactly as an edited MCP-SETUP.md is.
 #
 # It fails closed on the case that matters: a Packages/manifest.json.bak the user wrote themselves
-# satisfies neither disjunct, gets no row, and uninstall.sh never touches it. (What this cannot
-# defend against is the `cp` above overwriting such a file before anything asks whose it was — that
-# is older than this row and is not addressed here.)
+# satisfies neither disjunct, gets no row, and uninstall.sh never touches it. Until 2026-08-13 the
+# `cp` above could still overwrite such a file before anything asked whose it was, at which point
+# this row correctly claimed bytes that were ours; the helper asks first now and declines the flag
+# outright, so the disjuncts below answer for the file whose ownership is actually in question.
 if [ "$MANIFEST_BAK_KEPT" -eq 1 ] || owned_by_installer "$MANIFEST_BAK_REL" ''; then
   printf '%s\t%s\t%s\ttoolkit\n' \
     "$MANIFEST_BAK_REL" \
@@ -963,6 +1033,12 @@ case "$CLAUDE_MD_BRANCH" in
     ;;
   refreshed)
     CLAUDE_MD_STEP='CLAUDE.md already had its generated section refreshed — your own prose was left untouched.'
+    ;;
+  # The decline. Sending the user to "the FILL: markers in CLAUDE.md.generated" here would point at a
+  # file this run deliberately did not write, whose contents are the user's own and contain no
+  # markers — defect 9's failure with the files swapped.
+  kept-yours)
+    CLAUDE_MD_STEP='Your own CLAUDE.md.generated was kept — no generated file was produced. Rename or delete it and re-run to get one.'
     ;;
   *)
     CLAUDE_MD_STEP='CLAUDE.md generation was skipped — see the warning above.'

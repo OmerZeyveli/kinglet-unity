@@ -79,6 +79,15 @@
 #   I5  the user edits ours, then such a run     NO row,      uninstall leaves it
 #   J   both --with-* flags, one run             exactly ONE Packages/manifest.json.bak row
 #
+# States K–K3 ask the other question entirely. Everything above asks whether the RECEIPT is right;
+# K–K3 ask whether the FILE IS STILL THERE. Two writers put bytes on disk before anything asked whose
+# they were, and once Tasks 2 and 2b gave both paths receipt rows, the runs began announcing
+# `keeping yours` about files they destroyed in the same output. Their own header sits above them.
+#
+#   K   ours, the user fills in the FILL: markers, install again   bytes survive, NO row
+#   K2  the user's own file, first install ever, twice             bytes survive, NO row
+#   K3  ours, the user edits the backup, a second --with-* flag    bytes survive, manifest unedited
+#
 # WHAT THIS FILE CANNOT SEE
 #   * Named paths, not an enumeration. A–D assert MCP-SETUP.md and .mcp.json; E, F and J assert
 #     Packages/manifest.json.bak; I–I5 assert CLAUDE.md.generated. A FIFTH unrecorded project-root
@@ -1037,12 +1046,11 @@ fi
 # the summary this installer prints.
 #
 # WHAT THESE STATES CANNOT SEE
-#   * The `mv` that writes this file overwrites whatever was at that path, so a CLAUDE.md.generated
-#     the user wrote is destroyed BEFORE any ownership question is asked — and the row that follows
-#     then correctly claims a file that is byte-for-byte ours. I3 therefore fixes its fixture in the
-#     two shapes where the branch does not run at all; the shape where it does run is the same
-#     unaddressed overwrite as the `cp` behind manifest.json.bak, one file over, and no assertion
-#     here can distinguish it from an ordinary fresh write.
+#   * The writing arm meeting a file it does not own. I3 fixes its fixture in the two shapes where
+#     that arm never runs at all, because until 2026-08-13 the `mv` overwrote whatever was at the
+#     path before any ownership question was asked — so in the third shape the row that follows
+#     correctly claimed a file that was by then byte-for-byte ours, and no assertion here could tell
+#     it from an ordinary fresh write. The arm asks first now; states K and K2 are that third shape.
 #   * The generator's own output. Every state below treats it as opaque bytes; that it is
 #     deterministic for a fixed project is relied on by I2 (which expects the same checksum twice)
 #     and asserted nowhere.
@@ -1248,6 +1256,271 @@ fi
 # Cardinality alone would be satisfied by one STALE row. The surviving row must describe the file
 # that survived.
 assert_owned "$J" "$MANIFEST_BAK_REL" "J (both flags in one run)"
+
+# ── States K…K3: the two writers that overwrite without asking ───────────────
+# Spec D11, acceptance criterion 14, and criterion 13's third clause as it is actually written.
+#
+# Every state above asks whether the RECEIPT is right. These ask whether the FILE is still there.
+# install.sh had two writers that put bytes on disk before anything asked whose they were:
+#
+#   mv "$TMP_MD" "$PROJECT_DIR/CLAUDE.md.generated"   # the separate-file branch
+#   cp "$MANIFEST" "$MANIFEST.bak"                     # add_manifest_dependency, per --with-* flag
+#
+# I3 and E3 are the fail-closed states for these two files, and both are structurally blind to this:
+# I3 fixes its fixture in the two shapes where the writing arm never runs at all, and E3 uses a plain
+# install that never calls add_manifest_dependency. Neither ever lets the writer meet a file it does
+# not own. K–K3 do exactly that, on the three paths the spec reproduces.
+#
+# THE AGGRAVATING HALF IS THIS WAVE'S OWN. Before Tasks 2 and 2b there were no receipt rows for these
+# paths, so the upgrade scan never named them. With the rows in place both appear in MODIFIED_FILES,
+# and the run printed `keeping yours:` naming a file it destroyed four lines later. That is why each
+# state below asserts the OUTPUT as well as the bytes: a silent overwrite is data loss, and an
+# overwrite announced as a keep is data loss the user was told did not happen.
+#
+#   K   ours, the user fills in the FILL: markers, install again   bytes survive, NO row
+#   K2  the user's own file, first install ever, twice             bytes survive, NO row
+#   K3  ours, the user edits the backup, a second --with-* flag    bytes survive, manifest unedited
+#
+# K2 is also criterion 13's third clause AS WRITTEN — a marker-less CLAUDE.md and a user-authored
+# CLAUDE.md.generated, across two installs, the file getting no row and surviving. Task 2b could only
+# assert the narrowed reading (I3's two shapes) because on this fixture the user's file was destroyed
+# before ownership was ever asked.
+#
+# EACH STATE ASSERTS THE ANTI-"NEVER WRITE ANYTHING" DIRECTION IN ITS OWN BODY, because a decline
+# that is too wide passes every bytes-survive assertion here by refusing to install. K's install 1
+# writes and records the file; K3's install 1 edits the manifest and keeps its backup; and K2 and K3
+# each end by clearing the user's file out of the way and re-running, which is the remedy the decline
+# messages promise — so the promise is measured rather than printed.
+#
+# WHAT THESE STATES CANNOT SEE
+#   * The dry run. `install.sh --dry-run` prints `CLAUDE.md.generated — yours exists and has no
+#     markers, so it is NOT touched`, which D11 names as the third surface saying the opposite of what
+#     happens. Nothing here runs --dry-run; that line is still wrong in the case where the installer
+#     legitimately writes the file, and closing it is the dry-run guard's job, not this file's.
+#   * Any third writer. Like every state above, these name their paths in advance.
+#   * uninstall.sh's treatment of a file the user wrote at a path the installer would have used is
+#     asserted only via the receipt (`assert_not_owned` then `assert_kept`); nothing here inspects
+#     uninstall.sh's own reasoning.
+#   * assert_keeping_yours_is_true is a CONDITIONAL, so it passes vacuously when the run makes no
+#     claim at all. That is correct — K2's first install has no previous receipt to drive the scan —
+#     but it means a change that stopped the upgrade scan naming these paths would go unnoticed here.
+#     What guards that is the receipt row itself, asserted by I, I4, E and J: no row, no entry in
+#     MODIFIED_FILES, and those states go red first.
+#   * WHY a run declined. The needles prove the decline was announced, not that the ownership test
+#     produced it. A writer hard-wired never to write satisfies every bytes assertion here, which is
+#     what the anti-"never write anything" halves in each state body are for.
+
+KEPT_GEN_NEEDLE='CLAUDE.md.generated exists and is not ours'
+NOT_TOUCHED_NEEDLE='Yours was not touched.'
+
+# The paths the upgrade scan listed under `keeping yours:`, one per line. Parsed rather than matched
+# as a substring: the claim is about a specific path, and `grep -F CLAUDE.md.generated` on the whole
+# output also matches the write announcement and the Next-steps summary.
+#
+# The block is `warn N installed file(s) have local edits — keeping yours:` followed by one path per
+# line at seven spaces of indent, so the terminator is the first line that is not indented that way.
+kept_list() {
+  awk '
+    /keeping yours:/            { grab = 1; next }
+    grab && /^       [^ ]/      { sub(/^       /, ""); print; next }
+    grab                        { grab = 0 }
+  ' <<< "$INSTALL_OUT"
+}
+
+# Criterion 14, verbatim: "no run claims `keeping yours` about a file it overwrote". The claim is not
+# itself the defect — once the writer declines, the file really is kept and saying so is the honest
+# thing. It is the claim TOGETHER WITH the overwrite that D8 called worse than silent data loss. So
+# this is a conditional, and the branch that matters prints which way it went.
+assert_keeping_yours_is_true() {
+  local d="$1" rel="$2" want="$3" label="$4" claimed=0 have
+  if grep -qxF -- "$rel" <<< "$(kept_list)"; then claimed=1; fi
+  have="$(sha_of "$d/$rel")"
+  if [ "$claimed" -eq 0 ]; then
+    pass "$label: the run made no 'keeping yours' claim about $rel"
+  elif [ "$have" = "$want" ]; then
+    pass "$label: the run listed $rel under 'keeping yours' and the file still carries those bytes"
+  else
+    fail "$label: the run listed $rel under 'keeping yours' and overwrote it in the same run ($want -> $have)"
+  fi
+}
+
+# Presence plus bytes, on a live project rather than after an uninstall — assert_kept is the
+# post-uninstall sibling of this one.
+assert_survived() {
+  local d="$1" rel="$2" want="$3" label="$4" have
+  if [ ! -e "$d/$rel" ]; then
+    fail "$label: the installer deleted $rel, which the user wrote"
+    return
+  fi
+  have="$(sha_of "$d/$rel")"
+  if [ "$have" = "$want" ]; then
+    pass "$label: $rel still carries the user's bytes after the run"
+  else
+    fail "$label: the installer overwrote $rel — the user's bytes are gone ($want -> $have)"
+  fi
+}
+
+assert_declined_gen() {
+  local label="$1"
+  if grep -qF -- "$KEPT_GEN_NEEDLE" <<< "$INSTALL_OUT"; then
+    pass "$label: the run announced that it kept the user's $CLAUDE_GEN_REL"
+  else
+    fail "$label: the run never announced '$KEPT_GEN_NEEDLE' — it did not reach the decline, so a surviving file below is surviving for some other reason"
+  fi
+  if grep -qF -- "$NOT_TOUCHED_NEEDLE" <<< "$INSTALL_OUT"; then
+    fail "$label: the run printed '$NOT_TOUCHED_NEEDLE', which belongs to the announcement of a write it did not make"
+  else
+    pass "$label: the run did not print '$NOT_TOUCHED_NEEDLE'"
+  fi
+}
+
+# ── State K: ours, then the user does what the summary told them to ──────────
+# Step 2 of install.sh's own Next-steps summary is "Fill in the FILL: markers in
+# CLAUDE.md.generated". Before D11 the edit survived zero reinstalls: the `mv` ran again, the nine
+# markers came back, and the run said `keeping yours: CLAUDE.md.generated` in the same output.
+#
+# I5 is this state's sibling and reaches "no row" by a different route: there the user adds the
+# markers to CLAUDE.md so run 2 takes `refreshed` and the writer never executes. Here CLAUDE.md stays
+# marker-less, so run 2 enters the writing arm and has to decline inside it.
+K="$(new_fixture state-k)"
+printf '# My Own Game\n\nSENTINEL-USER-PROSE-K\n' > "$K/CLAUDE.md"
+K_MD_SHA="$(sha_of "$K/CLAUDE.md")"
+run_install_flags "$K" "K install 1"
+# Anti-"never write anything", half 1: the installer must still produce and claim its own file.
+assert_separate_branch "K (install 1)"
+assert_owned "$K" "$CLAUDE_GEN_REL" "K (install 1, the file is ours)"
+# The FILL: markers are the installer's own instruction, so their presence is the premise of the edit
+# below rather than a detail of the generator.
+# `awk`, not `grep -c`: on a missing file grep prints nothing and exits 2, and the `-gt` below then
+# gets an empty string, which is a `[: integer expression expected` on stderr rather than an
+# assertion — the shape sha_of's own comment warns about, one helper over.
+K_MARKERS_BEFORE="$(awk '/FILL:/ { n++ } END { print n + 0 }' "$K/$CLAUDE_GEN_REL" 2>/dev/null || echo 0)"
+if [ "$K_MARKERS_BEFORE" -gt 0 ]; then
+  pass "K: install 1's $CLAUDE_GEN_REL carries the FILL: markers the summary tells the user to fill in"
+else
+  fail "K: install 1's $CLAUDE_GEN_REL carries no FILL: markers — the edit below is not the one the installer asks for"
+fi
+sed -i 's/FILL:/FILLED-IN-BY-HAND:/g' "$K/$CLAUDE_GEN_REL"
+printf '\nSENTINEL-K-MY-WORK\n' >> "$K/$CLAUDE_GEN_REL"
+K_SHA="$(sha_of "$K/$CLAUDE_GEN_REL")"
+
+run_install_flags "$K" "K install 2"
+assert_survived "$K" "$CLAUDE_GEN_REL" "$K_SHA" "K (install 2)"
+assert_not_separate_branch "K (install 2)"
+assert_declined_gen "K (install 2)"
+assert_keeping_yours_is_true "$K" "$CLAUDE_GEN_REL" "$K_SHA" "K (install 2)"
+# The markers must not be back. Counted and compared as a number rather than matched: the count is
+# what the user lost, and a needle like '9 markers' would also match '19'.
+K_MARKERS_AFTER="$(awk '/FILL:/ { n++ } END { print n + 0 }' "$K/$CLAUDE_GEN_REL" 2>/dev/null || echo 0)"
+if [ "$K_MARKERS_AFTER" -eq 0 ]; then
+  pass "K: install 2 did not put the FILL: markers back — the user's filled-in file is what is on disk"
+else
+  fail "K: install 2 restored $K_MARKERS_AFTER FILL: marker(s) — the edit the installer asked for was overwritten"
+fi
+assert_not_owned "$K" "$CLAUDE_GEN_REL" "K (edited, then a run that entered the writing arm)"
+run_uninstall "$K" "K"
+assert_kept "$K" "$CLAUDE_GEN_REL" "$K_SHA" "K"
+assert_kept "$K" 'CLAUDE.md' "$K_MD_SHA" "K (the user's own CLAUDE.md)"
+
+# ── State K2: a CLAUDE.md.generated the user wrote, before any install ever ──
+# Criterion 13's third clause as written, and the harshest shape of the defect: there is no previous
+# receipt to consult, nothing on disk that is ours, and the run destroyed the file and then recorded
+# it as `toolkit` — so the next uninstall would have removed what was left.
+#
+# Two installs, because "no row" is also what the unfixed installer produced on run 1 for the wrong
+# reason: it had overwritten the file with our own bytes and had no receipt to match them against.
+K2="$(new_fixture state-k2)"
+printf '# My Own Game\n\nSENTINEL-USER-PROSE-K2\n' > "$K2/CLAUDE.md"
+K2_MD_SHA="$(sha_of "$K2/CLAUDE.md")"
+printf 'My own notes, in a file I named myself. SENTINEL-K2-MINE\n' > "$K2/$CLAUDE_GEN_REL"
+K2_SHA="$(sha_of "$K2/$CLAUDE_GEN_REL")"
+
+run_install_flags "$K2" "K2 install 1"
+assert_survived "$K2" "$CLAUDE_GEN_REL" "$K2_SHA" "K2 (first install ever)"
+assert_not_separate_branch "K2 (install 1)"
+assert_declined_gen "K2 (install 1)"
+assert_not_owned "$K2" "$CLAUDE_GEN_REL" "K2 (after install 1)"
+
+run_install_flags "$K2" "K2 install 2"
+assert_survived "$K2" "$CLAUDE_GEN_REL" "$K2_SHA" "K2 (second install)"
+assert_declined_gen "K2 (install 2)"
+assert_keeping_yours_is_true "$K2" "$CLAUDE_GEN_REL" "$K2_SHA" "K2 (install 2)"
+assert_not_owned "$K2" "$CLAUDE_GEN_REL" "K2 (after install 2)"
+
+# Anti-"never write anything", and the decline message's own promise: "rename or delete it and
+# re-run". Measured, because an installer that can never write this file again after seeing a
+# stranger at that path passes every assertion above.
+rm -f "$K2/$CLAUDE_GEN_REL"
+run_install_flags "$K2" "K2 install 3"
+assert_separate_branch "K2 (install 3, the user's file removed)"
+assert_owned "$K2" "$CLAUDE_GEN_REL" "K2 (install 3, the path is free again)"
+run_uninstall "$K2" "K2"
+assert_gone "$K2" "$CLAUDE_GEN_REL" "K2 (install 3's file is ours)"
+assert_kept "$K2" 'CLAUDE.md' "$K2_MD_SHA" "K2 (the user's own CLAUDE.md)"
+
+# ── State K3: the manifest backup, and the flag that must decline with it ────
+# D11 answers this file differently from CLAUDE.md.generated, deliberately and asymmetrically: the
+# installer declines THE MANIFEST EDIT ITSELF for that flag. A backup exists to make a risky edit
+# recoverable, so making the edit while skipping the backup keeps the risk and drops the mitigation.
+#
+# The builtin variant carries neither package, so both --with-* flags have work to do. E and J use
+# one run; this state needs two, because the file in the way has to be there before the second `cp`.
+K3="$(new_fixture_variant state-k3 builtin)"
+if git -C "$K3" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  fail "K3: the fixture is inside a git work tree — install.sh deletes the backup instead of keeping it, and there would be no file here for the user to edit"
+else
+  pass "K3: the fixture is not under git, so install.sh must keep the backup it makes"
+fi
+K3_MCP_PKG='com.coplaydev.unity-mcp'
+K3_INPUT_PKG='com.unity.inputsystem'
+
+run_install_flags "$K3" "K3 install 1" --with-mcp
+# Anti-"never write anything", half 1: the flag works when nothing is in the way.
+if grep -qF -- "$K3_MCP_PKG" "$K3/$MANIFEST_REL"; then
+  pass "K3: install 1 added $K3_MCP_PKG to the manifest"
+else
+  fail "K3: install 1 did not add $K3_MCP_PKG — the flag did no work, and the backup below is not the one this state is about"
+fi
+assert_owned "$K3" "$MANIFEST_BAK_REL" "K3 (install 1, the backup is ours)"
+printf '\n// SENTINEL-K3-MY-EDIT-TO-THE-BACKUP\n' >> "$K3/$MANIFEST_BAK_REL"
+K3_SHA="$(sha_of "$K3/$MANIFEST_BAK_REL")"
+K3_MANIFEST_SHA="$(sha_of "$K3/$MANIFEST_REL")"
+
+run_install_flags "$K3" "K3 install 2" --with-input-system
+assert_survived "$K3" "$MANIFEST_BAK_REL" "$K3_SHA" "K3 (install 2)"
+assert_keeping_yours_is_true "$K3" "$MANIFEST_BAK_REL" "$K3_SHA" "K3 (install 2)"
+if grep -qF -- "declining --with-input-system" <<< "$INSTALL_OUT"; then
+  pass "K3: the run announced that it declined --with-input-system"
+else
+  fail "K3: the run never announced a declined --with-input-system — a surviving backup below is surviving for some other reason"
+fi
+# The asymmetry, asserted. Declining only the `cp` would leave the manifest edited with no backup.
+if grep -qF -- "$K3_INPUT_PKG" "$K3/$MANIFEST_REL"; then
+  fail "K3: the manifest carries $K3_INPUT_PKG — the edit went ahead without the backup that makes it undoable, which is the half D11 rejects"
+else
+  pass "K3: the manifest does not carry $K3_INPUT_PKG — the edit was declined along with its backup"
+fi
+if [ "$(sha_of "$K3/$MANIFEST_REL")" = "$K3_MANIFEST_SHA" ]; then
+  pass "K3: the manifest is byte-for-byte as install 1 left it"
+else
+  fail "K3: the manifest changed during the declined run — something edited it besides the flag"
+fi
+assert_not_owned "$K3" "$MANIFEST_BAK_REL" "K3 (the user's backup, after install 2)"
+
+# Anti-"never write anything", half 2, and the decline message's promise: move the file aside and the
+# flag proceeds.
+K3_MINE="$MANIFEST_BAK_REL.mine"
+mv "$K3/$MANIFEST_BAK_REL" "$K3/$K3_MINE"
+run_install_flags "$K3" "K3 install 3" --with-input-system
+if grep -qF -- "$K3_INPUT_PKG" "$K3/$MANIFEST_REL"; then
+  pass "K3: install 3 added $K3_INPUT_PKG once the user's backup was moved aside"
+else
+  fail "K3: install 3 still did not add $K3_INPUT_PKG — the decline is permanent, and moving the file aside does not do what the message says it does"
+fi
+assert_owned "$K3" "$MANIFEST_BAK_REL" "K3 (install 3, a backup that is ours again)"
+run_uninstall "$K3" "K3"
+assert_gone "$K3" "$MANIFEST_BAK_REL" "K3 (install 3's backup is ours)"
+assert_kept "$K3" "$K3_MINE" "$K3_SHA" "K3 (the user's backup, moved aside)"
 
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-ownership assertions passed\n'
