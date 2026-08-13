@@ -20,7 +20,14 @@ Task 2 closes: `CLAUDE.md.generated` is created by the installer, kept, announce
 permanent debris on the project root. Spec **D10**, criterion 13. D10 declared itself the wave's last
 insertion, with one exemption: **data loss in shipped software**.
 
-**Task 2c was then inserted the same day, through that exemption, and it is the wave's most serious
+**Tasks 2b and 2c are now done and closed.** Suite **795/795**, 32 files, `provenance OK`, baseline zero
+drift, tree clean at `b573ce8`. **Task 3 is the next action**, then 4, 5, 6 — and Task 3's dispatch must
+carry three things this wave measured after the plan was written: the dry-run's `is NOT touched` line
+names the wrong subject, `.gitignore` is created-and-unrecorded on a `bare` fixture (its first oracle
+will see it), and **all three of D4's oracles are silent on a run that writes nothing** — which is the
+same blindness D4 exists to correct.
+
+**Task 2c was inserted 2026-08-13, through that exemption, and it is the wave's most serious
 finding.** Task 2b's review reproduced on three independent paths that `install.sh` has two writers
 that overwrite without asking — and that **this wave taught both of them to claim the file was safe**
 while doing it. See the Task 2b section below. Spec **D11**, criterion 14, plus an amendment to
@@ -145,7 +152,7 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 1d | `studio-doctor.sh` reads origin, and stops piping into `head` | **done** | `cfc35b9..11ff9ee` | Reviewed after the fact — see below. Spec ✅, Quality Needs work: 1 Important + 6 Minor. **3 fix rounds**, and rounds 2 and 3 each closed a defect the previous round's own fix introduced. Round 1 ran on a fresh implementer because the original was killed |
 | 2 | A kept backup is a file the installer owns | **done** | `c096d1b..a8acd49` | **No fix round** — Spec ✅, Quality Approved. The implementer refused the brief's literal Step 3 and implemented the spec; the review reproduced that the brief's shape *is* the defect. Suite 645 → 674 |
 | 2b | The other file the installer keeps and does not record | **done** | `c4d36f3..15dfda4` | **No fix round** — Spec ✅ (criterion 13 clause 3 narrowed, disclosed), Quality Approved. Answered the open question by measurement; added I4/I5 beyond the plan, and I4 is the only state that discriminates the receipt arm. Suite 674 → 738 |
-| 2c | The two writers that overwrite without asking | open | — | Inserted 2026-08-13 from Task 2b's review. **Data loss**, D10's one exemption, and the wave created the aggravating half |
+| 2c | The two writers that overwrite without asking | **done** | `e85ea32..b573ce8` | Spec ✅, Quality Approved, 1 fix round. Survived **eight** adversarial shapes the implementer never built. Its round-1 test fix uncovered a live D11 violation the old test was reporting green. Suite 738 → 795 |
 | 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
 | 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |
 | 5 | One pipeline detector, and Option B states its costs | open (brief pending) | — | `urp+hdrp` display and skill routing is the implementer's call |
@@ -504,7 +511,102 @@ shipped software."* This is data loss, in shipped software, in the workflow the 
 prescribes, on three paths. Deferring would ship two *fresh* instances of the defect the wave exists to
 eliminate, and criterion 13 could not honestly be signed off. **The exemption is now spent.**
 
+## Task 2c — and the test that reported green about a file it had fabricated
+
+**The fix itself held under attack.** Its review built **eight** shapes at the `CLAUDE.md.generated`
+path that neither the implementer nor the controller had used — symlink, read-only, **a directory**
+(where the old `mv` moves the temp file *inside* it), bytes byte-identical to the generator's output,
+a deleted receipt, a truncated checksum — plus a directory at the `.bak` path and both flags declining
+in one run. **Every one declined, kept the user's bytes, and wrote no row.** Both anti-"never write
+anything" controls pass.
+
+**The exit-status question had a decisive answer, and it is the reason the brief made it a question.**
+`add_manifest_dependency`'s callers are `[ "$WITH_MCP" -eq 1 ] && add_manifest_dependency …` —
+AND-lists with the function after the final `&&`, **the one position `set -e` does not exempt**.
+Injecting `return 1` and measuring: the installer dies at the call site, **before** `.mcp.json`,
+`MCP-SETUP.md` and the receipt, leaving 85 installed files and **no receipt at all** — which
+`uninstall.sh`, being receipt-driven, refuses to touch. Reproduced independently by the review. The
+reflex to signal a decline with a non-zero return would have turned a data-loss fix into an
+uninstallable project.
+
+**The implementer kept exit 0 and argued it rather than asserting it.** The decline is the **fourth
+member of an existing family**: `add_manifest_dependency` already has three outcomes meaning "the flag
+did not happen" — no manifest, package already present, and `Could not edit manifest.json safely`
+(which prints *the same* manual `"dependencies"` block) — and all three return 0. Making one of four
+non-zero substitutes a new inconsistency for the one being fixed. The review verified that premise in
+the code rather than in the report: four outcomes, all 0, the third really does print the same block.
+
+It also put **the strongest case against its own choice** on record — a scripted
+`install.sh --with-mcp && start_unity` proceeds as though the package landed, and no summary line helps
+a script. Deferred, not dismissed, with the reason: that is a contract change across all four outcomes
+at once, needing documentation, not a side effect of a data-loss fix.
+
+### The finding that matters most: a state was measuring bytes the test itself had written
+
+Round 1's second item looked like housekeeping — a `sed -i` that died instead of failing as an
+assertion. Guarding it led the implementer to **three more instances in state code it had written
+itself**: K's and K3's `printf >>` *create* the file on a missing path, and K3's `mv` would die and
+take install 3 with it.
+
+The review then found what that had been hiding. Under a "never keep a backup" regression, the old
+test file's `printf >>` **created the missing `Packages/manifest.json.bak`**, and the state went on to
+measure the test's own bytes and report:
+
+```
+PASS: K3 (the user's backup, moved aside): …survived uninstall with the user's bytes intact
+```
+
+about a file the test had fabricated. With the fix, seven more real failures surface, including:
+
+```
+FAIL: K3: the manifest carries com.unity.inputsystem — the edit went ahead without the backup that
+      makes it undoable, which is the half D11 rejects
+FAIL: K3: install 1 kept no Packages/manifest.json.bak to edit — K3's premise is absent, and every
+      assertion below describes a file that was never there
+```
+
+**The fabrication hazard was masking a D11 violation.** And on a differently-shaped regression the old
+file reported *three* failures while **48 assertions never executed** — a nearly-green report on a
+broken installer. This is the ledger's own "a probe that dies reports nothing" finding, one helper
+over, and it is the strongest evidence yet that a test's *robustness* is not cosmetic: an assertion
+that fabricates its own fixture is worse than an assertion that is missing.
+
 ## Deferred and parked findings
+
+### From Task 2c — five, plus a class worth naming
+
+20. **The installer has a window where the payload is written and the receipt is not, and any failure
+    in it produces a project `uninstall.sh` refuses to touch.** Three measured members: a **read-only**
+    `Packages/manifest.json.bak` (`cp: Permission denied`), a **dangling symlink** at that path
+    (`cp: not writing through dangling symlink`, and `[ -e ]` is false so D11's guard does not fire),
+    and any `return 1` from `add_manifest_dependency`. Each leaves exit 1, **85 installed files, no
+    receipt**, and `err Refusing to guess which files are ours.` **All pre-existing and not
+    regressions** — measured identically at `94837b5` and `e85ea32`. Reachable on workflows this
+    toolkit targets: Perforce keeps files read-only until checked out, and console projects live there.
+    **Name it as a class for the second wave** — the fix is presumably to write the receipt for what
+    has been installed before entering Step 8, or to trap and finish the receipt on failure.
+21. **The run's ending tells the truth for one of three flag-abandonment reasons.** `No
+    Packages/manifest.json — skipping` and `Could not edit manifest.json safely` both still end with
+    `Installation complete.`, exit 0 and **no `Not done:` block** — measured on a `bare` fixture and on
+    a manifest with no `"dependencies"` key. Same defect shape as the one Task 2c fixed, in the other
+    members of the very family its exit-status argument invokes. The implementer's stated reason for
+    excluding the closest sibling — "it already prints its own manual block" — is the argument that was
+    rejected for the decline, which also printed four `warn` lines a dozen lines above the banner.
+22. **The `Not done:` block is unguarded, and Task 3 will not reach it.** The implementer deferred it to
+    D4's dry-run guard; the review checked whether that lands and it does not. **All three of D4's
+    oracles are silent by construction on a run that writes nothing** — no new path, no receipt row,
+    `manifest.json` byte-identical — and the dry run exits before the summary block executes. That is
+    the same "structurally unable to see" failure D4 was itself written to correct, one surface over.
+    The reasoning against building a narrow second copy of the oracle inside the ownership test is
+    sound; the landing place is not.
+23. **No machine-readable channel for "installed, but the work you asked for was not done."** All four
+    outcomes exit 0 today and no document states an exit contract beyond `exit 0` / `die`, so a caller
+    already cannot distinguish them. A contract change across all four, with documentation.
+24. **Two minor wording items in the new block.** The trailer is singular under a plural block ("Move
+    *that file* aside and re-run with *the flag*") when two flags declined — nothing false, imprecise.
+    And the `install.sh` comment claims the two writers' declines "end the run the same way"; measured,
+    they do not — one is a `Not done:` block, the other is Next-steps item 2. The **mechanism** parity
+    the report claims is real and verified; the presentation parity in the comment is not.
 
 ### From Task 2's review — four, one of which became Task 2b
 
