@@ -148,9 +148,19 @@ fi
 # run in this mode", so `-exec dos2unix {} \;` rewrites every .meta file it is handed.
 #
 # $1 is the command name; $2 is that command's OWN argument tokens, already dequoted and
-# space-joined by find_exec_commands, bounded by its clause.
+# TAB-joined by find_exec_commands, bounded by its clause. TAB rather than space, because
+# find_exec_commands now respects quoting: `awk '/a/ && /b/ {print > F}'` is ONE argument, and
+# re-splitting it on spaces here would hand these arms back the quote-blind token stream the
+# whole tokeniser exists to replace.
+FIND_TOK_SEP=$'\t'
+# The command name find_exec_commands emits when it could not parse the command's quoting at
+# all. No real command is spelled this way, and the consumer below compares against it exactly
+# rather than trying to classify it — an unparseable command is not an unlisted one, and the
+# two get different sentences.
+FIND_TOK_UNPARSEABLE='!!unparseable!!'
 find_exec_is_read_only() {
     local _cmd="$1" _args="${2:-}" _tok _skip=0
+    local IFS="$FIND_TOK_SEP"
     case "$_cmd" in
         grep|egrep|fgrep|rg|ag|ack|stat|file|wc|cksum|md5sum|sha1sum|sha256sum|sha512sum|\
         b2sum|shasum|cat|head|tail|less|more|od|xxd|strings|nl|ls|basename|dirname|realpath|\
@@ -193,9 +203,10 @@ find_exec_is_read_only() {
         if [ "$_skip" = "1" ]; then _skip=0; continue; fi
         case "$_cmd" in
             sed|gsed|yq)
-                # -i, -i.bak, -ibak, -i~, -i'' (dequoted to -i'), bundles like -ni, and the
-                # long spellings. A `case` glob is anchored at both ends, which is why find's
-                # own -iname can never reach this and an attached suffix can never escape it.
+                # -i, -i.bak, -ibak, -i~, -i'' and -'i' (both now dequote to exactly -i),
+                # bundles like -ni, and the long spellings. A `case` glob is anchored at both
+                # ends, which is why find's own -iname can never reach this and an attached
+                # suffix can never escape it.
                 case "$_tok" in
                     -i|-i[!-]*|-[A-Za-z]*i|--in-place|--in-place=*|--inplace|--inplace=*)
                         return 1 ;;
@@ -228,77 +239,205 @@ find_exec_is_read_only() {
     esac
 }
 
-# find_exec_commands — prints, one per line, `<command><TAB><its own argument tokens>` for
-# every command that find's -exec/-execdir/-ok(dir) or a pipeline's xargs would actually run.
-# Tokenised in bash rather than matched with a regex, because "the word after the introducer"
-# is a position, and the regex attempts to express that position are what kept missing verbs.
+# ============================================================================================
+# THE TOKENISER HAS A QUOTE MODEL. Read this before changing either function below.
 #
-# The argument list is bounded by the command's own CLAUSE: find's `\;` or `+`, a shell
-# operator for an xargs pipeline, or the next -exec/xargs introducer. That bound is what keeps
-# `grep -i` after a pipe, a `2>/dev/null` after the terminator, and an unrelated later
-# `git status` out of the decision about the command that actually touches the .meta files.
+# Rounds 3, 4 and 5 of this hook each closed one hole in the find route and opened another, and
+# all three were the same defect one level down: `find_exec_commands` split the raw command
+# string on whitespace with NO model of quoting, and every round repaired a consequence
+# downstream of that instead of the cause.
+#
+#   -exec awk '/guid/ && /:/ {print > FILENAME}' {} \;   emitted `awk` with args ` /guid/`
+#   -exec sed -E 's/(a | b)/x/' -i {} \;                 emitted `sed` with args ` -E s/(a`
+#
+# In the first the `>` never reached the awk arm; in the second the `-i` never reached the sed
+# arm. Both were permitted at round 5 and both were verified against real files: the awk payload
+# truncated 3 of 3 `.meta` files from 119 B to 39 B, the `system("rm ")` twin deleted all three,
+# and the sed payload rewrote the guid line of all three. A ` && ` inside a quoted awk program is
+# not a shell operator, and word splitting cannot tell the difference.
+#
+# So the split now respects quoting: a single- or double-quoted run is ONE token and its
+# contents are inert — no operator inside it ends a clause, no `xargs` inside it introduces a
+# command, no `;` inside it is find's terminator.
+#
+# WHAT THE MODEL DOES NOT HANDLE, and the direction each one fails:
+#   - command substitution `$(…)` and backticks, and ANSI-C / locale quoting `$'…'` `$"…"`:
+#     a command or a flag can hide inside them and the scanner would mis-bound the clause. All
+#     of them mark the parse UNPARSEABLE, which BLOCKS. It costs a first-attempt block on a
+#     read that uses `$(pwd)`; that is the cheaper direction and it is asserted both ways.
+#   - an unterminated quote: same, UNPARSEABLE, blocks.
+#   - ordinary variable expansion (`$FLAG`, `${FLAG}`): NOT modelled and NOT flagged. A
+#     variable that expands to `-i` is a hole, unchanged from every previous version. Flagging
+#     it would block every `grep "$PAT"`, and the gate has never modelled expansion.
+#   - a literal TAB inside a quoted argument: the arms re-split on TAB, so such an argument
+#     becomes two. That only ever produces MORE tokens for a write flag to match, which blocks.
+#
+# WHY awk. The scan has to look at every character, and bash cannot afford that: measured on
+# this host (bash 5.2, en_US.UTF-8) a single `${x#\\}` costs 503 ms on a 122 880-character
+# token and 49 125 ms on a 1 048 576-character one, which is the mechanism behind round 5's
+# 172-second worst case. The same scan in `LC_ALL=C awk` costs 30 ms and 229 ms. `awk` is
+# already a hard dependency of this file (the two-stage gate's hash uses it). `LC_ALL=C` is
+# safe here because every character the scanner tests is ASCII and no UTF-8 continuation byte
+# can collide with one.
+# ============================================================================================
+
+# The tokeniser's own protocol: TWO lines per token — a header `<flags> <bytelen> <basename>`
+# and then the token's dequoted value on its own line. flags is two characters: `q` if the
+# token contained a quoted run (else `-`), `b` if it contained a backslash escape (else `-`).
+# The basename is computed in awk and capped at 64 characters so that bash never has to run a
+# `${x##*/}` over a megabyte-long token — that expansion is the pathological operation above.
+# A header of `!!` is the unparseable marker and its value line is the reason.
+find_exec_tokens() {
+    printf '%s' "$1" | LC_ALL=C awk '
+        function emit(   L, c) {
+            if (!started) return
+            L = length(tok)
+            if (L <= 512) { c = tok; sub(/^.*\//, "", c) } else { c = substr(tok, 1, 64) }
+            print (q ? "q" : "-") (b ? "b" : "-") " " L " " substr(c, 1, 64)
+            print tok
+            tok = ""; started = 0; q = 0; b = 0
+        }
+        BEGIN { SQ = "\047"; DQ = "\042"; BS = "\\"; st = 0; tok = ""; started = 0
+                q = 0; b = 0; bad = "" }
+        {
+            line = $0; n = length(line); i = 1; cont = 0
+            while (i <= n) {
+                c = substr(line, i, 1)
+                if (st == 0) {
+                    if (c == BS) {
+                        if (i == n) { cont = 1; break }      # backslash-newline: line splice
+                        tok = tok substr(line, i + 1, 1); started = 1; b = 1; i += 2; continue
+                    }
+                    if (c == SQ) { st = 1; started = 1; q = 1; i++; continue }
+                    if (c == DQ) { st = 2; started = 1; q = 1; i++; continue }
+                    if (c == " " || c == "\t") { emit(); i++; continue }
+                } else if (st == 1) {                        # inside single quotes: all inert
+                    if (c == SQ) { st = 0; i++; continue }
+                    tok = tok c; i++; continue
+                } else {                                     # inside double quotes
+                    if (c == BS) {
+                        if (i == n) break                    # backslash-newline: line splice
+                        d = substr(line, i + 1, 1)
+                        if (d == DQ || d == BS || d == "$" || d == "`") { tok = tok d; b = 1 }
+                        else { tok = tok BS d }
+                        i += 2; continue
+                    }
+                    if (c == DQ) { st = 0; i++; continue }
+                }
+                if (c == "$" && i < n) {
+                    d = substr(line, i + 1, 1)
+                    if (d == "(" || d == SQ || d == DQ) bad = "substitution-or-ansi-c-quoting"
+                }
+                if (c == "`") bad = "backtick-command-substitution"
+                tok = tok c; started = 1; i++
+            }
+            if (st == 0) { if (!cont) emit() } else { tok = tok " " }
+        }
+        END {
+            if (st != 0) bad = "unterminated-quote"
+            else emit()
+            if (bad != "") { print "!! 0 !!"; print bad }
+        }
+    '
+}
+
+# find_exec_commands — prints, one per line, `<command><TAB><its own argument tokens, TAB-joined>`
+# for every command that find's -exec/-execdir/-ok(dir) or a pipeline's xargs would actually run.
+# The positions are decided in bash; only the split is delegated (see above). "The word after the
+# introducer" is a position, and the regex attempts to express that position are what kept
+# missing verbs.
+#
+# The argument list is bounded by the command's own CLAUSE: find's terminator, an UNQUOTED shell
+# operator, or the next -exec/xargs introducer. That bound is what keeps `grep -i` after a pipe,
+# a `2>/dev/null` after the terminator, and an unrelated later `git status` out of the decision
+# about the command that actually touches the .meta files.
+#
+# TWO TERMINATOR RULES, BECAUSE THERE ARE TWO PARSERS. On the find route the terminator is
+# whatever find sees after the shell has removed quoting, so `\;`, `';'` and `";"` all terminate
+# — verified: `-exec sed -e ';' -i {} \;` makes find stop at that `;`, report `unknown predicate
+# -i`, exit 1 and write nothing. `+` is different: GNU find only reads it as the terminator when
+# the PRECEDING argument was `{}`, which is why `-exec sort -u '+' -o {} {} \;` really does hand
+# sort an `-o {}` — verified, sort ran and only failed because `+` was not a readable file. On
+# the xargs route there is no find, so only a genuinely unquoted operator ends the clause.
 #
 # EVERY BUG THIS FUNCTION HAS HAD IS THE SAME BUG: a token classified by its shape rather than
-# by its position, so the real command was stepped over. Three of them, kept here because the
-# fourth will look just as reasonable:
+# by its position, so the real command was stepped over. Four of them, kept here because the
+# fifth will look just as reasonable:
 #   - `';'*|'\'*` skipped ANY token starting with a backslash, meaning to skip find's `\;`
 #     terminator. `\rm`, `\mv`, `\gzip` are the standard alias-bypass spelling and were
 #     therefore invisible — on the find route, on the verb this classification is named after.
-#     `-exec \mv {} /tmp \;` still blocked, but reported "runs 'tmp'": having skipped `\mv`
-#     and `{}` it landed on the next word. The terminator is now matched in full, and the
-#     backslash is stripped from every token before anything looks at it, which also fixes
-#     `| \xargs -0 rm` — a stripped `\xargs` is an introducer again.
 #   - an xargs option's ARGUMENT was read as the command: `xargs -n 1 grep` reported
 #     "runs '1'", `xargs -d "\n" grep` reported "runs '\n'". Only options whose argument is
 #     mandatory and separate are skipped; `-i`/`-e`/`-l` take an OPTIONAL attached one, so
 #     skipping their next word would step over the command in `xargs -i rm {}`.
-#   - the same class in `CMD_START` above, for the direct arm.
+#   - a write flag decided by regexing the whole raw command string, so `sed -i''` walked past
+#     the pattern's right boundary. Fixed by reading the exec'd command's own arguments.
+#   - and the one this rewrite is for: an operator inside a quoted program read as a clause end.
 find_exec_commands() {
-    local tok cmd want=0 pend="" args=""
-    # `set -f` matters: the command line being tokenised contains globs (`*.meta` is the whole
-    # point), and unquoted word splitting would otherwise expand them against the real cwd.
-    set -f
-    # shellcheck disable=SC2086 -- deliberate word splitting; this IS the tokeniser
-    set -- $1
-    set +f
-    while [ "$#" -gt 0 ]; do
-        tok="$1"; shift
-        # Strip one layer of shell quoting, and the alias-bypass backslash with it.
-        #
-        # GUARDED, because `${var#pat}` is the one pathological operation here. Measured on
-        # this host, bash 5.2 in en_US.UTF-8, against a single 122 880-character token:
-        # ONE `${x#\\}` costs 432 ms and the five steps below cost 2098 ms, while a `case`
-        # against the same token — literal, `*/xargs`, or `*>*` — costs 3–4 ms. It is the
-        # multibyte-aware scan, and it is why a long command line was seconds rather than
-        # milliseconds. The guard is exact rather than a length cap: every step below is a
-        # no-op unless the token starts with a backslash or a quote, or ends with a quote.
-        case "$tok" in
-            '\'*|"'"*|'"'*|*"'"|*'"')
-                tok="${tok#\\}"                    # \rm -> rm, \xargs -> xargs, \; -> ;
-                tok="${tok%\'}"; tok="${tok#\'}"   # 'rm -> rm, -i'' -> -i'
-                tok="${tok%\"}"; tok="${tok#\"}"   # "-i" -> -i
-                ;;
-        esac
+    local flags len cand tok cmd want=0 pend="" args="" route="" skipnext=0 prevbrace=0 toks
+    # An `||`, because a failed tokenisation under `set -e` would otherwise kill the hook and
+    # fail it OPEN. Unparseable is a block, whichever way the parse failed.
+    toks="$(find_exec_tokens "$1")" || toks="!! 0 !!
+tokeniser-failed"
+    # A here-string, not a pipe: nothing downstream may exit early and SIGPIPE the writer.
+    while IFS=' ' read -r flags len cand; do
+        IFS= read -r tok || tok=""
+        if [ "$flags" = "!!" ]; then
+            printf '%s\t%s\n' "$FIND_TOK_UNPARSEABLE" "$tok"
+            continue
+        fi
+        if [ "$skipnext" = "1" ]; then skipnext=0; prevbrace=0; continue; fi
         if [ -n "$pend" ]; then
-            # Collecting the pending command's own arguments. The clause ends at find's
-            # terminator, at a shell operator, or at the next introducer.
-            case "$tok" in
-                ';'|'+'|'|'|'||'|'&&'|'&')
-                    printf '%s\t%s\n' "$pend" "$args"; pend=""; args=""; continue ;;
-                -exec|-execdir|-ok|-okdir|xargs|*/xargs)
-                    printf '%s\t%s\n' "$pend" "$args"; pend=""; args=""; want=1; continue ;;
+            # Collecting the pending command's own arguments.
+            if [ "$route" = "find" ]; then
+                if [ "$tok" = ";" ] || { [ "$tok" = "+" ] && [ "$prevbrace" = "1" ]; }; then
+                    printf '%s\t%s\n' "$pend" "$args"
+                    pend=""; args=""; route=""; prevbrace=0; continue
+                fi
+            fi
+            if [ "$flags" = "--" ]; then
+                case "$tok" in
+                    ';'|'|'|'||'|'&&'|'&')
+                        printf '%s\t%s\n' "$pend" "$args"
+                        pend=""; args=""; route=""; prevbrace=0; continue ;;
+                    # A redirection is the shell's, not the command's. SKIPPED rather than
+                    # treated as a clause end, because the shell strips it wherever it sits:
+                    # `xargs -0 sed 2>/dev/null -i s/a/b/` really does run `sed -i`.
+                    # `&` followed by two `>` is deliberately absent from this exact list: it
+                    # is bash-4-only syntax and tests/test-bash32-compat.sh greps every shipped
+                    # script for that literal three-character sequence, so writing it here
+                    # would fail the compat guard on a string this file never executes. It is
+                    # still handled — by the attached-operand arm below, which skips the
+                    # operator token and leaves the filename as a harmless argument.
+                    '>'|'>>'|'<'|'<<'|'<<<'|'&>'|'>&'|[0-9]'>'|[0-9]'>>'|[0-9]'<'|[0-9]'>&')
+                        skipnext=1; prevbrace=0; continue ;;
+                    '>'*|'<'*|'&>'*|[0-9]'>'*|[0-9]'<'*)
+                        prevbrace=0; continue ;;
+                esac
+            fi
+            case "$flags" in
+                q*) ;;                                 # a quoted run never introduces anything
+                *)  case "$tok" in
+                        -exec|-execdir|-ok|-okdir)
+                            printf '%s\t%s\n' "$pend" "$args"
+                            pend=""; args=""; want=1; route="find"; prevbrace=0; continue ;;
+                        xargs|*/xargs)
+                            printf '%s\t%s\n' "$pend" "$args"
+                            pend=""; args=""; want=1; route="xargs"; prevbrace=0; continue ;;
+                    esac ;;
             esac
-            args="$args $tok"
+            args="$args$FIND_TOK_SEP$tok"
+            if [ "$tok" = "{}" ]; then prevbrace=1; else prevbrace=0; fi
             continue
         fi
         if [ "$want" = "1" ]; then
             case "$tok" in
                 -a|-E|-I|-d|-L|-n|-P|-s|--arg-file|--delimiter|--max-args|--max-chars|--max-procs)
-                    shift || true                  # an xargs option and its separate argument
+                    skipnext=1                     # an xargs option and its separate argument
                     continue ;;
                 -*|*=*|'{}'*|';'|'+') continue ;;
             esac
-            cmd="${tok##*/}"                       # /usr/bin/rm -> rm
+            cmd="$cand"                            # /usr/bin/rm -> rm, computed in awk
             case "$cmd" in
                 # The same prefix vocabulary CMD_START uses: these run the NEXT word.
                 env|sudo|doas|nice|nohup|command|time|exec|'') continue ;;
@@ -306,12 +445,17 @@ find_exec_commands() {
             pend="$cmd"
             args=""
             want=0
+            prevbrace=0
             continue
         fi
-        case "$tok" in
-            -exec|-execdir|-ok|-okdir|xargs|*/xargs) want=1 ;;
+        case "$flags" in
+            q*) continue ;;
         esac
-    done
+        case "$tok" in
+            -exec|-execdir|-ok|-okdir) want=1; route="find" ;;
+            xargs|*/xargs)             want=1; route="xargs" ;;
+        esac
+    done <<< "$toks"
     # A clause that runs to the end of the line has no terminator to flush it. An `if`, not an
     # AND-list: under `set -e` a trailing `[ -n "$x" ] && printf` fails the function when the
     # test is false.
@@ -328,16 +472,29 @@ if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
         DANGER_MSG="$META_DEL_MSG"
     else
         META_EXEC=""
+        META_UNPARSEABLE=""
         # A here-string, not a pipe: `break` in a piped `while` would leave the writer to die
         # of SIGPIPE, which under pipefail + set -e kills the hook and fails it OPEN.
         while IFS=$'\t' read -r _mc _margs; do
             [ -n "$_mc" ] || continue
+            if [ "$_mc" = "$FIND_TOK_UNPARSEABLE" ]; then
+                META_UNPARSEABLE="${_margs:-unknown}"
+                META_EXEC="(unparsed)"
+                break
+            fi
             if ! find_exec_is_read_only "$_mc" "${_margs:-}"; then
                 META_EXEC="$_mc"
                 break
             fi
         done <<< "$(find_exec_commands "$COMMAND")"
-        if [ -n "$META_EXEC" ]; then
+        if [ -n "$META_UNPARSEABLE" ]; then
+            # The gate could not tokenise this command, so it does not know WHICH command runs
+            # over the .meta files. Unparseable is treated as unrecognised, never as safe: the
+            # only alternative is to guess at a clause boundary, and guessing wrong in this
+            # direction is what let a quoted awk program truncate every .meta file it touched.
+            DANGER_KIND="meta-mutation"
+            DANGER_MSG="This gate could not parse this command's quoting (${META_UNPARSEABLE}), so it cannot tell which command runs over these .meta files. .meta files hold the GUIDs every scene, prefab and ScriptableObject reference resolves through — a command that rewrites them breaks those references silently, so an unparseable one is treated as unrecognised rather than as safe."
+        elif [ -n "$META_EXEC" ]; then
             # ONE classification, and the message names the command rather than guessing its
             # category. Once the decision stops depending on knowing the verb, a message that
             # says "deleting" or "renaming" would be asserting knowledge the gate no longer
@@ -508,8 +665,13 @@ echo "" >&2
 echo "  Risk: $DANGER_MSG" >&2
 echo "" >&2
 if [ "$DANGER_KIND" = "meta-mutation" ]; then
-    echo "  This gate does not know what '${META_EXEC}' does — only that it is not on the" >&2
-    echo "  read-only list. Before retrying:" >&2
+    if [ -n "${META_UNPARSEABLE:-}" ]; then
+        echo "  This gate could not parse this command's quoting (${META_UNPARSEABLE}), so it" >&2
+        echo "  cannot tell which command runs over these files. Before retrying:" >&2
+    else
+        echo "  This gate does not know what '${META_EXEC}' does — only that it is not on the" >&2
+        echo "  read-only list. Before retrying:" >&2
+    fi
     echo "" >&2
     echo "  - If it only READS these files, say so in one line and retry. That is the whole" >&2
     echo "    answer; do not manufacture a rollback plan for a read." >&2
@@ -523,6 +685,9 @@ if [ "$DANGER_KIND" = "meta-mutation" ]; then
     echo "  unrelated lines, quoting, or whitespace — produces a different key and will be" >&2
     echo "  blocked again as a new command.)" >&2
     echo "" >&2
+    if [ -n "${META_UNPARSEABLE:-}" ]; then
+        unity_hook_block "BashGate: this command's quoting could not be parsed (${META_UNPARSEABLE}); say whether it reads or writes these .meta files, then retry byte-identically (key: $KEY)."
+    fi
     unity_hook_block "BashGate: say whether '${META_EXEC}' reads or writes these .meta files, then retry byte-identically (key: $KEY)."
 fi
 echo "  Before retrying, present these facts:" >&2
