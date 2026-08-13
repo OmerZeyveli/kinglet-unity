@@ -13,30 +13,33 @@ added mid-wave, so re-read it rather than working from an earlier reading.
 
 ## RESUME HERE
 
-**Tasks 1, 1b, 1c, 1d, 2, 2b, 2c and 3 are done and closed. Task 4 is the next action**, then 5 and 6,
-then the whole-branch review.
+**The wave is complete and merge-ready. Nothing is open.** Every task closed, the whole-branch review
+ran and returned *merge with one thing fixed first*, that fix landed and was itself reviewed
+(**Approved — no shipped sentence is false**), and a final commit closed a live defect that review
+found while checking an arithmetic claim.
 
-**Every task in the plan is done and closed. The whole-branch review is the next and last action** —
-base `c5280c4` to HEAD.
+**Suite `1022/1022` over 35 files**, ANSI-stripped header count 35, `provenance OK`, baseline drift 0,
+tree clean at `b86dde5`. **45 commits**, `c5280c4..HEAD`, 19 files, roughly +6800/−120.
 
-**Suite green: `Total: 996  Passed: 996  Failed: 0`, 34 files, tree clean at `ca30a1c`.**
-`provenance OK`, baseline zero drift. Task 3 left seven deliberate reds and **Task 4 closed all
-seven**; the dry-run guard went 138/7 → **165/0**.
+**Not pushed.** `origin/main` is far behind and pushing is the owner's call, as it was at the end of
+the previous wave.
 
-**Two spec corrections landed mid-wave and both are dated blocks inside the spec, not rewrites.**
-Criterion 8's example was false when written (checked against `c5280c4`), and **D5's body prescribed
-the defect** — it describes stage 1 of a two-stage decision. Criterion 8 was amended on 2026-08-13 and
-D5 was not; Task 4's implementer caught the half-correction. Read both dated blocks before touching
-that area.
+**If you are resuming to merge:** the whole-branch review's triage is below under *Final review —
+triage*. Everything marked *spin out* is a second wave, and the spec's own out-of-scope list plus the
+previous wave's twelve carried items belong to it.
 
-**`grep` in an interactive shell here is a function wrapping `ugrep 7.5.0`; `/usr/bin/grep` is GNU
-grep 3.11, and they diverge.** An **unescaped `$` mid-pattern** is a literal in GNU BRE and an anchor
-in ugrep, so such a probe returns a **silent false negative** through the wrapper. It already produced
-one wrong conclusion in this wave — a review reported "no precedent anywhere in this repo" for a
-construct that appears three times. **Use `/usr/bin/grep` for anything reported as an absence.**
-Narrower than it first looked: a script run as `bash x.sh` gets `/usr/bin/grep`, so `install.sh`'s and
-the guards' own `grep` calls are GNU at runtime. The hazard is hand probing — which is what every
-dispatch in this wave does.
+### One correction to this ledger's own record, made 2026-08-13
+
+**The receipt-less window's severity, as this ledger stated it, does not reproduce.** Item 20 argued it
+mattered because *"Perforce keeps files read-only until checked out, and console projects live
+there."* Measured against the finished branch: a **read-only `Packages/manifest.json`** — the actual
+Perforce shape — completes with `rc=0` and a receipt. Two of the three members are closed (D11's
+decline fires before the `cp`; `add_manifest_dependency` has no `return 1` after Task 4). **One narrow
+member survives**: a *dangling symlink* at `Packages/manifest.json.bak`, where `[ -e ]` is false so the
+guard does not fire and the `cp` dies — 86 files, no receipt, `uninstall.sh` refuses forever.
+
+A second wave scoped from this ledger's original text would have gone looking for a Perforce failure
+that does not exist. **Downgraded, and the reasoning corrected rather than the entry deleted.**
 
 ### How the wave grew, and why it stopped growing
 
@@ -833,6 +836,77 @@ strips NUL and silently undoes `-z`. And two new arms fire loudly on no-index an
 already universal here — `check-provenance.sh`'s orphan check reads `git ls-files` too, so an unstaged
 file is outside the whole apparatus rather than just this test.
 
+## Final review — triage of forty findings, and what only a whole-branch view could see
+
+The whole-branch review read every deferred finding **against the finished branch** rather than against
+the moment it was written. **Three came out differently**, and one of those is the wave's sharpest
+self-correction.
+
+**Moot, closed by later tasks:** items 12, 13, 14 and 18, plus the third member of item 20. D11 turned
+out to *be* the fix for item 14, and to close item 13 as a side effect — the decline fires before the
+`cp` a read-only file would have failed.
+
+**Merge as-is:** items 1–4, 7, 11, 26, 28, 34, 36, 37, 39, 40, and the two plan bugs. Several are
+disclosures that are correct precisely because they are honest about a limit.
+
+**Spin out to a second wave:** 8, 9, 10, 15, 16, 17, 19, 20 (downgraded, above), 21+22+23+25 as **one**
+item, 27, 35, 38, and the sticky `user-modified` trade — which is `c2d27f1f`'s design decision and the
+owner's, not this wave's.
+
+**Fixed in the post-review pass:** 24, 29, 30, 33.
+
+### The finding no per-task review could have reached
+
+**The record said the wave inherited something the wave created.** Finding 30 read *"`studio-doctor.sh`
+**still** carries `${VAR%%$'\n'*}`; `install.sh` moved off it for the macOS pass; that file did not."*
+Measured:
+
+```
+git show c5280c4:scripts/studio-doctor.sh | /usr/bin/grep "%%\$'"  ->  no match
+git log -S"UV_VER%%" -- scripts/studio-doctor.sh                    ->  6a2793e  (Task 1d)
+```
+
+Both sites were introduced **by this wave**. And `install.sh`'s comment, written **13 h 28 m later** by
+Task 4, cited them as *"precedent here"*. So Task 4 weighed its own predecessor task's half-day-old
+code as inherited practice, chose the safer idiom for `install.sh`, and left the one it had just
+rejected where the wave had just put it. **Three artifacts — this ledger, a shipped comment, and the
+macOS backlog — recorded as pre-existing something the wave created.** Fixed in the code, not only in
+the record.
+
+*(The controller's dispatch said "six days" and "four states"; the implementer measured both and
+reported 13.5 hours and five. Neither changed a fix. Recorded because the correction of a
+mis-measurement should not itself be a mis-measurement.)*
+
+### Five contracts changed, two documents revised
+
+`MCP-SETUP.md` — **which ships into every user project and is what `Next steps: 1.` points at** — still
+promised *"a `manifest.json.bak` backup is written first"*, the very claim D11 exists to break.
+`README.md` said *"every file written is recorded"*, now wrong in both directions. `MERGE-NOTES.md`
+carried a sentence describing the exact defect D7 fixed. A wave whose thesis is *every claim the
+installer makes about what it owns is true* was one surface from merging with its own setup guide
+stating the superseded claim.
+
+Two more surfaces nobody had listed turned up in the fix: `install.sh --help` carried the identical
+false receipt sentence, and `uninstall.sh --help` said *"Removes what install.sh **wrote**"* —
+authorship, where the wave's whole subject is the difference between that and ownership.
+
+### And the last commit exists because a review checked an arithmetic claim it was asked to verify
+
+`scripts/generate-claude-md.sh`'s `usage()` sliced `3,17p` of its own header, and **line 17 ended
+mid-sentence** — a shipped `--help`, in one of the ten scripts that install into `.claude/scripts/`,
+stopping at *"had this script write"*. Six files carry that `sed`-slice construct and **no test rendered
+any of them**. `tests/test-help-ranges.sh` now does, deriving the file set from two independently
+spelled needles whose set equality is itself asserted, so a seventh script joins automatically.
+
+Its predicate is worth keeping: *"is not code"* was too weak, because **a prose comment is not code and
+that is the whole defect**. The test asks *"does not continue the help"* — a boundary line passes when
+it leaves the block, hits EOF, or is a comment with **no alphanumeric character** after its `#`. Prose
+cannot avoid letters.
+
+**One incident recorded in that file:** its first draft **matched its own needle**, because the comment
+explaining the constraint put `sed -n` and `"$0"` on one line. The repo's own *"a sentinel must not
+contain its own needle"*, met once more, by the guard written to enforce it.
+
 ## Deferred and parked findings
 
 ### From Task 2c — five, plus a class worth naming
@@ -1028,7 +1102,8 @@ task has run rewrites the record of what the implementer was actually told.
 29. **Step 3b's invariant comment omits `$BACKUP_DIR`** from its enumeration of what Steps 4–6 write at
     the project root — Step 5's head is `mv "$CLAUDE_DIR" "$BACKUP_DIR"`. The conclusion holds; the
     sentence is what a future reader will audit against.
-30. **`scripts/studio-doctor.sh` carries `${VAR%%$'\n'*}` twice** (lines 88 and 162). `install.sh`
+30. **`scripts/studio-doctor.sh` carried `${VAR%%$'\n'*}` twice** — at lines 88 and 162 as of
+    `b2e762d`; the sites are now at 95 and 169 and carry `${VAR%%"$NL"*}`. `install.sh`
     moved off it for the macOS pass; that file did not. ~~Second wave.~~ **Closed in the post-review
     pass, and the framing above was wrong in a way no per-task review could have caught.** This entry
     said "*still* carries", and `install.sh:391` called it "precedent here" — both reading as
@@ -1091,6 +1166,26 @@ task has run rewrites the record of what the implementer was actually told.
     *file*-oriented and matches a package *name*; sweep 2 (`-n` over `install.sh`) is the
     *line*-oriented one. Copying them verbatim would have put two false statements into the wave's own
     verification record. Caught before it happened.
+
+### From the post-review pass and the final fix — three carried
+
+41. **`tests/test-help-ranges.sh` cannot run under this repository's documented probe method.** It
+    derives its file set from `git ls-files`, so a `git archive HEAD | tar -x -C "$(mktemp -d)"`
+    extraction — the method `CLAUDE.md` and every dispatch in this wave prescribe — makes it die
+    `rc=128` with `fatal: not a git repository`, asserting **nothing**. Through the runner that is
+    caught loudly (`exited N without reporting a failure`), so it is not a silent-green risk, and it
+    works correctly from a `git clone`. **Verified by the controller directly**: from a clone it
+    reddens in *both* directions with messages naming the file, the line and the consequence — the
+    stop-short case (*"line 18 is prose that continues it, so --help stops mid-thought"*) and the
+    over-run case (*"these lines in that range are not comments … The help text is printing the
+    script's own code"*). `tests/test-pipeline-detector.sh` faced the same dependency and grew two
+    explicit no-index arms; this one did not. **Same class as the finding it exists to guard**: a probe
+    whose shape decides where it can be run.
+42. **Stopping one *blank-comment* line short is not caught** — verified green at `3,21`. Stated
+    plainly in the file rather than left to be discovered.
+43. **Eight other tracked scripts advertise `--help` via heredoc.** Not defects, not the `sed`-slice
+    class, and not covered by the new guard. Recorded so the next reader does not assume the sweep is
+    exhaustive over `--help` rather than over the construct.
 
 ### From Task 1's review — five Minor, four closed in round 1
 
