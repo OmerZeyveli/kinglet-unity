@@ -645,6 +645,46 @@ which zero it is.** Third measured instance in this repository. **→ Task 13** 
     on the `_lib.sh` row; `…without word splitting Also: the single assertion…` on the
     `test-skills.sh` row). Every other multi-clause note uses `; ` or `. `. **→ Task 11.**
 
+**From Task 13's review (2026-08-14). Task 13 is in fix round 1. Both Importants are the five
+shapes applied to the task that wrote them down.**
+
+31. **The new review instructions landed only in the document that structurally cannot fire first.**
+    Task 13's own Step 1 diagnosed it — *"a guard first lands at the **task** review… so the clause
+    that would have caught F6 was in a document that does not run at the moment F6 is created"* — and
+    then placed the fix in that same document. `SKILL.md` makes the two explicitly disjoint and the
+    fix loop only runs once the task review **already found something**, so a guard landing in a
+    clean task review is reached by none of the three. **Ruled a fix round, not a brief amendment**:
+    `task-reviewer-prompt.md` is already in the task's Files list.
+32. **Step 0 reconciled the citation rule in two files and left it standing in the surface the
+    reviewer actually reads.** `.claude/agents/unity-reviewer.md` still pairs `file:line` with **the
+    identical sentence** Step 0 exists to reconcile, interpolates a bare line number three times in
+    its output template, and says so again in its frontmatter `description:`;
+    `.claude/commands/unity-review.md` repeats it. `SKILL.md` dispatches that agent **with**
+    `task-reviewer-prompt.md`, so the reviewer reads both in one turn and they disagree. **The Step 0
+    probe was scoped to the skill directory — shape 1 applied to this task and missed.** *Ruled:
+    widen the scope; those files have no other owner and a citation-format change is not a capability
+    change, so R8 does not bite.*
+33. **Five Minor, folded into the same round because each is a defect in shipped prose and three are
+    the rot this task teaches against, inside the rule that teaches it:** the two surfaces disagree
+    on the size of the same class (three shapes vs four); F1's corroboration is restated as *"both by
+    running the upgrade"* when one lens walked the dependency graph; a quotation-marked *"finish with
+    two green gates"* appears **nowhere** in the plan; *"the instruction is not 'check that your
+    mutation applied'"* is followed immediately by a mechanical way of checking that your mutation
+    applied; and the bare-numeral sweep is the only one of four with no search needle — **the shape
+    with the highest measured cost**, as its own section states.
+34. **The honest answer to "do these additions reduce the risk or merely name it": mostly name it,
+    with exactly one real reduction — and it is the part the implementer added beyond the brief.**
+    `re-review-prompt.md`'s Output paragraph (*"a verdict that omits them reads identically to one
+    that ran them"*) converts a skipped mutation from invisible into a **visible omission** a human
+    or controller can see. That is a genuine if weak mechanism, and it binds **only the fix-loop
+    reviewer** — which is finding 31 from the other side. **Record it: it is the only structural
+    change in the task, and everything else is a rule a model reads under load.**
+35. **`provenance.tsv`'s SUPERSEDED append was ruled acceptable as-is**, not deferred. Tagged append
+    is that file's own convention, the marker is explicit and adjacent, and editing the stale clause
+    out would destroy the record of what the row claimed **while the contradiction shipped** — the
+    historical-narrative case R12 says to preserve. Residual risk checked and not live: no
+    `tests/*.sh` greps `file:line` at all.
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
