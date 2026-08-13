@@ -210,6 +210,133 @@ done <<'S2S_SENTINELS'
 .claude/skills/subagent-driven-implementation/SKILL.md
 S2S_SENTINELS
 
+# --- 7. The frontmatter is a well-formed BLOCK, not two lines ---------------
+#
+# Sections 3 and 4 read a `name:` line and a `description:` line. That is all they read, so until
+# 2026-08-14 the CLOSING `---` fence was unguarded across every skill, and so was everything else
+# inside the block. Measured on this tree, all three of these left the suite green:
+#
+#   * deleting the closing `---`          — the frontmatter never terminates, so the whole document
+#                                            is frontmatter to a YAML parser;
+#   * adding a third key (`alwaysApply: true`)
+#                                          — CLAUDE.md says the frontmatter is `name` and
+#                                            `description`, "nothing else"; test-no-mobile.sh:96
+#                                            catches those two specific inert Cursor keys by name and
+#                                            nothing catches any OTHER third key;
+#   * moving the opening `---` off line 1  — a document that begins with anything else has no
+#                                            frontmatter at all, and `name:`/`description:` sitting
+#                                            in the body still satisfied sections 3 and 4.
+#
+# So the block is parsed as a block: opens on line 1, closes on a later bare `---`, and between them
+# every non-blank line is `name:` or `description:`, once each. That is CLAUDE.md's rule, asserted
+# rather than requested.
+#
+# WHAT THIS CANNOT SEE. It is a line-shape check, not a YAML parser. A description whose VALUE is
+# malformed YAML (an unbalanced quote, a stray `:` in an unquoted scalar) has the right key on the
+# right line and passes here — the value's own validity is not asserted anywhere in this suite, and
+# saying so is cheaper than implying otherwise. It also says nothing about whether the description
+# is any GOOD, which is the entire selection mechanism and remains unguardable by a shell test.
+FM_BAD=""
+FM_CHECKED=0
+for d in .claude/skills/*/; do
+  [ -e "${d}SKILL.md" ] || continue
+  FM_CHECKED=$((FM_CHECKED + 1))
+  FM_VERDICT="$(awk '
+    NR == 1 { if ($0 != "---") { print "does not open with --- on line 1 (line 1 is: " $0 ")"; exit } ; next }
+    !closed && /^---[[:space:]]*$/ { closed = NR; next }
+    !closed {
+      if ($0 ~ /^[[:space:]]*$/) next
+      if ($0 ~ /^name:/)        { n++; next }
+      if ($0 ~ /^description:/) { desc++; next }
+      other = other " " $0
+    }
+    END {
+      if (NR == 0) { print "is empty"; exit }
+      if (!closed) { print "has no closing --- fence, so the whole file reads as frontmatter"; exit }
+      if (n != 1)    { print "has " n+0 " name: line(s) in its frontmatter, not exactly 1"; exit }
+      if (desc != 1) { print "has " desc+0 " description: line(s) in its frontmatter, not exactly 1"; exit }
+      if (other != "") { print "carries frontmatter beyond name and description:" other; exit }
+    }
+  ' "${d}SKILL.md")"
+  [ -z "$FM_VERDICT" ] || FM_BAD="${FM_BAD}$(basename "$d") ${FM_VERDICT}
+"
+done
+if [ -n "$FM_BAD" ]; then
+  echo "--- skills whose frontmatter block is not name + description between two --- fences ---"
+  printf '%s' "$FM_BAD"
+fi
+assert_eq "$(printf '%s' "$FM_BAD" | grep -c . || true)" "0" "every skill's frontmatter opens on line 1, closes on a --- fence, and carries exactly name: and description:"
+
+# The same anti-vacuity the sections above lack: this loop reports zero problems over zero skills.
+#
+# TWO assertions, not one, and the second is here because the FIRST was measured insufficient while
+# this block was being written. `FM_CHECKED = FM_DIRS` is satisfied by `0 = 0`: with
+# `.claude/skills/` emptied, `ls -d` errors, `grep -c .` returns 0, the loop body never runs, and
+# the equality passes — the exact "green because it scanned nothing" shape this whole change exists
+# to remove, reintroduced inside the fix for it. A floor is what makes the equality mean something.
+FM_DIRS=$(ls -d .claude/skills/*/ 2>/dev/null | grep -c . || true)
+FM_FLOOR_STATE="ok"
+[ "$FM_DIRS" -ge 1 ] || FM_FLOOR_STATE="no skill directories found under .claude/skills/ at all"
+assert_eq "$FM_FLOOR_STATE" "ok" "there are skills to check — an empty .claude/skills/ must not read as a clean one"
+assert_eq "$FM_CHECKED" "$FM_DIRS" "the frontmatter check read every skill directory ($FM_DIRS), rather than passing on a set that went empty"
+
+# --- 8. The red-flag sections have BODIES ----------------------------------
+#
+# tests/test-surface-references.sh asserts that the three skills `using-kinglet` names each CARRY a
+# `## The thought that means you are about to…` heading. That is existence-only, and for
+# `systematic-debugging` and `verification-before-completion` it is their ONLY coverage in the whole
+# suite: measured 2026-08-14, deleting every table row under both headings and leaving the headings
+# in place left the suite entirely green. `using-kinglet` is injected at session start and tells the
+# model to go and READ those sections; a heading over nothing satisfies the pointer and teaches
+# nothing.
+#
+# Asserted as a FLOOR on three-column data rows, not as a count and not as fixed text. The rows are
+# measured rationalizations and the set grows — a count would red on every honest addition, and
+# pinning the text would red on a reword, which is the shape field note 81 rules against. Two is
+# calibrated the way section 6's floor is: the smallest of the three sections carries two rows today,
+# so any gutting to one or zero trips it while any legitimate edit does not.
+#
+# WHAT THIS CANNOT SEE. Row COUNT is not row VALUE: two rows of nonsense pass. It cannot tell a
+# rewritten row from an original one, and it does not check that the Source column cites anything
+# real — that is the claim the rows make and nothing in a shell test can settle it. It also reads
+# only the three skills `using-kinglet` names; a fourth skill growing a red-flag section is outside
+# it, deliberately, because the promise being kept is `using-kinglet`'s.
+RF_BODY_BAD=""
+RF_BODY_CHECKED=0
+while IFS= read -r RF_NAME; do
+  [ -n "$RF_NAME" ] || continue
+  RF_FILE=".claude/skills/${RF_NAME}/SKILL.md"
+  if [ ! -f "$RF_FILE" ]; then
+    RF_BODY_BAD="${RF_BODY_BAD}${RF_NAME}: no SKILL.md
+"
+    continue
+  fi
+  RF_BODY_CHECKED=$((RF_BODY_CHECKED + 1))
+  # A data row: a table line inside the section that is neither the header row nor the `|---|` rule.
+  # `seen_head` skips the first table line, which is the column header.
+  RF_ROWS=$(awk '
+    /^## The thought that means you are about to/ { inrf = 1; next }
+    inrf && /^#{1,3} /                            { exit }
+    inrf && /^\|/ {
+      if ($0 ~ /^\|[[:space:]-]*\|[[:space:]-]*\|[[:space:]-]*\|?[[:space:]]*$/) next
+      if (!seen_head) { seen_head = 1; next }
+      rows++
+    }
+    END { print rows + 0 }
+  ' "$RF_FILE")
+  [ "$RF_ROWS" -ge 2 ] || RF_BODY_BAD="${RF_BODY_BAD}${RF_NAME}: its red-flag section has ${RF_ROWS} data row(s), and using-kinglet sends every session there to read them
+"
+done <<'RF_BODY_SKILLS'
+unity-brainstorming
+systematic-debugging
+verification-before-completion
+RF_BODY_SKILLS
+if [ -n "$RF_BODY_BAD" ]; then
+  echo "--- red-flag sections that are a heading over nothing ---"; printf '%s' "$RF_BODY_BAD"
+fi
+assert_eq "$(printf '%s' "$RF_BODY_BAD" | grep -c . || true)" "0" "every red-flag section using-kinglet points at carries rows, not just a heading"
+assert_eq "$RF_BODY_CHECKED" "3" "all three red-flag skills were opened and read, rather than the loop passing on a set that went empty"
+
 # --- Summary ---------------------------------------------------------------
 echo ""
 echo "test-skill-discovery: $TESTS_PASSED/$TESTS_RUN passed"

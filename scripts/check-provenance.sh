@@ -65,14 +65,45 @@ done < <(paths)
 [ "$GHOSTS" -eq 0 ] && pass "no ghost rows ($(paths | wc -l | tr -d ' ') rows resolve to files)"
 
 # ── 3. No orphans — every tracked file has a row ─────────────────────────────
+#
+# THE INDEX IS PROVED READABLE FIRST. This loop's entire input is `git ls-files`, and the check is an
+# ABSENCE check, so "no orphans" and "no files" produce the same green. Measured 2026-08-14 on a
+# `git archive HEAD | tar -x` extraction — this repository's documented probe method, which has no
+# index — this script printed:
+#
+#     fatal: not a git repository (or any of the parent directories): .git
+#     pass no orphan files (0 tracked files covered)
+#     ...
+#     provenance OK                                              rc=0
+#
+# `provenance OK` over a repository whose files were never enumerated. The `0` was even in the
+# message. CLAUDE.md's own account of what this script is for — "no rows without files, no files
+# without rows ... that is what keeps a removed surface from silently returning" — was half true:
+# the ghosts direction reads the manifest and held, the orphans direction read nothing.
+#
+# A floor rather than an equality, because the tracked count moves on most commits. It is compared
+# against the manifest's own row count, which is the one number that must track it: the two are
+# equal today by construction (every tracked file has a row), so requiring the index to be at least
+# half the manifest catches an empty or truncated listing without pinning either number.
+TRACKED_LIST=$(mktemp); TMP_PATHS=$(mktemp)
+trap 'rm -f "$TMP_PATHS" "$TRACKED_LIST"' EXIT
+paths | sort > "$TMP_PATHS"
+TRACKED_RC=0
+git ls-files 2>/dev/null | sort > "$TRACKED_LIST" || TRACKED_RC=$?
+TRACKED_N=$(grep -c . "$TRACKED_LIST" || true)
+ROWS_N=$(grep -c . "$TMP_PATHS" || true)
+if [ "$TRACKED_RC" -ne 0 ] || [ "$TRACKED_N" -lt $((ROWS_N / 2)) ] || [ "$TRACKED_N" -eq 0 ]; then
+  fail "git listed $TRACKED_N tracked file(s) against $ROWS_N manifest rows — the orphan check below read nothing, and its silence would certify a tree it never opened"
+else
+  pass "the tracked-file index is readable ($TRACKED_N file(s)), so the orphan check below means something"
+fi
+
 ORPHANS=0
-TMP_PATHS=$(mktemp); paths | sort > "$TMP_PATHS"
-trap 'rm -f "$TMP_PATHS"' EXIT
 while IFS= read -r f; do
   # The manifest describes itself and its own tooling loosely; skip nothing — every file gets a row.
   grep -qxF "$f" "$TMP_PATHS" || { fail "orphan file (no row): $f"; ORPHANS=$((ORPHANS + 1)); }
-done < <(git ls-files | sort)
-[ "$ORPHANS" -eq 0 ] && pass "no orphan files ($(git ls-files | wc -l | tr -d ' ') tracked files covered)"
+done < "$TRACKED_LIST"
+[ "$ORPHANS" -eq 0 ] && pass "no orphan files ($TRACKED_N tracked files covered)"
 
 # ── 4. status=verbatim must actually be verbatim ─────────────────────────────
 # Offline, using the upstream_sha256 already recorded in the row. This check did not exist at first,

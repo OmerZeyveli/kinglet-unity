@@ -92,7 +92,38 @@
 # survives" — not as "the class of defect is closed."
 # ============================================================================
 
-TMDI_TRACKED=$(cd "$REPO_DIR" && git ls-files -- .claude/)
+# ── The three sweeps in this file must have swept something ─────────────────
+#
+# All three scans here (`TMDI_TRACKED`, `TMDI3_TRACKED`, `TMDI4_ALL_TRACKED`) index by
+# `git ls-files`. With no git index every one of them yields the empty string, every `while` loop
+# reads a single blank line and `continue`s, every HITS variable stays empty, and every
+# `assert_eq "" "$HITS"` passes. Measured 2026-08-14 against a `git archive HEAD | tar -x`
+# extraction — this repository's documented probe method — this file reported **23 passed, 0
+# failed**, identical in every respect to a healthy run, having opened no file at all.
+#
+# The canaries further down do NOT cover this, and that distinction is the whole point. They prove
+# the PATTERN still catches a reconstructed offender, by running it against a string built inside
+# this file; they say nothing about whether the pattern was ever run over the repository. A pattern
+# that binds perfectly, applied to nothing, is the shape being closed here.
+#
+# One guard for all three, because all three read the same index: if `.claude/` is listable and
+# populated, `*.md` and `docs/` are being listed by the same machinery. The floor is 30 against 62
+# tracked paths under `.claude/` today — below any plausible surface removal, far enough above zero
+# that a pathspec which stops matching is caught rather than rounded off.
+TMDI_INDEX_ERR="$(mktemp "${TMPDIR:-/tmp}/tmdi-index-err.XXXXXX")"
+TMDI_INDEX_RC=0
+TMDI_TRACKED=$( ( cd "$REPO_DIR" && git ls-files -- .claude/ ) 2>"$TMDI_INDEX_ERR" ) || TMDI_INDEX_RC=$?
+TMDI_INDEX_N=$(printf '%s' "$TMDI_TRACKED" | grep -c . || true)
+TMDI_INDEX_STATE="ok"
+if [ "$TMDI_INDEX_RC" -ne 0 ]; then
+    TMDI_INDEX_STATE="git could not list .claude/ (exit $TMDI_INDEX_RC): $(tr '\n' ' ' < "$TMDI_INDEX_ERR")"
+elif [ "$TMDI_INDEX_N" -lt 30 ]; then
+    TMDI_INDEX_STATE="only $TMDI_INDEX_N tracked path(s) under .claude/, which is fewer than this payload can have"
+fi
+rm -f "$TMDI_INDEX_ERR"
+assert_eq "ok" "$TMDI_INDEX_STATE" \
+    "the sweeps in this file have files to read — an unreadable index must not certify the same green as a clean payload"
+
 TMDI_HITS=""
 while IFS= read -r tmdi_relpath; do
     [ -z "$tmdi_relpath" ] && continue

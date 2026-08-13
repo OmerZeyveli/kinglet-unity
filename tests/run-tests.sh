@@ -12,15 +12,49 @@
 # note further down for why they cannot be shared variables), and `Total` is simply their sum — not a
 # count of tests that exist.
 #
-# So the Python suites reached through test-kinglet-build.sh and test-kinglet-spike.sh contribute
-# **nothing to Total when they pass**: `unittest -v` prints `ok`, not `PASS`. As of 2026-07-30 that is
-# 126 tests and 459 subtests invisible to the number below. When one of them FAILS it prints `FAIL:`
-# and is counted, and a file that exits non-zero without reporting a failure is caught separately —
-# so the omission is only ever in the safe direction, and no failure can hide in it.
+# THE PYTHON BLINDNESS, AND HOW IT WAS CLOSED (2026-08-14).
 #
-# Left as-is deliberately rather than "fixed" by also counting `ok`: the totals are quoted in CLAUDE.md
-# and in several reports, and changing the arithmetic would silently invalidate every one of them. If
-# you do change it, update those in the same commit.
+# The Python suites reached through test-kinglet-build.sh and test-kinglet-spike.sh used to
+# contribute **nothing to Total when they passed**: `unittest -v` prints `ok`, not `PASS`. Measured
+# 2026-08-14 at commit 5b636d3, BEFORE this change — `Ran 135 tests` and `Ran 1308 tests`, 1443
+# results across the two files, contributing exactly **1** to Total, and that 1 was
+# test-kinglet-spike.sh's own decorative `PASS:` echo. test-kinglet-build.sh emitted no PASS token
+# at all, so a suite of 135 was worth 0.
+#
+# The figures above are pinned to that commit rather than to "this tree", because the commit
+# carrying this change also adds one python test: the same run on the committed tree reads
+# `Ran 1309` and 1444. Re-derive, never transcribe — `bash tests/run-tests.sh` prints both numbers.
+#
+# That was recorded here as "only ever in the safe direction". It is not, and the reason is this
+# file's own subject: a suite that discovers NOTHING prints `Ran 0 tests` and `OK`, exits 0, and
+# under the old arithmetic was indistinguishable from a suite of 1443 that passed. A guard that is
+# green because it scanned nothing is the worst shape in this repository, and the runner was
+# reporting one.
+#
+# So a file whose output carries unittest's own summary is now tallied from that summary:
+#
+#   `Ran N test(s) in …`     — N is the authoritative result count. NOT a count of `... ok` lines:
+#                              measured, a test that writes to stdout mangles its own outcome line
+#                              (1282 `... ok` + 22 `skipped` against `Ran 1308`), so line-counting
+#                              undercounts by however many tests happen to print.
+#   `OK (skipped=S)` /       — the outcome line supplies the polarity. failures/errors/unexpected
+#   `FAILED (failures=F, …)`   successes go to Failed, skipped to Skipped, the remainder to Passed.
+#   `Ran 0 tests`            — a python suite that discovered nothing FAILS, by name.
+#   `Ran N` with no outcome  — a suite cut off mid-run FAILS, by name.
+#
+# unittest also prints one `FAIL: <test>` detail header per failing test, which the generic token
+# grep above already counts. That overlap is subtracted, so a python failure is counted once.
+#
+# THE SAME-COMMIT OBLIGATION THIS BLOCK CARRIES. The previous version of this header ended: "Left
+# as-is deliberately rather than 'fixed' by also counting `ok`: the totals are quoted in CLAUDE.md
+# and in several reports, and changing the arithmetic would silently invalidate every one of them.
+# If you do change it, update those in the same commit." That obligation was discharged when this
+# change landed: `/usr/bin/grep -rn 'Total:' CLAUDE.md README.md docs/*.md` finds no quoted suite
+# total, CLAUDE.md's testing section says in so many words that file and assertion counts drift and
+# must not be hardcoded there, and no test asserts a total. The obligation stands for the next
+# person who changes this arithmetic: re-run that sweep, and update whatever it finds in the same
+# commit. Do not answer it by writing a number down here — CLAUDE.md forbids exactly that, because a
+# hardcoded expected total is itself a claim that goes stale.
 # ============================================================================
 
 set -euo pipefail
@@ -49,6 +83,11 @@ NC='\033[0m'
 PASS=0
 FAIL=0
 SKIP=0
+# Python results are folded into PASS/FAIL/SKIP above so `Total` is honest, and counted here as well
+# so the summary can say how many of them there were. Reporting both is the granularity: 1443 and 1
+# were the same number to this runner until 2026-08-14.
+PY_RESULTS=0
+PY_SUITES=0
 CURRENT_TEST_FILE=""
 
 # --- Assertion Helpers ---
@@ -278,6 +317,62 @@ for test_file in "${test_files[@]}"; do
     file_pass=$(echo "$test_plain" | grep -cE '(^|[[:space:]])PASS(:|[[:space:]])' || true)
     file_fail=$(echo "$test_plain" | grep -cE '(^|[[:space:]])FAIL(:|[[:space:]])' || true)
     file_skip=$(echo "$test_plain" | grep -cE '(^|[[:space:]])SKIP(:|[[:space:]])' || true)
+
+    # --- unittest's own vocabulary, read in ONE awk pass ---------------------
+    #
+    # One pass, a here-string, and no reader that can stop early: `grep -q`/`head` on the write end
+    # of a pipe is the SIGPIPE-under-pipefail trap this repository documents at length, and this
+    # block runs with `set -e` back on.
+    #
+    # `skipped=`/`failures=`/`errors=`/`unexpected successes=` are read ONLY off a line beginning
+    # `OK` or `FAILED`, never from anywhere in the output — a test whose own message contains
+    # `failures=3` must not be able to move the tally.
+    py_stats=$(awk '
+        /^Ran [0-9]+ tests? in / { ran += $2; suites++ }
+        /^(OK|FAILED)/ {
+            outcomes++
+            if (match($0, /skipped=[0-9]+/))              sk += substr($0, RSTART + 8,  RLENGTH - 8)
+            if (match($0, /failures=[0-9]+/))             fl += substr($0, RSTART + 9,  RLENGTH - 9)
+            if (match($0, /errors=[0-9]+/))               er += substr($0, RSTART + 7,  RLENGTH - 7)
+            if (match($0, /unexpected successes=[0-9]+/)) us += substr($0, RSTART + 21, RLENGTH - 21)
+        }
+        /^FAIL: / { detail++ }
+        END { printf "%d %d %d %d %d %d %d %d\n", ran+0, suites+0, outcomes+0, sk+0, fl+0, er+0, us+0, detail+0 }
+    ' <<< "$test_plain")
+    read -r py_ran py_suites py_outcomes py_skip py_fail py_err py_unexp py_detail <<< "$py_stats"
+
+    if [ "$py_suites" -gt 0 ] || [ "$py_outcomes" -gt 0 ]; then
+        py_bad=$((py_fail + py_err + py_unexp))
+        if [ "$py_ran" -eq 0 ]; then
+            # The defect this whole block exists for, one level down: a discovery pattern that stops
+            # matching, a renamed test directory, an import error that empties the suite. `OK` over
+            # zero tests is the same green as `OK` over 1308.
+            echo -e "  ${RED}FAIL${NC} ${CURRENT_TEST_FILE} ran a python suite that discovered 0 tests — a suite that found nothing must not report success"
+            # file_fail, not FAIL: the backstop below fires when a file exits non-zero having
+            # reported no failure, and `NO TESTS RAN` exits 5. Reporting through file_fail means
+            # this cause is named once instead of twice.
+            file_fail=$((file_fail + 1))
+        elif [ "$py_outcomes" -eq 0 ]; then
+            echo -e "  ${RED}FAIL${NC} ${CURRENT_TEST_FILE} started a python suite (${py_ran} test(s)) that never printed an OK/FAILED outcome — it was cut off, so its results mean nothing"
+            file_fail=$((file_fail + 1))
+        else
+            # unittest prints one `FAIL: <test>` detail header per failing test and the generic grep
+            # above already counted those. Subtract the overlap so a python failure is counted once,
+            # and never below zero — a shell `FAIL:` line in the same file is the caller's, not
+            # unittest's, and must survive.
+            py_overlap=$py_detail
+            [ "$py_overlap" -le "$file_fail" ] || py_overlap=$file_fail
+            [ "$py_overlap" -le "$py_bad" ]    || py_overlap=$py_bad
+            file_fail=$((file_fail - py_overlap))
+            file_pass=$((file_pass + py_ran - py_skip - py_bad))
+            file_fail=$((file_fail + py_bad))
+            file_skip=$((file_skip + py_skip))
+            PY_RESULTS=$((PY_RESULTS + py_ran))
+            PY_SUITES=$((PY_SUITES + py_suites))
+            echo -e "  ${CYAN}python${NC} ${py_ran} result(s) from ${py_suites} unittest run(s) in ${CURRENT_TEST_FILE}"
+        fi
+    fi
+
     PASS=$((PASS + file_pass))
     FAIL=$((FAIL + file_fail))
     SKIP=$((SKIP + file_skip))
@@ -305,6 +400,10 @@ fi
 TOTAL=$((PASS + FAIL + SKIP))
 echo "========================================"
 echo -e "Total: ${TOTAL}  ${GREEN}Passed: ${PASS}${NC}  ${RED}Failed: ${FAIL}${NC}  ${YELLOW}Skipped: ${SKIP}${NC}"
+# Named separately, not because Total excludes them — it includes them now — but because a reader who
+# only sees Total move cannot tell a python suite that shrank from a shell assertion that was deleted.
+# Derived from the run, never written down: CLAUDE.md forbids a hardcoded expected count here.
+echo -e "  of which ${CYAN}${PY_RESULTS}${NC} result(s) came from ${PY_SUITES} python suite(s)"
 echo "========================================"
 
 if [ "$FAIL" -gt 0 ]; then

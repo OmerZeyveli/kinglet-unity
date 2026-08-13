@@ -188,6 +188,25 @@ assert_contains "$TSD_ORIGIN_OUT" "WARN 1 file(s) have a receipt origin this che
     "the unreadable-origin row is reported on its OWN line, not merged into the modified count"
 assert_contains "$TSD_ORIGIN_OUT" ".claude/rules/performance.md" \
     "doctor names the origin it cannot read rather than certifying it, as uninstall.sh keeps such a file"
+# The three continuation lines under that header were asserted by NOTHING until 2026-08-14.
+#
+# They are the substance of the diagnosis, not decoration: the header says only "reported, not
+# verified", and these lines are what tell the user which of the two tools will do what to the file.
+# Two fix rounds worked to make them true — the 2026-08-13 round measured that install.sh classifies
+# by bytes rather than by the origin column and rewrote the sentence away from the false "install.sh
+# will keep your versions" — and deleting all three was invisible: measured 2026-08-14, removing
+# every one of them left this file 31/31 green.
+#
+# Asserted as three separate needles rather than one reflowed paragraph, because the doctor prints
+# them as three `warn` calls and a reflow that merged two of them would be a legitimate edit that a
+# single whole-paragraph needle would red. Each needle is a clause that carries a distinct claim, and
+# each is short enough to survive rewrapping.
+assert_contains "$TSD_ORIGIN_OUT" "Neither toolkit nor user-modified in the receipt's fourth column" \
+    "the unreadable-origin header is followed by the line that says WHAT was unreadable"
+assert_contains "$TSD_ORIGIN_OUT" "uninstall.sh keeps" \
+    "…and by the line that states uninstall.sh's behaviour for such a row"
+assert_contains "$TSD_ORIGIN_OUT" "install.sh classifies it by bytes and not by that column" \
+    "…and by the line the 2026-08-13 round rewrote: install.sh decides by bytes, not by the origin column"
 # WHICH list a path lands in is the whole point, and a substring test over the full output cannot see
 # it — both paths are present either way. So extract the indented block that follows the
 # `keep your versions` header (print_first_5 indents by seven spaces) and test membership there.
@@ -232,6 +251,20 @@ rm -rf "$TSD_ORIGIN"
 #
 # BOTH lists are made long in ONE run deliberately. The missing-list printer runs first, so reaching
 # the summary is only possible if neither printer aborted — one assertion covering both call sites.
+#
+# THE FIXTURE IS ASYMMETRIC, AND THAT IS THE SECOND THING IT IS FOR.
+#
+# It made both lists exactly 1500 until 2026-08-14, which meant the block could not tell its two
+# lists apart: `MODIFIED` and `MISSING` both printed 1500, so the two assertions below were
+# satisfied by either counter. Measured on that version — swap the doctor's two counters (print
+# `$MISSING file(s) modified since install` and `$MODIFIED receipted file(s) missing`) and BOTH
+# assertions stay green, on a doctor that has its two diagnoses backwards. A fixture whose inputs
+# are indistinguishable cannot discriminate between the outputs derived from them, however many
+# assertions are written on top of it.
+#
+# So the missing list is N + K rows and the modified list is N. Any confusion of the two counters
+# now reddens by name. K is small and non-round on purpose: 7 cannot be produced by an off-by-one, a
+# halving, or a rounding of N, so a failure message reading `1507` versus `1500` names its own cause.
 echo ""
 echo "--- Test: a long modified/missing list does not kill the script ---"
 TSD_LONG="/tmp/kinglet-doctor-long-$$"
@@ -242,17 +275,24 @@ bash "${REPO_DIR}/install.sh" --project-dir "$TSD_LONG" --yes >/dev/null 2>&1
 # host, 400 entries died 2/10 and 500 died 3/10, while 1000 and 2000 died 10/10. The size is chosen
 # to sit well inside the deterministic region, not just past the first failure seen.
 TSD_LONG_N=1500
+TSD_LONG_K=7
+TSD_LONG_MISSING_N=$((TSD_LONG_N + TSD_LONG_K))
 TSD_LONG_SHA=0000000000000000000000000000000000000000000000000000000000000000
 mkdir -p "$TSD_LONG/.claude/generated"
 TSD_LONG_I=0
 {
+  # One row whose file exists but whose checksum cannot match  → the modified list, N rows.
   while [ "$TSD_LONG_I" -lt "$TSD_LONG_N" ]; do
-    # One row whose file exists but whose checksum cannot match  → the modified list.
-    # One row whose file was never created                       → the missing list.
     printf 'generated payload %s\n' "$TSD_LONG_I" \
       > "$TSD_LONG/.claude/generated/present-payload-file-$TSD_LONG_I.md"
     printf '%s\t%s\t664\ttoolkit\n' \
       ".claude/generated/present-payload-file-$TSD_LONG_I.md" "$TSD_LONG_SHA"
+    TSD_LONG_I=$((TSD_LONG_I + 1))
+  done
+  # One row whose file was never created → the missing list, N + K rows. Both lists stay well inside
+  # the deterministic SIGPIPE region measured above; the asymmetry only has to be readable, not big.
+  TSD_LONG_I=0
+  while [ "$TSD_LONG_I" -lt "$TSD_LONG_MISSING_N" ]; do
     printf '%s\t%s\t664\ttoolkit\n' \
       ".claude/generated/absent-payload-file-$TSD_LONG_I.md" "$TSD_LONG_SHA"
     TSD_LONG_I=$((TSD_LONG_I + 1))
@@ -278,10 +318,10 @@ TSD_LONG_RC=$?
 # `awk` with no `exit`, so two matching lines would print two numbers and fail loudly rather than
 # silently taking the first.
 assert_contains "$TSD_LONG_OUT" "WARN $TSD_LONG_N file(s) modified since install" \
-    "the fixture reaches the state under test — the modified list is long"
-TSD_LONG_MISSING_N=$(awk '/receipted file\(s\) missing/ { print $2 }' <<< "$TSD_LONG_OUT")
-assert_eq "$TSD_LONG_N" "$TSD_LONG_MISSING_N" \
-    "…and so is the missing list, counted exactly rather than by substring"
+    "the fixture reaches the state under test — the modified list is long, and its count is N not N+K"
+TSD_LONG_MISSING_GOT=$(awk '/receipted file\(s\) missing/ { print $2 }' <<< "$TSD_LONG_OUT")
+assert_eq "$TSD_LONG_MISSING_N" "$TSD_LONG_MISSING_GOT" \
+    "…and the missing list is N+K, counted exactly rather than by substring — the two counters are distinguishable"
 assert_contains "$TSD_LONG_OUT" "NOTICE.md present" \
     "doctor runs the checks that come AFTER both list printers"
 assert_contains "$TSD_LONG_OUT" "passed ·" \

@@ -199,7 +199,23 @@ done
 #
 # The skip is one file and stays one file. Wanting to add a second is the signal that a sentence
 # needs rewriting into the past tense, not that the guard needs loosening.
-dead_scan="$(git -C "$REPO" ls-files '.claude/*' 'scripts/*' ':(glob)docs/*.md' 'README.md')"
+# The rc is captured, not promoted. This file sets `set -euo pipefail` of its own, so a bare
+# `dead_scan="$(git …)"` in a tree with no index kills it where it stands: measured 2026-08-14 on a
+# `git archive HEAD | tar -x` extraction — this repository's documented probe method — it exited 128
+# having printed 14 PASS lines and no failure, with the remaining 33 assertions never reached. The
+# runner notices the exit code, but the message it prints names a number, not a cause, and the
+# floors and sentinels below (the machinery that exists precisely to catch a scan that read nothing)
+# are among the assertions that never run.
+dead_scan_err="$(mktemp "${TMPDIR:-/tmp}/kinglet-dead-scan-err.XXXXXX")"
+dead_scan_rc=0
+dead_scan="$(git -C "$REPO" ls-files '.claude/*' 'scripts/*' ':(glob)docs/*.md' 'README.md' 2>"$dead_scan_err")" \
+  || dead_scan_rc=$?
+if [ "$dead_scan_rc" -eq 0 ]; then
+  pass "the dead-name scan's file list came from a readable git index"
+else
+  fail "the dead-name scan could not list tracked files (git exited $dead_scan_rc), so every 'clean' result below is a report about an empty set: $(tr '\n' ' ' < "$dead_scan_err")"
+fi
+rm -f "$dead_scan_err"
 
 # The needles are matched BARE, without a leading slash.
 #
@@ -216,6 +232,98 @@ dead_scan="$(git -C "$REPO" ls-files '.claude/*' 'scripts/*' ':(glob)docs/*.md' 
 dead_needles='unity-workflow
 unity-feature
 deep-interview'
+
+# ── The 19 surfaces the 2026-08-13 cut retired, matched by PATH rather than bare ─────────────────
+#
+# The three needles above are matched BARE because those names are retired outright and reusing one
+# is the thing being prevented. Applying that same rule to the hooks and scripts the surface
+# criterion removed does not work, and the reason is measured rather than argued. Adding all 19 as
+# bare needles reddens the suite on TEN mentions across five files, and eight of the ten are exactly
+# what the comment above prescribes as the correct repair — past-tense records:
+#
+#   .claude/hooks/session-save.sh   "pre-compact.sh was its only writer and was removed on 2026-08-13"
+#   .claude/hooks/track-edits.sh    "listed stop-validate.sh and cost-tracker.sh as readers too;
+#                                    both were removed"
+#   .claude/hooks/_lib.sh           "unity_track_read's only caller was track-reads.sh"
+#   scripts/validate-asmdefs.sh     a comment about what the removed scripts would have needed
+#   docs/ARCHITECTURE.md            the paragraph documenting the leftover state paths
+#
+# A guard that forbids a file from recording its own history is mis-specified, not strict (field
+# note 81), and this repository has already ruled on that class once.
+#
+# The other two hits are not prose: `_lib.sh` still defines `UNITY_READS_FILE` (gateguard-reads.txt)
+# and `UNITY_NOTIFY_EVENT_FILE` (notify-event.json) for hooks that no longer exist. That is a KNOWN,
+# recorded, deferred decision — `_lib.sh` states it at the dead function pair, `docs/ARCHITECTURE.md`
+# states it in prose, and `tests/test-state.sh` reads `UNITY_READS_FILE`, so retiring it is a change
+# to this library's surface rather than a leftover to sweep up. Not this guard's call to force.
+#
+# So the forbidden thing for these 19 is not the NAME, it is a LIVE POINTER: a path that says "run
+# this", in code or in a document. Matched as `.claude/hooks/<name>.sh` / `scripts/<name>.sh`, on
+# non-comment lines of shell files and anywhere in Markdown — the same scan-mode split
+# tests/test-mcp-naming.sh uses, and for the same reason: in shell a comment is commentary and a
+# non-comment line is a use, while in Markdown a path is a pointer wherever it appears.
+#
+# "A COMMENT" MEANS A LINE THE SHELL PARSES AS ONE — NOT EVERY LINE STARTING WITH `#`.
+#
+# An exemption is a hole with a reason, and this one's reason is that a `#` line in a shell file is
+# commentary. That reason does not hold for a `#` inside a HEREDOC, which is payload the script
+# WRITES OUT. scripts/generate-claude-md.sh carries 142 such lines: they are Markdown headings
+# emitted into every user's CLAUDE.md. Measured 2026-08-14 with the first version of this block —
+# inserting `## Hooks: run .claude/hooks/gateguard.sh after every session` into that generator's
+# document heredoc left this file at 49/0 while the identical text in docs/ARCHITECTURE.md reddened,
+# and `generate-claude-md.sh <project>` emitted the line into the generated CLAUDE.md at line 16. A
+# live pointer shipped into a user project is the exact class this guard exists for, and the
+# exemption was the one route that opened it.
+#
+# THE RULE IS GENERAL, NOT FILE-SPECIFIC, and the two cheaper shapes were measured and rejected:
+#
+#   * "scan generate-claude-md.sh whole-body" fixes the instance, not the class. Three other scanned
+#     shell files carry heredocs (detect-missing-refs.sh, validate-asmdefs.sh,
+#     validate-serialization.sh) and two of them also install into .claude/scripts/.
+#   * "any .sh containing a heredoc gets whole-body mode" is one line and WRONG: measured, exactly
+#     one of the four files whose genuine comments name a retired surface — scripts/validate-asmdefs.sh
+#     — also contains a heredoc, so that rule reddens a legitimate past-tense comment and the
+#     exemption stops doing the job it was added for.
+#
+# So heredoc state is tracked and only real shell comments are dropped. The tracker errs toward
+# SCANNING (see the `next` ordering below), because a false positive here is a red on prose someone
+# can rewrite, while a false negative ships a pointer to a deleted hook into user projects — the
+# direction this repository's own doctrine rules on.
+#
+# Measured 2026-08-14: zero hits on this tree, and it catches every real instance of the class — a
+# `settings.json` registration pointing at a deleted hook, `docs/GETTING-STARTED.md` naming
+# `scripts/validate-code-quality.sh` (which it did until the cut), and a pointer emitted from a
+# generator heredoc.
+#
+# DERIVED FROM provenance-skip.tsv, NEVER TYPED. A twentieth retirement joins this list by being
+# recorded as `rule=absent`, which is where the decision already has to be written down. Typing the
+# names here would put the membership in a second place, which is the defect this wave is about.
+# The rc is captured, exactly as `dead_scan` is eight lines above — and this line did not capture it
+# in the commit that hardened that one. Under this file's own `set -euo pipefail` a bare
+# `dead_paths="$(awk … file)"` dies where it stands when the file is gone: measured 2026-08-14 with
+# provenance-skip.tsv deleted, this file exited **rc=2 with PASS=10 FAIL=5**, awk's `cannot open
+# file` as its last line, and THE FLOOR ASSERTION BELOW — written to catch precisely this — never
+# printed. The comment above it named "a moved file" as one of the cases it covers, and that was the
+# one case the code could not reach; the schema-rename case did work. It failed closed through the
+# runner's backstop, which names an exit code rather than a cause: the same complaint this block
+# makes about the pre-fix `dead_scan`.
+dead_paths_err="$(mktemp "${TMPDIR:-/tmp}/kinglet-dead-paths-err.XXXXXX")"
+dead_paths_rc=0
+dead_paths="$(awk -F'\t' '$3 == "absent" && $1 ~ /\.sh$/ && ($1 ~ /^\.claude\/hooks\// || $1 ~ /^scripts\//) { print $1 }' \
+              "$REPO/provenance-skip.tsv" 2>"$dead_paths_err" | LC_ALL=C sort -u)" || dead_paths_rc=$?
+dead_paths_n=$(printf '%s' "$dead_paths" | grep -c . || true)
+
+# Anti-vacuity before use: a `rule=absent` schema change, a renamed column or a moved file empties
+# this list, and an empty needle list finds nothing in a tree full of violations. All three cases
+# now reach this assertion.
+if [ "$dead_paths_rc" -ne 0 ]; then
+  fail "provenance-skip.tsv could not be read (awk exited $dead_paths_rc), so the live-pointer scan below has no needles at all: $(tr '\n' ' ' < "$dead_paths_err")"
+elif [ "$dead_paths_n" -ge 15 ]; then
+  pass "derived $dead_paths_n retired hook/script path(s) from provenance-skip.tsv to scan for live pointers"
+else
+  fail "provenance-skip.tsv yielded only $dead_paths_n retired hook/script path(s), so the live-pointer scan below has almost nothing to look for and its silence means nothing"
+fi
+rm -f "$dead_paths_err"
 
 dead_scanned=0
 dead_payload=0
@@ -259,6 +367,93 @@ while IFS= read -r dead_f; do
       fail "names retired surface '$dead_n': $dead_f"
     fi
   done <<< "$dead_needles"
+
+  # The live-pointer half. `dead_live` is the same bytes with REAL shell comments stripped in `.sh`
+  # files and left intact everywhere else — so a comment reminiscing about a removed hook survives
+  # and a line that RUNS one, or WRITES one into a user's project, does not.
+  #
+  # The awk below tracks heredoc state, and its ordering is the whole guarantee:
+  #
+  #   1. inside a heredoc  → always kept, comment-looking or not. This is payload, not commentary.
+  #   2. otherwise a `#` line → dropped. A commented-out heredoc introducer is therefore NOT
+  #      followed, which is correct: the shell does not start a heredoc from inside a comment.
+  #   3. otherwise → look for an introducer, then keep the line.
+  #
+  # HERE-STRINGS ARE NEUTRALISED FIRST, and that is a correction to what this comment said on its
+  # first draft. It claimed `<<<` could not match "because after `<<` the pattern requires a quote or
+  # a word character and finds `<`". That reasoning is wrong: awk's `match()` finds the LEFTMOST
+  # match ANYWHERE in the line, so on `awk '…' <<< "$1"` it starts at the SECOND `<`, matches `<<`,
+  # skips the space, and takes `"$1"` as the delimiter. Measured — scripts/studio-doctor.sh has three
+  # here-strings, the tracker latched on the first at line 51 and never left, so every later line was
+  # treated as heredoc payload and that file's genuine past-tense comments stopped being exempt. My
+  # own Q1 mutation caught it before this shipped. `gsub(/<<</, …)` on a working copy removes the
+  # construct from consideration entirely; a here-string is never a heredoc introducer.
+  #
+  # `<<-` is matched, and its terminator may be indented, so both forms are accepted.
+  #
+  # WHAT THE TRACKER CANNOT SEE. Four shapes, each with the direction it fails in — MEASURED, one
+  # synthetic input per row, not reasoned. The first draft of this block asserted that all of them
+  # "leave the tracker believing it is still inside a heredoc, which means it KEEPS scanning — the
+  # strict direction". That is false for two of the four, and it is false in the direction that
+  # matters: they DROP payload, which is the hole this whole block exists to close. A limitation
+  # note that misstates its own direction is worse than no note, because the next maintainer reads it
+  # when deciding not to fix it.
+  #
+  #   shape                              tracker does          direction
+  #   ---------------------------------  --------------------  -------------------------------------
+  #   cat <<$D          (var delimiter)  never enters          LAX — payload dropped as commentary
+  #   cat <<A <<B       (two on a line)  follows only A        LAX — B's payload dropped
+  #   x=$((1<<n))       (arith shift)    latches on `n`        strict — later real comments scanned
+  #   foo  # cat <<EOF  (trailing cmt)   latches on `EOF`      strict — later real comments scanned
+  #
+  # (A terminator that is not alone on its line — `EOF > /dev/null` — also latches, and is strict.)
+  #
+  # NONE OF THE FOUR IS REACHABLE ON THIS TREE, and that measurement is what makes this a comment
+  # rather than a code change. All 7 real introducers under the scanned globs use a LITERAL or QUOTED
+  # delimiter, exactly one per line:
+  #
+  #   scripts/detect-missing-refs.sh:29        cat <<EOF
+  #   scripts/generate-claude-md.sh:137        $(cat <<'PKGS'
+  #   scripts/generate-claude-md.sh:321        cat <<MDEOF
+  #   scripts/generate-claude-md.sh:519,553    cat <<'MDEOF'
+  #   scripts/validate-asmdefs.sh:31           cat <<EOF
+  #   scripts/validate-serialization.sh:30     cat <<EOF
+  #
+  # Re-derive rather than trusting that list — it is the same class of claim this wave exists to
+  # guard, and nothing asserts it:
+  #
+  #   for f in $(git ls-files '.claude/*' 'scripts/*'); do case "$f" in *.sh) awk '…' "$f";; esac; done
+  #
+  # A limitation with a measured reachability is a different object from one without. If a shipped
+  # script ever grows a variable delimiter or two heredocs on one line, the two LAX rows above become
+  # live and this tracker needs a real parser, not another arm.
+  case "$dead_f" in
+    *.sh) dead_live="$(awk '
+            indoc {
+              if ($0 == delim || $0 ~ ("^[[:space:]]*" delim "[[:space:]]*$")) { indoc = 0 }
+              print; next
+            }
+            /^[[:space:]]*#/ { next }
+            {
+              probe = $0
+              gsub(/<<</, "@", probe)
+              if (match(probe, /<<-?[[:space:]]*("[^"]+"|\047[^\047]+\047|[A-Za-z_][A-Za-z0-9_]*)/)) {
+                tok = substr(probe, RSTART, RLENGTH)
+                sub(/^<<-?[[:space:]]*/, "", tok)
+                gsub(/["\047]/, "", tok)
+                delim = tok; indoc = 1
+              }
+              print
+            }
+          ' <<< "$dead_body" || true)" ;;
+    *)    dead_live="$dead_body" ;;
+  esac
+  while IFS= read -r dead_p; do
+    [ -n "$dead_p" ] || continue
+    if grep -qF -- "$dead_p" <<< "$dead_live"; then
+      fail "points at retired surface '$dead_p', which provenance-skip.tsv records as rule=absent: $dead_f"
+    fi
+  done <<< "$dead_paths"
 done <<< "$dead_scan"
 
 # Anti-vacuity, per glob and by sentinel — NOT as one total.

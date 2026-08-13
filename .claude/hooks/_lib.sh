@@ -9,11 +9,30 @@
 #   UNITY_HOOK_MODE=warn           — downgrade blocking hooks to warnings (exit 0 instead of 2)
 #   UNITY_HOOK_PROFILE=standard    — hook profile: minimal|standard|strict (default: standard)
 #
-# Hook profiles control which hooks are active:
-#   minimal  — the file-extension blockers and the session brief ONLY. Drops bash-gate, so the
-#              destructive-command gate is off; drops warn-serialization. A safety setting.
+# Hook profiles control which hooks are active. A hook runs when its declared HOOK_PROFILE_LEVEL is
+# <= the active profile, and a hook that declares no level always runs.
+#
+#   minimal  — hooks declaring `minimal`, plus hooks declaring nothing. EVERYTHING ELSE IS OFF,
+#              including blocking gates. A safety setting, not a speed setting.
 #   standard — every hook (default)
-#   strict   — no hook declares this level, so it is identical to standard (see HOOK-REFERENCE.md)
+#   strict   — no hook declares this level, so it is identical to standard
+#
+# MEMBERSHIP IS NOT LISTED HERE, AND THAT IS DELIBERATE. This header used to name the keeps as a
+# CLOSED list ("the file-extension blockers and the session brief ONLY") and the drops as two
+# examples ("Drops bash-gate ...; drops warn-serialization"). Both rot, and the closed list rots in
+# the UNSAFE direction: a reader choosing `minimal` because it sounds cautious would take it to be a
+# narrower set than it is, and would take two gates to be off when the tree drops eight. Every hook
+# added to `.claude/hooks/` moves both lists, and nothing here would have said so.
+#
+# Derive it instead, from the hooks themselves, in both directions — run from `.claude/hooks/`:
+#
+#   grep -L '^HOOK_PROFILE_LEVEL=' *.sh | grep -v '^_lib\.sh$'   # runs at minimal (declares nothing)
+#   grep -l '^HOOK_PROFILE_LEVEL="minimal"' *.sh                 # runs at minimal (declares it)
+#   grep -l '^HOOK_PROFILE_LEVEL="\(standard\|strict\)"' *.sh    # OFF at minimal
+#
+# `_lib.sh` is excluded from the first command because it is the library, not a hook. The three
+# outputs partition `.claude/hooks/*.sh`; if they do not, a hook carries a HOOK_PROFILE_LEVEL this
+# library cannot read, and `_profile_to_num` silently treats an unreadable level as `standard`.
 #
 # Usage in hook scripts (add after set -euo pipefail):
 #   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

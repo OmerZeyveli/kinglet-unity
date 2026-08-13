@@ -97,6 +97,9 @@
 #   * A SLICE OF SOME OTHER FILE. The needle requires the script to slice ITSELF.
 #   * ANYTHING UNTRACKED. The walk is `git ls-files`, so a script written but never `git add`ed is
 #     outside it — the same window check-provenance.sh's orphan check has, and it closes on staging.
+#   * ANYTHING AT ALL, WHEN THERE IS NO INDEX. That is now a named failure rather than a silent
+#     death (see the arms below), but the arm does not make the file work without git: it makes the
+#     file SAY it cannot work. A `git archive` extraction gets two red assertions and no coverage.
 #   * WHETHER THE HELP IS TRUE. That the text is whole says nothing about whether it documents the
 #     flags the script actually parses. Untouched here.
 #   * A RANGE THAT STOPS ONE BLANK-COMMENT LINE SHORT. Measured: uninstall.sh at `3,21` instead of
@@ -136,15 +139,59 @@ TAB="$(printf '\t')"
 # draft, and the sweep caught its own explanation.
 SELF_REF='"'"\$0"'"'
 
+# ── The tracked-file index, with explicit arms ───────────────────────────────
+#
+# This file's whole input set is `git ls-files`, and this repository's documented probe method is
+# `git archive HEAD | tar -x` into a scratch directory — an extraction with no index at all.
+# Measured 2026-08-14 on exactly that:
+#
+#   $ git archive HEAD | tar -x -C /tmp/probe && bash /tmp/probe/tests/run-tests.sh
+#   --- test-help-ranges.sh ---
+#   fatal: not a git repository (or any of the parent directories): .git
+#   rc=128, PASS=0, FAIL=0
+#
+# `git ls-files | while …` under `set -euo pipefail` promotes git's 128 through pipefail, `set -e`
+# ends the file, and every assertion below describes a set that was never built. The runner reports
+# it (`exited 128 without reporting a failure`), so it is loud — but the message names an exit code
+# rather than the cause, and none of the four per-file checks ever runs.
+#
+# tests/test-pipeline-detector.sh met the same dependency and grew explicit no-index arms
+# (SWEEP_RC_NO_INDEX / SWEEP_RC_EMPTY_INDEX). This is that shape, copied: the list goes to a FILE,
+# its rc is captured rather than promoted, and an unreadable or empty index is a NAMED failure. The
+# file then runs to completion, and the discovery-integrity assertion below reddens as well —
+# deliberately two signals, because "the index is unreadable" and "the derivation found nothing" are
+# different repairs.
+#
+# Measured after the change, same extraction: rc=0, and the file reports the two failures by name
+# instead of dying. It does NOT invent a fallback — a working-tree walk would read untracked and
+# ignored files and change what the guard covers, which is the trade
+# tests/test-pipeline-detector.sh's `sweep` note argues against at length.
+TRACKED_LIST="$WORK/tracked"
+TRACKED_RC=0
+git -C "$REPO" ls-files '*.sh' > "$TRACKED_LIST" 2>"$WORK/tracked.err" || TRACKED_RC=$?
+
+INDEX_STATE="ok"
+if [ "$TRACKED_RC" -ne 0 ]; then
+  INDEX_STATE="git could not list tracked *.sh under $REPO — exit $TRACKED_RC: $(tr '\n' ' ' < "$WORK/tracked.err")"
+elif [ ! -s "$TRACKED_LIST" ]; then
+  INDEX_STATE="git tracks no *.sh at all under $REPO, so the walk below has nothing to read"
+fi
+if [ "$INDEX_STATE" = "ok" ]; then
+  pass "the tracked *.sh index is readable and non-empty ($(awk 'END {print NR+0}' "$TRACKED_LIST") file(s)) — the derivation below has something to walk"
+else
+  fail "this file's entire input set comes from git, and it could not be read, so nothing below certifies anything: $INDEX_STATE"
+fi
+
 # ── Derivation ───────────────────────────────────────────────────────────────
-# git ls-files feeds a `while` that reads to EOF, and awk reads each file by name. No pipeline here
-# has a reader that can stop early, so there is no SIGPIPE to turn into a failure under pipefail.
+# The tracked list is read from a FILE and awk reads each source by name. No pipeline here has a
+# reader that can stop early, so there is no SIGPIPE to turn into a failure under pipefail — and no
+# git invocation left inside the walk whose 128 could end the file mid-derivation.
 derive() {
   # $1 = "coarse" (any self-slice) or "fine" (self-slice with a literal range)
-  # No `cd` — git is pointed at the repo with -C and awk is handed an absolute path, so this
-  # function cannot move the caller's working directory out from under the assertions below.
+  # No `cd` — awk is handed an absolute path, so this function cannot move the caller's working
+  # directory out from under the assertions below.
   local mode="$1" f
-  git -C "$REPO" ls-files '*.sh' | while IFS= read -r f; do
+  while IFS= read -r f; do
     [ -f "$REPO/$f" ] || continue
     awk -v F="$f" -v SELF="$SELF_REF" -v MODE="$mode" '
       index($0, SELF) == 0 { next }
@@ -161,7 +208,7 @@ derive() {
         printf "%s\t%s\t%s\t%s\n", F, ab[1], ab[2], FNR
       }
     ' "$REPO/$f"
-  done
+  done < "$TRACKED_LIST"
 }
 
 derive coarse | LC_ALL=C sort -u > "$WORK/coarse"

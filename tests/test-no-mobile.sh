@@ -65,6 +65,52 @@ MOBILE_CI='hyper-casual|endless-runner|platform/mobile|tile-based GPU|thermal th
 ALLOWLIST='provenance-skip.tsv|tests/test-no-mobile.sh|MERGE-NOTES.md|docs/SKILL-CATALOG.md|.claude/rules/pc-console.md'
 
 SCAN_DIRS=(.claude/ docs/ scripts/ examples/ templates/)
+
+# --- 3a. The scan has something to scan, and the patterns still bind --------
+#
+# Sections 3, 4 and 5 are `grep -r … 2>/dev/null || true` over roots. Every one of them reports the
+# same clean result when the roots are GONE as when they are clean: grep's error goes to /dev/null,
+# the `|| true` swallows the exit status, HITS is empty, and `assert_eq 0 0` passes. Measured
+# 2026-08-14 against a copy of this repository with `.claude/agents`, `.claude/commands`,
+# `.claude/hooks`, `.claude/rules` and `.claude/skills` emptied: this file reported **13 passed, 0
+# failed** — a full green over a payload that no longer existed. Section 1's `assert_absent` calls
+# are what made that green plausible: on an empty tree they are all trivially true.
+#
+# Two mechanisms, because they fail differently. The roots check catches a tree that emptied or a
+# path that was renamed; the canaries catch the other direction — roots still full of files, but a
+# pattern that no longer matches anything, which no file count can see. The canary strings are the
+# real removed terms, run through the real patterns.
+#
+# WHAT THE CANARIES CANNOT SEE, measured rather than assumed: each one exercises ONE alternative of
+# an alternation. Breaking `hyper-casual` inside MOBILE_CI leaves all three canaries green, because
+# the case-insensitive canary matches on `safe area`. They prove the pattern still binds at all —
+# which is the no-op direction this block exists for — not that every alternative in it still binds.
+# Covering all eleven would mean a canary per alternative and a list that has to be kept in step
+# with the pattern by hand, which is the shape this file's own history argues against.
+SCAN_STATE="ok"
+for SCAN_D in "${SCAN_DIRS[@]}"; do
+  [ -d "$SCAN_D" ] || SCAN_STATE="scan root $SCAN_D does not exist, so every sweep below silently read nothing from it"
+done
+# `{ find …; } | wc -l`, with find's non-zero status swallowed INSIDE the braces. A missing root
+# makes find exit 1, pipefail promotes it, and at a bare assignment site `set -e` ends the file —
+# measured while writing this block: with one root renamed, this file died here silently after
+# section 1 and reported no failure of its own. The very check written to catch an absent root was
+# killed by the absent root.
+SCAN_FILES=$( { find "${SCAN_DIRS[@]}" -type f 2>/dev/null || true; } | wc -l | tr -d ' ')
+[ "$SCAN_FILES" -ge 1 ] || SCAN_STATE="the five scan roots hold no files at all"
+assert_eq "$SCAN_STATE" "ok" "the mobile sweep has roots to read ($SCAN_FILES file(s)) — an absent payload must not read as a clean one"
+
+# `ASTC 6x6`, not `ASTC_6x6`: `_` is a word character, so `\bASTC\b` does NOT match inside
+# `ASTC_6x6` — measured while writing this canary, which is the canary earning its keep on its first
+# run. The pattern is deliberately boundary-anchored (its own comment above says why), and a canary
+# that used the underscored spelling would have asserted the pattern was broken when it was not.
+CANARY_CS=$(printf 'texture format ASTC 6x6 for mobile\n' | grep -cE "$MOBILE_CS" || true)
+assert_eq "$CANARY_CS" "1" "the case-sensitive acronym pattern still matches a real mobile-only term"
+CANARY_CI=$(printf 'respect the safe area inset\n' | grep -ciE "$MOBILE_CI" || true)
+assert_eq "$CANARY_CI" "1" "the case-insensitive mobile-term pattern still matches a real mobile-only term"
+CANARY_NEG=$(printf 'the raycast hit castCount and _lastCheckpointPosition\n' | grep -cE "$MOBILE_CS" || true)
+assert_eq "$CANARY_NEG" "0" "…and still does not fire on the substrings this file's own comment names as the blind-matching trap"
+
 HITS=$( { grep -rnE "$MOBILE_CS" "${SCAN_DIRS[@]}" 2>/dev/null || true
           grep -rniE "$MOBILE_CI" "${SCAN_DIRS[@]}" 2>/dev/null || true
         } | grep -vE "$ALLOWLIST" | sort -u || true)
