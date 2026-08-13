@@ -32,6 +32,34 @@ artifact does.
      code as it stood at the time, now describing behavior a later task changed.
    - **A number typed into prose that a later commit invalidated.** A count, a percentage, a file
      total — written as a fact, and no longer true once something after it shipped.
+
+   **Required, and not a category to look for but a procedure to run: the aggregate sweep.** Every
+   removal sweep during the loop was keyed on **names** — search the tree for the thing that was
+   deleted. A bare numeral, a category word, a capability sentence and a scope claim contain no
+   removed name, so a name-keyed sweep is structurally blind to all four, and this sweep has
+   therefore never run. You are the only reader positioned to run it, because you are the only one who
+   sees every removal on the branch at once. Collect what the branch removed or renamed, then search
+   the whole shipped tree for these four shapes and **re-derive each against the tree as it now
+   stands**:
+
+   - **Bare numerals.** Any count of a thing whose number the branch changed, wherever it is written
+     as a fact — a table cell, a summary line, a comment. **Search on the noun, not the number**,
+     because the number is what you are trying to find and cannot be the needle: for each kind whose
+     count moved, search the shipped tree for that kind's word and read every digit near a hit —
+     `grep -rniE '[0-9]+[^0-9]{0,40}NOUN|NOUN[^0-9]{0,40}[0-9]+'`, plus its spelled-out forms ("two",
+     "a dozen"), which no digit pattern reaches. Then derive the count and compare; never read it off
+     the document that states it. **This is the highest-cost shape of the four** — see below.
+   - **Category words.** A list of kinds ("meta, code quality, workflow") that a removal emptied or
+     shortened. A list survives the deletion of its last member without one word changing.
+   - **Capability sentences.** "X enforces Y", "the tool checks Z" — written about a behaviour rather
+     than a file, so nothing that names a path will find them, and they stay true-sounding after the
+     thing that did the enforcing is gone.
+   - **Scope claims.** "This was never applied to W", "W is an open question". A branch that applies
+     it leaves the sentence asserting the opposite, in a file nobody on the branch opened.
+
+   In the audit that produced this instruction, **every documentation finding was one of these four,
+   and not one was reachable by the name-keyed sweep the plan actually specified.** One of them was a
+   count overstated by more than double on the page a reader uses to decide whether to install.
 3. **Judge shipped content as product, not just as correct.** A task review asks "does this diff meet
    its brief." This review asks the question none of them asked: is this good, on its own terms, for
    someone who did not write it and has no plan document to explain it — the wording an operator
