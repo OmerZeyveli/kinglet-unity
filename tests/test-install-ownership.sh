@@ -1569,5 +1569,301 @@ run_uninstall "$K3" "K3"
 assert_gone "$K3" "$MANIFEST_BAK_REL" "K3 (install 3's backup is ours)"
 assert_kept "$K3" "$K3_MINE" "$K3_SHA" "K3 (the user's backup, moved aside)"
 
+# ── States L…O2: the receipt has to exist before anything that can abort ─────
+#
+# Everything above asks whether a row is right. These ask whether the receipt EXISTS AT ALL, which
+# is the one failure in this file that cannot be undone by re-running anything.
+#
+# install.sh writes $RECEIPT at Step 9, after Steps 5–8c. Every one of those steps can die under
+# `set -euo pipefail`, and one of them dies on an input a user can produce by accident: a dangling
+# symlink at Packages/manifest.json.bak. `[ -e ]` is false through a dangling link, so the D11
+# decline does not fire; `cp "$MANIFEST" "$MANIFEST.bak"` then reports `not writing through dangling
+# symlink` and `set -e` ends the run — with the whole payload on disk and NO receipt. uninstall.sh
+# refuses to run without one ("Refusing to guess which files are ours"), so the project is stuck
+# with an install nothing can remove. Measured on the tree before this state existed: rc=1, the
+# receipt directory created and empty.
+#
+#   L   dangling symlink at the .bak path, --with-mcp   a receipt exists, covering what was written;
+#                                                       uninstall cleans the project; the user's
+#                                                       symlink is not touched
+#   M   the installer CREATES .gitignore                row present, survives a second install,
+#                                                       uninstall removes it
+#   M2  a .gitignore the user already had               NO row, uninstall leaves it and their line
+#   M3  ours, then the user edits it                    NO row, uninstall leaves it
+#   N   an unreadable origin column, across an upgrade  the row is re-claimed, not dropped
+#   N2  an unreadable `user-modified `, same recipe     NOT re-claimed — the trim opens no hole
+#   O   a foreign .claude/ (no receipt)                 still backed up, still not merged, and the
+#                                                       foreign file is not claimed
+#   O2  a run that aborts having installed NOTHING      NO receipt — this did not become "always
+#                                                       write a receipt"
+#
+# WHAT THESE CANNOT SEE
+#   * L asserts one abort site. It is the one a user reaches without doing anything unusual, but
+#     Steps 5–8c contain many commands and this file exercises exactly one of their failures. The
+#     property is structural (the trap covers every abort after it is armed); the evidence here is
+#     one instance of it.
+#   * O2 aborts immediately after the trap is armed, so it proves the empty-$RECEIPT_TMP guard and
+#     nothing about an abort partway through the payload loop.
+#   * Nothing here reads install.sh. A rewrite that made the receipt correct by writing it twice, or
+#     early enough to change what owned_by_installer reads, would pass every assertion below.
+#   * N and N2 mangle the origin column by hand, because install.sh cannot produce either shape.
+#     They assert a direction, not a live case — the same standing as G.5.
+
+new_fixture_variant() {
+  local d="$SCRATCH/$1"
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" --variant "$2" >/dev/null
+  printf '%s' "$d"
+}
+
+# ── State L: a dangling symlink where the manifest backup goes ───────────────
+L="$(new_fixture_variant state-l urp)"
+# The fixture must actually carry a manifest, or --with-mcp returns early and this state exercises
+# nothing. Asserted rather than assumed — a state that builds its own premise measures itself.
+if [ -f "$L/$MANIFEST_REL" ]; then
+  pass "L: the fixture has a $MANIFEST_REL for --with-mcp to edit"
+else
+  fail "L: the fixture has no $MANIFEST_REL — --with-mcp returns early and every L assertion below is vacuous"
+fi
+ln -s /nonexistent "$L/$MANIFEST_BAK_REL"
+if [ -L "$L/$MANIFEST_BAK_REL" ] && [ ! -e "$L/$MANIFEST_BAK_REL" ]; then
+  pass "L: $MANIFEST_BAK_REL is a dangling symlink — [ -e ] is false through it, which is what defeats the decline"
+else
+  fail "L: $MANIFEST_BAK_REL is not a dangling symlink — the abort this state is about does not happen"
+fi
+# NOT run_install_flags: this run is EXPECTED to exit non-zero today, and a helper that fails the
+# state on a non-zero status would report the defect as a red in the wrong place. The status is
+# recorded and reported; what is asserted is the receipt.
+L_RC=0
+L_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+      bash "$REPO/install.sh" --project-dir "$L" --with-mcp --yes </dev/null 2>&1 \
+      | sed $'s/\x1b\\[[0-9;]*m//g')" || L_RC=$?
+L_RECEIPT="$(receipt_of "$L")"
+# The payload landed. Without this the receipt assertion below could pass on a run that installed
+# nothing at all, which is a different (and fine) outcome.
+# `|| true` on the pipeline, not decoration: `find` on a missing directory exits 1, `pipefail`
+# promotes that past `wc`, and at an ASSIGNMENT `set -e` would end this file here — mid-state, with
+# every assertion below reading as absent rather than red.
+L_ON_DISK="$(find "$L/.claude" -type f ! -path '*/state/*' 2>/dev/null | wc -l | tr -d ' ' || true)"
+if [ "$L_ON_DISK" -gt 0 ]; then
+  pass "L: the run wrote $L_ON_DISK file(s) under .claude/ before it stopped (exit $L_RC)"
+else
+  fail "L: nothing was installed under .claude/, so this state says nothing about a receipt for an interrupted install"
+fi
+if [ -f "$L_RECEIPT" ]; then
+  pass "L: a receipt exists after the run stopped at the manifest backup"
+else
+  fail "L: no receipt after the run stopped — uninstall.sh refuses to touch a project it cannot prove is ours, so those $L_ON_DISK file(s) are permanent"
+fi
+L_ROWS="$(awk -F'\t' '$1 ~ /^\.claude\// { n++ } END { print n + 0 }' "$L_RECEIPT" 2>/dev/null || printf '0')"
+if [ "$L_ROWS" -eq "$L_ON_DISK" ]; then
+  pass "L: the receipt claims all $L_ON_DISK installed .claude/ file(s)"
+else
+  fail "L: the receipt claims $L_ROWS .claude/ file(s) but $L_ON_DISK are on disk — the difference is what uninstall.sh leaves behind"
+fi
+run_uninstall "$L" "L"
+# FILES, not the directory. An ordinary uninstall leaves empty directories behind too — uninstall.sh
+# prunes with `find ... -depth -type d -empty -exec rmdir {} +`, and the `+` batches every path into
+# one rmdir call, so a parent is attempted before its children are gone. Measured on a plain
+# install/uninstall of the default fixture: .claude/ and .claude/skills/ survive, holding nothing.
+# That is uninstall.sh's, not this task's, and asserting on the directory here would red on it.
+L_LEFT="$(find "$L/.claude" -type f 2>/dev/null | wc -l | tr -d ' ' || true)"
+if [ "$L_LEFT" -eq 0 ]; then
+  pass "L: uninstall.sh removed every file the interrupted run installed"
+else
+  fail "L: $L_LEFT file(s) from the interrupted run survived the uninstall"
+fi
+# The user's own file — a broken symlink is still theirs — is not ours to remove or repair.
+if [ -L "$L/$MANIFEST_BAK_REL" ]; then
+  pass "L: the user's dangling symlink is untouched"
+else
+  fail "L: the user's dangling symlink at $MANIFEST_BAK_REL was removed or replaced"
+fi
+
+# ── State M: a .gitignore the installer created ──────────────────────────────
+# `bare` has no .gitignore, which is the only variant that reaches the create branch. The default
+# fixture ships an empty one, so every other state in this file takes the append path and none of
+# them can see this.
+GITIGNORE_REL='.gitignore'
+M="$(new_fixture_variant state-m bare)"
+if [ -e "$M/$GITIGNORE_REL" ]; then
+  fail "M: the bare fixture already has a $GITIGNORE_REL — the installer will append rather than create, and this state tests the wrong branch"
+else
+  pass "M: the bare fixture has no $GITIGNORE_REL, so the installer must create one"
+fi
+run_install "$M" "M install 1"
+if [ -f "$M/$GITIGNORE_REL" ]; then
+  pass "M: the installer created $GITIGNORE_REL"
+else
+  fail "M: the installer did not create $GITIGNORE_REL — nothing below is about a file that exists"
+fi
+assert_owned "$M" "$GITIGNORE_REL" "M (the installer created it)"
+# Ownership, not authorship: run 2 appends nothing, so a row written where the file is CREATED
+# disappears here and the file becomes permanent debris one run later.
+run_install "$M" "M install 2"
+assert_owned "$M" "$GITIGNORE_REL" "M (second install, nothing appended)"
+run_uninstall "$M" "M"
+assert_gone "$M" "$GITIGNORE_REL" "M (a file only we ever wrote)"
+
+# ── State M2: a .gitignore the user already had ──────────────────────────────
+# The installer appends to it. Appending is not authorship, and claiming it would let
+# uninstall.sh delete a file the user wrote — the fail-closed direction C and D hold for the two
+# project-root files.
+M2="$(new_fixture_variant state-m2 bare)"
+printf '# my own ignores\n/Builds/\n' > "$M2/$GITIGNORE_REL"
+M2_MARKER='/Builds/'
+run_install "$M2" "M2 install"
+if grep -qxF -- '.claude/settings.local.json' "$M2/$GITIGNORE_REL"; then
+  pass "M2: the installer appended its entries to the user's $GITIGNORE_REL"
+else
+  fail "M2: the installer appended nothing — this state is not exercising the append branch"
+fi
+assert_not_owned "$M2" "$GITIGNORE_REL" "M2 (a $GITIGNORE_REL the user wrote)"
+run_uninstall "$M2" "M2"
+if [ -f "$M2/$GITIGNORE_REL" ] && grep -qxF -- "$M2_MARKER" "$M2/$GITIGNORE_REL"; then
+  pass "M2: the user's $GITIGNORE_REL survived uninstall with their own entry intact"
+else
+  fail "M2: the user's $GITIGNORE_REL did not survive uninstall with their own entry intact"
+fi
+
+# ── State M3: ours, then the user edits it ───────────────────────────────────
+M3="$(new_fixture_variant state-m3 bare)"
+run_install "$M3" "M3 install 1"
+printf '/MyLocalScratch/\n' >> "$M3/$GITIGNORE_REL"
+M3_MARKER='/MyLocalScratch/'
+run_install "$M3" "M3 install 2"
+assert_not_owned "$M3" "$GITIGNORE_REL" "M3 (ours until the user edited it)"
+run_uninstall "$M3" "M3"
+if [ -f "$M3/$GITIGNORE_REL" ] && grep -qxF -- "$M3_MARKER" "$M3/$GITIGNORE_REL"; then
+  pass "M3: the edited $GITIGNORE_REL survived uninstall with the user's line intact"
+else
+  fail "M3: the edited $GITIGNORE_REL did not survive uninstall with the user's line intact"
+fi
+
+# ── State N: an origin column we cannot read, across an upgrade ──────────────
+# $OLD is B2's scratch "previous version": the same payload with a different MCP-SETUP.md. That
+# difference is what makes the receipt the ONLY thing that can answer for the file — the shipped
+# reference copy no longer matches, so owned_by_installer's first arm is out of play and its awk is
+# the whole decision. Give that awk a row whose origin column carries one trailing space and the
+# `$4 == "toolkit"` test is byte-unequal: the file is never re-claimed, by this run or any later
+# one, and uninstall.sh can never remove it.
+N="$(new_fixture state-n)"
+N_RC=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$OLD/install.sh" --project-dir "$N" --yes >/dev/null 2>&1 </dev/null || N_RC=$?
+if [ "$N_RC" -eq 0 ]; then
+  pass "N install 1 (previous version): install.sh exited 0"
+else
+  fail "N install 1 (previous version): install.sh exited $N_RC"
+fi
+if [ "$(sha_of "$N/MCP-SETUP.md")" = "$(sha_of "$REPO/MCP-SETUP.md")" ]; then
+  fail "N: the scratch toolkit installed the CURRENT MCP-SETUP.md — owned_by_installer's reference-copy arm answers and its awk is never reached, so this state proves nothing"
+else
+  pass "N: the previous version installed different bytes, so only the receipt can answer for MCP-SETUP.md"
+fi
+N_RECEIPT="$(receipt_of "$N")"
+N_TMP="$SCRATCH/n-receipt.tsv"
+awk -F'\t' -v OFS='\t' '$1 == "MCP-SETUP.md" { $4 = "toolkit " } { print }' "$N_RECEIPT" > "$N_TMP"
+mv "$N_TMP" "$N_RECEIPT"
+if [ -n "$(awk -F'\t' '$1 == "MCP-SETUP.md" && $4 == "toolkit " { print }' "$N_RECEIPT")" ]; then
+  pass "N: the row now carries an unreadable origin ('toolkit' with a trailing space)"
+else
+  fail "N: the receipt rewrite did not take — the assertion below would pass for the wrong reason"
+fi
+run_install "$N" "N install 2 (current version)"
+assert_owned "$N" 'MCP-SETUP.md' "N (upgrade across an unreadable origin column)"
+run_uninstall "$N" "N"
+assert_gone "$N" 'MCP-SETUP.md' "N (upgrade across an unreadable origin column)"
+
+# ── State N2: the other direction of the same trim ───────────────────────────
+# `user-modified ` must not become `toolkit`. If it does, the next uninstall deletes a file a
+# previous run recorded as the user's — which is the data loss G.5 exists to stop, arriving through
+# this fix instead of through the classifier.
+N2="$(new_fixture state-n2)"
+N2_RC=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$OLD/install.sh" --project-dir "$N2" --yes >/dev/null 2>&1 </dev/null || N2_RC=$?
+if [ "$N2_RC" -eq 0 ]; then
+  pass "N2 install 1 (previous version): install.sh exited 0"
+else
+  fail "N2 install 1 (previous version): install.sh exited $N2_RC"
+fi
+N2_RECEIPT="$(receipt_of "$N2")"
+N2_SHA="$(sha_of "$N2/MCP-SETUP.md")"
+N2_TMP="$SCRATCH/n2-receipt.tsv"
+awk -F'\t' -v OFS='\t' '$1 == "MCP-SETUP.md" { $4 = "user-modified " } { print }' "$N2_RECEIPT" > "$N2_TMP"
+mv "$N2_TMP" "$N2_RECEIPT"
+if [ -n "$(awk -F'\t' '$1 == "MCP-SETUP.md" && $4 == "user-modified " { print }' "$N2_RECEIPT")" ]; then
+  pass "N2: the row now carries 'user-modified' with a trailing space"
+else
+  fail "N2: the receipt rewrite did not take — the assertion below would pass for the wrong reason"
+fi
+run_install "$N2" "N2 install 2 (current version)"
+assert_not_owned "$N2" 'MCP-SETUP.md' "N2 (a mangled user-modified row is still the user's)"
+run_uninstall "$N2" "N2"
+assert_kept "$N2" 'MCP-SETUP.md' "$N2_SHA" "N2 (a mangled user-modified row is still the user's)"
+
+# ── State O: a foreign .claude/ is still foreign ─────────────────────────────
+# MODE is decided by the receipt's ABSENCE, and this task makes an interrupted run write one. That
+# is correct — such a run really did install the payload — but it is one edit away from "always
+# write a receipt", which would turn somebody else's .claude/ into ours.
+O="$(new_fixture state-o)"
+mkdir -p "$O/.claude/agents"
+printf 'a teammate wrote this, and Kinglet never did\n' > "$O/.claude/agents/teammate.md"
+O_FOREIGN_REL='.claude/agents/teammate.md'
+O_FOREIGN_SHA="$(sha_of "$O/$O_FOREIGN_REL")"
+if [ ! -f "$(receipt_of "$O")" ]; then
+  pass "O: the fixture has a .claude/ and no receipt — the definition of foreign mode"
+else
+  fail "O: the fixture already has a receipt, so this state is an upgrade rather than a foreign install"
+fi
+run_install_flags "$O" "O install"
+if grep -qF -- 'Backed up existing .claude/' <<< "$INSTALL_OUT"; then
+  pass "O: the run backed the foreign .claude/ up instead of merging into it"
+else
+  fail "O: the run did not announce a backup — a foreign .claude/ was treated as ours"
+fi
+O_BACKUP="$(find "$O" -maxdepth 1 -type d -name '.claude.backup.*' | sed -n '1p')"
+if [ -n "$O_BACKUP" ] && [ "$(sha_of "$O_BACKUP/agents/teammate.md")" = "$O_FOREIGN_SHA" ]; then
+  pass "O: the teammate's file is in the backup, byte-for-byte"
+else
+  fail "O: the teammate's file is not in a .claude.backup.*/ directory — it was destroyed rather than moved aside"
+fi
+assert_not_owned "$O" "$O_FOREIGN_REL" "O (a file the toolkit never installed)"
+
+# ── State O2: a run that installs nothing writes no receipt ──────────────────
+# The mutation this task is one edit from: flush the receipt unconditionally, and a run that died
+# before writing a byte leaves a receipt behind — which reclassifies a foreign or absent .claude/
+# as ours on the next run. Injected by CONTENT, at the line that arms the trap, so the probe does
+# not rot against a line number.
+O2_KIT="$SCRATCH/o2-toolkit"
+mkdir -p "$O2_KIT"
+cp -R "$REPO/.claude" "$O2_KIT/.claude"
+cp -R "$REPO/scripts" "$O2_KIT/scripts"
+cp "$REPO/MCP-SETUP.md" "$O2_KIT/MCP-SETUP.md"
+O2_MARK='injected abort: armed the trap, installed nothing'
+awk -v ins="die \"$O2_MARK\"" '
+  { print }
+  /^trap / && !done { print ins; done = 1 }
+' "$REPO/install.sh" > "$O2_KIT/install.sh"
+if grep -qF -- "$O2_MARK" "$O2_KIT/install.sh"; then
+  pass "O2: the abort was injected into a scratch copy of install.sh"
+else
+  fail "O2: nothing was injected — install.sh no longer has a line beginning 'trap ', and the run below is an ordinary install"
+fi
+O2="$(new_fixture state-o2)"
+O2_RC=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$O2_KIT/install.sh" --project-dir "$O2" --yes >/dev/null 2>&1 </dev/null || O2_RC=$?
+if [ "$O2_RC" -ne 0 ]; then
+  pass "O2: the injected run exited $O2_RC"
+else
+  fail "O2: the injected run exited 0 — the injected die never executed and nothing below is about an aborted run"
+fi
+if [ -f "$(receipt_of "$O2")" ]; then
+  fail "O2: a run that installed nothing left a receipt — a foreign or absent .claude/ would be read as ours on the next run"
+else
+  pass "O2: a run that installed nothing left no receipt"
+fi
+
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-ownership assertions passed\n'
