@@ -108,12 +108,37 @@ UNITY_VERSION="unknown"
 [ -f "$PROJECT_DIR/ProjectSettings/ProjectVersion.txt" ] && \
   UNITY_VERSION=$(awk '/^m_EditorVersion:/ {print $2; exit}' "$PROJECT_DIR/ProjectSettings/ProjectVersion.txt")
 [ -n "$UNITY_VERSION" ] || UNITY_VERSION="unknown"
-RENDER_PIPELINE="Built-in"
 MANIFEST="$PROJECT_DIR/Packages/manifest.json"
-if [ -f "$MANIFEST" ]; then
-  grep -q 'com.unity.render-pipelines.universal' "$MANIFEST" && RENDER_PIPELINE="URP"
-  grep -q 'com.unity.render-pipelines.high-definition' "$MANIFEST" && RENDER_PIPELINE="HDRP"
-fi
+# ONE detector, shared with scripts/generate-claude-md.sh. This block used to be two unconditional
+# greps with HDRP last, so HDRP won; the generator used if/elif with URP first, so URP won. A
+# project carrying both packages got HDRP here and URP in its own generated CLAUDE.md from a single
+# install. See scripts/detect-pipeline.sh's header for what package presence can and cannot tell
+# you — in particular that it does NOT read ProjectSettings/GraphicsSettings.asset, so none of these
+# four answers is a statement about which pipeline is ACTIVE.
+#
+# install.sh runs BEFORE the payload is installed, so the detector is reached at $SCRIPT_DIR/scripts/
+# and never at $PROJECT_DIR/.claude/scripts/. `bash "$path"`, matching how $GEN is invoked further
+# down, so a lost exec bit in a checkout cannot break it.
+#
+# `|| die`, not a bare RENDER_PIPELINE_ID="$(...)": under `set -e` a bare assignment from a failing
+# command substitution kills the installer with NO message. The status lands here at Step 2 — after
+# the Unity-project gate and before anything is written or backed up — so a failure exits with the
+# project untouched and no receipt to reconcile. Measured on a mutated copy, not reasoned about.
+RENDER_PIPELINE_ID="$(bash "$SCRIPT_DIR/scripts/detect-pipeline.sh" "$PROJECT_DIR")" \
+  || die "Render-pipeline detection failed — $SCRIPT_DIR/scripts/detect-pipeline.sh did not run."
+case "$RENDER_PIPELINE_ID" in
+  builtin)  RENDER_PIPELINE="Built-in" ;;
+  urp)      RENDER_PIPELINE="URP" ;;
+  hdrp)     RENDER_PIPELINE="HDRP" ;;
+  # Named as its own state rather than silently picking a winner — which is the whole defect this
+  # shared detector closes. The parenthetical is not decoration: the manifest cannot say which of
+  # the two renders, and a confident "URP" here would be the wrong answer half the time.
+  urp+hdrp) RENDER_PIPELINE="URP + HDRP (both packages present — active pipeline undetermined)" ;;
+  # Unreachable while the detector emits the four tokens above. It reports the token instead of
+  # defaulting to "Built-in", because a confident wrong answer is the failure mode this whole block
+  # exists to remove.
+  *)        RENDER_PIPELINE="undetermined (detector said '$RENDER_PIPELINE_ID')" ;;
+esac
 ok "Unity $UNITY_VERSION · $RENDER_PIPELINE"
 
 HAS_INPUT_SYSTEM=0
