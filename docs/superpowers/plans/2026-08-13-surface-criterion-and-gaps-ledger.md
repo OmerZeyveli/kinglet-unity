@@ -401,6 +401,27 @@ and 4 scripts.
    net after round 2's restoration. `test-help-ranges.sh:90` discloses the restoration; `:460` does
    not. **→ Task 11.**
 
+**From Task 9's review (2026-08-14).**
+
+11. **Task 9's new section `### What the score does not know` is entirely unguarded.** Measured by
+    the reviewer, not reasoned: deleting the section outright leaves the suite at full green, and so
+    does **replacing it with prose stating the opposite of its ruling**. The cause is that
+    `unity-brainstorming` has **no heading-inventory assertion at all**, unlike `using-kinglet`'s
+    `UK_SECTIONS_EXPECTED` — the same absence that made the insertion invisible in the first place.
+    It cuts both ways. Two concrete closures: an `assert_eq` on
+    `ub_section '### What the score does not know'`, **or** a `UB_SECTIONS_EXPECTED` inventory
+    mirroring `UK_SECTIONS_EXPECTED` — the second closes the general hole rather than this instance.
+    *Deferred by ruling, with Task 9's collision reason accepted: `tests/test-surface-references.sh`
+    is on Task 10's edit list and Task 10 was running concurrently.* **-> Task 10.**
+12. **`provenance.tsv`, the `unity-brainstorming` row's note:** the 2026-08-14 clause is a *content
+    claim* placed immediately after the sentence asserting content claims are guarded by
+    `tests/test-surface-references.sh` — which does not guard it. Roughly four words closes it.
+    Offered to Task 9's fix round as fold-in-if-trivial. **-> Task 11 if it was not folded.**
+13. **Two counting slips in `task-9-report.md`** (report-only, no diff impact): whole-section frozen
+    comparisons are **11 (7 + 4)**, not 10 — the derivation grep was single-line and missed the
+    two-line `assert_eq "$UK_REDFLAGS_EXPECTED" \` form; and `provenance.tsv` was counted as
+    Markdown in the no-code-path split. Neither changes a conclusion. **Recorded, no owner.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
@@ -534,5 +555,12 @@ would have cost four to five unnecessary rounds.
 - **The fixture is thin.** All script behaviour was measured on `--variant urp`: **1 C# file, 0
   `.meta` files, 1 assembly.** `detect-missing-refs.sh` indexed **0 GUIDs** there. The scripts run;
   nobody has confirmed they *find* anything on a project with real content. **This is what EE tests.**
-- **One host.** BSD awk's handling of `/^#{1,3} /` is untested, and **seven frozen comparisons depend
-  on it** — if the interval is not honoured, every one runs to EOF and fails on macOS.
+- **One host — and this one improved on measurement.** BSD awk's handling of `/^#{1,3} /` was
+  recorded here as untested, with the fear that an unhonoured interval would run every frozen
+  comparison to EOF. Task 9 simulated it — both terminators replaced with a pattern no heading can
+  match, which is what an awk treating `{1,3}` literally produces — and its reviewer reproduced the
+  result exactly: **95 pass / 15 fail**, spanning both extractors, all seven `unity-brainstorming`
+  whole-section comparisons plus eight on `using-kinglet`. **The failure is loud, not silent**,
+  which is the good direction. The pattern appears exactly twice in the tree, both in
+  `tests/test-surface-references.sh` (`ub_section` and `uk_section`). Still unverified on real BSD
+  awk: the simulation measures the consequence, not the cause.

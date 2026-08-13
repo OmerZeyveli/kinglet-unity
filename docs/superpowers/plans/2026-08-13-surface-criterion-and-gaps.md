@@ -673,7 +673,9 @@ Score *"Add multiplayer to my game"* by the file's rubric, twice: with and witho
 
 - [ ] **Step 2: Add a new section — and it must be new**
 
-`tests/test-surface-references.sh` freezes **six named sections of this skill character-for-character**, and `ub_section` stops at the next `#{1,3}` heading, so **a new heading is invisible to every frozen comparison; editing an existing one is not.** Confirm that yourself before writing.
+`tests/test-surface-references.sh` freezes ~~six~~ **a set of named sections of this skill character-for-character** — **derive the membership, do not take a number from this plan** — and `ub_section` stops at the next `#{1,3}` heading, so **a new heading is invisible to every frozen comparison; editing an existing one is not.** Confirm both yourself before writing.
+
+*(Amended 2026-08-14. This section was written saying **six**. Task 9's implementer reported the disagreement rather than resolving it silently, and its reviewer counted independently: the file freezes **seven** — the six ECU-survival sections plus the vague-as-clear table. The stale number is struck through and left visible rather than replaced, because a plan that quotes a count is the defect this wave exists to close, and replacing a stale count with a fresher one repeats it. **The plan is corrected, not the tree.**)*
 
 The content is one argument: a fact supplied by the generated block is context for *answering* a dimension, never points, because **a constant cannot discriminate between requests**. Restate that the score gates depth, not whether the round happens.
 
