@@ -331,6 +331,130 @@ fi
 ORPHAN_COUNT=$(printf '%s' "$ORPHANS" | grep -c . || true)
 ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 
+# ── Step 3b: The decisions the dry run and the real run must not compute twice ───────────────────
+#
+# Everything below is ANNOUNCED by the `Would install:` block a few lines down and ACTED ON by
+# Steps 7 and 8, hundreds of lines later. It lives here, above both, for the reason this block has
+# already paid for twice — once on the CLAUDE.md branch, once on MCP-SETUP.md: an announcement
+# computed from a COPY of the write's condition is a second definition of that condition, and a
+# second definition drifts. Call the predicate; never restate it.
+
+# ── The .gitignore decision ──────────────────────────────────────────────────
+# Ask git what it already ignores rather than grepping for our exact lines. A project that ignores
+# `/.claude/` wholesale — a perfectly sensible choice, and one real projects make — is already
+# covered, and appending our entries to it is just noise in someone else's file.
+#
+# TWO KINDS, NOT ONE LIST, AND MERGING THEM WOULD BE A BUG. `WANT_IGNORED` holds concrete PROBE
+# PATHS to hand to `git check-ignore`, which needs a path and can never be handed a negation.
+# `GITIGNORE_ENTRIES` holds the PATTERNS actually appended. The correspondence is 3 → 4, not 1:1:
+# `.claude/state/session.json` is the probe for both `.claude/state/*` and the negation
+# `!.claude/state/.gitkeep`. Both counts are DERIVED wherever they are used rather than written into
+# a sentence — the sentence that used to sit here said "three" for a whole wave after a fourth
+# pattern was added below it.
+GITIGNORE="$PROJECT_DIR/.gitignore"
+WANT_IGNORED='.claude/settings.local.json
+.claude/state/session.json
+.claude.backup.20260101120000/'
+# uninstall.sh writes its backup to .claude.backup.<timestamp>/ at the project root. Without the
+# last entry, every uninstall leaves an untracked directory that dirties `git status` in the user's
+# own repo.
+GITIGNORE_ENTRIES='.claude/settings.local.json
+.claude/state/*
+!.claude/state/.gitkeep
+.claude.backup.*/'
+GITIGNORE_ENTRY_COUNT=$(printf '%s\n' "$GITIGNORE_ENTRIES" | grep -c . || true)
+
+already_ignored() {
+  git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1 || return 1
+  git -C "$PROJECT_DIR" check-ignore -q "$1" 2>/dev/null
+}
+
+# THE DECISION IS TWO-STAGE, and an announcement built on the first stage alone is wrong in every
+# project git does not track — which is the shape of every second install in such a project.
+#
+#   Stage 1  `already_ignored` per probe path. OUTSIDE a work tree it cannot answer and returns 1
+#            for everything, so this stage says "needed" on every run of a non-git project and can
+#            never be the thing that declines there.
+#   Stage 2  the per-entry `grep -qxF` that used to live inside `add_ignore`. This is what actually
+#            declines on that second install: all four literals are already lines in the file from
+#            install 1, nothing is appended, and the run prints "already has our entries".
+#
+# Prints a verdict word on the first line, then the entries an append would add, in order:
+#   covered   a .gitignore exists and git ignores every probe path — Step 7 leaves the file alone
+#   present   the block runs, and every entry is already a line in the file — nothing is appended
+#   append    the lines that follow are exactly what Step 7 appends, in the order it appends them
+gitignore_plan() {
+  local p e needed=0 missing=''
+  # Stage 1 can only decline when there is a file to leave alone — the real run's guard is
+  # `NEEDED -eq 0` AND `-f "$GITIGNORE"` — so with no file the probes cannot change the outcome.
+  if [ -f "$GITIGNORE" ]; then
+    while IFS= read -r p; do
+      [ -n "$p" ] || continue
+      already_ignored "$p" || needed=1
+    done <<< "$WANT_IGNORED"
+    if [ "$needed" -eq 0 ]; then printf 'covered\n'; return 0; fi
+  fi
+  # Stage 2. `grep` reads a FILE ARGUMENT, not a pipe, so `-q`'s exit-on-first-match cannot SIGPIPE
+  # a writer under `set -euo pipefail`. A missing file makes grep exit 2, which is "not present" —
+  # the create path's correct answer, and the reason no `-f` test is needed here.
+  while IFS= read -r e; do
+    [ -n "$e" ] || continue
+    grep -qxF -- "$e" "$GITIGNORE" 2>/dev/null || missing="${missing}${e}"$'\n'
+  done <<< "$GITIGNORE_ENTRIES"
+  if [ -z "$missing" ]; then printf 'present\n'; return 0; fi
+  printf 'append\n%s' "$missing"
+}
+
+# ── The Packages/manifest.json decisions ─────────────────────────────────────
+# Derived from $MANIFEST rather than written out again, so the receipt row, the announcement, and
+# the file they both name cannot disagree. A row whose path is one character off is a row
+# uninstall.sh silently declines to act on, which on disk is indistinguishable from no row at all.
+MANIFEST_BAK_REL="${MANIFEST#"$PROJECT_DIR"/}.bak"
+
+# Would a --with-* flag passed to THIS run still have an edit to make? `add_manifest_dependency`
+# returns early when there is no manifest or the package is already in it, and an early return
+# copies nothing — so neither the edit nor the backup happens.
+manifest_edit_pending() {
+  [ -f "$MANIFEST" ] || return 1
+  if [ "$WITH_MCP" -eq 1 ] && ! grep -q "$MCP_PKG_NAME" "$MANIFEST" 2>/dev/null; then return 0; fi
+  if [ "$WITH_INPUT_SYSTEM" -eq 1 ] && [ "$HAS_INPUT_SYSTEM" -eq 0 ]; then return 0; fi
+  return 1
+}
+
+# D11's decline, asked the way `add_manifest_dependency` asks it. A Packages/manifest.json.bak that
+# exists and is not ours abandons THE WHOLE FLAG rather than overwriting the user's file — so the
+# manifest edit does not happen either, and an announcement that promised it would be wrong in the
+# direction that destroys trust. `MANIFEST_BAK_KEPT`'s disjunct is deliberately absent here: it
+# answers "this run already made the copy", and at dry-run time no run has.
+manifest_bak_is_foreign() {
+  [ -e "$MANIFEST.bak" ] || return 1
+  if owned_by_installer "$MANIFEST_BAK_REL" ''; then return 1; fi
+  return 0
+}
+
+# Would THIS run create Packages/manifest.json.bak and keep it? FIVE conditions gate that file in
+# `add_manifest_dependency`, and FOUR of them are answerable from here:
+#
+#   1. a manifest exists                        — asked, inside manifest_edit_pending
+#   2. some flag still has an edit to make      — asked, manifest_edit_pending
+#   3. it is not D11's decline                  — asked, manifest_bak_is_foreign
+#   4. the surgical `sed` insert SUCCEEDED      — NOT ASKABLE HERE. The failure arm runs
+#                                                 `mv "$MANIFEST.bak" "$MANIFEST"` and leaves no
+#                                                 backup behind, and the only way to know in advance
+#                                                 is to rehearse the edit on a temp copy. The
+#                                                 announcement NAMES this condition instead of
+#                                                 pretending to have evaluated it.
+#   5. git does not track Packages/manifest.json — asked. When git tracks it, git IS the backup and
+#                                                 the .bak is deleted straight after the edit.
+manifest_bak_would_be_kept() {
+  manifest_edit_pending || return 1
+  if manifest_bak_is_foreign; then return 1; fi
+  if git -C "$PROJECT_DIR" ls-files --error-unmatch Packages/manifest.json >/dev/null 2>&1; then
+    return 1
+  fi
+  return 0
+}
+
 if [ "$DRY_RUN" -eq 1 ]; then
   printf '\n%s\n' "${BOLD}Would install:${NC}"
   printf '  %s files into %s\n' "$PAYLOAD_COUNT" "$CLAUDE_DIR"
@@ -377,24 +501,97 @@ if [ "$DRY_RUN" -eq 1 ]; then
     fi
   fi
 
-  printf '  .gitignore — add .claude/settings.local.json and .claude/state/*\n'
+  # THE SAME PLAN STEP 7 ACTS ON, called rather than restated. The line here was unconditional and
+  # named two of the four entries: it promised an edit on every run, including the two runs that
+  # make none, and under-described the one run that does.
+  #
+  # THE DECLINE WORDING IS A CONTRACT WITH tests/test-install-dryrun.sh'S PARSER, NOT FREE PROSE.
+  # That file reads a line whose first field is a path as a PROMISE unless the line carries one of
+  # the phrases it recognises. `already covered` and `no change` are both in that set; the real
+  # run's own "already has our entries" is deliberately NOT, because the bias is toward a loud false
+  # red rather than a silent false green. Both declines below therefore carry the recognised
+  # spelling and say WHICH of the two mechanisms declined in the prose after it.
+  DRY_GITIGNORE_PLAN="$(gitignore_plan)"
+  case "${DRY_GITIGNORE_PLAN%%$'\n'*}" in
+    covered)
+      printf '  .gitignore — git already ignores every path we would add, so it is already covered — no change\n' ;;
+    present)
+      printf '  .gitignore — all %s of our entries are already lines in it, so it is already covered — no change\n' \
+        "$GITIGNORE_ENTRY_COUNT" ;;
+    *)
+      # ONE LINE, WITH THE ENTRIES ON IT RATHER THAN INDENTED UNDER IT. An entry per line would give
+      # each entry a first field of its own and mint claims about paths nothing writes.
+      DRY_GITIGNORE_ADD="${DRY_GITIGNORE_PLAN#*$'\n'}"
+      DRY_GITIGNORE_N=$(printf '%s\n' "$DRY_GITIGNORE_ADD" | grep -c . || true)
+      # awk drains its input to the end, so this pipeline cannot SIGPIPE the writer.
+      DRY_GITIGNORE_LIST="$(printf '%s\n' "$DRY_GITIGNORE_ADD" \
+        | awk 'NF { if (n++) printf ", "; printf "%s", $0 } END { printf "\n" }')"
+      if [ -f "$GITIGNORE" ]; then
+        printf '  .gitignore — append %s entries: %s\n' "$DRY_GITIGNORE_N" "$DRY_GITIGNORE_LIST"
+      else
+        printf '  .gitignore (new) — create it, with %s entries: %s\n' "$DRY_GITIGNORE_N" "$DRY_GITIGNORE_LIST"
+      fi ;;
+  esac
+
+  # ── Packages/manifest.json, its backup, and the flags ──────────────────────
+  # LEAD WITH THE PATH. These lines used to begin `--with-mcp:` / `--with-input-system:`, so their
+  # first field was a FLAG NAME. A reader scanning the block for the files a run touches — and
+  # tests/test-install-dryrun.sh's parser, which reads the first field — saw no claim about
+  # Packages/manifest.json at all, while the real run edited it in place at the project root.
+  #
+  # The third arm is D11's decline, and it is new. A Packages/manifest.json.bak that is not ours
+  # abandons the flag rather than overwriting it, so the edit this block used to promise
+  # unconditionally does not happen.
   if [ "$WITH_MCP" -eq 1 ]; then
     if [ ! -f "$MANIFEST" ]; then
-      printf '  --with-mcp: no Packages/manifest.json — would skip\n'
+      printf '  Packages/manifest.json — none in this project, so --with-mcp would skip\n'
     elif grep -q "$MCP_PKG_NAME" "$MANIFEST" 2>/dev/null; then
-      printf '  --with-mcp: %s already present — would skip\n' "$MCP_PKG_NAME"
+      printf '  Packages/manifest.json — %s already present, so --with-mcp would skip\n' "$MCP_PKG_NAME"
+    elif manifest_bak_is_foreign; then
+      printf '  Packages/manifest.json — %s is not ours, so --with-mcp is declined and the manifest would be left alone\n' \
+        "$MANIFEST_BAK_REL"
     else
-      printf '  --with-mcp: add %s to Packages/manifest.json\n' "$MCP_PKG_NAME"
+      printf '  Packages/manifest.json — add %s to "dependencies" (--with-mcp)\n' "$MCP_PKG_NAME"
     fi
   fi
   if [ "$WITH_INPUT_SYSTEM" -eq 1 ]; then
     if [ ! -f "$MANIFEST" ]; then
-      printf '  --with-input-system: no Packages/manifest.json — would skip\n'
+      printf '  Packages/manifest.json — none in this project, so --with-input-system would skip\n'
     elif [ "$HAS_INPUT_SYSTEM" -eq 1 ]; then
-      printf '  --with-input-system: %s already present — would skip\n' "$INPUT_SYSTEM_PKG_NAME"
+      printf '  Packages/manifest.json — %s already present, so --with-input-system would skip\n' \
+        "$INPUT_SYSTEM_PKG_NAME"
+    elif manifest_bak_is_foreign; then
+      printf '  Packages/manifest.json — %s is not ours, so --with-input-system is declined and the manifest would be left alone\n' \
+        "$MANIFEST_BAK_REL"
     else
-      printf '  --with-input-system: add %s to Packages/manifest.json\n' "$INPUT_SYSTEM_PKG_NAME"
+      printf '  Packages/manifest.json — add %s to "dependencies" (--with-input-system)\n' \
+        "$INPUT_SYSTEM_PKG_NAME"
     fi
+  fi
+
+  # OUTSIDE THE FLAGS, NOT JUST OUTSIDE THE BRANCHES — Step 8's receipt row already states this
+  # placement rule in those words, and the announcement was never given the same treatment. On every
+  # install after the first the user passes no --with-* flag, so the branch that MAKES this file
+  # does not run, while the file sits on disk and the receipt goes on claiming it. An announcement
+  # inside `if [ "$WITH_MCP" -eq 1 ]` is silent on exactly the path every user is on after install 1.
+  #
+  # TWO STATES, TWO VERDICTS, AND THEY ARE NOT INTERCHANGEABLE:
+  #   this run would create it   → a PROMISE. The real run writes that path.
+  #   an earlier run created it  → a DECLINE. This run re-claims it in the receipt and does not
+  #                                touch a byte of it, so promising it would be an announcement with
+  #                                no write — the other direction of the same defect.
+  # `owned_by_installer` is the disjunct that can answer on a flagless run, and it is the same call
+  # Step 8's row makes, with the same '' reference argument: this file is a copy of the user's own
+  # manifest, so the toolkit ships no reference copy to compare it against.
+  if manifest_bak_would_be_kept; then
+    # THE ONE CONDITION THIS CANNOT EVALUATE IS NAMED RATHER THAN ASSUMED AWAY — see
+    # manifest_bak_would_be_kept's fourth condition. "if the edit succeeds" is a smaller claim than
+    # the run can break.
+    printf '  %s — kept as the pre-edit backup if the edit succeeds, and recorded as ours to remove\n' \
+      "$MANIFEST_BAK_REL"
+  elif owned_by_installer "$MANIFEST_BAK_REL" ''; then
+    printf '  %s — the backup an earlier run kept; still ours and still claimed, contents NOT touched\n' \
+      "$MANIFEST_BAK_REL"
   fi
   [ -n "$BACKUP_DIR" ] && printf '  backup: %s\n' "$(basename "$BACKUP_DIR")"
   if [ ! -f "$PROJECT_DIR/.mcp.json" ]; then
@@ -795,58 +992,46 @@ fi
 
 # ── Step 7: .gitignore ───────────────────────────────────────────────────────
 #
-# Ask git what it already ignores rather than grepping for our exact lines. A project that ignores
-# `/.claude/` wholesale — a perfectly sensible choice, and one real projects make — is already
-# covered, and appending our four entries to it is just noise in someone else's file. Four, not the
-# three this line claimed until 2026-08-12: `.claude.backup.*/` was added below without updating the
-# count here. Count the add_ignore calls rather than trusting this sentence.
-GITIGNORE="$PROJECT_DIR/.gitignore"
-WANT_IGNORED='.claude/settings.local.json
-.claude/state/session.json
-.claude.backup.20260101120000/'
-
-already_ignored() {
-  git -C "$PROJECT_DIR" rev-parse --git-dir >/dev/null 2>&1 || return 1
-  git -C "$PROJECT_DIR" check-ignore -q "$1" 2>/dev/null
-}
-
-NEEDED=0
-while IFS= read -r p; do
-  [ -n "$p" ] || continue
-  already_ignored "$p" || NEEDED=1
-done <<< "$WANT_IGNORED"
-
-if [ "$NEEDED" -eq 0 ] && [ -f "$GITIGNORE" ]; then
-  ok ".gitignore already covers .claude/ local state — left alone."
-else
-  [ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; info "Created .gitignore"; }
-  # Only append a newline first if the file does not already end with one; otherwise our header
-  # lands on the end of their last line.
-  [ -s "$GITIGNORE" ] && [ -n "$(tail -c1 "$GITIGNORE")" ] && printf '\n' >> "$GITIGNORE"
-  ADDED=0
-  add_ignore() {
-    grep -qxF "$1" "$GITIGNORE" 2>/dev/null && return
-    [ "$ADDED" -eq 0 ] && printf '\n# Claude Code local settings and session state\n' >> "$GITIGNORE"
-    printf '%s\n' "$1" >> "$GITIGNORE"; ADDED=$((ADDED + 1))
-  }
-  add_ignore '.claude/settings.local.json'
-  add_ignore '.claude/state/*'
-  add_ignore '!.claude/state/.gitkeep'
-  # uninstall.sh writes its backup to .claude.backup.<timestamp>/ at the project root. Without this,
-  # every uninstall leaves an untracked directory that dirties `git status` in the user's own repo.
-  add_ignore '.claude.backup.*/'
-  [ "$ADDED" -gt 0 ] && ok "Updated .gitignore ($ADDED entries)" || ok ".gitignore already has our entries."
-fi
+# The DECISION is `gitignore_plan`'s, made once in Step 3b and already announced by the dry run.
+# What is left here is acting on it. `add_ignore`'s per-entry `grep -qxF` moved INTO the plan rather
+# than staying here, because it was stage 2 of the decision rather than a detail of the write —
+# leaving it here would have left the announcement free to disagree with the file, which is the
+# whole of the defect this replaces.
+GITIGNORE_PLAN="$(gitignore_plan)"
+case "${GITIGNORE_PLAN%%$'\n'*}" in
+  covered)
+    ok ".gitignore already covers .claude/ local state — left alone." ;;
+  present)
+    # NOTHING IS WRITTEN ON THIS BRANCH, INCLUDING THE TRAILING NEWLINE. The previous shape reached
+    # the `printf '\n'` below before discovering it had nothing to append, so a .gitignore that held
+    # all four entries and did not end in a newline got one byte appended under the banner
+    # "already has our entries" — a write announced as a no-change.
+    ok ".gitignore already has our entries." ;;
+  append)
+    [ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; info "Created .gitignore"; }
+    # Only append a newline first if the file does not already end with one; otherwise our header
+    # lands on the end of their last line.
+    [ -s "$GITIGNORE" ] && [ -n "$(tail -c1 "$GITIGNORE")" ] && printf '\n' >> "$GITIGNORE"
+    printf '\n# Claude Code local settings and session state\n' >> "$GITIGNORE"
+    ADDED=0
+    while IFS= read -r e; do
+      [ -n "$e" ] || continue
+      printf '%s\n' "$e" >> "$GITIGNORE"
+      ADDED=$((ADDED + 1))
+    done <<< "${GITIGNORE_PLAN#*$'\n'}"
+    ok "Updated .gitignore ($ADDED entries)" ;;
+  *)
+    warn "gitignore_plan returned an unrecognised verdict — .gitignore left alone." ;;
+esac
 
 # ── Step 8: Optional — manifest.json package additions ───────────────────────
 # One helper for every "--with-X adds a package to Packages/manifest.json" flag, so --with-mcp and
 # --with-input-system share the same surgical insert, the same backup behaviour, and the same
 # "could not edit safely" fallback rather than two hand-maintained copies drifting apart.
 #
-# Derived from $MANIFEST rather than written out again, so the receipt row and the file it claims
-# cannot disagree. A row whose path is one character off is a row uninstall.sh silently declines to
-# act on, which on disk is indistinguishable from no row at all.
-MANIFEST_BAK_REL="${MANIFEST#"$PROJECT_DIR"/}.bak"
+# $MANIFEST_BAK_REL is defined in Step 3b, not here: the dry-run block announces this file and had
+# to be able to name it. One definition, derived from $MANIFEST, so the receipt row, the
+# announcement and the file they both name cannot disagree.
 MANIFEST_BAK_KEPT=0
 # Newline-terminated, one flag per line, in the idiom MODIFIED_FILES and ORPHANS already use here.
 # Set unconditionally so the summary's `[ -n ... ]` test is not an unbound-variable death under
