@@ -497,6 +497,50 @@ and 4 scripts.
     sha at `d038ca9`: `b8bd6d1fa2a2c288753d016663e237e777c2f97936546d5825c2fcb6868cf767`,
     superseding `0284206…` from the first commit.
 
+**From Task 4's review (2026-08-14). Task 4 is in fix round 1; these are the deferrals.**
+
+18. **The `$RECEIPT`-holds-the-previous-run invariant gets a cheap, non-hollow guard — and it goes to
+    Task 5**, the next `install.sh` owner, so it protects 6, 4b and 4c rather than arriving after
+    them. The reviewer's proposed form: **assert `install.sh` contains exactly one `> "$RECEIPT"`
+    redirection and that it lives inside `write_receipt`.** That is the single edit the four
+    downstream owners cannot make silently, and it reads `install.sh`'s *structure* rather than the
+    filesystem — a different oracle from `tests/test-install-ownership.sh`'s, which is why it did not
+    belong in Task 4. **→ Task 5.**
+19. **`README.md`'s `.gitignore` sentence, with its replacement wording, moves into Task 11's row
+    here rather than living only in Task 4's report.** The sentence *"Your `.gitignore` is not in it:
+    the installer creates or appends to that file and never claims it"* is confirmed present and
+    confirmed **false** at HEAD — Task 4 made the installer claim it, which spec acceptance criterion
+    6 requires. **Nothing guards the sentence**: `/usr/bin/grep -rn 'never claims it\|creates or
+    appends' tests/` is empty. The corrected wording is already written in `install.sh`'s own
+    `--help` header; copy it from there. **→ Task 11.** *(Recorded here because "it is in the report"
+    is not a delivery mechanism — the whole point of this ledger is that a report nobody re-reads is
+    a finding that did not happen.)*
+20. **An asynchronous signal leaves exactly one file unrowed.** Measured across eight
+    `timeout -s TERM/INT` runs at 0.15–0.30 s: the EXIT trap always fires and never writes a spurious
+    row, but in five of eight the file being copied when the signal landed had no row. **One leftover
+    file instead of 67 is about as tight as this design gets** — recorded as a known bound, not a
+    defect. Cosmetic companion: `$?` at trap entry is 0 for SIGINT/SIGQUIT, so those runs print
+    *"This install did not finish (exit 0)"*. **No owner; carried.**
+21. **`stat -c` sites are now six and the plan says five, with nothing guarding the figure.** Task 4
+    added the sixth (the `.gitignore` row, which **reads** the mode rather than hardcoding it —
+    measured `664` on a created `.gitignore`, `600` on `CLAUDE.md.generated`; hardcoding `644` there
+    would have produced a receipt disagreeing with its own file). All six are **GNU-only**;
+    `stat -c` is unsupported on macOS. **→ Task 12** (R1 leaves `install.sh` to Task 4, but the
+    *figure* and the macOS exposure are Task 12's subject).
+22. **`assert_not_owned "$O" '.claude/agents/teammate.md'` is weakly guarded** — it did not red under
+    the reviewer's `MODE=ours` mutation, because in `ours` mode the payload loop never writes that
+    path, so no row appears either way. The state's first two assertions carry it. **Noted, not
+    actionable.**
+
+**A method note from the same review, worth more than any of the above.** The reviewer's first
+mutation attempt used `perl -pi -e` **without `/g`**; the first occurrence of the target string was
+in a **comment**, so the mutation landed there, the code was untouched, and the suite reported a
+clean **325 PASS / 0 FAIL**. Read naively that is *"the guard is hollow"* — a finding that does not
+exist, and a round spent chasing it. **The unapplied-mutation failure is symmetric**: it makes a
+broken guard look sound *and* a sound guard look broken. The remedy is not "check it applied" but
+`cmp` plus an explicit `MUTANT DID NOT APPLY` marker, because **a zero means nothing until you know
+which zero it is.** Third measured instance in this repository. **→ Task 13** (already sent).
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
