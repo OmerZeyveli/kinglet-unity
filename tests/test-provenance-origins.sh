@@ -391,10 +391,42 @@ while IFS= read -r dead_f; do
   #
   # `<<-` is matched, and its terminator may be indented, so both forms are accepted.
   #
-  # WHAT THE TRACKER CANNOT SEE, stated rather than implied: two heredocs opened on ONE line (only
-  # the first is followed), a delimiter built from a variable, and a terminator that is not alone on
-  # its line. Each of those leaves the tracker believing it is still inside a heredoc, which means it
-  # KEEPS scanning — the strict direction, a red on prose rather than a hole.
+  # WHAT THE TRACKER CANNOT SEE. Four shapes, each with the direction it fails in — MEASURED, one
+  # synthetic input per row, not reasoned. The first draft of this block asserted that all of them
+  # "leave the tracker believing it is still inside a heredoc, which means it KEEPS scanning — the
+  # strict direction". That is false for two of the four, and it is false in the direction that
+  # matters: they DROP payload, which is the hole this whole block exists to close. A limitation
+  # note that misstates its own direction is worse than no note, because the next maintainer reads it
+  # when deciding not to fix it.
+  #
+  #   shape                              tracker does          direction
+  #   ---------------------------------  --------------------  -------------------------------------
+  #   cat <<$D          (var delimiter)  never enters          LAX — payload dropped as commentary
+  #   cat <<A <<B       (two on a line)  follows only A        LAX — B's payload dropped
+  #   x=$((1<<n))       (arith shift)    latches on `n`        strict — later real comments scanned
+  #   foo  # cat <<EOF  (trailing cmt)   latches on `EOF`      strict — later real comments scanned
+  #
+  # (A terminator that is not alone on its line — `EOF > /dev/null` — also latches, and is strict.)
+  #
+  # NONE OF THE FOUR IS REACHABLE ON THIS TREE, and that measurement is what makes this a comment
+  # rather than a code change. All 7 real introducers under the scanned globs use a LITERAL or QUOTED
+  # delimiter, exactly one per line:
+  #
+  #   scripts/detect-missing-refs.sh:29        cat <<EOF
+  #   scripts/generate-claude-md.sh:137        $(cat <<'PKGS'
+  #   scripts/generate-claude-md.sh:321        cat <<MDEOF
+  #   scripts/generate-claude-md.sh:519,553    cat <<'MDEOF'
+  #   scripts/validate-asmdefs.sh:31           cat <<EOF
+  #   scripts/validate-serialization.sh:30     cat <<EOF
+  #
+  # Re-derive rather than trusting that list — it is the same class of claim this wave exists to
+  # guard, and nothing asserts it:
+  #
+  #   for f in $(git ls-files '.claude/*' 'scripts/*'); do case "$f" in *.sh) awk '…' "$f";; esac; done
+  #
+  # A limitation with a measured reachability is a different object from one without. If a shipped
+  # script ever grows a variable delimiter or two heredocs on one line, the two LAX rows above become
+  # live and this tracker needs a real parser, not another arm.
   case "$dead_f" in
     *.sh) dead_live="$(awk '
             indoc {
