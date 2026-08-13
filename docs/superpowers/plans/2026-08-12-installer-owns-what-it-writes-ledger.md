@@ -153,8 +153,8 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 2 | A kept backup is a file the installer owns | **done** | `c096d1b..a8acd49` | **No fix round** — Spec ✅, Quality Approved. The implementer refused the brief's literal Step 3 and implemented the spec; the review reproduced that the brief's shape *is* the defect. Suite 645 → 674 |
 | 2b | The other file the installer keeps and does not record | **done** | `c4d36f3..15dfda4` | **No fix round** — Spec ✅ (criterion 13 clause 3 narrowed, disclosed), Quality Approved. Answered the open question by measurement; added I4/I5 beyond the plan, and I4 is the only state that discriminates the receipt arm. Suite 674 → 738 |
 | 2c | The two writers that overwrite without asking | **done** | `e85ea32..b573ce8` | Spec ✅, Quality Approved, 1 fix round. Survived **eight** adversarial shapes the implementer never built. Its round-1 test fix uncovered a live D11 violation the old test was reporting green. Suite 738 → 795 |
-| 3 | The dry-run guard, three oracles | open (brief pending) | — | The third oracle is the task's reason to exist |
-| 4 | The `.gitignore` announcement says what will happen | open (brief pending) | — | Turns Task 3's guard green |
+| 3 | The dry-run guard, three oracles | **done** | `9710ae6..82b806a` | Spec ✅, Quality Approved, **3 fix rounds**. Grew from 6 fixtures to 9. Leaves **7 deliberate reds** — the suite is red on purpose until Task 4 |
+| 4 | The dry run announces what the run will actually do | open | — | **Brief rewritten 2026-08-13** before dispatch: two defects, seven reds, four `.gitignore` shapes, and a placement requirement the original did not have |
 | 5 | One pipeline detector, and Option B states its costs | open (brief pending) | — | `urp+hdrp` display and skill routing is the implementer's call |
 | 6 | Whole-wave verification | open (brief pending) | — | Criterion 6 re-run, not cited |
 
@@ -570,6 +570,96 @@ file reported *three* failures while **48 assertions never executed** — a near
 broken installer. This is the ledger's own "a probe that dies reports nothing" finding, one helper
 over, and it is the strongest evidence yet that a test's *robustness* is not cosmetic: an assertion
 that fabricates its own fixture is worse than an assertion that is missing.
+
+## Task 3 — the guard that could be silenced by the fix it exists to gate
+
+**Three fix rounds, and the last one found a hole that would have let Task 4 pass while doing nothing.**
+
+**The three oracles are not three opinions — each write is seen by exactly one.** The `--with-mcp`
+fixture, added in round 1, is the proof, and the review established it by computing each oracle's set
+directly rather than by neutering:
+
+| `--with-mcp` write | oracle 1 (new paths) | oracle 2 (receipt) | oracle 3 (content) |
+|---|---|---|---|
+| `manifest.json.bak` created | sees it | sees it | blind |
+| `manifest.json` edited in place | blind | blind | **sees it** |
+| the `.bak`'s receipt row | blind | **sees it** | blind |
+
+That fixture also gave **oracle 2 a live permanent subject** rather than a review-time mutation — until
+then, oracle 2 had never been mutation-proven by anyone, and the review had to prove it by injecting a
+receipt row by hand.
+
+**Round 1's real subject was a category error the controller had to name.** The implementer left the
+`--with-mcp` gap open because closing it "means teaching the dry-run block the git-tracking test and
+the ownership test" — which **conflates asserting a gap with fixing it**. Adding the fixture only makes
+the guard red, which is what Task 3 is chartered to do. D4's text is literal: the filesystem oracle
+runs *"with the flags exercised."* And `manifest.json.bak` is the file D4 was written **about** — the
+previous wave's receipt-only check reported "no third unannounced write" and was structurally unable
+to see it. A guard that documents rather than asserts that one class is D4's failure mode one level up.
+
+**Round 2 withdrew a false reason and then built what the reason had excused.** The header said the
+dry run *"structurally cannot name"* the backup directory, so a path oracle would be permanently red on
+a non-defect. Measured: the dry-run-plus-snapshot sequence fits inside one second, so the two `date`
+calls agree — **5/5 identical**. An exact-name oracle would be **green almost always and red when the
+clock ticks**: a *flake*, not a permanent red, and a materially better problem to have. The implementer
+then built the `dirty` fixture it had declined, because *"a decline whose stated obstacle turns out to
+be a two-line canonicalisation is the documented-instead-of-asserted failure Round 1 corrected me for."*
+`canon_backup` removes the flake rather than tolerating it — proven by forcing a real clock tick: the
+fixture stays green, and with `canon_backup` neutered the same tick produces two reds.
+
+### Round 3's finding: the parser could be steered from `install.sh`
+
+Round 2's `backup:` directory claim needed a prefix fallback in `claim_of`. The confinement note said
+the trailing slash was the marker and *"exactly one rule produces it."* **False** — `pathre` put `/` in
+its character class with no trailing-character exclusion, so the **generic** rule minted directory
+claims too.
+
+Measured end to end: **one line** added inside `install.sh`'s *existing* `WITH_MCP` dry-run guard,
+naming neither file —
+
+```
+printf '  Packages/ — the manifest and its backup\n'
+```
+
+— took the guard from **135/7 to 139/4**, with the FAIL diff a pure deletion of three reds. **No
+assertion was edited.** A vague announcement would have closed three of Task 4's seven reds while
+telling the user nothing.
+
+What hid it was luck: an *unguarded* vague line reddens the eight fixtures that write nothing under
+`Packages/`, so the total moves the wrong way and someone notices. Placed **inside** the flag guard —
+the natural place, and exactly where Task 4 works — there is no compensating red at all.
+
+Closed by making the generic rule **skip** any claim ending in `/` (skip, not fail: an ignored line can
+neither silence a red nor invent one). Verified by the controller directly, not only by the
+implementer: the same insertion now leaves all seven reds standing.
+
+### The implementer's own account of its failure mode, which is worth more than the fixes
+
+Three rounds in a row, its **measurements** held and the **sentences explaining why they mattered**
+did not: "structurally cannot name" (round 2), "uninstall.sh acts on the mode column" (round 3 — it
+does not; `uninstall.sh` destructures `_mode` and contains no `chmod`, and the mutation demonstrating
+the blindness targeted a file that never enters a receipt row at all), and the parser confinement note.
+Its own diagnosis:
+
+> The measurements have held every round; the sentences explaining *why they matter* are where it
+> keeps failing, because those are the part I write from memory rather than from a command.
+
+**That is the wave's recurring finding in its most precise form yet.** Ten times a probe's *shape*
+decided what it found; here the probe was right every time and the prose around it was not. Three
+separate corrections in this wave each introduced their own version of the defect being corrected —
+not carelessness, but what writing confidently about a program one has just measured does.
+
+### Also established
+
+- **`dirty`'s arrival check certified one file, not the backup's completeness.** A `mv` that lost a
+  user's second file was invisible — 135/7 with a byte-identical FAIL set and the anti-vacuity
+  assertion still green. Round 3 gave the fixture a second user file and made the check a **set
+  comparison** against a pre-run listing; the same sabotage now produces exactly one new red.
+- **There is still no deletion oracle anywhere.** A file that *leaves* is seen by nothing.
+- **The snapshot is files-only-by-content**, so modes, empty directories and symlinks are outside all
+  three oracles — `chmod` + `mkdir` + `ln -s` appended to a real run leave the FAIL set byte-identical.
+  Disclosed, with the honest reason: the mode is recorded by `install.sh` on 5 of 8 row writers and
+  **unused** by `uninstall.sh`.
 
 ## Deferred and parked findings
 

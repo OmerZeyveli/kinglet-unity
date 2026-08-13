@@ -88,6 +88,27 @@ prints whether or not the real run adds anything — a project that already igno
 wholesale is fully covered, `already_ignored` correctly skips every entry, and the dry-run still
 promises the edit.
 
+> **Correction, 2026-08-13 — the last sentence's example was false when this was written.** Task 3's
+> review checked it against `c5280c4`, this spec's own anchor, and `WANT_IGNORED` already carried
+> `.claude.backup.20260101120000/` there. A project ignoring `/.claude/` **alone** is therefore *not*
+> fully covered: `already_ignored` returns 0 for the state paths and 1 for the backup probe, so
+> `NEEDED=1` and the real run appends all four entries. Measured: `ok Updated .gitignore (4 entries)`.
+>
+> **The defect is real; only the example was wrong**, and it is real in *two* shapes rather than one:
+>
+> - **git, fully covered.** The `.gitignore` must cover every `WANT_IGNORED` entry — both `/.claude/`
+>   **and** `.claude.backup.*/`. Then `NEEDED=0` and the run prints
+>   `ok .gitignore already covers .claude/ local state — left alone.`
+> - **non-git, second install.** `already_ignored` runs `git rev-parse --git-dir`, which fails outside
+>   a work tree, so it returns 1 for every probe and `NEEDED=1` — the block runs. Then `add_ignore`'s
+>   own `grep -qxF` finds all four literals already present from install 1, appends nothing, and the
+>   run prints `ok .gitignore already has our entries.`
+>
+> **The second shape is the one that matters for the fix**, and this spec did not know about it: the
+> real run's decision is **two-stage**, and D5's "computed from the same `already_ignored` results"
+> describes only the first stage. An announcement built that way is still wrong in every non-git
+> project. Criterion 8 is amended below.
+
 This is the third instance of the dry-run under-announcing, and the reason the shipped-citations
 wave's own check missed it is worth keeping: that check used a `find` snapshot as its oracle, and
 `.gitignore` already exists, so a path snapshot has nothing to diff. **A third oracle — file
@@ -410,8 +431,19 @@ inside those tasks' diffs naturally, close it there; do not widen them to reach 
 7. The new dry-run guard fails when a write is added without an announcement, and fails when an
    announcement is added without a write. **Both directions, mutation-proven**, and across all three
    oracles — a new path, a missing receipt row, and a modified pre-existing file.
-8. Against a fixture that already ignores `/.claude/` wholesale, the dry-run does **not** promise a
-   `.gitignore` edit, and the real run makes none.
+8. **Amended 2026-08-13** — the original wording named a fixture that does not produce the no-write
+   branch; see the correction under problem statement 5. The `.gitignore` announcement must be right
+   in **all four** shapes the real run can take, each proven by running it:
+   - **created** — no `.gitignore` exists (`--variant bare`);
+   - **appended** — a `.gitignore` exists and does not carry our entries;
+   - **no change, because git already covers every entry** — a git fixture whose `.gitignore` carries
+     `/.claude/` **and** `.claude.backup.*/`, so `already_ignored` returns 0 for all probes;
+   - **no change, because the literals are already in the file** — a **non-git** project on its second
+     install, where `already_ignored` cannot answer and `add_ignore`'s own `grep -qxF` is what
+     declines.
+
+   The last two are two different mechanisms reaching the same outcome. **A fix that closes only the
+   first leaves the second promising an edit that will not happen.**
 9. `docs/GETTING-STARTED.md`'s Option B states its two costs.
 10. **A `.claude/` file the user edited survives `uninstall.sh --yes`**, is counted under
     `keep N file(s) you modified` rather than `unchanged since install`, and is removed by

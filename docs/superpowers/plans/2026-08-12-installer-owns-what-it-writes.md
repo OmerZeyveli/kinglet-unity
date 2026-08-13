@@ -553,36 +553,115 @@ tests/test-install-dryrun.sh	original	-	-	-	original	the dry-run announces every
 
 ---
 
-## Task 4: The `.gitignore` announcement says what will happen
+## Task 4: The dry run announces what the run will actually do
+
+**Rewritten 2026-08-13, before dispatch.** Task 3's guard and its three reviews measured four things
+this section did not know. The original text scoped this task to "the dry-run's `.gitignore` line" and
+to two fixtures; the guard now has **nine** fixtures and **seven** deliberate reds across **two**
+defects, and the `.gitignore` fix as originally prescribed closes only half of its own half.
 
 **Files:**
-- Modify: `install.sh` — the dry-run's `.gitignore` line
+- Modify: `install.sh` — the dry-run block's `.gitignore` line **and** its `--with-mcp` arm, plus a new
+  announcement that does not exist anywhere today.
 
 **Interfaces:**
-- Consumes: Task 3's guard.
+- Consumes: `tests/test-install-dryrun.sh` (Task 3), `owned_by_installer()` (Task 1).
 - Produces: nothing.
 
-- [ ] **Step 1: Read what the real run actually does**
+### The seven reds, each with its mechanism
 
-Find both halves: `grep -n 'add_ignore\|already_ignored\|WANT_IGNORED' install.sh`. The real run consults `already_ignored` per entry and appends only what is not covered. The dry-run's line names two entries and prints unconditionally.
+Do not treat "the reds went away" as success — see Step 4. These are what must become true.
 
-Count the `add_ignore` calls and compare against `WANT_IGNORED`'s entries — a comment in that region claims a number; **derive it rather than trusting the comment**, which has been wrong before in this exact file.
+| # | fixture | red | mechanism |
+|---|---|---|---|
+| 1 | `wholesale` | promised `.gitignore`, no change | git fixture covering **every** `WANT_IGNORED` entry → `already_ignored` returns 0 for all → `NEEDED=0` → `ok .gitignore already covers .claude/ local state — left alone.` |
+| 2 | `upgrade` | same | **non-git**, second install → `already_ignored` cannot answer → `NEEDED=1`, block runs → `add_ignore`'s own `grep -qxF` finds all four literals → `ADDED=0` → `ok .gitignore already has our entries.` |
+| 3 | `mcpthen` | same | identical to 2 |
+| 4 | `withmcp` | wrote `Packages/manifest.json`, never named | the block's line is `--with-mcp: add … to Packages/manifest.json` — **first field `--with-mcp:`**, unreadable as a claim |
+| 5 | `withmcp` | wrote `Packages/manifest.json.bak`, never named | the backup is not mentioned in any form |
+| 6 | `withmcp` | receipt claims the `.bak`, never named | same, seen from ownership |
+| 7 | `mcpthen` | receipt claims the `.bak`, never named | run 2 is **flagless**, so `WITH_MCP=0` and the whole arm is skipped — the path is absent from the block entirely while the receipt still claims it |
 
-- [ ] **Step 2: Compute the announcement from the same source as the action**
+- [ ] **Step 1: Read what the real run actually does — both stages of it**
 
-The dry-run must run the same `already_ignored` test and name the entries that will actually be appended. When none will be, say so — `.gitignore — already covered, no change` — rather than promising an edit.
+```bash
+grep -n 'add_ignore\|already_ignored\|WANT_IGNORED' install.sh
+```
 
-**The trap, and it is the mirror of the one Task 3's guard exists to catch:** an announcement computed from a *copy* of the real run's logic is a second definition that will drift. Share the computation.
+**The decision is two-stage, and this is the correction that matters most.** Stage 1 is
+`already_ignored` per entry, deciding `NEEDED`. Stage 2 is inside `add_ignore` itself: a
+`grep -qxF "$1" "$GITIGNORE"` that appends nothing when the literal is already present. **In a non-git
+project stage 1 always says "needed" and stage 2 is what actually declines** — so an announcement
+computed from `already_ignored` alone is still wrong in every non-git project. Reds 2 and 3 are
+exactly that.
 
-- [ ] **Step 3: Task 3's guard goes green**
+**`WANT_IGNORED` and the `add_ignore` calls are different kinds and must not be merged.**
+`WANT_IGNORED` holds **3 concrete probe paths** for `git check-ignore`; `add_ignore` takes **4
+patterns**. The correspondence is 3→4 — `.claude/state/session.json` covers both `.claude/state/*` and
+the negation `!.claude/state/.gitkeep`. `check-ignore` needs a path, and a negation is never a probe.
+Derive both counts rather than trusting the comment in that region, which has been wrong before in
+this exact file.
+
+- [ ] **Step 2: Compute the `.gitignore` announcement from the same source as the action**
+
+Share the computation across **both** stages: an entry is appended iff `NEEDED` **and**
+`! grep -qxF <entry> "$GITIGNORE"`, plus the file-creation case.
+
+**The trap, and it is the mirror of the one Task 3's guard exists to catch:** an announcement computed
+from a *copy* of the real run's logic is a second definition that will drift. Share it.
+
+**The decline wording is a contract with the guard's parser, not free prose.** `already covered` and
+`no change` are in its recognised set; **`already has our entries` — the phrase the real run itself
+prints — is not**, so reusing it verbatim reads as a *promise* and leaves the red standing. Either pick
+a recognised phrase or extend the parser's list in the same commit, deliberately and with a comment
+saying why.
+
+- [ ] **Step 3: Announce the manifest edit and the backup — and put the backup outside the flag**
+
+For red 4: the existing line mentions the manifest but its first field is `--with-mcp:`. Reshape it to
+**lead with the path**. Note that a `backup: <path>` form emits a directory claim (trailing slash) and
+will **not** satisfy a plain path — a false red in the other direction. Use an ordinary path line.
+
+For reds 5–7, the backup announcement does not exist today and its condition has **five** stages, not
+two. The `.bak` survives only if: the manifest exists; the package is absent; it is not D11's decline
+(`[ -e "$MANIFEST.bak" ] && [ "$MANIFEST_BAK_KEPT" -ne 1 ] && ! owned_by_installer …`); the surgical
+edit **succeeded** (the failure arm does `mv "$MANIFEST.bak" "$MANIFEST"`, leaving no backup); and git
+does **not** track `Packages/manifest.json`. **The edit-succeeded stage is the one the dry run cannot
+predict without rehearsing the edit on a temp copy** — decide what to do about that and say what you
+chose. An honest announcement that names a condition it cannot evaluate is better than a confident one
+that is wrong.
+
+**Red 7 is the placement requirement.** Run 2 is flagless, so an announcement inside
+`if [ "$WITH_MCP" -eq 1 ]` never prints while the receipt still claims the file — in the path **every
+user is on after install 1**. `install.sh`'s own Step 8 comment already states this principle for the
+receipt row (*"OUTSIDE THE FLAGS, NOT JUST OUTSIDE THE BRANCHES"*); the announcement must mirror it.
+`owned_by_installer` is the disjunct that answers on a flagless run.
+
+- [ ] **Step 4: The guard goes green — and the acceptance is the announcement's CONTENT**
 
 ```bash
 bash tests/test-install-dryrun.sh; echo "exit=$?"
 ```
 
-Against both fixtures — the default and the wholesale-ignore one. Report both.
+All nine fixtures, `Failed: 0`.
 
-- [ ] **Step 4: Gates, commit**
+**Do not accept "the reds are gone" as done.** Task 3's third review proved the guard will accept a bad
+fix: **one line** reading `printf '  Packages/ — the manifest and its backup\n'` inside the existing
+`WITH_MCP` guard closed reds 4, 5 and 6 while naming neither file. That specific hole was then closed —
+the generic rule no longer mints directory claims — but the lesson stands: **state in your report what
+each new announcement actually says, and check by eye that a user reading it learns which files are
+written and which are claimed.**
+
+Then re-run the three mutations Task 3's Step 3 established — a write with no announcement, an
+announcement with no write, and an unannounced append to a pre-existing file — and confirm the guard is
+still red on each. A fix that made the guard permissive would pass Step 4 and fail this.
+
+- [ ] **Step 5: Gates, commit.** Both. `install.sh` is not under `.claude/`; confirm zero baseline
+drift rather than assuming it.
+
+**Do not touch the `bare` create path's missing receipt row.** D11 explicitly declined to promote it —
+debris, not data loss — and it is a second-wave item. If your edit is near that branch, leave the
+decision where the spec put it.
 
 ---
 
