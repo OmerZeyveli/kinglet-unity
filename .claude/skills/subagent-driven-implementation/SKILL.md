@@ -102,7 +102,8 @@ contradicted in the file beside it is a rule nobody is following.
    hook files, every guard and every task review passed, and updating a project whose
    `.claude/settings.json` had ever been edited — one appended newline is enough — left 15
    registrations pointing at files that no longer exist, with no self-healing. Two independent
-   readers found it after the wave closed, by running the upgrade. The fixture is: install the base
+   readers found it after the wave closed and agreed to the name — one by walking the dependency
+   graph outward from the deleted files, one by running the upgrade. The fixture is: install the base
    version, modify the one file the update is documented to preserve, install the change, then assert
    the **resulting tree is internally consistent** — not merely that files were written.
 2. **Handle the report.** The implementer returns one of four statuses — see `implementer-prompt.md`
@@ -143,8 +144,10 @@ contradicted in the file beside it is a rule nobody is following.
    *Sweep the blast radius, not the diff.* If the task removed or renamed anything, sweep by the
    removed **name** — and then sweep again by the **aggregate**: re-derive every count, category list
    and capability sentence the removed thing contributed to, across the whole tree. A bare numeral, a
-   category word and a scope claim contain no removed name, so a name-keyed sweep is structurally
-   blind to all three, and the aggregate sweep is the one that never gets run. Measured in this wave:
+   category word, a capability sentence and a scope claim contain no removed name, so a name-keyed
+   sweep is structurally blind to all four, and the aggregate sweep is the one that never gets run.
+   (`final-reviewer-prompt.md` gives each of those four a search shape — it is the same four.)
+   Measured in this wave:
    the suite's wall clock outgrew the timeout written into the plan's own constraints — 150000 ms
    against four later measurements of 191–255 seconds — and every round that made the suite slower
    passed without opening that sentence. A truncated run reads as red, so the constraint did not
@@ -156,8 +159,8 @@ contradicted in the file beside it is a rule nobody is following.
    you just filled — "unguarded", "hand-maintained", "not yet", "open question", "we do not" — and
    for the prose that describes the state you just left. Measured in this wave: a ruling correctly
    forbade implementers from regenerating a generated baseline, and thereby made every brief's
-   "finish with two green gates" impossible for any task that drifts that baseline. Nobody re-read
-   the briefs, so the next implementer's only two options were a false green and a stall.
+   requirement to finish on a green suite impossible for any task that drifts that baseline. Nobody
+   re-read the briefs, so the next implementer's only two options were a false green and a stall.
 
    Then mark the ledger item done with its commit range (first commit of the task through its last,
    inclusive — the range the whole-branch review will diff). Record every deferred Minor finding and

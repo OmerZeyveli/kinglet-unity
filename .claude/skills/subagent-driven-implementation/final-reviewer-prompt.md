@@ -43,8 +43,12 @@ artifact does.
    stands**:
 
    - **Bare numerals.** Any count of a thing whose number the branch changed, wherever it is written
-     as a fact — a table cell, a summary line, a comment. Derive the number; never read it off the
-     document that states it.
+     as a fact — a table cell, a summary line, a comment. **Search on the noun, not the number**,
+     because the number is what you are trying to find and cannot be the needle: for each kind whose
+     count moved, search the shipped tree for that kind's word and read every digit near a hit —
+     `grep -rniE '[0-9]+[^0-9]{0,40}NOUN|NOUN[^0-9]{0,40}[0-9]+'`, plus its spelled-out forms ("two",
+     "a dozen"), which no digit pattern reaches. Then derive the count and compare; never read it off
+     the document that states it. **This is the highest-cost shape of the four** — see below.
    - **Category words.** A list of kinds ("meta, code quality, workflow") that a removal emptied or
      shortened. A list survives the deletion of its last member without one word changing.
    - **Capability sentences.** "X enforces Y", "the tool checks Z" — written about a behaviour rather

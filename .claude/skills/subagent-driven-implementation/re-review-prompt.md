@@ -50,10 +50,12 @@ round that wrote them.
 ways.** If the text you meant to break was already gone, or your edit missed by a character, the gate
 is green because nothing changed. That green is indistinguishable from a hollow guard, so the
 reviewer files a finding that does not exist and a round gets dispatched after it; and it is equally
-indistinguishable from a guard doing its job, so a real hole survives. **So the instruction is not
-"check that your mutation applied."** It is: `cmp` the mutated file against the original, confirm the
-marker you injected is actually present in it, and emit an explicit `MUTANT DID NOT APPLY` when it is
-not. A zero is not evidence until you know which zero it is.
+indistinguishable from a guard doing its job, so a real hole survives. **Confirming the mutant applied
+is exactly the instruction — confirming it by eye is what does not count**, because the edit you meant
+to make and the edit that landed look identical in your own head. Confirm it mechanically: `cmp` the
+mutated file against the original, check that the marker you injected is actually present in it, and
+emit an explicit `MUTANT DID NOT APPLY` when it is not. A zero is not evidence until you know which
+zero it is.
 
 Measured three times in one wave, the third by a reviewer in the act of verifying someone else's
 work — which is the instance worth remembering, because nobody involved had a stake in the answer. It

@@ -64,7 +64,9 @@ Use the `unity-reviewer` agent to check:
 
 ## Output
 
-Present findings grouped by severity with specific file:line references and suggested fixes.
+Present findings grouped by severity, each anchored to the file plus the symbol, method or exact text
+to search for — a line number alongside that anchor is welcome, never instead of it — with suggested
+fixes.
 End with a summary: X critical, Y performance, Z suggestions.
 
 ## Suggest next

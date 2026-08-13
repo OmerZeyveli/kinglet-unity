@@ -31,6 +31,24 @@ them verbatim, not summarized; a summary is a second-hand paraphrase of a rule t
 asked to enforce exactly, and a paraphrase can silently drop the clause that mattered. This is the
 reviewer's attention lens — the specific things to check, not "review the code" unscoped.
 
+## If the task claims a guard covers something, THIS review is where that gets tested
+
+`re-review-prompt.md` states three requirements in full — but **the fix loop only runs when this
+review has already found something**, so a guard that lands in a task you approve is never reached by
+any of them. Apply all three here, on first read:
+
+- **Mutate the claim instead of reading it.** Falsify what the guard is supposed to catch, run the
+  gate, restore. A gate that stays green is the finding. Four of thirteen findings in one audit were
+  settled this way in minutes, and every one of them was introduced at a round like this one.
+- **Re-derive any class the task names.** "Five stale counts", "every reference to X" is a claim about
+  **membership** — derive that membership from the criterion. Checking the listed members is not
+  checking the class.
+- **Never accept a guard's own coverage list as its coverage.** The same commit wrote the guard and
+  the list, so their agreeing with each other is not evidence about the tree.
+
+Read `re-review-prompt.md` for the failure modes, above all `MUTANT DID NOT APPLY` — without it a
+green gate means nothing.
+
 ## Verdict format the reviewer must return
 
 **Spec:** ✅ or ❌, with specifics — which requirement, and what the diff does or does not do about
