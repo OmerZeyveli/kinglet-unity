@@ -200,6 +200,23 @@ The announcement is computed from the same `already_ignored` results the real ru
 entries that will actually be appended. When none will be, it says so or says nothing — it does not
 promise an edit that will not happen.
 
+> **Correction, 2026-08-13 — this paragraph describes one stage of a two-stage decision, and as
+> written it prescribes the defect.** Criterion 8 was amended the same day; **D5 was not**, and Task
+> 4's implementer caught the half-correction. `already_ignored` is stage 1 and decides `NEEDED`. Stage
+> 2 lived inside `add_ignore`: a per-entry `grep -qxF` that appends nothing when the literal is
+> already a line in the file. **In a non-git project stage 1 always says "needed" and stage 2 is what
+> actually declines**, so an announcement built from `already_ignored` alone is still wrong in every
+> non-git project — which is most Unity projects on their second install.
+>
+> The correct statement: **the announcement and the action share one decision, spanning both stages.**
+> An entry is appended iff `NEEDED` **and** the literal is not already a line, plus the file-creation
+> case.
+>
+> Task 4 implemented it by moving the decision *up* rather than copying it: `gitignore_plan()` makes
+> the whole call once, above both readers, and `add_ignore` no longer exists. That is the shape this
+> decision should have asked for — **the trap D5's last sentence names is not "the announcement might
+> drift from the action", it is "there are two definitions at all."**
+
 **The dry-run guard in D4 therefore needs a third oracle**: a `find` snapshot sees new paths, the
 receipt sees claimed ownership, and neither sees a line appended to a file that already existed. Hash
 the content of every pre-existing file the installer may touch, before and after.

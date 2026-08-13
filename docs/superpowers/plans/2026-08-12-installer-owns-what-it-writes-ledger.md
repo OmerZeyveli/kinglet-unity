@@ -16,19 +16,24 @@ added mid-wave, so re-read it rather than working from an earlier reading.
 **Tasks 1, 1b, 1c, 1d, 2, 2b, 2c and 3 are done and closed. Task 4 is the next action**, then 5 and 6,
 then the whole-branch review.
 
-**The suite is RED on purpose: `Total: 940  Passed: 933  Failed: 7`, 33 files, tree clean at
-`82b806a`.** `provenance OK`, baseline zero drift. The plan puts guards before fixes so each guard
-starts red; Task 3 built the dry-run guard and **Task 4 closes all seven**. Do not "fix" the red by
-weakening the guard — Task 3's own third review proved a one-line vague announcement could close three
-of the seven while telling the user nothing, and that hole is now shut.
+**Suite green: `Total: 960  Passed: 960  Failed: 0`, 33 files, tree clean at `82dc293`.**
+`provenance OK`, baseline zero drift. Task 3 left seven deliberate reds and **Task 4 closed all
+seven**; the dry-run guard went 138/7 → **165/0**.
 
-**Task 4's brief was rewritten 2026-08-13 before dispatch** and is not the plan's original text. The
-original scoped it to "the dry-run's `.gitignore` line" and two fixtures; the guard now has nine
-fixtures and seven reds across two defects. Read the rewritten section, not memory of the old one.
+**Two spec corrections landed mid-wave and both are dated blocks inside the spec, not rewrites.**
+Criterion 8's example was false when written (checked against `c5280c4`), and **D5's body prescribed
+the defect** — it describes stage 1 of a two-stage decision. Criterion 8 was amended on 2026-08-13 and
+D5 was not; Task 4's implementer caught the half-correction. Read both dated blocks before touching
+that area.
 
-**Criterion 8 was amended the same day, and the amendment is a correction to this spec's own
-problem statement** — its example was false when written, checked against `c5280c4`. See the dated
-block under problem statement 5.
+**`grep` in an interactive shell here is a function wrapping `ugrep 7.5.0`; `/usr/bin/grep` is GNU
+grep 3.11, and they diverge.** An **unescaped `$` mid-pattern** is a literal in GNU BRE and an anchor
+in ugrep, so such a probe returns a **silent false negative** through the wrapper. It already produced
+one wrong conclusion in this wave — a review reported "no precedent anywhere in this repo" for a
+construct that appears three times. **Use `/usr/bin/grep` for anything reported as an absence.**
+Narrower than it first looked: a script run as `bash x.sh` gets `/usr/bin/grep`, so `install.sh`'s and
+the guards' own `grep` calls are GNU at runtime. The hazard is hand probing — which is what every
+dispatch in this wave does.
 
 ### How the wave grew, and why it stopped growing
 
@@ -159,7 +164,7 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 2b | The other file the installer keeps and does not record | **done** | `c4d36f3..15dfda4` | **No fix round** — Spec ✅ (criterion 13 clause 3 narrowed, disclosed), Quality Approved. Answered the open question by measurement; added I4/I5 beyond the plan, and I4 is the only state that discriminates the receipt arm. Suite 674 → 738 |
 | 2c | The two writers that overwrite without asking | **done** | `e85ea32..b573ce8` | Spec ✅, Quality Approved, 1 fix round. Survived **eight** adversarial shapes the implementer never built. Its round-1 test fix uncovered a live D11 violation the old test was reporting green. Suite 738 → 795 |
 | 3 | The dry-run guard, three oracles | **done** | `9710ae6..82b806a` | Spec ✅, Quality Approved, **3 fix rounds**. Grew from 6 fixtures to 9. Leaves **7 deliberate reds** — the suite is red on purpose until Task 4 |
-| 4 | The dry run announces what the run will actually do | open | — | **Brief rewritten 2026-08-13** before dispatch: two defects, seven reds, four `.gitignore` shapes, and a placement requirement the original did not have |
+| 4 | The dry run announces what the run will actually do | **done** | `6ad42eb..82dc293` | Spec ✅, 1 fix round. Brief rewritten before dispatch. **Suite green again: 960/960**, guard 138/7 → 165/0. `add_ignore` no longer exists — the decision moved up rather than being copied |
 | 5 | One pipeline detector, and Option B states its costs | open (brief pending) | — | `urp+hdrp` display and skill routing is the implementer's call |
 | 6 | Whole-wave verification | open (brief pending) | — | Criterion 6 re-run, not cited |
 
@@ -666,6 +671,55 @@ not carelessness, but what writing confidently about a program one has just meas
   Disclosed, with the honest reason: the mode is recorded by `install.sh` on 5 of 8 row writers and
   **unused** by `uninstall.sh`.
 
+## Task 4 — the decision moved up instead of being copied, and one word nearly shipped a latent red
+
+**The restructuring is the task's real content.** D5 asked for the announcement to be "computed from
+the same `already_ignored` results", and the implementer worked out that this describes **one stage of
+two**: stage 1 decides `NEEDED`; stage 2 was a per-entry `grep -qxF` **inside `add_ignore`** that
+appends nothing when the literal is already a line. In a non-git project stage 1 always says "needed"
+and stage 2 is what declines — so D5's prescription is wrong in every non-git project, which is most
+Unity projects on their second install.
+
+Rather than copy the second stage into the announcement, it moved the whole decision **up**:
+`gitignore_plan()` in a new Step 3b, above both readers. **`add_ignore` no longer exists.** The trap
+D5's last sentence names is not "the announcement might drift from the action" — it is "there are two
+definitions at all."
+
+Verified byte-for-byte against `6ad42eb` across eight `.gitignore` shapes: **seven identical, the
+eighth a bug fix.** The old `present` path reached `printf '\n'` *before* discovering it had nothing
+to append, so a `.gitignore` **not ending in a newline** got one byte appended under the banner
+`already has our entries.` — **a write announced as a no-change**, this wave's thesis at its smallest
+scale. The 3→4 distinction survived: `WANT_IGNORED` still holds 3 probe paths for `check-ignore`,
+`GITIGNORE_ENTRIES` holds 4 patterns, and no negation reaches a probe.
+
+### The one word
+
+The D11 decline arm read `… so --with-mcp is declined and the manifest would be left alone`. The
+guard's recognised decline set contains the **active** `would leave alone`; that line is **passive**.
+Substring match fails, so the line classified as a **promise** — and the review measured it end to end:
+
+```
+=== CLAIMS ===  Packages/manifest.json  promise
+*** the dry run promised Packages/manifest.json and the real run neither created nor changed it ***
+```
+
+**A latent red planted in the tree**, invisible only because no dry-run fixture built that shape — and
+the shape already existed one file over. The implementer's report had asserted the correct wording *as
+measured fact*; it was its intent, not the bytes. Fixed as wording rather than by widening the
+recognised set, on its own earlier reasoning that widening weakens every future announcement's failure
+mode. Then guarded: the new `bakmine` fixture is red on the passive spelling (164/1) and green on the
+active (165/0), and because **a declining run is invisible to all three oracles** it also asserts
+outside them that the user's bytes survived, the manifest gained no package, and the receipt gained no
+row — each proven failable by a separate installer mutation.
+
+### The `set -e` hazard, closed structurally
+
+`gitignore_plan` is called as a bare assignment, so under `set -euo pipefail` the assignment's status
+is the substitution's. Every path returns 0 today, so it could not fire — and the review measured what
+would happen if it ever did, by injecting `return 3`: **exit 3, 85 files installed, no receipt**, and
+a project `uninstall.sh` refuses to touch. The same injection now gives exit 0, 94 receipt rows, and a
+warn. That is the third measured member of the receipt-less-window class, and the first one closed.
+
 ## Deferred and parked findings
 
 ### From Task 2c — five, plus a class worth naming
@@ -840,6 +894,29 @@ task has run rewrites the record of what the implementer was actually told.
 19. **`stat -c '%a'` is GNU-only**, now at a fifth site. On BSD `stat` the row records `644` for a
     `600` file. Nothing reads the mode column (`uninstall.sh` destructures it as `_mode`), and mirroring
     the four existing sites beats introducing a second idiom. **For the macOS pass.**
+
+### From Tasks 3 and 4 — the announcement's remaining edges
+
+25. **The `gitignore_plan` fallback warns, exits 0, and does not feed `Not done:`.** Its `*)` arm
+    leaves `.gitignore` alone and prints one `warn` twelve lines above the green banner — the exact
+    shape `install.sh` introduces the `Not done:` block for, one writer over. It also does not name
+    the consequence: `.claude/settings.local.json` and `.claude/state/*` are then not gitignored.
+    Same family as item 21.
+26. **The dry-run guard is 165/0 green against an installer whose `.gitignore` step does nothing at
+    all.** By design — it measures honesty, not function — and the functional half lives in
+    `tests/test-install.sh`, whose backup-pattern assertion does go red. Worth knowing before anyone
+    reads the guard as coverage.
+27. **`--with-input-system` alone and both-flags-in-one-run are announced and hand-verified correct
+    but unasserted** — no fixture reaches them. The D11 decline arm *was* in that set and was measured
+    **wrong**, which is why it got a fixture and these got a disclosure.
+28. **`"pre-edit backup"` is loose on the both-flags run** — the surviving `.bak` holds the manifest
+    *after* the first caller's edit. Not false (it is the second caller's pre-edit state) but a user
+    could read it as the untouched original. Inherited by the new wording, not introduced by it.
+29. **Step 3b's invariant comment omits `$BACKUP_DIR`** from its enumeration of what Steps 4–6 write at
+    the project root — Step 5's head is `mv "$CLAUDE_DIR" "$BACKUP_DIR"`. The conclusion holds; the
+    sentence is what a future reader will audit against.
+30. **`scripts/studio-doctor.sh` still carries `${VAR%%$'\n'*}` twice** (lines 88 and 162). `install.sh`
+    moved off it for the macOS pass; that file did not. Second wave.
 
 ### From Task 1's review — five Minor, four closed in round 1
 
