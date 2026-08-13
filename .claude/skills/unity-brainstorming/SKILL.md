@@ -103,6 +103,39 @@ questions and re-score. At or above 6, one confirming round is enough.
 `design.md` is still written, still presented, and still approved. "Short design" and "no design"
 are different outcomes and only one of them is allowed.
 
+### What the score does not know
+
+In a project that has been through `/unity-init`, `CLAUDE.md`'s generated block states the Unity
+version, the render pipeline, the assembly definitions, the scenes in the build and the detected
+packages. Read the rubric literally and those facts answer dimensions on their own: **Platform** asks
+for "Unity version, render pipeline", and both sit in the context of every request in that project. A
+networking package in the detected list does the same to **Integration**'s "Dependencies?".
+
+Score this file's own vague example that way and it moves. "Add multiplayer to my game" is 3/10 in
+the examples below; in an initialised project whose block reports a networking package, Platform goes
+0 to 2 and Integration 1 to 2, and the total reaches 6 — the threshold exactly, from a request that
+has not gained a single word.
+
+**A fact the generated block supplies is context for answering a dimension. It is never points.** The
+block says the same thing to every request in the project, and because each dimension clamps at 2 it
+does not lift them equally — it lifts the vaguest request furthest. "Add multiplayer" gains 2 on
+Platform and 1 on Integration; the 7/10 example below gains 1 on Platform and nothing on Integration,
+which was already 2 on the strength of the request alone. The gap between the two closes from 4
+points to 2. A constant that lifts hardest exactly the requests the score exists to catch is worse
+than no signal at all. The dimension is not asking whether the Unity version is knowable. It is
+asking whether this request has been pinned down, and that answer comes from the user or it does not
+exist yet.
+
+So score each dimension on what the request settled, and use the block for what it is good at —
+answering the questions you would otherwise have had to spend the interview budget on. A dimension
+you could only answer by reading the block scores 0 or 1 on the request alone. The fact still belongs
+in the design; it just does not pay for the round.
+
+None of this decides whether the round happens. It cannot: the score sets depth, and the HARD-GATE,
+the written `design.md` and the user's approval are unconditional and sit outside it. Scoring the
+block's facts as points never skips the round — it buys a shallower one than the request earned,
+which is the failure this section exists to name.
+
 ## Interview Protocol
 
 When the score is below threshold:
