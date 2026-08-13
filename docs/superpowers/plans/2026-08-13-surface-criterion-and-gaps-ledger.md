@@ -201,6 +201,9 @@ stands. It has now gone stale twice.
   "both gates green" without this carve-out asks for something the ruling makes impossible, and the
   implementer either reports a false green or stalls. **Say it in the dispatch, and have the
   reviewer confirm the failure set rather than accept the claim.**
+- **The interactive `find` is a `bfs 4.1.1` wrapper, the same trap as `grep`→`ugrep`.** Use
+  `/usr/bin/find` (GNU 4.9.0) for any behaviour or absence claim. Discovered 2026-08-14 by a
+  reviewer measuring real file damage.
 - **Every dispatch gets its own `mktemp -d` scratch root, and no shared temp path.** Round 5 of Task 2
   had its `probe.sh` and `mutate.sh` replaced mid-task by another agent writing to a shared
   scratchpad, and the measurements it took afterwards were of the other agent's harness.
@@ -416,6 +419,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 1 | Twenty surfaces leave, and the counts get a guard | **done** | `818b2bd`…`38dec6c` | **19, not 20** — cut is 15 hooks + 4 scripts. 3 fix rounds. `detect-missing-refs.sh` restored by ruling; wiring is Task 3's. Whole-task audit ran after closure → F1–F13 |
 | 2 | The two gates block the act and permit the prose | **adjudicated at cap → 2b** | `5041b4b`…`3fd22dc` | 5 rounds; each fixed the previous round's fix. Inverted to a read-only allowlist in round 3, positional argument read in round 5 |
 | 2b | The tokeniser gets a quote model, and a corpus stops the next hole | open | — | **New.** Data loss: a quoted operator truncates the arg list, dropping the write flag. Requires a regression corpus checked against `546870f` / `06883cc` / `3fd22dc` |
+| 2c | What decides the route, and what the allowlist vouches for | open | — | **New.** Both holes exist at all four hook versions; `./evil/grep` destroyed 3/3 `.meta` files with the gate at 0 |
 | 3 | The surviving scripts become reachable | open | — | **R2**: leaves `scripts/` entirely. **R8**: no `Bash` for `unity-reviewer`. **R7** if it lands second |
 | **Stage 2 — installer correctness** | | | | |
 | 4 | The receipt exists before anything that can abort | open | — | The only permanent-damage path in the wave. **R1**: gains the five `stat -c` sites |
@@ -684,6 +688,47 @@ shapes applied to the task that wrote them down.**
     out would destroy the record of what the row claimed **while the contradiction shipped** — the
     historical-narrative case R12 says to preserve. Residual risk checked and not live: no
     `tests/*.sh` greps `file:line` at all.
+
+**From Task 2b's review (2026-08-14). Task 2b is in fix round 1. No Critical; three Important.**
+
+36. **The asserted cost bound measures the one shape the implementer optimised.** A command line a
+    quarter the size blows through the 10 000 ms ceiling: 8 000 short args (248 KB) costs **21 563
+    ms** where r5 costs 22 320 — **the fix bought nothing on that shape** — and 20 000 args (620 KB)
+    costs **127 182 ms**. Attribution measured directly: the awk scan is **114 ms**; the bash loop is
+    **19 612 ms**, and the cost is the `args="$args$FIND_TOK_SEP$tok"` accumulation, **O(n²) in
+    tokens per clause**. *The awk scanner is exonerated.* Inherited, not introduced. **This is the
+    task's own thesis applied to its cost guard: a test built from the same idea as the code confirms
+    the idea.** → in fix round.
+37. **The corpus catches the mutants its author imagined — measured one iteration further out.**
+    46 corpus payloads contain `xargs`; **none is path-qualified.** Deleting `*/xargs` from both arms
+    of `find_exec_commands` leaves the corpus at **419 PASS / 0 FAIL** while
+    `… | /usr/bin/xargs -0 sed -i` goes 2 → 0 and **destroys all three `.meta` files**. Calibration:
+    three of the reviewer's five mutants *were* caught, so the corpus works — it just does not cover
+    this. The task's own §5 had already noticed the shape (three of its mutants reddened zero first
+    try) and added five payloads; this is the same finding one level out. **The deliverable is the
+    sweep, not the payload:** for every branch that exists on purpose, is there a payload that would
+    notice its removal?
+38. **The exemption mechanism accepts "this is a known live hole" as a monotonic waiver.** The brief's
+    property is *verified false positives*; the guard accepts `X` plus **any non-empty string**.
+    Three records use it for **true positives** and two were executed: `awk -f script.awk` (127 B →
+    40 B) and `sed --in-pl` both destroy files. **So a future round can downgrade a real block to a
+    permit by typing `KNOWN HOLE` in the note column and the guard stays green** — defeating the very
+    mechanism the brief says makes the r3→r4→r5 pattern impossible to repeat. Fix: distinct markers
+    with the count of known-holes asserted.
+39. **43 of the 45 exemptions were executed against real `.meta` files and caused no damage
+    whatsoever** (byte length + cksum identical). Their reasons are measured facts, not assertions.
+    Recorded because it is the strongest evidence in the wave that a mechanism was built honestly.
+40. **Minor, all confirmed and carried:** the `awk`-failure fail-open is inherited (a broken `awk` on
+    `PATH` → rc=1 on both new and r5); the unbalanced-apostrophe false positive reproduces
+    (`# it's only a read` above a read-only find → 2 where all three earlier versions → 0), bounded
+    by the route precondition, and it cost the reviewer one blocked probe; a **2–3× slowdown on the
+    linear path** (576 ms vs r5's 267 at 71 KB; 42 vs 38 ms on ordinary commands); and the second
+    `unity_hook_block` after the unparseable one is unreachable — correct, but a fall-through rather
+    than an `else`.
+41. **A trap worth knowing beyond this task: the interactive `find` here is a `bfs 4.1.1` wrapper**,
+    exactly like `grep`→`ugrep`. Task 2b's reviewer used `/usr/bin/find` (GNU 4.9.0) for every
+    damage measurement. **Add it to the standing facts** — an absence or a behaviour claim made with
+    the interactive `find` is the same silent-false-negative class.
 
 **Inherited from earlier waves, still open:**
 

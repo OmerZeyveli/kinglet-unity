@@ -282,6 +282,125 @@ that were wrong were wrong in a direction their own probes could not look.
 
 ---
 
+## Task 2c: What decides the route, and what the allowlist vouches for
+
+**Files:** `.claude/hooks/bash-gate.sh` (the route precondition and the allowlist's identity test),
+`tests/test-bash-gate-precision.sh` (the corpus), `provenance.tsv` (note column).
+
+**Interfaces:**
+- Consumes: **Task 2b's tokeniser and its 242-payload corpus.** Both are correct and both stay. The
+  corpus's frozen `hist` column now spans four versions; **extend it, do not restart it.**
+- Produces: two holes closed that every version of this hook has had, and corpus anchors for both —
+  Task 2b's review recorded that **neither has any corpus payload today**, so a future tightening has
+  nothing to regress against.
+
+**Why this is a task and not more of 2b.** Task 2b was scoped to `find_exec_commands` — how a
+command's own tokens are read. Both findings below sit **one level up**, in the code that decides
+*whether that function runs at all* and *which command it is looking at*. They are identical at
+`546870f`, `06883cc`, `3fd22dc` and `f735fe2`, so nothing regressed; 2b's reviewer ruled them
+correctly-scoped successor items rather than Criticals, and this section is that ruling.
+
+### Step 1: Reproduce both, and derive the third
+
+All measured by Task 2b's reviewer against real `.meta` files. **Re-run each before changing
+anything** — if one does not reproduce, the tree has moved and this brief's premise is void.
+
+**The route precondition.** The regex deciding whether the `.meta` route applies runs *before* the
+tokeniser, so a name split across quotes never reaches the parser that would resolve it:
+
+| payload | verdict at all four versions |
+|---|---|
+| `ls Assets/*.meta \| xargs sed -i s/a/b/` | **0** |
+| `find Assets -name "*.m"*"eta" -exec sed -i s/a/b/ {} \;` | **0** |
+| `find Assets -name '*.met'a -exec sed -i s/a/b/ {} \;` | **0** |
+
+The second and third are the sharp ones, and they are **the same defect one level up**: Task 2b's
+tokeniser resolves those names correctly, and the gate never asks it. The first is different — no
+`find` at all — and may need a different answer; say so rather than folding them together.
+
+**Basename vouching.** The read-only allowlist matches on the command's basename, so any executable
+whose *name* is on the list is vouched for regardless of where it comes from. Executed, not reasoned:
+a real program at `./evil/grep` that rewrites its arguments, invoked as
+`find Assets -name '*.meta' -exec ./evil/grep -l guid {} \;`, **destroyed all three `.meta` files,
+127 B → 6 B, with the gate returning 0 at all four versions.** `/tmp/evil/grep` behaves the same.
+
+- [ ] Reproduce all four. Report the third route spelling's derivation — it was found by a reviewer
+      generalising from two, and **the class is "a glob whose literal text is split by quoting", not
+      "these three spellings".** Derive the class, then write payloads for it.
+
+### Step 2: Decide what the route precondition should be, and say why
+
+This is the load-bearing judgement and the brief does not make it for you. Three shapes, and none is
+obviously right:
+
+1. **Tokenise first, then decide the route.** Correct, and it inverts the hook's cost model: every
+   Bash call pays for a full parse before the cheap regex can reject it. Task 2b measured the awk
+   scan at 114 ms on a 248 KB payload — cheap in isolation, not free on every call.
+2. **Widen the precondition regex** to match a quote-split literal. Cheap, and it is a fourth
+   iteration of exactly the pattern that put Task 2 at its cap — a regex chasing spellings.
+3. **Make the precondition conservative rather than exact**: if the command names `find`, `xargs` or
+   a glob over `Assets/`, tokenise; otherwise the fast reject stands. Wider than (2), cheaper than
+   (1), and it costs first-attempt blocks on reads that mention `Assets/`.
+
+**Measure before choosing.** Cost the fast-reject path on an ordinary command under each shape (Task
+2b's figure for an ordinary command is 42 ms; r3's was 38 ms) and report the numbers. **If your
+measurement says the obvious choice is wrong, take the other one and say so.**
+
+### Step 3: Decide what the allowlist's identity test should be
+
+`grep` on the allowlist means *"the `grep` I expect"*, and the code cannot tell that from
+`./evil/grep`. Options, again yours to choose:
+
+- **Reject any command containing `/`** — a path-qualified command is never allowlisted, so it blocks.
+  Conservative and blunt: `/usr/bin/grep` blocks too, which is a legitimate spelling a careful user
+  writes deliberately.
+- **Allow only a fixed set of absolute prefixes** (`/usr/bin`, `/bin`) plus bare names.
+- **Resolve and compare** against `command -v` — accurate and it makes the gate depend on `PATH`,
+  which is attacker-controlled in exactly the scenario that matters.
+
+Whatever you choose, **keep the direction negative**: an identity the table cannot establish must
+cost a **block on a read**, never a **pass on a write**. And note the interaction with Task 2b's
+`*/xargs` handling — that arm exists precisely because path-qualified introducers are real, so a rule
+that rejects every `/` must not break it. Task 2b's own reviewer found the corpus had **no
+path-qualified `xargs` payload at all**; check whether that gap is closed before you rely on it.
+
+### Step 4: Corpus anchors, and extend the frozen column
+
+Both findings must gain corpus payloads, with the `hist` column extended to record the verdict at
+Task 2b's commit as a fifth historical version. **The corpus's monotonic property is what makes the
+r3→r4→r5 pattern impossible to repeat; adding versions to it is how it keeps working.**
+
+- [ ] Add payloads for **every** route spelling in your derived class, plus the basename class in
+      both directions (`./evil/grep` blocks; `/usr/bin/grep` behaves as you decided in Step 3).
+- [ ] **Then run the sweep Task 2b's review asked for and generalise it:** for every branch in the
+      hook that exists on purpose, is there a corpus payload that would notice its removal? Report
+      the branches with no payload. That sweep, not the payloads, is this step's deliverable — the
+      measured lesson from Task 2b is that **a corpus catches the mutants its author imagined.**
+
+### Step 5: Mutation-prove, both directions
+
+- [ ] Mutate each fix so it fails open and confirm the new payloads red. Report **which** assertions
+      red — a mutation that reds everything has isolated nothing.
+- [ ] `cmp` the mutated file against the original and emit an explicit **`MUTANT DID NOT APPLY`**
+      when it did not. Three measured instances in this repository of an unapplied mutant reporting a
+      clean zero, and the failure is **symmetric**: it makes a broken guard look sound *and* a sound
+      guard look broken.
+- [ ] Confirm the exemption marker scheme Task 2b introduced still holds, and that nothing you add
+      uses an exemption where a fix belongs.
+
+### Step 6: Gates, report, commit
+
+Both gates. `bash tests/run-tests.sh` with a timeout of **at least 400000 ms** — a killed run is not
+a red suite. `.claude/hooks/` is inside `migration/baseline-inventory.json`, so **your suite will be
+RED with failures naming exactly the files you changed under `.claude/`, and that is correct** —
+enumerate them and show the failure set is only that. **Do not run `baseline-regenerate`** (R6); list
+your `.claude/` files for the controller. Commit messages through a file.
+
+**Report the one thing this task cannot settle:** whether a determined caller can still reach a write
+through some third route. Every version of this hook has been confidently wrong about that once.
+
+---
+
 ## Task 3: The surviving scripts become reachable
 
 **Amended after Task 1 (2026-08-13).** This section was written before the cut and every figure in it
