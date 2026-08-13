@@ -576,6 +576,63 @@ seven-column row **iff a task adds a tracked file**. `migration/baseline-invento
 semantic serializer, and only five of the tasks drift it. Treating provenance as a hard serializer
 would have cost four to five unnecessary rounds.
 
+## Corrections the figure re-derivation forced on the rulings themselves
+
+A four-agent wave re-derived every figure Batch 1's briefs quote, at a commit none of the source
+documents saw, in private `mktemp -d` trees. It corrected the controller, the scouts and the audit —
+and two of its corrections were to rulings, not to numbers.
+
+- **R9's "nine files, not two" names the WRONG nine.** The nine are the **archive-breakage** set, and
+  that set is **disjoint** from the vacuous-green class R9's own decisive measurement is about. An
+  implementer who re-derives by diffing a clone against a `git archive` extraction **fixes the wrong
+  nine and ships the class untouched, while reporting success**, because the nine it fixed all now
+  behave. The class R9 actually measured — *a guard whose loop body never runs when its sweep goes
+  empty, so it reports green, or greener, on a real violation* — measures **eight**: seven in
+  `tests/` plus `scripts/check-provenance.sh`. **Derive by the criterion; report both sets and name
+  the overlap.**
+- **Task 10's title corresponds to no derivable set.** Files line 5, Steps 6, R9 9, archive-breakage
+  9, vacuous-green 8. **No command in this repository produces six.** Retitle by the criterion — this
+  wave's own thesis applied to its own task title.
+- **R4 was carved into, and R4 wins.** The controller's Task 10 dispatch handed it two repairs living
+  in `tests/test-derived-counts.sh`. R4 gives that file **exactly one owner for the whole wave: Task
+  11**, and it was made to resolve six conflicting pairs at once. **Both repairs move to Task 10's
+  report as text for Task 11.** A ruling with a convenience exception is not a ruling.
+- **F6's one line reds 10 sites across 5 files immediately** (not 6 — the source's own repair list
+  said 5 while its prose said 6), and several are **deliberate documented residue**: a retired name
+  legitimately appearing in `docs/ARCHITECTURE.md`, in `_lib.sh`'s comments, and in `session-save.sh`
+  / `track-edits.sh`. The five: `.claude/hooks/_lib.sh`, `.claude/hooks/session-save.sh`,
+  `.claude/hooks/track-edits.sh`, `docs/ARCHITECTURE.md`, `scripts/validate-asmdefs.sh`. **The risk
+  is an implementer deleting correct prose to make a guard green.**
+- **The jq vacuity is real but its tally is violation-dependent.** Reported `3/2 → 5/0 rc=0`; a
+  *replacement* violation gives `3/2 → 4/1 rc=1`, because a replacement is visible from both
+  directions and the non-jq assertion still reds. `5/0 rc=0` needs a violation isolated to the
+  jq-fed sweep — an **added** dangling registration that removes nothing. **An implementer handed
+  the replacement recipe concludes the finding evaporated.**
+- **Task 4 and Task 4c collide on two files, not one.** Both write `install.sh` (receipt block vs
+  summary block) **and both write `README.md`** (Task 4 falsified the `.gitignore` sentence; 4c/F2
+  owns the hook-count row). **Serialise, or give each an explicit line-disjointness instruction.**
+- **`.claude/hooks/bash-gate.sh` blocks probes that rewrite a fixture's `Packages/manifest.json`** —
+  four instances in this wave. The retry after clearing must be **byte-identical, including
+  unrelated lines**. **Prefer `python3` over `grep -v … > tmp && mv` for fixture edits**; the
+  re-derivation agent used python3 throughout and was never blocked once.
+- **"The 29 failure-capable write commands in the pre-receipt window" is not derivable by any
+  command.** It is a hand classification, and a mechanical grep gives a different number per verb
+  set. **Do not put 29 in a brief.** Four *reachable* triggers were verified by execution instead —
+  and spec acceptance criterion 5 grades **one of the four**, three of which need no flag, so a
+  `[ -L ]` patch on the single `cp` satisfies the criterion while leaving three live.
+- **`test-provenance-origins.sh` in an archive copy dies rc=128 having asserted 14 of 47, emitting
+  no `FAIL` token** — the `1` in an earlier report is the runner's own backstop line. Word it that
+  way or the next reader hunts for a named assertion that does not exist.
+- **Say "69 *data* rows"** of the receipt: the file is 76 lines = a 7-line preamble + 69 data rows
+  (67 `.claude/*` + 2 root). A brief that writes "69 rows" sends an implementer to `wc -l`.
+
+**Method note worth keeping:** the driver that produced every per-file figure replicates
+`run-tests.sh`'s loop body exactly — `source tests/run-tests.sh --source-only`, `set +e`,
+`( source tests/<file> ) 2>&1 </dev/null`, tallied with the runner's own ANSI-stripped needles. It
+does **not** synthesise the runner's backstop line, which is the whole of disagreement D4. **A
+faithful driver and the real runner disagree in exactly one place, and knowing which place is worth
+more than either number.**
+
 ## The honest limits, carried forward to EE
 
 - **Nothing in either audit proves the toolkit works inside Claude Code.** No scout ran a command
