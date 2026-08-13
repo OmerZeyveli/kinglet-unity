@@ -354,7 +354,27 @@ if [ "$DRY_RUN" -eq 1 ]; then
   elif grep -q 'kinglet:generated:begin' "$PROJECT_DIR/CLAUDE.md" 2>/dev/null; then
     printf '  CLAUDE.md — refresh the generated section only; your prose untouched\n'
   else
-    printf '  CLAUDE.md.generated — yours exists and has no markers, so it is NOT touched\n'
+    # TWO FILES, TWO FATES, AND THIS ARM USED TO NAME ONE AND DESCRIBE THE OTHER:
+    #
+    #   CLAUDE.md.generated — yours exists and has no markers, so it is NOT touched
+    #
+    # "yours", "has no markers" and "NOT touched" are all true of CLAUDE.md. The file the line NAMES
+    # is the one this arm CREATES. So the dry run promised to leave alone the only path it was about
+    # to write, on the branch a user reaches by already having a CLAUDE.md of their own — which is
+    # exactly the reader who is checking whether their file is safe.
+    #
+    # Split, so each path gets its own sentence and the guard can read one claim per line.
+    printf '  CLAUDE.md — yours has no generated markers, so it is NOT touched\n'
+    # THE SAME PREDICATE THE REAL RUN USES, called rather than restated: an announcement computed
+    # from a copy of the write's condition is a second definition that drifts, which is the failure
+    # this whole block has already paid for twice. owned_by_installer is defined above this point,
+    # $RECEIPT still holds the previous run's receipt here, and the arguments match the real run's
+    # call — '' for the reference copy, because this file is generated per project and has none.
+    if [ -e "$PROJECT_DIR/CLAUDE.md.generated" ] && ! owned_by_installer 'CLAUDE.md.generated' ''; then
+      printf '  CLAUDE.md.generated exists and is not ours — would leave alone, and generate nothing\n'
+    else
+      printf '  CLAUDE.md.generated — generated beside your own CLAUDE.md, for you to merge by hand\n'
+    fi
   fi
 
   printf '  .gitignore — add .claude/settings.local.json and .claude/state/*\n'
