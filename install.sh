@@ -351,6 +351,22 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 # `!.claude/state/.gitkeep`. Both counts are DERIVED wherever they are used rather than written into
 # a sentence — the sentence that used to sit here said "three" for a whole wave after a fourth
 # pattern was added below it.
+#
+# THE PLAN IS COMPUTED TWICE — once by the dry-run block, once by Step 7 — AND THE TWO AGREE ONLY
+# BECAUSE NOTHING BETWEEN THEM TOUCHES ITS INPUTS. Those inputs are exactly two: the contents of
+# $GITIGNORE, and git's ignore rules for $PROJECT_DIR. Steps 4–6 write only under $CLAUDE_DIR, plus
+# CLAUDE.md and CLAUDE.md.generated at the root, and install.sh runs no git command that mutates an
+# index or a config. True at the time of writing and asserted NOWHERE — if a future step gains a
+# write to .gitignore, or runs `git add`/`git config` on the project, Step 7's recomputation will
+# silently disagree with what the dry run already announced. The fix then is to call gitignore_plan
+# ONCE, here, and pass the result down; it is two calls today only because the dry run exits before
+# Step 7 ever runs and a single call would be dead weight on that path.
+#
+# A NEWLINE HELD IN A VARIABLE, so no `$'…'` appears inside a parameter-expansion pattern below.
+# `${VAR%%$'\n'*}` does have precedent here — scripts/studio-doctor.sh uses it twice — but this file
+# is the one a planned macOS pass most needs to survive, bash 3.2's parser cannot be exercised from
+# this host, and `"$NL"` inside the pattern is unambiguous in every bash. Cheap insurance.
+NL=$'\n'
 GITIGNORE="$PROJECT_DIR/.gitignore"
 WANT_IGNORED='.claude/settings.local.json
 .claude/state/session.json
@@ -511,17 +527,23 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # run's own "already has our entries" is deliberately NOT, because the bias is toward a loud false
   # red rather than a silent false green. Both declines below therefore carry the recognised
   # spelling and say WHICH of the two mechanisms declined in the prose after it.
-  DRY_GITIGNORE_PLAN="$(gitignore_plan)"
-  case "${DRY_GITIGNORE_PLAN%%$'\n'*}" in
+  # NOT A BARE ASSIGNMENT — see Step 7's call site, which carries the measurement. A death here
+  # would be harmless (nothing is written on this path), but the two readers are kept identical on
+  # purpose, and an idiom that is safe in only one of the two places it appears is one edit from
+  # being moved to the other.
+  DRY_GITIGNORE_RC=0
+  DRY_GITIGNORE_PLAN="$(gitignore_plan)" || DRY_GITIGNORE_RC=$?
+  [ "$DRY_GITIGNORE_RC" -eq 0 ] || DRY_GITIGNORE_PLAN="failed with status $DRY_GITIGNORE_RC"
+  case "${DRY_GITIGNORE_PLAN%%"$NL"*}" in
     covered)
       printf '  .gitignore — git already ignores every path we would add, so it is already covered — no change\n' ;;
     present)
       printf '  .gitignore — all %s of our entries are already lines in it, so it is already covered — no change\n' \
         "$GITIGNORE_ENTRY_COUNT" ;;
-    *)
+    append)
       # ONE LINE, WITH THE ENTRIES ON IT RATHER THAN INDENTED UNDER IT. An entry per line would give
       # each entry a first field of its own and mint claims about paths nothing writes.
-      DRY_GITIGNORE_ADD="${DRY_GITIGNORE_PLAN#*$'\n'}"
+      DRY_GITIGNORE_ADD="${DRY_GITIGNORE_PLAN#*"$NL"}"
       DRY_GITIGNORE_N=$(printf '%s\n' "$DRY_GITIGNORE_ADD" | grep -c . || true)
       # awk drains its input to the end, so this pipeline cannot SIGPIPE the writer.
       DRY_GITIGNORE_LIST="$(printf '%s\n' "$DRY_GITIGNORE_ADD" \
@@ -531,6 +553,17 @@ if [ "$DRY_RUN" -eq 1 ]; then
       else
         printf '  .gitignore (new) — create it, with %s entries: %s\n' "$DRY_GITIGNORE_N" "$DRY_GITIGNORE_LIST"
       fi ;;
+    *)
+      # THE SAME FALLBACK STEP 7 TAKES, IN THE SAME SHAPE, and that symmetry is the point: the whole
+      # premise of one shared plan is that the two readers cannot diverge. Without an explicit
+      # `append)` above, an unrecognised verdict fell into the append branch here and announced
+      # `append 0 entries:` while Step 7 warned and wrote nothing — a promise with no write, in the
+      # one file built to make that impossible.
+      #
+      # A DECLINE, AND THE ACTIVE VOICE IS LOAD-BEARING: tests/test-install-dryrun.sh's `declre`
+      # carries `would leave alone`, not `would be left alone`. The passive is a substring miss and
+      # classifies as a PROMISE.
+      printf '  .gitignore — its plan could not be computed — would leave alone\n' ;;
   esac
 
   # ── Packages/manifest.json, its backup, and the flags ──────────────────────
@@ -542,16 +575,28 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # The third arm is D11's decline, and it is new. A Packages/manifest.json.bak that is not ours
   # abandons the flag rather than overwriting it, so the edit this block used to promise
   # unconditionally does not happen.
+  #
+  # `would leave alone`, NOT `would be left alone`. tests/test-install-dryrun.sh's `declre` matches
+  # the ACTIVE phrase as a substring; the passive misses it and classifies the line as a PROMISE —
+  # and since D11's decline writes nothing at all, that is a red on a correct installer. The passive
+  # shipped here for one round and the fixture below now guards the wording.
+  #
+  # BOTH LINES CARRY THE SAME HEDGE, and the symmetry is the fix rather than the decoration. The
+  # surgical `sed` insert can fail — a manifest with no "dependencies" key matches nothing — and its
+  # failure arm runs `mv "$MANIFEST.bak" "$MANIFEST"`, leaving the manifest UNCHANGED and NO backup.
+  # Both files are equally absent from that outcome, so hedging the derived file and stating the
+  # primary one flat read as though the edit were certain and only its by-product conditional.
   if [ "$WITH_MCP" -eq 1 ]; then
     if [ ! -f "$MANIFEST" ]; then
       printf '  Packages/manifest.json — none in this project, so --with-mcp would skip\n'
     elif grep -q "$MCP_PKG_NAME" "$MANIFEST" 2>/dev/null; then
       printf '  Packages/manifest.json — %s already present, so --with-mcp would skip\n' "$MCP_PKG_NAME"
     elif manifest_bak_is_foreign; then
-      printf '  Packages/manifest.json — %s is not ours, so --with-mcp is declined and the manifest would be left alone\n' \
+      printf '  Packages/manifest.json — %s is not ours, so --with-mcp is declined — would leave alone\n' \
         "$MANIFEST_BAK_REL"
     else
-      printf '  Packages/manifest.json — add %s to "dependencies" (--with-mcp)\n' "$MCP_PKG_NAME"
+      printf '  Packages/manifest.json — add %s to "dependencies", if the edit succeeds (--with-mcp)\n' \
+        "$MCP_PKG_NAME"
     fi
   fi
   if [ "$WITH_INPUT_SYSTEM" -eq 1 ]; then
@@ -561,10 +606,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
       printf '  Packages/manifest.json — %s already present, so --with-input-system would skip\n' \
         "$INPUT_SYSTEM_PKG_NAME"
     elif manifest_bak_is_foreign; then
-      printf '  Packages/manifest.json — %s is not ours, so --with-input-system is declined and the manifest would be left alone\n' \
+      printf '  Packages/manifest.json — %s is not ours, so --with-input-system is declined — would leave alone\n' \
         "$MANIFEST_BAK_REL"
     else
-      printf '  Packages/manifest.json — add %s to "dependencies" (--with-input-system)\n' \
+      printf '  Packages/manifest.json — add %s to "dependencies", if the edit succeeds (--with-input-system)\n' \
         "$INPUT_SYSTEM_PKG_NAME"
     fi
   fi
@@ -997,8 +1042,20 @@ fi
 # than staying here, because it was stage 2 of the decision rather than a detail of the write —
 # leaving it here would have left the announcement free to disagree with the file, which is the
 # whole of the defect this replaces.
-GITIGNORE_PLAN="$(gitignore_plan)"
-case "${GITIGNORE_PLAN%%$'\n'*}" in
+#
+# NOT A BARE ASSIGNMENT, AND THE HAZARD IS THE ONE add_manifest_dependency'S CALL SITE ALREADY
+# CARRIES SIX LINES ABOUT. Under `set -euo pipefail` a command substitution's exit status IS the
+# assignment's, so a non-zero return from gitignore_plan would kill the installer at THIS line —
+# which is AFTER the payload is written and BEFORE the receipt is. Measured on a scratch copy by
+# injecting a `return 3`: exit 3, `ok Installed 85 file(s).`, `ok Generated CLAUDE.md`, and NO
+# RECEIPT — 85 files in a project uninstall.sh removes nothing from, because it removes only what a
+# receipt lists. Every path through gitignore_plan returns 0 today; capturing the status makes that
+# an invariant the installer SURVIVES the loss of rather than one it silently DEPENDS ON, and the
+# `*)` arm below turns the loss into a warning and a skipped .gitignore instead of a dead run.
+GITIGNORE_PLAN_RC=0
+GITIGNORE_PLAN="$(gitignore_plan)" || GITIGNORE_PLAN_RC=$?
+[ "$GITIGNORE_PLAN_RC" -eq 0 ] || GITIGNORE_PLAN="failed with status $GITIGNORE_PLAN_RC"
+case "${GITIGNORE_PLAN%%"$NL"*}" in
   covered)
     ok ".gitignore already covers .claude/ local state — left alone." ;;
   present)
@@ -1018,10 +1075,12 @@ case "${GITIGNORE_PLAN%%$'\n'*}" in
       [ -n "$e" ] || continue
       printf '%s\n' "$e" >> "$GITIGNORE"
       ADDED=$((ADDED + 1))
-    done <<< "${GITIGNORE_PLAN#*$'\n'}"
+    done <<< "${GITIGNORE_PLAN#*"$NL"}"
     ok "Updated .gitignore ($ADDED entries)" ;;
   *)
-    warn "gitignore_plan returned an unrecognised verdict — .gitignore left alone." ;;
+    # The dry run's `*)` arm announces this same outcome as a decline, so the two readers still
+    # agree on the branch neither of them can reach today.
+    warn "gitignore_plan gave an unusable verdict (${GITIGNORE_PLAN%%"$NL"*}) — .gitignore left alone, and the install continues." ;;
 esac
 
 # ── Step 8: Optional — manifest.json package additions ───────────────────────

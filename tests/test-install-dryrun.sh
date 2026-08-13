@@ -70,19 +70,37 @@
 #   * A RUN THAT WRITES NOTHING IS INVISIBLE TO ALL THREE ORACLES AT ONCE. When install.sh declines
 #     a --with-* flag because Packages/manifest.json.bak is the user's, it creates no path, adds no
 #     row and leaves the manifest byte-identical — so a find snapshot, a receipt diff and a content
-#     hash are all quiet, and this guard certifies the decline without being able to tell it apart
-#     from a branch that never ran. That is the same "structurally unable to see" failure the
+#     hash are all quiet, and the three oracles certify the decline without being able to tell it
+#     apart from a branch that never ran. That is the same "structurally unable to see" failure the
 #     three-oracle shape exists to correct, one surface over. The `usergen` fixture below is that
 #     shape for CLAUDE.md.generated: it passes because nothing happened, and "nothing happened" is
 #     all it can establish. Whether the DECLINE happened, and for the right reason, is
 #     tests/test-install-ownership.sh's states I3/K–K3, whose oracle is the user's bytes.
-#   * ONLY --with-mcp IS EXERCISED, and only in its keep-the-backup shape — once as the flagged run
-#     itself (`withmcp`) and once as the flagless run after it (`mcpthen`). `--with-input-system` is
-#     never passed: the urp fixture already carries com.unity.inputsystem, so the flag returns early
-#     and writes nothing, and no fixture here is missing the package. Nor is the git-tracked shape
-#     covered, where install.sh deletes its own backup and there is no created path to announce.
-#     A single run passing BOTH flags — the two-callers case tests/test-install-ownership.sh's
-#     state J exists for — is not exercised either.
+#
+#     THE `bakmine` FIXTURE IS THE ONE PLACE THAT GAP IS CLOSED HERE, and it is closed OUTSIDE the
+#     three oracles rather than by them: after `probe` it asserts the user's bytes directly, that
+#     the manifest gained no package, and that the receipt gained no row. The oracles supply the
+#     claim-vs-behaviour half; those three supply the "and the branch actually ran" half. Neither
+#     half is worth anything alone, which is the same pairing the `withmcp` preconditions already
+#     use one fixture over.
+#   * ONLY --with-mcp IS EXERCISED, in three shapes: the flagged run that keeps the backup
+#     (`withmcp`), the flagless run after it (`mcpthen`), and D11's decline against a backup the
+#     user wrote (`bakmine`). `--with-input-system` is never passed: the urp fixture already carries
+#     com.unity.inputsystem, so the flag returns early and writes nothing, and no fixture here is
+#     missing the package. Nor is the git-tracked shape covered, where install.sh deletes its own
+#     backup and there is no created path to announce. A single run passing BOTH flags — the
+#     two-callers case tests/test-install-ownership.sh's state J exists for — is not exercised
+#     either, and it is the run on which the surviving backup holds the manifest AFTER the first
+#     caller's edit rather than the untouched original.
+#   * THE EDIT-FAILURE ARM IS NOT EXERCISED, and it falsifies TWO announcements at once. When the
+#     surgical `sed` insert matches nothing — a manifest with no "dependencies" key — the failure
+#     arm restores the manifest from the backup and deletes it, so neither Packages/manifest.json
+#     nor Packages/manifest.json.bak is written while the block promised both. Both lines carry an
+#     `if the edit succeeds` hedge in their prose for that reason, but the hedge is invisible to
+#     this parser: both still classify as PROMISE, so a fixture of that shape would be red. That is
+#     the loud direction and it is deliberate — the alternative is for the dry run to rehearse the
+#     edit on a temp copy, which is a second implementation of the write inside a block whose first
+#     promise is that it writes nothing.
 #   * WHAT THE `dirty` FIXTURE DOES NOT COVER. Install mode `foreign` IS now reached — that fixture
 #     is it — but only in its `--yes` shape, which takes branch 1 (back up and install fresh)
 #     without asking. The interactive branch, and branch 2 (abort), are never exercised.
@@ -777,6 +795,58 @@ if [ -f "$F_MCPTHEN/$WITHMCP_BAK" ]; then
   pass "mcpthen: $WITHMCP_BAK survived the flagless second run — it is still there to be announced"
 else
   fail "mcpthen: $WITHMCP_BAK is gone after the flagless run — oracle 2's subject vanished and its silence above means nothing"
+fi
+
+# ── Fixture: --with-mcp declined, because the backup is the user's ───────────
+# D11'S DECLINE, AND IT IS HERE BECAUSE THIS ARM WAS MEASURED WRONG RATHER THAN MERELY UNGUARDED.
+# A Packages/manifest.json.bak the user wrote makes install.sh abandon THE WHOLE FLAG — not just the
+# backup — so the manifest is not edited either, and the dry run has to announce a DECLINE about the
+# one path this block otherwise always promises when the flag is passed.
+#
+# THE WORDING IS WHAT THIS FIXTURE ACTUALLY GUARDS. `declre` above carries the ACTIVE
+# `would leave alone`. A line ending in the PASSIVE `would be left alone` is a substring miss, so it
+# classifies as a PROMISE — and against a branch that writes nothing, a promise is a red on a
+# correct installer. That passive wording shipped for one round and nothing in the suite could see
+# it, because no fixture built this shape. Measured both ways at the time of writing: passive →
+# `the dry run promised Packages/manifest.json and the real run neither created nor changed it`;
+# active → green. Nothing else in the suite distinguishes the two spellings.
+#
+# THE PRECONDITION AND THE OUTCOME ARE BOTH ASSERTED, because this is precisely the shape the header
+# names as invisible to all three oracles at once: the run creates no path, changes no pre-existing
+# one, and adds no row, so `probe` alone cannot tell "declined correctly" from "the branch never
+# ran". The three checks after the probe are what make the silence mean something.
+F_BAKMINE="$SCRATCH/bakmine"
+mkfixture bakmine "$F_BAKMINE"
+printf '{\n  "dependencies": {\n    "my.own.hand.rolled.backup": "1.0.0"\n  }\n}\n' > "$F_BAKMINE/$WITHMCP_BAK"
+BAKMINE_SHA="$(sha256sum "$F_BAKMINE/$WITHMCP_BAK" | cut -d' ' -f1)"
+# Planted BEFORE any install ever ran, so there is no receipt for owned_by_installer to consult and
+# it fails closed — which is the whole reason the file counts as the user's.
+if [ -f "$F_BAKMINE/$RECEIPT_REL" ]; then
+  fail "bakmine: the fixture already carries a receipt — owned_by_installer has a record to read and the backup may be judged ours, which is not the state this fixture exists to test"
+else
+  pass "bakmine: the backup was planted before any install, so no receipt can vouch for it and it is the user's"
+fi
+if [ -f "$F_BAKMINE/$WITHMCP_MANIFEST" ] && ! grep -qF -- "$WITHMCP_PKG" "$F_BAKMINE/$WITHMCP_MANIFEST"; then
+  pass "bakmine: the manifest exists and does not yet name $WITHMCP_PKG, so only the foreign backup can stop the edit"
+else
+  fail "bakmine: the fixture has no manifest, or already names $WITHMCP_PKG — the flag returns early for a reason that is not D11's decline, and this fixture measures the wrong branch"
+fi
+probe bakmine "$F_BAKMINE" fresh --with-mcp
+# The three things the oracles structurally cannot establish for a run that writes nothing.
+if [ "$(sha256sum "$F_BAKMINE/$WITHMCP_BAK" | cut -d' ' -f1)" = "$BAKMINE_SHA" ]; then
+  pass "bakmine: $WITHMCP_BAK still carries the user's bytes — the decline held"
+else
+  fail "bakmine: $WITHMCP_BAK was overwritten — the installer took a backup slot it does not own"
+fi
+if grep -qF -- "$WITHMCP_PKG" "$F_BAKMINE/$WITHMCP_MANIFEST"; then
+  fail "bakmine: the run added $WITHMCP_PKG to the manifest — D11 declines the WHOLE flag, not just the backup, and the dry run announced the manifest would be left alone"
+else
+  pass "bakmine: the manifest was not edited — the decline covered the edit, exactly as the dry run said"
+fi
+if [ -n "$(awk -F'\t' -v want="$WITHMCP_BAK" '$1 == want { print }' "$F_BAKMINE/$RECEIPT_REL" 2>/dev/null)" ]; then
+  fail "bakmine: the receipt claims $WITHMCP_BAK — the installer took ownership of a file the user wrote, and uninstall.sh would delete it"
+else
+  pass "bakmine: the receipt does not claim $WITHMCP_BAK — no row, so uninstall.sh can never take the user's file"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
