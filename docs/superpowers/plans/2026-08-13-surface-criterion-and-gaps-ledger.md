@@ -367,7 +367,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | **Stage 3 — the generated block** | | | | |
 | 7 | `/unity-init` names the generator, markers become a contract | open | — | Sixteen surfaces rest on that region. **R7** if it lands second |
 | 8 | `/unity-ui` and `/unity-scene` stop reading as entry points | open | — | A HARD-GATE bypass, not a tidiness fix |
-| 9 | The Ambiguity Score says what it does not know | open | — | Must be a **new** heading; six sections are frozen. **The score has no code path at all** — Step 1 may not be executable |
+| 9 | The Ambiguity Score says what it does not know | **done** | `5b636d3`…`d038ca9` | Must be a **new** heading; six sections are frozen. **The score has no code path at all** — Step 1 may not be executable |
 | **Stage 4 — guards, claims, and the loop** | | | | |
 | 10 | Six guards see the class | open | — | **R9**: the deliverable is the CLASS. "Nine files, not two". Changes `run-tests.sh` tally arithmetic → invalidates every quoted suite total |
 | 11 | Claims are re-derived or removed | open | — | **R4**: sole owner of `tests/test-derived-counts.sh`. **R12**: pointers vs historical narrative. **F9**: `CLAUDE.md` joins its file list. **F11**: widen Step 1's pattern *before* it runs |
@@ -451,6 +451,47 @@ and 4 scripts.
     comparisons are **11 (7 + 4)**, not 10 — the derivation grep was single-line and missed the
     two-line `assert_eq "$UK_REDFLAGS_EXPECTED" \` form; and `provenance.tsv` was counted as
     Markdown in the no-code-path split. Neither changes a conclusion. **Recorded, no owner.**
+
+**From Task 9's fix round and closing re-review (2026-08-14). Task 9 is complete at `d038ca9`.**
+
+14. **`provenance.tsv`'s note paraphrases wording the section no longer carries.** The row's note
+    still says the ruling holds *"because a constant cannot discriminate between requests"* — the
+    plan's bolded phrase — and the fix round deliberately replaced that rationale in the skill with
+    the stronger regressive-lift argument. `/usr/bin/grep -c -F` on that phrase: **1 in
+    `provenance.tsv`, 0 in the file the row describes.** Not false (the new rationale entails the
+    old), only stale in substance. One clause fixes it. **→ Task 11.**
+15. **The extractor-dependent `assert_eq` count is settled, and the reason three readers gave three
+    numbers is that the question was never pinned to a definition.** Record it as
+    **11 direct / 6 indirect / 17 total**, with the command, which must join backslash continuations
+    first — that omission is where the original **10** came from:
+
+    ```bash
+    awk '{ line = line $0 } /\\$/ { sub(/\\$/, "", line); next } { print line; line = "" }' \
+      tests/test-surface-references.sh \
+    | /usr/bin/grep -c 'assert_eq.*\(ub_section\|uk_section\)'
+    ```
+
+    Direct = 11 (7 on `unity-brainstorming`, 4 on `using-kinglet`). Indirect = 6, found by a taint
+    trace through `UK_CHAIN` / `UK_TABLE_LINES` / `UK_ROWS` / `UK_TAIL`; the four tainted `UB_*`
+    variables feed only `assert_contains` and contribute nothing. `UK_INJECTED` is **not**
+    extractor-derived — it comes from running `.claude/hooks/session-brief.sh` — so its two
+    `assert_eq` belong in neither bucket. **Do not conflate 17 with the 15 from the BSD-awk
+    simulation**: they measure different things, and the 15 includes assertions outside this set.
+16. **The plan's bolded reason is deliberately not in the tree verbatim.** The plan says the content
+    must argue *"a constant cannot discriminate between requests"*; the shipped section argues
+    something strictly stronger — the constant does not merely fail to discriminate, **it
+    discriminates backwards**. The reviewer accepted the substitution (a brief states an argument,
+    not a frozen string; no test freezes the phrase). **Recorded so the next reader does not treat
+    the plan's wording as missing.**
+17. **The `--expect-drift` figure for Task 9's merge is contested and must be derived, not chosen.**
+    The closing re-review says **1** (one file changed). The figure re-derivation counted
+    `.claude/skills/unity-brainstorming/SKILL.md` appearing **twice** in
+    `migration/baseline-inventory.json` (123 records, 72 distinct paths), and the suite reds **two**
+    assertions — one per index. **Derive it at the merge with `--dry-run` against the committed
+    merged tree**, which is the one situation where `--dry-run` is trustworthy: R6's defect is that
+    it reads the anchor commit's tree, and after the merge commit that tree is the right one. File
+    sha at `d038ca9`: `b8bd6d1fa2a2c288753d016663e237e777c2f97936546d5825c2fcb6868cf767`,
+    superseding `0284206…` from the first commit.
 
 **Inherited from earlier waves, still open:**
 
