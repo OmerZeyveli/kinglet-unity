@@ -258,6 +258,61 @@ stands. It has now gone stale twice.
   criterion 6 requires. **→ Task 11** (sole owner of `README.md` by R4). `install.sh`'s own `--help`
   header now carries the correct wording to copy.
 
+**Task 2b** (`f735fe2` on `task/2b-tokeniser-quote-model`, in review).
+
+- **`find_exec_commands` now splits with a one-pass `LC_ALL=C awk` scanner.** A quoted run is one
+  token whose contents are inert; arguments reach the four arms TAB-joined; `;` terminates an
+  `-exec` clause unconditionally while `+` requires a preceding `{}`; a redirect is skipped rather
+  than ending the clause; and **command substitution, backticks, ANSI-C quoting and an unterminated
+  quote are unparseable and block.** The allowlist inversion and the positional flag read are
+  untouched, as the brief required.
+- **The corpus is the durable deliverable, not the fix.** 242 unique payloads carrying a frozen
+  `hist` column — each payload's verdict at `546870f` / `06883cc` / `3fd22dc` — of which **155 are
+  monotonically protected** and **45 are exemptions each with a reason, 0 unexplained permits.**
+  Any later work on this hook is now measured against the union of what every past version blocked.
+- **Cost: a 1 MB quote-leading command line went r3 1 144 ms → r4 44 632 ms → r5 123 504 ms → new
+  1 976 ms**, and a **10 000 ms ceiling is asserted where none existed before.** This hook runs on
+  every Bash call, so the previous state was a two-minute hang on a hostile input.
+- **Three recorded facts were wrong, and the implementer measured rather than inherited them:**
+  `sort -u '+' -o {} {}` is a *find* problem (GNU find needs `{}` before `+`, so sort really receives
+  `-o {}`); `sed -e ';' -i {} \;` **cannot write at all** (`find rc=1, "unknown predicate -i"`, 0
+  files changed), so the r3/r4 blocks were **false positives** and it is the one deliberate monotonic
+  exemption; and `./\grep` blocking was a dequoting artifact — `./grep` is permitted at all four
+  versions.
+- **§9, raised by the implementer against itself, and it is the same defect one level up:** the
+  route's *precondition* is now the weakest thing in the file. `ls Assets/*.meta | xargs sed -i` and
+  `find Assets -name "*.m"*"eta" -exec sed -i` are **permitted at every version** — and the second is
+  the shape the new tokeniser would resolve correctly, except **the regex gating the route never sees
+  the tokeniser's output.** *"No corpus payload could look there."* Also inherited and open: **the
+  allowlist vouches by basename**, so any `/tmp/evil/grep` passes.
+
+**Task 10** (`44eea70` on `task/10`, in review).
+
+- **The wave's own gate was vacuous.** `scripts/check-provenance.sh` printed
+  `pass no orphan files (0 tracked files covered)` and ended **`provenance OK`, rc=0, over a tree it
+  never enumerated.** Every "provenance OK" recorded from a scratch copy in this wave was that.
+  Fixed.
+- **The two sets are 5 and 8, and only 3 are in both** — so **4 of the 8 are invisible to an archive
+  diff.** The archive-breakage set (diff a clone against a `git archive` extraction) is 5; the
+  vacuous-green class R9's own measurement is about is 8: `test-mcp-naming.sh`,
+  `test-mcp-doc-instructions.sh`, `test-skills.sh`, `test-no-mobile.sh`,
+  `test-surface-references.sh`, `test-cross-validation.sh`, `test-skill-discovery.sh`, and
+  `scripts/check-provenance.sh`. **A figure re-derivation put the archive set at 9; the implementer
+  measures 5. The reviewer is settling it.** The brief's Files line misses the decisive file
+  entirely, and `test-pipeline-detector.sh` needs no change.
+- **F6 needed an exemption mechanism, not a skip list.** Bare retired names red 10 sites across 5
+  files, **8 of them the past-tense records the guard's own comment prescribes** — so the 19 retired
+  names are matched as **path-form pointers on non-comment lines, derived from `provenance-skip.tsv`
+  rather than typed**. **No prose was deleted**, which was the named risk.
+- **R4 was honoured after the controller withdrew its exception:** `tests/test-derived-counts.sh` is
+  reverted, and both findings are in the report as text for Task 11 with the one-line awk repair and
+  the measured proof that de-backticking silences the assertion.
+- **Task 9 is safe:** `tests/test-surface-references.sh` gained a 19-line **pure insertion**;
+  `ub_section` and its `/^#{1,3} /` interval are untouched. **Still re-run that guard on the merged
+  tree** — that is the whole point of H2.
+- **The runner's tally changed as predicted:** `Total: 1189 → 2653`, with **1444 python results from
+  2 suites (was 1)**. Every suite total written anywhere before this is now invalid.
+
 ## Batch 1 hazards — derived by the controller from the plan text, not measured
 
 **In one line each:** H1 Task 10's
