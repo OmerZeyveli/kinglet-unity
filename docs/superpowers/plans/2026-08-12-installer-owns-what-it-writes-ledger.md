@@ -1028,8 +1028,21 @@ task has run rewrites the record of what the implementer was actually told.
 29. **Step 3b's invariant comment omits `$BACKUP_DIR`** from its enumeration of what Steps 4–6 write at
     the project root — Step 5's head is `mv "$CLAUDE_DIR" "$BACKUP_DIR"`. The conclusion holds; the
     sentence is what a future reader will audit against.
-30. **`scripts/studio-doctor.sh` still carries `${VAR%%$'\n'*}` twice** (lines 88 and 162). `install.sh`
-    moved off it for the macOS pass; that file did not. Second wave.
+30. **`scripts/studio-doctor.sh` carries `${VAR%%$'\n'*}` twice** (lines 88 and 162). `install.sh`
+    moved off it for the macOS pass; that file did not. ~~Second wave.~~ **Closed in the post-review
+    pass, and the framing above was wrong in a way no per-task review could have caught.** This entry
+    said "*still* carries", and `install.sh:391` called it "precedent here" — both reading as
+    inherited. Measured: `git show c5280c4:scripts/studio-doctor.sh | grep "%%\$'"` matches nothing,
+    and `git log -S"UV_VER%%" -- scripts/studio-doctor.sh` returns `6a2793e` (Task 1d, 2026-08-12
+    17:12). Both sites were **introduced by this wave**, and the `install.sh` comment citing them as
+    precedent was written by `82dc293` at 2026-08-13 06:40 — thirteen hours later, in the same wave.
+    So Task 4 weighed its own predecessor task's day-old code as inherited practice, chose `NL=$'\n'`
+    for `install.sh`, and left the spelling it had just rejected in the file the wave had just put it
+    in. Fixed in the code, not only in the record: `studio-doctor.sh` now holds its own `NL` and both
+    sites use `${VAR%%"$NL"*}`. Equivalence was proved over empty, no-newline, trailing-newline,
+    multi-line, leading-newline and glob-metacharacter inputs, and at both live call sites (`uv
+    --version`, one line; the `serverInfo` sed at 0, 1, 3 and 1000 matching lines) — identical output
+    in every case.
 
 ### From Task 5 — three closed in round 1, four carried
 

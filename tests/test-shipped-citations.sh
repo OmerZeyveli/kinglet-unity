@@ -45,9 +45,11 @@ PAYLOAD="$(payload_paths)"
 SHIPPED_MD="$(find "$REPO/.claude" -name '*.md' | sort)"
 MD_COUNT="$(printf '%s\n' "$SHIPPED_MD" | grep -c . || true)"
 
-# 0. Coverage floors. A guard that silently stops reading its subject reports green forever. These
-# are derived-with-headroom from the tree on 2026-08-11: 44 shipped .md files, 85 payload entries.
-# Raise them when the tree grows; never lower one to make a run pass.
+# 0. Coverage floors. A guard that silently stops reading its subject reports green forever. They
+# were derived with headroom from the tree on 2026-08-11, which held 44 shipped .md files and 85
+# payload entries; scripts/detect-pipeline.sh made the second of those 86 and this line went a wave
+# without noticing. Do not read either count off it — both pass lines below print what the tree holds
+# on the run in front of you. Raise a floor when the tree grows; never lower one to make a run pass.
 if [ "$MD_COUNT" -ge 35 ]; then
   pass "guard scanned $MD_COUNT shipped .md files (floor 35)"
 else

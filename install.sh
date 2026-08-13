@@ -15,9 +15,9 @@
 #   --dry-run             Report what would happen; write nothing
 #   -h, --help            Show this help
 #
-# Every file written is recorded in .claude/state/install-receipt.tsv with its checksum, so
-# uninstall can remove exactly what we installed and leave everything else — including files you
-# edited — alone.
+# .claude/state/install-receipt.tsv records every file the toolkit owns, with its checksum, so
+# uninstall removes exactly what is ours and leaves everything else — files you edited, files you
+# wrote, and your .gitignore — alone.
 #
 set -euo pipefail
 
@@ -388,9 +388,16 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 # Step 7 ever runs and a single call would be dead weight on that path.
 #
 # A NEWLINE HELD IN A VARIABLE, so no `$'…'` appears inside a parameter-expansion pattern below.
-# `${VAR%%$'\n'*}` does have precedent here — scripts/studio-doctor.sh uses it twice — but this file
-# is the one a planned macOS pass most needs to survive, bash 3.2's parser cannot be exercised from
-# this host, and `"$NL"` inside the pattern is unambiguous in every bash. Cheap insurance.
+# bash 3.2's parser cannot be exercised from this host, a planned macOS pass has to survive it, and
+# `"$NL"` inside the pattern is unambiguous in every bash. Cheap insurance.
+#
+# THIS COMMENT USED TO CITE scripts/studio-doctor.sh AS PRECEDENT for `${VAR%%$'\n'*}` — "it uses it
+# twice" — and read as though the spelling were inherited and only this file were opting out. It was
+# not inherited. Both of that file's sites were written by 6a2793e on 2026-08-12, and this comment by
+# 82dc293 the next morning, so the precedent cited was thirteen hours old and the wave's own. There is
+# no such precedent now: studio-doctor.sh holds an `NL` of its own and both files spell it the same
+# way. If you are about to add a third site, check for the old spelling rather than assuming:
+#   grep -rn "%%\$'" --include='*.sh' .
 NL=$'\n'
 GITIGNORE="$PROJECT_DIR/.gitignore"
 WANT_IGNORED='.claude/settings.local.json
@@ -793,7 +800,12 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 #
 #   warn 1 installed file(s) have local edits — keeping yours:
 #          .claude/scripts/studio-doctor.sh
-#   ok   Installed 85 file(s).
+#   ok   Installed N file(s).
+#
+# N is the whole payload — the point is that the kept file is inside it. It read `85` until
+# 2026-08-13, a real figure from the day it was measured and stale by one the moment
+# scripts/detect-pipeline.sh joined the group loop, at which point it read as a current transcript of
+# a run that no longer happens. `bash install.sh --project-dir <fixture> --yes` prints the live one.
 #
 # and the edit was gone. MODIFIED_FILES is computed at Step 4, before either loop runs, so the
 # warning was accurate about what the installer knew and false about what it then did — the one
@@ -1072,11 +1084,11 @@ fi
 # CARRIES SIX LINES ABOUT. Under `set -euo pipefail` a command substitution's exit status IS the
 # assignment's, so a non-zero return from gitignore_plan would kill the installer at THIS line —
 # which is AFTER the payload is written and BEFORE the receipt is. Measured on a scratch copy by
-# injecting a `return 3`: exit 3, `ok Installed 85 file(s).`, `ok Generated CLAUDE.md`, and NO
-# RECEIPT — 85 files in a project uninstall.sh removes nothing from, because it removes only what a
-# receipt lists. Every path through gitignore_plan returns 0 today; capturing the status makes that
-# an invariant the installer SURVIVES the loss of rather than one it silently DEPENDS ON, and the
-# `*)` arm below turns the loss into a warning and a skipped .gitignore instead of a dead run.
+# injecting a `return 3`: exit 3, `ok Installed N file(s).`, `ok Generated CLAUDE.md`, and NO
+# RECEIPT — the whole payload in a project uninstall.sh removes nothing from, because it removes
+# only what a receipt lists. Every path through gitignore_plan returns 0 today; capturing the status
+# makes that an invariant the installer SURVIVES the loss of rather than one it silently DEPENDS ON,
+# and the `*)` arm below turns the loss into a warning and a skipped .gitignore instead of a dead run.
 GITIGNORE_PLAN_RC=0
 GITIGNORE_PLAN="$(gitignore_plan)" || GITIGNORE_PLAN_RC=$?
 [ "$GITIGNORE_PLAN_RC" -eq 0 ] || GITIGNORE_PLAN="failed with status $GITIGNORE_PLAN_RC"
@@ -1155,7 +1167,7 @@ add_manifest_dependency() {
   # The status: the callers are `[ "$WITH_MCP" -eq 1 ] && add_manifest_dependency ...` — AND-lists in
   # which the function is the command after the final `&&`, so `set -e` DOES apply to it. Measured on
   # a scratch copy 2026-08-13: a `return 1` here exits the installer at the call site with status 1,
-  # before Step 8b, Step 8c and Step 9 — so the project keeps 85 installed files and NO RECEIPT, and
+  # before Step 8b, Step 8c and Step 9 — so the project keeps the whole payload and NO RECEIPT, and
   # uninstall.sh, which removes only receipt-listed paths, can then never clean any of it up. That is
   # a worse failure than the one this guard closes.
   #
@@ -1358,7 +1370,16 @@ esac
 # the receipt is written — but on its own it read as "everything you asked for happened", and a
 # declined --with-* flag left no trace down here at all: four warn lines a dozen lines up, above the
 # green banner, and an exit status of 0. This block is the manifest side of what the `kept-yours`
-# arm below does for CLAUDE.md.generated, so the two writers' declines end the run the same way.
+# arm ABOVE does for CLAUDE.md.generated — above, in the `case` that sets CLAUDE_MD_STEP, not below.
+# It read "below" for as long as this comment existed; `grep -n 'kept-yours)' install.sh` locates it.
+#
+# WHAT THE TWO SHARE IS THE MECHANISM, NOT THE PRESENTATION, and the sentence here used to claim
+# both: "the two writers' declines end the run the same way". Measured, they do not. Shared: a global
+# set where the decision is made ($MANIFEST_DECLINED, $CLAUDE_MD_BRANCH) and read where the run
+# speaks to the user, so neither decline can be silently dropped on the way out. Not shared: this one
+# prints its own `Not done:` block before the summary, while the CLAUDE.md side rewrites `Next
+# steps: 2.` in place and adds no block at all. A reader who took "the same way" literally would go
+# looking for a `Not done:` entry on a `kept-yours` run and find none.
 #
 # `while read` over a here-string rather than a pipe: the loop drains its input, so there is no
 # SIGPIPE hazard either way, but a here-string keeps the body out of a subshell. `if`, not
@@ -1370,7 +1391,11 @@ if [ -n "$MANIFEST_DECLINED" ]; then
       printf '  %s — declined: %s is not ours to overwrite.\n' "$f" "$MANIFEST_BAK_REL"
     fi
   done <<< "$MANIFEST_DECLINED"
-  printf '  Move that file aside and re-run with the flag, or add the package to\n'
+  # PLURAL-NEUTRAL, because the loop above can print two lines. One foreign Packages/manifest.json.bak
+  # declines EVERY --with-* flag the run passed, so `--with-mcp --with-input-system` reaches here with
+  # both listed while this trailer said "the flag" and "the package" — singular, and pointing at
+  # neither of them in particular.
+  printf '  Move that file aside and re-run with the flag(s) listed here, or add their packages to\n'
   printf '  Packages/manifest.json by hand. The manifest was not edited.\n'
 fi
 cat <<EOF

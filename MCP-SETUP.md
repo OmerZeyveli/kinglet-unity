@@ -83,7 +83,11 @@ you got used to depend on the day you installed. `./install.sh --with-mcp` pins 
 > Or run `./install.sh --with-mcp`, which inserts exactly that dependency into
 > `Packages/manifest.json` for you. It's a surgical insert, not a reformat: your manifest keeps its
 > existing formatting, a `manifest.json.bak` backup is written first, and if the edit can't be made
-> safely the backup is restored and the line is printed for you to add by hand.
+> safely the backup is restored and the line is printed for you to add by hand. On success the backup
+> is kept — unless git already tracks the manifest, in which case git is the better record and the
+> `.bak` is removed. And if a `manifest.json.bak` is already there that the installer didn't write,
+> it declines the flag rather than overwrite the file: nothing is backed up, nothing is edited, and
+> you get the line to add yourself.
 
 ---
 

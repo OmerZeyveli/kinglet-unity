@@ -2,7 +2,7 @@
 #
 # Kinglet Pioneer — uninstaller
 #
-# Removes what install.sh wrote, and nothing else. Every removal is checked against the install
+# Removes what install.sh owns, and nothing else. Every removal is checked against the install
 # receipt: a file goes only if the receipt marks it ours AND it still carries the checksum we
 # recorded. A file the receipt marks yours stays, whatever its checksum says, unless --purge.
 #
@@ -209,5 +209,11 @@ fi
 [ -n "$SAVED_LOCAL" ] && ok "Preserved settings.local.json → $(basename "$SAVED_LOCAL")"
 
 printf '\n%s\n' "${BOLD}${GREEN}Uninstalled.${NC}"
-printf 'Left alone: CLAUDE.md, docs/, and anything you wrote.\n'
+# CLAUDE.md.generated is NOT in this list, and naming it is the whole point of the parenthesis. It
+# used to be absent from the receipt entirely, so it survived every uninstall and the line was
+# accidentally right about it; once install.sh started claiming it, a plain uninstall began removing
+# it while this line still read as a promise covering the whole CLAUDE.md family. The promise is
+# narrowed rather than turned into an outcome claim: an edited one is reported under "keep N file(s)
+# you modified" in the plan above and stays, so "it is removed" would be false in that direction.
+printf 'Left alone: CLAUDE.md (not CLAUDE.md.generated), docs/, and anything you wrote.\n'
 exit 0

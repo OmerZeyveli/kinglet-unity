@@ -22,6 +22,13 @@ else
   RED=''; GREEN=''; YELLOW=''; BOLD=''; NC=''
 fi
 PASS_C=0; WARN_C=0; FAIL_C=0
+# A newline held in a variable, so no `$'…'` appears inside a parameter-expansion pattern below.
+# install.sh carries the reasoning at its own `NL=`: bash 3.2's parser cannot be exercised from this
+# host, a macOS pass is planned, and `"$NL"` inside the pattern is unambiguous in every bash. This
+# file used to be install.sh's cited precedent for the risky spelling; both of its two sites were
+# written on 2026-08-12 in the same wave that then chose against it, so the citation was to the
+# wave's own code. Same idiom in both files now.
+NL=$'\n'
 pass() { printf '%s\n' "${GREEN}PASS${NC} $*"; PASS_C=$((PASS_C + 1)); }
 warn() { printf '%s\n' "${YELLOW}WARN${NC} $*"; WARN_C=$((WARN_C + 1)); }
 fail() { printf '%s\n' "${RED}FAIL${NC} $*"; FAIL_C=$((FAIL_C + 1)); }
@@ -85,7 +92,7 @@ if command -v uv >/dev/null 2>&1; then
   # First line only, via parameter expansion rather than `| head -1` — see print_first_5. `uv
   # --version` prints one line today, so this pipe was unlikely to fire, but the shape is the same
   # one and the spec's criterion 12 admits no `| head` in this file.
-  UV_VER=$(uv --version 2>/dev/null || true); UV_VER=${UV_VER%%$'\n'*}
+  UV_VER=$(uv --version 2>/dev/null || true); UV_VER=${UV_VER%%"$NL"*}
   pass "uv present ($UV_VER)"
 else
   warn "uv not found — the MCP bridge runs under it. See https://docs.astral.sh/uv/"
@@ -159,7 +166,7 @@ else
     # serverInfo. Measured 2026-08-12: 3 matching lines survived 5/5, 100 survived 5/5, 1000 died
     # 5/5. Whether a real bridge sends a thousand is not the point — the failure is silent and total.
     SRV=$(sed -n 's/.*"serverInfo"[^{]*{[^}]*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' <<< "$MCP_RESP")
-    SRV=${SRV%%$'\n'*}
+    SRV=${SRV%%"$NL"*}
     pass "MCP bridge answered at $MCP_URL${SRV:+ (${SRV})}"
   else
     # Something is listening, but it is not an MCP server. Say so — do not call it a bridge.
