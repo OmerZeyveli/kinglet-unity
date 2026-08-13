@@ -38,7 +38,15 @@ info()  { echo "${CYAN}[INFO]${RESET}  $*" >&2; }
 warn()  { echo "${YELLOW}[WARN]${RESET}  $*" >&2; }
 error() { echo "${RED}[ERROR]${RESET} $*" >&2; }
 
-usage() { sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+# 3,24 is the header block between its two `# ====` rules, and both numbers are derived from the
+# file rather than guessed at: the first line that is neither a comment nor blank is 27
+# (`set -euo pipefail`), the last comment line before it is the closing rule at 25, and the slice
+# already starts one past the opening rule at 2 — so it ends one before the closing one, at 24.
+# It read `3,17` until 2026-08-13, which is the FIRST line of the eight-line paragraph below, so the
+# shipped `--help` stopped at "…had this script write" and the sentence never finished. This script
+# is one of the ones install.sh copies into $PROJECT_DIR/.claude/scripts/, so that reached users.
+# tests/test-help-ranges.sh now renders this `--help` and every other one built the same way.
+usage() { sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 # ---------------------------------------------------------------------------
 # Args

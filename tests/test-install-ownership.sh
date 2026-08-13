@@ -782,8 +782,8 @@ assert_gone "$G_ODD" "$G_UNTOUCHED2" "G (unreadable origin, a well-formed toolki
 #   ok   Installed N file(s).
 #
 # N is the whole payload; the count is not what the transcript is about, and a literal one here read
-# as current long after it stopped being so (`85` until 2026-08-13, one short from the run that
-# 2026-08-12 measured — scripts/detect-pipeline.sh joined the group loop in between).
+# as current long after it stopped being so. It read `85` until 2026-08-13 — a real figure from the
+# day it was measured, and stale by one the moment scripts/detect-pipeline.sh joined the group loop.
 #
 # and replaced the file with the shipped bytes in the same output. MODIFIED_FILES is computed from
 # the receipt BEFORE either loop runs, so the warning was accurate about what the installer knew and
@@ -816,11 +816,13 @@ assert_gone "$G_ODD" "$G_UNTOUCHED2" "G (unreadable origin, a well-formed toolki
 # decision, and the only way to assert that is to vary them and watch the answer not change.
 #
 # WHAT STATE H CANNOT SEE
-#   * Two of the ten scripts install.sh ships, in one arrangement — `scripts/*.sh` less
-#     `check-provenance.sh`, so derive it (`ls scripts/*.sh | grep -vc check-provenance`) rather than
-#     trusting the word here; it said "nine" from the day Task 1 wrote it, and Task 5's
-#     detect-pipeline.sh made that ten without revisiting the sentence. A fix keyed on the two names
-#     together, or on "the first two", is not distinguishable here from a correct one.
+#   * Two of the scripts install.sh ships, in one arrangement. How many it ships is not written
+#     here on purpose — the shipped set is `scripts/*.sh` less `check-provenance.sh`, so derive it
+#     (`ls scripts/*.sh | grep -vc check-provenance`). This line carried the number until
+#     2026-08-13: it said "nine" from the day Task 1 wrote it, Task 5's detect-pipeline.sh made that
+#     ten without revisiting the sentence, and nothing in the suite watches a script count, so the
+#     next script to join will do it again. A fix keyed on the two names together, or on "the first
+#     two", is not distinguishable here from a correct one.
 #   * The `keeping yours` list is compared against the `user-modified` rows the receipt ends up
 #     with. Those two sets can legitimately differ when a file the user edited was DROPPED from the
 #     payload — install.sh announces it and writes no row, by design. This fixture installs the same

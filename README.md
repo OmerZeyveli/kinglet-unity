@@ -139,8 +139,8 @@ in the current scene?"* (Python 3.10+ and `uv` required; no API key.)
 ```
 
 `uninstall.sh` removes a file only when the receipt marks it ours *and* it still carries the checksum
-we recorded — so anything you edited stays, and so does anything you wrote yourself. Without a
-receipt it refuses rather than guessing.
+we recorded — so anything you edited stays *unless you pass `--purge`*, and anything you wrote
+yourself stays either way. Without a receipt it refuses rather than guessing.
 
 ---
 
