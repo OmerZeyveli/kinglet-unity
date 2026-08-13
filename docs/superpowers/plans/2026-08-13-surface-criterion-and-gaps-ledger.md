@@ -12,7 +12,7 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-### IN FLIGHT as of 2026-08-14 00:45 — four implementers, four worktrees
+### IN FLIGHT as of 2026-08-14 02:10 — Task 9 CLOSED (`5b636d3`…`d038ca9`, unmerged); 2b, 10, 13 running; Task 4 in review
 
 All four are based on `5b636d3` and commit to their own branches. **Nothing of theirs is merged.**
 If this session is lost, `git worktree list` is the recovery map and each report path below is the
@@ -24,8 +24,12 @@ verdict.
 | 4 | `…/kinglet-wt/task-4` | `task/4` | `/tmp/kinglet-t4-WuaZVF` | `…/task-4-report.md` |
 | 9 | `…/kinglet-wt/task-9` | `task/9` | `/tmp/kinglet-t9-cqGTgD` | `…/task-9-report.md` |
 | 10 | `…/kinglet-wt/task-10` | `task/10` | `/tmp/kinglet-t10-p8ZTUf` | `…/task-10-report.md` |
+| 13 | `…/kinglet-wt/task-13` | `task/13` | `/tmp/kinglet-t13-8jVeGK` | `…/task-13-report.md` |
 
-**Merge order at the boundary: 4, then 9, then 10 last** — Task 10 changes `run-tests.sh`'s tally
+**Task 13 was dispatched out of batch order** — it shares no file with anything running and its
+output improves the loop that is executing the rest of the wave.
+
+**Merge order at the boundary: 4, then 9, then 13, then 10 last** — Task 10 changes `run-tests.sh`'s tally
 arithmetic and invalidates every quoted total the moment it lands (H4). Task 2b merges independently
 of the three; it shares no file with any of them.
 
