@@ -16,9 +16,14 @@
 #
 # The Python suites reached through test-kinglet-build.sh and test-kinglet-spike.sh used to
 # contribute **nothing to Total when they passed**: `unittest -v` prints `ok`, not `PASS`. Measured
-# 2026-08-14 on this tree — `Ran 135 tests` and `Ran 1308 tests`, 1443 results across the two files,
-# contributing exactly **1** to Total, and that 1 was test-kinglet-spike.sh's own decorative
-# `PASS:` echo. test-kinglet-build.sh emitted no PASS token at all, so a suite of 135 was worth 0.
+# 2026-08-14 at commit 5b636d3, BEFORE this change — `Ran 135 tests` and `Ran 1308 tests`, 1443
+# results across the two files, contributing exactly **1** to Total, and that 1 was
+# test-kinglet-spike.sh's own decorative `PASS:` echo. test-kinglet-build.sh emitted no PASS token
+# at all, so a suite of 135 was worth 0.
+#
+# The figures above are pinned to that commit rather than to "this tree", because the commit
+# carrying this change also adds one python test: the same run on the committed tree reads
+# `Ran 1309` and 1444. Re-derive, never transcribe — `bash tests/run-tests.sh` prints both numbers.
 #
 # That was recorded here as "only ever in the safe direction". It is not, and the reason is this
 # file's own subject: a suite that discovers NOTHING prints `Ran 0 tests` and `OK`, exits 0, and
