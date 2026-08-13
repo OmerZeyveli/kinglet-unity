@@ -66,7 +66,7 @@ What `minimal` keeps:
 <!-- kinglet:minimal-keeps:begin -->
 - `block-scene-edit` — blocks Edit/Write on `.unity` / `.prefab` / `.asset`
 - `block-meta-edit` — blocks Edit/Write on `.meta`
-- `block-legacy-input` — blocks legacy `Input.*` in first-party C#
+- `block-legacy-input` — blocks legacy `Input.*` in first-party runtime C#
 - `session-brief` — declares no `HOOK_PROFILE_LEVEL`, so every profile runs it
 <!-- kinglet:minimal-keeps:end -->
 
@@ -234,7 +234,7 @@ These hooks run when the agent stops (conversation ends or user exits).
 |------|-------|---------|---------|------|---------|
 | block-scene-edit | PreToolUse | Edit\|Write | minimal | Blocking | Block .unity/.prefab/.asset edits |
 | block-meta-edit | PreToolUse | Edit\|Write | minimal | Blocking | Block .meta edits |
-| block-legacy-input | PreToolUse | Edit\|Write | minimal | Blocking | Block legacy Input.* in first-party C# |
+| block-legacy-input | PreToolUse | Edit\|Write | minimal | Blocking | Block legacy Input.* in first-party runtime C# |
 | guard-project-config | PreToolUse | Edit\|Write | standard | Blocking | Block quality config weakening |
 | bash-gate | PreToolUse | Bash | standard | Blocking | Gate destructive Bash commands |
 | warn-serialization | PostToolUse | Edit\|Write | standard | Advisory | Warn on renamed SerializeField |

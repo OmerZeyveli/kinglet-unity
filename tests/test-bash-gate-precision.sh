@@ -101,6 +101,10 @@ assert_eq "2" "$(tbg_run 'cd Assets && git reset --hard')" \
     "still blocks the hard reset after a control operator"
 assert_eq "2" "$(tbg_run 'git -C /repo reset --hard')" \
     "still blocks the hard reset behind a git -C option"
+assert_eq "2" "$(tbg_run 'git --git-dir=/r/.git clean -fdx')" \
+    "still blocks git clean behind a --git-dir option"
+assert_eq "2" "$(tbg_run 'git --no-pager -c core.pager=cat reset --hard')" \
+    "still blocks the hard reset behind stacked git global options"
 
 # --- O1 row 2: a commit message quoting it --------------------------------------------------
 # The repository's own plans carry a standing instruction to write commit messages to a file
@@ -156,6 +160,42 @@ assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec rm {} \;')" \
     "still blocks find -exec rm on .meta files"
 assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 rm')" \
     "still blocks find piped into xargs rm on .meta files"
+
+# Review finding: the first cut of the find clause asked for a DELETION verb only, so the find
+# route to a mass RENAME went from blocked to allowed while this file's own header and
+# docs/HOOK-REFERENCE.md both promised "mass .meta deletion or rename". The verb is also matched
+# as a token rather than after a space, because three of these four do not put a space there.
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec mv {} /tmp \;')" \
+    "still blocks the find route to a mass .meta rename"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec /bin/rm {} \;')" \
+    "still blocks find -exec with a path-prefixed rm"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec git rm {} \;')" \
+    "still blocks find -exec git rm"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sh -c "rm \$1" _ {} \;')" \
+    "still blocks find -exec through a shell wrapper"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec stat {} \;')" \
+    "does not block find -exec with a read-only command"
+
+# --- classifications with no probe at all before this task ----------------------------------
+# meta-rename and manifest-wipe had zero assertions here, and unity-dir-wipe had three blocking
+# probes and no prose probe. Both halves of each, because a classification nothing sends a
+# payload for is exactly how the five leaking patterns stayed invisible in the first place.
+assert_eq "2" "$(tbg_run 'mv Assets/Player.cs.meta Assets/Enemy.cs.meta')" \
+    "still blocks a direct .meta rename"
+assert_eq "0" "$(tbg_run 'git log --follow -- Assets/Player.cs.meta')" \
+    "does not block reading the history of a renamed .meta file"
+assert_eq "2" "$(tbg_run 'echo {} > Packages/manifest.json')" \
+    "still blocks a redirect over Packages/manifest.json"
+assert_eq "2" "$(tbg_run 'rm -f Packages/manifest.json')" \
+    "still blocks deleting Packages/manifest.json"
+assert_eq "0" "$(tbg_run 'jq .dependencies Packages/manifest.json')" \
+    "does not block reading Packages/manifest.json"
+assert_eq "2" "$(tbg_run 'rm -rf Library/ Temp/')" \
+    "still blocks a Library/Temp wipe"
+assert_eq "0" "$(tbg_run 'echo "delete Library/ only when the editor is closed"')" \
+    "does not block prose about wiping Library/"
+assert_eq "0" "$(tbg_run 'du -sh Library/ Temp/ Logs/')" \
+    "does not block measuring the directories a wipe would remove"
 
 # --- O1 rows 5 and 6: block-projectsettings.sh was removed in this wave ----------------------
 # Its true positive was `git add ProjectSettings/…`, which stages a file and mutates nothing;

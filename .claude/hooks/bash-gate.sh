@@ -81,23 +81,52 @@ fi
 # deletion. `find` is a search verb: on its own it prints paths and changes nothing.
 # Measured 2026-08-13 — `find Assets -name "*.meta" | wc -l`, a count, was classified
 # meta-deletion and blocked. Command position was never the problem for this pattern; the
-# verb was. `find` deletes only through an action, so require one: -delete, -exec/-execdir/-ok
-# rm, or a pipe into xargs rm. The action is looked for anywhere in the command rather than
-# inside SAME_CMD, because `find … | xargs rm` puts it in the *next* segment by construction.
-DELETE_ACTION='(-delete([[:space:]]|$)|-(exec|execdir|ok)[[:space:]]+rm|xargs[^;&|]*[[:space:]]rm([[:space:]]|$))'
+# verb was. `find` acts only through an action, so require one. The action is looked for
+# anywhere in the command rather than inside SAME_CMD, because `find … | xargs rm` puts it in
+# the *next* segment by construction.
+#
+# BOTH verbs, and the rename is not decoration: this file's own header and
+# docs/HOOK-REFERENCE.md have always said "mass .meta deletion OR RENAME", and the first cut
+# of this clause required a deletion verb only — so `find … -exec mv {} /tmp \;`, the find
+# route to exactly that mass rename, went from blocked to allowed and left two shipped
+# sentences claiming otherwise. Found in review, measured, and fixed here rather than by
+# narrowing the sentences: the claim is worth keeping true.
+#
+# The verb is matched as a token bounded by non-identifier characters instead of `[[:space:]]+`,
+# because the four measured routes to it do not all put a space there: `-exec /bin/rm` (a path
+# prefix), `-exec git rm` (a wrapper), `-exec sh -c 'rm "$1"'` (a quote). A find whose -exec
+# merely passes the word `rm` to something harmless is a false positive here, accepted
+# deliberately: this is a two-stage gate, so the cost is one retry, and the plan is explicit
+# that a false negative on a mass .meta operation is the more expensive direction.
+FIND_RM='-(exec|execdir|ok)[^;&|]*[^A-Za-z0-9_.-]rm([^A-Za-z0-9_-]|$)'
+FIND_MV='-(exec|execdir|ok)[^;&|]*[^A-Za-z0-9_.-]mv([^A-Za-z0-9_-]|$)'
+XARGS_RM='xargs[^;&|]*[^A-Za-z0-9_.-]rm([^A-Za-z0-9_-]|$)'
+XARGS_MV='xargs[^;&|]*[^A-Za-z0-9_.-]mv([^A-Za-z0-9_-]|$)'
+# Single-quoted around the interpolations: `$)` inside double quotes is left literal by bash,
+# but relying on that to carry a regex anchor is not something the next reader should have to
+# verify.
+FIND_DELETES='(-delete([[:space:]]|$)|'"${FIND_RM}"'|'"${XARGS_RM}"')'
+FIND_RENAMES='('"${FIND_MV}"'|'"${XARGS_MV}"')'
+
+META_DEL_MSG=".meta files hold GUIDs — deleting them silently breaks every reference (scenes, prefabs, ScriptableObjects, AssetReferences)."
+META_MV_MSG="Renaming .meta files without their asset sibling orphans references. Unity will not recover from this automatically."
 
 if grep -qE "${CMD_START}rm[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
     DANGER_KIND="meta-deletion"
-    DANGER_MSG=".meta files hold GUIDs — deleting them silently breaks every reference (scenes, prefabs, ScriptableObjects, AssetReferences)."
+    DANGER_MSG="$META_DEL_MSG"
 fi
-if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND" \
-    && grep -qE "$DELETE_ACTION" <<< "$COMMAND"; then
-    DANGER_KIND="meta-deletion"
-    DANGER_MSG=".meta files hold GUIDs — deleting them silently breaks every reference (scenes, prefabs, ScriptableObjects, AssetReferences)."
+if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
+    if grep -qE "$FIND_DELETES" <<< "$COMMAND"; then
+        DANGER_KIND="meta-deletion"
+        DANGER_MSG="$META_DEL_MSG"
+    elif grep -qE "$FIND_RENAMES" <<< "$COMMAND"; then
+        DANGER_KIND="meta-rename"
+        DANGER_MSG="$META_MV_MSG"
+    fi
 fi
 if grep -qE "${CMD_START}(mv|rename)[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
     DANGER_KIND="meta-rename"
-    DANGER_MSG="Renaming .meta files without their asset sibling orphans references. Unity will not recover from this automatically."
+    DANGER_MSG="$META_MV_MSG"
 fi
 
 # ProjectSettings direct mutation.
@@ -132,11 +161,15 @@ fi
 # match `git commit -m "… about git reset --hard"` and re-open the exact defect. The words
 # allowed between them are flag-shaped only.
 #
-# `git -C <dir>` and `git -c key=value` are the two option forms that legitimately sit
-# before a subcommand. Allowing them closes a false negative (`git -C /repo reset --hard`
-# was permitted) without re-opening the prose one — prose reaching `reset --hard` has
-# ordinary words in that gap, not flags.
-GIT_OPTS='([[:space:]]+-[cC][[:space:]]*[^[:space:];&|]+)*'
+# git's global options legitimately sit between `git` and its subcommand. Allowing them
+# closes false negatives (`git -C /repo reset --hard` and `git --git-dir=/r/.git clean -fdx`
+# were both permitted, the second found in review) without re-opening the prose one: every
+# alternative below is flag-shaped, and prose reaching `reset --hard` has ordinary words in
+# that gap rather than a leading dash. Enumerated rather than written as a catch-all `-\S+`,
+# because a catch-all would also swallow a subcommand's own arguments and walk the match
+# forward into unrelated text.
+GIT_OPT='(-[cC][[:space:]]*[^[:space:];&|]+|--(git-dir|work-tree|namespace|exec-path|config-env)[= ][^[:space:];&|]+|--(no-pager|paginate|bare|literal-pathspecs|no-replace-objects))'
+GIT_OPTS='([[:space:]]+'"${GIT_OPT}"')*'
 
 if grep -qE "${CMD_START}git${GIT_OPTS}[[:space:]]+reset[[:space:]]+--hard" <<< "$COMMAND"; then
     DANGER_KIND="git-reset-hard"
@@ -169,6 +202,14 @@ fi
 # the command may be multi-line (a heredoc into psql puts the client and the SQL on
 # different lines), and grep is line-oriented, so a single regex would only match when both
 # halves sit on one line.
+#
+# THIS IS A CLOSED ALLOWLIST and it narrows differently from what it replaced, rather than
+# strictly less. Anything issuing destructive SQL through something not named below now
+# passes: measured, `python3 -c "cur.execute('DROP TABLE users')"` and
+# `bq query 'DROP TABLE ds.t'` both went from blocked to allowed. Adding names does not close
+# the class — any language runtime can open a connection — so the real alternative is a
+# different discriminator (require the SQL to sit inside a quoted argument), which is a design
+# change and not a list. Recorded rather than papered over with four more names.
 SQL_CLIENT='(^|[^A-Za-z0-9_.-])(psql|mysql|mysqladmin|mariadb|sqlite3|sqlcmd|cockroach|clickhouse-client|duckdb)([^A-Za-z0-9_-]|$)'
 
 if grep -qiE '(drop[[:space:]]+table|truncate[[:space:]]+table|drop[[:space:]]+database)' <<< "$COMMAND" \
@@ -191,7 +232,14 @@ fi
 #   - macOS: `defaults delete <domain>` where the domain names unity
 #   - Linux: an `rm` under ~/.config/unity3d/<Company>/<Product>/prefs, which is where
 #     PlayerPrefs live on the only host .claude/UPSTREAM claims this toolkit ships for
-# (Windows keeps them in the registry; `reg delete` is not covered.)
+#
+# Two gaps, both measured 2026-08-13, both named here rather than left to be rediscovered:
+#   - Windows keeps them in the registry; `reg delete` is not covered at all.
+#   - The macOS plist is the same act by a different route, and neither arm above sees it.
+#     `rm -f ~/Library/Preferences/unity.Acme.Game.plist` does return 2 — but as
+#     `unity-dir-wipe`, because every macOS preferences path contains `Library/`, so the
+#     developer is told the wipe "triggers a full Unity reimport" when it erases their saves.
+#     A BARE `rm` of the same path returns 0: `unity-dir-wipe` requires an `-[rRf]` flag.
 if grep -qE "${CMD_START}defaults[[:space:]]+delete${SAME_CMD}[Uu]nity" <<< "$COMMAND" \
     || grep -qE "${CMD_START}rm[[:space:]]+${SAME_CMD}unity3d" <<< "$COMMAND"; then
     DANGER_KIND="playerprefs-wipe"

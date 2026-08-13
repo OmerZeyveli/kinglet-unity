@@ -44,20 +44,26 @@ case "$FILE_PATH" in
 esac
 
 # Editor and test code is not runtime code, which is the scope this hook's header claims and
-# the scope HOOK-REFERENCE.md documents. The two entries are not equally solid and the
-# difference is worth knowing before either is widened:
+# the scope HOOK-REFERENCE.md documents.
 #
-#   Editor/  — Unity's own semantics. A folder named Editor at any depth compiles into the
-#              Editor assembly and is excluded from every player build, so legacy input there
-#              cannot ship. guard-editor-runtime.sh (removed 2026-08-13) skipped the same
-#              paths for the same reason.
-#   Tests/   — convention only. Unity excludes TEST ASSEMBLIES from builds, not folders
-#              called Tests; a Tests/ folder with no test asmdef compiles into the runtime
-#              assembly and does ship. This entry trades a real hole for a false-positive
-#              class, and it is the one to revisit first if a legacy-input call is ever found
-#              shipping from a path this hook waved through.
+# What makes the exemption sound is the ASSEMBLY, not the folder name, and this toolkit ships
+# the layout that ties the two together. .claude/skills/assembly-definitions/SKILL.md requires
+# editor-only code to live in a separate Editor assembly and spells out the mechanism —
+# `"includePlatforms": ["Editor"]`, described there as "this assembly is excluded from builds
+# entirely" — and its Recommended Structure puts test code under `Assets/Tests/EditMode` and
+# `Assets/Tests/PlayMode` with test asmdefs. The folder name is a proxy for the asmdef, and it
+# is exactly as good as the project's adherence to that structure; a `Tests/` folder with no
+# test asmdef compiles into the runtime assembly and ships.
+#
+# ANCHORED UNDER Assets/, and that is the whole point of the pattern rather than a detail.
+# FILE_PATH is absolute. Unanchored, `*/Tests/*` matched
+# `/home/dev/Tests/MyGame/Assets/Scripts/Player.cs` — a checkout kept in an ordinary
+# `~/Projects/Tests/` directory — and switched this gate off for EVERY runtime file in that
+# project. Measured 2026-08-13, all three of `/home/dev/Tests/…`, `/home/dev/Editor/…` and
+# `/Users/dev/Projects/Tests/…` went from blocked to allowed. The third-party skip above was
+# already anchored this way; these two now match it.
 case "$FILE_PATH" in
-    Editor/*|*/Editor/*|Tests/*|*/Tests/*)
+    */Assets/Editor/*|*/Assets/*/Editor/*|*/Assets/Tests/*|*/Assets/*/Tests/*)
         exit 0 ;;
 esac
 

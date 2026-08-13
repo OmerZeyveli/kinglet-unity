@@ -110,7 +110,18 @@ assert_eq "$(verdict /proj/Assets/Scripts/S.cs 'void U(){ if (SteamInput.GetButt
 LEGACY_CALL='void U(){ if (Input.GetKeyDown(KeyCode.F9)) {} }'
 assert_eq "$(verdict /proj/Assets/Editor/BuildTool.cs "$LEGACY_CALL")" "0" "does not block editor-only tooling under Editor/"
 assert_eq "$(verdict /proj/Assets/Scripts/Editor/Win.cs "$LEGACY_CALL")" "0" "does not block a nested Editor/ folder"
+assert_eq "$(verdict /proj/Assets/A/B/Editor/Deep.cs "$LEGACY_CALL")" "0" "does not block an Editor/ folder nested several levels down"
 assert_eq "$(verdict /proj/Assets/Tests/PlayMode/InputTests.cs "$LEGACY_CALL")" "0" "does not block test code under Tests/"
+assert_eq "$(verdict /proj/Assets/Scripts/Tests/EditMode/T.cs "$LEGACY_CALL")" "0" "does not block a nested Tests/ folder"
+
+# The skip is anchored under Assets/, and these three are why. FILE_PATH is absolute, so an
+# unanchored */Tests/* matched every runtime file in a checkout that happens to live under a
+# directory named Tests — an ordinary place to keep one. Measured before the anchor: all three
+# went from blocked to allowed, which switches this gate off for a whole project at once.
+# The bug is about what precedes Assets/, so a corrected relative path would not have caught it.
+assert_eq "$(verdict /home/dev/Tests/MyGame/Assets/Scripts/Player.cs "$LEGACY_CALL")" "2" "still blocks when the CHECKOUT sits under a directory named Tests"
+assert_eq "$(verdict /home/dev/Editor/MyGame/Assets/Scripts/Player.cs "$LEGACY_CALL")" "2" "still blocks when the checkout sits under a directory named Editor"
+assert_eq "$(verdict /Users/dev/Projects/Tests/Game/Assets/Scripts/Enemy.cs "$LEGACY_CALL")" "2" "still blocks a Tests directory anywhere above the project root"
 
 # The skip is a path SEGMENT, not a substring: EditorTools/ is runtime code.
 assert_eq "$(verdict /proj/Assets/Scripts/EditorTools/Live.cs "$LEGACY_CALL")" "2" "still blocks EditorTools/ — a segment named Editor is not a prefix of one"
