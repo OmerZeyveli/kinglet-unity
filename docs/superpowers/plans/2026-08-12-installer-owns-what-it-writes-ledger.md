@@ -1,6 +1,8 @@
 # Ledger — plan: `docs/superpowers/plans/2026-08-12-installer-owns-what-it-writes.md`
 
-Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md` at `2d081f0`.
+Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md` — **eleven
+decisions and fourteen criteria as of `faf45e6`**; D10, D11 and the criterion 8 amendment were all
+added mid-wave, so re-read it rather than working from an earlier reading.
 
 - **Branch:** `pioneer/installer-ownership`, cut from `main` at `c5280c4`.
 - **Base commit for the whole-branch review:** `c5280c4`.
@@ -11,50 +13,41 @@ Spec: `docs/superpowers/specs/2026-08-12-installer-owns-what-it-writes-design.md
 
 ## RESUME HERE
 
-**Tasks 1, 1b, 1c, 1d and 2 are done and closed.** Task 2 passed review with **no fix round** — Spec ✅,
-Quality Approved — which is the first time in this wave. **Task 2b is the next action**, then 3, 4, 5,
-6.
+**Tasks 1, 1b, 1c, 1d, 2, 2b, 2c and 3 are done and closed. Task 4 is the next action**, then 5 and 6,
+then the whole-branch review.
 
-**Task 2b was inserted 2026-08-13** because Task 2's review measured a second live member of the class
-Task 2 closes: `CLAUDE.md.generated` is created by the installer, kept, announced, and never recorded —
-permanent debris on the project root. Spec **D10**, criterion 13. D10 declared itself the wave's last
-insertion, with one exemption: **data loss in shipped software**.
+**The suite is RED on purpose: `Total: 940  Passed: 933  Failed: 7`, 33 files, tree clean at
+`82b806a`.** `provenance OK`, baseline zero drift. The plan puts guards before fixes so each guard
+starts red; Task 3 built the dry-run guard and **Task 4 closes all seven**. Do not "fix" the red by
+weakening the guard — Task 3's own third review proved a one-line vague announcement could close three
+of the seven while telling the user nothing, and that hole is now shut.
 
-**Tasks 2b and 2c are now done and closed.** Suite **795/795**, 32 files, `provenance OK`, baseline zero
-drift, tree clean at `b573ce8`. **Task 3 is the next action**, then 4, 5, 6 — and Task 3's dispatch must
-carry three things this wave measured after the plan was written: the dry-run's `is NOT touched` line
-names the wrong subject, `.gitignore` is created-and-unrecorded on a `bare` fixture (its first oracle
-will see it), and **all three of D4's oracles are silent on a run that writes nothing** — which is the
-same blindness D4 exists to correct.
+**Task 4's brief was rewritten 2026-08-13 before dispatch** and is not the plan's original text. The
+original scoped it to "the dry-run's `.gitignore` line" and two fixtures; the guard now has nine
+fixtures and seven reds across two defects. Read the rewritten section, not memory of the old one.
 
-**Task 2c was inserted 2026-08-13, through that exemption, and it is the wave's most serious
-finding.** Task 2b's review reproduced on three independent paths that `install.sh` has two writers
-that overwrite without asking — and that **this wave taught both of them to claim the file was safe**
-while doing it. See the Task 2b section below. Spec **D11**, criterion 14, plus an amendment to
-criterion 13. **The exemption is now spent**: nothing further is promoted unless it is data loss, and
-the two known non-data-loss instances (`.gitignore`, and the `.bak` `cp` clobber's remaining half) are
-recorded for a second wave.
+**Criterion 8 was amended the same day, and the amendment is a correction to this spec's own
+problem statement** — its example was false when written, checked against `c5280c4`. See the dated
+block under problem statement 5.
 
-The wave keeps growing because each task's review finds the next instance of one root cause. The
-spec now carries **nine decisions**, and the tally is: the origin column is written in four places
-and, before this wave, read in none. Task 1 fixed the project-root rows, Task 1b fixed
-`uninstall.sh`, **Task 1c fixes the scripts loop — which does not check `is_modified` at all, so the
-run prints `keeping yours:` naming a file it overwrites in the same output** — and Task 1d fixes
-`studio-doctor.sh`, the last reader, which also carries two `printf | head` SIGPIPE traps.
+### How the wave grew, and why it stopped growing
 
-Suite: **645/645**, 32 test files, `provenance OK`, baseline zero drift, tree clean at `29a8593`.
+Every insertion came from a task's own review finding the next instance of one root cause: **the
+installer makes a claim it does not keep.** The spec now carries **eleven** decisions.
 
-Nine defects now, one shape: the installer makes a claim it does not keep. The receipt is rebuilt every
-run and two project-root files write their rows inside a *create* branch, so a second install
-silently disowns them and `uninstall.sh` leaves them behind. `manifest.json.bak` is kept without a
-row, so uninstall can never remove it. Two pipeline detectors disagree when both packages are
-present, and neither has a both-installed state. The dry-run announces two of four `.gitignore`
-entries, unconditionally. And "Option B: Manual Copy" produces an install `uninstall.sh` refuses to
-touch.
+- **D7, D8, D9** — the origin column is written in four places and, before this wave, read in none.
+  Tasks 1b, 1c and 1d fixed `uninstall.sh`, the scripts loop, and `studio-doctor.sh`.
+- **D10** — `CLAUDE.md.generated` is the same defect as `manifest.json.bak`, one file over. It also
+  **closed the wave to further growth**, with one exemption: data loss in shipped software.
+- **D11** — that exemption, spent. Two writers overwrite without asking, and **this wave taught both to
+  print `keeping yours:` about a file they destroy in the same run**. The destruction pre-dated the
+  wave; the false claim did not.
 
-Three of those nine were found *by this wave's own reviews*, not by the survey that opened it —
-D7, D8 and D9, each surfaced by the task before it. State at wave start: suite **503/503**, 31 test
-files, tree clean at `f8cd590`.
+**Nothing further is promoted.** The known non-data-loss instances — `.gitignore` created-and-
+unrecorded, the `.bak` `cp` clobber's remaining half, and the receipt-less-window class — are recorded
+below for a second wave.
+
+State at wave start, for comparison: suite **503/503**, 31 test files, tree clean at `f8cd590`.
 
 ## Controller decisions, made at setup
 
@@ -72,15 +65,18 @@ files, tree clean at `f8cd590`.
 
 ## Standing facts for every dispatch
 
-- **Spec** at `2d081f0`. Where the plan and the spec disagree, **the spec wins** and the
-  disagreement is a bug in the plan — report it rather than resolving it silently.
+- **Where the plan and the spec disagree, the spec wins** and the disagreement is a bug in the plan —
+  report it rather than resolving it silently. **Five plan bugs have been found this way, every one by
+  an implementer who checked instead of assuming**, and one of them was a brief whose literal
+  instruction *was* the defect.
 - **This is NOT a Unity project.** No Editor, no MCP bridge, no C#, no console. `install.sh` gates on
   `Assets/` + `ProjectSettings/`, so the fixture is how it is exercised:
   `bash tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed]`.
   Make fixtures realistic — a one-line `ProjectVersion.txt` once hid a real bug, because Unity writes
   two lines and both match the version regex.
-- **Gates, both, before reporting done.** Current: `Total: 602  Passed: 602  Failed: 0`, 32 files.
-  *(This line is copied into dispatches and goes stale every task — re-measure before quoting it.)*
+- **Gates, both, before reporting done.** Current: `Total: 940  Passed: 933  Failed: 7`, 33 files —
+  **the 7 are deliberate and belong to Task 4.** *(This line is copied into dispatches and goes stale
+  every task — re-measure before quoting it, and say which reds are expected.)*
 - **Strip ANSI before counting suite headers.** `grep -c '^--- test-.*\.sh ---'` on raw output
   returns **0** on a healthy suite — the exact signal of the catastrophe the count detects. Use
   `sed $'s/\x1b\\[[0-9;]*m//g'` first.
@@ -88,6 +84,15 @@ files, tree clean at `f8cd590`.
 - **Never pipe into a reader that can exit early** under `set -euo pipefail`. `grep -q` exits on
   first match without draining stdin. Use `grep -qF -- "$needle" <<< "$haystack"`.
 - **`[ x = y ] && continue` is a `set -e` trap** as a loop body's last command. Use `if/then/fi`.
+- **A test must not fabricate its own fixture.** Measured 2026-08-13: a state's `printf >>` created a
+  file that was supposed to already exist, measured the test's own bytes, and printed `PASS:` about it
+  — masking a live spec violation. Any step that assumes a file is present must **assert** it, and any
+  step that can die (`sed -i` on a missing file, `mv` of an absent path, `cd` into a missing dir) must
+  fail as an assertion instead, or every assertion after it silently never runs.
+- **A needle must not carry the literal token `FAIL`.** The runner tallies with
+  `grep -cE '(^|[[:space:]])FAIL(:|[[:space:]])'` and helpers echo the needle on failure, so one
+  failing assertion tallies as two. Inflation, never a false green — but measured.
+- **An unanchored count needle passes for the wrong reason** — `"1 file"` also matches `11 files`.
 - **Both new tests are self-contained** — own `set -euo pipefail`, own `pass`/`fail`, `REPO` from
   `${BASH_SOURCE[0]}`. Model on `tests/test-provenance-origins.sh`. **Do not use the runner's
   `assert_*` helpers in them**: the runner does `set +e` before sourcing, so an undefined helper
