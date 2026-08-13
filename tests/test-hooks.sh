@@ -87,17 +87,9 @@ RESULT=$(run_hook "guard-project-config.sh" "$PAYLOAD")
 EXIT_CODE="${RESULT%%|*}"
 assert_eq "0" "$EXIT_CODE" "guard-project-config allows .cs files"
 
-# --- track-reads.sh ---
-
-# Should exit 0 (advisory) and track the file
-TEMP_STATE="/tmp/unity-claude-hooks"
-rm -f "${TEMP_STATE}/gateguard-reads.txt"
-PAYLOAD='{"tool_name":"Read","tool_input":{"file_path":"Assets/Scripts/Player.cs"}}'
-RESULT=$(run_hook "track-reads.sh" "$PAYLOAD")
-EXIT_CODE="${RESULT%%|*}"
-assert_eq "0" "$EXIT_CODE" "track-reads exits 0"
-
 # --- track-edits.sh ---
+
+TEMP_STATE="/tmp/unity-claude-hooks"
 
 # Should exit 0 and track the edit
 rm -f "${TEMP_STATE}/session-edits.txt"
@@ -106,23 +98,10 @@ RESULT=$(run_hook "track-edits.sh" "$PAYLOAD")
 EXIT_CODE="${RESULT%%|*}"
 assert_eq "0" "$EXIT_CODE" "track-edits exits 0"
 
-# --- cost-tracker.sh (strict profile) ---
-
-# Should be skipped under standard profile
-PAYLOAD='{"tool_name":"Read","tool_input":{"file_path":"test.cs"}}'
-RESULT=$(run_hook "cost-tracker.sh" "$PAYLOAD" "UNITY_HOOK_PROFILE=standard")
-EXIT_CODE="${RESULT%%|*}"
-assert_eq "0" "$EXIT_CODE" "cost-tracker skipped under standard profile"
-
-# --- notify.sh ---
-
-# Should exit 0 when notifications disabled (default)
-PAYLOAD='{}'
-RESULT=$(run_hook "notify.sh" "$PAYLOAD")
-EXIT_CODE="${RESULT%%|*}"
-assert_eq "0" "$EXIT_CODE" "notify exits 0 when disabled"
-
-# Should exit 0 when enabled but no webhook URL
-RESULT=$(run_hook "notify.sh" "$PAYLOAD" "UNITY_NOTIFY_ENABLED=1")
-EXIT_CODE="${RESULT%%|*}"
-assert_eq "0" "$EXIT_CODE" "notify exits 0 when no webhook URL"
+# track-reads.sh, cost-tracker.sh and notify.sh were asserted here until 2026-08-13 and are gone:
+# the first two declared HOOK_PROFILE_LEVEL="strict" while nothing sets UNITY_HOOK_PROFILE, so their
+# assertions were measuring the profile gate rather than the hook, and notify.sh was opt-in behind
+# UNITY_NOTIFY_ENABLED. Their absence is enforced by provenance-skip.tsv, not by this file.
+#
+# What this file cannot see, and never could: whether a hook is registered on the right event, or
+# registered at all. tests/test-derived-counts.sh owns that set identity.

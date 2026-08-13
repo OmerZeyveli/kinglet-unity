@@ -23,7 +23,7 @@ This project follows the architecture established by [everything-claude-code](ht
   settings.json      Configuration: permissions, hook definitions
   agents/             8 agent definitions (.md files with frontmatter)
   commands/           9 user-invocable slash commands
-  hooks/             27 registered shell scripts + _lib.sh (safety, quality, session, learning)
+  hooks/             12 registered shell scripts + _lib.sh (safety, session, quality warnings)
   rules/              6 always-loaded coding standards
   skills/            16 knowledge modules, flat — one directory per skill, no categories
   state/             Session state directory (session.json, tracking files)
@@ -169,11 +169,18 @@ already live.
 
 Hooks are shell scripts in `.claude/hooks/` configured in `settings.json`. They run automatically at various lifecycle events: before/after tool invocations, before context compaction, on session start, and on session stop.
 
-All 27 registered hooks source a shared library (`_lib.sh`, a sourced library and not itself a hook)
-that provides kill switches, profile filtering, and utility functions. Hooks are organized into three
-**profile levels** -- `minimal` (7 cumulative, including `session-brief.sh`, which declares no
-`HOOK_PROFILE_LEVEL` and always runs), `standard` (20 cumulative), and `strict` (27 cumulative, all
-of them). Set the active profile via `UNITY_HOOK_PROFILE=standard`.
+All 12 registered hooks source a shared library (`_lib.sh`, a sourced library and not itself a hook)
+that provides kill switches, profile filtering, and utility functions -- except `session-brief.sh`,
+which sources nothing and therefore honours no kill switch. Hooks are organized into three
+**profile levels** -- `minimal` (4 cumulative, including `session-brief.sh`, which declares no
+`HOOK_PROFILE_LEVEL` and always runs), `standard` (12 cumulative), and `strict` (12 cumulative). Set
+the active profile via `UNITY_HOOK_PROFILE=standard`.
+
+**No hook declares `strict` any more**, so `standard` and `strict` are the same set. That is a
+consequence of the 2026-08-13 cut, not an oversight: every strict-declared hook was removed, because
+`UNITY_HOOK_PROFILE` is set nowhere in `settings.json`, `install.sh` or `scripts/`, so `standard` is
+the only profile that has ever been active and seven hooks had never run. The tier that is left doing
+work is `minimal`, which drops the three standard-profile warning hooks and the session pair.
 
 ### Event Types
 
@@ -191,31 +198,21 @@ of them). Set the active profile via `UNITY_HOOK_PROFILE=standard`.
 |------|-------|---------|---------|------|
 | `block-scene-edit` | PreToolUse | Edit\|Write | minimal | Blocking |
 | `block-meta-edit` | PreToolUse | Edit\|Write | minimal | Blocking |
-| `guard-editor-runtime` | PreToolUse | Edit\|Write | minimal | Blocking |
 | `block-legacy-input` | PreToolUse | Edit\|Write | minimal | Blocking |
 | `guard-project-config` | PreToolUse | Edit\|Write | standard | Blocking |
-| `gateguard` | PreToolUse | Edit\|Write | strict | Blocking |
-| `block-projectsettings` | PreToolUse | Bash | minimal | Blocking |
 | `bash-gate` | PreToolUse | Bash | standard | Blocking |
-| `track-reads` | PostToolUse | Read | strict | Advisory |
 | `warn-serialization` | PostToolUse | Edit\|Write | standard | Advisory |
 | `warn-filename` | PostToolUse | Edit\|Write | standard | Advisory |
 | `warn-platform-defines` | PostToolUse | Edit\|Write | standard | Advisory |
-| `quality-gate` | PostToolUse | Edit\|Write | standard | Advisory |
 | `track-edits` | PostToolUse | Edit\|Write | standard | Advisory |
-| `suggest-verify` | PostToolUse | Edit\|Write | standard | Advisory |
-| `validate-commit` | PostToolUse | Bash | standard | Advisory |
-| `build-analyze` | PostToolUse | Bash | strict | Advisory |
-| `cost-tracker` | PostToolUse | (all) | strict | Advisory |
-| `instinct-capture` | PostToolUse | (all) | strict | Advisory |
-| `pre-compact` | PreCompact | (all) | minimal | Advisory |
 | `session-restore` | SessionStart | (all) | standard | Advisory |
 | `session-brief` | SessionStart | startup\|clear\|compact | always (no `HOOK_PROFILE_LEVEL`) | Advisory |
-| `stop-validate` | Stop | (all) | standard | Advisory |
 | `session-save` | Stop | (all) | standard | Advisory |
-| `auto-learn` | Stop | (all) | strict | Advisory |
-| `instinct-distill` | Stop | (all) | strict | Advisory |
-| `notify` | Stop | (all) | standard | Advisory |
+
+There is no `PreCompact` or `PostToolUse`-on-`Bash` registration left. Fifteen hooks were removed on
+2026-08-13 when the surface criterion — *does it do something the model cannot do unaided?* — was
+applied to this directory for the first time; `provenance-skip.tsv` carries the ground for each, and
+`scripts/check-provenance.sh` fails if any of them reappears.
 
 ### Hook Input
 
@@ -407,12 +404,14 @@ Session state is persisted in the `.claude/state/` directory (falls back to `/tm
 |------|---------|------------|
 | `session.json` | Full session state for restore | `session-save.sh` |
 | `session-start-time` | Epoch timestamp for duration calculation | `session-restore.sh` |
-| `gateguard-reads.txt` | Files read during session (for GateGuard) | `track-reads.sh` |
 | `session-edits.txt` | Files edited during session | `track-edits.sh` |
-| `session-cost.jsonl` | Tool call log (tool name + timestamp) | `cost-tracker.sh` |
-| `learnings.jsonl` | Extracted session patterns | `auto-learn.sh` |
 | `session-warnings.txt` | Hook warnings for analytics | Various hooks |
-| `precompact-state.md` | Git state snapshot before compaction | `pre-compact.sh` |
+
+`_lib.sh` still defines paths for `gateguard-reads.txt`, `session-cost.jsonl`, `learnings.jsonl` and
+`notify-event.json`, and `session-restore.sh` still clears three of them at session start, but the
+hooks that wrote and read them were removed on 2026-08-13. `session-save.sh` reads
+`session-cost.jsonl` and `precompact-state.md` behind `[ -f ]` guards, so it now reports 0 tool calls
+and an empty workflow phase rather than failing.
 
 ### Session TTL
 

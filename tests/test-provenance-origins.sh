@@ -291,9 +291,16 @@ done <<< "$dead_scan"
 # That is also the likely edit rather than an exotic one. The comment above says "the skip is one
 # file and stays one file", which is a request; the next contributor who meets an awkward file will
 # reach for that `case` first, and a request is not a guard.
+#
+# The scripts/ floor moved from 8 to 5 on 2026-08-13. `scripts/` held 12 tracked files when the floor
+# was written and holds 7 now, because the surface criterion was applied to it and removed 5 by a
+# decision recorded in provenance-skip.tsv and enforced path by path by scripts/check-provenance.sh.
+# Lowering a coverage floor is normally the exact move that hides a broken pathspec, so: the tree
+# shrank by a cut a second guard polices, not by a glob that stopped matching, and the sentinel
+# below — which no count can substitute for — is unchanged and still read.
 dead_floor_bad=""
 [ "$dead_payload" -ge 60 ] || dead_floor_bad="${dead_floor_bad}.claude/* scanned $dead_payload files (expected >= 60)"$'\n'
-[ "$dead_scripts" -ge 8 ]  || dead_floor_bad="${dead_floor_bad}scripts/* scanned $dead_scripts files (expected >= 8)"$'\n'
+[ "$dead_scripts" -ge 5 ]  || dead_floor_bad="${dead_floor_bad}scripts/* scanned $dead_scripts files (expected >= 5)"$'\n'
 [ "$dead_docs"    -ge 4 ]  || dead_floor_bad="${dead_floor_bad}docs/*.md scanned $dead_docs files (expected >= 4)"$'\n'
 [ "$dead_readme"  -eq 1 ]  || dead_floor_bad="${dead_floor_bad}README.md scanned $dead_readme times (expected exactly 1)"$'\n'
 

@@ -84,9 +84,11 @@
 # matching: the count is asserted non-zero, and both spellings would have to break together.
 #
 # It cannot see:
-#   * A `--help` BUILT ANY OTHER WAY. Eight other tracked scripts advertise one and none of them is
-#     checked here: the seven `scripts/*.sh` outside this set (analyze-build-size, detect-missing-refs
-#     and the five validate-*) and spikes/platform/unity/run-host.sh all emit a heredoc. A heredoc
+#   * A `--help` BUILT ANY OTHER WAY. Every tracked script outside this set that advertises one
+#     emits a heredoc instead — `spikes/platform/unity/run-host.sh` and whichever `scripts/*.sh`
+#     are outside the range-checked set. Derive that set rather than listing it: this comment named
+#     seven scripts by hand until 2026-08-13, when five of them were removed by the surface-criterion
+#     cut and the sentence became a list of files that do not exist. A heredoc
 #     cannot truncate the way this construct does — the text is not addressed by line number — so
 #     they are out of scope rather than missed. But "the suite checks every --help" is NOT what this
 #     file proves; it checks the six whose help is a line range, which is the six that can rot.

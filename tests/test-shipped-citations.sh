@@ -50,6 +50,15 @@ MD_COUNT="$(printf '%s\n' "$SHIPPED_MD" | grep -c . || true)"
 # payload entries; scripts/detect-pipeline.sh made the second of those 86 and this line went a wave
 # without noticing. Do not read either count off it — both pass lines below print what the tree holds
 # on the run in front of you. Raise a floor when the tree grows; never lower one to make a run pass.
+#
+# THE PAYLOAD FLOOR MOVED DOWN ON 2026-08-13, from 70 to 55, and that is the one edit the paragraph
+# above forbids — so it needs its reason on the record. The surface criterion was applied to
+# `.claude/hooks/` and `scripts/` for the first time and removed 15 hooks and 5 scripts by a decision
+# recorded in provenance-skip.tsv, which `scripts/check-provenance.sh` enforces path by path. The
+# tree shrank from 86 payload entries to 66 because it was CUT, not because a derivation broke, and
+# the new floor keeps the same proportional headroom the old one had. A floor lowered to match a
+# shrinkage nothing authorised would be the failure this comment warns about; this one is pinned to a
+# skip list a second guard reads.
 if [ "$MD_COUNT" -ge 35 ]; then
   pass "guard scanned $MD_COUNT shipped .md files (floor 35)"
 else
@@ -57,10 +66,10 @@ else
 fi
 
 PAYLOAD_COUNT="$(printf '%s\n' "$PAYLOAD" | grep -c . || true)"
-if [ "$PAYLOAD_COUNT" -ge 70 ]; then
-  pass "payload derivation produced $PAYLOAD_COUNT entries (floor 70)"
+if [ "$PAYLOAD_COUNT" -ge 55 ]; then
+  pass "payload derivation produced $PAYLOAD_COUNT entries (floor 55)"
 else
-  fail "payload derivation produced only $PAYLOAD_COUNT entries — expected at least 70; install.sh's layout has changed or the derivation is broken"
+  fail "payload derivation produced only $PAYLOAD_COUNT entries — expected at least 55; install.sh's layout has changed or the derivation is broken"
 fi
 
 # The floors above are lower bounds, so a derivation that *over*-includes clears them silently — and
@@ -78,7 +87,7 @@ SCRIPTS_COUNT="$(printf '%s\n' "$PAYLOAD" | grep -c '^\.claude/scripts/' || true
 if [ "$SCRIPTS_COUNT" -ge 1 ]; then
   pass "payload carries $SCRIPTS_COUNT .claude/scripts/ entries (floor 1)"
 else
-  fail "payload derivation produced no .claude/scripts/ entries — the scripts/*.sh loop has stopped matching; the count then falls to 76 and still clears the floor of 70"
+  fail "payload derivation produced no .claude/scripts/ entries — the scripts/*.sh loop has stopped matching; the count then falls to 61 and still clears the floor of 55"
 fi
 
 # 1. No numbered section marker in any shipped .md. The one exception is NOTICE.md's own §3, which

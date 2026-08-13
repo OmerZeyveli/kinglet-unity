@@ -71,11 +71,11 @@ Each cost below was measured against a manual copy, not assumed:
 
 - **No `.claude/scripts/`.** That directory does not exist in this repository — Option A builds it
   by copying the repo-root `scripts/`. A manual copy of `.claude/` therefore has no
-  `.claude/scripts/validate-code-quality.sh`, which `/unity-optimize` and the `unity-optimizer`
-  agent both invoke by that exact path. To match Option A, copy them yourself — **all except
+  `.claude/scripts/studio-doctor.sh`, which `/unity-doctor` and this guide both point at by that
+  exact path. To match Option A, copy them yourself — **all except
   `check-provenance.sh`**, which Option A deliberately skips in both its announcement and its write
   loop, because it validates *this repository's* `provenance.tsv` and expects the repo's layout. The
-  repo has 11 scripts; an installed project has 10:
+  repo has 6 scripts; an installed project has 5:
 
   ```bash
   mkdir -p your-unity-project/.claude/scripts
@@ -109,7 +109,7 @@ After installation, your project contains:
 .claude/
   agents/           8 specialized sub-agents (coder, reviewer, scene-builder, prototyper, etc.)
   commands/         9 slash commands (/unity-prototype, /unity-fix, /unity-doctor, etc.)
-  hooks/           27 hooks + _lib.sh (safety, quality, session, learning) — 8 of them blocking
+  hooks/           12 hooks + _lib.sh (safety, session, quality warnings) — 5 of them blocking
   rules/            6 always-loaded coding standards (C# style, performance, architecture, PC/console)
   skills/          16 knowledge modules, one directory each — flat, never nested, because one level
                    is the only depth Claude Code discovers (see below)

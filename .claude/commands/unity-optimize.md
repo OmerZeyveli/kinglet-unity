@@ -33,7 +33,7 @@ manage_profiler → memory snapshot
 - **Memory** — large textures, uncompressed audio, leaked Addressables
 
 ### Step 3: Code Scan
-Run `./.claude/scripts/validate-code-quality.sh` to find:
+Read the files the profiler named in Step 1 and look for:
 - GetComponent in Update
 - Uncached Camera.main
 - LINQ in gameplay code

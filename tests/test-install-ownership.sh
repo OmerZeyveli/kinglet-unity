@@ -576,7 +576,7 @@ G_UNTOUCHED='.claude/rules/architecture.md'
 G_UNTOUCHED2='.claude/hooks/bash-gate.sh'
 # Newline-separated, not an array: bash 3.2 is the floor and `declare -A` is out.
 G_EDITED='.claude/rules/pc-console.md
-.claude/hooks/auto-learn.sh
+.claude/hooks/warn-filename.sh
 .claude/settings.json'
 G_EDITED_COUNT=3
 
@@ -796,7 +796,7 @@ assert_gone "$G_ODD" "$G_UNTOUCHED2" "G (unreadable origin, a well-formed toolki
 # H.4 IS THE ANTI-"KEEP EVERYTHING" DIRECTION, AND IT NEEDS A STALE FILE TO BE WORTH ANYTHING. If
 # the untouched sibling already carried the bytes the current toolkit ships, "it still holds the
 # shipped bytes" would pass for a loop that wrote nothing at all — the assertion would be satisfied
-# by the previous run. So H installs a PREVIOUS toolkit first, one whose validate-architecture.sh
+# by the previous run. So H installs a PREVIOUS toolkit first, one whose validate-asmdefs.sh
 # carries an extra line, and requires the current run to replace it. A fix that keeps everything
 # leaves the old bytes there and goes red.
 #
@@ -830,10 +830,18 @@ assert_gone "$G_ODD" "$G_UNTOUCHED2" "G (unreadable origin, a well-formed toolki
 #   * Nothing about uninstall. H stops at the end of install 2.
 # Newline-separated, not arrays: bash 3.2 is the floor. Written pre-sorted, because every set
 # comparison below goes through `sort` and a mis-sorted literal would fail for the wrong reason.
-H_EDITED='.claude/scripts/analyze-build-size.sh
+#
+# The four names below moved on 2026-08-13: analyze-build-size.sh and validate-architecture.sh were
+# removed when the surface criterion was applied to scripts/, so this fixture now uses
+# detect-pipeline.sh and validate-asmdefs.sh. H_UNTOUCHED must stay clear of the two scripts
+# install.sh EXECUTES from its own directory (detect-pipeline.sh and generate-claude-md.sh), because
+# the previous-version fixture appends a line to every H_UNTOUCHED file in $OLDH/scripts/ before
+# running $OLDH/install.sh. H_EDITED is edited in the PROJECT copy, which install.sh never runs, so
+# it carries no such constraint.
+H_EDITED='.claude/scripts/detect-pipeline.sh
 .claude/scripts/studio-doctor.sh'
 H_EDITED_COUNT=2
-H_UNTOUCHED='.claude/scripts/validate-architecture.sh
+H_UNTOUCHED='.claude/scripts/validate-asmdefs.sh
 .claude/scripts/validate-serialization.sh'
 
 # The "previous version": the payload and scripts as they stand, with the untouched siblings each

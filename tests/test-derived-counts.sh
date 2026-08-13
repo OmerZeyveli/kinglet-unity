@@ -407,3 +407,185 @@ if [ -n "$DCS_VACUOUS" ]; then
 fi
 assert_eq "0" "$(printf '%s' "$DCS_VACUOUS" | grep -c . || true)" \
   "every surface-count phrasing this guard covers is still present in the file that carries it"
+
+# ============================================================================
+# Hooks and installed scripts — the other half of the payload, and the half that had no block here
+# at all until 2026-08-13.
+#
+# The 2026-08-03 cut applied "does it do something the model cannot do unaided?" to agents, commands
+# and skills; hooks and scripts/ were out of scope and every one survived. When the criterion was
+# applied to them on 2026-08-13, 15 of 27 hooks and 5 of 10 installed scripts left in one commit —
+# and `grep -c hook tests/test-derived-counts.sh` returned 0 the morning of that commit, so seven
+# quoted numbers across three shipped documents would have gone wrong simultaneously with the suite
+# green. That is verbatim the failure the surface-pool block above was written for after the
+# 2026-08-10 wave, one payload directory to the left.
+#
+# THE REGISTRATION IDENTITY IS THE POINT OF THIS BLOCK, not the prose counts.
+#
+# A hook file on disk that no `settings.json` entry names never runs, and Claude Code reports
+# nothing — it is not an error, it is silence, exactly like a nested skill. A `settings.json` entry
+# naming a file that is not there is the same silence from the other side. Both are invisible to
+# every other guard in this suite, and the second one is what a cut of this size produces if a
+# registration is missed. So the identity is asserted as a SET, both directions, by name: a count
+# comparison would pass on a tree where one hook was deleted and an unrelated one double-registered.
+echo "--- derived counts: hooks and installed scripts ---"
+
+# Hooks on disk. `_lib.sh` is a sourced library, not a hook — it is the one file in this directory
+# that settings.json must NOT name, and CLAUDE.md says so. It is also why a naive
+# `grep -l HOOK_PROFILE_LEVEL=` overcounts: _lib.sh defines the constant it reads.
+DCK_DISK=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | sed 's|.*/||' | grep -vx '_lib.sh' | sort)
+DCK_HOOKS=$(printf '%s\n' "$DCK_DISK" | grep -c . || true)
+
+# Hooks registered in settings.json. Read with grep+sed rather than a JSON parser: this suite has no
+# python/jq dependency anywhere else, and the shape here is one `"command": ".claude/hooks/x.sh"` per
+# line. A malformed settings.json shows up as a set mismatch below, which is louder than a parse
+# error swallowed by `|| true`.
+DCK_REG=$(grep -oE '\.claude/hooks/[a-z0-9-]+\.sh' "$REPO_DIR/.claude/settings.json" 2>/dev/null \
+          | sed 's|.claude/hooks/||' | sort -u)
+DCK_REGISTERED=$(printf '%s\n' "$DCK_REG" | grep -c . || true)
+
+# Blocking hooks — those that can actually stop a tool call. Derived from the call, not from a
+# comment: `unity_hook_block` is _lib.sh's only exit-2 path, and a hook that stops using it stops
+# blocking. The trailing space keeps the definition inside _lib.sh from matching its own callers.
+DCK_BLOCKING=$(grep -l 'unity_hook_block ' "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null \
+               | sed 's|.*/||' | grep -vx '_lib.sh' | grep -c . || true)
+
+# Profile tiers, cumulative, as `_lib.sh` computes them: a hook runs when its declared level is <=
+# the active profile, and a hook that declares no level always runs. session-brief.sh is the only
+# one in the second class and it is deliberate, so `minimal` is "declared minimal, plus undeclared".
+DCK_MINIMAL=0
+DCK_STANDARD=0
+DCK_STRICT=0
+while IFS= read -r dck_h; do
+  [ -n "$dck_h" ] || continue
+  dck_lvl=$(grep -m1 '^HOOK_PROFILE_LEVEL=' "$REPO_DIR/.claude/hooks/$dck_h" 2>/dev/null \
+            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/')
+  case "$dck_lvl" in
+    ''|minimal) DCK_MINIMAL=$((DCK_MINIMAL + 1)) ;;
+    standard)   DCK_STANDARD=$((DCK_STANDARD + 1)) ;;
+    strict)     DCK_STRICT=$((DCK_STRICT + 1)) ;;
+  esac
+done <<< "$DCK_DISK"
+DCK_STANDARD=$((DCK_MINIMAL + DCK_STANDARD))
+DCK_STRICT=$((DCK_STANDARD + DCK_STRICT))
+
+# Scripts. install.sh writes `scripts/*.sh` into `.claude/scripts/` and skips exactly one file,
+# check-provenance.sh, because it validates THIS repository. The two numbers therefore always differ
+# by one, and both are quoted in docs/GETTING-STARTED.md, so both are derived here. The skip is read
+# out of install.sh rather than hardcoded: if that line ever names a second file, this derivation
+# follows it instead of silently disagreeing.
+#
+# Counted as DISTINCT NAMES, not as matching lines. install.sh carries the same skip twice — once in
+# the NEW_PATHS enumeration and once in the write loop, and its own comment says the two must stay in
+# step — so a line count says 2 for a tree that skips one file. Round 1 of this block asserted the
+# line count and went red on a correct tree.
+DCK_SKIP_NAMES=$(grep -oE '\[ "\$b" = "[^"]+" \] && continue' "$REPO_DIR/install.sh" 2>/dev/null \
+                 | sed 's/.*= "//; s/" \].*//' | sort -u)
+DCK_SKIPPED=$(printf '%s\n' "$DCK_SKIP_NAMES" | grep -c . || true)
+DCK_REPO_SCRIPTS=$(ls -1 "$REPO_DIR"/scripts/*.sh 2>/dev/null | grep -c . || true)
+DCK_INSTALLED_SCRIPTS=$((DCK_REPO_SCRIPTS - DCK_SKIPPED))
+
+# The derivation has to be able to fail, for the same reason the surface-pool block says so: run
+# against a tree with no payload, every number above is 0, and 0 == 0 is a green suite that read
+# nothing. Asserted before anything is compared against them.
+DCK_DERIVATION="ok"
+[ "$DCK_HOOKS"         -ge 1 ] || DCK_DERIVATION="no hooks found under \$REPO_DIR/.claude/hooks"
+[ "$DCK_REGISTERED"    -ge 1 ] || DCK_DERIVATION="no hook registrations found in \$REPO_DIR/.claude/settings.json"
+[ "$DCK_REPO_SCRIPTS"  -ge 1 ] || DCK_DERIVATION="no scripts found under \$REPO_DIR/scripts"
+[ "$DCK_SKIPPED"       -eq 1 ] || DCK_DERIVATION="install.sh no longer skips exactly one script (skips: $(printf '%s' "$DCK_SKIP_NAMES" | tr '\n' ' ')) — the installed-script derivation is guessing"
+assert_eq "ok" "$DCK_DERIVATION" \
+  "the hook and script counts are derived from a tree that actually has hooks and scripts in it"
+
+# --- The registration identity, both directions, by name. ---
+DCK_UNREGISTERED=$(comm -23 <(printf '%s\n' "$DCK_DISK") <(printf '%s\n' "$DCK_REG"))
+DCK_MISSING=$(comm -13 <(printf '%s\n' "$DCK_DISK") <(printf '%s\n' "$DCK_REG"))
+
+if [ -n "$DCK_UNREGISTERED" ]; then
+  printf '%s\n' "$DCK_UNREGISTERED" | sed 's|^|     on disk but named by no settings.json entry — it never runs: |'
+fi
+assert_eq "0" "$(printf '%s' "$DCK_UNREGISTERED" | grep -c . || true)" \
+  "every hook file on disk is registered in settings.json ($DCK_HOOKS hooks)"
+
+if [ -n "$DCK_MISSING" ]; then
+  printf '%s\n' "$DCK_MISSING" | sed 's|^|     registered in settings.json but absent from .claude/hooks/ — Claude Code reports nothing: |'
+fi
+assert_eq "0" "$(printf '%s' "$DCK_MISSING" | grep -c . || true)" \
+  "every hook registered in settings.json exists on disk ($DCK_REGISTERED registrations)"
+
+# --- The quoted numbers. Same table shape, same flattening, same per-pair floors as above. ---
+#
+# docs/ARCHITECTURE.md   "hooks/ 12 registered shell scripts"          total
+# docs/ARCHITECTURE.md   "All 12 registered hooks source"              total
+# docs/ARCHITECTURE.md   "minimal (4 cumulative"                       minimal tier
+# docs/ARCHITECTURE.md   "standard (12 cumulative)"                    standard tier
+# docs/ARCHITECTURE.md   "strict (12 cumulative"                       strict tier
+# docs/GETTING-STARTED.md "hooks/ 12 hooks + _lib.sh"                  total
+# docs/GETTING-STARTED.md "5 of them blocking"                         blocking
+# docs/GETTING-STARTED.md "repo has 6 scripts; an installed project has 5"  repo, installed
+# docs/HOOK-REFERENCE.md  "includes 12 hooks"                          total
+# docs/HOOK-REFERENCE.md  "standard profile 12 hooks"                  standard tier
+DCK_CLAIMS="docs/ARCHITECTURE.md	hooks/ [0-9]+ registered shell scripts	$DCK_HOOKS	-
+docs/ARCHITECTURE.md	All [0-9]+ registered hooks source	$DCK_HOOKS	-
+docs/ARCHITECTURE.md	.minimal. \([0-9]+ cumulative	$DCK_MINIMAL	-
+docs/ARCHITECTURE.md	.standard. \([0-9]+ cumulative\)	$DCK_STANDARD	-
+docs/ARCHITECTURE.md	.strict. \([0-9]+ cumulative	$DCK_STRICT	-
+docs/GETTING-STARTED.md	hooks/ [0-9]+ hooks [+] _lib.sh	$DCK_HOOKS	-
+docs/GETTING-STARTED.md	[0-9]+ of them blocking	$DCK_BLOCKING	-
+docs/GETTING-STARTED.md	repo has [0-9]+ scripts; an installed project has [0-9]+	$DCK_REPO_SCRIPTS	$DCK_INSTALLED_SCRIPTS
+docs/HOOK-REFERENCE.md	includes [0-9]+ hooks	$DCK_HOOKS	-
+docs/HOOK-REFERENCE.md	standard profile [^.]* [0-9]+ hooks	$DCK_STANDARD	-"
+
+DCK_BAD=""
+DCK_VACUOUS=""
+while IFS=$'\t' read -r dck_rel dck_pat dck_want1 dck_want2; do
+  [ -n "$dck_rel" ] || continue
+  if [ ! -f "$REPO_DIR/$dck_rel" ]; then
+    DCK_VACUOUS="${DCK_VACUOUS}${dck_rel} is not present, so its '${dck_pat}' claim was never checked"$'\n'
+    continue
+  fi
+
+  # tr drains its input; neither reader here can exit early.
+  dck_flat="$(tr '\n' ' ' < "$REPO_DIR/$dck_rel" | tr -s ' ')"
+  dck_hits=0
+  while IFS= read -r dck_claim; do
+    [ -n "$dck_claim" ] || continue
+    dck_hits=$((dck_hits + 1))
+    dck_got1=$(printf '%s' "$dck_claim" | grep -oE '[0-9]+' | sed -n 1p)
+    dck_got2=$(printf '%s' "$dck_claim" | grep -oE '[0-9]+' | sed -n 2p)
+    if [ "$dck_got1" != "$dck_want1" ] || { [ "$dck_want2" != "-" ] && [ "$dck_got2" != "$dck_want2" ]; }; then
+      DCK_BAD="${DCK_BAD}${dck_rel} claims '${dck_claim}' — the tree has ${dck_want1}"$([ "$dck_want2" != "-" ] && printf ' and %s' "$dck_want2")$'\n'
+    fi
+  done <<< "$(grep -oE "$dck_pat" <<< "$dck_flat" || true)"
+
+  if [ "$dck_hits" -lt 1 ]; then
+    DCK_VACUOUS="${DCK_VACUOUS}${dck_rel} no longer states its '${dck_pat}' claim in a form this guard can read"$'\n'
+  fi
+done <<< "$DCK_CLAIMS"
+
+if [ -n "$DCK_BAD" ]; then
+  printf '%s' "$DCK_BAD"
+  printf '     %s\n' "Re-derive with: ls .claude/hooks/*.sh | grep -v _lib | wc -l ; ls scripts/*.sh | wc -l"
+fi
+assert_eq "0" "$(printf '%s' "$DCK_BAD" | grep -c . || true)" \
+  "every hook and script count quoted in prose matches the tree ($DCK_HOOKS hooks, $DCK_BLOCKING blocking, tiers $DCK_MINIMAL/$DCK_STANDARD/$DCK_STRICT, $DCK_REPO_SCRIPTS repo scripts, $DCK_INSTALLED_SCRIPTS installed)"
+
+if [ -n "$DCK_VACUOUS" ]; then
+  printf '%s' "$DCK_VACUOUS"
+fi
+assert_eq "0" "$(printf '%s' "$DCK_VACUOUS" | grep -c . || true)" \
+  "every hook-count phrasing this guard covers is still present in the file that carries it"
+
+# What this block cannot see, stated rather than assumed:
+#
+#   - Whether a registered hook is registered on the RIGHT event. `validate-commit.sh` was removed in
+#     this same wave for being PostToolUse when its whole job needed PreToolUse, and both the set
+#     identity above and any count would have called that tree clean. Nothing in this suite reads a
+#     hook's intended event, because nothing writes it down in a machine-readable form.
+#   - Whether a hook does anything. The seven strict-gated hooks removed on 2026-08-13 were
+#     registered, present, and dead; the profile tiers above would have counted them happily.
+#   - Any count quoted in a phrasing not in the table. That is the standing residual the per-pair
+#     floors exist to make loud when it shrinks — growing the covered set is still manual.
+#   - MERGE-NOTES.md's hook counts, deliberately. They are dated statements about what a PAST wave
+#     shipped ("32 surfaces: ... 27 registered hooks"), and a guard that forbids recording a former
+#     state stops this repository writing its own history — the ruling field note 81 already made and
+#     tests/test-mcp-naming.sh already applies to docs/research/.

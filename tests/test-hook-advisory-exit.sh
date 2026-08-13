@@ -20,12 +20,20 @@ mkdir -p "$HAE_TMP"
 # A directory that is emphatically not a git repository, and not inside one.
 cd "$HAE_TMP" || exit 1
 
-# auto-learn.sh and instinct-distill.sh declare HOOK_PROFILE_LEVEL="strict", and _lib.sh defaults
-# the active profile to "standard" — one rung below strict. Without exporting
-# UNITY_HOOK_PROFILE=strict here, both hooks hit the profile gate and exit 0 before a single line
-# of the code under test runs, so 4 of this loop's 10 assertions passed without exercising
-# anything. Exporting strict is also the union case for the other three (standard-profile) hooks:
-# strict is >= standard, so they still run in full.
+# The profile export, and why it survives a loop that is now one hook long.
+#
+# Until 2026-08-13 this loop ran five hooks, two of which (auto-learn, instinct-distill) declared
+# HOOK_PROFILE_LEVEL="strict" while _lib.sh defaults the active profile to "standard" — so 4 of the
+# loop's 10 assertions passed without exercising anything until the export below was added. Then the
+# surface criterion was applied to this directory and four of the five hooks were removed, three of
+# them (auto-learn, instinct-distill, notify) named in that finding and the fourth (stop-validate)
+# for warning about the pattern .claude/rules/performance.md mandates. session-save.sh is the only
+# Stop hook left.
+#
+# The export stays because it is still load-bearing for the trace-line comparison further down:
+# session-save.sh declares "standard", so `minimal` gates it out and the exported profile does not,
+# which is exactly the distinguishing signal that block needs. Keep it even if this loop regains
+# hooks that declare a lower level — strict is the union case.
 export UNITY_HOOK_PROFILE=strict
 
 # A hook that stayed silent behind its profile gate looks identical, from stdout/stderr alone, to
@@ -39,7 +47,7 @@ export UNITY_HOOK_PROFILE=strict
 # under the profile this test actually exports. A hook that is genuinely exercised produces
 # strictly more trace lines under the real profile than under a profile guaranteed to gate it out;
 # one that is still silently gated produces the same (short) trace either way.
-for hae_hook in session-save auto-learn instinct-distill notify stop-validate; do
+for hae_hook in session-save; do
     hae_out=$(printf '%s' "$HAE_PAYLOAD" \
         | bash "${HAE_HOOKS}/${hae_hook}.sh" 2>&1)
     hae_rc=$?
@@ -77,8 +85,8 @@ assert_eq "0" "$hae_rc" "session-save.sh exits 0 inside a git repository"
 assert_contains "$hae_out" "Session state saved" \
     "session-save.sh still does its job inside a git repository"
 
-# Note on the assertion above, and on advisory_exit_guard more generally: none of these 5 hooks
-# actually `jq`-parse the raw Stop-event stdin (they read git state and the tracked state files
+# Note on the assertion above, and on advisory_exit_guard more generally: session-save.sh does not
+# `jq`-parse the raw Stop-event stdin (it reads git state and the tracked state files
 # instead), so "no jq parse error in the output" cannot be driven to fail via malformed stdin the
 # way test-studio-doctor.sh drives a genuine failure — there is no such input-shaped failure mode
 # to induce here. It is kept as a defensive invariant (and "parse error" now matches jq's real
