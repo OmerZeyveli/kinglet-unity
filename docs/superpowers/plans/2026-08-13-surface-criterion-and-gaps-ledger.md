@@ -12,62 +12,33 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-**STOPPED BY THE OPERATOR mid-round, and the tree is RED. Read this before running anything.**
+**Stage 1, Task 1 is closed and green. Task 2 is next and has not been dispatched.**
 
-Task 1's implementer was killed while running its closing gates, after committing. **It committed its
-work** — `6cd80bd` (the round-1 fixes) and `8e216b2` (the baseline) — so nothing is lost, but it never
-reached the check that would have caught what it left.
+- **HEAD `38dec6c`. Working tree clean.**
+- `bash tests/run-tests.sh` → **1023/1023**, 35/35 ANSI-stripped headers.
+- `bash scripts/check-provenance.sh` → **`provenance OK`**, 116 `rule=absent` enforced.
+- `python3 -m tools.kinglet_build baseline-regenerate --anchor HEAD --dry-run --expect-drift 0` → rc=0,
+  `0 change(s), 0 removal(s), 0 addition(s)`. **`--expect-drift` is required** — without it, rc=64.
 
-### State, measured by the controller after the stop
+Task 1 took **three fix rounds**. What they cost is worth knowing before dispatching Task 2, because
+every round found the same class in a different document:
 
-- **HEAD `8e216b2`. Working tree clean.**
-- **`bash scripts/check-provenance.sh` FAILS — 2 problems**, and this is the thing to fix first:
+- **Round 0 → 1:** three of six corrections were false.
+- **Round 1 → 2:** two of six were false, both in the two documents the implementer writes *about*
+  the structure rather than *from* a command.
+- **Round 2 → 3:** one finding survived — `ARCHITECTURE.md` still named three hooks' membership four
+  lines above the sentence claiming it did not.
+- **Round 3:** clean, and its own first draft of the fix was an over-claim the implementer caught
+  itself.
 
-  ```
-  FAIL status=verbatim but the file differs from its recorded upstream: .claude/hooks/session-restore.sh
-  FAIL status=verbatim but the file differs from its recorded upstream: .claude/hooks/track-edits.sh
-  ```
+The implementer's diagnosis, which held up: *every claim it got wrong was composed from memory of the
+tree; every one it got right came out of a command it had just run.* The counts were never the
+problem. The sentences explaining them were.
 
-  Round 1 edited both (`git diff --stat 48d42bb..8e216b2 --` those paths → 11 insertions, 5 deletions)
-  to fix the stale comments naming cut hooks, and **did not flip their `provenance.tsv` status from
-  `verbatim` to `modified`.** That is the identical class the implementer's own third commit
-  (`48d42bb`) fixed for two other files one round earlier. It hit it again and was stopped before the
-  gate ran.
-
-  **Do not fix this in the controller session.** Resume the implementer; it is one round's leftover.
-
-- **`bash tests/run-tests.sh` → `Total: 1015  Passed: 1014  Failed: 1`.** The failure is in
-  `tests/test-kinglet-spike.sh`'s embedded python suite (`FAILED (failures=1, errors=17, skipped=3)`),
-  and **it does not reproduce in a clean clone of the same commit** — measured both ways:
-
-  | | rc |
-  |---|---|
-  | `git clone` → checkout `48d42bb` → run the file | **0**, 18/18 |
-  | `git clone` → checkout `8e216b2` → run the file | **0**, 18/18 |
-  | the same file in the main working tree | **1** |
-
-  Clearing `__pycache__` under `tests/` and `tools/` did **not** change it. So it is environmental to
-  this working tree, not a regression from round 1 — **but the cause was not established**, and
-  "environmental" is a hypothesis, not a finding. One error reads
-  `E_CANDIDATE: failed to launch candidate '/tmp/tmpXXXX/does_not_exist'`, which is a test that expects
-  a failure, so the 17 "errors" may be reporting noise around one real failure.
-
-  **This is also the file the wave's own D4 names**: the runner is blind to python results, 1443 of
-  them contributing 1 to the total. Task 10 owns that.
-
-- **`migration/baseline-inventory.json` was left modified** and the controller reverted it. The change
-  was the regenerator bumping `source_commit` from `6cd80bd` to `8e216b2` — **circular**, because
-  `8e216b2` *is* the baseline commit. The committed state points at the content commit, which is what
-  the commit → regenerate → commit discipline produces. Baseline reports `0 change(s)` either way.
-
-### The next action
-
-**Resume Task 1's implementer for the provenance leftover**, then let round 1's re-review run. Do not
-start Task 2 until the gate is green — everything after Task 1 works against the tree it leaves.
-
-Round 1's six findings and the three-script measurement were dispatched and are in the implementer's
-context; its report at `.superpowers/sdd/2026-08-13-surface-criterion/task-1-report.md` has a
-`# Round 1` section only if it got that far — **check before assuming.**
+**The structural fix that came out of it:** `tests/test-derived-counts.sh` is now the single guarded
+statement of hook membership. Before this task, the Event and Matcher columns had **no assertion of
+any kind**, and four hand-written restatements of the profile membership were each proved silent when
+falsified.
 
 ## Controller decisions, made at setup
 
@@ -122,14 +93,31 @@ context; its report at `.superpowers/sdd/2026-08-13-surface-criterion/task-1-rep
 
 ## Interfaces produced so far
 
-*(nothing yet)*
+**Task 1.**
+
+- **`tests/test-derived-counts.sh` is the single guarded statement of hook membership.** It asserts
+  the twelve per-hook `Profile:` lines, the Summary Table's **event, matcher and profile** columns,
+  the `minimal`-keeps list **as a set**, and every hook named as a state-file writer in
+  `ARCHITECTURE.md`'s Tracking Files table. **Any task that adds, removes, renames or re-registers a
+  hook must update `docs/HOOK-REFERENCE.md` in the same commit, or the suite goes red.** This lands
+  on Task 2 immediately — it edits two hooks.
+- The keeps list is asserted as a **set** because keeps and drops are complements and a hand-written
+  complement drifts *independently*: a hook can vanish from both lists while each still reads
+  coherently on its own. Verified — that mutation reds on the keeps assertion and nothing else.
+- **`docs/ARCHITECTURE.md` no longer states any hook's profile, event or matcher.** Do not restate
+  membership there; the file now says so about itself, and the sentence is true.
+- **`scripts/detect-missing-refs.sh` is restored** (controller ruling — see Deferred, item 0) and is
+  referenced by nothing. **Wiring it is Task 3's**, and Task 3's section does not know it exists.
+- Enforced `rule=absent` count is **116**.
+- `docs/GETTING-STARTED.md`'s script counts are derived and guarded (`DCK_REPO_SCRIPTS`,
+  `DCK_INSTALLED_SCRIPTS`). Moving a script reds them, correctly.
 
 ## Tasks
 
 | # | Task | Status | Commits | Notes |
 |---|---|---|---|---|
 | **Stage 1 — the cut** | | | | |
-| 1 | Twenty surfaces leave, and the counts get a guard | open | — | Re-derive the membership; do not copy the list |
+| 1 | Twenty surfaces leave, and the counts get a guard | **done** | `818b2bd`…`38dec6c` | **19, not 20** — cut is 15 hooks + 4 scripts. 3 fix rounds. `detect-missing-refs.sh` restored by ruling; wiring is Task 3's |
 | 2 | The two gates block the act and permit the prose | open | — | Two probe subjects are on Task 1's cut list |
 | 3 | The five surviving scripts become reachable | open | — | 8 of 10 named by nothing that ships |
 | **Stage 2 — installer correctness** | | | | |
@@ -162,4 +150,49 @@ what still asserts it.
 
 ## Deferred and parked findings
 
-*(none yet)*
+**0. The one ruling, not a deferral: `scripts/detect-missing-refs.sh` was cut and restored.**
+Measured before ruling: the compiler never reads scene YAML; no surviving script or hook reports a
+dangling GUID; and the only two shipped surfaces with a path to it — `unity-scene-builder`'s
+`manage_scene action:"validate"` and `unity-fixer`'s missing-script section — **both need a live
+Editor and neither produces a project-wide negative.** Offline, project-wide dangling-GUID detection
+is exactly where a model samples a few scenes and answers confidently wrong. The cut became 15 hooks
+and 4 scripts.
+
+**From Task 1's rounds. None of these blocks Stage 1; each has an owner.**
+
+1. **`_lib.sh`: `unity_track_read` / `unity_was_read` have zero callers and zero test references.**
+   Confirmed independently by two reviewers. Deleting them is a `_lib.sh` surface decision, not a
+   consequence of the hook cut. `docs/HOOK-REFERENCE.md:259-260` documents both and would go with
+   them. **`UNITY_READS_FILE` is NOT free to remove alongside** — `tests/test-state.sh` reads it
+   twice. *Ruling: carry forward, → a later surface pass.*
+2. **The writer-column assertion requires backticks.** The cell is matched as
+   `` /^`[a-z0-9-]+\.sh`$/ ``; de-backticking a writer cell silences the assertion for that cell
+   while the suite stays green. The N2 failure class in its *silent* direction. One-line awk fix
+   (strip optional backticks — they are not needed to exclude the `Various hooks` row, which fails
+   the name pattern anyway). **→ Task 10.**
+3. **`tests/test-derived-counts.sh:858` and `:215` — a command substitution that exits 1 at an
+   assignment site** when `dck_want2` is `-` (10 of the claim rows). Reachable only on the *failure*
+   path and inert under the runner, which is the only supported way to run this runner-provided file.
+   Pre-existing from `818b2bd`. **→ Task 10.**
+4. **`docs/ARCHITECTURE.md:363` is false and self-contradicting** — *"All hooks source a shared
+   library"* against `:172-173`'s *"except one, which sources nothing"*. `session-brief.sh` provably
+   sources nothing. `docs/HOOK-REFERENCE.md:252` carries the same false sentence. Pre-existing since
+   the ECU vendor commit `45eada9`. **→ Task 11.**
+5. **Unguarded prose about named hooks in `ARCHITECTURE.md`** — `:221`, `:420`, `:421`, `:427`. All
+   currently **true**, all proved silent when falsified. None asserts a profile, event or matcher, so
+   the file's narrowed sentence still holds; these are behaviour/registration claims outside every
+   guard. **→ Task 11**, with the ruling to make: guard them or delete them, not both.
+6. **`docs/ARCHITECTURE.md:197`** still lists `PreCompact` in the Event Types table while `:213` says
+   no `PreCompact` registration remains. Adjacent, not contradictory. **→ Task 11.**
+7. **`test-derived-counts.sh:460` says "4 … left in one commit"**, but that commit removed 5; 4 is the
+   net after round 2's restoration. `test-help-ranges.sh:90` discloses the restoration; `:460` does
+   not. **→ Task 11.**
+
+**Inherited from earlier waves, still open:**
+
+8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
+9. **`dirty_foundation_files()` has no `--cached`**, so `git add` silences the guard entirely — and
+   the suite goes red during the `commit → regenerate → commit` sequence this repo prescribes.
+   **→ Task 10.**
+10. **`session-brief.sh` sources nothing** while the template claims `DISABLE_UNITY_HOOKS` bypasses
+    ALL safety hooks. **→ Task 11.**

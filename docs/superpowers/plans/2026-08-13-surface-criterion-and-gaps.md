@@ -110,17 +110,27 @@ Include the shapes the spec measured as *permitted today and wrong*: staging eve
 
 ---
 
-## Task 3: The five surviving scripts become reachable
+## Task 3: The surviving scripts become reachable
 
-**Files:** `.claude/commands/unity-doctor.md`, `.claude/commands/unity-init.md`, and whichever agent or command should name the other three.
+**Amended after Task 1 (2026-08-13).** This section was written before the cut and every figure in it
+was pre-cut. The heading said *"The five surviving scripts"*; there are six installed. Its **Files**
+line named only the two commands below; Task 1's controller ruling restored
+`scripts/detect-missing-refs.sh`, which is referenced by nothing and whose wiring is **this task's**.
+The figures below are left as written, marked, because what they were is the point — a plan that
+quotes a count is the defect this wave exists to close, and replacing a stale count with a fresher one
+repeats it rather than fixing it.
 
-- [ ] **Step 1: Measure what is reachable today**
+**Files:** `.claude/commands/unity-doctor.md`, `.claude/commands/unity-init.md`, and whichever agent or command should name the rest — **including a home for `detect-missing-refs.sh`**.
+
+- [ ] **Step 1: Derive what is reachable today — do not read the figures below**
 
 ```bash
 /usr/bin/grep -rn 'scripts/' .claude/
 ```
 
-Three references from shipped surfaces, naming two scripts. **Eight of ten installed scripts are named by nothing that ships.** `studio-doctor.sh` is pointed at humans from four places and reachable from no agent, command or skill — while `/unity-doctor.md` **re-implements its checks by hand**.
+~~Three references from shipped surfaces, naming two scripts. **Eight of ten installed scripts are named by nothing that ships.**~~ *(pre-cut, superseded — derive it.)* `studio-doctor.sh` is pointed at humans from four places and reachable from no agent, command or skill — while `/unity-doctor.md` **re-implements its checks by hand**. That much is unchanged by the cut; verify it anyway.
+
+Count the installed set (`.claude/scripts/`, not the repo's `scripts/`), count how many are named by a shipped surface, and state both. Task 1's re-review measured one shipped surface naming one installed script — treat that as a figure to reproduce, not to cite.
 
 - [ ] **Step 2: Wire them, and delete the duplication**
 
