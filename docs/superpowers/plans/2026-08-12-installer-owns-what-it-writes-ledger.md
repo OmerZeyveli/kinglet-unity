@@ -16,7 +16,9 @@ added mid-wave, so re-read it rather than working from an earlier reading.
 **Tasks 1, 1b, 1c, 1d, 2, 2b, 2c and 3 are done and closed. Task 4 is the next action**, then 5 and 6,
 then the whole-branch review.
 
-**Suite green: `Total: 960  Passed: 960  Failed: 0`, 33 files, tree clean at `82dc293`.**
+**Tasks 1 through 5 are done and closed. Task 6 is the next action**, then the whole-branch review.
+
+**Suite green: `Total: 960  Passed: 960  Failed: 0`, 33 files, tree clean at `13812a7`.**
 `provenance OK`, baseline zero drift. Task 3 left seven deliberate reds and **Task 4 closed all
 seven**; the dry-run guard went 138/7 → **165/0**.
 
@@ -165,8 +167,8 @@ Task 5 will produce `scripts/detect-pipeline.sh` printing one of `builtin`, `urp
 | 2c | The two writers that overwrite without asking | **done** | `e85ea32..b573ce8` | Spec ✅, Quality Approved, 1 fix round. Survived **eight** adversarial shapes the implementer never built. Its round-1 test fix uncovered a live D11 violation the old test was reporting green. Suite 738 → 795 |
 | 3 | The dry-run guard, three oracles | **done** | `9710ae6..82b806a` | Spec ✅, Quality Approved, **3 fix rounds**. Grew from 6 fixtures to 9. Leaves **7 deliberate reds** — the suite is red on purpose until Task 4 |
 | 4 | The dry run announces what the run will actually do | **done** | `6ad42eb..82dc293` | Spec ✅, 1 fix round. Brief rewritten before dispatch. **Suite green again: 960/960**, guard 138/7 → 165/0. `add_ignore` no longer exists — the decision moved up rather than being copied |
-| 5 | One pipeline detector, and Option B states its costs | open (brief pending) | — | `urp+hdrp` display and skill routing is the implementer's call |
-| 6 | Whole-wave verification | open (brief pending) | — | Criterion 6 re-run, not cited |
+| 5 | One pipeline detector, and Option B states its costs | **done** | `85b6a2e..13812a7` | Spec ✅, Quality Approved, 1 fix round. **16/16 fixtures agree**, eight of them hostile shapes the report's table could not see. Two commits in round 1 — the second is the baseline regeneration `unity-init.md` required |
+| 6 | Whole-wave verification | open | — | **Brief rewritten 2026-08-13**: fourteen criteria not nine, and the sweep becomes an *assertion* — the defect that actually happened was two implementations agreeing until one grew a state |
 
 ## What Task 1 found, and the controller error it exposed
 
@@ -720,6 +722,52 @@ would happen if it ever did, by injecting `return 3`: **exit 3, 85 files install
 a project `uninstall.sh` refuses to touch. The same injection now gives exit 0, 94 receipt rows, and a
 warn. That is the third measured member of the receipt-less-window class, and the first one closed.
 
+## Task 5 — two implementations that agreed for as long as they both had three states
+
+**The red-first evidence is one project producing two verdicts**, captured before anything changed:
+
+```
+ ok  Unity 6000.0.23f1 · HDRP                              <- install.sh
+[INFO]  Render pipeline: Universal Render Pipeline (URP)   <- generate-claude-md.sh
+- `urp-pipeline`                                           <- routed off the second answer
+```
+
+**The trap inside the delegated judgement.** The plan left the `urp+hdrp` display string and skill
+routing to the implementer. What made it non-obvious: `generate-claude-md.sh` routed `urp-pipeline` on
+`*URP*`, so **any** display string containing "URP" would have loaded a URP skill into a possibly-HDRP
+project **as a side effect of wording**. The implementer decoupled routing from prose onto the
+detector's token *first*, then chose — which makes reversing the choice a one-token edit to one `case`
+arm. Proven by mutation in both directions: scrubbing "URP" from the display leaves the skill routed
+(it would have been 0 before); forcing the token unroutes it.
+
+**Verification went eight fixtures past the report.** The reviewer added empty manifest, manifest as a
+**directory**, `Packages/` absent, `chmod 000`, truncated JSON, the package name inside a `_comment`,
+the package under `"testables"`, and CRLF — **16/16 agree**. The `_comment` and `testables` results are
+exactly what the detector's own header promises, which makes that documentation accurate rather than
+decorative.
+
+**The `|| die` was measured, not reasoned.** Detector `exit 3` → `err … did not run.`, exit 1,
+filesystem byte-identical, no receipt. **Without the `|| die`: nothing printed, exit 3.** Fourth time
+this wave that a non-zero status in the wrong place was checked rather than assumed.
+
+### The finding that rewrote Task 6
+
+Task 5's implementer reported that `hdrp` and `urp+hdrp` had no fixture coverage. Measured, it is
+worse: `/usr/bin/grep -rn 'detect-pipeline\|Render Pipeline\|render-pipelines' tests/` returns **only
+three `mkproject.sh` lines that write a URP manifest**. Nothing in `tests/` names the detector or
+asserts a pipeline verdict at all — **no arm has regression coverage**, and criterion 6's guarantee
+lives in a report table.
+
+Asked what the smallest honest guard would assert, it gave the answer the controller had not seen:
+
+> Agreement on the easy case is worth nothing — two independent implementations passed it here.
+> Pairwise catches a re-fork that gets it **wrong**; a sweep catches one that gets it right today and
+> drifts later, **which is the failure that actually happened**, since the two implementations agreed
+> for as long as they both had three states.
+
+**Task 6 Step 2 already ran almost exactly that sweep and only recorded its output.** Recording is what
+let the defect survive. Task 6's brief is rewritten to make it an assertion with an explicit allow-list.
+
 ## Deferred and parked findings
 
 ### From Task 2c — five, plus a class worth naming
@@ -917,6 +965,34 @@ task has run rewrites the record of what the implementer was actually told.
     sentence is what a future reader will audit against.
 30. **`scripts/studio-doctor.sh` still carries `${VAR%%$'\n'*}` twice** (lines 88 and 162). `install.sh`
     moved off it for the macOS pass; that file did not. Second wave.
+
+### From Task 5 — three closed in round 1, four carried
+
+31. **Option B's remedy over-copied by one file** — the doc said `scripts/*.sh` while `install.sh`
+    skips `check-provenance.sh` at two sites; repo 11, installed project 10. Closed: the annotation now
+    carries a runnable loop reproducing the exclusion, verified to land 10 with an empty `diff` against
+    a real install.
+32. **`.claude/commands/unity-init.md` enumerated three pipeline states** against a four-state
+    detector whose fourth state a user can now see in their own `CLAUDE.md`. Closed, and the fix adds
+    the load-bearing half — *"Report it the same way; do not resolve it to one pipeline"* — without
+    which the surface names four states and still has no instruction against collapsing them.
+33. **`.claude/skills/unity-mcp-patterns/SKILL.md:65`** says *"The project uses URP (might be Built-in
+    or HDRP)"*. **Left deliberately**: it sits under `Don't assume:` and is a caution, not a
+    specification of the detector's output set — the fourth state makes it *more* true. The controller
+    accepts that reading; one clause to overrule if a later pass disagrees.
+34. **The unreadable-manifest case leaks `Permission denied` to stderr** (3 lines from `install.sh`,
+    27 from `generate-claude-md.sh`) and returns `builtin`. **`2>/dev/null` was deliberately not
+    added**: it would turn noisy-but-true into a *silent confident `builtin`*, which is this wave's own
+    defect class. Measured identical at `85b6a2e` and HEAD, so neither created nor widened. Now the
+    fourth entry in the detector's blind-spot list, named as *"a GUESS wearing the one token this
+    header calls reliable"*.
+35. **The report's proximity argument was off by ~17 lines** — the `undetermined` row is generated-line
+    35, `` - `urp-pipeline` `` is 55, with two tables between. Self-corrected. The routing choice stands
+    on its other two legs, but **the skills list itself carries no signal of the ambiguity**; a one-line
+    qualifier in the `urp+hdrp` arm would close it.
+36. **D3 says "source it"; the implementation executes it as a subprocess.** D3's substance — one
+    implementation, reachable by both, before the payload is installed — is met, and the subprocess form
+    is safer (no variable collisions, no `set -e` coupling). Recorded as a choice, not a drift.
 
 ### From Task 1's review — five Minor, four closed in round 1
 

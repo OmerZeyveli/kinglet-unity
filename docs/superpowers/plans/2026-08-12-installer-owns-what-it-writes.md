@@ -727,25 +727,64 @@ scripts/detect-pipeline.sh	original	-	-	-	original	the single render-pipeline de
 
 ## Task 6: Whole-wave verification
 
-**Files:** none modified unless a check fails.
+**Rewritten 2026-08-13, before dispatch.** The spec had nine criteria when this was written and now has
+**fourteen**; and Task 5's review established that **criterion 6 has no guard at all** — nothing in
+`tests/` names the detector or asserts a pipeline verdict, so the criterion's guarantee currently lives
+in a report table. This task closes that.
 
-- [ ] **Step 1: Run the spec's nine acceptance criteria**
+**Files:** `tests/fixtures/mkproject.sh`, one test file, and nothing else unless a check fails.
 
-Each one, with the command and its actual output. Criterion 6 requires running both detectors against every fixture — do it, do not cite Task 5.
+**A tooling hazard that has already produced one false conclusion in this wave:** interactive `grep`
+here is a function wrapping `ugrep`, and **an unescaped `$` mid-pattern is a literal in GNU BRE and an
+anchor in ugrep** — such a probe returns a silent false negative. **Use `/usr/bin/grep` for every
+sweep below**, and for anything you report as an absence.
 
-- [ ] **Step 2: Sweep for the class, scoped to what ships**
+- [ ] **Step 1: Run all fourteen acceptance criteria**
 
-Two questions the guards do not answer:
+Each one, with the command and its actual output. **Fourteen, not nine** — D7 through D11 added criteria
+10–14 mid-wave, and criterion 8 carries a dated amendment naming four `.gitignore` shapes rather than
+one. Read the spec's criteria section as it now stands.
+
+Criterion 6 requires running both detectors against every fixture — do it, do not cite Task 5. Then
+Step 2 makes that permanent.
+
+- [ ] **Step 2: Promote the sweep from a record to an assertion**
+
+The original text ran two sweeps and recorded their output. **Recording is what let the defect survive
+in the first place.** Task 5's implementer, having just held both callers in mind at once, named the
+property worth asserting — and it is not the pairwise comparison:
+
+> Agreement on the easy case is worth nothing: two independent implementations passed it here. Pairwise
+> catches a re-fork that gets it **wrong**; a sweep catches one that gets it right today and drifts
+> later — **which is the failure that actually happened**, since the two implementations agreed for as
+> long as they both had three states.
+
+So assert **that the detector is the only implementation**:
 
 ```bash
-# Does any other project-root write skip the receipt?
-grep -n 'PROJECT_DIR/' install.sh | grep -vE 'RECEIPT|receipt'
-
-# Does any shipped script still carry its own pipeline detection?
-grep -rn 'render-pipelines' .claude/ scripts/ install.sh
+/usr/bin/grep -rln 'render-pipelines' .claude/ scripts/ install.sh
 ```
 
-Record what each returns. **Say what each sweep cannot see** — the first is line-oriented over a file whose writes are not all one-line, and the second matches a package name rather than the concept.
+Today this returns exactly two paths: `scripts/detect-pipeline.sh` (the implementation) and
+`.claude/skills/urp-pipeline/SKILL.md` (a skill *about* URP, which names the package legitimately).
+Write the assertion with that allow-list explicit and commented, so adding a third path is a decision
+someone has to make rather than a line that quietly passes.
+
+Then the pairwise half, which needs fixtures that do not exist:
+`tests/fixtures/mkproject.sh` has **no HDRP variant and no both-packages variant**. Add them, and
+assert that on the both-packages fixture **three surfaces agree** — `install.sh`'s console line, the
+generated `CLAUDE.md`'s `| **Render Pipeline** |` cell, and whether `` - `urp-pipeline` `` appears —
+**asserted against the detector's token, not against the prose.** Asserting on prose reintroduces
+exactly the `*URP*` coupling Task 5 removed.
+
+Also run the other sweep the original task named, and record it:
+
+```bash
+/usr/bin/grep -n 'PROJECT_DIR/' install.sh | /usr/bin/grep -vE 'RECEIPT|receipt'
+```
+
+**Say what each sweep cannot see.** The first is line-oriented over a file whose writes are not all
+one-line; the second matches a package name rather than the concept.
 
 - [ ] **Step 3: Branch coherence**
 
