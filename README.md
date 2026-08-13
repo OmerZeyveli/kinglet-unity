@@ -172,7 +172,7 @@ Because this repo contains other people's code, it tracks whose:
   upstream version and path, upstream checksum, and whether we modified it. The vendored layer is
   79 files from ECU plus the process-chain surfaces adapted from Superpowers 6.2.0, and 0 from
   Donchitos (that layer was removed 2026-08-03; `provenance-skip.tsv` keeps the record). Repo-wide
-  that is 17 verbatim, 64 modified — nearly every vendored surface has been rewritten for an agent
+  that is 15 verbatim, 66 modified — nearly every vendored surface has been rewritten for an agent
   reader.
 - **`provenance-skip.tsv`** — what we deliberately did *not* vendor, and why. This is what stops a
   future upstream sync from quietly reintroducing the mobile content.
@@ -183,7 +183,7 @@ Because this repo contains other people's code, it tracks whose:
   **`.claude/NOTICE.md`**, which carries the upstream MIT notices as their licenses require.
 
 Vendoring trades one risk for another. The old overlay broke whenever ECU moved a file; that risk is
-gone. The new one is staleness — upstream fixes no longer reach us on their own, and with 62 of 79
+gone. The new one is staleness — upstream fixes no longer reach us on their own, and with 64 of 79
 ECU-origin files now `modified`, a future `--online` diff against a newer ECU verifies little. The
 offline half of `provenance.tsv` — no rows without files, no files without rows, every `rule=absent`
 path stays absent — is what still carries weight; see `CLAUDE.md`'s provenance section for the full
