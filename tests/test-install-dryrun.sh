@@ -37,6 +37,19 @@
 # different fates in the same run, so conflating them is the whole defect one of these fixtures
 # exists to catch.
 #
+# THE DECLINE PHRASES ARE A CONTRACT, NOT A GUESS, and anyone changing an announcement is bound by
+# it. `already covered` and `no change` are recognised — which is why the plan's own suggested
+# `.gitignore — already covered, no change` would read as a decline — but `already has our entries`,
+# the phrase install.sh's REAL run prints on that branch, is NOT in the list. Reusing the real run's
+# wording in the dry run would therefore read as a PROMISE and leave the red standing. That is the
+# safe direction by design, and it is stated here so the wording is chosen rather than stumbled on.
+#
+# ONLY the `backup:` rule mints a DIRECTORY claim. The generic rule is explicitly forbidden from
+# ending a claim in `/` — see dry_claims — because a claim ending in `/` is satisfied by a PREFIX
+# match, and a vague line like `Packages/` would otherwise close every red under that directory
+# while telling the user nothing. Measured: one such line inside the existing WITH_MCP dry-run guard
+# closed three of this file's seven reds with no assertion edited.
+#
 # THE ASSERTION IS BIDIRECTIONAL, over project-root paths:
 #
 #   written  => promised   a path created or edited by the real run that the dry run declined, or
@@ -72,9 +85,17 @@
 #     state J exists for — is not exercised either.
 #   * WHAT THE `dirty` FIXTURE DOES NOT COVER. Install mode `foreign` IS now reached — that fixture
 #     is it — but only in its `--yes` shape, which takes branch 1 (back up and install fresh)
-#     without asking. The interactive branch, and branch 2 (abort), are never exercised. Nor is the
-#     DELETION side: the run moves `.claude/agents/theirs.md` out of `.claude/`, and this file does
-#     not classify deletions at all, so the disappearance is unasserted while the arrival is.
+#     without asking. The interactive branch, and branch 2 (abort), are never exercised.
+#
+#     THERE IS STILL NO DELETION ORACLE. A file that leaves the project and arrives nowhere is
+#     invisible to all three: `new_paths` sees arrivals, `changed_paths` sees edits to files that
+#     survive, and the receipt sees claims. The `dirty` fixture closes this only for the ONE
+#     directory it can: the backup is compared as a SET against the pre-run `.claude/` listing, so a
+#     `mv` that drops a user file is caught there. Everywhere else — a payload file removed by the
+#     orphan sweep, a project-root file the installer might one day delete — a disappearance is
+#     unasserted. Until 2026-08-13 the `dirty` check hand-named ONE file, which certified that file
+#     and nothing else; measured, an `mv` rewritten to carry only `agents/theirs.md` and destroy the
+#     rest left PASS, FAIL and the FAIL set byte-identical with that assertion still green.
 #
 #     A CORRECTION, because the reason recorded here until 2026-08-13 was false as measured. It read
 #     that BACKUP_DIR's `$(date +%Y%m%d%H%M%S)` meant the dry run "structurally CANNOT name the path
@@ -100,12 +121,23 @@
 #     `ln -sfn ProjectSettings unannounced-link`) left this file's result unchanged, PASS and FAIL
 #     alike, with the FAIL set byte-identical to baseline. All three invisible.
 #
-#     THE MODE ONE IS NOT ACADEMIC. install.sh writes `stat -c '%a'` into every receipt row and
-#     uninstall.sh acts on it, so a mode change to a pre-existing project-root file is an
-#     ownership-relevant write about which this guard certifies silence. Compare mutation (c), a
-#     CONTENT append to that same file, which reddens every fixture: same file, same run, opposite
-#     verdicts. Closing it means a portable mode read — `stat -c` is GNU and this repo keeps a macOS
-#     pass in view — which is why it is recorded rather than folded in.
+#     WHY THE MODE ONE MATTERS, corrected 2026-08-13 — the reason first written here was false in
+#     all three of its clauses, which is the exact defect this file exists to catch, committed by
+#     this file, in the round that withdrew the previous one. It claimed install.sh writes
+#     `stat -c '%a'` into EVERY receipt row and that uninstall.sh ACTS on it. Measured: of the eight
+#     row writers, five read the mode and THREE HARDCODE IT — the scripts-toolkit row (`755`),
+#     `.mcp.json` (`644`) and `MCP-SETUP.md` (`644`); and `grep -n 'chmod\|_mode' uninstall.sh`
+#     returns exactly one line, the destructuring read `read -r rel recorded _mode origin`, whose
+#     underscore is this repo's discard convention. There is no `chmod` in that file at all. The
+#     mutation above compounds it: `ProjectSettings/ProjectVersion.txt` never enters a receipt row,
+#     so the receipt-mode story did not even connect to the thing measured.
+#
+#     The honest version is smaller and still worth the disclosure: the mode is RECORDED by
+#     install.sh, on most rows, and CURRENTLY UNUSED by uninstall.sh — so the exposure is a
+#     recorded-but-unenforced field on one side and, on this side, a guard that cannot see a mode
+#     change at all. Either could grow teeth without the other noticing. Closing this half means a
+#     portable mode read — `stat -c` is GNU and this repo keeps a macOS pass in view — which is why
+#     it is recorded rather than folded in.
 #   * A WRITE TO A PATH OUTSIDE THE FIXTURE DIRECTORY. Every snapshot is rooted at $PROJECT_DIR, so
 #     anything the installer wrote elsewhere — $HOME, /tmp, a sibling directory — would be invisible.
 #     Vacuous in this tree: install.sh's only path outside $PROJECT_DIR is the read-only
@@ -226,6 +258,7 @@ dry_claims() {
     BEGIN {
       pathre = "^[A-Za-z0-9_.][A-Za-z0-9_./-]*$"
       dotre  = "[./]"
+      dirend = "/$"
       declre = "NOT touched|not touched|would leave alone|would skip|not rewrite|already covered|no change|would keep yours"
     }
     {
@@ -234,12 +267,32 @@ dry_claims() {
       if (line == "") next
       split(line, f, /[ \t]+/)
       p = f[1]
-      # `backup: <dir>` — the ONE announcement whose subject is its second field, and the only
-      # DIRECTORY claim this parser makes. The trailing slash is the marker: exactly one rule
-      # produces it, so the prefix fallback in claim_of cannot quietly satisfy an ordinary path.
+      # `backup: <dir>` — the ONE announcement whose subject is its second field, and the ONLY rule
+      # that may mint a DIRECTORY claim. The trailing slash is the marker, and the generic rule
+      # below is forbidden from producing one so that the marker stays exclusive.
       if (p == "backup:" && f[2] != "") { print f[2] "/" "\tpromise"; next }
       if (p !~ pathre) next
       if (p !~ dotre) next
+      # THE GENERIC RULE MINTS NO DIRECTORY CLAIMS, AND THIS LINE IS WHY. pathre puts a slash in
+      # its character class with no trailing exclusion, so Packages/, Assets/ and .claude/skills/
+      # all match it -- and once round 2 taught claim_of to satisfy a path by a directory PREFIX, a
+      # vague line became a way to silence real reds. Measured end to end: ONE line added inside the
+      # existing WITH_MCP dry-run guard,
+      #
+      #     printf "  Packages/ - the manifest and its backup\n"
+      #
+      # naming neither file, closed THREE of the seven reds in this file -- the two withmcp writes
+      # and the withmcp receipt claim -- with no assertion edited and the user told nothing about
+      # which files are written or claimed. Placed inside that guard there is no compensating red
+      # anywhere, because the eight other fixtures never reach the line.
+      #
+      # Skipped rather than failed, deliberately: an ignored line can neither silence a red (the
+      # write stays unclaimed) nor invent one (it promises nothing). A vague announcement is then
+      # exactly as unreadable as the --with-mcp: line already is, which the header discloses.
+      #
+      # (No ASCII apostrophes in this comment: it sits inside a single-quoted awk program, and one
+      # apostrophe ends the quote and turns the rest of the parser into shell. Measured here.)
+      if (p ~ dirend) next
       print p "\t" ((line ~ declre) ? "decline" : "promise")
     }' "$1"
 }
@@ -247,13 +300,23 @@ dry_claims() {
 # The verdict for one path, or nothing when the block never named it. Field equality, not substring
 # — then, and only then, a DIRECTORY claim (one ending in `/`) that is a prefix of the path. The
 # fallback exists for `backup: <dir>`, whose real-run effect is a set of files INSIDE the directory
-# it names rather than the directory itself.
+# it names rather than the directory itself. Only the `backup:` rule can mint one.
+#
+# THE TRAILING SLASH IS THIS PARSER'S, NOT THE INSTALLER'S, so the bare form is accepted too. A
+# future `backup: Packages/manifest.json.bak` — a `backup:` line naming a FILE, which is a shape
+# Task 4 could plausibly write — would otherwise become the claim `Packages/manifest.json.bak/`,
+# match the written `Packages/manifest.json.bak` by neither prefix nor equality, and produce a false
+# red in the direction nobody expects. Comparing the bare form as well costs one line and removes a
+# surprise.
 claim_of() {
   local want="$1" f="$2" v
   v="$(awk -F'\t' -v want="$want" '$1 == want { print $2; exit }' "$f")"
   if [ -n "$v" ]; then printf '%s' "$v"; return 0; fi
   awk -F'\t' -v want="$want" 'BEGIN { dirre = "/$" }
-    $1 ~ dirre && index(want, $1) == 1 { print $2; exit }' "$f"
+    $1 ~ dirre {
+      bare = substr($1, 1, length($1) - 1)
+      if (want == bare || index(want, $1) == 1) { print $2; exit }
+    }' "$f"
 }
 
 # Does any observed write live under this directory claim? The mirror of claim_of's fallback, for
@@ -371,10 +434,15 @@ probe() {
       # Written. Both verdicts were already reported by the loop above, from the other side.
       continue
     fi
-    # A directory claim is kept by writing anything underneath it, not by writing the directory.
+    # A directory claim is kept by writing anything underneath it, not by writing the directory —
+    # or, when the `backup:` line named a file rather than a directory, by writing that file.
     case "$p" in
       */) if dir_claim_covered "$p" "$written"; then
             pass "$label: the dry run promised the $p directory and the real run wrote into it"
+            continue
+          fi
+          if grep -qxF -- "${p%/}" "$written"; then
+            pass "$label: the dry run promised ${p%/} and the real run wrote it"
             continue
           fi ;;
     esac
@@ -630,6 +698,21 @@ fi
 # testing the branch two fixtures over already cover.
 F_DIRTY="$SCRATCH/dirty"
 mkfixture dirty "$F_DIRTY" --variant dirty
+# A SECOND USER FILE, because completeness and "the one file arrived" are the same assertion on a
+# .claude/ that holds exactly one. mkproject.sh --variant dirty ships one (agents/theirs.md); with
+# only that, an `mv` that carried one file and dropped the rest would be indistinguishable from a
+# correct one. Two files is the smallest number that can tell them apart.
+mkdir -p "$F_DIRTY/.claude/rules"
+printf -- '# a second rule the user wrote by hand\nSENTINEL-KEEP-ME-THREE\n' > "$F_DIRTY/.claude/rules/theirs-too.md"
+# Captured BEFORE the run, because after it there is no .claude/ left to compare against — that is
+# the whole of what the foreign branch does.
+DIRTY_PRE="$SCRATCH/dirty.pre-claude"
+( cd "$F_DIRTY" && find .claude -type f | LC_ALL=C sort ) > "$DIRTY_PRE"
+if [ "$(grep -c . "$DIRTY_PRE" || true)" -ge 2 ]; then
+  pass "dirty: the foreign .claude/ holds $(grep -c . "$DIRTY_PRE" || true) user file(s) — enough for completeness to differ from arrival"
+else
+  fail "dirty: the foreign .claude/ holds fewer than two files — the completeness assertion below cannot tell a full mv from one that dropped everything but the first file"
+fi
 if [ -d "$F_DIRTY/.claude" ] && [ ! -f "$F_DIRTY/$RECEIPT_REL" ]; then
   pass "dirty: the fixture has a .claude/ with no receipt — install.sh must take its 'foreign' branch"
 else
@@ -639,11 +722,26 @@ probe dirty "$F_DIRTY" fresh
 # The mv happened, and it took the user's file with it. Without this the fixture would stay green
 # for a run that skipped the backup entirely — nothing above distinguishes "announced and done"
 # from "announced and never attempted".
+#
+# A SET COMPARISON, NOT A NAMED FILE. Naming one file certifies that file and nothing else: measured
+# 2026-08-13, an `mv` rewritten to carry only agents/theirs.md and destroy the rest left this file at
+# an unchanged PASS/FAIL with a byte-identical FAIL set, and a hand-named arrival assertion still
+# printing PASS. There is no deletion oracle here, so a user file that leaves .claude/ and arrives
+# nowhere is otherwise invisible in both directions at once. The pre-run listing is the only thing
+# that knows what was supposed to move.
 DIRTY_BACKUPS="$(cd "$F_DIRTY" && find . -maxdepth 1 -type d -name '.claude.backup.*' | sed 's|^\./||')"
-if [ -n "$DIRTY_BACKUPS" ] && [ -f "$F_DIRTY/$DIRTY_BACKUPS/agents/theirs.md" ]; then
-  pass "dirty: the run moved the foreign .claude/ to $DIRTY_BACKUPS and the user's agent went with it"
+if [ -n "$DIRTY_BACKUPS" ] && [ -d "$F_DIRTY/$DIRTY_BACKUPS" ]; then
+  pass "dirty: the run moved the foreign .claude/ aside, to $DIRTY_BACKUPS"
+  ( cd "$F_DIRTY/$DIRTY_BACKUPS" && find . -type f | sed 's|^\./|.claude/|' | LC_ALL=C sort ) \
+    > "$SCRATCH/dirty.post-backup"
+  if cmp -s "$DIRTY_PRE" "$SCRATCH/dirty.post-backup"; then
+    pass "dirty: the backup holds exactly the files the foreign .claude/ held — every one moved, none invented"
+  else
+    fail "dirty: the backup does not match the foreign .claude/ that was moved — a user file was lost or added by the mv"
+    diff "$DIRTY_PRE" "$SCRATCH/dirty.post-backup" || true
+  fi
 else
-  fail "dirty: no .claude.backup.<ts>/agents/theirs.md — the mv this fixture exists to watch did not happen, and the claim above was satisfied by a run that did nothing"
+  fail "dirty: no .claude.backup.<ts>/ directory — the mv this fixture exists to watch did not happen, and the claim above was satisfied by a run that did nothing"
 fi
 
 # ── Fixture: --with-mcp, then a plain install ────────────────────────────────
