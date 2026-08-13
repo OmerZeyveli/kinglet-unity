@@ -224,6 +224,31 @@ stands. It has now gone stale twice.
 - `docs/GETTING-STARTED.md`'s script counts are derived and guarded (`DCK_REPO_SCRIPTS`,
   `DCK_INSTALLED_SCRIPTS`). Moving a script reds them, correctly.
 
+**Task 4** (`86abc0a` on `task/4`, unmerged at time of writing — reviewed separately).
+
+- **The receipt's commit point is now an `EXIT` trap** (`write_receipt` / `receipt_rescue`), not an
+  earlier line. The reason is an invariant every later `install.sh` task must respect: **four
+  `owned_by_installer` call sites read `$RECEIPT` expecting the PREVIOUS run's rows**, so writing the
+  receipt early silently changes what all four read. `[ -s "$RECEIPT_TMP" ]` is what stops it
+  degenerating into "always write a receipt", which would break the `foreign` mode where the
+  receipt's *absence* is the definition.
+- **That invariant is asserted by nothing.** It is held by a comment. **It is the edit Tasks 5, 6,
+  4b and 4c can each break silently** — every one of them opens `install.sh`. Their dispatches must
+  carry it, and §7 of `task-4-report.md` is written for them.
+- `.gitignore` now gets an ownership row **when the installer created it**, never when it appended to
+  the user's. `owned_by_installer` **trims the origin column**, so one trailing space no longer
+  disowns a root file forever, while a mangled `user-modified` is still declined.
+  `MANIFEST_BAK_KEPT` is cleared by the arm that deletes the file it names.
+- **Ruling R1 amended by measurement:** there are now **six** `stat` sites, not five, and the
+  fallback is **not** uniformly 644 — the scripts-loop `user-modified` row falls back to **755**.
+  The new `.gitignore` row reads the mode rather than hardcoding it.
+- **The brief's "86 files" is pre-Task-1.** Measured after the cut: **67**
+  (`find "$P/.claude" -type f | wc -l`). The mechanism the figure illustrated is unchanged.
+- **`README.md` is now false** where it says the installer *"creates or appends to that file and
+  never claims it"* about `.gitignore` — Task 4 made the installer claim it, which spec acceptance
+  criterion 6 requires. **→ Task 11** (sole owner of `README.md` by R4). `install.sh`'s own `--help`
+  header now carries the correct wording to copy.
+
 ## Batch 1 hazards — derived by the controller from the plan text, not measured
 
 **In one line each:** H1 Task 10's
