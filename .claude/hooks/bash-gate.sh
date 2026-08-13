@@ -65,8 +65,15 @@ DANGER_MSG=""
 # CMD_START also bounds the gap between the verb and its path to `[^;&|]*` — text within the
 # same command segment, not across a `;`/`&&`/`||`/`|` into an unrelated command that merely
 # happens to mention the path later on the same line.
+#
+# The optional trailing `\\?` is the alias-bypass spelling: `\rm -rf Library/` and
+# `\rm Assets/Player.cs.meta` really do run rm, and without it the backslash sat between the
+# command start and the verb and every pattern below missed them. Measured before it was added:
+# `\rm -rf Library/`, `\rm Assets/Player.cs.meta`, `\mv` of a .meta, `\find` and
+# `\git reset --hard` were all permitted. It is the same defect the find route's tokeniser had
+# (see find_exec_commands), in the other arm.
 CMD_PREFIX='((sudo|doas|env|nice|nohup|exec|command|time|xargs)([[:space:]]+[A-Za-z0-9_=./{}-]+)*[[:space:]]+)?'
-CMD_START="(^[[:space:]]*|[;&|]+[[:space:]]*|[({][[:space:]]*)${CMD_PREFIX}"
+CMD_START="(^[[:space:]]*|[;&|]+[[:space:]]*|[({][[:space:]]*)${CMD_PREFIX}\\\\?"
 SAME_CMD='[^;&|]*'
 
 # Unity directory wipes
@@ -128,26 +135,83 @@ if grep -qE "${CMD_START}${DIRECT_MV}[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAN
 fi
 
 # --- the find shape: an allowlist of read-only commands ------------------------------------
-# Commands that cannot modify the files find hands them. Deliberately NOT here: `sed` (`-i`
-# rewrites in place), `awk` and any general-purpose interpreter (`sh`, `bash`, `python3`,
-# `perl`, `ruby`) — they can write, and a wrapper is exactly how a destructive verb hides.
-# `git` is out for the same reason: `git rm` and `git mv` are two of its subcommands.
-# Extending this list is safe in a way that extending a denylist never was: the worst a missing
-# entry does is block a read.
+# Commands that cannot modify the files find hands them. Deliberately NOT here: any
+# general-purpose interpreter (`sh`, `bash`, `python3`, `perl`, `ruby`) — they can write, and a
+# wrapper is exactly how a destructive verb hides. Extending this list is safe in a way that
+# extending a denylist never was: the worst a missing entry does is block a read.
+#
+# Membership means "cannot modify the files find hands it", and that is a stronger claim than
+# "is usually harmless". Two members failed it and are gone: `touch`, whose entire job is to
+# mutate mtime — which is a Unity reimport trigger — and `sort`, whose `sort -o {} {}` is the
+# documented in-place rewrite. `dos2unix` was proposed for this list and refused for the same
+# reason: its man page says old-file mode "overwrite[s] output to it. The program defaults to
+# run in this mode", so `-exec dos2unix {} \;` rewrites every .meta file it is handed.
+#
+# $1 is the command name, $2 the token straight after it, $3 the whole command line.
 find_exec_is_read_only() {
     case "$1" in
-        grep|egrep|fgrep|rg|ag|ack|stat|file|wc|cksum|md5sum|sha1sum|sha256sum|shasum|\
-        cat|head|tail|less|more|od|xxd|strings|nl|ls|basename|dirname|realpath|readlink|\
-        echo|printf|true|false|test|diff|cmp|sort|uniq|cut|tr|comm|column|jq|touch|date)
+        grep|egrep|fgrep|rg|ag|ack|stat|file|wc|cksum|md5sum|sha1sum|sha256sum|sha512sum|\
+        b2sum|shasum|cat|head|tail|less|more|od|xxd|strings|nl|ls|basename|dirname|realpath|\
+        readlink|echo|printf|true|false|test|'['|diff|cmp|uniq|cut|tr|comm|column|jq|du|\
+        identify|date)
             return 0 ;;
+    esac
+
+    # --- second stage: read-only in the form you meet them, destructive in one other one ----
+    # A table of four arms, deliberately not a mechanism. Each names the shape that writes,
+    # and each reads the haystack in which BEING WRONG BLOCKS RATHER THAN PERMITS:
+    #   - the flag arms read the WHOLE command line ($3), because a wider haystack finds `-i`
+    #     more easily, so a miss costs one first-attempt block on a read;
+    #   - `git` reads ONLY the token straight after it ($2), because a wider haystack would let
+    #     an unrelated `git status` later on the line vouch for an earlier `git rm`.
+    # The cost of the wide haystack, accepted: an unrelated `grep -i` or find's own `-o`
+    # elsewhere on the line makes the read form block once. `openssl` joins `sort` rather than
+    # the flat list because it is the same shape — `-out FILE` writes a named file.
+    case "$1" in
+        sed|gsed|yq)
+            if grep -qE '(^|[[:space:]])(-[A-Za-z]*i([[:space:]]|=|\.|$)|--in-?place)' <<< "$3"; then
+                return 1
+            fi
+            return 0 ;;
+        sort|openssl)
+            if grep -qE '(^|[[:space:]])(-[A-Za-z]*o([[:space:]]|=|$)|--output|-out([[:space:]]|=|$))' <<< "$3"; then
+                return 1
+            fi
+            return 0 ;;
+        awk|gawk|mawk)
+            if grep -qE '(>|system[[:space:]]*\()' <<< "$3"; then
+                return 1
+            fi
+            return 0 ;;
+        git)
+            case "$2" in
+                log|blame|ls-files|check-ignore|show|diff|status|cat-file|grep) return 0 ;;
+            esac
+            return 1 ;;
     esac
     return 1
 }
 
-# find_exec_commands — prints, one per line, the name of every command that find's
-# -exec/-execdir/-ok(dir) or a pipeline's xargs would actually run. Tokenised in bash rather
-# than matched with a regex, because "the word after the introducer" is a position, and the
-# regex attempts to express that position are what kept missing verbs.
+# find_exec_commands — prints, one per line, `<command><TAB><the token after it>` for every
+# command that find's -exec/-execdir/-ok(dir) or a pipeline's xargs would actually run.
+# Tokenised in bash rather than matched with a regex, because "the word after the introducer"
+# is a position, and the regex attempts to express that position are what kept missing verbs.
+#
+# EVERY BUG THIS FUNCTION HAS HAD IS THE SAME BUG: a token classified by its shape rather than
+# by its position, so the real command was stepped over. Three of them, kept here because the
+# fourth will look just as reasonable:
+#   - `';'*|'\'*` skipped ANY token starting with a backslash, meaning to skip find's `\;`
+#     terminator. `\rm`, `\mv`, `\gzip` are the standard alias-bypass spelling and were
+#     therefore invisible — on the find route, on the verb this classification is named after.
+#     `-exec \mv {} /tmp \;` still blocked, but reported "runs 'tmp'": having skipped `\mv`
+#     and `{}` it landed on the next word. The terminator is now matched in full, and the
+#     backslash is stripped from every token before anything looks at it, which also fixes
+#     `| \xargs -0 rm` — a stripped `\xargs` is an introducer again.
+#   - an xargs option's ARGUMENT was read as the command: `xargs -n 1 grep` reported
+#     "runs '1'", `xargs -d "\n" grep` reported "runs '\n'". Only options whose argument is
+#     mandatory and separate are skipped; `-i`/`-e`/`-l` take an OPTIONAL attached one, so
+#     skipping their next word would step over the command in `xargs -i rm {}`.
+#   - the same class in `CMD_START` above, for the direct arm.
 find_exec_commands() {
     local tok cmd want=0
     # `set -f` matters: the command line being tokenised contains globs (`*.meta` is the whole
@@ -156,10 +220,17 @@ find_exec_commands() {
     # shellcheck disable=SC2086 -- deliberate word splitting; this IS the tokeniser
     set -- $1
     set +f
-    for tok in "$@"; do
+    # `while`/`shift` rather than `for`, so that $1 is the token after the current one and the
+    # command's own next word is available without a second pass.
+    while [ "$#" -gt 0 ]; do
+        tok="$1"; shift
+        tok="${tok#\\}"                            # \rm -> rm, \xargs -> xargs, \; -> ;
         if [ "$want" = "1" ]; then
             case "$tok" in
-                -*|*=*|'{}'*|';'*|'\'*|'+') continue ;;
+                -a|-E|-I|-d|-L|-n|-P|-s|--arg-file|--delimiter|--max-args|--max-chars|--max-procs)
+                    shift || true                  # an xargs option and its separate argument
+                    continue ;;
+                -*|*=*|'{}'*|';'|'+') continue ;;
             esac
             cmd="${tok##*/}"                       # /usr/bin/rm -> rm
             cmd="${cmd%\'}"; cmd="${cmd#\'}"       # 'rm -> rm
@@ -168,7 +239,7 @@ find_exec_commands() {
                 # The same prefix vocabulary CMD_START uses: these run the NEXT word.
                 env|sudo|doas|nice|nohup|command|time|exec|'') continue ;;
             esac
-            printf '%s\n' "$cmd"
+            printf '%s\t%s\n' "$cmd" "${1:-}"
             want=0
             continue
         fi
@@ -188,9 +259,9 @@ if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
         META_EXEC=""
         # A here-string, not a pipe: `break` in a piped `while` would leave the writer to die
         # of SIGPIPE, which under pipefail + set -e kills the hook and fails it OPEN.
-        while IFS= read -r _mc; do
+        while IFS=$'\t' read -r _mc _mnext; do
             [ -n "$_mc" ] || continue
-            if ! find_exec_is_read_only "$_mc"; then
+            if ! find_exec_is_read_only "$_mc" "${_mnext:-}" "$COMMAND"; then
                 META_EXEC="$_mc"
                 break
             fi
@@ -201,8 +272,13 @@ if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
             # says "deleting" or "renaming" would be asserting knowledge the gate no longer
             # has — and a category list kept only for wording would rot exactly as the denylist
             # did, but silently, because a wrong sentence is less visible than a missed block.
+            #
+            # For the same reason the sentence says "not on this gate's read-only list" rather
+            # than "not a read-only command". The second is a claim about the command and the
+            # gate cannot make it: for `git log` it is simply false. The first is a claim about
+            # the gate, which is the only thing it actually knows.
             DANGER_KIND="meta-mutation"
-            DANGER_MSG="This find runs '${META_EXEC}' over .meta files, and '${META_EXEC}' is not a read-only command. .meta files hold the GUIDs every scene, prefab and ScriptableObject reference resolves through — deleting, renaming or rewriting them breaks those references silently."
+            DANGER_MSG="This find runs '${META_EXEC}' over .meta files, and '${META_EXEC}' is not on this gate's read-only list. .meta files hold the GUIDs every scene, prefab and ScriptableObject reference resolves through — deleting, renaming or rewriting them breaks those references silently."
         fi
     fi
 fi
@@ -344,12 +420,40 @@ echo "$KEY" >> "$BASH_GATE_DENIED"
 unity_track_warning "bash-gate" "$DANGER_KIND"
 
 echo "" >&2
-echo "  BashGate — DESTRUCTIVE COMMAND (first attempt blocked)" >&2
+# meta-mutation is the one classification that does NOT assert the command is destructive —
+# it fires because the command is unrecognised, which is a fact about this gate's list. A
+# header reading DESTRUCTIVE and a demand for a rollback plan would be asking the developer to
+# justify what may well be a read, and ceremony demanded for a harmless command is exactly the
+# training this hook is meant to avoid: it teaches that the way past a guard is to produce the
+# words it wants.
+if [ "$DANGER_KIND" = "meta-mutation" ]; then
+    echo "  BashGate — UNRECOGNISED COMMAND OVER .meta FILES (first attempt blocked)" >&2
+else
+    echo "  BashGate — DESTRUCTIVE COMMAND (first attempt blocked)" >&2
+fi
 echo "  Classification: $DANGER_KIND" >&2
 echo "  Command: $COMMAND" >&2
 echo "" >&2
 echo "  Risk: $DANGER_MSG" >&2
 echo "" >&2
+if [ "$DANGER_KIND" = "meta-mutation" ]; then
+    echo "  This gate does not know what '${META_EXEC}' does — only that it is not on the" >&2
+    echo "  read-only list. Before retrying:" >&2
+    echo "" >&2
+    echo "  - If it only READS these files, say so in one line and retry. That is the whole" >&2
+    echo "    answer; do not manufacture a rollback plan for a read." >&2
+    echo "  - If it WRITES them, name the asset files these .meta files belong to, confirm the" >&2
+    echo "    siblings are handled identically, and give a one-line rollback." >&2
+    echo "" >&2
+    echo "  After answering, retry with the BYTE-IDENTICAL command — including every other" >&2
+    echo "  line of this same invocation — and it will pass." >&2
+    echo "  Recorded key: $KEY" >&2
+    echo "  (This is derived from the whole command string. Reformatting anything — even" >&2
+    echo "  unrelated lines, quoting, or whitespace — produces a different key and will be" >&2
+    echo "  blocked again as a new command.)" >&2
+    echo "" >&2
+    unity_hook_block "BashGate: say whether '${META_EXEC}' reads or writes these .meta files, then retry byte-identically (key: $KEY)."
+fi
 echo "  Before retrying, present these facts:" >&2
 echo "" >&2
 echo "  1. Enumerate exactly what this command will modify or delete." >&2
@@ -358,7 +462,8 @@ case "$DANGER_KIND" in
         echo "     - Confirm Unity editor is closed (otherwise reimport may race)." >&2
         echo "     - Note the expected reimport duration." >&2
         ;;
-    meta-deletion|meta-rename|meta-mutation)
+    meta-deletion|meta-rename)
+        # meta-mutation is deliberately NOT here: it exits above with its own, shorter demand.
         echo "     - List the asset files these .meta files belong to." >&2
         echo "     - Confirm the sibling assets are being handled identically." >&2
         ;;

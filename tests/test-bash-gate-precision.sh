@@ -298,3 +298,171 @@ assert_eq "2" "$(tbg_run 'cp /tmp/staged.asset ProjectSettings/ProjectSettings.a
     "still blocks copying over a ProjectSettings asset"
 assert_eq "2" "$(tbg_run 'rm -f ProjectSettings/QualitySettings.asset')" \
     "still blocks deleting a ProjectSettings asset"
+
+# ============================================================================================
+# 2026-08-13 round 4 — THE VERB-EXTRACTION BOUNDARY IS ITS OWN FAILURE CLASS.
+#
+# Three separate misses now, all the same shape: a token classified by what it LOOKS like
+# rather than by the position it occupies, so the real command was stepped over.
+#
+#   1. `prename` — the left boundary of a regex excluded `-`, so `rename` did not match inside
+#      it. Missed in a comment that explained the mechanism.
+#   2. `\rm` — the want-branch skip list carried a `'\'*` arm meaning to skip find's `\;`
+#      terminator, and it skipped EVERY token starting with a backslash. `\rm` is the standard
+#      alias-bypass spelling; the fix that removed a family of false negatives introduced one
+#      on the verb the classification is named after. `-exec \mv {} /tmp \;` still blocked but
+#      reported "runs 'tmp'" — having skipped `\mv` and `{}`, it landed on the next word.
+#   3. `xargs -n 1 grep` — the option's ARGUMENT was read as the command, reported "runs '1'".
+#
+# Every payload below is asserted in both directions, because each of these fixes could be
+# made by blocking more, and a gate that blocks everything satisfies the block half alone.
+# ============================================================================================
+
+# tbg_stderr — the message, not the exit code. Two of round 4's findings are sentences: the
+# gate said "'git' is not a read-only command" (false for `git log` — the gate knows its own
+# list, not the command) and demanded a rollback plan for what may be a read.
+tbg_stderr() {
+    printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":%s}}' \
+        "$(printf '%s' "$1" | jq -Rs .)" \
+        | UNITY_HOOK_STATE_DIR="$TBG_STATE_DIR" bash "$TBG_HOOK" 2>&1 >/dev/null || true
+}
+
+# --- the alias-bypass spelling, every route ---------------------------------------------
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec \rm {} \;')" \
+    "blocks find -exec on a backslash-escaped rm"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 \rm')" \
+    "blocks xargs on a backslash-escaped rm"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec \gzip {} \;')" \
+    "blocks a backslash-escaped verb that was never on any denylist"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec \perl-rename s/meta/bak/ {} \;')" \
+    "blocks a backslash-escaped perl-rename"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" | \xargs -0 rm')" \
+    "blocks a backslash-escaped xargs — the INTRODUCER hides behind one too"
+
+# The other direction, and it is the one that proves the fix is not "block any backslash":
+# a read-only command keeps passing when it is written the alias-bypass way.
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec \grep -l guid {} \;')" \
+    "does not block a backslash-escaped read-only command"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -print0 | \xargs -0 \grep -l guid')" \
+    "does not block a backslash-escaped xargs running a read-only command"
+
+# The message must name the verb, not the word after the one it skipped.
+assert_contains "$(tbg_stderr 'find Assets -name "*.meta" -exec \mv {} /tmp/bak \;')" \
+    "runs 'mv'" \
+    "names the escaped verb rather than the argument after it"
+
+# find's terminator is still skipped — in full, rather than by its first character.
+assert_eq "2" "$(tbg_run "find Assets -name '*.meta' -exec rm {} ';'")" \
+    "blocks a find whose terminator is quoted rather than escaped"
+assert_eq "0" "$(tbg_run "find Assets -name '*.meta' -exec grep -c guid {} ';'")" \
+    "does not block the read-only twin of the quoted-terminator form"
+
+# --- the same class in CMD_START, for the direct arm ------------------------------------
+# `\rm Assets/Player.cs.meta` really runs rm. The backslash sat between the command start and
+# the verb, and every anchored pattern in the file missed it.
+assert_eq "2" "$(tbg_run '\rm Assets/Enemy.cs.meta')" \
+    "blocks a backslash-escaped direct .meta deletion"
+assert_eq "2" "$(tbg_run '\rm -rf Library/')" \
+    "blocks a backslash-escaped Library wipe"
+assert_eq "2" "$(tbg_run '\mv Assets/A.cs.meta Assets/B.cs.meta')" \
+    "blocks a backslash-escaped direct .meta rename"
+assert_eq "2" "$(tbg_run '\git reset --hard HEAD~2')" \
+    "blocks a backslash-escaped hard reset"
+assert_eq "2" "$(tbg_run '\find Assets -name "*.meta" -delete')" \
+    "blocks a backslash-escaped find -delete"
+assert_eq "0" "$(tbg_run 'echo "use \rm to bypass the alias, but not in this repo"')" \
+    "does not block prose that quotes the alias-bypass spelling"
+
+# --- an option's argument is not the command --------------------------------------------
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 -n 1 grep -l guid')" \
+    "does not block a read-only xargs whose option takes a separate argument"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -print0 | xargs -0 -n 1 gzip')" \
+    "still blocks the destructive twin of that same xargs form"
+# -i/-e/-l take an OPTIONAL ATTACHED argument, so skipping their next word would step over the
+# command. These two are why the skip list names only the mandatory-separate options.
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" | xargs -i rm {}')" \
+    "still blocks xargs -i rm, whose next word IS the command"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" | xargs -I {} rm {}')" \
+    "still blocks xargs -I with a separate replacement string"
+
+# ============================================================================================
+# The allowlist means "cannot modify the files find hands it", not "usually harmless".
+# Two members failed that test and are gone; a third was proposed and refused.
+# ============================================================================================
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec du -h {} \;')" \
+    "does not block find -exec du"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec b2sum {} \;')" \
+    "does not block find -exec b2sum"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec sha512sum {} \;')" \
+    "does not block find -exec sha512sum"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec identify {} \;')" \
+    "does not block find -exec identify"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec [ -s {} ] \;')" \
+    "does not block find -exec with the test builtin spelled as a bracket"
+
+# touch mutates mtime, which is a Unity reimport trigger; sort -o is the documented in-place
+# rewrite; dos2unix defaults to old-file mode, which overwrites what it is given. None of the
+# three can sit on a list whose membership claims the file cannot be modified.
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec touch {} \;')" \
+    "blocks find -exec touch, which rewrites mtime and triggers a reimport"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sort -o {} {} \;')" \
+    "blocks sort -o, which is the documented in-place rewrite"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec sort {} \;')" \
+    "does not block a sort with no output flag"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec dos2unix {} \;')" \
+    "blocks dos2unix, which converts in place unless told otherwise"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec openssl dgst -sha256 {} \;')" \
+    "does not block an openssl digest"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec openssl rand -out {} 32 \;')" \
+    "blocks openssl when it is given an output file"
+
+# ============================================================================================
+# Four commands are read-only in the form you meet them and destructive in one other form.
+# Each arm reads the haystack in which BEING WRONG BLOCKS: the flag arms read the whole
+# command line (a wider haystack finds `-i` more easily), git reads only the token straight
+# after it (a wider one would let an unrelated `git status` vouch for an earlier `git rm`).
+# ============================================================================================
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec sed -n /guid/p {} \;')" \
+    "does not block a sed that only prints"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sed -i.bak s/guid/x/ {} \;')" \
+    "blocks sed -i with a backup suffix attached"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec sed --in-place s/guid/x/ {} \;')" \
+    "blocks the long spelling of sed's in-place flag"
+assert_eq "0" "$(tbg_run 'find Assets -iname "*.meta" -exec sed -n 1p {} \;')" \
+    "does not read find's own -iname as sed's -i"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec git log --oneline {} \;')" \
+    "does not block git log — the sentence it used to print about it was false"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec git blame -L 1,2 {} \;')" \
+    "does not block git blame"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec git mv {} /tmp/bak \;')" \
+    "still blocks git mv, which is not on the read-only subcommand list"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec git rm --cached {} \; && git log --oneline')" \
+    "does not let an unrelated git log later on the line vouch for git rm"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec awk /guid/ {} \;')" \
+    "does not block an awk that only matches"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec awk "{print > \"o.txt\"}" {} \;')" \
+    "blocks an awk program containing a redirect"
+assert_eq "0" "$(tbg_run 'find Assets -name "*.meta" -exec yq .guid {} \;')" \
+    "does not block a yq query"
+assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec yq -i .guid=1 {} \;')" \
+    "blocks yq -i, which writes the file back"
+
+# ============================================================================================
+# The message is a claim about the gate, and the demand is proportionate to what it knows.
+# ============================================================================================
+assert_contains "$(tbg_stderr 'find Assets -name "*.meta" -exec pandoc {} \;')" \
+    "is not on this gate's read-only list" \
+    "says the command is not on the gate's list, not that it is not read-only"
+assert_contains "$(tbg_stderr 'find Assets -name "*.meta" -exec pandoc -t plain {} \;')" \
+    "UNRECOGNISED COMMAND OVER .meta FILES" \
+    "does not call an unrecognised command destructive"
+assert_contains "$(tbg_stderr 'find Assets -name "*.meta" -exec pandoc -t html {} \;')" \
+    "do not manufacture a rollback plan for a read" \
+    "offers the one-line answer when the command may be a read"
+# The classifications that DO know the act is destructive keep the full demand.
+assert_contains "$(tbg_stderr 'find Assets/Art -name "*.meta" -delete')" \
+    "DESTRUCTIVE COMMAND" \
+    "still calls find -delete destructive, because there the verb is find's own flag"
+assert_contains "$(tbg_stderr 'find Assets/Art -name "*.meta" -newer x -delete')" \
+    "Write a one-line rollback procedure" \
+    "still demands a rollback plan for a deletion"
