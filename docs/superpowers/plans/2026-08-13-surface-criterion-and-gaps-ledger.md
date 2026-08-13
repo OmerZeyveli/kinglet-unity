@@ -12,35 +12,40 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-### IN FLIGHT as of 2026-08-14 02:10 — Task 9 CLOSED (`5b636d3`…`d038ca9`, unmerged); 2b, 10, 13 running; Task 4 in review
+### MERGED AND GREEN as of 2026-08-14 — Tasks 9, 13 and 10 are in the branch
 
-All four are based on `5b636d3` and commit to their own branches. **Nothing of theirs is merged.**
-If this session is lost, `git worktree list` is the recovery map and each report path below is the
-verdict.
+`git log --oneline -8` from `c27b21f`. **Both gates pass on the merged tree:**
 
-| task | worktree | branch | scratch root | report |
+- `bash tests/run-tests.sh` → **`Total: 2654  Passed: 2651  Failed: 0  Skipped: 3`, rc=0**, of which
+  **1444** results came from 2 python suites. **35** ANSI-stripped headers == `ls tests/test-*.sh |
+  wc -l` **35**.
+- `bash scripts/check-provenance.sh` → **`provenance OK`**.
+- Baseline regenerated twice against committed merged trees, which is **the one situation where
+  `--dry-run` is trustworthy** (R6's defect is that it reads the anchor commit's tree; after the
+  merge commit that tree is the right one): **11 records** for Tasks 9 + 13 (2 + 9, exactly what the
+  two reports derived), then **1** for Task 10's `_lib.sh`.
+- **H2 is resolved by measurement, not by hope.** Task 9's approach rests on `ub_section`'s
+  `/^#{1,3} /` boundary in a file Task 10 edited, and that collision is invisible in either worktree.
+  On the merged tree `tests/test-surface-references.sh` is **111 PASS / 0 FAIL**, Task 9's section is
+  present, and the interval is untouched at both sites.
+- **The suite total moved as predicted and every quoted figure before this line is now invalid.**
+  Task 10 changed the runner's tally arithmetic: 1189 → 2654, with python results counted per result
+  instead of per file.
+
+### STILL IN FLIGHT
+
+| task | worktree | branch | scratch root | state |
 |---|---|---|---|---|
-| 2b | `/home/riive/Documents/Github/kinglet-wt/task-2b` | `task/2b-tokeniser-quote-model` | `/tmp/kinglet-2b-NprXPW` | `.superpowers/sdd/2026-08-13-surface-criterion/task-2b-report.md` |
-| 4 | `…/kinglet-wt/task-4` | `task/4` | `/tmp/kinglet-t4-WuaZVF` | `…/task-4-report.md` |
-| 9 | `…/kinglet-wt/task-9` | `task/9` | `/tmp/kinglet-t9-cqGTgD` | `…/task-9-report.md` |
-| 10 | `…/kinglet-wt/task-10` | `task/10` | `/tmp/kinglet-t10-p8ZTUf` | `…/task-10-report.md` |
-| 13 | `…/kinglet-wt/task-13` | `task/13` | `/tmp/kinglet-t13-8jVeGK` | `…/task-13-report.md` |
+| 4 | `…/kinglet-wt/task-4` | `task/4` | `/tmp/kinglet-t4-WuaZVF` | fix round **2** re-review; 3 commits, `8056f53` |
+| 2b | `…/kinglet-wt/task-2b` | `task/2b-tokeniser-quote-model` | `/tmp/kinglet-2b-NprXPW` | fix round **1**; `f735fe2` |
 
-**Task 13 was dispatched out of batch order** — it shares no file with anything running and its
-output improves the loop that is executing the rest of the wave.
+**Both are based on `5b636d3` and will merge onto a moved tree.** `provenance.tsv` is the only shared
+file and the rows are disjoint — concatenate the note appends by hand, **keep apostrophes straight**.
 
-**Merge order at the boundary: 4, then 9, then 13, then 10 last** — Task 10 changes `run-tests.sh`'s tally
-arithmetic and invalidates every quoted total the moment it lands (H4). Task 2b merges independently
-of the three; it shares no file with any of them.
+### Remaining, in batch order
 
-**After merging: re-run `tests/test-surface-references.sh` on the merged tree** — Task 9's approach
-depends on a property of a file Task 10 may touch, and that collision is invisible in either
-worktree (H2).
-
-A figure re-derivation workflow was also dispatched for Batch 1 (three derive agents plus a
-synthesis) writing to `.superpowers/sdd/2026-08-13-surface-criterion/batch1-facts.md`. It is
-**advisory** — every brief already tells its implementer to derive its own figures — so a missing
-facts sheet does not block anything.
+`{5, 3, 12}` → `{6, 7}` → `{8, 4b, 4c, 2c}` → `{11}` alone. **Re-derive every figure at each
+boundary; nothing above this line is inherited.**
 
 ---
 
@@ -444,12 +449,12 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | **Stage 3 — the generated block** | | | | |
 | 7 | `/unity-init` names the generator, markers become a contract | open | — | Sixteen surfaces rest on that region. **R7** if it lands second |
 | 8 | `/unity-ui` and `/unity-scene` stop reading as entry points | open | — | A HARD-GATE bypass, not a tidiness fix |
-| 9 | The Ambiguity Score says what it does not know | **done** | `5b636d3`…`d038ca9` | Must be a **new** heading; six sections are frozen. **The score has no code path at all** — Step 1 may not be executable |
+| 9 | The Ambiguity Score says what it does not know | **done, merged** | `5b636d3`…`d038ca9` | Must be a **new** heading; six sections are frozen. **The score has no code path at all** — Step 1 may not be executable |
 | **Stage 4 — guards, claims, and the loop** | | | | |
-| 10 | Six guards see the class | open | — | **R9**: the deliverable is the CLASS. "Nine files, not two". Changes `run-tests.sh` tally arithmetic → invalidates every quoted suite total |
+| 10 | Six guards see the class | **done, merged** | `5b636d3`…`5db856d` | **R9**: the deliverable is the CLASS. "Nine files, not two". Changes `run-tests.sh` tally arithmetic → invalidates every quoted suite total |
 | 11 | Claims are re-derived or removed | open | — | **R4**: sole owner of `tests/test-derived-counts.sh`. **R12**: pointers vs historical narrative. **F9**: `CLAUDE.md` joins its file list. **F11**: widen Step 1's pattern *before* it runs |
 | 12 | The early-exit-reader trap leaves the shipped scripts | open | — | **R1**: leaves `install.sh` entirely. **R2**: gains the six `--help` texts |
-| 13 | The loop learns the five shapes a scoped review cannot see | **done** | `234fa85`…`222e40e` | **New**, from Task 1's audit. Payload skill — drifts the baseline |
+| 13 | The loop learns the five shapes a scoped review cannot see | **done, merged** | `234fa85`…`222e40e` | **New**, from Task 1's audit. Payload skill — drifts the baseline |
 
 ---
 
@@ -823,6 +828,27 @@ ADDRESSED, none returned to the fix loop.**
     `Total` rises by exactly the number of *failing* python assertions — 1189 → 1191 (2 drift) →
     1193 (4 drift) — while `Passed` is untouched. **A regressed bash assertion would drop `Passed`.**
     Constant 1189 across a moving `Total` is therefore evidence, not a coincidence.
+
+**From Task 10's round-2 re-review (2026-08-14). Task 10 is COMPLETE at `5db856d`.**
+
+51. **Four more heredoc-tracker shapes, found by a reviewer looking past the five it was handed.**
+    `<<` inside a **single-quoted** string (`awk 'BEGIN { print "a<<b" }'` → latches on `b`), inside a
+    **double-quoted** string (`msg="use << to open a heredoc"` → latches on `to`), and in a **case
+    pattern** (`*"<<Q"*)` → latches on `Q`) are all **strict** and share the root cause of the two
+    already-known strict rows — leftmost-anywhere `match()` on a non-comment line. **The fourth is
+    the one that matters: a backslash line-continuation before the delimiter** (`cat << \` + newline
+    + `EOF`) — confirmed with `bash -c` to be valid shell that really opens a heredoc, and the
+    tracker **never enters**. **That is a THIRD lax trigger**, and the block's closing sentence names
+    only two. Unreachable on this tree (census re-derived a third time, differently shaped: 46 lines
+    containing `<<` across 20 scanned `.sh` files → 39 here-strings, 0 whole-line comments, 7 real
+    introducers, all with a literal or quoted delimiter, one per line, at exactly the file:line pairs
+    the shipped comment names). **One clause repairs the sentence if that block is ever touched.**
+52. **A comment-only claim needs three proofs, not one, and the reviewer gave the reason.** Stripping
+    `#` lines to compare revisions **would itself hide a change inside the single-quoted awk
+    program**, where a `#` line is not a shell comment. So: `git diff -U0` (every changed line begins
+    with `#`), comment-stripped revisions identical, **and the awk program extracted from each
+    revision `cmp`-identical** — the third is what closes the gap the first two leave. Behaviourally
+    corroborated: per-file tallies across the full suite unchanged between the two commits.
 
 **Inherited from earlier waves, still open:**
 
