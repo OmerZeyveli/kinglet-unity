@@ -170,23 +170,31 @@ already live.
 Hooks are shell scripts in `.claude/hooks/` configured in `settings.json`. They run automatically at various lifecycle events: before/after tool invocations, before context compaction, on session start, and on session stop.
 
 All 12 registered hooks source a shared library (`_lib.sh`, a sourced library and not itself a hook)
-that provides kill switches, profile filtering, and utility functions -- except `session-brief.sh`,
-which sources nothing and therefore honours no kill switch. Hooks are organized into three
-**profile levels** -- `minimal` (4 cumulative, including `session-brief.sh`, which declares no
-`HOOK_PROFILE_LEVEL` and always runs), `standard` (12 cumulative), and `strict` (12 cumulative). Set
-the active profile via `UNITY_HOOK_PROFILE=standard`.
+that provides kill switches, profile filtering, and utility functions -- except one, which sources
+nothing and therefore honours no kill switch. Hooks are organized into three
+**profile levels** -- `minimal` (4 cumulative, one of which declares no `HOOK_PROFILE_LEVEL` at all
+and therefore runs under every profile), `standard` (12 cumulative), and `strict` (12 cumulative).
+Set the active profile via `UNITY_HOOK_PROFILE=standard`.
 
 **No hook declares `strict` any more**, so `standard` and `strict` are the same set. That is a
 consequence of the 2026-08-13 cut, not an oversight: every strict-declared hook was removed, because
 `UNITY_HOOK_PROFILE` is set nowhere in `settings.json`, `install.sh` or `scripts/`, so `standard` is
 the only profile that has ever been active and seven hooks had never run.
 
-The tier that is left doing work is `minimal`, and **it drops 8 of the 12 — including `bash-gate`,
-the gate on destructive Bash commands, and `warn-serialization`.** It reads as a performance setting
-and is in fact a safety setting. `docs/HOOK-REFERENCE.md` lists the full dropped set, which is
-derived from the hook files and guarded as a set by `tests/test-derived-counts.sh`; this file
-deliberately does not restate the membership, because two documents listing the same set by hand is
-how the list goes stale in one of them.
+The tier that is left doing work is `minimal`, and **it drops 8 of the 12 — among them a blocking
+gate and the hook that warns about the silent-data-loss case `.claude/rules/serialization.md` opens
+with.** It reads as a performance setting and is in fact a safety setting; do not set it without
+reading what it costs.
+
+**Which hooks those are is in [HOOK-REFERENCE.md](HOOK-REFERENCE.md), named there and nowhere else.**
+That document's list is derived from the hook files and asserted as a set by
+`tests/test-derived-counts.sh`. This file names **no hook's profile, event or matcher** — it states
+only counts, and those are guarded. Two documents listing one set by hand is how the list goes stale
+in one of them, and a name here would be the whole of that failure at three-quarters the size.
+
+(The Tracking Files table further down does name hooks, as the *writers* of state files. That is a
+different fact from profile membership, and it is asserted too: `tests/test-derived-counts.sh` checks
+that every hook named there still exists.)
 
 ### Event Types
 

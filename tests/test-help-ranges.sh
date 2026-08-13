@@ -87,8 +87,10 @@
 #   * A `--help` BUILT ANY OTHER WAY. Every tracked script outside this set that advertises one
 #     emits a heredoc instead — `spikes/platform/unity/run-host.sh` and whichever `scripts/*.sh`
 #     are outside the range-checked set. Derive that set rather than listing it: this comment named
-#     seven scripts by hand until 2026-08-13, when five of them were removed by the surface-criterion
-#     cut and the sentence became a list of files that do not exist. A heredoc
+#     seven scripts by hand until 2026-08-13, when four of them were removed by the surface-criterion
+#     cut and the sentence became a list of files that do not exist. (A fifth, detect-missing-refs.sh,
+#     was cut in that same commit and restored two rounds later — which is the second reason not to
+#     write the list down.) A heredoc
 #     cannot truncate the way this construct does — the text is not addressed by line number — so
 #     they are out of scope rather than missed. But "the suite checks every --help" is NOT what this
 #     file proves; it checks the six whose help is a line range, which is the six that can rot.

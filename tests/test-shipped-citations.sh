@@ -53,9 +53,9 @@ MD_COUNT="$(printf '%s\n' "$SHIPPED_MD" | grep -c . || true)"
 #
 # THE PAYLOAD FLOOR MOVED DOWN ON 2026-08-13, from 70 to 55, and that is the one edit the paragraph
 # above forbids — so it needs its reason on the record. The surface criterion was applied to
-# `.claude/hooks/` and `scripts/` for the first time and removed 15 hooks and 5 scripts by a decision
+# `.claude/hooks/` and `scripts/` for the first time and removed 15 hooks and 4 scripts by a decision
 # recorded in provenance-skip.tsv, which `scripts/check-provenance.sh` enforces path by path. The
-# tree shrank from 86 payload entries to 66 because it was CUT, not because a derivation broke, and
+# tree shrank from 86 payload entries to 67 because it was CUT, not because a derivation broke, and
 # the new floor keeps the same proportional headroom the old one had. A floor lowered to match a
 # shrinkage nothing authorised would be the failure this comment warns about; this one is pinned to a
 # skip list a second guard reads.

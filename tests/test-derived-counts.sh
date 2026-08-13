@@ -457,7 +457,7 @@ assert_eq "0" "$(printf '%s' "$DCS_VACUOUS" | grep -c . || true)" \
 #
 # The 2026-08-03 cut applied "does it do something the model cannot do unaided?" to agents, commands
 # and skills; hooks and scripts/ were out of scope and every one survived. When the criterion was
-# applied to them on 2026-08-13, 15 of 27 hooks and 5 of 10 installed scripts left in one commit —
+# applied to them on 2026-08-13, 15 of 27 hooks and 4 of 10 installed scripts left in one commit —
 # and `grep -c hook tests/test-derived-counts.sh` returned 0 the morning of that commit, so seven
 # quoted numbers across three shipped documents would have gone wrong simultaneously with the suite
 # green. That is verbatim the failure the surface-pool block above was written for after the
@@ -501,8 +501,15 @@ DCK_STANDARD=0
 DCK_STRICT=0
 while IFS= read -r dck_h; do
   [ -n "$dck_h" ] || continue
+  # `|| true` is load-bearing, not decoration. session-brief.sh declares no HOOK_PROFILE_LEVEL, so
+  # this grep exits 1; pipefail promotes that through the sed, and at an ASSIGNMENT site `set -e`
+  # kills the file. Measured 2026-08-13 with errexit on: it died here having printed its section
+  # header and 0 of the 14 hook assertions, and NOTHING WENT RED — the runner does `set +e` before
+  # sourcing, so the suite total silently drops by 14 and no guard watches the total. That is the
+  # same shape as the pre-compact.sh defect this wave cut a hook for, inside the guard the wave is
+  # building. All four sites in this file carry it.
   dck_lvl=$(grep -m1 '^HOOK_PROFILE_LEVEL=' "$REPO_DIR/.claude/hooks/$dck_h" 2>/dev/null \
-            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/')
+            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/' || true)
   case "$dck_lvl" in
     ''|minimal) DCK_MINIMAL=$((DCK_MINIMAL + 1)) ;;
     standard)   DCK_STANDARD=$((DCK_STANDARD + 1)) ;;
@@ -527,8 +534,10 @@ DCK_DROPPED_MINIMAL=$((DCK_HOOKS - DCK_MINIMAL))
 DCK_DROPPED_DERIVED=$(
   while IFS= read -r dck_h; do
     [ -n "$dck_h" ] || continue
+    # `|| true`: see the note at the first of these four sites — a hook that declares no level makes
+    # this grep exit 1, and under errexit that kills the file silently.
     dck_l=$(grep -m1 '^HOOK_PROFILE_LEVEL=' "$REPO_DIR/.claude/hooks/$dck_h" 2>/dev/null \
-            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/')
+            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/' || true)
     case "$dck_l" in
       ''|minimal) ;;
       *) printf '%s\n' "${dck_h%.sh}" ;;
@@ -620,8 +629,10 @@ assert_eq "0" "$(printf '%s' "$DCK_DROP_PHANTOM" | grep -c . || true)" \
 DCK_KEEPS_DERIVED=$(
   while IFS= read -r dck_h; do
     [ -n "$dck_h" ] || continue
+    # `|| true`: see the note at the first of these four sites — a hook that declares no level makes
+    # this grep exit 1, and under errexit that kills the file silently.
     dck_l=$(grep -m1 '^HOOK_PROFILE_LEVEL=' "$REPO_DIR/.claude/hooks/$dck_h" 2>/dev/null \
-            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/')
+            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/' || true)
     case "$dck_l" in ''|minimal) printf '%s\n' "${dck_h%.sh}" ;; esac
   done <<< "$DCK_DISK" | sort
 )
@@ -664,8 +675,10 @@ echo "--- derived counts: hook membership restated by hand ---"
 DCK_LEVELS=$(
   while IFS= read -r dck_h; do
     [ -n "$dck_h" ] || continue
+    # `|| true`: see the note at the first of these four sites — a hook that declares no level makes
+    # this grep exit 1, and under errexit that kills the file silently.
     dck_l=$(grep -m1 '^HOOK_PROFILE_LEVEL=' "$REPO_DIR/.claude/hooks/$dck_h" 2>/dev/null \
-            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/')
+            | sed 's/^HOOK_PROFILE_LEVEL="\(.*\)".*/\1/' || true)
     printf '%s\t%s\n' "${dck_h%.sh}" "${dck_l:-always}"
   done <<< "$DCK_DISK" | sort
 )
@@ -708,9 +721,16 @@ assert_eq "$DCK_LEVELS" "$DCK_PERHOOK_DOC" \
 #
 #    So: protect the escaped pipes with a byte that cannot occur in the source, split on the real
 #    separators, then restore.
+#    AND THE ROW MATCH IS PADDING-TOLERANT, which is the difference between a guard and a nuisance.
+#    Round 2 of this block required exactly single-space padding — `| bash-gate | PreToolUse |` — so
+#    re-spacing one row to `|  bash-gate  |  PreToolUse  |`, which is what a markdown formatter does
+#    on save, made this assertion RED ON A SEMANTICALLY CORRECT DOCUMENT. It errs safe and the
+#    diagnostic is readable, but that is not the point: a guard that fires when nothing is wrong is
+#    disabled by the next person who touches the table, and every assertion behind it goes quiet at
+#    once. The row is recognised on structure, and every cell is trimmed before it is compared.
 DCK_TABLE_DOC=$(
   awk '
-    /^\| [a-z0-9-]+ \| (PreToolUse|PostToolUse|PreCompact|SessionStart|Stop) \|/ {
+    /^\|[[:space:]]*[a-z0-9-]+[[:space:]]*\|[[:space:]]*(PreToolUse|PostToolUse|PreCompact|SessionStart|Stop)[[:space:]]*\|/ {
         line = $0
         gsub(/\\\|/, "\001", line)
         split(line, f, "|")
@@ -736,6 +756,52 @@ DCK_TABLE_DERIVED=$(
 assert_eq "$DCK_TABLE_DERIVED" "$DCK_TABLE_DOC" \
   "the Summary Table's event, matcher and profile columns match settings.json and the hook files"
 
+# 4. docs/ARCHITECTURE.md's Tracking Files table names hooks as the WRITERS of state files.
+#
+# That is a different fact from profile membership — which is why that file is allowed to state it
+# while stating no profile, event or matcher by name — but it is still a hand-written hook fact, and
+# it went stale in exactly the predicted way: the 2026-08-13 cut removed four of the writers it named
+# and the table had to be hand-edited, with nothing to catch it if that edit had been missed.
+#
+# Asserted narrowly and on purpose: every hook NAMED there must exist. The converse (every hook that
+# writes state appears in the table) is deliberately not asserted — the table documents the state
+# files worth knowing about, not every write, so completeness there is an editorial call rather than
+# a derivable fact. Saying so, because a check's silence is only as wide as what it read.
+DCK_TRACKING_NAMED=$(
+  awk '
+    /^### Tracking Files/ { intable = 1; next }
+    intable && /^###/     { intable = 0 }
+    intable && /^\|/ {
+        n = split($0, f, "|")
+        if (n >= 4) {
+            w = f[4]
+            gsub(/^[ \t]+|[ \t]+$/, "", w)
+            if (w ~ /^`[a-z0-9-]+\.sh`$/) { gsub(/`/, "", w); print w }
+        }
+    }
+  ' "$REPO_DIR/docs/ARCHITECTURE.md" 2>/dev/null | sort -u
+)
+assert_eq "yes" "$([ -n "$DCK_TRACKING_NAMED" ] && echo yes || echo no)" \
+  "docs/ARCHITECTURE.md still has a readable Tracking Files writer column"
+
+DCK_TRACKING_GONE=""
+while IFS= read -r dck_w; do
+  [ -n "$dck_w" ] || continue
+  if [ ! -f "$REPO_DIR/.claude/hooks/$dck_w" ]; then
+    DCK_TRACKING_GONE="${DCK_TRACKING_GONE}${dck_w}"$'\n'
+  fi
+done <<< "$DCK_TRACKING_NAMED"
+
+if [ -n "$DCK_TRACKING_GONE" ]; then
+  # printf '%s', not '%s\n': DCK_TRACKING_GONE is accumulated with a trailing newline per entry, so
+  # adding one more prints a blank diagnostic line. The assertion counts with `grep -c .` and was
+  # correct either way; the stray line was noise in the failure output, which is the part a reader
+  # acts on.
+  printf '%s' "$DCK_TRACKING_GONE" | sed 's|^|     ARCHITECTURE.md names this hook as a state-file writer and it does not exist: |'
+fi
+assert_eq "0" "$(printf '%s' "$DCK_TRACKING_GONE" | grep -c . || true)" \
+  "every hook docs/ARCHITECTURE.md names as a state-file writer exists"
+
 # --- The quoted numbers. Same table shape, same flattening, same per-pair floors as above. ---
 #
 # NOTE ON THE TWO `of the` PATTERNS. `runs N of the M` (the minimal row) and `drops N of the M`
@@ -752,7 +818,7 @@ assert_eq "$DCK_TABLE_DERIVED" "$DCK_TABLE_DOC" \
 # docs/ARCHITECTURE.md   "strict (12 cumulative"                       strict tier
 # docs/GETTING-STARTED.md "hooks/ 12 hooks + _lib.sh"                  total
 # docs/GETTING-STARTED.md "5 of them blocking"                         blocking
-# docs/GETTING-STARTED.md "repo has 6 scripts; an installed project has 5"  repo, installed
+# docs/GETTING-STARTED.md "repo has 7 scripts; an installed project has 6"  repo, installed
 # docs/HOOK-REFERENCE.md  "includes 12 hooks"                          total
 # docs/HOOK-REFERENCE.md  "standard profile 12 hooks"                  standard tier
 DCK_CLAIMS="docs/ARCHITECTURE.md	hooks/ [0-9]+ registered shell scripts	$DCK_HOOKS	-
