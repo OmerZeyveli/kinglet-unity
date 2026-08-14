@@ -89,7 +89,56 @@ first steps and the wrong one is expensive to undo in a shipping game's reposito
 
 ---
 
-## Task 1: Re-baseline EE onto the current toolkit *(blocked on the decision)*
+## RESULT — Task 1 executed 2026-08-14. Owner chose **C**. EE branch `chore/kinglet-3.0-rebaseline`, commit `1eea9e9a`.
+
+**The headline is that the toolkit worked, and that is the first time anyone can say it about a real
+game.** Nothing in the installer, the doctor or the hooks had to be fixed to complete this migration.
+
+**What the previous two waves built, doing its job on a shipping project:**
+
+- **The `Not done:` accumulator told the truth about what it could not do** instead of reporting
+  success — *"3 retired surface(s) were NOT removed… you edited them, so they stay on disk and stay
+  selectable by the model"*, and *"14 hook registration(s) were NOT removed… the entries naming them
+  outlived the files."*
+- **The dead-registration sweep printed `Hooks 13 (27 registered, 14 dead)`** — the exact defect that
+  wave was built for, in a real project.
+- **The doctor named its own limitation and the remedy**: *"26 of those carry a `user-modified` row
+  with no shipped copy to compare against… **a file you have PUT BACK reads exactly like one you are
+  still editing.** Re-run with `--toolkit-dir`."* Re-run that way, it correctly reported **25
+  byte-identical** and warned the project was *"still cut off from updates to them"* until the next
+  install rewrote the rows.
+- **Ownership tracking was verified, not trusted**: `install.sh` compares against the receipt hash,
+  not the payload — 59 of 92 rows still matched.
+
+**The 29 "you modified" files were the mechanism collision, proved by hash.** For each diverged file
+the test was *does it match any past toolkit commit exactly* — **25 of 26 did**, so they carried zero
+EE content. Only `settings.json` was genuinely edited here (`enabledPlugins`, Superpowers off).
+`unity-feature.md` and `unity-workflow.md` likewise hash-matched retired upstream commits.
+
+**Final state:** 19 stale files removed, 4 surfaces added (`unity-brainstorming`, `unity-planning`,
+`unity-execution`, `detect-pipeline.sh`), commands 11 → **9**, skills 14 → **16**, hooks 28 → **12**,
+zero dead registrations. `studio-doctor` **8 passed · 2 warnings · 0 failures**.
+
+### The one real defect, and it was in EE's own prose
+
+**`CLAUDE.md`'s "How to work" section instructed the model to use fifteen surfaces that do not
+exist** — `/brainstorm`, `/map-systems`, `/design-system`, `/design-review`, `/sprint-plan`,
+`/estimate`, `/scope-check`, `/milestone-review`, `/retrospective`, `/unity-feature`, and the five
+`*-designer` / `*-director` agents — and described the whole layer as *"architecture-agnostic and safe
+to use as-is."* **All fifteen were removed on 2026-08-03.** Measured: **10 of 14 commands and 5 of 7
+agents named there did not exist.**
+
+**This is the "capability sentence" shape the previous wave's aggregate sweep was designed to catch,
+found in a real project rather than in a test.** A sentence describing a *behaviour* rather than a
+*file* stays true-sounding after the thing that did the behaving is gone, and nothing that greps for
+a removed name will find it. It also carried a hand-written architecture warning that
+`generate-claude-md.sh` now emits as a **detected** verdict (494 first-party C# files: VContainer 0,
+MessagePipe 0, UniTask 1, `StartCoroutine` 38).
+
+**Not merged to EE's `main`.** EE is a shipping game and its history is PR-based; that merge is the
+owner's call.
+
+## Task 1 (as originally written): Re-baseline EE onto the current toolkit
 
 **Preconditions, all verified 2026-08-14:** EE is on `main`, working tree clean (0 porcelain lines),
 Unity 6000.0.68f1 · URP detected, `com.unity.inputsystem` present.
