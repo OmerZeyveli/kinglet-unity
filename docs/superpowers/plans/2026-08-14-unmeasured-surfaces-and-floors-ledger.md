@@ -34,6 +34,32 @@ who ever runs the suite with a dirty `migration/` and is therefore the only one 
 **Ordering that binds:** T1 → T2 (T2's mechanism is T1's output). T5 → T6 and T5 → T7 (both cite its
 criterion). T3, T4, T8 are independent.
 
+### Owner's ruling, 2026-08-14: cut to 3 + 4 + 5, then Endless Evolution
+
+**The remaining four are not cancelled — they run in the background while the EE migration proceeds.**
+The ruling came from a question worth recording, because it is the right question and this wave was
+drifting away from it: *does any of this improve game development quality?*
+
+**The honest split, and it is uncomfortable.** What reached a real Unity project was all in the
+*previous* wave plus Task 1: `bash-gate.sh`'s four executed `.meta` destruction routes (a lost `.meta`
+means a new GUID and **every reference to that asset breaks**, in scenes, prefabs and
+ScriptableObjects); `install.sh` amputating the user's `CLAUDE.md` on every install while printing
+success; `warn-serialization.sh` — the hook that catches a field rename without
+`[FormerlySerializedAs]`, i.e. every configured value in every scene silently resetting — proven by
+behaviour for the first time; and `warn-filename.sh` returning rc=1 with zero bytes mid-session on a
+routine Edit.
+
+**Of the eight tasks here, exactly one — Task 4 — reaches a user's project.** The rest are the
+toolkit's claims about itself. The defensible case for them is real (`warn-serialization.sh`'s
+hollowness was found *by* this kind of sweep) but **the marginal value is falling fast**: Task 1's
+three rounds each found a genuine defect; Tasks 6/7/8 will find a number in a comment.
+
+**And the largest gap is still untouched, as the plan's own last paragraph says: nobody has ever run
+this toolkit inside Claude Code against a live Unity project.** No agent has issued a single command
+to a real Editor. The fixture is **1 C# file, 0 `.meta` files**. So the toolkit's internal
+consistency is now heavily measured and its behaviour on a game is not measured at all — and
+continuing down this plan makes that imbalance worse, not better. That is what EE tests.
+
 ---
 
 ## Standing facts for every dispatch
