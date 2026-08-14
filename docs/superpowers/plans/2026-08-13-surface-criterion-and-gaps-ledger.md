@@ -214,6 +214,13 @@ stands. It has now gone stale twice.
 - **The interactive `find` is a `bfs 4.1.1` wrapper, the same trap as `grep`→`ugrep`.** Use
   `/usr/bin/find` (GNU 4.9.0) for any behaviour or absence claim. Discovered 2026-08-14 by a
   reviewer measuring real file damage.
+- **The general form, and it recurred four times tonight in four disguises: a probe whose own text
+  satisfies the condition it is testing.** The route regex that matched the raw string it was meant
+  to reason about; the damage harness whose `evil/xargs` measured arguments instead of stdin; the
+  size-only probe that called three destructive payloads harmless; and the waiter below. **When
+  clearing such a thing, filter by something the current command cannot match** — one agent killed
+  24 self-matching waiters by **age plus pattern**, excluding its own shell, precisely so the running
+  command could not be caught by its own filter.
 - **`pgrep -f <pattern>` is not a usable wait condition when several agents share a session.** It
   matches **the waiter's own command line** (which contains the pattern) and **every other agent
   running the same command**. Measured 2026-08-14: three `until ! pgrep -f 'run-tests.sh'` loops that
@@ -478,7 +485,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 4b | A `CLAUDE.md` missing its end marker is amputated silently | open | — | **New, R5.** Data loss, repeats on every install, prints success |
 | 4c | An upgrade across the cut leaves dead hook registrations | open | — | **New, F1.** Not a Task 1 reopen — Task 1 never opened `install.sh` |
 | 5 | A run that abandons work says so, and something asserts it | **done, merged** | `75ea1de`…`0755d2a` | **R3**: contract goes in `MCP-SETUP.md`. **R11**: exit code stays 0; ≥10 sites, not 4 |
-| 6 | A reverted file stops being sticky | open | — | **R10**: shape (iii), `--toolkit-dir`. Shape (ii) silently breaks three origin readers |
+| 6 | A reverted file stops being sticky | **done, merged** | `b3eb097`…`9be6e6c` | **R10**: shape (iii), `--toolkit-dir`. Shape (ii) silently breaks three origin readers |
 | **Stage 3 — the generated block** | | | | |
 | 7 | `/unity-init` names the generator, markers become a contract | **done, merged** | `05d9cfe`…`f804913` | Sixteen surfaces rest on that region. **R7** if it lands second |
 | 8 | `/unity-ui` and `/unity-scene` stop reading as entry points | **done, merged** | `468c382`…`6f91053` | A HARD-GATE bypass, not a tidiness fix |
@@ -1518,6 +1525,27 @@ ADDRESSED, none returned to the fix loop.**
      difference being the two route-decided records added between. Task 6's `raw-argcmp` at **1 vs
      7**: the same mutation before and after the symlink arms existed. **A count taken at two tree
      states is not a contradiction; it is a missing timestamp.**
+
+**Task 6 COMPLETE at `9be6e6c`, merged. Final ledger from its closing confirmation.**
+
+149. **The bind-mount case was measured, not assumed.** The reviewer built the duplicate with
+     `unshare -rm` + `mount --bind` and `-ef` refused it by shared `st_dev`/inode. **The
+     false-positive direction of the tighter comparison was checked too** — a symlink to the *real*
+     checkout and a checkout via a symlinked parent are both **accepted** and both still report the
+     live edit as modified. *That is what `-ef` could plausibly have broken, and it did not.*
+150. **"Nothing to detect it by" was too strong, and the cheaper discriminator is a presence test.**
+     The residual — `--toolkit-dir` pointed at a genuinely distinct **copy** of the project — is
+     correctly left open (a different directory legitimately holding the same bytes; relative to that
+     toolkit the files really are unmodified, and the flag's contract is *compare against this
+     toolkit*). **But it is detectable:** a real checkout has **no** `.claude/state/install-receipt.tsv`
+     and **does** have `provenance.tsv` / `install.sh`; a copied project is the reverse. **A one-line
+     presence test, strictly cheaper than the "compare receipts" the file names as the alternative.**
+     → sized ledger item.
+151. **The merge was predicted before it was performed.** The reviewer ran `git merge-tree`
+     read-only against the real target — **0 conflict markers**, the single "changed in both" entry
+     being `provenance.tsv`, append-vs-append in a manifest rather than a semantic conflict — and
+     re-checked the baseline against **the target's own inventory** (which Task 2c had updated), not
+     against the task's base. **Zero drift held post-2c, not only against `b3eb097`.**
 
 **Inherited from earlier waves, still open:**
 
