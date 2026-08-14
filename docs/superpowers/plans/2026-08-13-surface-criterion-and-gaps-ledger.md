@@ -243,6 +243,11 @@ stands. It has now gone stale twice.
   `git archive HEAD | tar -x -C "$(mktemp -d)"` (the documented probe method), `git clone
   --no-hardlinks --shared .` when history or an index is needed, or a second `git worktree add`
   under your own scratch root.
+- **Measure file damage by checksum, never by size.** Task 2c reproduced three route payloads that
+  destroy `.meta` files with **no byte-size change at all** — `sed -i s/a/b/` rewrites in place at
+  equal length. **A size-only probe would have called all three harmless.** Earlier payloads in this
+  same wave *did* change size (127 B → 6 B, 104 B → 39 B), so both behaviours are real and a probe
+  must assume neither.
 - **Every dispatch gets its own `mktemp -d` scratch root, and no shared temp path.** Round 5 of Task 2
   had its `probe.sh` and `mutate.sh` replaced mid-task by another agent writing to a shared
   scratchpad, and the measurements it took afterwards were of the other agent's harness.
