@@ -464,7 +464,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 4 | The receipt exists before anything that can abort | **done, merged** | `5b636d3`…`8056f53` | The only permanent-damage path in the wave. **R1**: gains the five `stat -c` sites |
 | 4b | A `CLAUDE.md` missing its end marker is amputated silently | open | — | **New, R5.** Data loss, repeats on every install, prints success |
 | 4c | An upgrade across the cut leaves dead hook registrations | open | — | **New, F1.** Not a Task 1 reopen — Task 1 never opened `install.sh` |
-| 5 | A run that abandons work says so, and something asserts it | open | — | **R3**: contract goes in `MCP-SETUP.md`. **R11**: exit code stays 0; ≥10 sites, not 4 |
+| 5 | A run that abandons work says so, and something asserts it | **done, merged** | `75ea1de`…`0755d2a` | **R3**: contract goes in `MCP-SETUP.md`. **R11**: exit code stays 0; ≥10 sites, not 4 |
 | 6 | A reverted file stops being sticky | open | — | **R10**: shape (iii), `--toolkit-dir`. Shape (ii) silently breaks three origin readers |
 | **Stage 3 — the generated block** | | | | |
 | 7 | `/unity-init` names the generator, markers become a contract | open | — | Sixteen surfaces rest on that region. **R7** if it lands second |
@@ -1074,6 +1074,33 @@ ADDRESSED, none returned to the fix loop.**
     blowup.*
 81. **bash 3.2 was never executed.** `local -a`, `args+=()` and `${#args[@]}` under `set -u` are
     reasoned, not measured — awaits the macOS host pass. Documented in the hook beside the guard.
+
+**From Task 5's closing confirmation (2026-08-14). COMPLETE at `0755d2a`, merged.**
+
+82. **The `> "$RECEIPT"` guard's stated limit has exactly one entry, and folding is what keeps it to
+    one.** `$SOME_CMD /dev/null "$RECEIPT"` still passes. The alternative — extending the limit —
+    was rejected on the implementer's own ground, which is the better statement of it: **"a limit
+    with one entry is a caveat; a limit with a growing list is a disclaimer."**
+83. **Rule 3 misdiagnoses a line that only *reads* both references** (`diff "$RECEIPT_TMP"
+    "$RECEIPT"`, or a log line naming both): it is short-circuited into the write counter and reds as
+    an ownership violation. **Fail-closed and loud**, `lines=` points straight at it, documented
+    beside the rule.
+84. **Three of the four `CLAUDE_MD_BRANCH=skipped` arms are covered only by the shared recording
+    point**; the block **inherits the unreadable-origin stickiness defect** (it reports that state
+    once, not persistently); the entries' consequence prose (*"they will never fire"*, *"no MCP
+    server to reach"*) is **reasoned, not measured**; and the block's internal **ordering** is
+    `install.sh`'s line order, asserted nowhere — only its position relative to `Next steps:` is.
+85. **B.11's coupling to B.10** is real and **avoidable** (reuse another run's `INSTALL_OUT`), and it
+    fails safe — an extra red, never a missed one. Agreed deferral.
+86. **`shellcheck` is not installed on this host** and CI now lints a 580-line test file. Neither the
+    implementer nor the reviewer ran it; **the report says so plainly rather than implying it**, and
+    CI is the authority.
+87. **A merge fact worth keeping: `main` is `3e4c6e5` and the wave's bases are NOT ancestors of it.**
+    The integration branch is `pioneer/surface-criterion-and-gaps`. A reviewer checked `main` first,
+    found `install.sh` there lacks Task 4 entirely, and corrected the controller's framing. **Suite
+    totals never carry across a merge** — 2811 in the worktree became **3099** on the merged tree,
+    exactly 3041 + 58. **What carries is the failure set and the discovery invariant** (glob = find =
+    headers).
 
 **Inherited from earlier waves, still open:**
 
