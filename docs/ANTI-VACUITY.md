@@ -301,6 +301,25 @@ is satisfied by `0 == 0` because `FM_CHECKED` counts the loop over `FM_DIRS`. Th
 repair. An identity needs an absolute floor on one side.** State which failure the identity is
 independent of, and floor the side that can reach zero.
 
+**The repair has now landed on the worked example itself, 2026-08-15.**
+`tests/test-hook-behaviour.sh` carries `REGISTERED_COUNT >= 1` — the assertion reading *"settings.json
+yields a non-empty registered-hook set"* — above the identity in source order. It floors the
+**registered** side and not the on-disk side because the registered side is what the rest of the file
+iterates over, so a `settings.json` that stops parsing is the failure that has to red. It covers that
+file's **second** collapsing identity for nothing: *"every registered hook was probed by execution"*
+compares `REGISTERED_COUNT` against record lines written by the loop over `REGISTERED_HOOKS`, so it
+reads `0 == 0` from the same cause, and `REGISTERED_COUNT` is the side both share.
+
+**And the honest limit of that repair, measured rather than assumed.** Re-running
+`find .claude -type f -delete` in a `git clone --no-hardlinks --shared` on 2026-08-15 gives **9 pass /
+28 fail without the floor and 9 / 29 with it** — the single extra red is the floor, by name, and
+**both identities print a serene `PASS` in both runs**, which is the claim. The other 28 come from
+three blocks that run hooks directly instead of through the registered set, all added the same week.
+That cover is incidental in exactly F4's sense — it is a property of which blocks happen to sit in
+that file, not of the identities, and folding those blocks back into the loop would remove it
+silently. **The 86-assertions-to-2 figure recorded above was true at the file's Task 1 size and is
+not true at 122; what carried over is the identity's own verdict, not the file's.**
+
 **What it costs otherwise.** A second derivation of the same quantity, which not every subject has.
 
 **Where no independent derivation exists**, in order of preference:
@@ -597,7 +616,8 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 
 | Guard · assertion anchor | The two derivations | Today |
 |---|---|---|
-| `test-hook-behaviour.sh` · *settings.json registers every hook file present in .claude/hooks* | `.claude/hooks/*.sh` less `_lib.sh` **vs** distinct commands in `settings.json` | 12 == 12 |
+| `test-hook-behaviour.sh` · *settings.json registers every hook file present in .claude/hooks* | `.claude/hooks/*.sh` less `_lib.sh` **vs** distinct commands in `settings.json` | 12 == 12 — **backed by an absolute floor since 2026-08-15**; see the F2 row in the next table |
+| `test-hook-behaviour.sh` · *every registered hook was probed by execution* | distinct commands in `settings.json` **vs** record lines a probe that RAN wrote | 12 == 12 — same absolute floor, same shared side |
 | `run-tests.sh` · *Test discovery is inconsistent* | the `test-*.sh` glob **vs** `find -type f -name 'test-*.sh'` | 40 == 40 |
 | `run-tests.sh` · *ran N test files but M match* | files actually executed **vs** files discovered | 40 == 40 |
 | `test-bash32-compat.sh` · per-source census | census rows **vs** four array lengths | 9 == 9 |
@@ -629,6 +649,7 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 | `test-skill-discovery.sh` · *the skill->skill sweep still reads the chain* | skill->skill references, **deduplicated**: `S2S_REFS` is `sort -u`'d before the loop, so `S2S_CHECKED` counts distinct targets | ≥ 5 | **6** (from 11 raw references) | **83 %** | **no — losing one leaves 5 and stays green, losing two reds it** |
 | `test-skill-discovery.sh` · *there are skills to check* | skill directories | ≥ 1 | 16 | **6 %** | yes |
 | `test-skills.sh` · *the skill walk found skills to check* | `SKILL.md` files | ≥ 1 | 16 | **6 %** | yes |
+| `test-hook-behaviour.sh` · *settings.json yields a non-empty registered-hook set* | hooks registered in `settings.json` | ≥ 1 | 12 | **8 %** | yes — **and deliberately so.** Added 2026-08-15 as F2's absolute floor under two identities that both read `0 == 0`; detecting a *narrowing* is those identities' job, and they do it at 100 % on both sides |
 | `test-hooks.sh` · *the kill-switch sweep found hook files to read* | hook files | ≥ 1 | 12 | **8 %** | yes |
 | `test-hooks.sh` · *session-brief prints the brief with no switch set* | output lines | ≥ 1 | 49 | **2 %** | yes |
 | `test-cross-validation.sh` · *the hook registrations were actually extracted* | `jq` commands from `settings.json` | ≥ 8 | 12 | 67 % | yes |

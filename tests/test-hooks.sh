@@ -167,20 +167,60 @@ assert_eq "0" "$EXIT_CODE" "track-edits exits 0"
 # THE ZERO-BYTES READING CAN ONLY HAVE COME FROM A PAYLOAD THAT PRODUCED NO OUTPUT ON THE PRISTINE
 # HOOK EITHER -- comparing silence with silence, which is the error this file warns against twice,
 # committed in the paragraph explaining why the error is unavoidable. The rule that pays for it: A
-# PROBE WHOSE PASSING CONDITION IS SILENCE MUST FIRST PROVE ITS OWN BASELINE IS NOT SILENT. That is
-# also the per-hook positive this file still lacks -- proof that each hook ACTS when no switch is
-# set, which is what makes "silent when disabled" mean anything.
+# PROBE WHOSE PASSING CONDITION IS SILENCE MUST FIRST PROVE ITS OWN BASELINE IS NOT SILENT.
 #
-# Probe 1 is that proof for one hook; the rest are covered only by their own
-# behaviour assertions elsewhere in the suite, and TWO HOOKS ARE NAMED BY NO TEST FILE AT ALL --
-# `warn-platform-defines.sh` and `warn-serialization.sh`. The second is the hook whose absence is the
-# silent-data-loss case `.claude/rules/serialization.md` opens with, and which
-# `docs/HOOK-REFERENCE.md` singles out as the reason the `minimal` profile is a safety setting.
-# Derive that pair rather than trusting this line, and note it is an UPPER bound on coverage --
-# being named by a test file is weaker than being asserted to act:
+# ============================================================================
+# WHERE PER-HOOK COVERAGE LIVES, AND HOW TO RE-DERIVE IT WITHOUT ASKING THIS FILE
 #
-#   for h in .claude/hooks/*.sh; do b=$(basename "$h"); [ "$b" = _lib.sh ] && continue
-#     grep -lq "$b" tests/*.sh 2>/dev/null || echo "$b"; done
+# Probe 1 below is the acting-then-silenced proof for ONE hook. The per-hook positive for the rest
+# is not in this file and is not meant to be: `tests/test-hook-behaviour.sh` runs a three-state
+# probe -- acts / `DISABLE_UNITY_HOOKS=1` / `DISABLE_HOOK_<NAME>=1` -- against every hook
+# `.claude/settings.json` registers, matches each acting run against a needle from that hook's own
+# message, and prints the acting byte count beside both zeros. It asserts its own completeness at
+# `every registered hook was probed by execution`. Deleting that file is not silent either: it
+# carries a `provenance.tsv` row, and a row without a file fails `scripts/check-provenance.sh`.
+#
+# THIS PARAGRAPH USED TO RECORD A DIFFERENT MEASUREMENT, WITH A RECIPE THAT INVERTED ITSELF. It
+# said TWO HOOKS ARE NAMED BY NO TEST FILE AT ALL -- `warn-platform-defines.sh` and
+# `warn-serialization.sh` -- and printed this, telling the reader to trust the command over the
+# comment:
+#
+#     for h in .claude/hooks/*.sh; do b=$(basename "$h"); [ "$b" = _lib.sh ] && continue
+#       grep -lq "$b" tests/*.sh 2>/dev/null || echo "$b"; done
+#
+# THE RECIPE GREPS `tests/` FOR HOOK NAMES, AND THIS FILE IS UNDER `tests/` AND NAMES THEM. Writing
+# the finding down is precisely what the command matches, so the command was switched off by the act
+# of recording its result. Measured 2026-08-15 at that exact wording, under /usr/bin/grep 3.11 and
+# under the interactive ugrep 7.5.0 alike: it prints NOTHING. Drop this file and
+# `tests/test-hook-behaviour.sh` from its scope and the same command prints THREE --
+# `block-meta-edit.sh`, `guard-project-config.sh`, `warn-serialization.sh` -- so the sentence was
+# also wrong about which hooks when it was written. A derivation whose scope includes the file
+# recording its result is not a derivation.
+#
+# THE REPLACEMENT KEYS ON EXECUTION AND EXCLUDES NOTHING. There is no path to exclude, because the
+# evidence is a line only a probe that RAN can emit; an exclusion keyed on the recording's own name
+# would just move the defect down one level, and on this host it would not even work -- `grep -r`
+# prints `path` under ugrep where GNU prints `./path`, so a `^\./` exclusion excludes nothing and
+# inflates the count instead of erroring. Nothing this comment says can add or remove a
+# `HOOK-PROBE` record. Strip ANSI first: the runner colours its headers.
+#
+#     bash tests/run-tests.sh 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g' > /tmp/suite.log
+#     awk '$1 == "HOOK-PROBE" { print $2 }' /tmp/suite.log | sort -u          > /tmp/probed
+#     jq -r '.hooks|to_entries[]|.value[]|.hooks[].command' .claude/settings.json \
+#       | sed -e 's#.*/##' -e 's#\.sh$##' | sort -u                           > /tmp/registered
+#     comm -13 /tmp/probed /tmp/registered      # registered, never executed by a probe
+#
+# `$1 ==` rather than a substring match: the emitted record opens its first field with the token and
+# nothing else in a suite log does -- an assertion message that mentions it is preceded by the
+# runner's own marker and cannot become field 1. Verified on the green suite of 2026-08-15: 12
+# occurrences of the token in the whole log, all 12 in field 1, `comm` empty.
+#
+# THE REGISTERED SET COMES FROM `settings.json`, NOT FROM A HAND LIST, and the third set --
+# `.claude/hooks/*.sh` less `_lib.sh` -- must agree with it. That identity is asserted in
+# `tests/test-hook-behaviour.sh` rather than duplicated here, so a hook that exists on disk and is
+# registered nowhere reds there instead of passing unnoticed in both files. All three sets were 12
+# on 2026-08-15; derive them, do not quote this line.
+# ============================================================================
 KS_BAD=""
 KS_SEEN=0
 #

@@ -88,14 +88,59 @@ REGISTERED_HOOKS="$(jq -r '.hooks | to_entries[] | .value[] | .hooks[] | .comman
     | sed -e 's#.*/##' -e 's#\.sh$##' | sort -u)"
 REGISTERED_COUNT="$(printf '%s\n' "$REGISTERED_HOOKS" | grep -c '[^[:space:]]' || true)"
 
-# --- Anti-vacuity floor ----------------------------------------------------
+# --- Anti-vacuity floor, in two parts --------------------------------------
 #
 # Everything below iterates over REGISTERED_HOOKS. If that derivation ever returns nothing — a
-# renamed key, a jq that is not installed, a settings.json that stops parsing — the loop runs zero
-# times, asserts nothing, and this file reports a serene green. The floor is not a hardcoded count
-# (CLAUDE.md forbids those, and it would go stale the next time a hook is added or cut): it is the
-# tree's own hook population, which moves with the tree. `_lib.sh` is excluded because it is the
-# shared library and not a hook — the same exclusion _lib.sh's own header documents.
+# renamed key, a jq that is not installed, a settings.json that stops parsing, the payload deleted —
+# the loop runs zero times, asserts nothing, and this file reports a serene green.
+#
+# PART 1 IS AN ABSOLUTE FLOOR AND IT IS NOT REDUNDANT WITH THE IDENTITY BELOW IT. Added 2026-08-15,
+# because the identity was published as docs/ANTI-VACUITY.md's worked example for F2 and then
+# measured failing F2's own independence clause. Over a payload with no files under `.claude/`,
+# `find` returns 0 and `jq` on a deleted `settings.json` returns 0, so the identity prints
+# `PASS settings.json registers every hook file present in .claude/hooks (0 present)` — its own
+# zero, in its own message. Three states, verdict of the IDENTITY alone:
+#
+#     .claude/hooks deleted, settings.json intact    0 == 12   FAIL   (identity catches it)
+#     .claude/hooks emptied, settings.json intact    0 == 12   FAIL   (identity catches it)
+#     find .claude -type f -delete                    0 == 0   PASS   (identity is blind to it)
+#
+# The two sides are independent of a MIS-REGISTRATION, which is what the identity was written for
+# and does catch at 100 % in both directions. They are not independent of the payload disappearing,
+# and F2's ruling for that is exactly this: an identity needs an absolute floor on one side. State
+# which failure the identity is independent of, and floor the side that can reach zero.
+#
+# WHAT THIS FLOOR IS NOT, MEASURED ON THE THIRD ROW RATHER THAN ASSUMED. It is not today the only
+# thing standing between a deleted payload and a green file. In a `git clone --no-hardlinks
+# --shared` with `find .claude -type f -delete`, this file scores 9 pass / 28 fail WITHOUT the
+# floor and 9 / 29 WITH it — the one extra red is this assertion, by name, and BOTH identities
+# print a serene PASS in both runs. The other 28 come from the three blocks below that run hooks
+# directly rather than through REGISTERED_HOOKS (warn-filename's line-46 gate, the third-party
+# skip, the Assets/ anchor), all added 2026-08-15. That cover is incidental: it is a property of
+# which blocks happen to live here, not of the identities, and folding those blocks back into the
+# loop would remove it without one word of the identities changing. F4's shape — a floor whose
+# reference the mutation also moves — applied to the cover rather than to the floor.
+#
+# The ledger for this wave records that state as `PASS … (0 present)`, 2 assertions, fully green.
+# That was true of the file at Task 1's size and is no longer true at this size; the IDENTITY's
+# verdict is what carried over, and it is the row above.
+#
+# `>= 1` RATHER THAN A NUMBER, deliberately. CLAUDE.md forbids writing a count down and it would go
+# stale the next time a hook is added or cut. The ratio is not the point either: detecting a
+# NARROWING is the identity's job, and it does that at 100 %, which no threshold below 100 % can.
+# This floor's whole job is the one failure the identity cannot see — both sides gone at once — and
+# against that it is complete. It is absolute in F4's sense: its reference is the literal 1, so no
+# mutation of the tree can move it.
+#
+# REGISTERED_HOOKS is the side to floor because it is the side the rest of the file consumes;
+# flooring PRESENT_COUNT would leave a parse failure in settings.json vacuous.
+REGISTERED_FLOOR="empty"
+[ "$REGISTERED_COUNT" -ge 1 ] && REGISTERED_FLOOR="populated"
+assert_eq "populated" "$REGISTERED_FLOOR" \
+    "settings.json yields a non-empty registered-hook set (${REGISTERED_COUNT}) — every assertion below iterates over it"
+
+# PART 2, the identity. `_lib.sh` is excluded because it is the shared library and not a hook — the
+# same exclusion _lib.sh's own header documents.
 PRESENT_COUNT="$(find "$HOOKS_DIR" -maxdepth 1 -type f -name '*.sh' ! -name '_lib.sh' | grep -c . || true)"
 assert_eq "$PRESENT_COUNT" "$REGISTERED_COUNT" \
     "settings.json registers every hook file present in .claude/hooks (${PRESENT_COUNT} present)"
@@ -168,7 +213,12 @@ select_probe() {
         block-meta-edit)
             KIND='block'
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"Assets/Scripts/Player.cs.meta","old_string":"a","new_string":"b"}}'
-            NEEDLE='files contain GUIDs that Unity uses to track assets'
+            # The block's own reason — its $MSG, via unity_hook_block — for the same reason
+            # block-scene-edit's was repointed on 2026-08-14. `files contain GUIDs that Unity uses
+            # to track assets` was the needle until 2026-08-15 and it is a STATIC explanation line
+            # echoed above the reason: measured, replacing $MSG with a placeholder left that needle
+            # matching and this file green over a block that no longer says why it blocked.
+            NEEDLE='Editing .meta files breaks asset references across the entire project.'
             ;;
         block-legacy-input)
             KIND='block'
@@ -181,7 +231,10 @@ select_probe() {
         guard-project-config)
             KIND='block'
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":".editorconfig","old_string":"a","new_string":"b"}}'
-            NEEDLE='defines code quality standards for the project'
+            # Same repoint, same date, same measurement: `defines code quality standards for the
+            # project` is a static line, and this hook has FIVE unity_hook_block calls, so the
+            # needle also has to name which branch ran. This is the .editorconfig branch's reason.
+            NEEDLE='Modifying code quality config is not allowed. Fix the code instead.'
             ;;
         bash-gate)
             KIND='block'
@@ -664,6 +717,16 @@ done
 # PROBED_COUNT counts record lines, and a record line is written only after a probe has actually run
 # three times against a real hook. No amount of text in this file can add one, which is the property
 # a name-keyed derivation cannot have when the file it scans is the file that lists the names.
+#
+# THIS IS THE SECOND IDENTITY THAT COLLAPSES AT 0 == 0, and it is floored by the same instrument:
+# PROBED_COUNT is written by the loop over REGISTERED_HOOKS, so REGISTERED_COUNT is the shared side
+# and the absolute `>= 1` at the head of this file bounds both. An empty registered set makes this
+# read `0 == 0` on its own; with the floor above, that state has already reddened.
+#
+# `tests/test-hooks.sh` defers its per-hook coverage paragraph to this assertion and prints an
+# execution-keyed recipe for re-deriving it from a suite log — the `HOOK-PROBE` lines below are that
+# recipe's input, and they are the durable interface. The TSV they mirror lives in $WORK_DIR and is
+# deleted three lines from here.
 PROBED_COUNT="$(awk 'END { print NR + 0 }' "$PROBE_RECORD")"
 assert_eq "$REGISTERED_COUNT" "$PROBED_COUNT" \
     "every registered hook was probed by execution (${REGISTERED_COUNT} registered, ${PROBED_COUNT} probed)"
