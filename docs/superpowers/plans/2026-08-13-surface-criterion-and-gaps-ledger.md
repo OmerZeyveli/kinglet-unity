@@ -488,7 +488,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 3 | The surviving scripts become reachable | **done, merged** | `75ea1de`…`d607839` | **R2**: leaves `scripts/` entirely. **R8**: no `Bash` for `unity-reviewer`. **R7** if it lands second |
 | **Stage 2 — installer correctness** | | | | |
 | 4 | The receipt exists before anything that can abort | **done, merged** | `5b636d3`…`8056f53` | The only permanent-damage path in the wave. **R1**: gains the five `stat -c` sites |
-| 4b | A `CLAUDE.md` missing its end marker is amputated silently | open | — | **New, R5.** Data loss, repeats on every install, prints success |
+| 4b | A `CLAUDE.md` missing its end marker is amputated silently | **done, merged** | `20c785b`…`32dbc49` | **New, R5.** Data loss, repeats on every install, prints success |
 | 4c | An upgrade across the cut leaves dead hook registrations | open | — | **New, F1.** Not a Task 1 reopen — Task 1 never opened `install.sh` |
 | 5 | A run that abandons work says so, and something asserts it | **done, merged** | `75ea1de`…`0755d2a` | **R3**: contract goes in `MCP-SETUP.md`. **R11**: exit code stays 0; ≥10 sites, not 4 |
 | 6 | A reverted file stops being sticky | **done, merged** | `b3eb097`…`9be6e6c` | **R10**: shape (iii), `--toolkit-dir`. Shape (ii) silently breaks three origin readers |
@@ -1634,6 +1634,28 @@ ADDRESSED, none returned to the fix loop.**
 167. **The corrected `set -e` comment names the two shapes where the death IS real**, so a future
      edit that looks like tidying has something to fail against: a function whose **last** command is
      the failing assignment, and the shipped printf-last shape **under `inherit_errexit`.**
+
+**Task 4b COMPLETE at `32dbc49`, merged. Final ledger from its closing re-review.**
+
+168. **There is a THIRD shape where the install-killing death is real, and it arrives through `set -u`
+     rather than `set -e`.** Dropping the call site's argument — *an edit that looks exactly like
+     tidying* — gives `$1: unbound variable`, **rc 1 after 67 payload files had landed, with the EXIT
+     trap writing an `INCOMPLETE` receipt** — precisely the outcome the retracted claim described.
+     **So "the death is real in exactly two shapes" should read "at least two."** → one word, on the
+     next touch.
+169. **The same-line amputation is confirmed at the base commit and the guard is not hollow.**
+     `126L/4826B → 80L/2697B`, the user's sentinel destroyed, sections **10 → 4**, while printing
+     `ok Refreshed the generated section of CLAUDE.md (your prose untouched)`. Deleting the
+     `malformed-same-line` arm so it falls back to `malformed-order` reds **exactly S3a's two new
+     assertions and nothing else.**
+170. **A state header now narrates the wrong baseline.** `tests/test-install-ownership.sh`, S3a's
+     header: *"The file was declined and its bytes were safe throughout"* — **true of `e58ee51`,
+     false of `20c785b`**, where it amputated. Every neighbouring header narrates the `20c785b`
+     baseline, **so this one reads as a cosmetic guard and could get S3a weakened later.** → one
+     sentence, on the next touch of that file.
+171. **Inserting the new predicate arm disturbed no other classification** — the nine-state sweep
+     re-run on the round-1 tree gives **checksums byte-identical to round 0 for all nine states.**
+     *That is the check a new arm in a classifier actually needs, and it is not the suite.*
 
 **Inherited from earlier waves, still open:**
 
