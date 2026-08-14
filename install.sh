@@ -672,13 +672,32 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 #
 # `awk` over the file, not `grep | ...`: nothing here may pipe into a reader that can exit early.
 #
-# IT ALWAYS EXITS 0 AND ALWAYS PRINTS A TOKEN, and neither is tidiness. The caller assigns it with
-# `X="$(claude_md_marker_state …)"`, where a non-zero function is a `set -e` kill at the assignment —
-# and the branch this replaced was `elif grep -q … "$CLAUDE_MD"`, whose status `set -e` suspends
-# because it is a condition. So a CLAUDE.md that exists and cannot be read used to fall harmlessly to
-# the next arm and would have taken the whole install down here instead, after the payload had
-# landed, leaving the trap to write an INCOMPLETE receipt. `unreadable` is a real state, not a
-# fallback: it declines, like every other state this function cannot certify.
+# IT ALWAYS EXITS 0 AND ALWAYS PRINTS A TOKEN. This comment claimed for one round that without the
+# `-r` guard an unreadable CLAUDE.md would kill the run at `X="$(claude_md_marker_state …)"`, after
+# the payload had landed, leaving the trap to write an INCOMPLETE receipt. THAT IS FALSE, AND IT WAS
+# FALSE FOR TWO INDEPENDENT REASONS, BOTH MEASURED against a `chmod 000` CLAUDE.md with the guard and
+# the `|| out=""` fallback both removed: rc **0**, the run completed, the receipt was written, and it
+# still declined — via the generic `do not form exactly one begin/end pair` message, because the
+# empty token satisfies the `!= none` test at the call site.
+#
+#   * `printf` is this function's LAST command, so the function's status is printf's, whatever awk
+#     did before it; and
+#   * bash CLEARS `-e` in the subshell it spawns for a command substitution unless `inherit_errexit`
+#     is on, so the failing assignment inside this function would not have ended the function even
+#     if printf were not last. Derive that this file sets no such option with the comments EXCLUDED —
+#     `awk '!/^[[:space:]]*#/ && /shopt/' install.sh` — because the naive `grep -n shopt` now matches
+#     the two lines you are reading and answers its own question wrongly.
+#
+# THE DEATH IS REAL IN EXACTLY TWO SHAPES, and they are worth naming because either could arrive by
+# an edit that looks like tidying. Both measured, rc=2, against the same chmod 000 fixture: a rewrite
+# that makes the failing ASSIGNMENT the function's last command (drop the trailing `printf` and let
+# `out=` fall out of the end), and this exact printf-last shape under `shopt -s inherit_errexit`.
+#
+# So the guard stays for what it actually buys, which is not survival: the correct `it exists but
+# could not be read` / `Make CLAUDE.md readable` pair instead of a marker diagnosis about a file
+# nobody could open, and immunity to the second shape above if this file ever gains inherit_errexit.
+# `unreadable` is a real state, not a fallback: it declines, like every other state this function
+# cannot certify.
 claude_md_marker_state() {
   local out
   [ -f "$1" ] || { printf 'absent\n'; return 0; }
@@ -691,6 +710,7 @@ claude_md_marker_state() {
       else if (b + 0 == 1 && e + 0 == 1 && bl < el)    { print "wellformed" }
       else if (e + 0 == 0)                             { print "malformed-no-end" }
       else if (b + 0 == 0)                             { print "malformed-no-begin" }
+      else if (b + 0 == 1 && e + 0 == 1 && bl == el)   { print "malformed-same-line" }
       else if (b + 0 == 1 && e + 0 == 1)               { print "malformed-order" }
       else                                             { print "malformed-count" }
     }
@@ -701,13 +721,21 @@ claude_md_marker_state() {
 
 # The user-facing half, kept beside the predicate so a new state cannot get a token and no sentence.
 # One clause, no trailing punctuation: all three call sites embed it mid-sentence.
+#
+# `malformed-same-line` HAS ITS OWN TOKEN BECAUSE IT HAD THE WRONG SENTENCE. One line carrying both
+# markers fails `bl < el` and used to fall through to `malformed-order`, which told the user their
+# end marker came before their begin marker — a statement about ordering that is not true of a single
+# line, on a file where the remedy sentence was nevertheless right. The action was never in question;
+# the diagnosis was, and a diagnosis a reader can check against their own file is the point of having
+# one at all.
 claude_md_marker_problem() {
   case "$1" in
-    malformed-no-end)   printf 'its kinglet:generated:begin marker has no closing :end marker' ;;
-    malformed-no-begin) printf 'its kinglet:generated:end marker has no opening :begin marker' ;;
-    malformed-order)    printf 'its kinglet:generated:end marker comes before its :begin marker' ;;
-    unreadable)         printf 'it exists but could not be read' ;;
-    *)                  printf 'its kinglet:generated markers do not form exactly one begin/end pair' ;;
+    malformed-no-end)     printf 'its kinglet:generated:begin marker has no closing :end marker' ;;
+    malformed-no-begin)   printf 'its kinglet:generated:end marker has no opening :begin marker' ;;
+    malformed-same-line)  printf 'its kinglet:generated:begin and :end markers are on the same line' ;;
+    malformed-order)      printf 'its kinglet:generated:end marker comes before its :begin marker' ;;
+    unreadable)           printf 'it exists but could not be read' ;;
+    *)                    printf 'its kinglet:generated markers do not form exactly one begin/end pair' ;;
   esac
 }
 
@@ -1477,9 +1505,28 @@ if [ -f "$GEN" ]; then
   elif [ "$CLAUDE_MD_MARKER_STATE" != none ]; then
     # DECLINE, DO NOT REPAIR. This file has kinglet:generated markers, so it is not the marker-less
     # case below; and it does not have a pair this installer can bound, so it is not the refresh case
-    # above. Every repair on offer guesses where the region ends and applies the guess to the user's
-    # prose: clearing `skip` at EOF keeps the begin-only file's prose but silently reinterprets a
-    # structure we cannot parse, and it still drops the old region on the end-before-begin file.
+    # above.
+    #
+    # THE REPAIR THAT LOOKS OBVIOUS IS "CLEAR `skip` AT EOF", AND IT HAS TWO READINGS. BOTH WERE
+    # BUILT AND RUN; NEITHER IS A REPAIR.
+    #
+    #   * Literally — `END { skip = 0 }` — it is a NO-OP. awk's END block runs after the last line,
+    #     so there is nothing left for the flag to gate. Measured: the begin-only file still
+    #     amputates to 80 lines / 2746 bytes and the swapped file still walks 84f3ba1d -> 1c804997,
+    #     shas identical to the unrepaired installer. It fixes zero states, not one.
+    #   * Effectively — buffer the skipped lines and flush them at END when no end marker ever
+    #     arrived — it does save the user's prose, in BOTH malformed states. What it does instead is
+    #     promote the old region into that prose and re-emit the facts block on every run: begin-only
+    #     goes 124 -> 176 -> 228 lines with `## Project Facts` headings at 10 -> 11 -> 12, swapped
+    #     goes 125 -> 178 -> 231. It never converges, it never repairs the pair that caused it, and
+    #     it goes on printing `your prose untouched` while doing it.
+    #
+    # So the ground for declining is not "the repair still destroys work" — the second reading does
+    # not. It is that the repair is NON-CONVERGENT and permanently reinterprets toolkit-owned bytes
+    # as the user's prose: content this installer wrote inside its own markers becomes content it
+    # must never touch again, growing once per install, with the malformed pair still there.
+    # Declining leaves the file exactly as the user left it and names the one edit that ends the
+    # state.
     #
     # NOTHING IS WRITTEN — not CLAUDE.md, not CLAUDE.md.generated. The second is deliberate: this
     # user's file already carries markers, so the beside-yours remedy ("paste the kinglet:generated

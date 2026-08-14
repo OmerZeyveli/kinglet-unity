@@ -636,9 +636,20 @@ fi
 # INSIDE the markers, deliberately. The generator owns every byte between them and the marker text
 # says so; a sentinel outside would be prose, and its removal would be the defect this suite exists
 # to catch rather than the behaviour it is asserting.
+# THE PRECONDITION IS ASSERTED, NOT ASSUMED. `next(...)` raises StopIteration on a CLAUDE.md with no
+# begin marker, and under this file's `set -euo pipefail` a python traceback ends the WHOLE test file:
+# no `FAIL:` line, every fixture below it silently unrun, and an exit status a reader cannot tell from
+# an ordinary red. That is the suite's own recorded hazard — a probe that dies is a probe that reports
+# nothing — so the pair is checked first and the mutation runs only when there is one to damage.
 STALE_NEEDLE='STALE-REGION-LINE-THE-REFRESH-MUST-REMOVE'
 stale_region() {
-  python3 - "$1/CLAUDE.md" "$STALE_NEEDLE" <<'PY'
+  local d="$1" pair
+  pair="$(awk '/kinglet:generated:begin/ { b++ } /kinglet:generated:end/ { e++ } END { print (b + 0) "," (e + 0) }' "$d/CLAUDE.md" 2>/dev/null || echo 0,0)"
+  if [ "$pair" != "1,1" ]; then
+    fail "$(basename "$d"): install 1 left no single kinglet:generated marker pair in CLAUDE.md (counts $pair) — the probe below would measure a fixture that never reaches the refresh branch"
+    return 0
+  fi
+  python3 - "$d/CLAUDE.md" "$STALE_NEEDLE" <<'PY'
 import sys
 path, needle = sys.argv[1], sys.argv[2]
 lines = open(path).read().split('\n')

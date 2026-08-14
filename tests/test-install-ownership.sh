@@ -108,6 +108,7 @@
 #   S   a begin marker with no closing end     bytes survive two more installs, the run says why
 #   S2  an end marker with no opening begin    bytes survive, and the diagnosis is the right one
 #   S3  end before begin                       bytes survive — this one GREW while losing sections
+#   S3a both markers on one line               declined, and NOT diagnosed as an ordering fault
 #   S3b the dry run for S's project            promises nothing the real run declines
 #   S4  a well-formed pair, four installs      the refresh still runs, and is idempotent byte-for-byte
 #
@@ -2596,12 +2597,19 @@ fi
 #   S   a begin marker with no closing end     bytes survive, the run declines and says why
 #   S2  an end marker with no opening begin    bytes survive, and the run's diagnosis is the right one
 #   S3  end before begin                       bytes survive — this one GREW while losing four sections
+#   S3a both markers on one line               declined, and NOT diagnosed as an ordering fault
 #   S4  a well-formed pair, four installs      the refresh is idempotent, byte-for-byte
 #
-# WHY THE FIX IS A REFUSAL AND NOT A REPAIR, since a reader will ask. Clearing `skip` at EOF saves S's
-# prose and does nothing for S3, where the merge clears `skip` at the end marker, prints the OLD
-# region as prose, then sets `skip` at the begin marker and drops the rest. Any repair has to guess
-# where the region ends, and the guess is applied to prose the installer did not write.
+# WHY THE FIX IS A REFUSAL AND NOT A REPAIR, since a reader will ask. "Clear `skip` at EOF" has two
+# readings and both were built and measured. LITERALLY — `END { skip = 0 }` — it is a no-op: awk's END
+# runs after the last line, so S still amputates to 80 lines / 2746 bytes and S3 still walks
+# 84f3ba1d -> 1c804997, shas identical to the unrepaired installer. EFFECTIVELY — buffer while `skip`
+# and flush at END when no end marker arrived — it does save the user's prose in both states, and
+# then promotes the old region into that prose and re-emits the facts block every run: S goes
+# 124 -> 176 -> 228 lines with `## Project Facts` headings at 10 -> 11 -> 12, S3 goes 125 -> 178 -> 231,
+# never converging, never repairing the pair, still printing `your prose untouched`. The ground for
+# declining is that second shape: a repair that permanently reinterprets toolkit-owned bytes as the
+# user's prose and grows the file once per install is not a repair.
 #
 # S2 IS THE ONE THAT WAS ALREADY HALF-GREEN AT 20c785b, and it is recorded here rather than quietly
 # strengthened. `grep -q ...begin` was false for it, so the run took the beside-yours arm: CLAUDE.md
@@ -2618,10 +2626,16 @@ fi
 #     but it is the difference between "repair the pair" being good advice and being confusing.
 #   * Duplicate markers (two begins, or two ends). `claude_md_marker_state` classifies them
 #     `malformed-count` by construction and no fixture here produces one, so that token's message is
-#     reasoned about, not measured.
+#     reasoned about, not measured. Review round 1 ran both by hand and both decline.
 #   * CRLF line endings, and a marker appearing inside a fenced code block in the user's own prose —
 #     the predicate matches the token anywhere on a line, so a user quoting the marker in prose reads
 #     as a marker. Fail-closed (it declines) rather than fail-open, but unasserted.
+#   * THE ONE FAIL-OPEN CORNER LEFT, and it predates this file: a hand-written CLAUDE.md that QUOTES
+#     one begin and one end marker in order, on a FIRST install, is well-formed by this predicate, so
+#     the run replaces whatever sits between the quotes and the dry run announces a plain refresh for
+#     it. Measured identical before and after this task's commit, so it is not a regression here — it
+#     is the last open corner of the marker contract, and closing it needs a rule about what a marker
+#     inside a code fence means, which is the generator's contract rather than the merge's.
 #   * S4 proves the refresh reproduces ITSELF byte-for-byte. It does not prove the refreshed region
 #     equals what a fresh generate would produce for a project whose facts have CHANGED since install
 #     1 — that is the generator's contract, not the merge's, and tests/test-rule-applicability.sh
@@ -2635,9 +2649,10 @@ s_not_done_block() {
   awk '/^Not done:/ { f = 1 } f && /^Next steps:/ { f = 0 } f' <<< "$INSTALL_OUT"
 }
 
-# s_mutate <file> <begin|end|swap> — damage the marker pair the way a half-finished hand-merge or a
-# bad conflict resolution does. python3, not `grep -v > tmp && mv`: the repo's hook gate blocks that
-# shape, and a rewrite that half-succeeds would leave the fixture in a state no assertion describes.
+# s_mutate <file> <begin|end|swap|sameline> — damage the marker pair the way a half-finished
+# hand-merge or a bad conflict resolution does. python3, not `grep -v > tmp && mv`: the repo's hook
+# gate blocks that shape, and a rewrite that half-succeeds would leave the fixture in a state no
+# assertion describes.
 s_mutate() {
   python3 - "$1" "$2" <<'PY'
 import sys
@@ -2647,6 +2662,13 @@ if how == 'begin':
     lines = [l for l in lines if 'kinglet:generated:begin' not in l]
 elif how == 'end':
     lines = [l for l in lines if 'kinglet:generated:end' not in l]
+elif how == 'sameline':
+    # One line carrying both tokens. Still one begin and one end, so every count-based check is
+    # satisfied and only the line numbers separate it from a well-formed file.
+    b = next(i for i, l in enumerate(lines) if 'kinglet:generated:begin' in l)
+    e = next(i for i, l in enumerate(lines) if 'kinglet:generated:end' in l)
+    lines[b] = lines[b] + ' ' + lines[e]
+    del lines[e]
 else:
     b = next(i for i, l in enumerate(lines) if 'kinglet:generated:begin' in l)
     e = next(i for i, l in enumerate(lines) if 'kinglet:generated:end' in l)
@@ -2750,6 +2772,24 @@ run_install_flags "$S3_DIR" "S3 install 2"
 s_assert_declined "$S3_DIR" "S3 (install 2)" "$S3_SHA" 'comes before'
 run_install_flags "$S3_DIR" "S3 install 3"
 s_assert_declined "$S3_DIR" "S3 (install 3)" "$S3_SHA" 'comes before'
+
+# ── State S3a: both markers on one line, and the sentence that was wrong ─────
+# THE ACTION WAS NEVER IN QUESTION HERE AND THE DIAGNOSIS WAS. One line carrying both tokens has one
+# begin and one end, so it fails only `bl < el` — and it therefore fell through to the ordering arm,
+# which told the user their end marker came before their begin marker. That is not true of one line.
+# The file was declined and its bytes were safe throughout; what a reader could not do was check the
+# sentence against their own file. `malformed-same-line` exists so they can, and this state is what
+# stops the token quietly losing its message again.
+s_setup state-s3a sameline
+S3A_DIR="$S_DIR_OUT"
+S3A_SHA="$(sha_of "$S3A_DIR/CLAUDE.md")"
+run_install_flags "$S3A_DIR" "S3a install 2"
+s_assert_declined "$S3A_DIR" "S3a (install 2)" "$S3A_SHA" 'on the same line'
+if grep -qF -- 'comes before' <<< "$INSTALL_OUT"; then
+  fail "S3a: the run said the end marker comes before the begin marker about a file whose markers share one line — the ordering arm is answering for this state again"
+else
+  pass "S3a: the run made no ordering claim about a file whose markers share one line"
+fi
 
 # ── State S3b: the dry run must not promise what the real run declines ───────
 # The same predicate, asked in the announcement. Before the fix the dry run printed
