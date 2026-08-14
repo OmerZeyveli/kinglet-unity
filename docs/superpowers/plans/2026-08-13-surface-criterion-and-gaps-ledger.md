@@ -12,37 +12,30 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-### MERGED AND GREEN — fourteen tasks are in the branch
+### MERGED AND GREEN — fifteen units are in the branch
 
-**1, 2b, 2c, 3, 4, 4b, 5, 6, 7, 8, 9, 10, 12, 13.** Both gates pass on the merged tree, re-measured
-after every merge:
+**1, 2b, 2c, 3, 4, 4b, 4c, 5, 6, 7, 8, 9, 10, 12, 13.** Both gates pass on the merged tree:
 
-- `bash tests/run-tests.sh` → **rc=0, `Total: 3290  Passed: 3287  Failed: 0  Skipped: 3`**.
+- `bash tests/run-tests.sh` → **rc=0, `Total: 3304  Passed: 3301  Failed: 0  Skipped: 3`**,
   **37** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **37**.
 - `bash scripts/check-provenance.sh` → **`provenance OK`**.
-- Baseline regenerated at each merge **against the committed merged tree** — the one situation where
-  `--dry-run` is trustworthy. Drift: 11 (Tasks 9+13), 1 (10), 0 (4), 6 (3), 0 (12), 2 (2b), 2 (7),
-  10 (8), 0 (5), 0 (6), 2 (2c), 0 (4b).
-- **Three `provenance.tsv` merge conflicts, all resolved by hand as the scout predicted** — note-column
-  appends on different rows, concatenated, apostrophes straight, seven fields verified each time.
-- **Every suite total written before Task 10 merged is invalid.** It changed the runner's tally
-  arithmetic; 1189 became 2653 and has moved with every merge since. **Re-measure; never transcribe.**
+- **Zero baseline drift at this merge** — `install.sh` and `tests/` are outside the inventory.
+- **Four `provenance.tsv` conflicts across the wave, all note-column appends on different rows**,
+  resolved by hand exactly as the scout predicted.
+- **The plan had twelve units; the wave has seventeen.** 2b, 2c, 4b, 4c and 13 each came from a
+  measured defect the plan did not foresee.
 
-### STILL IN FLIGHT — the last two
+### STILL IN FLIGHT — one
 
 | task | worktree | branch | scratch root | state |
 |---|---|---|---|---|
-| 4c | `…/kinglet-wt/task-4c` | `task/4c` | `/tmp/kinglet-t4c-KSnW7W` | in review; `6d042bb` |
 | 11 | `…/kinglet-wt/task-11` | `task/11` | `/tmp/kinglet-t11-Nafx3L` | dispatched from `de8abf7` |
 
-**They were dispatched concurrently against the batch plan's "11 alone and last", deliberately.** The
-plan's reason was file conflict *and* that Task 11's subject is the claims the others falsify —
-thirteen of fourteen are merged, so the second reason is nearly discharged, and the only overlap is
-`provenance.tsv` note appends. **Task 11's brief names Task 4c's pending change** (the installer now
-prints `Hooks 12 (27 registered, 15 dead)` on a broken upgrade) so it derives against the merged tree.
-
-**Task 11 is the wave's inheritance: thirty-one ledger entries name it.** Its plan section was written
-before any of the fourteen completed tasks existed.
+**Task 11 is the wave's inheritance: thirty-one ledger entries name it**, and its plan section was
+written before any of the fifteen completed units existed. **Task 4c's reviewer named what a Task 11
+merge invalidates and what it does not** — suite totals and the six-site character-class derivation
+must be **re-derived** on the merged tree; everything behavioural carries, because `install.sh` is
+byte-identical and `.claude/` is untouched across 4c's whole range.
 
 ### After both merge
 
@@ -495,7 +488,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | **Stage 2 — installer correctness** | | | | |
 | 4 | The receipt exists before anything that can abort | **done, merged** | `5b636d3`…`8056f53` | The only permanent-damage path in the wave. **R1**: gains the five `stat -c` sites |
 | 4b | A `CLAUDE.md` missing its end marker is amputated silently | **done, merged** | `20c785b`…`32dbc49` | **New, R5.** Data loss, repeats on every install, prints success |
-| 4c | An upgrade across the cut leaves dead hook registrations | open | — | **New, F1.** Not a Task 1 reopen — Task 1 never opened `install.sh` |
+| 4c | An upgrade across the cut leaves dead hook registrations | **done, merged** | `a54fe5a`…`33cb406` | **New, F1.** Not a Task 1 reopen — Task 1 never opened `install.sh` |
 | 5 | A run that abandons work says so, and something asserts it | **done, merged** | `75ea1de`…`0755d2a` | **R3**: contract goes in `MCP-SETUP.md`. **R11**: exit code stays 0; ≥10 sites, not 4 |
 | 6 | A reverted file stops being sticky | **done, merged** | `b3eb097`…`9be6e6c` | **R10**: shape (iii), `--toolkit-dir`. Shape (ii) silently breaks three origin readers |
 | **Stage 3 — the generated block** | | | | |
@@ -1726,6 +1719,27 @@ ADDRESSED, none returned to the fix loop.**
      broken upgrade; `/usr/bin/grep -rn 'missing hook' tests/` is empty and
      `tests/test-studio-doctor.sh` contains **zero** occurrences of "hook". **Task 4c's new fixture
      already builds a project with exactly one dead registration.**
+
+**Task 4c COMPLETE at `33cb406`, merged. Final ledger from its closing review.**
+
+182. **The discrimination depends on the hook being DROPPED from the payload, not merely edited.**
+     With the drop removed and the edit kept, **MX3 goes green again at 25/25** — the assertion this
+     round exists for is disarmed. **The fixture's comment states the invariant; carry it so a future
+     "simplification" cannot silently remove it.** *Found by the reviewer attacking its own accepted
+     fix four ways, not by the fix.*
+     The other three attacks all behaved: both hooks edited → **RED ×5**, leading with the
+     `…script is pruned…` precondition; the edit made a **no-op** (`touch`, same bytes) → **RED ×4**,
+     leading with `a hook the user edited survives the payload dropping it` — **so the discrimination
+     cannot be vacuously true: if the edit stops being an edit, it reds rather than greens.**
+183. **`install.sh` is byte-identical between the fix commit and the guard commit**, so every
+     behavioural measurement from round 0 — 27 registrations / 12 exist / 15 dead / `Hooks 27` /
+     `Not done:` absent, the checksum-verified no-edit across two runs, and the eight constructed
+     `settings.json` states — **carries over by checksum rather than by assumption.** *That is how a
+     closing review avoids re-running what a hash already settles.*
+184. **A guard's over-reporting mutant is now caught two independent ways.** M5 (every registration
+     reported dead) moved from **×1 to ×2** under the reshaped fixture: the edited-but-present hook
+     lands in the dead list, which the new assertion forbids **by name**, while the headline count
+     catches it **by number.**
 
 **Inherited from earlier waves, still open:**
 
