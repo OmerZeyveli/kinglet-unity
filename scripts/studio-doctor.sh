@@ -90,13 +90,32 @@ RECEIPT="$CLAUDE_DIR/state/install-receipt.tsv"
 # In a checkout this file is <repo>/scripts/studio-doctor.sh, so `dirname $0`/.. is the repo and
 # carries .claude/VERSION. In an installed project it is <project>/.claude/scripts/studio-doctor.sh,
 # so the same expression is <project>/.claude, which carries no .claude/VERSION of its own — no
-# default, which is correct, because an installed project HAS no second copy to compare against. The
-# `!= "$PROJECT_DIR"` guard covers the degenerate case of pointing the checkout's own doctor at the
-# checkout, where every file would trivially equal itself.
+# default, which is correct, because an installed project HAS no second copy to compare against.
+#
+# THE DEGENERATE CASE IS REFUSED IN BOTH BRANCHES, and it used to be refused in only one. A toolkit
+# directory that IS the project makes every file trivially equal to itself, so EVERY `user-modified`
+# row reports as reverted — the exact direction the classifier arm below forbids, because telling a
+# user their work is not at risk when it is, is the one wrong answer that costs something. Measured
+# 2026-08-14 on a project with a live, uncommitted edit: `--toolkit-dir <checkout>` correctly said
+# `1 file(s) modified since install`, and `--toolkit-dir <the project>` said `1 file(s) recorded as
+# yours are byte-identical to this toolkit's copy` and `You put them back.`
+#
+# The `else` branch below has always declined it, silently, because a default that does not resolve
+# is not an error. An EXPLICIT flag is different: the user asked for a comparison, and the honest
+# answer is that this one cannot be made — so it exits 2 like the other two argument failures rather
+# than falling back to a bare run whose output would look nothing like what they asked for.
 if [ -n "$TOOLKIT_DIR" ]; then
   TOOLKIT_DIR="$(cd "$TOOLKIT_DIR" 2>/dev/null && pwd)" || { printf 'Toolkit directory not found.\n' >&2; exit 2; }
   [ -f "$TOOLKIT_DIR/.claude/VERSION" ] \
     || { printf 'Not a kinglet-unity checkout (no .claude/VERSION): %s\n' "$TOOLKIT_DIR" >&2; exit 2; }
+  # `printf '%s\n' "--toolkit-dir …"`, never `printf -- '--toolkit-dir …'`: a format string starting
+  # with `-` is read as an option by bash's builtin printf, which reported
+  # `printf: --: invalid option` on the very line meant to explain the refusal. The message is data,
+  # so it travels as an argument.
+  [ "$TOOLKIT_DIR" != "$PROJECT_DIR" ] \
+    || { printf '%s\n' "--toolkit-dir is the project itself: $TOOLKIT_DIR" >&2
+         printf '%s\n' "Every file would equal itself, so every file you have edited would be reported as put back." >&2
+         exit 2; }
 else
   TOOLKIT_CAND="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)" || TOOLKIT_CAND=""
   if [ -n "$TOOLKIT_CAND" ] && [ -f "$TOOLKIT_CAND/.claude/VERSION" ] && [ "$TOOLKIT_CAND" != "$PROJECT_DIR" ]; then

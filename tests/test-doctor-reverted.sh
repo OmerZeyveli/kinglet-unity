@@ -29,6 +29,7 @@
 #   6  a LIVE edit, with a checkout            still modified: the anti-"everything is reverted" arm
 #   7  the summary line, on every run above    Task 3's `/unity-doctor` contract survives the change
 #   8  --toolkit-dir's own argument handling   a missing value and a non-checkout both exit 2
+#   9  --toolkit-dir pointed at the project    refused: there, every file equals itself
 #
 # WHAT THIS FILE CANNOT SEE
 #   * install.sh's side of the same comparison. tests/test-install-ownership.sh states R…R4 own it,
@@ -82,7 +83,11 @@ install_into() {
 # nothing to auto-detect) or `checkout` for the repo's own, which does auto-detect. Running the
 # wrong one is the difference between assertions 2 and 4, so it is named at every call site.
 doctor() {
-  local which="$1" d="$2"
+  # One `local` per statement, even where neither operand references the other: bash expands ALL of
+  # a `local`'s arguments before performing any assignment, so the two-name form is a trap waiting
+  # for the next edit that makes the second refer to the first.
+  local which="$1"
+  local d="$2"
   shift 2
   local exe rc=0
   if [ "$which" = project ]; then exe="$d/.claude/scripts/studio-doctor.sh"; else exe="$REPO/scripts/studio-doctor.sh"; fi
@@ -265,6 +270,40 @@ if [ "$NOTK_RC" -eq 2 ] && has "$NOTK_OUT" 'Not a kinglet-unity checkout'; then
   pass "8: a --toolkit-dir that is not a checkout is refused loudly, not accepted as one supplying no reference for anything"
 else
   fail "8: a non-checkout --toolkit-dir exited $NOTK_RC saying '$NOTK_OUT' — a flag that appears to work and changes nothing"
+fi
+# ── 9: --toolkit-dir pointed at the project itself ───────────────────────────
+# THE DEGENERATE CASE, AND IT IS THE ONE THAT FAILED OPEN. A toolkit directory that IS the project
+# makes every file trivially equal to itself, so every `user-modified` row reports as REVERTED — the
+# one direction the classifier's own comment forbids, because it tells the user their work is not at
+# risk when it is. The `else` branch's default has always declined this silently; the explicit branch
+# validated `cd` and `.claude/VERSION` and nothing else. Measured 2026-08-14 on a project carrying a
+# LIVE edit: `--toolkit-dir <checkout>` said `1 file(s) modified since install`, and
+# `--toolkit-dir <the project>` said `1 file(s) recorded as yours are byte-identical …` followed by
+# `You put them back.`
+#
+# Asserted on $EPROJ — the still-edited fixture — because on a reverted project the wrong answer and
+# the right answer are the same sentence, so only a live edit can tell the two apart.
+SELF_RC=0
+SELF_OUT="$(bash "$REPO/scripts/studio-doctor.sh" --project-dir "$EPROJ" --toolkit-dir "$EPROJ" 2>&1)" || SELF_RC=$?
+if [ "$SELF_RC" -eq 2 ] && has "$SELF_OUT" 'is the project itself'; then
+  pass "9: --toolkit-dir pointed at the project is refused — every file equals itself there, so every live edit would be reported as put back"
+else
+  fail "9: --toolkit-dir pointed at the project exited $SELF_RC saying '$SELF_OUT'"
+fi
+if has "$SELF_OUT" "$REV_HDR"; then
+  fail "9: …and it reported a live edit as reverted, which is the fail-open direction the refusal exists to prevent"
+else
+  pass "9: …and no reverted line was printed about the live edit it holds"
+fi
+# The refusal is on the RESOLVED path, so a relative spelling of the same directory cannot slip past
+# it: `cd`+`pwd` normalises both sides before they are compared, where a string test on the raw
+# arguments would accept `./`.
+SELFREL_RC=0
+SELFREL_OUT="$(cd "$EPROJ" && bash "$REPO/scripts/studio-doctor.sh" --project-dir . --toolkit-dir ./ 2>&1)" || SELFREL_RC=$?
+if [ "$SELFREL_RC" -eq 2 ] && has "$SELFREL_OUT" 'is the project itself'; then
+  pass "9: …and a relative spelling of the same directory is refused too, because both sides are resolved before they are compared"
+else
+  fail "9: a relative spelling of the project dir exited $SELFREL_RC saying '$SELFREL_OUT' — the comparison reads the raw argument, not the resolved path"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1

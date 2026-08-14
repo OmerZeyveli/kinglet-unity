@@ -97,6 +97,7 @@
 #   R2  ours, edited, three consecutive installs           edit survives all three, row stays yours
 #   R3  the same for `.claude/scripts/*`                   the OTHER reference root
 #   R4  a toolkit whose copy moved on                      lands in the reclaimed project
+#   R5  a retired surface that cannot be hashed            NOT reclaimed, NOT pruned
 #
 # WHAT THIS FILE CANNOT SEE
 #   * Named paths, not an enumeration. A–D assert MCP-SETUP.md and .mcp.json; E, F and J assert
@@ -2256,6 +2257,7 @@ fi
 #   R2  ours, edited, three consecutive installs           edit survives all three, row stays yours
 #   R3  the same for `.claude/scripts/*`                   the OTHER reference root
 #   R4  a toolkit whose copy moved on                      lands in the reclaimed project
+#   R5  a retired surface that cannot be hashed            NOT reclaimed, NOT pruned
 #
 # WHAT R CANNOT SEE
 #   * One payload file per state. A project with several reverted files at once, and any interaction
@@ -2488,6 +2490,71 @@ if [ -n "$R_EDIT_SHA" ] && [ "$(sha_of "$R4_EDITED/$P_REL")" = "$R_EDIT_SHA" ]; 
   pass "R4: a live edit still survives the bumped toolkit — reclaiming a reverted file did not become reclaiming every file"
 else
   fail "R4: the bumped toolkit destroyed a live edit — the reclaim test is matching files that still carry the user's work"
+fi
+
+# ── State R5: the `[ -f "$ref" ]` conjunct, which stands between this arm and ─
+# ── the same class of destruction that got c2d27f1f reverted ─────────────────
+#
+# `sha_of` RETURNS THE EMPTY STRING FOR A FILE IT CANNOT HASH, and it does so on BOTH sides of the
+# comparison in the reclaim arm. A `user-modified` row for a RETIRED surface — one this payload no
+# longer ships, so the reference path is constructed but nothing is there — hashes its reference to
+# "". If the project's own copy is also unhashable, `"" = ""` is true, the file is reclaimed out of
+# MODIFIED_FILES, and the ORPHAN PRUNE then deletes it: the prune's whole contract is that anything
+# the user edited is never removed, and reclaiming the row is exactly how a path leaves that
+# protection.
+#
+# R–R4 were all green with `[ -f "$ref" ]` deleted — measured, 0 failing — while the file was gone:
+#
+#   head  : retired file survives? YES              reclaim line? 0
+#   mutant: retired file survives? *** DELETED ***  reclaim line? 1
+#
+# The doctor's analogous guard (`-n "$REF_HAVE"`, for the same both-sides-empty reason) was already
+# asserted; this one was not, and the asymmetry ran in the destructive direction.
+#
+# THREE ARMS, AND THE THIRD IS WHAT STOPS THE STATE PASSING VACUOUSLY. If the orphan prune never ran
+# against this fixture at all, the two survival assertions would be satisfied by a run that did
+# nothing. So a third retired file carries a clean `toolkit` row and MUST be removed by the same run.
+R5_DIR="$SCRATCH/state-r5"
+R5_UNREADABLE='.claude/agents/retired-unreadable.md'
+R5_READABLE='.claude/agents/retired-readable.md'
+R5_PRUNED='.claude/agents/retired-toolkit.md'
+bash "$REPO/tests/fixtures/mkproject.sh" "$R5_DIR" >/dev/null
+R5_RC=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$REPO/install.sh" --project-dir "$R5_DIR" --yes >/dev/null 2>&1 </dev/null || R5_RC=$?
+# Three surfaces the payload does not ship, each with a row the previous run could have written.
+printf 'a retired surface the user edited, now unreadable\n' > "$R5_DIR/$R5_UNREADABLE"
+printf 'a retired surface the user edited\n'                 > "$R5_DIR/$R5_READABLE"
+printf 'a retired surface nobody touched\n'                  > "$R5_DIR/$R5_PRUNED"
+{
+  printf '%s\t%s\t644\tuser-modified\n' "$R5_UNREADABLE" "$(sha_of "$R5_DIR/$R5_UNREADABLE")"
+  printf '%s\t%s\t644\tuser-modified\n' "$R5_READABLE"   "$(sha_of "$R5_DIR/$R5_READABLE")"
+  printf '%s\t%s\t644\ttoolkit\n'       "$R5_PRUNED"     "$(sha_of "$R5_DIR/$R5_PRUNED")"
+} >> "$(receipt_of "$R5_DIR")"
+# Mode 000 is what makes `sha_of` return "" on the project side. `-f` in install.sh's loop tests the
+# file's TYPE, not the caller's ability to read it, so the row still reaches the reclaim arm.
+chmod 000 "$R5_DIR/$R5_UNREADABLE"
+R5_OUT="$(r_install_out "$R5_DIR")"
+chmod 644 "$R5_DIR/$R5_UNREADABLE" 2>/dev/null || true
+if [ -e "$R5_DIR/$R5_UNREADABLE" ]; then
+  pass "R5: a retired surface whose row says 'user-modified' and whose file cannot be hashed SURVIVES — an empty hash on both sides is not a match"
+else
+  fail "R5: the unreadable retired surface was DELETED — both sides hashed to the empty string, the row was reclaimed out of MODIFIED_FILES, and the orphan prune removed a file the user had edited"
+fi
+if grep -qxF -- "       $R5_UNREADABLE" <<< "$(warn_block "$R5_OUT" "$RECLAIM_HDR")"; then
+  fail "R5: …and the run announced it as reclaimed, which is the claim that let the prune have it"
+else
+  pass "R5: …and the run made no reclaim claim about it"
+fi
+if [ -e "$R5_DIR/$R5_READABLE" ]; then
+  pass "R5: a readable retired surface with a 'user-modified' row survives too — nothing the payload no longer ships can be proved reverted"
+else
+  fail "R5: the readable retired surface was deleted — a row with no reference copy was reclaimed on some other ground"
+fi
+if [ -e "$R5_DIR/$R5_PRUNED" ]; then
+  fail "R5: the retired surface with a clean 'toolkit' row was NOT removed — the orphan prune did not run against this fixture, so the two survival assertions above prove nothing"
+else
+  pass "R5: …while a retired surface with a clean 'toolkit' row IS pruned by the same run, which is what makes the two above non-vacuous"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
