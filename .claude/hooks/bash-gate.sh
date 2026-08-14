@@ -395,12 +395,27 @@ find_exec_tokens() {
 find_exec_flush() {
     printf '%s' "$pend"
     # `"${args[@]}"` on an EMPTY array is an unbound-variable error under `set -u` in bash before
-    # 4.4, and macOS ships 3.2. The count test is the portable guard.
+    # 4.4, and macOS ships 3.2. `${#args[@]}` on the same empty array is safe in every version,
+    # so the count test is the portable guard and the hazard sits inside it. The empty case is
+    # real, not theoretical: `-exec gzip \;` and `| xargs -0 gzip` both reach here with no
+    # arguments at all, and both must still emit their command so it can be classified.
+    #
+    # NOT EXECUTED ON BASH 3.2 — this host runs 5.2 and no 3.2 is installed, so `local -a`,
+    # `args+=()` and `${#args[@]}` under `set -u` are reasoned here rather than measured. All
+    # three predate 3.2 (array append arrived in 3.1) and tests/test-bash32-compat.sh passes,
+    # but the real assertion waits for the planned macOS host pass.
     if [ "${#args[@]}" -gt 0 ]; then
         printf '\t%s' "${args[@]}"
     fi
     printf '\n'
     pend=""
+    # BOTH resets matter and NEITHER can be tested alone. The other one is in
+    # find_exec_commands' want-branch, where a new command is armed. Remove either and nothing
+    # changes, because the other still clears the list; remove BOTH and clause 1's arguments
+    # survive into clause 2, so `-exec git log {} \; -exec git rm {} \;` finds `log` among
+    # `git rm`'s own arguments and the git arm VOUCHES for the second clause — the one direction
+    # this file says cannot exist. A single-site mutation of this branch reports a meaningless
+    # zero, which is the same masking that hid the route-tracking branch from its own sweep.
     args=()
     route=""
     prevbrace=0

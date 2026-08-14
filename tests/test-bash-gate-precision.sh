@@ -590,14 +590,31 @@ assert_eq "2" "$(tbg_run 'git status && find Assets -name "*.meta" -exec git rm 
 # destroyed three real .meta files. Payloads for those fifteen are in the list below and each
 # names the branch it exists for.
 #
-# Two of the fifty have NO payload and cannot have one, and that is a finding rather than an
-# omission: the double-quote backslash escape (`\"` inside `"…"`) and the newline-to-space
-# substitution inside a quoted run change the token's VALUE but no arm's decision depends on the
-# difference, in either direction. Removing either only ever lengthens a token, which can add a
-# block and never remove one. They are correctness of the token, not of the verdict.
+# Two of the fifty have NO payload, and that is a finding rather than an omission: the
+# double-quote backslash escape (`\"` inside `"…"`) and the newline-to-space substitution inside
+# a quoted run change the token's VALUE, and no arm's decision depends on the difference.
+#
+# BUT THE REASON FIRST WRITTEN HERE WAS WRONG, AND THE CORRECTION MATTERS MORE THAN THE
+# CONCLUSION. It said "removing either only ever lengthens a token, which can add a block and
+# never remove one". That is true of the gentle mutation (leave a stray backslash in the value)
+# and FALSE of the one that matters: delete the whole backslash branch inside `"…"` and the `"`
+# in `\"` is no longer consumed, so it CLOSES the quoted run. Quote parity flips for the rest of
+# the line. On `-exec sed "pat\" ; " -i {} \;` that really does end the clause before `-i` is
+# collected — the verdict is still a block, but because the parse now ends `unterminated-quote`,
+# not because the token got longer. Conclusion unchanged, mechanism different, and a reason that
+# is wrong about the mechanism is a reason that will be trusted somewhere it does not hold.
+#
+# AND "46 OF 49 BRANCHES ARE MEASURED" IS REALLY "46 OF 49 CHOSEN MUTATIONS ARE MEASURED". A
+# branch can red under one mutation and not another: making `prevbrace` never set — so find's
+# `+` can never terminate a clause — runs this file 442/0, and no hole could be constructed for
+# it, because every path it changes is conservative. The sweep measures the mutations someone
+# wrote, which is a weaker claim than the one the numbers look like.
 #
 # To repeat the sweep: mutate one branch, run this corpus, and record how many assertions go
-# red. A branch with zero is a branch this file does not measure.
+# red. A branch with zero is a branch this file does not measure — and mutate it more than one
+# way, because a single-site mutation of a branch that appears twice is a no-op. That happened
+# twice in this file's own tooling: once on the route-tracking branch, and once on the clause's
+# argument reset, where removing EITHER `args=()` alone is masked by the other.
 #
 # HOW TO REGENERATE THE `hist` COLUMN (it is data, not derivation — the permanent test runs
 # inside a `git archive` scratch copy and cannot shell out to git):
@@ -1155,6 +1172,8 @@ find Assets -name '*.meta' -exec env grep -l guid {} \;
 find Assets -name '*.meta' -o -name 'xargs' gzip -exec grep -l guid {} \;
 2 222 - git reached with no arguments at all, which is the one path to the git arm's final refusal
 find Assets -name '*.meta' -print0 | xargs -0 git
+2 222 - a clause's arguments must not survive into the next one: with both args=() sites removed the first clause's read-only git log vouches for the second clause's git rm
+find Assets -name '*.meta' -exec git log {} \; -exec git rm {} \;
 TBG_CORPUS
 }
 
@@ -1168,6 +1187,7 @@ tbg_permits=0
 tbg_protected=0
 tbg_fp=0
 tbg_holes=0
+tbg_hist2=0
 tbg_unexplained=""
 tbg_reasonless=""
 tbg_badflag=""
@@ -1188,6 +1208,7 @@ while read -r tbg_exp tbg_hist tbg_ex tbg_note; do
     esac
     case "$tbg_hist" in
         *2*)
+            tbg_hist2=$((tbg_hist2 + 1))
             if [ "$tbg_exp" = "2" ]; then
                 tbg_protected=$((tbg_protected + 1))
             else
@@ -1245,6 +1266,27 @@ assert_eq "3" "$tbg_holes" \
 # stale on its own; both move only when someone means them to.
 assert_eq "45" "$tbg_fp" \
     "the number of payloads recorded as verified false positives has not grown"
+
+# AND THE FROZEN HISTORY ITSELF, WHICH THE TWO CEILINGS ABOVE DO NOT GUARD.
+#
+# Everything monotonic here is derived from the `hist` column, and until this assertion existed
+# the column was unguarded. Rewrite one protected record's hist from `202` to `000` and its
+# expected verdict from `2` to `0`, then change the hook to permit it, and every corpus
+# assertion, both ceilings, the unexplained/reasonless/badflag lists and all four non-emptiness
+# assertions stay green. Deleting the record outright has the identical signature. The property
+# was resting on a column nothing counted.
+#
+# WHY THIS COUNT AND NOT `tbg_protected`. Either reds on a hist rewrite and on a record
+# deletion, so both close the reported evasion. This one is a property of the frozen column
+# ALONE, and that makes it strictly wider: erasing the history behind an EXEMPTION — an `X`
+# record whose hist goes `200` -> `000`, expected still 0, marker and reason untouched — reds
+# here and is invisible to `tbg_protected`, because that record was never protected. An
+# exemption whose historical evidence has been deleted is an exemption nobody can check.
+#
+# It is a fixed number for the same reason the two ceilings are: it is not derived from the
+# tree, so it cannot go stale on its own, and moving it costs an edit in front of a reviewer.
+assert_eq "211" "$tbg_hist2" \
+    "the frozen hist column still records 211 payloads that an earlier hook version blocked"
 
 # --- the quote model's own direct evidence --------------------------------------------------
 # The corpus checks verdicts. These two check the tokeniser's output shape, which is where the
@@ -1322,6 +1364,16 @@ i s/guid/x/ {} \;')" \
 # WHAT IT STILL DOES NOT VARY, said plainly: the PRODUCT of D2 and D3 (many clauses each with
 # many arguments), and the number of unparseable markers. Measured once by hand at 200 clauses x
 # 100 args: 1 060 ms, i.e. it behaves as the sum rather than the product. Nothing asserts that.
+# The round-2 review re-measured that product at 5-8x this size, including a 4.2 MB line of 256
+# clauses x one 16 KB quoted token, and found the same: cost stays linear at roughly 75-90 us
+# per token in every shape it could construct.
+#
+# AND THE CEILING IS STILL EXCEEDABLE — the character of that changed rather than the fact. The
+# first version of this block was broken at 248 KB by a shape-dependent blowup. The smallest
+# input that now exceeds 10 000 ms is 1.4 MB / 131 072 tokens at 11 737 ms, the law is linear in
+# every shape anyone has constructed, and every point asserted below has about 6x headroom. A
+# guard that a 1.4 MB command line can trip is a different object from one a 248 KB command line
+# could trip, and the difference is that this one has no cliff to fall off.
 # ============================================================================================
 
 # Built by doubling — `s="$s $tok"` in a loop is the same O(n^2) this block is about, and a test
