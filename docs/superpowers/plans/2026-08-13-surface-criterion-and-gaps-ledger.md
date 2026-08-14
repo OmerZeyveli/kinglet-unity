@@ -1394,6 +1394,33 @@ ADDRESSED, none returned to the fix loop.**
      discriminator because it is not destructive as written. `M2a` **stays 0 and is unobservable by
      construction.**
 
+**From Task 6's fix round 1 (2026-08-14, `835006c`, in re-review).**
+
+131. **A cross-task validation neither task could have produced alone.** Task 6's first `column-only`
+     doctor mutation stripped the `REF=` assignment, `set -u` killed the script, and every run
+     reported "no summary line" — **and `assert_finished` caught it.** That is **Task 3's
+     summary-line contract doing its job on an input nobody designed it for**, in a harness the
+     implementer then discarded as its own artifact. *Evidence, not anecdote: the contract was ruled
+     structural (nothing after the summary can print or abort) and here it detected an abort it was
+     never aimed at.*
+132. **A refusal message that could not print itself.** The `--toolkit-dir` self-guard's first
+     spelling was `printf '--toolkit-dir …'` — **a format string beginning with `-`**, which bash's
+     builtin `printf` answers with `printf: --: invalid option`, **on the line meant to explain the
+     refusal.** The message travels as an argument now. *Recorded because the failure lands exactly
+     where a reader is looking for an explanation.*
+133. **The self-guard compares resolved paths, not argument strings.** Both sides go through
+     `cd`+`pwd` **before** comparison, so a raw-string test would have accepted `./`. Asserted
+     separately, on the **still-edited** fixture — *"on a reverted project the right and wrong
+     answers are the same sentence."*
+134. **The traversal ledger item is narrower than first recorded.** It reproduces **only with the
+     toolkit's own README bytes** (a first attempt using user text correctly survived), and **the
+     class pre-exists the change** — the same crafted row with a `toolkit` origin deletes the file at
+     `b3eb097` too. **No `install.sh` writer emits a `..` path (measured 0).** *Second time in this
+     wave a ledger entry was written wider than the truth and corrected on re-measurement.*
+135. **State R5's third arm exists to stop the other two passing vacuously** — a retired file with a
+     clean `toolkit` row **is pruned by the same run**, so "the file survived" cannot be satisfied by
+     a run in which nothing happened at all.
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
