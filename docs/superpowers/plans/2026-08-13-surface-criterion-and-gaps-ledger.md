@@ -907,6 +907,31 @@ ADDRESSED, none returned to the fix loop.**
     list as a cross-check on its own derivation — if its sweep finds fewer than six, that gap is the
     finding.**
 
+**From Task 12's implementation (2026-08-14, `daf745a`, in review).**
+
+60. **The early-exit trap has one site that actually kills, and its consequence is a silent
+    user-facing failure, not a script bug.** `scripts/generate-claude-md.sh`'s asmdef-name read
+    (`sed … | head -1` in a bare assignment) on a `.asmdef` producing **80 KB** of sed output — past
+    the 64 KiB pipe capacity — exits **141 with zero bytes of document**, dying right after the
+    "Architecture stack" line; the same file at **413 B** exits 0. **Both halves of the trap in one
+    fixture.** And `install.sh` calls the script inside `if … 2>/dev/null`, **so the install
+    completes, writes no `CLAUDE.md`, and prints nothing.**
+61. **The recorded ground for excluding `scripts/` from the pipe sweep was a *size* argument, and
+    size is not what decides.** Measured at 1 / 50 / 120 / 400 KB: **a one-line haystack never fires
+    at any size**, because grep must read the whole line and therefore drains its writer; the same
+    bytes newline-separated fail open from ~50 KB. So the historically-named exception
+    (`validate-asmdefs.sh`'s list) was safe because of a **`tr '\n' ' '` seventy lines above it**,
+    not because the list is small — **right verdict, wrong reason, and nothing re-ran it.** *This is
+    the most transferable measurement in the task: the sweep's exclusion was justified by a property
+    that does not govern the failure.*
+62. **Two plan premises had gone stale and were reported rather than resolved.**
+    `scripts/validate-architecture.sh`, whose `| head -1 … || true` instances Step 1 asks about,
+    **was removed 2026-08-13** and none survive anywhere — the question was answered on merit anyway,
+    by measurement: `|| true` really is safe, the trap fires but the value is already complete. And
+    **`tests/test-install-dryrun.sh`'s own record went stale after Task 4** — **nine** row writers,
+    **six** read the mode, not the "eight/five" it records. **That second one is a live stale claim
+    inside a test file. → Task 11.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
