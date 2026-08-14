@@ -1547,6 +1547,41 @@ ADDRESSED, none returned to the fix loop.**
      re-checked the baseline against **the target's own inventory** (which Task 2c had updated), not
      against the task's base. **Zero drift held post-2c, not only against `b3eb097`.**
 
+**From Task 4b's implementation (2026-08-14, `e58ee51`, in review).**
+
+152. **The sharpest illustration in the wave that size is not damage: the end-before-begin state
+     GROWS 11 lines while losing 485 bytes and four of the user's sections** (4870 → 4385), and **it
+     is not even stable across runs.** A line-count probe reads that as *"the file got bigger."*
+153. **The pre-fix dry run promised `refresh the generated section only; your prose untouched` for
+     BOTH destructive states.** The false reassurance was not one line in one place — it was in the
+     dry run, in the completion message, and in a second Next-steps line, **with no `Not done:`
+     block.**
+154. **Refusal over repair, with the argument stated rather than assumed:** *"clear `skip` at EOF
+     fixes one state and leaves the swapped one still destroying work; every repair guesses the
+     region boundary and applies the guess to prose the installer did not write."*
+155. **The fix would itself have died on an unreadable `CLAUDE.md`, and the implementer found it
+     unasked.** The `elif grep -q` it replaced had `set -e` **suspended**; a bare `X="$(fn)"`
+     assignment **does not** — the exact class this repository legislates about, appearing inside the
+     repair for a data-loss path. `unreadable` is now a real declining state.
+156. **A test file the plan did not name was touched, and the justification is falsifiable.**
+     Closing the one-byte delta reddened `tests/test-install-dryrun.sh`'s `upgrade` and `mcpthen`
+     fixtures — **they were satisfying that file's own no-identical-bytes fixture rule by way of the
+     blank line the fix removed.** The implementer fixed **the fixtures, not the oracle**, and claims
+     the modified file is green against the **pre-fix** installer too (168 PASS / 0 FAIL). *That
+     claim is the whole justification; if it fails, the change is a weakening dressed as a
+     strengthening.*
+157. **The one-byte refresh delta is closed, so both Task 7 sentences in
+     `.claude/commands/unity-init.md` become simplifiable — with one judgement left open:** *a
+     malformed pair is still not refreshed, it is just no longer silent data loss*, so the qualifier
+     *"on every run that finds a well-formed one"* may still be the honest wording. **→ route to
+     whoever next opens that command.**
+158. **`README.md`'s byte-for-byte claim was false in two states and the fix makes it TRUE.** Verified
+     present and unedited. **→ Task 11 keeps the sentence rather than narrowing it** — the opposite
+     of what the earlier routing assumed.
+159. **A red-first state was already half-green and the implementer said so.** `S2`'s bytes survived
+     pre-fix; only its diagnosis and beside-file assertions were red. *Reporting a partial red-first
+     is worth more than a clean one, because the clean number is what a reader would have believed.*
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
