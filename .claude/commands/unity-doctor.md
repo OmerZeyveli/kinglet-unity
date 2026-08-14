@@ -64,11 +64,15 @@ printed.** Report it as such: *the health check aborted after `<the last line it
 check after that point did not run.* Do not treat what it never reached as passing, and do not offer
 its final warning as the diagnosis.
 
-That last row is not hypothetical. Measured on an otherwise healthy install with `.claude/rules/`
-deleted and the receipt absent: exit 1, **zero `FAIL` lines and no summary**, the run stopping just
-after the receipt check. A reader mapping only PASS/WARN/FAIL concludes *"no install receipt"* about
-a project whose five binding spine rules are gone. **Check 3's first item is the check that names
-that cause** — run it whenever the summary line is missing.
+The third row is why you read the last line rather than the exit status — but **no known input
+produces it today**, so do not go looking for one. The case that used to, an otherwise healthy
+install with `.claude/rules/` deleted and the receipt absent, no longer does: measured 2026-08-14,
+that run **exits 0, prints a full summary, and reaches every later check**, because the count block
+now tolerates a missing directory instead of dying on it. What it prints instead is `rules=0` inside
+its `INFO` line, and a reader mapping only PASS/WARN/FAIL still concludes *"no install receipt"*
+about a project whose five binding spine rules are gone. **A zero on the `INFO` line is a finding
+and the script reports it as neither WARN nor FAIL** — which is Check 3's first item, and the reason
+to run that item on every run, not only when the summary line is missing.
 
 If the script is missing altogether, that is an **ERROR** too — the install is incomplete; re-run the
 Kinglet installer from the toolkit checkout.
@@ -86,17 +90,21 @@ prints the counts as `INFO`, which is not a verdict a reader can act on.
    existence test and passes the doctor script too, which prints `INFO agents=0`, `0 failure(s)` and
    exits 0 — a project with no agents at all reported healthy by both. Any one present and empty →
    **ERROR**, naming which.
-   **This is also the first thing to check when Check 2 produced no summary line**, because the
-   script's count block reads four of these five directories in a row and cannot survive one of them
-   being absent — so a missing directory is both the most likely cause of an aborted run and a check
-   that run never reached.
+   **The script's `INFO` line is not a substitute for this item.** Its count block reads four of
+   these five — `agents`, `commands`, `skills`, `rules`, never `hooks` — and prints what it finds,
+   absent and empty alike, as `INFO agents=… commands=… skills=… rules=…`. It issues no verdict on
+   any of them, so a payload directory that is gone shows up as a zero and never as a `FAIL`. Read
+   those four numbers yourself: any zero is this item's **ERROR**, whatever the summary line says.
 2. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
    other direction: for every `.sh` in `.claude/hooks/` except `_lib.sh`, confirm it appears in
    `PreToolUse` or `PostToolUse` in `.claude/settings.json`. Unregistered → **WARNING** (that hook
    never fires).
 3. **Executable bit.** Every hook file should be `-x`. Missing → **WARNING**.
-4. **Placement.** Blocking hooks (`block-*.sh`) belong in `PreToolUse`; warning hooks (`warn-*.sh`,
-   `validate-*.sh`, `suggest-*.sh`) in `PostToolUse`. Misplaced → **WARNING**.
+4. **Placement.** A hook that can block a tool call belongs in `PreToolUse`; a hook that only warns
+   or records belongs in `PostToolUse`. **Classify by what the hook does with its exit status, not
+   by its filename** — `block-*.sh` and `warn-*.sh` are the only self-describing prefixes, and
+   `bash-gate.sh` and `guard-project-config.sh` (both blocking) and `track-edits.sh` (recording)
+   match neither. Misplaced → **WARNING**.
 5. **Frontmatter.** Each file in `.claude/commands/` has `name` and `description`; each in
    `.claude/agents/` has `name`, `description`, `model` and `tools`. Invalid → **WARNING**.
 
@@ -131,8 +139,8 @@ Present a summary report:
 ```
 === Unity Doctor Report ===
 
-MCP Server:        PASS  (Unity 2022.3.20f1, StandaloneWindows64)
-Install (script):   PASS  (N file(s) verified against the receipt; N agents, N commands, N skills, N rules — read off the INFO line, not re-derived, and not a fixed number)
+MCP Server:         PASS  (Unity 2022.3.20f1, StandaloneWindows64)
+Install (script):   PASS  (N file(s) verified against the receipt; N agents, N commands, N skills, N rules)
 Payload & hooks:    PASS  (all five directories present; every hook registered, executable and correctly placed)
 Project Structure:  WARNING — no test assembly definitions found
 

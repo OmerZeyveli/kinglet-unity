@@ -59,12 +59,6 @@ prose that is not there.
    It writes the document to **stdout** and its log lines to stderr; the caller owns the destination
    file, so nothing is written until you write it in step 2.
 
-   **One known disagreement, and it is the installer's, not the generator's:** the installer's
-   *refresh* path adds one extra blank line immediately before the `end` marker, so a region it last
-   refreshed is exactly one newline longer than the same region freshly generated. Following step 2
-   normalises that away. It is a blank line and nothing else — do not read it as a fact having
-   changed, and do not "fix" the generator to match it.
-
    It already does, from the project's own files, most of what a hand pass would do: Unity version,
    render pipeline, assembly definitions, scenes in build settings, the skills that match this
    project, the *"Architecture stack — detected, not assumed"* verdict, and the packages it knows.

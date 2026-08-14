@@ -847,8 +847,10 @@ DCK_TRACKING_NAMED=$(
             # de-backticked writer cell simply left the set this loop builds — measured by Task 10:
             # repoint the session-edits.txt row writer cell at a lowercase, de-backticked,
             # NONEXISTENT hook and
-            # both assertions below stayed green. They are not needed to exclude the `Various hooks`
-            # row, which fails `[a-z0-9-]+\.sh` on its own either way.
+            # both assertions below stayed green. Until 2026-08-14 the session-warnings.txt row read
+            # `Various hooks`, which fell out of this set by failing `[a-z0-9-]+\.sh` — so a
+            # category word in the writer column was invisible here while three of its members were
+            # deleted. It names `bash-gate.sh` now, its one real writer, and is read like the rest.
             if (w ~ /^`?[a-z0-9-]+\.sh`?$/) { gsub(/`/, "", w); print w }
         }
     }

@@ -45,10 +45,19 @@ artifact does.
    - **Bare numerals.** Any count of a thing whose number the branch changed, wherever it is written
      as a fact — a table cell, a summary line, a comment. **Search on the noun, not the number**,
      because the number is what you are trying to find and cannot be the needle: for each kind whose
-     count moved, search the shipped tree for that kind's word and read every digit near a hit —
-     `grep -rniE '[0-9]+[^0-9]{0,40}NOUN|NOUN[^0-9]{0,40}[0-9]+'`, plus its spelled-out forms ("two",
-     "a dozen"), which no digit pattern reaches. Then derive the count and compare; never read it off
-     the document that states it. **This is the highest-cost shape of the four** — see below.
+     count moved, search the shipped tree for that kind's word — `grep -rniF -- NOUN` — and read
+     every number near each hit. **Flatten the file before you read** (`tr '\n' ' ' | tr -s ' '`): a
+     count and its noun sit either side of a line wrap often enough that a line-oriented reader
+     silently skips them. Search the spelled-out forms too ("two", "a dozen"), which no digit pattern
+     reaches. Then derive the count and compare; never read it off the document that states it.
+
+     This bullet used to prescribe the digit-proximity form
+     `grep -rniE '[0-9]+[^0-9]{0,40}NOUN|NOUN[^0-9]{0,40}[0-9]+'`, which does the opposite of the
+     sentence that introduces it. Measured on one branch of the toolkit this skill came from, with
+     `NOUN=hooks` over two documents: the digit form returned **10** lines where the plain noun search
+     returned **28**, and that branch's highest-value bare-numeral defect was among the 18 it
+     discarded — its count and its noun were split by a wrap. **This is the highest-cost shape of the
+     four** — see below.
    - **Category words.** A list of kinds ("meta, code quality, workflow") that a removal emptied or
      shortened. A list survives the deletion of its last member without one word changing.
    - **Capability sentences.** "X enforces Y", "the tool checks Z" — written about a behaviour rather

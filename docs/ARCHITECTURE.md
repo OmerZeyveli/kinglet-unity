@@ -42,8 +42,14 @@ process-chain wave traded two commands for two skills. The **hook counts here ar
 guarded** by the same file — see "How Hooks Work" below, which says so 150 lines down; this sentence
 claimed the opposite until 2026-08-14, because the commit that added the guard and the commit that
 documented it were the first and last of one task and neither reread this one. **The rule count is
-still hand-maintained and unguarded** — nothing derives `.claude/rules/*`, and that is the gap this
-parenthetical still names.)
+derived too — and still unguarded in this file.** `tests/test-derived-counts.sh:36` counts
+`.claude/rules/*.md` into `DCS_RULES`, but that guard's claim table carries a rules row for
+`README.md` and `docs/GETTING-STARTED.md` and none for `docs/ARCHITECTURE.md`. Measured 2026-08-14
+by mutation: changing the `6` above to `99` leaves `tests/test-derived-counts.sh` green, while the
+same change to the `8` on the agents line reds it, and the same change to
+`docs/GETTING-STARTED.md`'s rule count reds it. So the gap this parenthetical names is **a missing
+row, not a missing derivation** — it read "nothing derives `.claude/rules/*`" until 2026-08-14, in
+the same commit that added `DCS_RULES`.)
 
 Supporting files outside `.claude/`:
 
@@ -204,18 +210,25 @@ that every hook named there still exists.)
 
 ### Event Types
 
-These are the events this toolkit registers, not every event Claude Code emits. The set is asserted
-against `.claude/settings.json` in both directions by `tests/test-derived-counts.sh`: a row here that
-no registration uses, and a registration whose event has no row, both fail. `PreCompact` had a row
-here after its last registration was removed on 2026-08-13, twelve lines above a paragraph that said
-so.
+These are the events this toolkit registers, not every event Claude Code emits. The **first column**
+is asserted against `.claude/settings.json` in both directions by `tests/test-derived-counts.sh`: a
+row here that no registration uses, and a registration whose event has no row, both fail.
+`PreCompact` had a row here after its last registration was removed on 2026-08-13, twelve lines
+above a paragraph that said so.
+
+**The third column is read by nothing**, and it rotted exactly where you would expect. The `Stop`
+row read *"Validation, persistence, learning, notifications"* until 2026-08-14, having lost three of
+its four members without one word changing: validation was `stop-validate.sh`, learning was
+`auto-learn.sh` and `instinct-distill.sh`, notifications was `notify.sh`, and all four were removed
+on 2026-08-13 (`provenance-skip.tsv` carries each as `rule=absent`). `Stop` has one registration now,
+`session-save.sh`. Derive a cell before trusting it.
 
 | Event | When | Hook Types |
 |-------|------|------------|
 | PreToolUse | Before a tool executes | Blocking (exit 2) or allow (exit 0) |
 | PostToolUse | After a tool executes | Advisory warnings and tracking (exit 0) |
 | SessionStart | When a conversation begins | State restoration (exit 0) |
-| Stop | When the agent stops | Validation, persistence, learning, notifications (exit 0) |
+| Stop | When the agent stops | Persistence (exit 0) |
 
 ### Hook Summary
 
@@ -375,8 +388,26 @@ Every hook honours the overrides below. 11 of the 12 get them by sourcing a shar
 (`.claude/hooks/_lib.sh`); `session-brief.sh` implements the two kill switches inline and sources
 nothing, deliberately — it runs at `SessionStart`, and a library failure there is a session that does
 not start. This sentence read *"All hooks source a shared library"* until 2026-08-14, contradicting
-this file's own *"except one, which sources nothing"* 190 lines above, and at that point the
-exception honoured no kill switch at all.
+**`## How Hooks Work`**'s own *"`session-brief.sh` sources nothing and carries the two kill switches
+inline instead"*, and at that point the exception honoured no kill switch at all.
+
+**That correction cited the contradiction as a quotation its own commit had just deleted.** Until
+2026-08-14 the sentence above quoted *"except one, which sources nothing"* as **190 lines above**.
+Derived from history rather than from this file: `38dec6c` wrote that wording into `## How Hooks
+Work` (*"…except one, which sources nothing and therefore honours no kill switch"*, wrapped across
+two lines); `3b4cc85` **rewrote that sentence into the one quoted above and, in the same commit,
+quoted the wording it had just removed as this file's own**. The quotation was true for one commit
+and false from the commit that wrote it. The distance was never right — in `3b4cc85` the citing line
+is 378 and the real text is at 178, which is 200 lines, not 190.
+
+**Two rules come out of it.** *Cite by anchor, not by distance* — a line count is stale the next time
+anything above it is edited, and nothing here reads it: `tests/test-citations-resolve.sh` resolves
+`file:line` shapes and never compares quoted text against the location cited, so a quotation is the
+one kind of pointer this tree cannot check. And *flatten before concluding a string is absent* — a
+line-oriented `grep` for the full quoted phrase returns 0 at `3b4cc85^` while
+`tr '\n' ' ' | tr -s ' '` finds it, because the wrap falls between "sources" and "nothing". The same
+wrap-blindness hid the `minimal`-profile undercount in `docs/HOOK-REFERENCE.md`, and it is how a
+sweep talks itself into "this file has never said that".
 
 ```
 DISABLE_UNITY_HOOKS=1              All hooks exit 0 immediately
@@ -430,7 +461,7 @@ Session state is persisted in the `.claude/state/` directory (falls back to `/tm
 | `session.json` | Full session state for restore | `session-save.sh` |
 | `session-start-time` | Epoch timestamp for duration calculation | `session-restore.sh` |
 | `session-edits.txt` | Files edited during session | `track-edits.sh` |
-| `session-warnings.txt` | Hook warnings for analytics | Various hooks |
+| `session-warnings.txt` | Hook warnings for analytics | `bash-gate.sh` |
 
 `_lib.sh` still defines paths for `gateguard-reads.txt`, `session-cost.jsonl`, `learnings.jsonl` and
 `notify-event.json`, and `session-restore.sh` still clears three of them at session start, but the

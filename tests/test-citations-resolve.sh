@@ -4,11 +4,17 @@
 #
 # WHAT WENT WRONG. This repository cites itself constantly: a test comment points at the install.sh
 # line it is about, a document points at the assertion that guards it. Nothing ever checked that any
-# of those pointers still landed where the prose said. Swept on 2026-08-14, seventeen live pointers
+# of those pointers still landed where the prose said. Swept on 2026-08-14, NINETEEN live pointers
 # had rotted — six heredoc introducers that a `--help` insertion pushed down by one to thirteen
 # lines, three copies of `tests/test-no-mobile.sh:96` that had come to rest on a comment about
-# SIGPIPE, two `provenance.tsv:71` that had come to rest on a different row's checksum, one
-# `provenance.tsv:555` past the end of a 551-line file, and two that had landed on a BLANK LINE.
+# SIGPIPE, two `provenance.tsv:71` that had come to rest on a different row's checksum, two
+# settings.json explanations, five bare self-citations, and one `provenance.tsv:555` past the end of
+# a 551-line file. That adds to 19, which is the figure the bullet below derives.
+#
+# UNTIL 2026-08-14 THIS PARAGRAPH WAS WRONG THREE TIMES OVER: it read "seventeen", over an
+# enumeration that added to 14, and it claimed two blank-line landings where the measurement below
+# finds one. Three underived numbers in the opening paragraph of the file whose subject is underived
+# numbers, disagreeing with the derived bullet 30 lines down.
 #
 # THE ENUMERATION IS THE HARD PART, NOT THE RESOLUTION. The obvious pattern —
 # `[A-Za-z0-9_./-]+\.(sh|md|tsv|json):[0-9]+` — cannot see a bare `:NNN` self-citation, cannot see a
@@ -32,21 +38,25 @@
 #     plausible line passes — which is what a shift of a few lines inside a file almost always is.
 #
 #     MEASURED, NOT ESTIMATED. The 2026-08-14 sweep repaired 19 rotted live pointers by hand. Run
-#     this guard against the pre-repair tree and it catches exactly ONE of them — `provenance.tsv:555`,
-#     which was past the end of a 551-line file. The other eighteen — six heredoc introducers, three
-#     copies of a test-no-mobile line, two provenance rows, two settings.json explanations and five
-#     bare self-citations — all landed in range and on real, non-blank text. Re-derive rather than
-#     trusting this paragraph:
+#     this guard against the pre-repair tree and it catches exactly TWO of them: `provenance.tsv:555`,
+#     past the end of a 551-line file, and `tests/test-shipped-citations.sh:154`, which had come to
+#     rest on a BLANK LINE. The other seventeen — six heredoc introducers, three copies of a
+#     test-no-mobile line, two provenance rows, two settings.json explanations and four more bare
+#     self-citations — all landed in range and on real, non-blank text. The same run reports two
+#     further unresolved hits on `Assets/Scripts/Existing.cs:123`, a fictional user-project path in a
+#     plan template — not rotted pointers, and repaired since by dropping the number. Re-derive
+#     rather than trusting this paragraph:
 #
 #       git archive <pre-repair-rev> | tar -x -C /tmp/base && cp tests/test-citations-resolve.sh /tmp/base/tests/
 #       cd /tmp/base && git init -q . && git add -A && bash tests/test-citations-resolve.sh
 #
 #     So: this guard closes the out-of-range and blank-line cases outright, and catches roughly one
-#     rotted pointer in nineteen. The durable repair is to cite by anchor and drop the number, which
+#     rotted pointer in ten. The durable repair is to cite by anchor and drop the number, which
 #     is what most of the 2026-08-14 repairs did — the guard is the floor under that habit, not a
-#     substitute for it. An earlier version of this bullet claimed "two of the seventeen", which was
-#     wrong twice over: the count was underived (the enumeration adds to 19) and the coverage claim
-#     overstated by about sixteen times. In the file whose subject is underived counts.
+#     substitute for it. Two earlier versions of this bullet were both wrong, in opposite directions:
+#     the first said "two of the seventeen" were the slid-onto-a-plausible-line cases, implying this
+#     guard caught the other fifteen; the correction of that overshot to "exactly ONE", dropping the
+#     blank-line catch — the one case the guard is unambiguously good at. Neither was run.
 #   * IT CANNOT SEE A CITATION IT DOES NOT ENUMERATE. A fifth shape may exist. The fourth — a dotfile
 #     citation, `.gitignore:43` — was found by a reviewer while this bullet said "a fourth shape
 #     exists somewhere", and it was one line away in tests/test-pipeline-detector.sh.

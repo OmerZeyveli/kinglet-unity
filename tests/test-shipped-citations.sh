@@ -396,20 +396,37 @@ fi
 #
 # WHAT THIS DOES NOT COVER, and it is deliberate, not an oversight. It reads ONE file. The payload
 # has 67 entries, 44 Markdown (rules 1-3) and 23 not; this is one of the 23. Applying the same
-# criterion to the other 22 leaves SIX unmarked repository-only paths, all naming `tests/` files,
-# which never install: five in `.claude/hooks/bash-gate.sh` and one in `.claude/hooks/_lib.sh`. Both
-# are pre-existing. It was nine across four files until 2026-08-14; the other three were written by
-# the task that added this rule, in `.claude/hooks/session-brief.sh` and
+# criterion to the other 22 leaves FIFTEEN unmarked repository-only citation sites, twelve of them
+# naming `tests/` files, which never install. Split by directory, and the split is the finding:
+#
+#   SIX in `.claude/hooks/`   -- five in bash-gate.sh, one in _lib.sh. Pre-existing.
+#   NINE in `.claude/scripts/` -- detect-missing-refs.sh, detect-pipeline.sh, generate-claude-md.sh
+#                                 x2, studio-doctor.sh x3, validate-asmdefs.sh,
+#                                 validate-serialization.sh.
+#
+# THIS COMMENT SAID SIX UNTIL 2026-08-14, AND THE SIX IT NAMED ARE EXACTLY THE HOOKS SUBSET -- the
+# nine it missed are exactly the scripts one, for the reason rule 3's own header states three
+# paragraphs up: `.claude/scripts/` DOES NOT EXIST IN THIS REPOSITORY. It is built at install time
+# by copying repository-root `scripts/*.sh`, so a hand-sweep of the `.claude/` tree cannot see those
+# six files, and the note written directly beneath rule 3 reproduced rule 3's own blind spot.
+# Derive; do not sweep by eye. It was nine across four files before that; three of those were
+# written by the task that added this rule, in `.claude/hooks/session-brief.sh` and
 # `.claude/settings.local.json.template`, and are marked now -- which is also what makes the marker
-# wording canonical, the precondition for widening. Widening is a separate change: it needs a
-# decision about `install.sh` and `uninstall.sh`, which the payload does not contain but which are
-# legitimately named as the commands a user ran.
+# wording canonical, the precondition for widening.
 #
-# Re-derive the six rather than trusting this comment -- the criterion is the whole of it:
+# WIDENING IS A SEPARATE CHANGE, and the criterion it needs is EXEMPT BY ROLE, NOT BY MARKER:
+# `install.sh` and `uninstall.sh` are not in the payload, yet a shipped file naming them is naming
+# the command the user ran, not a dangling pointer. The same holds for a script's own
+# `./scripts/<self>.sh` usage string. Both are excluded from the fifteen above. That ruling lived
+# only in the wave ledger until 2026-08-14, where a widening pass would never have opened it.
 #
-#   for every non-Markdown payload file, every `*.tsv|md|sh|json` token naming a real file here
+# Re-derive the fifteen rather than trusting this comment -- the criterion is the whole of it:
+#
+#   for every non-Markdown payload file except this rule's own subject, every `*.tsv|md|sh|json`
+#   token naming a real file here -- reading `.claude/scripts/X` as repository `scripts/X` --
 #   that is neither in the payload nor a project-root file install.sh writes, on a line whose
-#   following text does not say `not installed`.
+#   following text does not say `not installed`, excluding install.sh, uninstall.sh, and each
+#   script's own usage string.
 UP_FILE="$REPO/.claude/UPSTREAM"
 
 # What an installed reader can open: the payload, plus the project-root files install.sh writes

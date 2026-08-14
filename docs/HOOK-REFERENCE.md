@@ -80,8 +80,16 @@ The `standard` profile is the default. Each profile includes all hooks from lowe
 declared `strict` was removed on 2026-08-13, on the measured ground that `UNITY_HOOK_PROFILE` is set
 nowhere in `settings.json`, `install.sh` or `scripts/` — so `standard` is the only profile that has
 ever been active, and those seven hooks exited 0 before their first line on every session this
-toolkit has shipped. The tier still doing work is `minimal`, which drops the four warning and session
-hooks that declare `standard`.
+toolkit has shipped. The tier still doing work is `minimal`, which drops 8 of the 12 hooks — every
+hook declaring `standard`, and that is not the same set as "the warning hooks". Three are `warn-*`
+and two are `session-*`; the other three are `track-edits` and **both `PreToolUse` guards,
+`bash-gate` and `guard-project-config`**. Until 2026-08-14 this sentence read "the four warning and
+session hooks", which was wrong in the number (four is the size of the *keeps* list below) and wrong
+in the kind. The membership is the marked region above; derive it rather than trusting either:
+
+```bash
+grep -l '^HOOK_PROFILE_LEVEL="\(standard\|strict\)"' .claude/hooks/*.sh
+```
 
 ---
 
@@ -260,7 +268,20 @@ one was not, in the same file. The library provides:
 - **State directory resolution** -- finds `.claude/state/` or falls back to `/tmp/unity-claude-hooks`
 - **Shared file paths** -- `UNITY_SESSION_FILE`, `UNITY_READS_FILE`, `UNITY_EDITS_FILE`, `UNITY_COST_FILE`, `UNITY_LEARNING_FILE`, `UNITY_WARNINGS_FILE`
 - **`unity_hook_block()`** -- replaces direct `exit 2` in blocking hooks; respects `UNITY_HOOK_MODE=warn`
-- **`unity_track_edit()`** / **`unity_track_read()`** -- append to tracking files
-- **`unity_was_read()`** -- check if a file was previously read (used by GateGuard)
+- **`unity_track_edit()`** -- append an edited path to the edit-tracking file; `track-edits.sh` calls it
+- **`unity_track_warning()`** -- record a hook warning for session analytics; `bash-gate.sh` is its only caller
+- **`advisory_exit_guard()`** -- for hooks whose contract is "advisory, exit 0 always"
+
+**Defined but dead**, and listed here so this section is not read as a menu of live services.
+None of the six has a caller anywhere in the tree; `_lib.sh` states the reason at the definitions and
+carries the command to re-derive the set:
+
+- **`unity_track_read()`** -- its caller was `track-reads.sh`, removed 2026-08-13
+- **`unity_was_read()`** -- its caller was `gateguard.sh`, removed 2026-08-13
 - **`unity_state_read()`** / **`unity_state_write()`** -- read/write keys in `session.json`
-- **`unity_track_warning()`** -- record a hook warning for session analytics
+- **`unity_project_hash()`**, **`unity_state_plan_update()`**
+
+Until 2026-08-14 the first four sat in the live list above, and `unity_was_read()` was credited to
+`GateGuard` in the present tense — a hook this toolkit deleted. The lowercase spelling had already
+been scrubbed from this file; the capitalised one survived because the sweep was keyed on the
+filename.

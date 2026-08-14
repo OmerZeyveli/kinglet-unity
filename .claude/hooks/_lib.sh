@@ -138,14 +138,33 @@ unity_track_edit() {
     fi
 }
 
-# unity_track_read / unity_was_read — DEAD as of 2026-08-13, with NO caller and NO test coverage.
+# SIX FUNCTIONS IN THIS LIBRARY ARE DEAD as of 2026-08-13, with NO caller and NO test coverage.
+# This comment named TWO of them until 2026-08-14 — as a closed list, which is the direction that
+# rots unsafely: a reader takes "the dead ones are these" as the whole answer and stops looking.
 #
-# unity_track_read's only caller was track-reads.sh; unity_was_read's only caller was gateguard.sh.
-# Both hooks were removed by the surface criterion, and `grep -rn 'unity_track_read\|unity_was_read'
-# tests/` returns nothing — no test references either function, so deleting the pair would break
-# nothing this suite asserts.
+#   unity_track_read        (here)  — only caller was track-reads.sh
+#   unity_was_read          (below) — only caller was gateguard.sh
+#   unity_project_hash      (above) — no reference anywhere in the tree, not even a document
+#   unity_state_read        (below) — named only by the hook reference, which is not installed
+#   unity_state_write       (below) — same
+#   unity_state_plan_update (below) — no reference anywhere in the tree, not even a document
 #
-# They are retained only because retiring them is a decision about this library's surface rather than
+# Their callers were the hooks the surface criterion removed: track-reads.sh, gateguard.sh, the
+# instinct-* pair, pre-compact.sh, stop-validate.sh, quality-gate.sh. What is still LIVE is the
+# other four: unity_hook_block (every blocking hook), unity_track_edit (track-edits.sh),
+# unity_track_warning (bash-gate.sh, and it is the only caller), advisory_exit_guard (the warn
+# hooks) — plus the two leading-underscore helpers this file calls itself.
+#
+# DERIVE THE SET; DO NOT TRUST THIS LIST EITHER. The scope has to exclude this file, or the list
+# below matches itself and every dead function reads as referenced:
+#
+#   for f in $(grep -oE '^[a-z_]+\(\)' .claude/hooks/_lib.sh | tr -d '()'); do
+#     printf '%-24s %s\n' "$f" \
+#       "$(grep -rn --include='*.sh' --include='*.md' --include='*.tsv' -- "$f" . \
+#          | grep -vc '^\./\.claude/hooks/_lib\.sh:')"
+#   done
+#
+# All six are retained because retiring them is a decision about this library's surface rather than
 # a side effect of the hook cut, and nothing forced it. UNITY_READS_FILE below is a separate case:
 # tests/test-state.sh does read it, so that variable is not free to remove alongside them.
 unity_track_read() {

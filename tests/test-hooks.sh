@@ -150,13 +150,28 @@ assert_eq "0" "$EXIT_CODE" "track-edits exits 0"
 # `source` STATEMENT, not whether that statement RUNS. Wrap a hook's source line in a never-true
 # conditional and it is still classified as a sourcer: it stays out of the inline-derived set, so
 # nothing probes it, and it is not the hook probe 1 uses, so nothing else covers it either.
-# Measured on `warn-filename.sh` with `if [ "1" = "2" ]; then source …; fi` -- rc=0 and ZERO BYTES of
-# output with no switch set, with `DISABLE_UNITY_HOOKS=1`, and with `DISABLE_HOOK_WARN_FILENAME=1`,
-# and this whole file reports 0 failures. The kill-switch property is vacuously satisfied because
-# the hook does nothing at all in every state. WHAT IS LOST IS THE HOOK, NOT THE SWITCH -- a
-# distinction no probe framed as "is it silent when disabled" can draw, because silence is the
-# passing condition. Closing it needs a per-hook positive: proof that each hook still ACTS when no
-# switch is set. Probe 1 is that proof for one hook; the rest are covered only by their own
+# MEASURED ON `warn-filename.sh` with `if [ "1" = "2" ]; then source …; fi`, against a payload that
+# actually triggers it -- `Assets/Player.cs` carrying `public class Enemy : MonoBehaviour`:
+#
+#                  no switch     DISABLE_UNITY_HOOKS=1   DISABLE_HOOK_WARN_FILENAME=1
+#     pristine     rc=0, 296 B   rc=0, 0 B               rc=0, 0 B
+#     mutant       rc=0, 296 B   rc=0, 296 B             rc=0, 296 B
+#
+# THE HOOK IS NOT LOST. IT STILL WARNS. WHAT IS LOST IS THE SWITCH: a user who sets
+# `DISABLE_UNITY_HOOKS=1` gets hook output anyway, which is the direction that matters. This comment
+# recorded the exact opposite until 2026-08-14 -- "rc=0 and ZERO BYTES of output" in all three
+# states, therefore "WHAT IS LOST IS THE HOOK, NOT THE SWITCH" -- and the inference built on it fell
+# with it. A switch-shaped probe DOES catch this: against a non-silent baseline the mutant fails to
+# go silent.
+#
+# THE ZERO-BYTES READING CAN ONLY HAVE COME FROM A PAYLOAD THAT PRODUCED NO OUTPUT ON THE PRISTINE
+# HOOK EITHER -- comparing silence with silence, which is the error this file warns against twice,
+# committed in the paragraph explaining why the error is unavoidable. The rule that pays for it: A
+# PROBE WHOSE PASSING CONDITION IS SILENCE MUST FIRST PROVE ITS OWN BASELINE IS NOT SILENT. That is
+# also the per-hook positive this file still lacks -- proof that each hook ACTS when no switch is
+# set, which is what makes "silent when disabled" mean anything.
+#
+# Probe 1 is that proof for one hook; the rest are covered only by their own
 # behaviour assertions elsewhere in the suite, and TWO HOOKS ARE NAMED BY NO TEST FILE AT ALL --
 # `warn-platform-defines.sh` and `warn-serialization.sh`. The second is the hook whose absence is the
 # silent-data-loss case `.claude/rules/serialization.md` opens with, and which
