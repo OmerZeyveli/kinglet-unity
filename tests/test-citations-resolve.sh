@@ -86,24 +86,45 @@
 #     tracks a single `.md` — they were one file away from the same hole, not outside it.
 #     The element is now `:(glob)*.md`. See the depth note at the pathspec itself.
 #   * THE FLOOR BELOW IS A THRESHOLD, NOT A SCOPE CHECK, AND IT DOES NOT DETECT LOST COVERAGE.
-#     `LIVE_N >= 30` fires only when the pathspec collapses under thirty files. It cannot see a
-#     NARROWING, and that is a property of comparing against a CONSTANT rather than of the constant's
-#     value — a narrowing leaves the count above the threshold by construction, so raising 30 does
-#     not close it and is the wrong instrument.
+#     The floor compares `LIVE_N` against a constant, so it catches a narrowing that falls BELOW the
+#     constant and misses one that does not. Raising the constant MOVES that line; it does not remove
+#     it. Measured 2026-08-14 against the pathspec below: a floor of 100 catches the `.claude/*` drop
+#     at 63 and still misses the `docs/*.md` drop at 119. NO CONSTANT CLOSES THE CLASS, because for
+#     any constant there is a smaller narrowing above it — that, and not the size of whatever
+#     constant is in the code today, is why a bigger number is the wrong instrument.
 #
-#     HOW MUCH IT MISSES WAS MEASURED, 2026-08-14, and it is worse than "does not catch a narrowing".
+#     HOW MUCH IT MISSES WAS MEASURED, 2026-08-14, and it is worse than "misses a small narrowing".
 #     Delete the `.claude/*` element from the pathspec below — the entire shipped payload, half the
 #     live set — and run this file. Every one of its five assertions still passes. The only counter
 #     that moves at all is shape C, by two, and BOTH of those are exemption-table rows, so the
-#     resolved-citation count does not move either: 26 before, 26 after. This guard cannot tell that
-#     half its subject stopped existing. Re-derive rather than trusting these figures: delete an
-#     element, and diff the `sweep read`, `A=/B=/C=/D=` and `resolved` lines against a pristine run.
+#     resolved-citation count does not move either: 26 before, 26 after.
+#
+#     AND AN UNMOVED COUNTER IS NOT PROOF THERE WAS NOTHING TO LOSE, so that is not where this rests.
+#     Plant a rotted pointer inside the dropped tree and the capability loss is direct: appending
+#     `<!-- probe: see .claude/NOTICE.md:999999 -->` to `.claude/rules/pc-console.md` fails this
+#     guard, by name, with `that file has 199 lines`, RC=1. Drop `.claude/*` from the pathspec and
+#     the identical tree goes fully green, RC=0, without mentioning the pointer at all. The 62 files
+#     were CHECKABLE, not merely counted — real detection disappears and nothing in the output says
+#     so. Re-derive rather than trusting any of these figures: delete an element, and diff the
+#     `sweep read`, `A=/B=/C=/D=` and `resolved` lines against a pristine run.
 #
 #     UNTIL 2026-08-14 THIS BULLET READ "a live set of 141", while the bullet above it had been
 #     corrected in the same commit to 125 — two figures for the same quantity in one comment block,
 #     in the file whose whole subject is numbers that rot where they were written. 141 was not even
-#     the old value: the pre-anchor measurement is 142. No set size is transcribed here now, which is
-#     the only version of this sentence that cannot go stale again.
+#     the old value: the pre-anchor measurement is 142. No set size is transcribed here now.
+#
+#     AND THE REPLACEMENT WAS FALSE, which is why this paragraph is longer than the fix. It read "a
+#     narrowing leaves the count above the threshold by construction, so raising 30 does not close
+#     it". Both halves were falsified by execution the same day. Narrow the pathspec to
+#     `scripts/*.sh install.sh uninstall.sh :(glob)*.md provenance*.tsv` and `LIVE_N` is 17: the
+#     floor FIRES, RC=1, so a narrowing plainly can go below it. And raising the floor to 100 catches
+#     the `.claude/*` drop this bullet uses as its own worked example. A stale NUMBER was replaced
+#     with a confident ARGUMENT, and the argument was wrong — in the bullet describing this guard's
+#     own coverage, in the file whose subject is exactly that. The surviving claim is the one above,
+#     which quantifies over all constants rather than reasoning about any one of them. Note also that
+#     nothing here now depends on the constant's value, because Task 5 owns it: an earlier draft of
+#     this bullet transcribed `30` three times, so changing the code would have rotted the prose in
+#     three places while every test stayed green.
 #   * IT CANNOT TELL A POINTER FROM A NARRATIVE. That judgement is the exemption table, written by
 #     hand, and a wrong row silences a real pointer. Each row names the exact token it exempts, so a
 #     wrong row silences one citation rather than a line.
