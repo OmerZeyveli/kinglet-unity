@@ -287,10 +287,32 @@ find_exec_is_read_only() {
 # The basename is computed in awk and capped at 64 characters so that bash never has to run a
 # `${x##*/}` over a megabyte-long token — that expansion is the pathological operation above.
 # A header of `!!` is the unparseable marker and its value line is the reason.
+#
+# TWO MODES, ONE SCANNER. `mode=meta` answers a single question — does any token in this
+# command, ONCE DEQUOTED, name .meta files — and prints `1` or `0` and nothing else. It exists
+# so the route decision below can ask the parser instead of asking a regex about the raw string
+# (see THE ROUTE IS DECIDED FROM TOKENS, below). It is a mode rather than a second function
+# because a second function would be a second quote model, and this file has already paid for
+# having two ideas about the same string.
 find_exec_tokens() {
-    printf '%s' "$1" | LC_ALL=C awk '
+    printf '%s' "$1" | LC_ALL=C awk -v mode="${2:-}" '
+        # Does this dequoted value name .meta files? `.meta` outright, or `.meta` with glob
+        # metacharacters standing inside it — `*.m*eta` is what `"*.m"*"eta"` dequotes to, and
+        # it is a real glob that really does match Player.cs.meta. The cheap containment test
+        # runs first because it is the spelling almost every real command uses.
+        function meta_ref(v,   s) {
+            if (index(v, ".meta") > 0) return 1
+            if (v !~ /[*?]/) return 0
+            s = v; gsub(/[*?]/, "", s)
+            return index(s, ".meta") > 0
+        }
         function emit(   L, c) {
             if (!started) return
+            if (mode == "meta") {
+                if (meta_ref(tok)) hit = 1
+                tok = ""; started = 0; q = 0; b = 0
+                return
+            }
             L = length(tok)
             if (L <= 512) { c = tok; sub(/^.*\//, "", c) } else { c = substr(tok, 1, 64) }
             print (q ? "q" : "-") (b ? "b" : "-") " " L " " substr(c, 1, 64)
@@ -298,7 +320,7 @@ find_exec_tokens() {
             tok = ""; started = 0; q = 0; b = 0
         }
         BEGIN { SQ = "\047"; DQ = "\042"; BS = "\\"; st = 0; tok = ""; started = 0
-                q = 0; b = 0; bad = "" }
+                q = 0; b = 0; bad = ""; hit = 0 }
         {
             line = $0; n = length(line); i = 1; cont = 0
             while (i <= n) {
@@ -334,6 +356,17 @@ find_exec_tokens() {
             if (st == 0) { if (!cont) emit() } else { tok = tok " " }
         }
         END {
+            # meta mode answers before the unparseable machinery, and it deliberately does NOT
+            # treat an unparseable command as a .meta reference. Every construct that sets
+            # `bad` — `$(...)`, a backtick, `$'\''...'\''` — appears in ordinary commands that
+            # have nothing to do with Assets/, and routing on it would send every one of them
+            # into a classification that ends in a block. Unparseable still blocks, but only
+            # once the route has been established on a token that really does name .meta.
+            if (mode == "meta") {
+                if (started && meta_ref(tok)) hit = 1   # a token left pending by an open quote
+                print (hit ? "1" : "0")
+                exit
+            }
             if (st != 0) bad = "unterminated-quote"
             else emit()
             if (bad != "") { print "!! 0 !!"; print bad }
@@ -484,6 +517,43 @@ tokeniser-failed"
                 -*|*=*|'{}'*|';'|'+') continue ;;
             esac
             cmd="$cand"                            # /usr/bin/rm -> rm, computed in awk
+            # THE ALLOWLIST VOUCHES FOR A NAME, SO THE NAME HAS TO BE ONE IT CAN VOUCH FOR.
+            # `grep` on the read-only list means "the grep I expect". Reducing every path to
+            # its basename handed that vouching to anything whose LAST PATH COMPONENT happened
+            # to spell an allowlisted name, wherever it came from. Executed, not reasoned: a
+            # real program at ./evil/grep that rewrites its arguments, run as
+            # `find Assets -name '*.meta' -exec ./evil/grep -l guid {} \;`, destroyed all three
+            # .meta files (119 B -> 6 B) with this gate returning 0. /tmp/evil/grep is the same.
+            #
+            # So a path-qualified command keeps its PATH as its name unless the directory is one
+            # the table can actually speak for, and no allowlist entry contains a `/`, so the
+            # full path falls through to the unlisted arm and blocks. The message then names the
+            # path the user actually wrote, which is the true statement.
+            #
+            # THE TRUSTED SET IS /bin AND /usr/bin, COMPARED WHOLE. `/usr/bin/grep` is a
+            # spelling careful people write on purpose — this repository's own guide mandates
+            # it, and 56 such spellings are in its tracked tree — so rejecting every `/` would
+            # charge a block for following the house style. The comparison is against the exact
+            # string `/usr/bin/<basename>`, not a `/usr/bin/*` prefix glob, because
+            # `/usr/bin/../../tmp/evil/grep` matches that glob and is not in /usr/bin at all.
+            #
+            # DELIBERATELY NOT TRUSTED: /usr/local/bin and /opt/homebrew/bin, where a macOS host
+            # keeps gsed, gawk, yq and rg. Both are user-writable on the very platform this
+            # toolkit plans to support next, and the cost of leaving them out is one
+            # first-attempt block on a read that spells such a tool with its full path — while
+            # the cost of putting them in is vouching for whatever a session dropped there.
+            # Bare `gsed` is unaffected; only the path-qualified spelling pays.
+            #
+            # `command -v` was the third option and it is the wrong one here: it resolves
+            # through PATH, which is attacker-controlled in exactly the scenario this defends
+            # against, and on this host `command -v grep` prints `grep` because a shell function
+            # shadows the binary — an identity test that cannot even name the file it resolved.
+            case "$tok" in
+                */*)
+                    if [ "$tok" != "/bin/$cand" ] && [ "$tok" != "/usr/bin/$cand" ]; then
+                        cmd="$tok"
+                    fi ;;
+            esac
             case "$cmd" in
                 # The same prefix vocabulary CMD_START uses: these run the NEXT word.
                 env|sudo|doas|nice|nohup|command|time|exec|'') continue ;;
@@ -511,8 +581,106 @@ tokeniser-failed"
     return 0
 }
 
-if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
-    if grep -qE '(^|[^A-Za-z0-9_-])-delete([[:space:]]|$)' <<< "$COMMAND"; then
+# ============================================================================================
+# THE ROUTE IS DECIDED FROM TOKENS, NOT FROM A REGEX OVER THE RAW STRING.
+#
+# This line used to read `grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta"`, and it was
+# the same defect the tokeniser above exists to fix, one level UP: the decision about WHICH
+# commands get parsed was itself taken by a quote-blind regex, so a name split across quotes
+# never reached the parser that would have resolved it. Measured at r3 (546870f), r4 (06883cc),
+# r5 (3fd22dc) and task 2b (c050743) — all four permitted, all three verified to rewrite the
+# guid line of all three real .meta files they were handed:
+#
+#     find Assets -name "*.m"*"eta" -exec sed -i s/a/b/ {} \;      dequotes to *.m*eta
+#     find Assets -name '*.met'a   -exec sed -i s/a/b/ {} \;      dequotes to *.meta
+#     ls Assets/*.meta | xargs sed -i s/a/b/                       no `find` anywhere
+#
+# THE CLASS, not those spellings: **a glob whose literal text is split by quoting**. There are
+# unboundedly many spellings of it — `'*.m'eta`, `*.me"ta"`, `"*.me""ta"`, `'*.m''eta'`,
+# `*.me\ta`, `'*.'meta`, and the same trick on `-path` or on a bare path argument — and each one
+# dequotes to a glob that matches every .meta file in the tree. Widening the regex to catch them
+# would have been the fourth iteration of chasing spellings that this file's history is made of.
+#
+# So the question moved to where the answer already lives: `find_exec_tokens ... meta` asks the
+# quote model whether any DEQUOTED token names .meta files. `"*.m"*"eta"` becomes `*.m*eta`,
+# `'*.met'a` becomes `*.meta`, and both answer yes.
+#
+# THE `find` REQUIREMENT IS GONE TOO, and that is a second hole rather than a side effect. The
+# old precondition demanded the word `find`, but `find_exec_commands` has always understood the
+# xargs route as well, so `ls Assets/*.meta | xargs sed -i` reached nothing that could classify
+# it. `SAME_CMD`'s `[^;&|]*` bound went with it: it required the .meta reference and the word
+# `find` to sit in the same pipeline segment, so `find Assets | grep .meta | xargs sed -i` was
+# permitted too.
+#
+# WHAT THIS COSTS, measured rather than assumed, end to end through the hook on this host:
+#
+#                                        task 2b   pre-filter   here
+#   ordinary short command                 33 ms      33 ms     36 ms
+#   an ordinary read naming Assets/        41 ms      39 ms     35 ms
+#   a read-only find over .meta            38 ms      41 ms     40 ms
+#   a 128 KB command with no .meta in it   87 ms      88 ms    145 ms
+#   a 1 MB command with no .meta in it    567 ms     552 ms   1 088 ms
+#
+# The scan is one extra `LC_ALL=C awk` pass over the command on EVERY Bash call. On the commands
+# anyone actually types it is inside the run-to-run noise; the whole cost sits in command lines
+# measured in megabytes, where it stays about 9x under this file's asserted 10 000 ms ceiling.
+#
+# THE PRE-FILTER COLUMN IS THE OPTION THAT WAS REJECTED, and it was rejected on a measurement
+# rather than on taste. Putting a cheap raw-string test — "does it mention find, xargs or
+# Assets/?" — in front of the scan saves ~520 ms on a 1 MB command and nothing at all on a
+# short one, and it buys back a hole of exactly the kind being closed here, because a raw-string
+# test is quote-blind by construction. Executed against real files:
+#
+#     ls Packages/*.me\ta | x\args sed -i s/guid/XXXX/
+#
+# rewrites all three .meta files it is handed. It contains no `find`, no literal `xargs`
+# (`x\args` runs xargs), no `Assets/` and no literal `.meta` — so the pre-filter rejects it and
+# the scan never runs. Measured: 0 with the pre-filter, 2 without it. A second quote-blind
+# precondition in front of the one being removed is not worth 520 ms on a command line nobody
+# types.
+#
+# WHAT IT DOES NOT CLOSE, all four executed against real .meta files and all four destructive:
+#   - a token that names .meta files without spelling them — `-name '*.me*'`, `-name '*'`. The
+#     route tracks what a token SAYS after dequoting, not what it will MATCH after globbing, and
+#     nothing here models the filesystem.
+#   - a variable that expands to the glob. Unchanged from every version; see the quote model's
+#     header.
+#   - a QUOTED INTRODUCER. `-'e'xec` and `| 'xargs' -0` reach the shell and find as `-exec` and
+#     `xargs`, and find_exec_commands refuses to read a token carrying a quote run as an
+#     introducer — task 2b's deliberate trade, which is what stops a quoted `xargs` inside a
+#     grep pattern from introducing a command. This is the same defect class as the one above,
+#     one word over, and closing it is a judgement this task was not given. It is recorded in
+#     tests/test-bash-gate-precision.sh with a payload and an `H` marker rather than left in a
+#     report nobody reads next time.
+#   - the DIRECT shape (`rm 'Assets/Player.cs.met'a`). That arm is a raw-regex denylist over
+#     command position and the split-literal class walks past it exactly as it did here.
+#     Executed, it deleted one of three real .meta files. Fixing it means tokenising command
+#     position too, which is a bigger change than either judgement this task was given.
+#
+# A FAILED SCAN COUNTS AS A HIT. An `||`, because a bare assignment from a failing command
+# substitution is fatal under `set -e` and would take the hook down before it classified
+# anything; the value it falls back to is the one that keeps parsing rather than the one that
+# stops. The tokeniser then fails again inside find_exec_commands and the command is classified
+# unparseable, which blocks.
+#
+# AND THIS WIDENS AN INHERITED FAILURE, WHICH IS SAID HERE RATHER THAN LEFT TO BE FOUND. With a
+# deliberately broken `awk` on PATH, this file exits 3 — a hook error, which the harness reports
+# and then lets the tool run. Task 2b's version did that only on the commands it classified;
+# this one does it on EVERY command, because the scan is what became universal. The dying is not
+# here: it is further down at the two-stage gate's own `awk` in CMD_HASH, a line this task did
+# not touch, where `set -e` reaches a bare assignment. Measured on this host: task 2b exits 3 on
+# a destructive .meta payload and 0 on `echo hello`; this version exits 3 on both; flipping the
+# fallback above to `0` exits 0 on both, which is a silent permit and strictly worse. The
+# assertion that holds this direction is in tests/test-bash-gate-precision.sh, and no corpus
+# payload can reach it — the scan fails on the environment, not on anything a command can say.
+# ============================================================================================
+META_ROUTE="$(find_exec_tokens "$COMMAND" meta)" || META_ROUTE="1"
+if [ "$META_ROUTE" = "1" ]; then
+    # `-delete` is find's own flag, so this arm still asks for a `find`. Without that the arm
+    # fires on any command that merely carries the word next to a .meta path — `grep -- -delete
+    # Assets/x.meta` is a read — and it would report a deletion that nothing is doing.
+    if grep -qE "${CMD_START}find[[:space:]]" <<< "$COMMAND" \
+       && grep -qE '(^|[^A-Za-z0-9_-])-delete([[:space:]]|$)' <<< "$COMMAND"; then
         # find's own flag. Unambiguous, so the precise message is free here.
         DANGER_KIND="meta-deletion"
         DANGER_MSG="$META_DEL_MSG"
@@ -551,8 +719,13 @@ if grep -qE "${CMD_START}find[[:space:]]+${SAME_CMD}\.meta" <<< "$COMMAND"; then
             # than "not a read-only command". The second is a claim about the command and the
             # gate cannot make it: for `git log` it is simply false. The first is a claim about
             # the gate, which is the only thing it actually knows.
+            #
+            # "This command runs", not "This find runs". The route no longer requires a `find`
+            # — `ls Assets/*.meta | xargs sed -i` reaches here now — and a sentence that names a
+            # program the user did not write is the same kind of false confidence as a category
+            # the gate cannot establish.
             DANGER_KIND="meta-mutation"
-            DANGER_MSG="This find runs '${META_EXEC}' over .meta files, and '${META_EXEC}' is not on this gate's read-only list. .meta files hold the GUIDs every scene, prefab and ScriptableObject reference resolves through — deleting, renaming or rewriting them breaks those references silently."
+            DANGER_MSG="This command runs '${META_EXEC}' over .meta files, and '${META_EXEC}' is not on this gate's read-only list. .meta files hold the GUIDs every scene, prefab and ScriptableObject reference resolves through — deleting, renaming or rewriting them breaks those references silently."
         fi
     fi
 fi
