@@ -1183,6 +1183,27 @@ ADDRESSED, none returned to the fix loop.**
   form once 4b makes the installer decline a malformed pair**, since the guarantee will then hold for
   every run that merges anything.
 
+**From Task 8's implementation (2026-08-14, `c55f220`, in review).**
+
+98. **No agent in the tree gates on anything, and that is wider than the plan asked about.** The
+    brief expected the two builder agents to have no approval gate; a widened probe
+    (`approval|gate|precondition|before you (start|begin|write)|docs/features`) across **all eight**
+    `.claude/agents/*.md` exits 1. Both builders go **straight from their skill list to writing**,
+    holding `mcp__UnityMCP__*`. **So row 11 did all three things `unity-brainstorming`'s HARD-GATE
+    withholds.** *This is a fact about the agent layer, not about two commands.* **→ open, no owner.**
+99. **`using-kinglet` behaves OPPOSITE to `unity-brainstorming` under the same guard, and the
+    difference decides where an argument can live.** `UK_SECTIONS_EXPECTED` is a **five-heading
+    inventory**, so a new heading **reds** here — measured — where `unity-brainstorming` has no
+    inventory and a new heading was invisible (which is what Task 9's whole approach rested on).
+    **Two sibling skills, one guard, opposite affordances.** Also measured: a thirteenth table row
+    reds, and unbackticked prose in the Surface column reds via the residue rule. **That is why Task
+    8's argument lives in the command bodies rather than in the skill.**
+100. **The second exemption is named and deliberately not listed.** Row 4 — *a written plan handed
+     over to be executed → `unity-planning` first* — skips `unity-brainstorming` entirely. **Adding
+     it to a list would falsify the skill's own frozen sentence that it has exactly one exemption,
+     and would build the artifact the skill explicitly refuses to build.** Row 4 left alone; whether
+     it is legitimate or a hole is **a design question above this task**. **→ open, no owner.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
