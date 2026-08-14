@@ -1421,6 +1421,41 @@ ADDRESSED, none returned to the fix loop.**
      clean `toolkit` row **is pruned by the same run**, so "the file survived" cannot be satisfied by
      a run in which nothing happened at all.
 
+**From Task 2c's fix-round re-review (2026-08-14). Approved; one documentation-only round in flight.**
+
+136. **Class membership decided by EXECUTION, not by reasoning about the matcher — 840 candidates,
+     776 real members, 0 permitted.** The reviewer generated `* ? [ ] \` and `**` at every position
+     of `.meta`, crossed with single / double / bare quoting, crossed with `-name` / `-path` /
+     `-delete` / `xargs`, ran every one against a real fixture, and **kept only those that actually
+     damaged files.** 648 of the 776 are newly blocked by this round. *This is the strongest form of
+     the class-derivation instrument seen in the wave: reasoning about `fnmatch` produces a
+     membership, running it produces the membership.* Two candidates it kept out are instructive —
+     a bracket containing `\` does **no damage** (blocking it is a safe over-approximation) and an
+     **unclosed `[`** does none either, so **permitting it is correct, not a hole.**
+137. **The portability trap's consequence is worse than "a hole", and the reviewer said it better:**
+     *"in this hook that is not a hole, it is the gate switching off"* — a fatal awk means the scan
+     fails, and the hook then exits **3 silently on every command**, which is non-blocking. Four of
+     five awks fatal; busybox alone accepts. **The near-miss is now guarded by the corpus** (a
+     mutation replacing the wildcard with a delete reds 2), not only by one interpreter disagreeing.
+138. **A new false positive nobody measured: the wildcard rewrite matches five consecutive
+     metacharacters with no literal surviving.** `find logs -name '*.log' -exec sed -i
+     's/[abc][def][ghi][jkl][mno]/x/' {} \;` → **2**, touching no `.meta` file — five bracket
+     expressions **inside a sed script**. And an odd asymmetry: **`-name '?????'` blocks while
+     `-name '*'`, which matches every `.meta` file, is a disclosed permit.** Direction is right and
+     retriable. → documentation round.
+139. **The provenance note shipped wrong numbers for the second consecutive round, and NOTHING
+     ASSERTS THEM.** `256 -> 321` / `65 added` against a measured **325** / **69**. The controller's
+     own dispatch said "with the base numbers asserted" and **that was false of the tree**:
+     `/usr/bin/grep` over `tests/` finds no assertion on any of those figures, and
+     `tests/test-derived-counts.sh` reads only provenance's status split. **A stale note reds
+     nothing — which is exactly why it went stale twice.** *The reusable half is the absence of the
+     guard, not the numbers.*
+140. **The quoted introducer now also defeats the new identity check.** `| ./evil/'xargs' -0 grep -l
+     guid` → **0, 3 of 3 rewritten**, same for `'./evil/xargs'` and `"./evil/xargs"`: **a quote
+     anywhere in the introducer token means it is never read as an introducer, so the trusted-path
+     check is never consulted.** Class still correctly deferred; **its consequence widened and the
+     disclosure had not.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
