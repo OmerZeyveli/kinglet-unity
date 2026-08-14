@@ -1359,6 +1359,41 @@ ADDRESSED, none returned to the fix loop.**
      chain ~230 chars in** where `/unity-ui`'s sits right after the noun list — stylistic, since the
      opening clause survives truncation in both. **→ open.**
 
+**From Task 2c's fix round 1 (2026-08-14, `20aa2b7`, in re-review).**
+
+124. **The implementer's own diagnosis, and it is the wave's thesis turned on its author:** *"Both
+     Criticals are the same sentence twice — a class is not a list of spellings, and I shipped a list
+     twice. That is the failure mode my own §8 names, found in the deliverable."*
+125. **Extending the stripped metacharacter set was measured to be the WRONG fix.** Each
+     metacharacter needs its own semantics: `*` and `\` are **deleted** (zero-width / escape), while
+     `?` and a bracket expression each match **exactly one** character and must become a
+     **wildcard**. **Deleting `?` turns `*.m?ta` into `.mta` and loses a real match** — caught only
+     because **busybox awk disagreed with the other four** on a test case. *The obvious repair to a
+     character-class bug is to widen the class, and here that was the bug.*
+126. **A runtime death nearly shipped inside the fix for the hole.** The natural character class
+     `"[][*?" BS "]"` **ends in an escaped bracket that never closes**: `gawk`, `gawk --posix`,
+     `gawk --traditional` and `mawk` **all die at runtime; busybox accepts it.** Every pattern is now
+     a dynamic string, verified 26 token values × five awks in both directions. **A portability
+     death in this hook is worse than any hole it closes**, and only one of five interpreters would
+     have shown it.
+127. **The ruling on Critical 2 was to fix rather than defer, on a consistency argument worth
+     keeping:** *"Admitting a program as an introducer **is** vouching for it. Deferring a six-line
+     application of a rule I had just argued for would be inconsistent."*
+128. **A damage probe agreed with its author, twice in one task.** The first `evil/xargs` harness
+     rewrote only **named arguments**, so every pipeline payload came back `unchanged` — rebuilt to
+     consume stdin, all three destroy. *Seventh measured instance in this wave of a result that meant
+     something other than what it looked like.*
+129. **A disagreement that was never a disagreement.** The reviewer's `N3a` and the implementer's
+     `N3a` **removed different lines**; the reviewer's is the implementer's `N1a`, red 2 on exactly
+     the reviewer's two payloads. **The measurement never disagreed — the label did**, and it read as
+     the containment line. **Every mutant now carries the line it removes.**
+130. **Two sweep branches came back at zero and both got payloads, with the distinction stated:**
+     `M2b` reddened nothing **because every payload also carried a `*`** — and the added `?` payload
+     **does not discriminate it**, *"since a payload that fails to discriminate is what the sweep
+     exists to find."* `X2a` is the documented single-site no-op, recorded as a **shape**
+     discriminator because it is not destructive as written. `M2a` **stays 0 and is unobservable by
+     construction.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
