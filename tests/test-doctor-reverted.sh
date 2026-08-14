@@ -29,7 +29,8 @@
 #   6  a LIVE edit, with a checkout            still modified: the anti-"everything is reverted" arm
 #   7  the summary line, on every run above    Task 3's `/unity-doctor` contract survives the change
 #   8  --toolkit-dir's own argument handling   a missing value and a non-checkout both exit 2
-#   9  --toolkit-dir pointed at the project    refused: there, every file equals itself
+#   9  --toolkit-dir pointed at the project    refused: there, every file equals itself —
+#                                             including its symlinked and relative spellings
 #
 # WHAT THIS FILE CANNOT SEE
 #   * install.sh's side of the same comparison. tests/test-install-ownership.sh states R…R4 own it,
@@ -43,6 +44,12 @@
 #     direction that must find NOTHING — an installed project, where `dirname $0`/.. is
 #     <project>/.claude — is covered implicitly by assertion 2 running the project's own copy, and
 #     would go red there as a false "reverted" rather than by name.
+#   * What `-ef` cannot see, in assertion 9's guard. It compares device and inode, so it catches
+#     symlinks, relative spellings and symlinked parents — all asserted — and it would catch a bind
+#     mount, which shares the underlying st_dev. It would NOT catch two genuinely distinct copies of
+#     the same tree (an rsync, a second clone, an overlay upper layer): those have different inodes
+#     and are, correctly, different directories, but a COPY of the project passed as --toolkit-dir
+#     produces the same fail-open with nothing to detect it by. Only the identity case is closed.
 #   * Anything about Claude Code. This drives a shell script against a synthetic project.
 # ============================================================================
 # Self-contained: own `set -euo pipefail`, own pass/fail, REPO from BASH_SOURCE. The runner's
@@ -304,6 +311,59 @@ if [ "$SELFREL_RC" -eq 2 ] && has "$SELFREL_OUT" 'is the project itself'; then
   pass "9: …and a relative spelling of the same directory is refused too, because both sides are resolved before they are compared"
 else
   fail "9: a relative spelling of the project dir exited $SELFREL_RC saying '$SELFREL_OUT' — the comparison reads the raw argument, not the resolved path"
+fi
+
+# ── 9, the symlink class: `cd`+`pwd` resolves LOGICALLY, so it does not close it ──
+# `cd <symlink-to-project> && pwd` prints the symlink's own path where `pwd -P` would print the
+# project's, so a STRING comparison of two resolved paths still misses every symlinked spelling.
+# Measured 2026-08-14 against the `!=` form on a project holding a live edit: four aliases each
+# rc=0, unrefused, each reporting that edit as reverted. The guard is `-ef` — same device and inode
+# — which compares what the names point AT, and these three arms are why that is asserted rather
+# than argued.
+#
+# Arms rather than one, because the aliasing can be on either side and at either level: the toolkit
+# given as a symlink, the PROJECT given as that symlink (so the string differs the other way round),
+# and either reached through a symlinked parent, which no per-argument check would catch.
+SYM_LINK="$SCRATCH/link-to-still-edited"
+SYM_PARENT="$SCRATCH/link-to-scratch"
+ln -s "$EPROJ" "$SYM_LINK"
+ln -s "$SCRATCH" "$SYM_PARENT"
+
+# sym_arm <label> <project-dir> <toolkit-dir> — both must be refused and neither may claim a revert.
+sym_arm() {
+  local label="$1"
+  local pdir="$2"
+  local tdir="$3"
+  local rc=0
+  local out
+  out="$(bash "$REPO/scripts/studio-doctor.sh" --project-dir "$pdir" --toolkit-dir "$tdir" 2>&1)" || rc=$?
+  if [ "$rc" -eq 2 ] && has "$out" 'is the project itself'; then
+    pass "9: $label is refused — a symlinked spelling of the project is still the project"
+  else
+    fail "9: $label exited $rc unrefused; cd+pwd resolves logically, so a string comparison of the two resolved paths does not see it"
+  fi
+  if has "$out" "$REV_HDR"; then
+    fail "9: …and $label reported the live edit as reverted, which is the fail-open this refusal exists to prevent"
+  else
+    pass "9: …and $label printed no reverted line about the live edit it holds"
+  fi
+  return 0
+}
+sym_arm "a symlink passed as --toolkit-dir"        "$EPROJ"    "$SYM_LINK"
+sym_arm "the project passed as that symlink"       "$SYM_LINK" "$EPROJ"
+sym_arm "--toolkit-dir through a symlinked parent" "$EPROJ"    "$SYM_PARENT/still-edited"
+
+# THE CONTROL THAT KEEPS ALL OF 9 FROM BEING SATISFIED BY A GUARD THAT REFUSES EVERYTHING. `-ef` is
+# a broader test than `!=`, so the direction that must NOT move is a real checkout still being
+# accepted — and accepted through a symlink of its own, which is how a checkout is commonly reached.
+SYM_TK="$SCRATCH/link-to-checkout"
+ln -s "$REPO" "$SYM_TK"
+SYMOK_RC=0
+SYMOK_OUT="$(bash "$REPO/scripts/studio-doctor.sh" --project-dir "$EPROJ" --toolkit-dir "$SYM_TK" 2>&1)" || SYMOK_RC=$?
+if [ "$SYMOK_RC" -ne 2 ] && grep -qxF -- "       $REL" <<< "$(doctor_block "$SYMOK_OUT" "$MOD_HDR")"; then
+  pass "9: …while a symlink to the real checkout is still ACCEPTED and still calls the live edit modified — the guard did not become 'refuse everything'"
+else
+  fail "9: a symlink to the real checkout exited $SYMOK_RC and did not report the live edit as modified — the refusal is too broad and the flag no longer works through a symlinked checkout"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1

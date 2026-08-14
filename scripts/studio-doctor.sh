@@ -112,13 +112,27 @@ if [ -n "$TOOLKIT_DIR" ]; then
   # with `-` is read as an option by bash's builtin printf, which reported
   # `printf: --: invalid option` on the very line meant to explain the refusal. The message is data,
   # so it travels as an argument.
-  [ "$TOOLKIT_DIR" != "$PROJECT_DIR" ] \
+  #
+  # `-ef` (SAME DEVICE AND INODE), NOT `!=`, AND THE DIFFERENCE IS A WHOLE CLASS. Both sides have
+  # been through `cd`+`pwd`, but that resolution is LOGICAL, not physical: `cd <symlink-to-project>
+  # && pwd` prints the symlink's own path where `pwd -P` would print the project's. A string
+  # comparison therefore catches only textual spellings, and four aliases walked straight past it —
+  # measured 2026-08-14 on a project holding a live edit, each rc=0, unrefused, and each reporting
+  # that edit as reverted: a symlink passed as --toolkit-dir, the project passed as that symlink, and
+  # either side reached through a symlinked parent. `-ef` compares what the two names actually point
+  # at, so every spelling of one directory is one directory. It is a `test` primary in bash and in
+  # POSIX, so it is safe on 3.2. Asserted in tests/test-doctor-reverted.sh's assertion 9.
+  [ ! "$TOOLKIT_DIR" -ef "$PROJECT_DIR" ] \
     || { printf '%s\n' "--toolkit-dir is the project itself: $TOOLKIT_DIR" >&2
          printf '%s\n' "Every file would equal itself, so every file you have edited would be reported as put back." >&2
          exit 2; }
 else
+  # `-ef` here too, for the same reason and to keep the two branches one rule rather than two. This
+  # side declines silently — a default that does not resolve is not an error — but it must decline
+  # the same set the explicit branch refuses, or the guard's coverage depends on which way the user
+  # invoked it.
   TOOLKIT_CAND="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)" || TOOLKIT_CAND=""
-  if [ -n "$TOOLKIT_CAND" ] && [ -f "$TOOLKIT_CAND/.claude/VERSION" ] && [ "$TOOLKIT_CAND" != "$PROJECT_DIR" ]; then
+  if [ -n "$TOOLKIT_CAND" ] && [ -f "$TOOLKIT_CAND/.claude/VERSION" ] && [ ! "$TOOLKIT_CAND" -ef "$PROJECT_DIR" ]; then
     TOOLKIT_DIR="$TOOLKIT_CAND"
   fi
 fi
