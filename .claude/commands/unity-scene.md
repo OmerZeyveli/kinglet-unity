@@ -16,6 +16,37 @@ args: scene_description
 
 Build or modify a scene based on the description: **$ARGUMENTS**
 
+## Precondition: the approved design this command does not create
+
+This command is the build step for a scene a design already specifies. It is not where a scene gets
+decided. `unity-scene-builder` holds `mcp__UnityMCP__*`, and
+`.claude/skills/unity-brainstorming/SKILL.md` withholds every MCP write call — scene, prefab and
+ScriptableObject included — until a design has been presented and approved. A single MCP call
+mutates state no test can restore, which is why the gate sits before the dispatch and not after it.
+
+Run this yourself, here, before the agent starts:
+
+```bash
+ls -1 docs/features/*/design.md 2>/dev/null || true
+```
+
+- **Nothing listed** — this project has no written design at all. Stop. Go to
+  `.claude/skills/unity-brainstorming/SKILL.md` and come back with one. Do not dispatch the agent.
+- **Something listed** — open the one that covers this scene and build what it specifies. If none of
+  them covers it, that is the same stop.
+
+If the scene is a throwaway built to try a mechanic rather than an addition the project will keep,
+it is not this command at all — `/unity-prototype` runs its own round instead. That choice is made
+before the work starts and cannot be taken from part-way in.
+
+**Why here and not in the agent.** `unity-scene-builder`'s tools are `Skill, Read, Glob, Grep,
+mcp__UnityMCP__*` — no `Bash`, so it cannot run that check. This command body is executed by the
+session that dispatches it, which is where the check can actually run.
+
+**What the check cannot tell you.** A file on disk records a design; it does not record an approval,
+and it does not know which scene you were asked for. Both halves are yours to establish before
+dispatching — the listing is a necessary condition, never a sufficient one.
+
 ## Workflow
 
 Use the `unity-scene-builder` agent to:
@@ -50,5 +81,10 @@ Report the complete scene structure when done.
 
 When this command finishes, name the next step and offer it. Do not take it.
 
-Offer `/unity-prototype` if the scene is throwaway; otherwise offer
-`.claude/skills/unity-brainstorming/SKILL.md`, which is where work on the real project starts.
+Offer `.claude/skills/verification-before-completion/SKILL.md` — a built scene is unverified work
+until something confirms it loads and plays as the design says.
+
+Both of the surfaces this section used to offer belong before the dispatch, not after it, and they
+are stated above as preconditions: `.claude/skills/unity-brainstorming/SKILL.md` is where a scene
+gets designed, and `/unity-prototype` is where a throwaway one goes instead. Offering either here
+would be offering the gate to a session that has already driven through it.

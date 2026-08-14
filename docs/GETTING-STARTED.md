@@ -200,12 +200,14 @@ See [MCP-SETUP.md](../MCP-SETUP.md) for detailed setup and troubleshooting.
 | `/unity-prototype "description"` | Creates a playable prototype from a text description |
 | `unity-brainstorming` (a skill, not a command) | The chain's entry for anything new: clarify requirements → plan → execute → verify, one skill handing to the next |
 | `/unity-fix` | Diagnoses and fixes bugs using console errors |
-| `/unity-scene "description"` | Builds a scene from a natural language description |
+| `/unity-scene "description"` | Builds a scene an approved design already specifies — a build step, not a first command (see below) |
 | `/unity-test` | Writes and runs EditMode/PlayMode tests |
 
 **To set the project up:** `/unity-init`, then `/unity-doctor` for a baseline. On a project that already has code, `/unity-review` is the safe next thing to run — it reads and reports, and changes nothing.
 
 **To build something:** don't type a command. Start at `unity-brainstorming`, which hands to `unity-planning`, where how the work gets executed is decided. The one exception is a throwaway scene made to try a mechanic — `/unity-prototype` — and that is a choice made before the work starts, never from part-way in.
+
+That applies to `/unity-scene` and `/unity-ui` above as much as to anything else. Both dispatch an agent that writes to your project through the MCP bridge, so both are the step that *builds* a screen or scene an approved design already specifies — never the step that decides one. Each states that precondition at the top of its own file.
 
 ---
 
