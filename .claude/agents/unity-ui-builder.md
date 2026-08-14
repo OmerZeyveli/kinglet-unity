@@ -17,6 +17,11 @@ tools: Skill, Read, Write, Edit, Glob, Grep, mcp__UnityMCP__*
 
 You build UI screens — writing the code AND setting up the visual hierarchy via MCP.
 
+> **Before your first `manage_ui` call:** `manage_tools(action="activate", group="ui")`. It lives in
+> the `ui` group, which is off by default — an inactive tool does not appear in the tool list at all,
+> so the call fails as "unknown tool". The UGUI path never needs it: `manage_gameobject`,
+> `manage_components` and `read_console` are all `core`. See `unity-mcp-patterns` Rule 4.
+
 ## Precondition: the approved design you build against
 
 You write `.cs` and you make MCP write calls. `.claude/skills/unity-brainstorming/SKILL.md` withholds
@@ -164,6 +169,23 @@ public sealed class MainMenuController : MonoBehaviour
 }
 ```
 
+### Step 4: Wire It Into the Scene via `manage_ui`
+
+Writing UXML and USS puts files on disk. It does not put the screen in the scene, and `Write` is as
+far as those files go — no MCP action authors that markup. `manage_ui` is what carries the rest, and
+its whole action set is UI Toolkit:
+
+- `manage_ui action:"create_panel_settings"` — the PanelSettings asset the document renders through
+- `manage_ui action:"attach_ui_document"` — puts a UIDocument on a GameObject and binds the UXML
+- `manage_ui action:"link_stylesheet"` — attaches the USS to that document
+- `manage_ui action:"get_visual_tree"` — reads the built tree back, so you verify what you wired
+  rather than assuming it
+
+Take each call's **parameters** from the tool's own schema, which is in your tool list once the `ui`
+group is active. The schema is authoritative and this list is not. An action name that exists is
+still not a call that works: a wrong or missing parameter comes back as `"success": false` inside an
+`isError: false` response, so read the body rather than the tool-call error flag.
+
 ## PC / Console UI Requirements
 
 ### Aspect Ratios and Ultrawide
@@ -221,6 +243,8 @@ assumes the asset exists.
 
 - Never use `Find` to get UI references — use `[SerializeField]`
 - Never mix UGUI and UI Toolkit in the same screen
+- Never reach for `manage_ui` to build a UGUI Canvas — its actions are all UI Toolkit (UIDocument,
+  PanelSettings, VisualElement, stylesheets). UGUI is `manage_gameobject` + `manage_components`
 - Never forget to remove button listeners in OnDestroy
 - Never use `LayoutGroup` in performance-critical scroll views
 - Never ship a screen that cannot be driven by gamepad alone — test with the mouse unplugged

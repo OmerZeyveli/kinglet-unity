@@ -116,10 +116,12 @@ SNAPSHOT_DATE="2026-08-14"
 
 # --- The snapshot. One `tool<TAB>action` row per verified action. -----------------------------
 #
-# `manage_profiler` is the tool's COMPLETE action list as the server reported it. `manage_graphics`
-# is its STATS family only (see the blind-spot list above). Every other row is an action that was
-# executed and answered on the day; those tools certainly have more actions than are listed, and
-# adding one means verifying it, not guessing it.
+# `manage_profiler` and `manage_ui` are those tools' COMPLETE action lists as the server reported
+# them — read off the live action enum, which is a weaker grade of evidence than execution and is
+# marked as such: an enum entry proves the name is accepted, never that a given call works (see the
+# `get_counters` blind spot above). `manage_graphics` is its STATS family only. Every other row is an
+# action that was executed and answered on the day; those tools certainly have more actions than are
+# listed, and adding one means verifying it, not guessing it.
 ALLOW="manage_profiler	ping
 manage_profiler	profiler_start
 manage_profiler	profiler_stop
@@ -138,6 +140,20 @@ manage_graphics	stats_get
 manage_graphics	stats_list_counters
 manage_graphics	stats_set_scene_debug
 manage_graphics	stats_get_memory
+manage_ui	ping
+manage_ui	create
+manage_ui	read
+manage_ui	update
+manage_ui	delete
+manage_ui	list
+manage_ui	attach_ui_document
+manage_ui	detach_ui_document
+manage_ui	create_panel_settings
+manage_ui	update_panel_settings
+manage_ui	get_visual_tree
+manage_ui	render_ui
+manage_ui	link_stylesheet
+manage_ui	modify_visual_element
 manage_tools	activate
 manage_scene	create
 manage_scene	validate
@@ -148,6 +164,7 @@ manage_components	add"
 # tool's rows reds by name instead of quietly shrinking the census (F8).
 SNAPSHOT_TOOLS="manage_profiler
 manage_graphics
+manage_ui
 manage_tools
 manage_scene
 manage_gameobject

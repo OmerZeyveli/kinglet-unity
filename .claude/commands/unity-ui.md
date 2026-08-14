@@ -52,14 +52,24 @@ same precondition in prose, because it can also be dispatched directly and then 
 
 Use the `unity-ui-builder` agent to:
 
+> **If the agent cannot be dispatched, do the work inline and say so.** A user or project setting
+> that forbids unrequested `Agent` calls outranks this command body, and that precedence is correct.
+> Run these steps yourself, load the skills `unity-ui-builder` lists under **Skills to load**, and
+> report that the work ran inline rather than in the agent.
+
 1. **Choose UI system** — UGUI (Canvas) or UI Toolkit based on project context
 2. **Plan the layout** — identify elements, hierarchy, interaction, styling
 3. **Write scripts:**
    - UGUI: MonoBehaviour with `[SerializeField]` Button/Text/Image references
    - UI Toolkit: UXML document + USS stylesheet + controller script
 4. **Build visual hierarchy** via MCP:
-   - UGUI: Canvas, panels, buttons, text via `manage_ui` + `manage_gameobject`
-   - UI Toolkit: write UXML/USS files, attach UIDocument component
+   - UGUI: Canvas, panels, buttons, text via `manage_gameobject` + `manage_components`, both in the
+     `core` tool group. **Not `manage_ui`** — its action set holds nothing that touches a Canvas, a
+     Button or a RectTransform.
+   - UI Toolkit: write the UXML and USS files yourself (no MCP tool authors that markup), then wire
+     them into the scene with `manage_ui` — `attach_ui_document`, `create_panel_settings`,
+     `link_stylesheet`. `manage_ui` is in the `ui` group, which is off by default; the agent
+     activates it before its first call.
 5. **Wire interactions** — button clicks, input fields, toggles
 6. **Verify** via `read_console`
 

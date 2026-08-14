@@ -372,9 +372,11 @@ public sealed class SaveManager
     private List<ISaveable> FindAllSaveables()
     {
         var result = new List<ISaveable>();
-        // FindObjectsOfType does not find interfaces directly, so find all MonoBehaviours
-        // and filter. For better performance, maintain a registry (see below).
-        foreach (var mb in FindObjectsOfType<MonoBehaviour>(true))
+        // FindObjectsByType does not find interfaces directly, so find all MonoBehaviours and
+        // filter. Include inactive objects — a disabled saveable still holds state. Sorting is the
+        // expensive half of this call and a save sweep has no use for an order, hence SortMode.None.
+        // For better performance, maintain a registry (see below).
+        foreach (var mb in FindObjectsByType<MonoBehaviour>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             if (mb is ISaveable saveable)
                 result.Add(saveable);

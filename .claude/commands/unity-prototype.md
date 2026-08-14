@@ -20,6 +20,11 @@ Create a playable prototype of: **$ARGUMENTS**
 
 Use the `unity-prototyper` agent to deliver a complete, playable prototype.
 
+> **If the agent cannot be dispatched, do the work inline and say so.** A user or project setting
+> that forbids unrequested `Agent` calls outranks this command body, and that precedence is correct.
+> Run these steps yourself, load the skills `unity-prototyper` lists under **Skills to load**, and
+> report that the work ran inline rather than in the agent.
+
 ### Step 1: Decompose
 Break the mechanic into:
 - Player systems (movement, abilities, input)

@@ -56,6 +56,11 @@ precondition in prose, because it can also be dispatched directly and then never
 
 Use the `unity-scene-builder` agent to:
 
+> **If the agent cannot be dispatched, do the work inline and say so.** A user or project setting
+> that forbids unrequested `Agent` calls outranks this command body, and that precedence is correct.
+> Run these steps yourself, load the skills `unity-scene-builder` lists under **Skills to load**, and
+> report that the work ran inline rather than in the agent.
+
 1. **Plan the scene** — identify GameObjects, components, hierarchy, lighting, and camera setup
 2. **Create or load scene** via `manage_scene` MCP (use templates: `3d_basic` or `2d_basic`)
 3. **Build hierarchy** using `batch_execute`:

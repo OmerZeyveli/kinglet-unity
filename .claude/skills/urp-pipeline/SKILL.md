@@ -62,6 +62,17 @@ public class URPQualityManager : MonoBehaviour
 
 Renderer Features let you inject custom rendering logic into URP's render pipeline.
 
+> **The two samples below are the Compatibility Mode path, and it is not the Unity 6 default.**
+> `ScriptableRenderPass.Execute` / `OnCameraSetup` / `RenderingData` only run when **Compatibility
+> Mode (Render Graph Disabled)** is ticked in Project Settings > Graphics; with URP 17's render graph
+> on — which is how a fresh Unity 6 project ships — URP calls `RecordRenderGraph` instead and these
+> overrides are never invoked. The code compiles either way, so the failure is a pass that silently
+> does nothing rather than an error. Unity's own 6000.0 manual states it plainly: *"Unity no longer
+> develops or improves the rendering path that doesn't use the render graph API. Use the render graph
+> API instead when developing new graphics features."* Before copying either sample, decide which
+> path this project is on, and read Unity's current render graph pass documentation for the other one
+> — it is not reproduced here, because nothing in this toolkit has executed it.
+
 ### Creating a Custom Renderer Feature
 
 ```csharp

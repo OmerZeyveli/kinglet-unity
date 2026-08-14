@@ -25,6 +25,11 @@ If no scope: identify the most critical untested code paths.
 
 Use the `unity-test-runner` agent to:
 
+> **If the agent cannot be dispatched, do the work inline and say so.** A user or project setting
+> that forbids unrequested `Agent` calls outranks this command body, and that precedence is correct.
+> Run these steps yourself, load the skills `unity-test-runner` lists under **Skills to load**, and
+> report that the work ran inline rather than in the agent.
+
 ### Step 1: Assess Test Coverage
 
 1. Find existing test assemblies (`.asmdef` files with test references)

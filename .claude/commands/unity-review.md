@@ -65,6 +65,11 @@ yours to catch.
 
 Use the `unity-reviewer` agent to check:
 
+> **If the agent cannot be dispatched, do the work inline and say so.** A user or project setting
+> that forbids unrequested `Agent` calls outranks this command body, and that precedence is correct.
+> Run these steps yourself, load the skills `unity-reviewer` lists under **Skills to load**, and
+> report that the work ran inline rather than in the agent.
+
 ### 1. Critical Issues (must fix)
 - `[SerializeField]` field renamed without `[FormerlySerializedAs]` (the script above is the
   history-aware half of this check; the agent still reads the code)

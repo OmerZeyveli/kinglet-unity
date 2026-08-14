@@ -20,6 +20,11 @@ Optimize the project's performance. Focus area: **$ARGUMENTS**
 
 Use the `unity-optimizer` agent to:
 
+> **If the agent cannot be dispatched, do the work inline and say so.** A user or project setting
+> that forbids unrequested `Agent` calls outranks this command body, and that precedence is correct.
+> Run these steps yourself, load the skills `unity-optimizer` lists under **Skills to load**, and
+> report that the work ran inline rather than in the agent.
+
 ### Step 1: Profile
 ```
 manage_profiler → start session, capture frame timing

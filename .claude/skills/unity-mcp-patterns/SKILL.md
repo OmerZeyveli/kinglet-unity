@@ -149,7 +149,8 @@ Tools marked **(group)** need `manage_tools(action="activate", group=...)` first
 | Materials | `manage_material` | create, assign, configure |
 | Shaders | `manage_shader` **(vfx)** | create, configure |
 | Animation | `manage_animation` **(animation)** | clips, controllers, states |
-| UI elements | `manage_ui` **(ui)** | create, layout, style |
+| UI Toolkit documents | `manage_ui` **(ui)** | attach_ui_document, create_panel_settings, link_stylesheet, get_visual_tree |
+| UGUI Canvas / widgets | `manage_gameobject` + `manage_components` | create, add, configure — `manage_ui` has no Canvas, Button or RectTransform action |
 | VFX | `manage_vfx` **(vfx)** | particles, effects |
 | Prefabs | `manage_prefabs` | create, instantiate, modify |
 | ScriptableObjects | `manage_scriptable_object` **(scripting_ext)** | create, edit |

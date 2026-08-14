@@ -183,6 +183,11 @@ public abstract class PlayerState : IState
 
 ### Idle State
 
+> Unity 6000.0 renamed `Rigidbody2D.velocity` to `linearVelocity` — the 6000.0 Scripting API lists
+> `linearVelocity` and no longer documents `velocity` at all (`drag` and `angularDrag` moved to
+> `linearDamping` / `angularDamping` in the same pass, on `Rigidbody` as well as `Rigidbody2D`). The
+> samples below use the current name; on 2022 LTS or older it is `velocity`.
+
 ```csharp
 public class PlayerIdleState : PlayerState
 {
@@ -192,7 +197,7 @@ public class PlayerIdleState : PlayerState
     public override void Enter()
     {
         Player.Animator.Play("Idle");
-        Player.Rb.velocity = new Vector2(0f, Player.Rb.velocity.y);
+        Player.Rb.linearVelocity = new Vector2(0f, Player.Rb.linearVelocity.y);
     }
 
     public override void Update()
@@ -241,14 +246,14 @@ public class PlayerJumpState : PlayerState
     public override void Update()
     {
         // Transition to fall when velocity turns downward
-        if (Player.Rb.velocity.y <= 0f)
+        if (Player.Rb.linearVelocity.y <= 0f)
         {
             StateMachine.ChangeState<PlayerFallState>();
             return;
         }
 
         // Variable jump height: cut velocity on release
-        if (Player.JumpReleased && Player.Rb.velocity.y > 0f)
+        if (Player.JumpReleased && Player.Rb.linearVelocity.y > 0f)
         {
             Player.CutJumpShort();
         }
