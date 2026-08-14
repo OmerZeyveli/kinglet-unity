@@ -34,7 +34,7 @@ this line.
 | Something is broken and the cause is not yet known | `systematic-debugging`, then `/unity-fix` |
 | Code was just written and is not yet verified | `verification-before-completion`, then `/unity-review` or `/unity-test` |
 | A performance complaint, or a "how is performance" check | `/unity-optimize` |
-| A UI screen, or a scene to build | `/unity-ui`, `/unity-scene` |
+| Building the UI screen or scene an approved design already specifies | `/unity-ui`, `/unity-scene` |
 | The setup itself may be wrong | `/unity-doctor` |
 
 A question about what the rules already state is answered from the rules — that is not work, and it

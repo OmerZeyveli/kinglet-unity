@@ -1,6 +1,6 @@
 ---
 name: unity-scene
-description: "Use when the user wants a scene built or reorganized — GameObjects, hierarchy, lighting, cameras, physics layers — entirely through the editor, not by hand-writing scene files. Prefer `/unity-prototype` when the request is a mechanic to try out in a new, disposable scene rather than work on the existing project."
+description: "Use after a design for the scene is approved — this is the build step for GameObjects, hierarchy, lighting, cameras and physics layers, worked entirely through the editor rather than by hand-writing scene files, and not where a scene gets decided. Prefer `/unity-prototype` when the request is a mechanic to try out in a new, disposable scene rather than work on the existing project."
 user-invocable: true
 args: scene_description
 ---
@@ -15,6 +15,42 @@ args: scene_description
 > session locked itself out of every MCP-driven agent it had.
 
 Build or modify a scene based on the description: **$ARGUMENTS**
+
+## Precondition: the approved design this command does not create
+
+This command is the build step for a scene a design already specifies. It is not where a scene gets
+decided. `unity-scene-builder` holds `mcp__UnityMCP__*`, and
+`.claude/skills/unity-brainstorming/SKILL.md` withholds every MCP write call — scene, prefab and
+ScriptableObject included — until a design has been presented and approved. A single MCP call
+mutates state no test can restore, which is why the gate sits before the dispatch and not after it.
+
+Run this yourself, here, before the agent starts:
+
+```bash
+ls -1 docs/features/*/design.md 2>/dev/null || true
+```
+
+- **Nothing listed** — this project has no written design at all. Stop. Go to
+  `.claude/skills/unity-brainstorming/SKILL.md` and come back with one. Do not dispatch the agent.
+- **Something listed** — open the one that covers this scene and build what it specifies. If none of
+  them covers it, that is the same stop.
+- **Listed, but you cannot point to where the user approved it** — ask, and wait for the answer
+  before dispatching. The gate turns on "presented **and** approved", and your own reading of the
+  file is not the approval.
+
+If the scene is a throwaway built to try a mechanic rather than an addition the project will keep,
+it is not this command at all — `/unity-prototype` runs its own round instead. That choice is made
+before the work starts and cannot be taken from part-way in.
+
+**What the listing cannot tell you.** It reports that a design exists. It does not report that this
+one covers the scene you were asked for, and it cannot report an approval at all — approval happens
+in the conversation, not on disk. The three branches above are how each of those is settled; the
+listing is a necessary condition, never a sufficient one.
+
+**Why here and not in the agent.** `unity-scene-builder`'s tools are `Skill, Read, Glob, Grep,
+mcp__UnityMCP__*` — no `Bash`, so it cannot run that check. This command body is executed by the
+session that dispatches it, which is where the check can actually run. The agent carries the same
+precondition in prose, because it can also be dispatched directly and then never sees this file.
 
 ## Workflow
 
@@ -50,5 +86,9 @@ Report the complete scene structure when done.
 
 When this command finishes, name the next step and offer it. Do not take it.
 
-Offer `/unity-prototype` if the scene is throwaway; otherwise offer
-`.claude/skills/unity-brainstorming/SKILL.md`, which is where work on the real project starts.
+Offer `.claude/skills/verification-before-completion/SKILL.md` — a built scene is unverified work
+until something confirms it loads and plays as the design says.
+
+Do not offer `.claude/skills/unity-brainstorming/SKILL.md` here. It is a precondition of this
+command, stated at the top, and offering it now would be offering the gate to a session that has
+already driven through it.
