@@ -642,6 +642,113 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 # computed from a COPY of the write's condition is a second definition of that condition, and a
 # second definition drifts. Call the predicate; never restate it.
 
+# ── The CLAUDE.md marker-pair decision ───────────────────────────────────────
+# WHICH CLAUDE.md BRANCH A RUN TAKES USED TO BE `grep -q kinglet:generated:begin`, IN TWO PLACES —
+# the dry run's announcement and Step 6's write — and both asked only whether the OPENING marker
+# exists. A file carrying a begin and no end satisfied that test, so the refresh arm ran its awk
+# merge against a region it could not close.
+#
+# What that costs is not a warning. The merge sets `skip` at the begin line and clears it ONLY at
+# the end line, so with no end line every remaining line of the user's file is dropped — and the
+# result is begin-only, so the NEXT run amputates the (now shorter) file again and reports success
+# again. Measured on a urp fixture at this commit: 122 lines / 4839 bytes -> 80 lines / 2746 bytes,
+# destroying five of the user's own sections, and byte-identical over runs 2, 3 and 4. The run
+# printed `ok Refreshed the generated section of CLAUDE.md (your prose untouched)`, which is the
+# half a user actually reads.
+#
+# The end-before-begin file is the same defect with a different silhouette and it is the reason the
+# fix is not "clear skip at EOF": there the merge clears `skip` at the end marker, prints the OLD
+# region as if it were prose, then sets `skip` at the begin marker and drops everything after it.
+# Measured on the same fixture: 123 lines / 4870 bytes -> 134 lines / 4385 bytes. It GREW by eleven
+# lines while losing four of the user's sections, which is why nothing here measures damage by size.
+#
+# SO THE PREDICATE ANSWERS FOR THE PAIR, NOT FOR THE OPENING MARKER, and a pair this function cannot
+# certify is one the installer declines to merge — the same posture it already takes toward a file
+# it does not own. Repair is deliberately not attempted: a file whose structure we cannot parse is a
+# file whose region boundary we would be guessing at, and the guess is applied to the user's prose.
+#
+# EXACTLY ONE OF EACH, IN ORDER. Two begin markers is not a harmless duplicate: the merge dumps the
+# facts block at each one and drops everything between the second and the next end. Fail closed.
+#
+# `awk` over the file, not `grep | ...`: nothing here may pipe into a reader that can exit early.
+#
+# IT ALWAYS EXITS 0 AND ALWAYS PRINTS A TOKEN. This comment claimed for one round that without the
+# `-r` guard an unreadable CLAUDE.md would kill the run at `X="$(claude_md_marker_state …)"`, after
+# the payload had landed, leaving the trap to write an INCOMPLETE receipt. THAT IS FALSE, AND IT WAS
+# FALSE FOR TWO INDEPENDENT REASONS, BOTH MEASURED against a `chmod 000` CLAUDE.md with the guard and
+# the `|| out=""` fallback both removed: rc **0**, the run completed, the receipt was written, and it
+# still declined — via the generic `do not form exactly one begin/end pair` message, because the
+# empty token satisfies the `!= none` test at the call site.
+#
+#   * `printf` is this function's LAST command, so the function's status is printf's, whatever awk
+#     did before it; and
+#   * bash CLEARS `-e` in the subshell it spawns for a command substitution unless `inherit_errexit`
+#     is on, so the failing assignment inside this function would not have ended the function even
+#     if printf were not last. Derive that this file sets no such option with the comments EXCLUDED —
+#     `awk '!/^[[:space:]]*#/ && /shopt/' install.sh` — because the naive `grep -n shopt` now matches
+#     the two lines you are reading and answers its own question wrongly.
+#
+# THE DEATH IS REAL IN EXACTLY TWO SHAPES, and they are worth naming because either could arrive by
+# an edit that looks like tidying. Both measured, rc=2, against the same chmod 000 fixture: a rewrite
+# that makes the failing ASSIGNMENT the function's last command (drop the trailing `printf` and let
+# `out=` fall out of the end), and this exact printf-last shape under `shopt -s inherit_errexit`.
+#
+# So the guard stays for what it actually buys, which is not survival: the correct `it exists but
+# could not be read` / `Make CLAUDE.md readable` pair instead of a marker diagnosis about a file
+# nobody could open, and immunity to the second shape above if this file ever gains inherit_errexit.
+# `unreadable` is a real state, not a fallback: it declines, like every other state this function
+# cannot certify.
+claude_md_marker_state() {
+  local out
+  [ -f "$1" ] || { printf 'absent\n'; return 0; }
+  [ -r "$1" ] || { printf 'unreadable\n'; return 0; }
+  out="$(awk '
+    /kinglet:generated:begin/ { b++; if (bl == 0) bl = NR }
+    /kinglet:generated:end/   { e++; if (el == 0) el = NR }
+    END {
+      if (b + 0 == 0 && e + 0 == 0)                    { print "none" }
+      else if (b + 0 == 1 && e + 0 == 1 && bl < el)    { print "wellformed" }
+      else if (e + 0 == 0)                             { print "malformed-no-end" }
+      else if (b + 0 == 0)                             { print "malformed-no-begin" }
+      else if (b + 0 == 1 && e + 0 == 1 && bl == el)   { print "malformed-same-line" }
+      else if (b + 0 == 1 && e + 0 == 1)               { print "malformed-order" }
+      else                                             { print "malformed-count" }
+    }
+  ' "$1" 2>/dev/null)" || out=""
+  [ -n "$out" ] || out="unreadable"
+  printf '%s\n' "$out"
+}
+
+# The user-facing half, kept beside the predicate so a new state cannot get a token and no sentence.
+# One clause, no trailing punctuation: all three call sites embed it mid-sentence.
+#
+# `malformed-same-line` HAS ITS OWN TOKEN BECAUSE IT HAD THE WRONG SENTENCE. One line carrying both
+# markers fails `bl < el` and used to fall through to `malformed-order`, which told the user their
+# end marker came before their begin marker — a statement about ordering that is not true of a single
+# line, on a file where the remedy sentence was nevertheless right. The action was never in question;
+# the diagnosis was, and a diagnosis a reader can check against their own file is the point of having
+# one at all.
+claude_md_marker_problem() {
+  case "$1" in
+    malformed-no-end)     printf 'its kinglet:generated:begin marker has no closing :end marker' ;;
+    malformed-no-begin)   printf 'its kinglet:generated:end marker has no opening :begin marker' ;;
+    malformed-same-line)  printf 'its kinglet:generated:begin and :end markers are on the same line' ;;
+    malformed-order)      printf 'its kinglet:generated:end marker comes before its :begin marker' ;;
+    unreadable)           printf 'it exists but could not be read' ;;
+    *)                    printf 'its kinglet:generated markers do not form exactly one begin/end pair' ;;
+  esac
+}
+
+# And the remedy, which is NOT the same sentence for every declined state — "repair the marker pair"
+# is wrong advice for a file the installer could not open. A whole sentence, naming the file: the
+# `Next steps` summary embeds it with no context around it.
+claude_md_marker_remedy() {
+  case "$1" in
+    unreadable) printf 'Make CLAUDE.md readable and re-run install.sh.' ;;
+    *)          printf 'Repair the kinglet:generated marker pair in CLAUDE.md — one :begin line, one :end line after it — then re-run install.sh.' ;;
+  esac
+}
+
 # ── The .gitignore decision ──────────────────────────────────────────────────
 # Ask git what it already ignores rather than grepping for our exact lines. A project that ignores
 # `/.claude/` wholesale — a perfectly sensible choice, and one real projects make — is already
@@ -813,10 +920,24 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # unconditionally, which is a lie in the one case that matters: against a project that already has
   # a CLAUDE.md, the real install writes CLAUDE.md.generated and leaves theirs alone. A dry run that
   # misreports the only step capable of destroying work is worse than having no dry run.
-  if [ ! -f "$PROJECT_DIR/CLAUDE.md" ]; then
+  #
+  # THE MALFORMED ARM IS HERE FOR THAT SENTENCE AND NOT FOR SYMMETRY. Both arms above used to be one
+  # `grep -q ...begin`, so a begin-only CLAUDE.md was announced as `refresh the generated section
+  # only; your prose untouched` by the dry run and then amputated by the real run — the dry run
+  # promising exactly the thing the real run destroyed, on the only step that can destroy work.
+  # `claude_md_marker_state` is called, not restated, for the reason this block's header gives.
+  DRY_MARKER_STATE="$(claude_md_marker_state "$PROJECT_DIR/CLAUDE.md")"
+  if [ "$DRY_MARKER_STATE" = absent ]; then
     printf '  CLAUDE.md (new — generated)\n'
-  elif grep -q 'kinglet:generated:begin' "$PROJECT_DIR/CLAUDE.md" 2>/dev/null; then
+  elif [ "$DRY_MARKER_STATE" = wellformed ]; then
     printf '  CLAUDE.md — refresh the generated section only; your prose untouched\n'
+  elif [ "$DRY_MARKER_STATE" != none ]; then
+    # ONE LINE, ONE PATH. This arm writes nothing at all — not CLAUDE.md, not CLAUDE.md.generated —
+    # so it names neither of the other two paths. `NOT touched` is one of the decline phrases
+    # tests/test-install-dryrun.sh recognises; a rewording that leaves that list reads as a PROMISE
+    # of a write this arm does not make.
+    printf '  CLAUDE.md — %s, so it is NOT touched and nothing is generated\n' \
+      "$(claude_md_marker_problem "$DRY_MARKER_STATE")"
   else
     # TWO FILES, TWO FATES, AND THIS ARM USED TO NAME ONE AND DESCRIBE THE OTHER:
     #
@@ -1334,17 +1455,26 @@ GEN="$SCRIPT_DIR/scripts/generate-claude-md.sh"
 # touched instead of assuming CLAUDE.md was (re)written. See defect 9: the installer already knows
 # this — it just wasn't asked.
 CLAUDE_MD_BRANCH="skipped"
+# The same predicate the dry run announced from, called rather than restated — see Step 3b. It is
+# read ONCE, here, and every arm below keys off the token: two calls could disagree only if
+# something between them rewrote the file, and the arms are what rewrite the file.
+CLAUDE_MD_MARKER_STATE="$(claude_md_marker_state "$CLAUDE_MD")"
 if [ -f "$GEN" ]; then
   TMP_MD=$(mktemp)
-  if [ ! -f "$CLAUDE_MD" ]; then
+  if [ "$CLAUDE_MD_MARKER_STATE" = absent ]; then
     if bash "$GEN" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       mv "$TMP_MD" "$CLAUDE_MD"; ok "Generated CLAUDE.md"
       CLAUDE_MD_BRANCH="new"
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md generation failed — skipped."
     fi
-  elif grep -q 'kinglet:generated:begin' "$CLAUDE_MD"; then
+  elif [ "$CLAUDE_MD_MARKER_STATE" = wellformed ]; then
     # Refresh only the fenced block; everything the user wrote stays byte-for-byte.
+    #
+    # THE CONDITION IS THE PAIR, NOT THE OPENING MARKER. `grep -q ...begin` stood here and let a file
+    # with no closing marker into this arm, where the awk below silently deleted every line under the
+    # region and then said `your prose untouched`. Step 3b's predicate holds the reasoning and the
+    # measurements; the malformed arm below is where such a file goes now.
     if bash "$GEN" --facts-only ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       # The generator owns every byte between the markers, heading included. This used to print the
       # "## Project Facts" heading here as well, from the era when --facts-only emitted only the
@@ -1352,9 +1482,18 @@ if [ -f "$GEN" ]; then
       # empty heading appearing on every refresh, compounding once per install; a real project was
       # found carrying two. Two producers for one region is the bug the generator's own comment
       # warns about, so this side prints nothing of its own.
+      #
+      # THE `end` RULE USED TO OPEN `print ""` AND THAT WAS THE SAME BUG, ONE BLANK LINE WIDE. The
+      # generator's emit_marked_region already ends in a blank line, and the fresh-file arm writes
+      # begin + that region + end with nothing added — so the refresh arm emitted the region one line
+      # LONGER than the arm it is supposed to reproduce. Measured on a urp fixture: 54 region lines on
+      # install 1, 55 from install 2 on, `cmp`-clean between runs 2/3 and 3/4 and prose outside
+      # byte-identical, so it was bounded rather than compounding. It was still a byte of the user's
+      # file that no run asked to change, and the first /unity-init after a refresh install normalised
+      # it away as a one-line `git diff` nobody requested. The rule now prints the end marker alone.
       awk -v factsfile="$TMP_MD" '
         /kinglet:generated:begin/ { print; while ((getline l < factsfile) > 0) print l; skip=1; next }
-        /kinglet:generated:end/   { print ""; print; skip=0; next }
+        /kinglet:generated:end/   { print; skip=0; next }
         !skip { print }
       ' "$CLAUDE_MD" > "$TMP_MD.merged" && mv "$TMP_MD.merged" "$CLAUDE_MD"
       rm -f "$TMP_MD"
@@ -1363,6 +1502,41 @@ if [ -f "$GEN" ]; then
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md refresh failed — left as-is."
     fi
+  elif [ "$CLAUDE_MD_MARKER_STATE" != none ]; then
+    # DECLINE, DO NOT REPAIR. This file has kinglet:generated markers, so it is not the marker-less
+    # case below; and it does not have a pair this installer can bound, so it is not the refresh case
+    # above.
+    #
+    # THE REPAIR THAT LOOKS OBVIOUS IS "CLEAR `skip` AT EOF", AND IT HAS TWO READINGS. BOTH WERE
+    # BUILT AND RUN; NEITHER IS A REPAIR.
+    #
+    #   * Literally — `END { skip = 0 }` — it is a NO-OP. awk's END block runs after the last line,
+    #     so there is nothing left for the flag to gate. Measured: the begin-only file still
+    #     amputates to 80 lines / 2746 bytes and the swapped file still walks 84f3ba1d -> 1c804997,
+    #     shas identical to the unrepaired installer. It fixes zero states, not one.
+    #   * Effectively — buffer the skipped lines and flush them at END when no end marker ever
+    #     arrived — it does save the user's prose, in BOTH malformed states. What it does instead is
+    #     promote the old region into that prose and re-emit the facts block on every run: begin-only
+    #     goes 124 -> 176 -> 228 lines with `## Project Facts` headings at 10 -> 11 -> 12, swapped
+    #     goes 125 -> 178 -> 231. It never converges, it never repairs the pair that caused it, and
+    #     it goes on printing `your prose untouched` while doing it.
+    #
+    # So the ground for declining is not "the repair still destroys work" — the second reading does
+    # not. It is that the repair is NON-CONVERGENT and permanently reinterprets toolkit-owned bytes
+    # as the user's prose: content this installer wrote inside its own markers becomes content it
+    # must never touch again, growing once per install, with the malformed pair still there.
+    # Declining leaves the file exactly as the user left it and names the one edit that ends the
+    # state.
+    #
+    # NOTHING IS WRITTEN — not CLAUDE.md, not CLAUDE.md.generated. The second is deliberate: this
+    # user's file already carries markers, so the beside-yours remedy ("paste the kinglet:generated
+    # markers into your CLAUDE.md") is advice that would give them a second stray marker. The remedy
+    # here is to repair the pair, and that is what the entry says.
+    rm -f "$TMP_MD"
+    warn "CLAUDE.md — $(claude_md_marker_problem "$CLAUDE_MD_MARKER_STATE"), so it was NOT touched."
+    warn "Nothing was merged into it and nothing was generated beside it."
+    warn "$(claude_md_marker_remedy "$CLAUDE_MD_MARKER_STATE")"
+    CLAUDE_MD_BRANCH="malformed"
   else
     # ASK BEFORE WRITING. The `mv` below used to be unconditional, and this is the arm where that
     # cost the user work — twice over, on two different fixtures:
@@ -1443,6 +1617,13 @@ fi
 # hear about is a contract nobody can script against. This entry is also SELF-CLEARING — the moment
 # the user takes its advice and adds the markers, the branch becomes `refreshed` and the entry stops —
 # which is the shape a recurring entry has to have to be worth printing.
+#
+# `malformed` IS HERE ON EXACTLY THE STATED CRITERION AND NOT ON A NEW ONE. The refresh this run was
+# asked for did not happen and no second artifact was written in its place, so the toolkit's project
+# facts are ABSENT from the only file Claude Code reads — the header's first clause, not the
+# edited-file exemption, which does not apply because the user chose nothing here: an unclosed marker
+# pair is what a half-finished hand-merge or a bad conflict resolution leaves behind. It is
+# self-clearing in the same way `separate` is: repair the pair and the next run is `refreshed`.
 case "$CLAUDE_MD_BRANCH" in
   skipped)
     note_not_done "CLAUDE.md — not generated, so this project has no toolkit configuration file and the FILL: markers never landed. The warn line above says which of the four ways it failed; re-run install.sh once that is fixed."
@@ -1452,6 +1633,9 @@ case "$CLAUDE_MD_BRANCH" in
     ;;
   separate)
     note_not_done "CLAUDE.md — yours has no generated markers, so the toolkit's configuration went to CLAUDE.md.generated beside it. Claude Code reads CLAUDE.md: none of it applies until you merge that block in, or paste the kinglet:generated markers into your CLAUDE.md and re-run to have it refreshed in place."
+    ;;
+  malformed)
+    note_not_done "CLAUDE.md — $(claude_md_marker_problem "$CLAUDE_MD_MARKER_STATE"), so the generated block was NOT refreshed and your file was left exactly as it was. $(claude_md_marker_remedy "$CLAUDE_MD_MARKER_STATE")"
     ;;
 esac
 
@@ -1885,6 +2069,13 @@ case "$CLAUDE_MD_BRANCH" in
   # markers — defect 9's failure with the files swapped.
   kept-yours)
     CLAUDE_MD_STEP='Your own CLAUDE.md.generated was kept — no generated file was produced. Rename or delete it and re-run to get one.'
+    ;;
+  # The other decline, and the reason it does not fall through to `*)`. That arm sends the reader to
+  # "the warning above" for a run whose warning is three lines long and names a repair; more to the
+  # point, `refreshed`'s line — "your own prose was left untouched" — is what this branch printed
+  # before the decline existed, on runs that had just deleted the prose.
+  malformed)
+    CLAUDE_MD_STEP="$(claude_md_marker_remedy "$CLAUDE_MD_MARKER_STATE") Nothing was written to it this run."
     ;;
   *)
     CLAUDE_MD_STEP='CLAUDE.md generation was skipped — see the warning above.'

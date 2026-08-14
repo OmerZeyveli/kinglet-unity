@@ -99,6 +99,19 @@
 #   R4  a toolkit whose copy moved on                      lands in the reclaimed project
 #   R5  a retired surface that cannot be hashed            NOT reclaimed, NOT pruned
 #
+# States S–S4 are the one project-root file with NO receipt row and no shipped copy: CLAUDE.md. Every
+# state above asks whose a file is; these ask whether the refresh arm may run at all. A CLAUDE.md
+# whose kinglet:generated markers do not form one ordered pair was merged anyway, and the merge
+# deleted every line below the region while printing `your prose untouched`. Their own header sits
+# above them.
+#
+#   S   a begin marker with no closing end     bytes survive two more installs, the run says why
+#   S2  an end marker with no opening begin    bytes survive, and the diagnosis is the right one
+#   S3  end before begin                       bytes survive — this one GREW while losing sections
+#   S3a both markers on one line               declined, and NOT diagnosed as an ordering fault
+#   S3b the dry run for S's project            promises nothing the real run declines
+#   S4  a well-formed pair, four installs      the refresh still runs, and is idempotent byte-for-byte
+#
 # WHAT THIS FILE CANNOT SEE
 #   * Named paths, not an enumeration. A–D assert MCP-SETUP.md and .mcp.json; E, F and J assert
 #     Packages/manifest.json.bak; I–I5 assert CLAUDE.md.generated. A FIFTH unrecorded project-root
@@ -119,7 +132,10 @@
 #     `--variant builtin` project, and the only one that passes `--with-input-system`. A–D, G, H and
 #     I–I5 pass no flag but `--yes`, and no fixture here is a git repository except F's, so every
 #     branch that turns on `git -C "$PROJECT_DIR"` takes its no-git side everywhere else. `--purge`
-#     is exercised in state G and nowhere else; `--dry-run` and `--keep-local` nowhere at all.
+#     is exercised in state G and nowhere else; `--dry-run` in state S3b and nowhere else, and there
+#     only to compare the announcement against the decline the real run makes for the same project —
+#     the dry run's own bidirectional oracle is tests/test-install-dryrun.sh's. `--keep-local` is
+#     exercised nowhere at all.
 #   * E and F use --with-mcp rather than --with-input-system because the urp fixture already carries
 #     com.unity.inputsystem, so that flag returns early and writes no backup. J is the state where
 #     both callers do reach the backup branch, and it asserts the ROW CARDINALITY only. What is
@@ -2555,6 +2571,290 @@ if [ -e "$R5_DIR/$R5_PRUNED" ]; then
   fail "R5: the retired surface with a clean 'toolkit' row was NOT removed — the orphan prune did not run against this fixture, so the two survival assertions above prove nothing"
 else
   pass "R5: …while a retired surface with a clean 'toolkit' row IS pruned by the same run, which is what makes the two above non-vacuous"
+fi
+
+# ── States S…S4: the marker pair, and the amputation it used to authorise ────
+# EVERY STATE ABOVE ASKS WHOSE A FILE IS. S–S4 ask a narrower question about the one project-root
+# file that has no receipt row at all: CLAUDE.md. It is never claimed, never removed by uninstall.sh,
+# and the installer nevertheless REWRITES it on most runs — the refresh arm merges the generated
+# block back into it in place. So the only oracle for that arm is the user's bytes, which is K's
+# oracle one file over.
+#
+# THE DEFECT. Both the dry run and the real run decided which arm to take with
+# `grep -q kinglet:generated:begin` — a test that asks about the OPENING marker and nothing else. The
+# merge awk sets `skip` at the begin line and clears it ONLY at the end line, so a file carrying a
+# begin and no end had every line below the region deleted, and the run said
+# `ok Refreshed the generated section of CLAUDE.md (your prose untouched)` while doing it. Measured
+# at 20c785b on a urp fixture: 122 lines / 4839 bytes -> 80 lines / 2746 bytes, five of the user's
+# own sections destroyed. The dry run for the same project announced
+# `CLAUDE.md — refresh the generated section only; your prose untouched`.
+#
+# AND IT IS PERMANENT, WHICH IS WHY IT IS NOT A ONE-SHOT LOSS. The amputated file is still begin-only,
+# so run 3 amputates the remains and reports success again. Measured byte-identical across runs 2, 3
+# and 4 at the shrunken size. S and S3 therefore each run the installer TWICE after the mutation and
+# compare against the pre-mutation checksum both times.
+#
+#   S   a begin marker with no closing end     bytes survive, the run declines and says why
+#   S2  an end marker with no opening begin    bytes survive, and the run's diagnosis is the right one
+#   S3  end before begin                       bytes survive — this one GREW while losing four sections
+#   S3a both markers on one line               declined, and NOT diagnosed as an ordering fault
+#   S4  a well-formed pair, four installs      the refresh is idempotent, byte-for-byte
+#
+# WHY THE FIX IS A REFUSAL AND NOT A REPAIR, since a reader will ask. "Clear `skip` at EOF" has two
+# readings and both were built and measured. LITERALLY — `END { skip = 0 }` — it is a no-op: awk's END
+# runs after the last line, so S still amputates to 80 lines / 2746 bytes and S3 still walks
+# 84f3ba1d -> 1c804997, shas identical to the unrepaired installer. EFFECTIVELY — buffer while `skip`
+# and flush at END when no end marker arrived — it does save the user's prose in both states, and
+# then promotes the old region into that prose and re-emits the facts block every run: S goes
+# 124 -> 176 -> 228 lines with `## Project Facts` headings at 10 -> 11 -> 12, S3 goes 125 -> 178 -> 231,
+# never converging, never repairing the pair, still printing `your prose untouched`. The ground for
+# declining is that second shape: a repair that permanently reinterprets toolkit-owned bytes as the
+# user's prose and grows the file once per install is not a repair.
+#
+# S2 IS THE ONE THAT WAS ALREADY HALF-GREEN AT 20c785b, and it is recorded here rather than quietly
+# strengthened. `grep -q ...begin` was false for it, so the run took the beside-yours arm: CLAUDE.md
+# really was untouched, and a bytes-only assertion would have passed before the fix. What was wrong
+# was everything the run then SAID and DID — `CLAUDE.md exists and has no generated markers` about a
+# file holding an end marker, a CLAUDE.md.generated written beside it, and a `Not done:` entry whose
+# remedy ("paste the kinglet:generated markers into your CLAUDE.md") would have given that user a
+# second stray marker. So S2's bytes assertion is the weakest of the three and its diagnosis and
+# no-beside-file assertions are the ones that were red.
+#
+# WHAT THESE STATES CANNOT SEE
+#   * A malformed pair inside a file the user WROTE, rather than one this installer generated and the
+#     user then damaged. The distinction is invisible to install.sh — it reads markers, not history —
+#     but it is the difference between "repair the pair" being good advice and being confusing.
+#   * Duplicate markers (two begins, or two ends). `claude_md_marker_state` classifies them
+#     `malformed-count` by construction and no fixture here produces one, so that token's message is
+#     reasoned about, not measured. Review round 1 ran both by hand and both decline.
+#   * CRLF line endings, and a marker appearing inside a fenced code block in the user's own prose —
+#     the predicate matches the token anywhere on a line, so a user quoting the marker in prose reads
+#     as a marker. Fail-closed (it declines) rather than fail-open, but unasserted.
+#   * THE ONE FAIL-OPEN CORNER LEFT, and it predates this file: a hand-written CLAUDE.md that QUOTES
+#     one begin and one end marker in order, on a FIRST install, is well-formed by this predicate, so
+#     the run replaces whatever sits between the quotes and the dry run announces a plain refresh for
+#     it. Measured identical before and after this task's commit, so it is not a regression here — it
+#     is the last open corner of the marker contract, and closing it needs a rule about what a marker
+#     inside a code fence means, which is the generator's contract rather than the merge's.
+#   * S4 proves the refresh reproduces ITSELF byte-for-byte. It does not prove the refreshed region
+#     equals what a fresh generate would produce for a project whose facts have CHANGED since install
+#     1 — that is the generator's contract, not the merge's, and tests/test-rule-applicability.sh
+#     reads the region for it.
+S_MARKED_MSG='your prose untouched'
+
+# The `Not done:` block, read the way tests/test-install-not-done.sh reads it. Duplicated rather than
+# shared because these two files have no common library and a sourced one would be a third idiom in a
+# suite that already documents two.
+s_not_done_block() {
+  awk '/^Not done:/ { f = 1 } f && /^Next steps:/ { f = 0 } f' <<< "$INSTALL_OUT"
+}
+
+# s_mutate <file> <begin|end|swap|sameline> — damage the marker pair the way a half-finished
+# hand-merge or a bad conflict resolution does. python3, not `grep -v > tmp && mv`: the repo's hook
+# gate blocks that shape, and a rewrite that half-succeeds would leave the fixture in a state no
+# assertion describes.
+s_mutate() {
+  python3 - "$1" "$2" <<'PY'
+import sys
+path, how = sys.argv[1], sys.argv[2]
+lines = open(path).read().split('\n')
+if how == 'begin':
+    lines = [l for l in lines if 'kinglet:generated:begin' not in l]
+elif how == 'end':
+    lines = [l for l in lines if 'kinglet:generated:end' not in l]
+elif how == 'sameline':
+    # One line carrying both tokens. Still one begin and one end, so every count-based check is
+    # satisfied and only the line numbers separate it from a well-formed file.
+    b = next(i for i, l in enumerate(lines) if 'kinglet:generated:begin' in l)
+    e = next(i for i, l in enumerate(lines) if 'kinglet:generated:end' in l)
+    lines[b] = lines[b] + ' ' + lines[e]
+    del lines[e]
+else:
+    b = next(i for i, l in enumerate(lines) if 'kinglet:generated:begin' in l)
+    e = next(i for i, l in enumerate(lines) if 'kinglet:generated:end' in l)
+    lines[b], lines[e] = lines[e], lines[b]
+open(path, 'w').write('\n'.join(lines))
+PY
+}
+
+# s_setup <name> <begin|end|swap> — install once into a fresh fixture, let the user add a line of
+# their own below the region, then damage the pair. Sets $S_DIR_OUT.
+#
+# A GLOBAL, NOT A PRINTED PATH, for the reason state R's r_setup is one: this helper calls
+# run_install_flags, which PRINTS its own PASS/FAIL line and sets $INSTALL_OUT. Under `d="$(s_setup
+# …)"` both are lost — the pass line disappears into the variable and every later assertion reads an
+# INSTALL_OUT set in a subshell that has already exited.
+#
+# THE FIXTURE IS A REAL INSTALL, NOT A HAND-WRITTEN STUB. The generated CLAUDE.md carries five of its
+# own sections below the region, and those are what the amputation destroyed on the real project this
+# was found on; a two-line stub would have shrunk by nothing anyone would notice. The sentinel is
+# appended on top of them because a user's own words below the block are the thing the README's
+# byte-for-byte sentence is about.
+S_DIR_OUT=''
+s_setup() {
+  local name="$1" how="$2" d
+  d="$SCRATCH/$name"
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" >/dev/null
+  run_install_flags "$d" "$name install 1"
+  # Non-vacuity: if install 1 did not produce a well-formed pair, the mutation below damages nothing
+  # and every assertion after it passes for the wrong reason.
+  if [ "$(awk '/kinglet:generated:begin/ { b++ } /kinglet:generated:end/ { e++ } END { print (b + 0) "," (e + 0) }' "$d/CLAUDE.md" 2>/dev/null || echo 0,0)" = "1,1" ]; then
+    pass "$name: install 1 produced a CLAUDE.md with exactly one marker pair, so there is a pair to damage"
+  else
+    fail "$name: install 1 did not produce exactly one marker pair — the mutation below has nothing to damage and every assertion after it is vacuous"
+  fi
+  printf '\n## My Own Notes\n\nSENTINEL-USER-PROSE-%s\n' "$name" >> "$d/CLAUDE.md"
+  s_mutate "$d/CLAUDE.md" "$how"
+  S_DIR_OUT="$d"
+}
+
+# s_assert_declined <dir> <label> <want-sha> <diagnosis-needle> — the four things a decline owes.
+s_assert_declined() {
+  local d="$1" label="$2" want="$3" needle="$4" have block
+  have="$(sha_of "$d/CLAUDE.md")"
+  if [ "$have" = "$want" ]; then
+    pass "$label: CLAUDE.md still carries the user's bytes"
+  else
+    fail "$label: the installer rewrote CLAUDE.md — the user's bytes are gone ($want -> $have)"
+  fi
+  if grep -qF -- "$S_MARKED_MSG" <<< "$INSTALL_OUT"; then
+    fail "$label: the run claimed '$S_MARKED_MSG' on a file it could not merge — the false-reassurance half"
+  else
+    pass "$label: the run made no 'prose untouched' claim about a merge it did not perform"
+  fi
+  if [ -e "$d/$CLAUDE_GEN_REL" ]; then
+    fail "$label: the run wrote $CLAUDE_GEN_REL beside a CLAUDE.md that already carries markers — the beside-yours remedy tells that user to paste in a second one"
+  else
+    pass "$label: the run wrote nothing beside it either"
+  fi
+  block="$(s_not_done_block)"
+  if [ -z "$block" ]; then
+    fail "$label: the run abandoned the refresh and printed no 'Not done:' block — MCP-SETUP.md sells the absence of that block as 'nothing was abandoned'"
+  elif grep -qF -- "$needle" <<< "$block"; then
+    pass "$label: the block names CLAUDE.md and says which half of the pair is wrong"
+  else
+    fail "$label: the block was printed but no entry matches '$needle' — the run recorded something else, or recorded this one with the wrong diagnosis"
+  fi
+}
+
+# ── State S: a begin marker with no closing end ──────────────────────────────
+s_setup state-s end
+S_DIR="$S_DIR_OUT"
+S_SHA="$(sha_of "$S_DIR/CLAUDE.md")"
+S_BYTES_BEFORE="$(wc -c < "$S_DIR/CLAUDE.md" | tr -d ' ')"
+run_install_flags "$S_DIR" "S install 2"
+s_assert_declined "$S_DIR" "S (install 2)" "$S_SHA" 'begin marker has no closing'
+# The third run. A one-shot loss and a permanent one are different findings: before the fix the
+# amputated file was still begin-only, so this run destroyed what was left and reported success again.
+run_install_flags "$S_DIR" "S install 3"
+s_assert_declined "$S_DIR" "S (install 3)" "$S_SHA" 'begin marker has no closing'
+if grep -qF -- "SENTINEL-USER-PROSE-state-s" "$S_DIR/CLAUDE.md"; then
+  pass "S: the user's own line below the region is still in the file after two more installs"
+else
+  fail "S: the user's own line below the region is gone — $S_BYTES_BEFORE bytes went in and $(wc -c < "$S_DIR/CLAUDE.md" | tr -d ' ') came out"
+fi
+
+# ── State S2: an end marker with no opening begin ────────────────────────────
+s_setup state-s2 begin
+S2_DIR="$S_DIR_OUT"
+S2_SHA="$(sha_of "$S2_DIR/CLAUDE.md")"
+run_install_flags "$S2_DIR" "S2 install 2"
+s_assert_declined "$S2_DIR" "S2 (install 2)" "$S2_SHA" 'end marker has no opening'
+
+# ── State S3: the end marker before the begin marker ─────────────────────────
+# The state that makes size useless as a damage measure. At 20c785b this file GREW from 123 lines to
+# 134 while shrinking from 4870 bytes to 4385 and losing four of the user's sections: the merge
+# printed the old region as prose, then dropped everything after the begin marker. Checksums, always.
+s_setup state-s3 swap
+S3_DIR="$S_DIR_OUT"
+S3_SHA="$(sha_of "$S3_DIR/CLAUDE.md")"
+run_install_flags "$S3_DIR" "S3 install 2"
+s_assert_declined "$S3_DIR" "S3 (install 2)" "$S3_SHA" 'comes before'
+run_install_flags "$S3_DIR" "S3 install 3"
+s_assert_declined "$S3_DIR" "S3 (install 3)" "$S3_SHA" 'comes before'
+
+# ── State S3a: both markers on one line, and the sentence that was wrong ─────
+# THE ACTION WAS NEVER IN QUESTION HERE AND THE DIAGNOSIS WAS. One line carrying both tokens has one
+# begin and one end, so it fails only `bl < el` — and it therefore fell through to the ordering arm,
+# which told the user their end marker came before their begin marker. That is not true of one line.
+# The file was declined and its bytes were safe throughout; what a reader could not do was check the
+# sentence against their own file. `malformed-same-line` exists so they can, and this state is what
+# stops the token quietly losing its message again.
+s_setup state-s3a sameline
+S3A_DIR="$S_DIR_OUT"
+S3A_SHA="$(sha_of "$S3A_DIR/CLAUDE.md")"
+run_install_flags "$S3A_DIR" "S3a install 2"
+s_assert_declined "$S3A_DIR" "S3a (install 2)" "$S3A_SHA" 'on the same line'
+if grep -qF -- 'comes before' <<< "$INSTALL_OUT"; then
+  fail "S3a: the run said the end marker comes before the begin marker about a file whose markers share one line — the ordering arm is answering for this state again"
+else
+  pass "S3a: the run made no ordering claim about a file whose markers share one line"
+fi
+
+# ── State S3b: the dry run must not promise what the real run declines ───────
+# The same predicate, asked in the announcement. Before the fix the dry run printed
+# `CLAUDE.md — refresh the generated section only; your prose untouched` for S and S3 — promising the
+# one thing the real run was about to destroy, on the only step that can destroy work. This is the
+# only place in this file that runs --dry-run at all.
+#
+# BOTH ASSERTIONS READ THE `CLAUDE.md` CLAIM LINE, NOT THE WHOLE RUN. Scoped to the output, the
+# decline half passes at 20c785b for free: `NOT touched` appears in the dry run's line for
+# CLAUDE.md.generated on other branches and in the .gitignore block, so a whole-output grep certifies
+# a phrasing this line never used. Field equality on the first field, for the reason
+# tests/test-install-dryrun.sh gives: `CLAUDE.md` is a prefix of `CLAUDE.md.generated`.
+S3B_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$REPO/install.sh" --project-dir "$S_DIR" --yes --dry-run </dev/null 2>&1 \
+  | sed $'s/\x1b\\[[0-9;]*m//g')"
+S3B_LINE="$(awk '$1 == "CLAUDE.md" { print }' <<< "$S3B_OUT")"
+if [ -z "$S3B_LINE" ]; then
+  fail "S3b: the dry run named no CLAUDE.md claim at all for a project whose CLAUDE.md the real run reads and declines"
+else
+  if grep -qF -- "$S_MARKED_MSG" <<< "$S3B_LINE"; then
+    fail "S3b: the dry run promised '$S_MARKED_MSG' for a project the real run declines to touch"
+  else
+    pass "S3b: the dry run makes no 'prose untouched' promise about a file with a broken marker pair"
+  fi
+  if grep -qF -- 'NOT touched' <<< "$S3B_LINE"; then
+    pass "S3b: …and its CLAUDE.md line carries a phrase tests/test-install-dryrun.sh reads as a decline"
+  else
+    fail "S3b: the dry run's CLAUDE.md line carries none of the recognised decline phrasings, so that guard would read it as a promise of a write"
+  fi
+fi
+
+# ── State S4: the well-formed pair, and a refresh that reproduces itself ─────
+# NOT A RESTATEMENT OF THE THREE ABOVE — the anti-"decline everything" half. A predicate mutated to
+# call every file malformed passes S, S2 and S3 outright, because their whole content is that nothing
+# happened. This state is the one that requires the refresh to still run.
+#
+# It also pins the byte the refresh arm used to add. `emit_marked_region` ends in a blank line and the
+# merge's end rule opened `print ""`, so the refresh emitted the region one line longer than the
+# fresh-file arm it reproduces: 54 region lines on install 1, 55 from install 2 on, bounded rather
+# than compounding. `/unity-init` normalised it away afterwards, which made it a one-line `git diff`
+# the user never asked for. Four installs, because a delta that appears only on the SECOND refresh
+# would be invisible to two.
+S4_DIR="$SCRATCH/state-s4"
+bash "$REPO/tests/fixtures/mkproject.sh" "$S4_DIR" >/dev/null
+run_install_flags "$S4_DIR" "S4 install 1"
+printf '\n## My Own Notes\n\nSENTINEL-USER-PROSE-state-s4\n' >> "$S4_DIR/CLAUDE.md"
+S4_SHA="$(sha_of "$S4_DIR/CLAUDE.md")"
+for s4_run in 2 3 4; do
+  run_install_flags "$S4_DIR" "S4 install $s4_run"
+  if grep -qF -- "$S_MARKED_MSG" <<< "$INSTALL_OUT"; then
+    pass "S4 (install $s4_run): the refresh arm ran, so the assertions below are about a merge that happened"
+  else
+    fail "S4 (install $s4_run): the run never announced the refresh — a predicate that declines every file would pass S, S2 and S3 and be caught only here"
+  fi
+done
+S4_AFTER="$(sha_of "$S4_DIR/CLAUDE.md")"
+if [ "$S4_SHA" = "$S4_AFTER" ]; then
+  pass "S4: three consecutive refreshes left CLAUDE.md byte-for-byte identical — the merge reproduces the fresh arm's region rather than growing it"
+else
+  fail "S4: the refresh changed CLAUDE.md without being asked to ($S4_SHA -> $S4_AFTER) — diff the region against install 1's, one blank line at a time"
+fi
+if grep -qF -- "SENTINEL-USER-PROSE-state-s4" "$S4_DIR/CLAUDE.md"; then
+  pass "S4: …with the user's own line below the region still in it"
+else
+  fail "S4: the refresh deleted the user's own line below the region"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
