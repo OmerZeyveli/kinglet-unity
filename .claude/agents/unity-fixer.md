@@ -59,6 +59,25 @@ In order of likelihood:
    - Script was renamed without updating references
    - Assembly definition issue (script not in correct asmdef)
 
+   Sweep the whole project for this class before you start guessing at one asset. From the project
+   root:
+
+   ```bash
+   bash .claude/scripts/detect-missing-refs.sh              # scans Assets/
+   bash .claude/scripts/detect-missing-refs.sh --path <dir> # narrow it
+   ```
+
+   It reads the serialised YAML in every `.unity`, `.prefab` and `.asset`, indexes every GUID the
+   project's `.meta` files define, and reports three things with file and line: null GUIDs,
+   `m_Script: {fileID: 0}`, and script GUIDs matching no `.meta` in the project. It exits 1 when it
+   finds any, 0 when it finds none.
+
+   **Reach for it before MCP, not after.** `read_console` reports a broken reference when Unity
+   loads the asset holding it, so it tells you about the scene that is open — the answer to *"is
+   this the only one?"* is a project-wide negative, and nothing in the MCP surface produces one.
+   This runs with the Editor closed, which also makes it the check available when the console is
+   the thing that will not come up.
+
 3. **Coroutine Issues**
    - Coroutine stopped by `SetActive(false)`
    - Coroutine stopped by `Destroy`
