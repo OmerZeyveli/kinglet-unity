@@ -42,9 +42,9 @@ do not re-check:
   origin it cannot read
 - `.claude/NOTICE.md` present
 - every hook `settings.json` references existing on disk
-- the five payload directories — `agents/`, `commands/`, `hooks/`, `rules/`, `skills/` — each
-  present **and holding at least one file of its own kind**, reported as a `FAIL` naming the
-  directory, not as a count
+- the payload directories — `agents/`, `commands/`, `hooks/`, `rules/`, `skills/` — each present
+  **and holding at least one file of its own kind**, reported as a `FAIL` naming the directory, not
+  as a count (`hooks/` needs a real hook; `_lib.sh` is a sourced library and does not count)
 - live counts of agents, commands, skills and rules
 - the process provider `CLAUDE.md` declares still being installed for this user
 
@@ -94,8 +94,10 @@ do not keep both.
 1. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
    other direction: for every `.sh` in `.claude/hooks/` except `_lib.sh`, confirm it appears in
    `.claude/settings.json` under **some** event. **A hook registered on any event — `PreToolUse`,
-   `PostToolUse`, `SessionStart`, `Stop` — fires on that event and is registered by definition; do
-   not report it.** Registered under no event at all → **WARNING** (that hook never fires). This is
+   `PostToolUse`, `SessionStart`, `Stop` — is registered, and registration is all this item asks
+   about; do not report it.** Registered under no event at all → **WARNING** (a hook nothing
+   registers can never fire; one that is registered may still be gated by its `matcher`, which is
+   not this item's question). This is
    the same axis the **Placement** item below draws its line on, and for the same reason: the
    session hooks this toolkit ships sit on `SessionStart` and `Stop`, so a rule keyed on
    `PreToolUse`/`PostToolUse` alone reports every one of them on a completely healthy install.

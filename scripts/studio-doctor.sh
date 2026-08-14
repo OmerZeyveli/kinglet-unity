@@ -604,6 +604,21 @@ if [ -d "$CLAUDE_DIR" ]; then
   # payload file is `<name>/SKILL.md`, and a `.claude/skills/` holding empty directories holds no
   # skills. Same `find … | wc -l` shape as the counts above, `|| true` inside the substitution for
   # the same reason.
+  #
+  # THIS LIST IS HAND-MAINTAINED, SO IT IS PINNED TO ONE THAT IS NOT. `install.sh`'s completion
+  # summary counts these same five directories and no others — four through `count_in <dir> <glob>`
+  # and `hooks` through `count_hooks` — and `tests/test-studio-doctor.sh` asserts the two lists are
+  # the same set with the same globs. A sixth payload directory therefore cannot be installed
+  # without this loop growing in the same commit, which is the only thing that keeps a hand-written
+  # list from becoming an assertion that decays in silence. `.claude/state/` is deliberately not a
+  # member on either side: it is the installer's machine-local state, not a surface anything reads.
+  #
+  # `! -name '_lib.sh'` FOR THE REASON install.sh COUNTS HOOKS FROM settings.json INSTEAD OF FROM
+  # DISK: `hooks/` also holds `_lib.sh`, a sourced library that is not itself a hook. Without the
+  # exclusion, a `.claude/hooks/` stripped of every real hook still passed this check on the
+  # library alone — measured 2026-08-14, `PASS Payload complete` printed beside thirteen dead
+  # registrations. The exclusion is applied to all five rather than to `hooks` alone because
+  # `_lib.sh` is not a payload member of any of them; it is only ever present in one.
   PAYLOAD_BAD=0
   for pd_spec in "agents:*.md" "commands:*.md" "hooks:*.sh" "rules:*.md" "skills:SKILL.md"; do
     pd_name="${pd_spec%%:*}"
@@ -612,7 +627,7 @@ if [ -d "$CLAUDE_DIR" ]; then
       fail "Payload directory .claude/$pd_name/ is missing — re-run install.sh --project-dir \"$PROJECT_DIR\""
       PAYLOAD_BAD=$((PAYLOAD_BAD + 1))
     else
-      pd_n=$(find "$CLAUDE_DIR/$pd_name" -name "$pd_glob" 2>/dev/null | wc -l | tr -d ' ' || true)
+      pd_n=$(find "$CLAUDE_DIR/$pd_name" -name "$pd_glob" ! -name '_lib.sh' 2>/dev/null | wc -l | tr -d ' ' || true)
       if [ "$pd_n" -eq 0 ]; then
         fail "Payload directory .claude/$pd_name/ is present but holds no $pd_glob — re-run install.sh --project-dir \"$PROJECT_DIR\""
         PAYLOAD_BAD=$((PAYLOAD_BAD + 1))

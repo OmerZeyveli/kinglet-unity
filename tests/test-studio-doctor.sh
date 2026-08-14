@@ -362,6 +362,16 @@ assert_eq "0" "$TSD_HEAD_HITS" \
 # here because the doctor's `[ -t 1 ]` is false inside `$( )`.
 tsd_verdict() { awk -v needle="$2" 'index($0, needle) { print $1 }' <<< "$1"; }
 
+# tsd_payload_fails <output> — how many of the doctor's failures came from the payload-directory
+# loop specifically. The summary total cannot answer that: emptying `.claude/hooks/` also produces
+# one dead-registration failure per registration, so a total-count assertion over that state would
+# be counting two checks at once and moving when either changed.
+# The `$1 == "FAIL"` is load-bearing and was added after a mutation showed why: downgrading the
+# empty-directory `fail` to a `warn` left every count below green, because a WARN line names the
+# directory in exactly the same words. The verdict token cannot appear in an assertion's arguments,
+# but nothing stops it being read INSIDE the helper — what leaves here is a number.
+tsd_payload_fails() { awk '$1 == "FAIL" && /Payload directory \.claude\//{ n++ } END { print n + 0 }' <<< "$1"; }
+
 # tsd_failures <output> — the failure count off the summary line, exactly, never by substring.
 # `assert_contains "$out" "1 failure(s)"` is satisfied by `11 failure(s)`, which is the same defect
 # measured in this file on 2026-08-13 against `1500` matching `11500`. Splitting the summary line on
@@ -474,10 +484,14 @@ assert_eq "0" "$TSD_PAY_OK_RC" \
     "…and exits 0, so the failures below belong to the directories and not to the missing receipt"
 
 rm -f "$TSD_PAY/.claude/agents/"*.md
-TSD_PAY_EMPTY_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_PAY" 2>&1)
-TSD_PAY_EMPTY_RC=$?
+# The fixture-state probe runs BEFORE the run it justifies, not after. The state is unchanged
+# either way here, so the old order was harmless — but a probe that reports after the fact cannot
+# stop an assertion being made against a state that was never reached, which is the only reason to
+# write one. The sibling probes in the hook section above are in this order for the same reason.
 assert_eq "0" "$(find "$TSD_PAY/.claude/agents" -name '*.md' | wc -l | tr -d ' ')" \
     "the fixture reaches the state under test — .claude/agents/ is present and holds no agent"
+TSD_PAY_EMPTY_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_PAY" 2>&1)
+TSD_PAY_EMPTY_RC=$?
 assert_contains "$TSD_PAY_EMPTY_OUT" "Payload directory .claude/agents/ is present but holds no *.md" \
     "an empty-but-present payload directory is reported, naming the directory and what it should hold"
 assert_eq "1" "$(tsd_failures "$TSD_PAY_EMPTY_OUT")" \
@@ -498,6 +512,107 @@ assert_eq "2" "$(tsd_failures "$TSD_PAY_GONE_OUT")" \
     "…and the failure count moves with the damage, 1 → 2, rather than being pinned to one finding"
 assert_eq "1" "$TSD_PAY_GONE_RC" \
     "…and the doctor still exits 1"
+
+# ── WHERE THAT LIST COMES FROM, AND EVERY MEMBER OF IT ─────────────────────
+#
+# The loop in studio-doctor.sh carries a hand-written list of five `name:glob` specs, and the two
+# states above exercise TWO of them. Measured 2026-08-14 against the first version of this section:
+# dropping `commands`, `hooks` and `skills` from that list left this file 56/56 GREEN, and dropping
+# `"hooks:*.sh"` alone did too. `hooks/` is the member this task ADDED — the prose it replaced made
+# exactly that argument, that the INFO block "reads four of these five … never hooks" — so the one
+# new member was the one nothing asserted.
+#
+# TWO DEFENCES, BECAUSE THEY FAIL DIFFERENTLY.
+#
+#   1. The set is pinned to a list DERIVED OUTSIDE studio-doctor.sh — install.sh's completion
+#      summary, which counts these same five directories and no others, four of them through
+#      `count_in <dir> <glob>` and `hooks` through `count_hooks`. That is the file which CREATES the
+#      tree this check reads, so a sixth payload directory cannot be installed without appearing
+#      there, and this assertion then requires the doctor's loop to grow in the same commit. A
+#      guard whose coverage list is written by the same hand as the thing it covers decays in
+#      silence; this one cannot. `.claude/state/` is absent from both sides and belongs on neither:
+#      it is the installer's machine-local state, not a surface anything reads.
+#   2. Every member is exercised BEHAVIOURALLY below. The static set assertion cannot see a member
+#      that is listed and does not work, and the behavioural probe cannot see a member that is
+#      missing from both files at once.
+#
+# THE ONE THING THAT CANNOT BE DERIVED, SAID OUT LOUD: install.sh supplies no disk glob for `hooks`,
+# because it counts hooks from settings.json — precisely so `_lib.sh`, a sourced library and not a
+# hook, is never counted as one. So `hooks:*.sh` is the single spec pinned by a literal here, and
+# the `_lib.sh` exclusion is asserted by behaviour instead.
+TSD_DOCTOR_CMD="${REPO_DIR}/.claude/commands/unity-doctor.md"
+TSD_PAY_SPECS=$(awk '/^  for pd_spec in /{
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^"[a-z]+:/) { s = $i; sub(/^"/, "", s); sub(/".*$/, "", s); print s }
+      }
+    }' "$TSD_DOCTOR" | sort)
+TSD_PAY_INSTALL=$(awk -v q="'" '
+    {
+      line = $0
+      pat = "count_in [a-z]+ " q "[^" q "]+" q
+      while (match(line, pat)) {
+        m = substr(line, RSTART, RLENGTH)
+        line = substr(line, RSTART + RLENGTH)
+        sub(/^count_in /, "", m)
+        gsub(q, "", m)
+        sub(/ /, ":", m)
+        print m
+      }
+      if ($0 ~ /\$\(count_hooks\)/) { print "hooks:" }
+    }' "${REPO_DIR}/install.sh" | sort -u)
+assert_eq "5" "$(printf '%s\n' "$TSD_PAY_SPECS" | grep -c . || true)" \
+    "the doctor's payload list parses to five specs — a derivation that reads nothing must not be compared against another that reads nothing"
+assert_eq "5" "$(printf '%s\n' "$TSD_PAY_INSTALL" | grep -c . || true)" \
+    "…and install.sh's completion summary parses to five counted directories"
+assert_eq "$(cut -d: -f1 <<< "$TSD_PAY_INSTALL")" "$(cut -d: -f1 <<< "$TSD_PAY_SPECS")" \
+    "the doctor checks exactly the payload directories install.sh reports installing — neither list may grow alone"
+assert_eq "$(grep -v '^hooks:' <<< "$TSD_PAY_INSTALL" || true)" "$(grep -v '^hooks:' <<< "$TSD_PAY_SPECS" || true)" \
+    "…with the same glob per directory, so the one structurally different member (skills/SKILL.md) cannot be edited to *.md unnoticed"
+assert_eq "*.sh" "$(grep '^hooks:' <<< "$TSD_PAY_SPECS" | cut -d: -f2 || true)" \
+    "hooks is the one spec install.sh supplies no disk glob for — it counts registrations — so its glob is pinned here"
+TSD_PAY_DOC_NAMES=$(awk '/the payload directories/ {
+      line = $0
+      while (match(line, /`[a-z]+\/`/)) {
+        print substr(line, RSTART + 1, RLENGTH - 3)
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }' "$TSD_DOCTOR_CMD" | sort)
+assert_eq "$(cut -d: -f1 <<< "$TSD_PAY_SPECS")" "$TSD_PAY_DOC_NAMES" \
+    "and the shipped /unity-doctor claim about what the script covers names exactly those directories — it reaches a user, and nothing else derived it"
+
+# Every remaining member, on the fixture already standing at two payload failures. Counted with
+# tsd_payload_fails rather than the summary total: emptying hooks/ also lights up the
+# dead-registration sweep, and one number cannot be evidence for two checks.
+rm -f "$TSD_PAY/.claude/commands/"*.md
+assert_eq "3" "$(tsd_payload_fails "$(bash "$TSD_DOCTOR" --project-dir "$TSD_PAY" 2>&1)")" \
+    "emptying .claude/commands/ is the third payload failure — the member is checked, not merely listed"
+find "$TSD_PAY/.claude/skills" -name 'SKILL.md' -delete
+TSD_PAY_SKILLS_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_PAY" 2>&1)
+assert_contains "$TSD_PAY_SKILLS_OUT" "Payload directory .claude/skills/ is present but holds no SKILL.md" \
+    "skills/ is checked on SKILL.md and not on *.md — the skill directories are all still there, holding everything except the file that makes one a skill"
+assert_eq "4" "$(tsd_payload_fails "$TSD_PAY_SKILLS_OUT")" \
+    "…and that is the fourth payload failure"
+# hooks/ keeping ONLY _lib.sh. Measured 2026-08-14 before the exclusion: `PASS Payload complete`
+# printed beside thirteen dead-registration failures — the payload verdict satisfied by the shared
+# library that CLAUDE.md and /unity-doctor's own registration item both exclude from the hook set.
+for tsd_h in "$TSD_PAY/.claude/hooks/"*.sh; do
+  case "$(basename "$tsd_h")" in _lib.sh) continue ;; esac
+  rm -f "$tsd_h"
+done
+assert_eq "_lib.sh" "$(cd "$TSD_PAY/.claude/hooks" && printf '%s\n' *)" \
+    "the fixture reaches the state under test — hooks/ holds the library and no hook"
+TSD_PAY_HOOKS_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_PAY" 2>&1)
+TSD_PAY_HOOKS_RC=$?
+assert_contains "$TSD_PAY_HOOKS_OUT" "Payload directory .claude/hooks/ is present but holds no *.sh" \
+    "a hooks/ holding only _lib.sh is empty of hooks, and the verdict says so rather than counting the library"
+assert_eq "5" "$(tsd_payload_fails "$TSD_PAY_HOOKS_OUT")" \
+    "…which is the fifth and last member: every spec in the doctor's list has now been made to fire"
+if [ "$(tsd_failures "$TSD_PAY_HOOKS_OUT")" -gt "$(tsd_payload_fails "$TSD_PAY_HOOKS_OUT")" ]
+then TSD_PAY_SWEEP_TOO=1; else TSD_PAY_SWEEP_TOO=0; fi
+assert_eq "1" "$TSD_PAY_SWEEP_TOO" \
+    "…and the dead-registration sweep fired on the same run, which is why these five were counted apart from the summary total"
+assert_eq "1" "$TSD_PAY_HOOKS_RC" \
+    "…and the doctor exits 1 with the whole payload gutted"
 rm -rf "$TSD_PAY"
 
 rm -rf "$TSD_MOCK"
