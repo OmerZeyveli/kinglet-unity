@@ -60,13 +60,22 @@
 #   * IT CANNOT SEE A CITATION IT DOES NOT ENUMERATE. A fifth shape may exist. The fourth — a dotfile
 #     citation, `.gitignore:43` — was found by a reviewer while this bullet said "a fourth shape
 #     exists somewhere", and it was one line away in tests/test-pipeline-detector.sh.
-#   * IT READS THE LIVE SURFACES ONLY, AND THAT IS 141 OF 540 TRACKED FILES. `docs/superpowers/` and
-#     `docs/research/` are dated records of what was measured on a day; their citations are pinned to
-#     that day by construction and renumbering them would be the falsification this guard exists to
-#     prevent. But the unscanned 399 also include `templates/`, `migration/`, `tools/`, `spikes/`,
-#     `tests/kinglet*/` and every non-`.md` file at the root — a rotted citation appended to
-#     `templates/Model.cs.template` is green here. Derive both numbers, never transcribe them:
-#     `git ls-files | wc -l` against the pathspec below.
+#   * IT READS THE LIVE SURFACES ONLY, AND THAT IS 125 OF 543 TRACKED FILES (measured 2026-08-14).
+#     `docs/superpowers/` and `docs/research/` are dated records of what was measured on a day; their
+#     citations are pinned to that day by construction and renumbering them would be the
+#     falsification this guard exists to prevent. The unscanned 418 also include `templates/`,
+#     `migration/`, `tools/`, `spikes/`, `tests/kinglet*/` and every non-`.md` file at the root — a
+#     rotted citation appended to `templates/Model.cs.template` is green here. Derive both numbers,
+#     never transcribe them: `git ls-files | wc -l` against the pathspec below.
+#
+#     UNTIL 2026-08-14 THAT SENTENCE WAS FALSE FOR TWO OF THE FIVE TREES IT NAMES, and the reason is
+#     one character of git pathspec semantics. `*` in a git pathspec CROSSES `/` unless the element
+#     carries `:(glob)` magic. So `'*.md'` — the element that reads as "root-level Markdown" — was
+#     matching Markdown at every depth, and this guard was reading SEVENTEEN files the bullet above
+#     declares out of scope: 13 under `spikes/` and 4 under `tests/kinglet/`. `tools/` and
+#     `tests/kinglet_spike/` are named in that list too and leaked nothing, but only because neither
+#     tracks a single `.md` — they were one file away from the same hole, not outside it.
+#     The element is now `:(glob)*.md`. See the depth note at the pathspec itself.
 #   * THE FLOOR BELOW IS A THRESHOLD, NOT A SCOPE CHECK. `LIVE_N >= 30` against a live set of 141
 #     survives losing three quarters of the pathspec. It catches a pathspec that empties, which is
 #     the failure it was written for; it does not catch one that narrows.
@@ -101,9 +110,31 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # reach. What stands in for it is the exemption audit at the bottom — every row must still match text
 # that exists — plus the three shape floors above, which is thinner cover than the rest of the tree
 # gets. A reader adding a live `file:line` pointer to this file should resolve it by hand.
+#
+# DEPTH IS PER ELEMENT, AND IT IS NOT THE SHELL'S RULES. In a git pathspec `*` crosses `/`; only
+# under `:(glob)` magic does `*` stop at `/` (and `**` cross). Four elements below use `*` and they
+# do not all want the same thing, so each one says which:
+#
+#   'tests/*.sh' 'scripts/*.sh'  CROSS deliberately. `tests/fixtures/mkproject.sh` is a live surface
+#                                — CLAUDE.md's testing section documents it as the way the installer
+#                                gets exercised — and anchoring these would silently drop it.
+#   '.claude/*'                  CROSSES deliberately. The payload is the whole nested tree.
+#   'docs/*.md'                  CROSSES deliberately: `docs/**/*.md`, less the two record trees the
+#                                `grep -vE` below strips.
+#   ':(glob)*.md'                MUST NOT CROSS. This is the root-level Markdown element. Unanchored
+#                                it read 17 files under `spikes/` and `tests/kinglet/` — see the
+#                                blind-spot bullet above. Its own neighbour is the tell, and that
+#                                tell is derivable without reading any comment: if `'*.md'` were
+#                                meant to cross, `'docs/*.md'` beside it would be dead code.
+#
+# `:(glob)` rather than a frozen six-file list, because this set has to keep moving with the tree: a
+# `SECURITY.md` added at the root tomorrow is a live surface, and an explicit list would leave it
+# unscanned with nothing to notice — the same hole, re-dug one commit later. It also keeps the
+# correction inside the pathspec instead of bolting a second mechanism onto the first (a downstream
+# `grep -v '/'`), which is one more pattern to get wrong on a host whose `grep` is not GNU's.
 LIVE_FILES="$(git ls-files \
   'tests/*.sh' 'scripts/*.sh' 'install.sh' 'uninstall.sh' \
-  '.claude/*' 'docs/*.md' '*.md' 'provenance.tsv' 'provenance-skip.tsv' 2>/dev/null \
+  '.claude/*' 'docs/*.md' ':(glob)*.md' 'provenance.tsv' 'provenance-skip.tsv' 2>/dev/null \
   | grep -vE '^docs/(superpowers|research)/' \
   | grep -vxF 'tests/test-citations-resolve.sh' | sort -u || true)"
 LIVE_N="$(printf '%s\n' "$LIVE_FILES" | grep -c . || true)"

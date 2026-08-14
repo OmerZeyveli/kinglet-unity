@@ -424,8 +424,42 @@ assert_contains "$TMDI3_ARCH_SETTINGS_SECTION" "\`.mcp.json\` at the project roo
 # This has no distance bound to outgrow, and does not need docs/ARCHITECTURE.md
 # or MERGE-NOTES.md excluded from it — a hit here is the actual defect, not a
 # proximity coincidence, and (as confirmed below) it finds zero matches across
-# every currently-tracked file, including the ones the proximity scan cannot
-# safely look at.
+# every tracked Markdown file in the shipped-and-documented trees, including the
+# ones the proximity scan cannot safely look at.
+#
+# --- SCOPE, AND THE SEVENTEEN FILES IT USED TO INCLUDE BY ACCIDENT (2026-08-14) ---
+#
+# The set is: every tracked `.md` under `.claude/`, every tracked root-level `.md`,
+# and every tracked `.md` under `docs/`. That is what the pathspec below now reads
+# and what this scan is for — the payload, the front door, and the documentation.
+#
+# It used to read more, and the extra was not a widening anyone chose. `*` in a git
+# pathspec CROSSES `/`, so the middle element `'*.md'` — sitting between two literal
+# directory prefixes and therefore obviously meant as "root-level Markdown" — matched
+# Markdown at EVERY depth. This scan was reading 17 files under `spikes/` (13) and
+# `tests/kinglet/` (4): scratch probe notes and deliberately-invalid runtime fixtures,
+# none of which is a shipped surface and several of which exist precisely to hold
+# wrong content.
+#
+# THAT WAS NOT A HARMLESS SURPLUS, IT WAS A LIVE FALSE-FAILURE VECTOR. A spike note
+# recording an observed client config verbatim — a `## Settings.json Structure`
+# heading over a fenced block carrying `mcpServers`, which is exactly what such a
+# note would contain — reds this assertion. Measured before the anchor: one staged
+# file under `spikes/platform/clients/claude-code/` took this file from 24 pass /
+# 0 fail to 23 / 1. And the maintainer chasing it would have started from a Round 3
+# comment that says the scan covers root `*.md` and `docs/`, in neither of which the
+# offending file lives. A loud failure pointing at the wrong place is worse than a
+# silent hole.
+#
+# The intent is derivable from the code alone, without trusting this comment: under
+# the crossing reading `'*.md'` already yields every `.md` in the repository, which
+# makes the `.claude/` and `docs/` elements beside it dead code. A pathspec whose
+# other two thirds do nothing is not the pathspec that was written. Under the
+# anchored reading all three elements contribute (6 + .claude/ + docs/).
+#
+# `:(glob)` rather than an explicit root-file list: `.claude/` and `docs/` are
+# already tree-following, and a frozen list of root `.md` names would go stale the
+# first time a doc is added at the root — re-digging this hole one commit later.
 tmdi4_fenced_block_hits() {
     local file="$1"
     awk '
@@ -452,7 +486,7 @@ tmdi4_fenced_block_hits() {
 }
 
 TMDI4_HITS=""
-TMDI4_ALL_TRACKED=$(cd "$REPO_DIR" && git ls-files -- .claude/ '*.md' 'docs/')
+TMDI4_ALL_TRACKED=$(cd "$REPO_DIR" && git ls-files -- .claude/ ':(glob)*.md' 'docs/')
 while IFS= read -r tmdi4_relpath; do
     [ -z "$tmdi4_relpath" ] && continue
     case "$tmdi4_relpath" in
@@ -474,7 +508,7 @@ if [ -n "$TMDI4_HITS" ]; then
     echo "--- end offenders ---"
 fi
 assert_eq "" "$TMDI4_HITS" \
-    "no fenced code block under a settings.json heading (in any tracked .md, including excluded-from-proximity-scan files) carries an mcpServers key"
+    "no fenced code block under a settings.json heading (in any tracked .md under .claude/, docs/, or the repository root -- including the files the proximity scan excludes) carries an mcpServers key"
 
 # Canary: the scan still binds. Reconstruct the reviewer's exact original finding as a fixture and
 # confirm this scan catches it — proving a green result above means "found nothing," not "checked
