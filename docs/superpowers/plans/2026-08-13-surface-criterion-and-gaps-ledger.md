@@ -1657,6 +1657,33 @@ ADDRESSED, none returned to the fix loop.**
      re-run on the round-1 tree gives **checksums byte-identical to round 0 for all nine states.**
      *That is the check a new arm in a classifier actually needs, and it is not the suite.*
 
+**From Task 4c's implementation (2026-08-14, `6d042bb`, in review).**
+
+172. **The audit's one real defect had a fourth number nobody counted: `Not done:` was absent
+     entirely.** 27 registrations kept, 12 files existing, `Hooks 27` printed — **and under Task 5's
+     `MCP-SETUP.md` contract, an exit-0 run that abandoned fifteen repairs claimed it had abandoned
+     nothing.** *Two tasks' defects intersecting, and neither task could see it alone.*
+173. **A guard that passed its own author's mutation because the claim was satisfiable by excess.**
+     **M5** — delete the existence test so **every** registration reports dead — **survived the first
+     version of the test**, because *"the cut hook is named"* is satisfied by naming everything. Fixed
+     by pinning the headline count to exactly 1. *Sixth measured instance in this wave of a mutation
+     result meaning something other than what it looked like — and the first where the guard was too
+     **permissive** rather than the mutant too narrow.*
+174. **`count_hooks()` chose report-both, and the reason is the wave's own thesis:** counting only
+     live registrations *"would make a broken project's summary read identically to a healthy one —
+     the same defect one digit left."* `Hooks 12 (27 registered, 15 dead)` broken, `Hooks 12`
+     healthy, and the sweep stays on `settings.json` so `_lib.sh` is still never counted.
+175. **Three sweeps, two character classes, found while checking something else.**
+     `install.sh` and `scripts/studio-doctor.sh` use `[a-z_-]+`; `tests/test-derived-counts.sh` uses
+     `[a-z0-9-]+`. **They agree on today's tree; a future `warn-2d.sh` or `warn_x.sh` would be
+     invisible to one side.** → open, no owner.
+176. **`scripts/studio-doctor.sh` had this exact check all along and reports all 15 on the broken
+     project.** *"The state was diagnosable all along, nothing ran the diagnosis, and no test asserts
+     the doctor's copy."* Recommended shape if it is ever shared: **a path-emitting
+     `dead_hook_registrations` helper with each caller keeping its own reaction** — only three lines
+     are common. *This is the audit's fourth durable shape, measured a second time: the check that
+     catches a defect existing in a script nothing calls.*
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
