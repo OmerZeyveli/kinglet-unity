@@ -219,6 +219,13 @@ stands. It has now gone stale twice.
   real: a function whose **last** command is the failing assignment, and the same printf-last shape
   **under `inherit_errexit`**. *A `set -e` claim in this repository must name which of the three it
   means.*
+- **No probe whose passing condition is SILENCE can distinguish "correctly quiet" from "not
+  running."** Measured 2026-08-14: a hook whose `source` line is wrapped in a never-true `if` stays
+  classified as a library user, is never behaviourally probed, and runs **rc=0 with zero bytes in all
+  three switch states** — the kill-switch property vacuously satisfied while **what is lost is the
+  hook.** *This is the silence half of the vacuity family the whole wave has been closing: a guard
+  green because its sweep was empty, a claim satisfiable by excess, and now a probe satisfiable by
+  absence.*
 - **The general form, and it recurred four times tonight in four disguises: a probe whose own text
   satisfies the condition it is testing.** The route regex that matched the raw string it was meant
   to reason about; the damage harness whose `evil/xargs` measured arguments instead of stdin; the
@@ -1849,6 +1856,25 @@ whole-branch review are below, because that review is the first reader positione
    **whether one representative is enough across the whole hook set is a branch-level question.**
 6. **The marker wording is not canonical** — one file says *"install.sh never copies into a project"*
    where the rule expects *"not installed"*. **It must be canonical before the rule is widened.**
+
+**From Task 11's fix round 2 (2026-08-14, `a09059d`, in closing confirmation).**
+
+204. **Two hooks are named by no test file at all** — `warn-platform-defines.sh` and
+     `warn-serialization.sh` — **and the second is the hook three shipped documents cite as the
+     reason `minimal` is a safety setting.** *Guarded by name in three places, by behaviour nowhere.*
+     Found while **sizing** another finding, not while looking for it. **→ open, no owner.**
+205. **Getting the stale-marker direction right required the INSTALLED set, not the payload.**
+     `.mcp.json` and `MCP-SETUP.md` install at the **project root** and are absent from
+     `payload_paths()`, so a payload-only test would have demanded a marker on two files **where it
+     would then be false.** The installed set is now **derived from `install.sh`'s receipt-row
+     `printf` formats**, with an assertion that the derivation still returns something. *New
+     machinery reading another file's format strings — coupling that rots quietly.*
+206. **Three of the nine unmarked repository-only paths were this task's own round-0 lines**, one of
+     them using a **variant wording** where the guard reads a single canonical marker. **Both are now
+     marked, which is the canonicalisation that was the stated precondition for widening the rule.**
+     Six remain, all pre-existing, and rule 4's comment carries **the criterion rather than the
+     number** plus the one open decision: **`install.sh` and `uninstall.sh` must be exempt by role,
+     not by marker.**
 
 **Inherited from earlier waves, still open:**
 
