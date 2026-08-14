@@ -25,7 +25,7 @@ who ever runs the suite with a dirty `migration/` and is therefore the only one 
 | 1 — the three hooks nothing has ever executed | **DONE**, merged `d770bf5` | `3ca4327..1ff204a` |
 | 2 — execution-keyed hook coverage | open *(brief pending — consumes Task 1's output)* | |
 | 3 — anchor the unanchored pathspecs | open | |
-| 4 — the doctor's two remaining compensations | open | |
+| 4 — the doctor's two remaining compensations | **DONE**, merged `22c232e` | `4e299b6..f868677` |
 | 5 — anti-vacuity floors, written | open | |
 | 6 — a heading inventory for `docs/` | open *(brief pending — cites Task 5)* | |
 | 7 — the claims with no owner | open *(brief pending — cites Task 5)* | |
@@ -182,6 +182,37 @@ Print the non-silent byte count beside every zero.
   ledger from a description rather than from a measurement, told a later task to cite it as its worked
   example, and it took two agents reporting contradictory verdicts to surface it. **A ledger entry is
   a claim with the same shelf life as any other, and this file is read as if it were not.**
+
+## Task 4 — deferred, and one obligation the shipped comment already cites
+
+**`.claude/scripts/` is installed and nothing gives it a verdict.** `install.sh` writes it through the
+separate `for group in scripts` loop; it is on **neither** side of the doctor's payload pin; and
+`/unity-doctor` Check 2 **runs a script from it**. `scripts/studio-doctor.sh`'s shipped comment now
+says *"that is a ledger item"* — **this entry is what that sentence points at.** Before Task 4, the
+directory was not merely uncovered, it was invisible; it is now named in a shipped file with its
+boundary asserted (`assert_not_contains "$TSD_PAY_TREE" "scripts"`, mutation-verified: adding
+`.claude/scripts/muts1-probe.sh` reds it **by name**). → a later doctor pass.
+
+**`awk`-first versus bash-last-assignment.** The test extracts install.sh's `PAYLOAD_FILES=` line with
+`awk '…{ print; exit }'` — **first** match wins — while bash honours the **last** assignment. Measured:
+a decoy `PAYLOAD_FILES=$(cd … ! -path './extradir/*' …)` placed *before* the real line installs
+`.claude/extradir/` with the guard **74/0 green** and `provenance OK`. It needs two top-level
+`PAYLOAD_FILES=$(cd ` assignments, a shape nobody writes and which does not exist. **Bounded, not
+closed.**
+
+**A behaviour-neutral edit reds three assertions.** `PAYLOAD_FILES="$(cd …)"` — quoting the
+substitution, which is what shellcheck asks for — gives **71/3** while install.sh installs the same 61
+files. **It fails closed and loud**, and the first failing assertion names the cause and the remedy in
+its own message, so it is recorded as known brittleness rather than repaired.
+
+**`assert_not_contains` is a substring claim, not set membership.** It cannot pass for the wrong reason
+in the dangerous direction — `scripts` entering the tree is a whole line — but it could red spuriously
+on a future member whose *name* contains `scripts`. `grep -qxF` is the one-word fix.
+
+**A standing trust boundary, worth naming rather than filing.** The guard **evaluates a line of
+`install.sh`'s own bytes** rather than re-implementing its `find`. Re-implementing it was correctly
+rejected — that would have been a **third** hand-written list, which is the defect being fixed — but it
+means the test trusts that line to stay a pure `cd` + `find` in a subshell. It is today.
 
 ## Inherited state, measured at the base commit
 
