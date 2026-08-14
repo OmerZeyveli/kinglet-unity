@@ -98,7 +98,24 @@ Print the non-silent byte count beside every zero.
 
 ## Interfaces produced so far
 
-*(empty — nothing has shipped on this branch yet)*
+**Task 1 → `tests/test-hook-behaviour.sh`** (runner-provided; standalone it exits 0 asserting nothing).
+
+- **The durable interface Task 2 consumes is the `HOOK-PROBE <hook> kind=… act=NNNB rc=… off_all=…
+  off_own=…` lines on stdout — one per hook, written only by a probe that ran.** *Not* the TSV
+  record file: it lives inside `$WORK_DIR` and `rm -rf "$WORK_DIR"` deletes it before the run ends.
+  The file's own comment said Task 2 would read it; that is corrected in Task 1's fix round. **This
+  is exactly what the Interfaces section is for — a brief written before the task ran would have
+  guessed the TSV.**
+- **Key on presence, never on the byte number.** Measured across clones of the same tree:
+  `session-save` **540 / 552 / 559 B**, `session-restore` **293 / 315 B**. They vary with branch name
+  and `git log` output. Nothing asserts them today; the moment something does, it is flaky.
+- **Coverage is execution-keyed, and it is proven so.** Renaming only the `case` label — leaving the
+  hook's name in the file three times — dropped the probed count to 11. A name-keyed sweep would have
+  reported full coverage.
+- **The anti-vacuity floor here has no ratio, and that is the point.** It is an identity between two
+  independently derived tree quantities — `.claude/hooks/*.sh` less `_lib.sh` versus distinct
+  commands in `settings.json`, currently 12 == 12. A 100 % floor that moves with the tree cannot go
+  stale and cannot have been sized by feel. **Task 5 should cite this as its worked example.**
 
 ## Inherited state, measured at the base commit
 
@@ -132,3 +149,19 @@ Print the non-silent byte count beside every zero.
    branches from was red for a reason unrelated to any of them. **A ledger asserting "both gates green
    at `e17f310`" was true for `e17f310` and false for the commit tasks actually branch from** — which
    is the same shelf-life problem this wave exists to fix, committed by the file that documents it.
+
+2. **Task 1, Minor — the criterion's C2 clause as reported would misclassify a shape.** The report
+   says a multi-substitution RHS dies; the assignment takes the status of the **last** substitution
+   performed, so `x="$(false)$(true)"` survives rc=0 (measured). **No such site exists in the tree, so
+   the membership is right and the fix is right** — and the hook's own in-file comment does not make
+   this error, only the report did. Recorded because the criterion, not the count, is what the next
+   wave inherits.
+
+3. **Task 1, carried obligation — `migration/baseline-inventory.json` is not regenerated in Task 1's
+   range**, correctly under R6 (an implementer in a worktree cannot trust `--dry-run`, which reads
+   the anchor commit's tree and returns a confident `0 change(s)`). **The branch cannot merge green
+   until it is regenerated outside a worktree, and the controller owns that.** Derived drift for
+   Task 1 is **2** — `.claude/hooks/warn-filename.sh` in `full_claude_tree/files` and again in
+   `categories/hooks/files`, independently confirmed by the reviewer against the two observed
+   failures. **Recorded here so it is not discovered at the whole-branch review**, which is where an
+   unregenerated baseline would otherwise surface as a mystery.
