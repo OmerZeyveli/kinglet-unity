@@ -1102,6 +1102,43 @@ ADDRESSED, none returned to the fix loop.**
     exactly 3041 + 58. **What carries is the failure set and the discovery invariant** (glob = find =
     headers).
 
+**From Task 7's review (2026-08-14). In fix round 1.**
+
+88. **The refresh arm emits the region one byte longer than the fresh arm, on every variant, and the
+    two producers are only "one producer" for *content*.** `emit_marked_region()` ends `echo ""` and
+    `install.sh`'s `/kinglet:generated:end/ { print ""; print; … }` adds a second. Bounded
+    (52 → 53 → 53 → 53 across four installs, `cmp`-clean between runs 2/3 and 3/4), prose outside
+    byte-identical, and **the first `/unity-init` after a refresh install silently normalises it away
+    — producing a one-line `git diff` the user did not ask for.** **The fix is Task 4b's**
+    (`install.sh` is not Task 7's file); **the claim is Task 7's**, because the sentence asserting
+    agreement lives in its file. *A producer that silently normalises another producer's output is
+    not one producer; it is two that agree except where one of them loses.*
+89. **Two Task 7 claims are contingent on Task 4b and become moot if it lands.** *"This is the one
+    producer … so running it is how this command and the installer stay in agreement"* is off by one
+    byte today; and *"refreshes exactly this region on every run"* is an unqualified universal while
+    an installer meeting a missing `end` marker **drops everything below the region and prints
+    `ok Refreshed the generated section of CLAUDE.md (your prose untouched)`** — the false-reassurance
+    half of 4b's defect, restated in a surface a model reads. **Both are being qualified now rather
+    than deferred, because 4b is not dispatched and a report file is not a delivery mechanism.**
+    **→ simplify both when 4b lands.**
+90. **`scripts/generate-claude-md.sh`'s `KNOWN_PACKAGES` (22 ids) contains none of the five packages
+    the deleted hand-derivation named** — Timeline, Mirror, Photon, Fish-Net, Odin — and **Timeline
+    and Mirror are ordinary manifest-detectable UPM ids.** The generator's only owner this wave was
+    Task 12, which is **merged**, so nothing closes this unless it is recorded. **→ a later generator
+    pass**; Task 7 softens the universal in the meantime.
+91. **A hand-copied `.claude/` has no `.claude/scripts/`, so `/unity-init`'s remedy for that exact
+    branch exits rc=127.** The command names the state by its cause and then strands the model in it.
+    Loud, not silent. **→ in Task 7's fix round.**
+92. **The empty `SC_REACH_PENDING` list is held by convention, not by a check.** Putting a name back
+    **together with** the unwiring it exempts passes green — the retirement rule targets *stale*
+    exemptions only, by design, inherited from Task 3. **Recorded so nobody reads the empty list as
+    guarded.**
+93. **The R4/R7 override was ruled correct, on a ground worth keeping: a directed instruction naming
+    the artefact beats a general ownership rule.** R7 verbatim requires *"replaced by a derived claim
+    row, not corrected prose"* and assigns it to whichever of Tasks 3 and 7 lands second. **Obeying
+    R4's file ownership strictly would have required violating R7's explicit instruction.** No
+    concurrent writer existed (`task-11` worktree confirmed absent) and the change is additive.
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
