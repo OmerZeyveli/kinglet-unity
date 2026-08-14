@@ -33,16 +33,44 @@ ROOT_SCRIPTS=(
     "$REPO_DIR"/uninstall.sh
 )
 
-# Hooks plus the two root installer scripts, for the early-exit-reader check below. scripts/ and
-# tests/ were already swept for this shape (Task 9) and are confined to short per-line/bounded-string
-# checks (a single asmdef field, one line of a .cs file) where a pipe buffer is never in play.
-# .claude/hooks/*.sh and install.sh/uninstall.sh are different in kind: those scripts routinely
-# receive an entire file's new_string, an entire Bash command, or an entire receipt's worth of
-# modified-file paths as one variable — exactly the size a generated PlayerControls.cs, a multi-line
-# Bash invocation, or a real project's edited-file list produces — so the same shape there is a live
-# fail-open bug, not a reviewed-safe one.
+# The early-exit-reader scope. This is a DIRECTORY list on purpose: the file set is derived by the
+# glob in shipped_scripts() below, so a script added to a covered directory is covered the day it
+# lands and no list here can go stale.
+#
+# scripts/ WAS EXCLUDED, AND THE GROUND IT WAS EXCLUDED ON WAS WRONG. That ground read: "scripts/
+# and tests/ were already swept for this shape (Task 9) and are confined to short
+# per-line/bounded-string checks (a single asmdef field, one line of a .cs file) where a pipe buffer
+# is never in play." Two things about it did not survive being re-run on 2026-08-14:
+#
+#   * The premise was about SIZE, and size is not what decides. Measured, at 1 KB / 50 KB / 120 KB /
+#     400 KB: `echo "$V" | grep -qw NEEDLE` where $V is ONE LINE never fires at any size, because
+#     grep cannot decide a line until it has all of it and therefore drains its input; the SAME
+#     bytes newline-separated fail open from ~50 KB up, reporting a match that is present as absent.
+#     So `scripts/validate-asmdefs.sh`'s reference check — the "single asmdef field" the old ground
+#     names as its accepted exception — is safe because of a `tr '\n' ' '` one line above it, not
+#     because the field is small. Delete that `tr` and the line is a live fail-open bug. A ground
+#     that names the wrong reason cannot be re-derived by the next reader.
+#   * It was written before the current set of scripts existed. The surface-criterion cut removed
+#     four of them and `scripts/generate-claude-md.sh` grew the `| head -1` this widening now
+#     catches: on a project whose .asmdef makes sed emit more than one pipe buffer, that line took
+#     SIGPIPE, pipefail promoted 141, `set -e` killed the generator, and install.sh — which calls it
+#     inside `if ... 2>/dev/null` — wrote NO CLAUDE.md and printed no diagnostic. Measured
+#     2026-08-14: 80 KB of sed output → exit 141, zero bytes of document; 413 B → exit 0.
+#
+# scripts/ is installed payload — install.sh copies it into the user's `.claude/scripts/` — so it is
+# exactly as much "must not fail open in the field" as .claude/hooks/ is, which is the argument this
+# file's own header already makes one level up for the bash-4 sweep.
+#
+# tests/ STAYS OUT, and that is a decision rather than an oversight. It is not shipped: nothing
+# under tests/ is copied into a user's project, so a fail-open there costs a wrong local answer, not
+# a wrong answer on a machine nobody is watching. The runner's own two assertion helpers were the
+# one instance that mattered and they were fixed to here-strings; tests/test-assert-helpers-under-load.sh
+# guards that specific regression under real concurrency, which is stronger evidence than a text
+# sweep. Re-derive what is left rather than trusting this sentence:
+#   /usr/bin/grep -nE '([^|]|^)\|[[:space:]]*grep([[:space:]]+-[A-Za-z]*q[A-Za-z]*)' tests/*.sh
 PIPE_CHECK_DIRS=(
     "$REPO_DIR"/.claude/hooks
+    "$REPO_DIR"/scripts
 )
 PIPE_CHECK_FILES=(
     "$REPO_DIR"/install.sh
@@ -195,9 +223,8 @@ assert_eq \
 # Not bash-4-vs-3.2 — this is the pipefail early-exit-reader shape (see
 # tests/test-hook-large-payload.sh and the file header above). `echo "$VAR" |
 # grep -q...` fails open the instant $VAR is large enough that grep exits
-# before draining stdin. Scoped to .claude/hooks/*.sh plus install.sh/uninstall.sh: those scripts
-# receive whole-file/whole-command/whole-receipt content, unlike the bounded per-line checks
-# already reviewed in scripts/ and tests/ under Task 9. `-q` on its own, or
+# before draining stdin. Scoped to PIPE_CHECK_DIRS + PIPE_CHECK_FILES — see the ruling at their
+# declaration for why scripts/ is now in and tests/ is still out. `-q` on its own, or
 # combined with a case/fixed/extended flag in either order (-qE/-Eq, -qi/-iq,
 # -qF/-Fq, -qx/-xq, -qiE, -qxF, ...), all count.
 #
@@ -210,4 +237,27 @@ PIPE_GREP_Q=$(grep_pipe_check -E '([^|]|^)\|[[:space:]]*grep([[:space:]]+-[A-Za-
 assert_eq \
     "" \
     "$PIPE_GREP_Q" \
-    "hooks and install/uninstall avoid piping into grep -q (early-exit reader can SIGPIPE its writer under pipefail on large content)"
+    "hooks, scripts and install/uninstall avoid piping into grep -q (early-exit reader can SIGPIPE its writer under pipefail on large content)"
+
+# THE SAME SHAPE WITH THE OTHER READER, and the one this sweep did not have when
+# scripts/generate-claude-md.sh shipped `sed -n '…' "$asmdef" | head -1` as a bare assignment.
+# `grep -q` is the subtle instance of the trap; `head` is the one the repo's own guidance names
+# first, and until 2026-08-14 nothing in the suite looked for it anywhere. Its consequence is worse,
+# not better: `grep -q` sits in an `if` condition, where `set -e` is suspended and a fired trap only
+# flips the answer, while `| head` in a bare `X=$(…)` assignment kills the script outright.
+#
+# WHY ` | head` AND NOT `\|[[:space:]]*head` — whitespace is REQUIRED on both sides of the pipe.
+# .claude/hooks/bash-gate.sh carries `…|cat|head|tail|less|…` as a `case` alternation of read-only
+# command names. That is not a pipeline at all, it is not a comment (so the comment filter below
+# does not drop it), and the looser needle matches it — a permanent red on a correct file. Requiring
+# a space on each side separates the two with no exception in the tree today.
+#
+# WHAT THAT COSTS: `foo |head -1` and `foo| head -1` are legal shell and this needle misses both.
+# That is a known hole, chosen over a guard that cannot go green. If it ever matters the repair is a
+# style rule, not a cleverer regex.
+PIPE_HEAD=$(grep_pipe_check -E '[[:space:]]\|[[:space:]]+head([[:space:]]|$)')
+
+assert_eq \
+    "" \
+    "$PIPE_HEAD" \
+    "hooks, scripts and install/uninstall avoid piping into head (it exits on line N and SIGPIPEs its writer; in a bare assignment under set -e that ends the script)"

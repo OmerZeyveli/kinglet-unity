@@ -4,6 +4,7 @@
 #
 # Usage:
 #   ./scripts/detect-pipeline.sh [project-dir]     # default: .
+#   In an installed Unity project this file is ./.claude/scripts/detect-pipeline.sh.
 #
 # Prints exactly one token on stdout, with a trailing newline:
 #
@@ -72,7 +73,7 @@
 set -euo pipefail
 
 usage() {
-  sed -n '3,17p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '3,18p' "$0" | sed 's/^# \{0,1\}//'
   exit 0
 }
 

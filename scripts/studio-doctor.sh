@@ -11,6 +11,9 @@
 #
 # Usage:
 #   ./scripts/studio-doctor.sh [--project-dir /path/to/UnityProject]
+#   In an installed Unity project this file is ./.claude/scripts/studio-doctor.sh — which is the
+#   invocation install.sh's own closing "Next steps" prints, and the one most readers of this help
+#   are actually holding.
 #
 # Exits 1 if any check FAILs, 0 otherwise. (This used to always exit 0, which made it useless in CI.)
 #
@@ -51,7 +54,7 @@ print_first_5() {
   awk 'NF && NR <= 5 { printf "       %s\n", $0 }' <<< "$1"
 }
 
-usage() { sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 PROJECT_DIR="$(pwd)"
 while [ $# -gt 0 ]; do

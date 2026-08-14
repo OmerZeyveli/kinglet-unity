@@ -9,6 +9,7 @@ set -euo pipefail
 #
 # Usage:
 #   ./scripts/validate-serialization.sh [--path <dir>] [--staged]
+#   In an installed Unity project this file is ./.claude/scripts/validate-serialization.sh.
 #   --path <dir>   Scan a specific directory (default: Assets/)
 #   --staged       Only check staged files (for pre-commit validation)
 # =============================================================================
@@ -32,6 +33,7 @@ ${BOLD}validate-serialization.sh${RESET} - Detect renamed serialized fields miss
 
 ${BOLD}Usage:${RESET}
   ./scripts/validate-serialization.sh [OPTIONS]
+  ./.claude/scripts/validate-serialization.sh [OPTIONS]  (the installed copy)
 
 ${BOLD}Options:${RESET}
   --path <dir>   Directory to scan (default: Assets/ under Unity project root)
