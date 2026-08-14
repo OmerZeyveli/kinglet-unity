@@ -416,12 +416,16 @@ while IFS= read -r dead_f; do
   #   scripts/generate-claude-md.sh:150        $(cat <<'PKGS'
   #   scripts/generate-claude-md.sh:366        cat <<MDEOF
   #   scripts/generate-claude-md.sh:564,598    cat <<'MDEOF'
-  #   scripts/validate-asmdefs.sh:32           cat <<EOF
+  #   scripts/validate-asmdefs.sh:38           cat <<EOF
   #   scripts/validate-serialization.sh:31     cat <<EOF
   #
   # Every number in that table was one to thirteen lines low until 2026-08-14: the six shipped
   # scripts gained `--help` blocks and each introducer moved. The delimiters are the anchor and the
-  # numbers are the convenience, which is the order to read them in.
+  # numbers are the convenience, which is the order to read them in. It happened again the very next
+  # day — validate-asmdefs.sh:32 became :38 when that script's header grew a paragraph about
+  # `.asmref` — which is the second data point for treating these six numbers as perishable. Nothing
+  # asserts them; tests/test-citations-resolve.sh only requires the line to exist and be non-blank,
+  # and line 32 of that file is still a non-blank `fi`.
   #
   # Re-derive rather than trusting that list — it is the same class of claim this wave exists to
   # guard, and nothing asserts it:

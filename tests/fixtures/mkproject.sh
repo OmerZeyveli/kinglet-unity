@@ -6,7 +6,7 @@
 # the installer scans is plain text, so a directory with the right shape exercises it fully.
 #
 # Usage:
-#   ./tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed|hdrp|both]
+#   ./tests/fixtures/mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed|hdrp|both|asmref]
 #
 #   urp      (default) URP + Input System + UniTask + VContainer, one asmdef, one scene
 #   builtin  Built-in pipeline, minimal packages
@@ -16,6 +16,8 @@
 #   async-mixed  UniTask named once (in a doc spec) against two coroutine users — the "takes no side" path
 #   hdrp     HDRP only — the pipeline token no fixture produced until 2026-08-13
 #   both     URP *and* HDRP present — the token neither pre-detector implementation had at all
+#   asmref   One .asmdef whose scope is extended by four .asmref files — the assembly shape no
+#            fixture here had until 2026-08-14. See the block above the case arm.
 #
 # WHY `hdrp` AND `both` EXIST. Until 2026-08-13 every fixture here produced one of two pipeline
 # tokens, `urp` or `builtin`. install.sh and scripts/generate-claude-md.sh each carried their own
@@ -28,7 +30,7 @@
 set -euo pipefail
 
 DIR="${1:-}"; shift || true
-[ -n "$DIR" ] || { echo "usage: mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed|hdrp|both]" >&2; exit 2; }
+[ -n "$DIR" ] || { echo "usage: mkproject.sh <dir> [--variant urp|builtin|bare|dirty|legacy|async-mixed|hdrp|both|asmref]" >&2; exit 2; }
 
 VARIANT=urp
 while [ $# -gt 0 ]; do
@@ -261,6 +263,82 @@ public class Pulser : MonoBehaviour
     private IEnumerator Pulse() { yield return null; }
 }
 CS
+    ;;
+  asmref)
+    # WHY THIS VARIANT EXISTS. scripts/validate-asmdefs.sh had a coverage check that read `.asmdef`
+    # files and had never heard of `.asmref` — `grep -rn asmref` over the whole toolkit returned
+    # nothing on 2026-08-14. Measured on a real shipping project (12 .asmdef, 29 .asmref) it emitted
+    # 21 warnings naming 800 files, every one of them false. It survived every prior suite run for
+    # one reason only: no fixture here contained an `.asmref`. The fixture set, not the code, was
+    # what made the defect invisible — the same lesson `hdrp`/`both` record above.
+    #
+    # Every path below is a discriminator, not decoration. Do not "tidy" any of them away:
+    #
+    #   name form      Assets/World Level/     -> {"reference":"Game.Gameplay"}
+    #   GUID form      Assets/Extras/          -> {"reference":"GUID:<the asmdef.meta guid>"}
+    #                  Both forms occur in the wild and on the measured project the GUID form
+    #                  outnumbered the name form more than 2:1, so a fixture carrying one form
+    #                  cannot stand in for the other.
+    #   spaces         "World Level", "DNA Forms" are transcribed from that project's real folder
+    #                  names. An unquoted `for f in $(find …)` splits them and silently reads two
+    #                  paths that do not exist; this already broke one probe while the finding was
+    #                  being gathered.
+    #   dangling x2    Assets/Dangling/ (GUID) and Assets/DanglingName/ (name). An unresolvable
+    #                  reference is a real condition and must be REPORTED, not skipped — one per
+    #                  form, because a resolver can fail on one and not the other.
+    #   true positive  Assets/Loose/Uncovered.cs sits under no assembly file at all. If a "fix"
+    #                  suppresses the false warnings by suppressing the check, this file stops being
+    #                  named and the guard goes red. A coverage count that falls to zero because the
+    #                  sweep died looks exactly like one that falls because the fix worked; this file
+    #                  is what tells them apart.
+    #   prefix trap    Assets/World LevelExtra/ is a sibling whose name has "World Level" as a
+    #                  prefix. The coverage test was a bare `[[ $dir == $covered* ]]`, which reads
+    #                  this as covered — latent while only .asmdef directories were listed, live the
+    #                  moment .asmref directories joined them. The measured project has exactly this
+    #                  pair (Assets/Player and Assets/PlayerPrefsEditor).
+    #
+    # Assets/Scripts/Gameplay.asmdef ("Game.Gameplay") comes from the shared non-bare block above;
+    # this arm adds the .meta that carries its guid, which is what a GUID-form .asmref resolves
+    # against. The guid lives in the .meta file, never inside the .asmdef itself.
+    cat > "$DIR/Packages/manifest.json" <<'JSON'
+{
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.3"
+  }
+}
+JSON
+    cat > "$DIR/Assets/Scripts/Gameplay.asmdef.meta" <<'META'
+fileFormatVersion: 2
+guid: 1a2b3c4d5e6f70819a2b3c4d5e6f7081
+AssemblyDefinitionImporter:
+  externalObjects: {}
+  userData:
+  assetBundleName:
+  assetBundleVariant:
+META
+    printf 'public sealed class Covered { }\n' > "$DIR/Assets/Scripts/Covered.cs"
+
+    mkdir -p "$DIR/Assets/World Level"
+    printf '{"reference":"Game.Gameplay"}\n' > "$DIR/Assets/World Level/Game.Gameplay.asmref"
+    printf 'public sealed class LevelThing { }\n' > "$DIR/Assets/World Level/LevelThing.cs"
+
+    mkdir -p "$DIR/Assets/Extras/DNA Forms"
+    printf '{"reference":"GUID:1a2b3c4d5e6f70819a2b3c4d5e6f7081"}\n' > "$DIR/Assets/Extras/Vendor.asmref"
+    printf 'public sealed class VendorThing { }\n' > "$DIR/Assets/Extras/DNA Forms/VendorThing.cs"
+
+    mkdir -p "$DIR/Assets/Dangling"
+    printf '{"reference":"GUID:deadbeefdeadbeefdeadbeefdeadbeef"}\n' > "$DIR/Assets/Dangling/Broken.asmref"
+    printf 'public sealed class Orphan { }\n' > "$DIR/Assets/Dangling/Orphan.cs"
+
+    mkdir -p "$DIR/Assets/DanglingName"
+    printf '{"reference":"Game.NoSuchAssembly"}\n' > "$DIR/Assets/DanglingName/BrokenName.asmref"
+    printf 'public sealed class OrphanName { }\n' > "$DIR/Assets/DanglingName/OrphanName.cs"
+
+    mkdir -p "$DIR/Assets/World LevelExtra"
+    printf 'public sealed class Sibling { }\n' > "$DIR/Assets/World LevelExtra/Sibling.cs"
+
+    mkdir -p "$DIR/Assets/Loose"
+    printf 'public sealed class Uncovered { }\n' > "$DIR/Assets/Loose/Uncovered.cs"
     ;;
   bare) ;;
   *) echo "err: unknown variant $VARIANT" >&2; exit 2 ;;

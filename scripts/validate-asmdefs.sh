@@ -7,6 +7,12 @@ set -euo pipefail
 # Validates reference integrity, detects circular dependencies, checks
 # Editor/Test assembly conventions, and reports uncovered C# files.
 #
+# COVERAGE READS `.asmref` AS WELL AS `.asmdef`. An `.asmref` file adds its enclosing folder
+# subtree to an assembly defined somewhere else, so Unity treats that subtree as covered. Until
+# 2026-08-14 this script had never heard of the extension (`grep -rn asmref` over the whole toolkit
+# returned nothing), and the coverage check counted every such file as uncovered. Measured on a real
+# shipping project with 12 `.asmdef` and 29 `.asmref`: 21 warnings naming 800 files, all false.
+#
 # Requires: jq
 #
 # Usage:
@@ -44,7 +50,8 @@ ${BOLD}Checks:${RESET}
   - Circular references between assemblies
   - Editor assemblies referencing runtime assemblies incorrectly
   - Test assemblies missing testOnly flag
-  - C# files without assembly definition coverage
+  - .asmref files whose reference resolves to no assembly
+  - C# files without assembly definition or reference coverage
 
 ${BOLD}Requirements:${RESET}
   jq (https://stedolan.github.io/jq/) must be installed.
@@ -134,6 +141,20 @@ ASMDEF_IS_TEST=()
 ASMDEF_TEST_ONLY=()
 
 asmdef_count=0
+
+# Read a Unity .meta file's guid. An `.asmref` in GUID form points at the `.asmdef`'s **`.meta`
+# file** guid, not at anything inside the `.asmdef` itself, so resolving one means reading
+# `<path-to-asmdef>.meta` and matching its `guid:` line.
+#
+# awk reads the file directly rather than being fed by a pipe. `exit` inside a rule is precisely the
+# early-exiting reader this repository's shell notes warn about — but only when something upstream is
+# still writing. There is no writer here, so there is no SIGPIPE to promote. `exit` in a rule falls
+# through to END, which supplies status 1 when no guid line was ever seen.
+meta_guid_of() {
+    local meta="$1.meta"
+    [[ -f "$meta" ]] || return 1
+    awk '$1 == "guid:" { print $2; seen = 1; exit } END { if (!seen) exit 1 }' "$meta"
+}
 
 # Linear scan for the index of `target` in ASMDEF_NAMES. Prints the index and returns 0 if found;
 # returns 1 (nothing printed) otherwise. Assembly counts don't justify anything smarter — see the
@@ -365,18 +386,138 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# 5. Files without assembly definition coverage
+# 5. Assembly reference (.asmref) files
+#
+# An `.asmref` is JSON with a single `reference` key and it takes two forms, both of which occur in
+# the wild — on the project this check was measured against the GUID form outnumbered the name form
+# more than 2:1, so neither can be treated as the special case:
+#
+#     {"reference":"MyGame.Runtime"}                          by assembly NAME
+#     {"reference":"GUID:4a1cb1490dc4df8409b2580d6b44e75e"}   by the target .asmdef.meta's guid
+#
+# RESOLUTION SCOPE is Assets/ plus Packages/, not Assets/ alone. The graph checks above index only
+# Assets/, but an `.asmref` may legitimately target an assembly defined by an embedded package, and
+# resolving against Assets/ alone would report that as dangling — trading one class of false positive
+# for another. Library/PackageCache is deliberately out of scope: it is a build artifact that a fresh
+# clone does not have, so a check that depended on it would give different answers on the same
+# commit. The warning text below names the scope so a reader can tell a genuine dangle from a target
+# this script cannot see.
+# ---------------------------------------------------------------------------
+echo "${BOLD}--- Assembly Reference (.asmref) Check ---${RESET}"
+
+ASMREF_DIRS=()
+asmref_count=0
+asmref_dangling=0
+
+# Resolution index, separate from the graph arrays on purpose: it spans a wider root set and it must
+# not feed cycle detection or the Editor/Runtime rules, which are defined over the project's own
+# assemblies. Built only when there is at least one .asmref to resolve.
+REFTARGET_NAMES=()
+REFTARGET_GUIDS=()
+
+reftarget_resolves() {
+    # $1 = "name:<assembly name>" or "guid:<hex>". Prints nothing; returns 0 when a target exists.
+    local kind="${1%%:*}" want="${1#*:}" i
+    if [[ "$kind" == "guid" ]]; then
+        for ((i = 0; i < ${#REFTARGET_GUIDS[@]}; i++)); do
+            [[ -n "${REFTARGET_GUIDS[$i]}" && "${REFTARGET_GUIDS[$i]}" == "$want" ]] && return 0
+        done
+    else
+        for ((i = 0; i < ${#REFTARGET_NAMES[@]}; i++)); do
+            [[ "${REFTARGET_NAMES[$i]}" == "$want" ]] && return 0
+        done
+    fi
+    return 1
+}
+
+# `find -print0` with `read -r -d ''`, not `for f in $(find …)`. Real projects carry folders with
+# spaces in them — the measurement that produced this check hit `Assets/Core/World Level/Editor/`
+# and `Assets/Player/DNA Forms/` — and word-splitting turns each of those into two nonexistent paths.
+#
+# Discovery is a separate pass from resolution so the count is known before the resolution index is
+# built: a project with no `.asmref` at all should not pay for a second `find`. The paths are held in
+# an ARRAY rather than joined into a newline-delimited string, because joining on newlines hands back
+# exactly the separator `-print0` was chosen to avoid.
+ASMREF_PATHS=()
+while IFS= read -r -d '' asmref_file; do
+    ASMREF_PATHS[asmref_count]="$asmref_file"
+    (( asmref_count += 1 ))
+done < <(find "$ASSETS_DIR" -name '*.asmref' -print0 2>/dev/null)
+
+if (( asmref_count > 0 )); then
+    reftarget_roots=("$ASSETS_DIR")
+    [[ -d "$PROJECT_ROOT/Packages" ]] && reftarget_roots+=("$PROJECT_ROOT/Packages")
+
+    while IFS= read -r -d '' target_asmdef; do
+        ti=${#REFTARGET_NAMES[@]}
+        REFTARGET_NAMES[ti]="$(jq -r '.name // empty' "$target_asmdef" 2>/dev/null || true)"
+        REFTARGET_GUIDS[ti]="$(meta_guid_of "$target_asmdef" || true)"
+    done < <(find "${reftarget_roots[@]}" -name '*.asmdef' -print0 2>/dev/null)
+
+    for ((ri = 0; ri < asmref_count; ri++)); do
+        asmref_file="${ASMREF_PATHS[$ri]}"
+        rel="${asmref_file#"$PROJECT_ROOT/"}"
+        ref=$(jq -r '.reference // empty' "$asmref_file" 2>/dev/null || true)
+
+        if [[ -z "$ref" ]]; then
+            warn_msg "Unresolvable .asmref: $rel has no readable 'reference' key."
+            (( asmref_dangling += 1 ))
+        elif [[ "$ref" == GUID:* ]]; then
+            if reftarget_resolves "guid:${ref#GUID:}"; then
+                if $VERBOSE; then info ".asmref $rel -> ${ref#GUID:} (by GUID)"; fi
+            else
+                warn_msg "Unresolvable .asmref: $rel references ${ref}, which matches no .asmdef.meta guid under Assets/ or Packages/. Files in that subtree are reported as covered below, but their assembly membership is NOT verified."
+                (( asmref_dangling += 1 ))
+            fi
+        else
+            if reftarget_resolves "name:$ref"; then
+                if $VERBOSE; then info ".asmref $rel -> $ref (by name)"; fi
+            else
+                warn_msg "Unresolvable .asmref: $rel references assembly '$ref', which no .asmdef under Assets/ or Packages/ defines. Files in that subtree are reported as covered below, but their assembly membership is NOT verified."
+                (( asmref_dangling += 1 ))
+            fi
+        fi
+
+        ASMREF_DIRS[ri]="$(dirname "$asmref_file")"
+    done
+fi
+
+info "Found $asmref_count assembly reference(s)."
+if (( asmref_dangling == 0 )); then
+    echo "  ${GREEN}All .asmref references resolve to an assembly.${RESET}"
+fi
+
+echo ""
+
+# ---------------------------------------------------------------------------
+# 6. Files without assembly definition coverage
+#
+# A DANGLING `.asmref` STILL GRANTS COVERAGE HERE, and that is a decision rather than an oversight.
+# The folder is claimed by an assembly file; what is broken is the reference, and section 5 has
+# already named it, once, with the subtree it affects. Withholding coverage instead would re-report
+# the same single defect once per C# file underneath — on the measured project a single dangling
+# third-party `.asmref` would have restored hundreds of warnings, which is precisely the noise this
+# section was fixed to stop emitting.
 # ---------------------------------------------------------------------------
 echo "${BOLD}--- Uncovered C# Files ---${RESET}"
 uncovered_count=0
 
-# Build list of asmdef directories (sorted deepest first for matching)
-asmdef_dirs=("${ASMDEF_DIRS[@]}")
+# Both file kinds cover their subtree, so both go in one list.
+covered_dirs=("${ASMDEF_DIRS[@]}")
+if (( asmref_count > 0 )); then
+    covered_dirs+=("${ASMREF_DIRS[@]}")
+fi
 
 is_covered() {
     local cs_dir="$1"
-    for adir in "${asmdef_dirs[@]}"; do
-        if [[ "$cs_dir" == "$adir"* ]]; then
+    local adir
+    for adir in "${covered_dirs[@]}"; do
+        # THE `/` MATTERS. This was a bare `"$cs_dir" == "$adir"*` prefix test, which is a fail-open
+        # the moment one covered directory's name is a prefix of a sibling's: with an assembly file
+        # at `Assets/Player`, everything under `Assets/PlayerPrefsEditor` read as covered. Latent
+        # while only .asmdef directories were listed here, and live the instant .asmref directories
+        # joined them — the measured project has exactly that Player / PlayerPrefsEditor pair.
+        if [[ "$cs_dir" == "$adir" || "$cs_dir" == "$adir"/* ]]; then
             return 0
         fi
     done
@@ -388,7 +529,7 @@ while IFS= read -r -d '' csfile; do
     if ! is_covered "$cs_dir"; then
         rel="${csfile#"$PROJECT_ROOT/"}"
         if (( uncovered_count < 20 )); then
-            warn_msg "No .asmdef coverage: $rel"
+            warn_msg "No .asmdef/.asmref coverage: $rel"
         fi
         (( uncovered_count += 1 ))
     fi
@@ -399,9 +540,9 @@ if (( uncovered_count > 20 )); then
 fi
 
 if (( uncovered_count == 0 )); then
-    echo "  ${GREEN}All C# files are covered by an assembly definition.${RESET}"
+    echo "  ${GREEN}All C# files are covered by an assembly definition or reference.${RESET}"
 else
-    echo "  ${YELLOW}$uncovered_count file(s) without assembly definition coverage.${RESET}"
+    echo "  ${YELLOW}$uncovered_count file(s) without assembly definition or reference coverage.${RESET}"
 fi
 
 echo ""
@@ -411,6 +552,7 @@ echo ""
 # ---------------------------------------------------------------------------
 echo "${BOLD}=== Summary ===${RESET}"
 echo "  Assemblies found : $asmdef_count"
+echo "  References found : $asmref_count"
 echo "  Errors           : $error_count"
 echo "  Warnings         : $warning_count"
 
