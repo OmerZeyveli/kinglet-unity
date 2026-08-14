@@ -28,8 +28,9 @@ fill the half the user owns by asking them.
 
 - **Inside the markers is the toolkit's.** That region is **regenerated in place**: it is replaced
   wholesale, every time, by the output of `.claude/scripts/generate-claude-md.sh`. A **re-install
-  rewrites it** — the Kinglet installer refreshes exactly this region on every run — and so does this
-  command. Nothing hand-written inside it survives, so do not put anything there.
+  rewrites it** — the Kinglet installer refreshes exactly this region on every run that finds a
+  well-formed one — and so does this command. Nothing hand-written inside it survives, so do not put
+  anything there, and do not read anything found there as the user's.
 - **Outside the markers is the user's.** The vision half above it (`FILL:` markers, pillars, scope)
   and anything they add below it are theirs. The generator never writes outside the region and
   neither do you, except where this command's own steps say so and the user has approved it.
@@ -53,16 +54,29 @@ prose that is not there.
    bash .claude/scripts/generate-claude-md.sh --facts-only .
    ```
 
-   This is the **one producer** of the marked region, and it is the same script the installer runs —
-   so running it is how this command and the installer stay in agreement instead of drifting. It
-   writes the document to **stdout** and its log lines to stderr; the caller owns the destination
+   This is the **one producer of the region's content**, and it is the same script the installer
+   runs — so running it is how this command and the installer stay in agreement instead of drifting.
+   It writes the document to **stdout** and its log lines to stderr; the caller owns the destination
    file, so nothing is written until you write it in step 2.
 
-   It already does, from the project's own files, everything a hand pass would do: Unity version,
-   render pipeline, detected packages, assembly definitions, scenes in build settings, the skills
-   that match this project, and the *"Architecture stack — detected, not assumed"* verdict.
+   **One known disagreement, and it is the installer's, not the generator's:** the installer's
+   *refresh* path adds one extra blank line immediately before the `end` marker, so a region it last
+   refreshed is exactly one newline longer than the same region freshly generated. Following step 2
+   normalises that away. It is a blank line and nothing else — do not read it as a fact having
+   changed, and do not "fix" the generator to match it.
+
+   It already does, from the project's own files, most of what a hand pass would do: Unity version,
+   render pipeline, assembly definitions, scenes in build settings, the skills that match this
+   project, the *"Architecture stack — detected, not assumed"* verdict, and the packages it knows.
    **Do not reproduce any of that by hand, and do not edit its output.** If a fact looks wrong, that
    is a bug in the generator or in the project's files — report it; do not paper over it.
+
+   **Its package table is a fixed list, and it is not exhaustive.** It does not currently carry
+   Timeline, Mirror, Photon, Fish-Net or Odin, among others. If you can see from
+   `Packages/manifest.json` that the project uses something the block does not mention, **say so in
+   your report to the user** — as a gap in the generator's list, named, so it can be closed. Do not
+   silently hand-edit the block to add it: the next refresh deletes the addition and the gap comes
+   back unrecorded.
 
    Two things worth knowing about what comes back:
 
@@ -84,12 +98,20 @@ prose that is not there.
    - **`CLAUDE.md` does not exist at all** (a hand-copied `.claude/`, which never produces one): run
      the generator **without** `--facts-only` and write its stdout to `CLAUDE.md`. That form emits
      the vision half, both markers and the region in one document.
+     **Check `.claude/scripts/` exists before you try** — a hand-copied `.claude/` has no `scripts/`
+     directory either, and that is the same project shape that has no `CLAUDE.md`, so step 1's line
+     and this branch's own command both exit 127 with *No such file or directory*. If that directory
+     is missing, **stop**: this is the manual-copy path, nothing here can generate anything, and the
+     fix is not yours to improvise. Tell the user to re-run the Kinglet installer from the toolkit
+     checkout, or to copy the toolkit's repo-root `scripts/` into `.claude/scripts/` themselves —
+     the toolkit's Getting Started guide carries that copy loop verbatim, including the one script
+     it deliberately leaves out.
    - **`CLAUDE.md` exists but has no markers at all**, or does not have the well-formed shape the
      marker contract above defines: **stop and show the user.** Do not edit the file, do not insert
-     markers into prose you did not write, and do not guess where the region was meant to go.
-     Report what you found,
-     and offer them the two ways forward: add the marker pair themselves where they want the block,
-     or keep their file and let you write the generated document beside it for them to merge.
+     markers into prose you did not write, and do not guess where the region was meant to go. Report
+     what you found, and offer them the two ways forward: add the marker pair themselves where they
+     want the block, or keep their file and let you write the generated document beside it for them
+     to merge.
 
 3. **Fill the vision half with the user.** The `FILL:` markers live *outside* the region — elevator
    pitch, core fantasy, unique hook, genre, target platforms, primary input, pillars, scope, MVP

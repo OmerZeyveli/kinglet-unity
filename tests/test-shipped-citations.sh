@@ -242,10 +242,15 @@ done <<< "$SHIPPED_MD"
 # reader never has to trust this comment. Raise it when the tree grows; never lower one to make a run
 # pass. The reverse-direction assertion below would also redden if every reference vanished at once —
 # but not if the token EXPRESSION broke while the references stayed, which is what this catches.
-if [ "$SC_TOKENS_N" -ge 4 ]; then
-  pass "guard examined $SC_TOKENS_N .claude/scripts/ path reference(s) in shipped surfaces (floor 4)"
+#
+# Raised 4 -> 8 on 2026-08-14, honouring the instruction above rather than leaving it as advice:
+# /unity-init gained two references to generate-claude-md.sh that day and the live count went 7 -> 9,
+# so a floor of 4 had come to sit at less than half the tree and would have sat through the loss of
+# five references without a word.
+if [ "$SC_TOKENS_N" -ge 8 ]; then
+  pass "guard examined $SC_TOKENS_N .claude/scripts/ path reference(s) in shipped surfaces (floor 8)"
 else
-  fail "guard examined only $SC_TOKENS_N .claude/scripts/ path reference(s) — expected at least 4; either the wiring has been removed or the token expression has stopped matching"
+  fail "guard examined only $SC_TOKENS_N .claude/scripts/ path reference(s) — expected at least 8; either the wiring has been removed or the token expression has stopped matching"
 fi
 
 # A token cannot contain a colon (the character class excludes it), so `##*:` recovers it from the
@@ -313,6 +318,7 @@ while IFS= read -r b; do
 done <<< "$SC_UNREF"
 
 SC_NAMED_N="$(printf '%s\n' "$SC_NAMED" | sort -u | grep -c . || true)"
+SC_PENDING_N="$(printf '%s\n' $SC_REACH_PENDING | grep -c . || true)"
 
 sc_stale_pending=""
 for b in $SC_REACH_PENDING; do
@@ -331,7 +337,7 @@ else
 fi
 
 if [ -z "$sc_unref_bad" ]; then
-  pass "$SC_NAMED_N of $SC_INSTALLED_N installed scripts are named by a shipped surface; the rest are on the recorded pending list"
+  pass "$SC_NAMED_N of $SC_INSTALLED_N installed scripts are named by a shipped surface, bar $SC_PENDING_N on the recorded pending list"
 else
   fail "installed script(s) named by no agent, command or skill and not on the pending list:$sc_unref_bad"
   printf '       %s of %s installed scripts are currently named by a shipped surface.\n' "$SC_NAMED_N" "$SC_INSTALLED_N"
