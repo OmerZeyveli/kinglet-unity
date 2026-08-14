@@ -5,8 +5,8 @@
 # `install.sh` exits 0 for every outcome it can report. That is the contract, it is written down in
 # MCP-SETUP.md § "What install.sh's exit status means", and it is only safe because a second channel
 # carries what the status cannot: the `Not done:` block. Before this file existed,
-# `/usr/bin/grep -rn 'Not done' tests/` was EMPTY — the block could be deleted, or fourteen of its
-# fifteen branches could stop feeding it, with the whole suite green.
+# `/usr/bin/grep -rn 'Not done' tests/` was EMPTY — the block could be deleted, or every branch but
+# one could stop feeding it, with the whole suite green.
 #
 # TWO ORACLES, AND THEY ARE DELIBERATELY DIFFERENT.
 #
@@ -86,55 +86,139 @@ INSTALLER="$REPO/install.sh"
 # different reason (MODE=foreign is defined by the receipt's ABSENCE, so an unconditional write would
 # destroy that mode), and its oracle is a fixture rather than the source.
 
-# receipt_commit_report <file> — prints `fn=<0|1> count=<n> outside=<n>`.
+# receipt_write_report <file> — prints `fn=<0|1> inside=<n> outside=<n> unclassified=<n>`.
 #
-#   fn       1 if a `write_receipt() {` opening and a column-0 `}` closing were both found. Guards
-#            against the whole check going vacuous after a rename or a re-indent.
-#   count    truncating `> "$RECEIPT"` redirections, comments excluded.
-#   outside  how many of those sit outside write_receipt's body.
+#   fn            1 if a `write_receipt() {` opening and a column-0 `}` closing were both found.
+#                 Guards the whole check against going vacuous after a rename or a re-indent.
+#   inside        writes to $RECEIPT inside write_receipt's body.
+#   outside       writes to $RECEIPT anywhere else. This is the invariant.
+#   unclassified  lines referencing $RECEIPT that are neither a recognised write nor a recognised
+#                 read. Fail-closed: an unrecognised shape is a red, not a shrug.
+#
+# THE FIRST VERSION OF THIS COUNTED ONE SPELLING — `> "$RECEIPT"` — AND THE REVIEWER BROKE IT SIX
+# WAYS IN A ROW. `> "${RECEIPT}"`, `> $RECEIPT`, `| tee "$RECEIPT"`, `cp /dev/null "$RECEIPT"`,
+# `mv "$RECEIPT_TMP" "$RECEIPT"` and `>| "$RECEIPT"` each added a second commit point outside the
+# function with the check still reporting clean, and the whole file still printing 36/36. The one
+# that mattered was `cp "$RECEIPT_TMP" "$RECEIPT"` before the `write_receipt` call: behaviour
+# unchanged, invariant destroyed, suite green. `mv "$RECEIPT_TMP" "$RECEIPT"` is the single most
+# natural idiom for committing a temp file, so this was not a contrived evasion — it is the shape
+# the next owner reaches for first.
+#
+# SO WRITES ARE DETECTED THREE WAYS, AND THE THIRD IS THE VERB-INDEPENDENT ONE:
+#
+#   1. Any output redirection whose target is the reference — `>`, `>>`, `>|`, `N>`, `exec N>` —
+#      quoted, braced or bare.
+#   2. A mutating command word on the line. A spelling list, and therefore the weak one.
+#   3. ANY LINE NAMING BOTH $RECEIPT_TMP AND $RECEIPT. That is what committing a temp file IS,
+#      whatever verb does it, and it catches `mv`, `cp`, `install`, `tee`, `rsync` and a command
+#      held in a variable with one rule and no list. install.sh's own commit does NOT trip it:
+#      `sort … "$RECEIPT_TMP"` and `} > "$RECEIPT"` are different lines.
+#
+# READS ARE RECOGNISED NARROWLY: a file-test operator, a reader command word, an input redirection,
+# or the reference as the line's final token. Everything else is `unclassified` and reds — which is
+# how a write through an interpreter (`python3 -c "open('$RECEIPT','w')"`) is caught without naming
+# python.
+#
+# THE STATED LIMIT, because a guard's blind spot belongs beside it: rule 4's trailing-token
+# concession exists for one real line — the closing line of a multi-line awk program, where the
+# reference is a bare file argument with no command word in sight. A mutating command that (a) is
+# spelled in no list, (b) does not mention $RECEIPT_TMP, and (c) takes $RECEIPT as its last argument
+# would pass. `$SOME_CMD /dev/null "$RECEIPT"` is that shape; it is measured and reported, not
+# claimed away.
 #
 # `[$]RECEIPT`, not `\$RECEIPT`: a backslash-dollar inside an awk ERE is an escape whose meaning is
-# not portable, and a bracket expression says the same thing in every awk. `(^|[^>])>` excludes `>>`
-# — an append to the receipt is a different operation and there are none, but a check that counted
-# them could not tell the difference. `"$RECEIPT"` with its closing quote also excludes
-# `"$RECEIPT_TMP"`, which every row writer appends to.
-receipt_commit_report() {
+# not portable, and a bracket expression says the same thing in every awk. The reference pattern
+# requires a non-identifier character after RECEIPT so `$RECEIPT_TMP`, `$RECEIPT_REL`,
+# `$RECEIPT_ROWS` and `$RECEIPT_WRITTEN` are not mistaken for it.
+receipt_write_report() {
   awk '
+    BEGIN {
+      ref  = "\"?[$]\\{?RECEIPT\\}?\"?"
+      refw = "[$]\\{?RECEIPT\\}?([^A-Za-z0-9_]|$)"
+      split("cp mv ln install dd truncate touch shred rsync tee sponge", wv, " ")
+      split("grep awk sed cat wc sort comm cut tail head sha256sum stat dirname basename test", rv, " ")
+    }
     /^[[:space:]]*#/ { next }
     /^write_receipt\(\)[[:space:]]*\{/ { infn = 1; opened = 1 }
     infn && /^\}[[:space:]]*$/ { infn = 0; closed = 1 }
-    /(^|[^>])>[[:space:]]*"[$]RECEIPT"/ { n++; if (!infn) out++ }
-    END { printf "fn=%d count=%d outside=%d\n", (opened && closed) ? 1 : 0, n + 0, out + 0 }
+    $0 !~ refw { next }
+    /^[[:space:]]*RECEIPT=/ { next }
+    {
+      w = 0
+      if ($0 ~ ("[0-9]*>>?\\|?[[:space:]]*" ref)) w = 1
+      for (i in wv) if ($0 ~ ("(^|[^A-Za-z0-9_./-])" wv[i] "([^A-Za-z0-9_./-]|$)")) w = 1
+      if ($0 ~ /[$]\{?RECEIPT_TMP\}?([^A-Za-z0-9_]|$)/) w = 1
+      if (w) { if (infn) ins++; else out++; next }
+      r = 0
+      if ($0 ~ /\[[[:space:]]+-[fsehr][[:space:]]/) r = 1
+      for (i in rv) if ($0 ~ ("(^|[^A-Za-z0-9_./-])" rv[i] "([^A-Za-z0-9_./-]|$)")) r = 1
+      if ($0 ~ ("<[[:space:]]*" ref)) r = 1
+      if ($0 ~ (ref "[[:space:]]*$")) r = 1
+      if (!r) unc++
+    }
+    END {
+      printf "fn=%d inside=%d outside=%d unclassified=%d\n", \
+        (opened && closed) ? 1 : 0, ins + 0, out + 0, unc + 0
+    }
   ' "$1"
 }
 
-A_REPORT="$(receipt_commit_report "$INSTALLER")"
-if [ "$A_REPORT" = "fn=1 count=1 outside=0" ]; then
-  pass "A.1: install.sh commits the receipt at exactly one point, inside write_receipt"
+A_GOOD="fn=1 inside=1 outside=0 unclassified=0"
+A_REPORT="$(receipt_write_report "$INSTALLER")"
+if [ "$A_REPORT" = "$A_GOOD" ]; then
+  pass "A.1: install.sh writes the receipt at exactly one point, inside write_receipt"
 else
-  fail "A.1: install.sh's receipt commit point is not what the ownership invariant requires — expected 'fn=1 count=1 outside=0', got '$A_REPORT'. Four owned_by_installer call sites read \$RECEIPT expecting the PREVIOUS run's rows"
+  fail "A.1: install.sh's receipt write points are not what the ownership invariant requires — expected '$A_GOOD', got '$A_REPORT'. Four owned_by_installer call sites read \$RECEIPT expecting the PREVIOUS run's rows"
 fi
 
-# ── A.2/A.3: the check is mutation-proved, in both directions it claims ──────
-# A guard that has never been shown to redden is a guard that has been read, not tested. Both mutants
-# below are the real defects in miniature: a second commit point, and a commit point that has left
-# the function. Each is applied to a COPY; nothing here touches the repository's install.sh.
-A_MUT_TWO="$SCRATCH/install-two-commits.sh"
-python3 - "$INSTALLER" "$A_MUT_TWO" <<'PY'
+# ── A.2: eleven mutants, each a second commit point outside the function ────
+# A guard that has never been shown to redden is a guard that has been read, not tested — and the
+# first version of this one passed six of these eleven. Every mutant is applied to a COPY in
+# $SCRATCH; nothing here touches the repository's install.sh. The insertion point is the line
+# immediately before the real commit, which is where a second one would most plausibly be added.
+#
+# The table is `name<TAB>shell line`. A tab, because every line here carries quotes and spaces.
+A_MUT_ANCHOR='write_receipt || die'
+a_mutant_report() {
+  local nm="$1"
+  local injected="$2"
+  local dst="$SCRATCH/mutant-$nm.sh"
+  python3 - "$INSTALLER" "$dst" "$injected" "$A_MUT_ANCHOR" <<'PY'
 import sys
-src, dst = sys.argv[1], sys.argv[2]
+src, dst, injected, anchor = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 s = open(src).read()
-anchor = 'RECEIPT_TMP=$(mktemp)\n'
-assert s.count(anchor) == 1, 'anchor for the second-commit mutant is not unique'
-open(dst, 'w').write(s.replace(anchor, anchor + 'printf "" > "$RECEIPT"\n', 1))
+assert s.count(anchor) == 1, 'the write_receipt call site is not unique'
+open(dst, 'w').write(s.replace(anchor, injected + '\n' + anchor, 1))
 PY
-A_REPORT_TWO="$(receipt_commit_report "$A_MUT_TWO")"
-if [ "$A_REPORT_TWO" = "fn=1 count=1 outside=0" ]; then
-  fail "A.2: a copy of install.sh carrying a SECOND '> \$RECEIPT' outside write_receipt still reported '$A_REPORT_TWO' — A.1 cannot see the defect it exists to catch"
-else
-  pass "A.2: a second receipt commit point reddens the check (mutant reported '$A_REPORT_TWO')"
-fi
+  receipt_write_report "$dst"
+}
 
+while IFS=$'\t' read -r a_name a_line; do
+  [ -n "$a_name" ] || continue
+  A_M="$(a_mutant_report "$a_name" "$a_line")"
+  if [ "$A_M" = "$A_GOOD" ]; then
+    fail "A.2/$a_name: a copy of install.sh carrying a second receipt commit point ($a_line) still reported '$A_M' — A.1 cannot see the defect it exists to catch"
+  else
+    pass "A.2/$a_name: a second commit point spelled '$a_line' reddens the check (reported '$A_M')"
+  fi
+done <<MUTANTS
+redirect-quoted	printf "" > "\$RECEIPT"
+redirect-braced	printf "" > "\${RECEIPT}"
+redirect-bare	printf "" > \$RECEIPT
+redirect-clobber	printf "" >| "\$RECEIPT"
+redirect-append	printf "x" >> "\$RECEIPT"
+exec-fd	exec 9> "\$RECEIPT"
+tee	cat "\$RECEIPT_TMP" | tee "\$RECEIPT" >/dev/null
+cp-devnull	cp /dev/null "\$RECEIPT"
+cp-tmp	cp "\$RECEIPT_TMP" "\$RECEIPT"
+mv-tmp	mv "\$RECEIPT_TMP" "\$RECEIPT"
+install-tmp	install -m 644 "\$RECEIPT_TMP" "\$RECEIPT"
+python-open	python3 -c "open('\$RECEIPT','w')"
+MUTANTS
+
+# ── A.3: the commit point moved OUT of write_receipt ────────────────────────
+# The other direction, and it is not covered by A.2: here the count of writes is still one. A check
+# that only counted would stay green on it.
 A_MUT_OUT="$SCRATCH/install-commit-moved.sh"
 python3 - "$INSTALLER" "$A_MUT_OUT" <<'PY'
 import sys
@@ -148,15 +232,40 @@ s = s.replace(inside, '  } > "$RECEIPT_TMP.out" || return 1\n', 1)
 s = s.replace(call, 'cat "$RECEIPT_TMP.out" > "$RECEIPT"\nwrite_receipt || die', 1)
 open(dst, 'w').write(s)
 PY
-A_REPORT_OUT="$(receipt_commit_report "$A_MUT_OUT")"
-if [ "$A_REPORT_OUT" = "fn=1 count=1 outside=0" ]; then
-  fail "A.3: a copy of install.sh whose only '> \$RECEIPT' was moved OUT of write_receipt still reported '$A_REPORT_OUT' — A.1 counts the redirection but does not locate it"
+A_REPORT_OUT="$(receipt_write_report "$A_MUT_OUT")"
+if [ "$A_REPORT_OUT" = "$A_GOOD" ]; then
+  fail "A.3: a copy of install.sh whose only receipt write was moved OUT of write_receipt still reported '$A_REPORT_OUT' — A.1 counts the writes but does not locate them"
 else
-  pass "A.3: moving the receipt commit out of write_receipt reddens the check (mutant reported '$A_REPORT_OUT')"
+  pass "A.3: moving the receipt write out of write_receipt reddens the check (reported '$A_REPORT_OUT')"
+fi
+
+# ── A.3b: the abort path reports before it exits ────────────────────────────
+# Answering *2* at the existing-.claude/ prompt is the most complete abandonment install.sh has:
+# nothing installed, no receipt, exit 0. It is the one recording point no fixture can reach — the
+# prompt is skipped entirely unless stdin is a tty — so it is asserted the way Section A asserts
+# everything else, in the source. `awk` walks the `case` arm from `*)` to its `;;` and requires both
+# halves: recording the abandonment, and printing the block before exiting.
+#
+# This is a weaker oracle than a run and it is named as one: it proves the calls are on that path,
+# not that their output is right. The behaviour was measured by hand with
+# `printf '2\n' | script -q -e -c "bash install.sh --project-dir P" /dev/null` — block printed,
+# rc=0, .claude/ holding only the pre-existing foreign file.
+A_ABORT="$(awk '
+  /REPLY_CHOICE:-2/            { incase = 1 }
+  incase && /^[[:space:]]*\*\)/ { inarm = 1 }
+  inarm && /note_not_done/     { n = 1 }
+  inarm && /print_not_done/    { p = 1 }
+  inarm && /exit 0/            { if (n && p) ok = 1; inarm = 0; incase = 0 }
+  END { print ok + 0 }
+' "$INSTALLER")"
+if [ "$A_ABORT" = "1" ]; then
+  pass "A.3b: the abort arm records the abandonment and prints the block before its exit 0"
+else
+  fail "A.3b: the abort arm reaches 'exit 0' without both a note_not_done and a print_not_done before it — a run that installs nothing would exit 0 saying one word"
 fi
 
 # ── A.4: one writer for the block itself ────────────────────────────────────
-# Eleven sites record into $NOT_DONE and one function prints it. A second printer is how the block
+# Every abandonment site records into $NOT_DONE and one function prints it. A second printer is how the block
 # and its contract drift apart — one of them would be reachable on a path the contract does not
 # describe. Comments are excluded, so the reasoning above `print_not_done` does not count as a
 # second writer.
@@ -248,6 +357,26 @@ else
   fail "B.0: the exit contract did not reach $B0/MCP-SETUP.md — a contract that only exists in the toolkit repository is not one a user of an installed project can read"
 fi
 
+# ── B.0b: --dry-run, the contract's one stated exit-0 exception ─────────────
+# MCP-SETUP.md says "One exit-0 run is not an install and prints no block: --dry-run". That sentence
+# had no assertion, in the file whose whole subject is that an unasserted sentence about install.sh
+# is a sentence that can go false. The fixture is deliberately one that WOULD produce a block on a
+# real run — a bare project with a flag it cannot honour — so this cannot pass by having nothing to
+# report. Step 4's unreadable-origin scan can call note_not_done before the dry-run exit, and the
+# dry run is supposed to print it nowhere; this is the arm that says so.
+B0B="$(new_fixture dryrun-exception bare)"
+run_install "$B0B" "B.0b (--dry-run against a project a real run would report on)" --dry-run --with-mcp
+if [ -n "$(not_done_block)" ]; then
+  fail "B.0b: --dry-run printed the block — MCP-SETUP.md tells callers it does not, and a dry run abandons nothing because it attempts nothing"
+else
+  pass "B.0b: --dry-run prints no block, as the shipped contract states"
+fi
+if grep -qF -- 'Dry run complete — nothing written.' <<< "$INSTALL_OUT"; then
+  pass "B.0b: the dry run ended with the line the contract names in its place"
+else
+  fail "B.0b: the dry run did not end with 'Dry run complete — nothing written.' — the contract offers that line as what a caller reads instead of the block"
+fi
+
 # ── B.1: a --with-* flag against a project with no Packages/manifest.json ───
 # The plan's first reproduction. Both flags are passed, because one manifest-shaped failure abandons
 # every flag the run carried and a single-flag fixture cannot tell "recorded once" from "recorded for
@@ -283,6 +412,33 @@ printf '# My own CLAUDE.md\n\nNothing generated here.\n' > "$B4/CLAUDE.md"
 printf '# My own CLAUDE.md.generated\n\nDo not overwrite this.\n' > "$B4/CLAUDE.md.generated"
 run_install "$B4" "B.4 (CLAUDE.md.generated is the user's)"
 assert_entry "B.4" 'CLAUDE.md.generated — yours was kept untouched'
+
+# ── B.4b: a CLAUDE.md of the user's own, with no generated markers ─────────
+# THE HOLE THE FIRST ROUND SHIPPED. This branch WRITES CLAUDE.md.generated and was excluded from the
+# block on the ground that "work done differently is not work abandoned" — a criterion invented to
+# escape the stated one. Claude Code reads CLAUDE.md; the toolkit's configuration sits in the file
+# beside it, inert, exactly as an unregistered hook sits on disk. Measured before the fix: rc=0, no
+# block, and zero `kinglet:generated` markers in the CLAUDE.md that Claude Code will read. Every
+# project that already has a CLAUDE.md takes this branch.
+#
+# The two halves are asserted separately: that the branch really ran (the beside-file exists and the
+# user's own file was not touched), and that the block names it. Without the first, a fixture that
+# quietly took the `refreshed` or `new` branch would leave the second asserting nothing.
+B4B="$(new_fixture markerless-claude-md urp)"
+printf '# My Game\n\nMy own notes. No generated markers anywhere in this file.\n' > "$B4B/CLAUDE.md"
+B4B_SHA="$(sha256sum "$B4B/CLAUDE.md" | cut -d' ' -f1)"
+run_install "$B4B" "B.4b (the user's CLAUDE.md has no markers)"
+if [ -f "$B4B/CLAUDE.md.generated" ] && [ "$(sha256sum "$B4B/CLAUDE.md" | cut -d' ' -f1)" = "$B4B_SHA" ]; then
+  pass "B.4b: the run wrote CLAUDE.md.generated beside the user's untouched CLAUDE.md, so the branch ran"
+else
+  fail "B.4b: the run did not take the beside-yours branch, so the entry assertion below is about a branch that did not run"
+fi
+if grep -qF -- 'kinglet:generated' "$B4B/CLAUDE.md"; then
+  fail "B.4b: the user's CLAUDE.md gained generated markers — this fixture is no longer the state the entry describes"
+else
+  pass "B.4b: the file Claude Code reads carries none of the generated block, which is what makes this an abandonment"
+fi
+assert_entry "B.4b" 'CLAUDE.md — yours has no generated markers'
 
 # ── B.5: an upgrade whose kept settings.json leaves a hook unregistered ─────
 # Two installs, because this is an UPGRADE-shaped defect and no fresh install can reach it: the file
@@ -354,7 +510,7 @@ assert_entry "B.6 (consequence)" '.claude/settings.local.json'
 
 # ── B.7: a Packages/manifest.json.bak that is not ours ─────────────────────
 # The site that ALREADY reached the block before this file existed — it is `MANIFEST_DECLINED`'s old
-# job, now one entry among eleven. Covered here for the same reason the mechanism was generalised
+# job, now one entry among many. Covered here for the same reason the mechanism was generalised
 # rather than copied: the one site that worked is the one a refactor is likeliest to break silently.
 B7="$(new_fixture foreign-manifest-bak urp)"
 printf '{ "notes": "my own pre-edit backup", "dependencies": {} }\n' > "$B7/Packages/manifest.json.bak"

@@ -36,19 +36,22 @@ die()  { err "$*"; exit 1; }
 usage() { sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 # ── Work this run was asked for and did not do ───────────────────────────────
-# ONE ACCUMULATOR, ONE EMITTER, AND THE REASON IS THAT FOURTEEN BRANCHES CAN ABANDON WORK AND
-# EXACTLY ONE OF THEM USED TO REACH THE USER'S SUMMARY. `Installation complete.` and exit 0 are true
+# ONE ACCUMULATOR, ONE EMITTER, AND THE REASON IS THAT MANY BRANCHES CAN ABANDON WORK AND EXACTLY
+# ONE OF THEM USED TO REACH THE USER'S SUMMARY. `Installation complete.` and exit 0 are true
 # of every one of them — the payload lands, the receipt is written — so the only trace of an
 # abandoned --with-* flag, an ungenerated CLAUDE.md, an unwritten .gitignore or a hook that will
 # never fire was a warn line up to five hundred lines above the green banner, in output nobody
 # scrolls back through and no caller can act on. `MANIFEST_DECLINED` was this mechanism for one of
 # them; this is the same mechanism with the rest routed through it.
 #
-# ELEVEN RECORDING POINTS FOR THOSE FOURTEEN BRANCHES, and the three collapses are all one outcome
-# reached more than one way: the three `add_manifest_dependency` sites each fire for either --with-*
-# flag, and CLAUDE.md's `skipped` is reached four ways that differ only in which warn line printed.
-# Derive the sites, never quote this number — and exclude comments, or the derivation counts the very
-# line you are reading. It did, for the length of one measurement:
+# THERE ARE FEWER RECORDING POINTS THAN THERE ARE BRANCHES, and every collapse is one outcome reached
+# more than one way: each `add_manifest_dependency` site fires for either --with-* flag, and
+# CLAUDE.md's `skipped` is reached four ways that differ only in which warn line printed.
+#
+# NO COUNT IS WRITTEN HERE, and that is this comment's own rule applied to itself — the number went
+# stale at the emitter within one round of being written down, in the file that forbids quoting it.
+# Exclude comments when you derive it, or the derivation counts the very line you are reading. It
+# did, for the length of one measurement:
 #
 #   awk '!/^[[:space:]]*#/ && /note_not_done "/ { n++ } END { print n + 0 }' install.sh
 #
@@ -1349,14 +1352,35 @@ fi
 # would be a second copy of a decision made above, so the entry points at the warning instead and
 # the `else` branch above exists to guarantee there is one.
 #
-# `separate` is NOT here: that arm writes CLAUDE.md.generated, announces it, and the Next-steps line
-# names it. Work done differently is not work abandoned.
+# `separate` IS HERE, AND THIS COMMENT ARGUED THE OPPOSITE FOR ONE ROUND. It read: "that arm writes
+# CLAUDE.md.generated, announces it, and the Next-steps line names it. Work done differently is not
+# work abandoned." Two things are wrong with that.
+#
+# THE FIRST IS THAT IT INVENTS A CRITERION TO ESCAPE THE STATED ONE. The criterion in this file's own
+# header is "absent or INERT", and CLAUDE.md.generated on this branch is inert in exactly the sense an
+# unregistered hook is: on disk, doing nothing, until the user acts. Claude Code reads CLAUDE.md.
+# Until the block is merged into it, not one line of the toolkit's configuration applies — measured on
+# a urp fixture whose CLAUDE.md is the user's own: rc=0, no block, and `grep -c kinglet:generated
+# CLAUDE.md` is 0. A caller running the snippet MCP-SETUP.md prints got a clean pass on that project.
+#
+# THE SECOND IS THAT IT IS NOT A KEEP AT ALL. The header's exemption is for a file kept because the
+# user edited it; here the installer WROTE a file, to a path the user must act on. And every project
+# that already has a CLAUDE.md takes this branch, which is most projects that are not new.
+#
+# THE ALTERNATIVE WAS TO NAME `separate` IN MCP-SETUP.md AS A SECOND STATED EXCEPTION beside
+# --dry-run, and it was rejected: an exception at the one outcome a scripted caller most needs to
+# hear about is a contract nobody can script against. This entry is also SELF-CLEARING — the moment
+# the user takes its advice and adds the markers, the branch becomes `refreshed` and the entry stops —
+# which is the shape a recurring entry has to have to be worth printing.
 case "$CLAUDE_MD_BRANCH" in
   skipped)
     note_not_done "CLAUDE.md — not generated, so this project has no toolkit configuration file and the FILL: markers never landed. The warn line above says which of the four ways it failed; re-run install.sh once that is fixed."
     ;;
   kept-yours)
     note_not_done "CLAUDE.md.generated — yours was kept untouched, so no generated file was produced this run. Rename or delete it and re-run to get one."
+    ;;
+  separate)
+    note_not_done "CLAUDE.md — yours has no generated markers, so the toolkit's configuration went to CLAUDE.md.generated beside it. Claude Code reads CLAUDE.md: none of it applies until you merge that block in, or paste the kinglet:generated markers into your CLAUDE.md and re-run to have it refreshed in place."
     ;;
 esac
 
@@ -1514,8 +1538,8 @@ fi
 MANIFEST_BAK_KEPT=0
 # MANIFEST_DECLINED USED TO BE DECLARED HERE, one flag per line, read by a `Not done:` block at the
 # bottom of the file that knew about this function and nothing else. It is now `$NOT_DONE` at the top
-# — same idiom, same "set where the decision is made, read where the run speaks to the user", eleven
-# more sites. All three abandonment outcomes in this function record through it, and the fourth
+# — same idiom, same "set where the decision is made, read where the run speaks to the user", every
+# other abandonment site as well. All three abandonment outcomes in this function record through it, and the fourth
 # outcome (the package is already there) is not an abandonment: the manifest ends the run in the
 # state the flag asked for.
 add_manifest_dependency() {
@@ -1570,7 +1594,7 @@ add_manifest_dependency() {
   # drives the `Not done:` block beside the green banner: set where the decision is made, read where
   # the run speaks to the user. Without it the only trace of an abandoned flag was four warn lines a
   # dozen lines above `Installation complete.` and an exit status of 0. The mechanism was
-  # MANIFEST_DECLINED, private to this function; it is now the shared one all eleven sites use, and
+  # MANIFEST_DECLINED, private to this function; it is now the shared one every site uses, and
   # the exit contract in MCP-SETUP.md is what says out loud that the block is complete.
   if [ -e "$MANIFEST.bak" ] && [ "$MANIFEST_BAK_KEPT" -ne 1 ] && ! owned_by_installer "$MANIFEST_BAK_REL" ''; then
     warn "$MANIFEST_BAK_REL exists and is not ours — declining $flag_name rather than overwriting it."
@@ -1800,9 +1824,13 @@ esac
 # abandonment left its only trace as warn lines up to five hundred lines above the green banner.
 #
 # THE BLOCK IS NOW THE `Not done:` CONTRACT MCP-SETUP.md STATES, not the manifest's private summary.
-# Twelve sites record into $NOT_DONE; this prints them. The CLAUDE.md side is one of the twelve now
-# rather than the exception it used to be — it still ALSO rewrites `Next steps: 2.` in place, so a
-# kept-yours run says it twice, in the two places a reader looks.
+# The sites record into $NOT_DONE; this prints them. Derive their number where the accumulator is
+# defined, and it writes no number down either. This sentence read "Twelve sites" for one round while
+# the file's own header said eleven and forbade quoting the figure — in the place a reader tracing
+# the mechanism arrives FIRST, which is how a stale count gets believed. The
+# CLAUDE.md side is one of the sites now rather than the exception it used to be — it still ALSO
+# rewrites `Next steps: 2.` in place, so a kept-yours or `separate` run says it twice, in the two
+# places a reader looks.
 #
 # BEFORE `Next steps:`, DELIBERATELY. What a user does next depends on what did not happen, and a
 # block printed after the numbered list reads as a footnote to it.
