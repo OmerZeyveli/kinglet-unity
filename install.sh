@@ -688,10 +688,21 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 #     `awk '!/^[[:space:]]*#/ && /shopt/' install.sh` — because the naive `grep -n shopt` now matches
 #     the two lines you are reading and answers its own question wrongly.
 #
-# THE DEATH IS REAL IN EXACTLY TWO SHAPES, and they are worth naming because either could arrive by
-# an edit that looks like tidying. Both measured, rc=2, against the same chmod 000 fixture: a rewrite
-# that makes the failing ASSIGNMENT the function's last command (drop the trailing `printf` and let
-# `out=` fall out of the end), and this exact printf-last shape under `shopt -s inherit_errexit`.
+# THE DEATH IS REAL IN THREE SHAPES, and they are worth naming because any of them could arrive by an
+# edit that looks like tidying. The first two were measured, rc=2, against the same chmod 000
+# fixture: a rewrite that makes the failing ASSIGNMENT the function's last command (drop the trailing
+# `printf` and let `out=` fall out of the end), and this exact printf-last shape under
+# `shopt -s inherit_errexit`.
+#
+# THE THIRD IS `set -u`, AND IT NEEDS NEITHER OF THOSE PRECONDITIONS. Call this function with no
+# argument — a caller that drops the path, or gains a default that is never passed — and `[ -f "$1" ]`
+# is an unbound-variable error. That is a fatal shell error, not an errexit death, so the
+# `-e`-clearing that defuses the other two does not touch it: the substitution subshell exits 1, and
+# the call site is an assignment in the main shell under `set -e`, so the run ends. Measured
+# 2026-08-14 on this exact function body: with `set -euo pipefail`, `$1: unbound variable`, rc=1,
+# before the file is ever opened; with `-u` off, the same call returns `absent` and rc=0. This header
+# said "exactly two shapes" until then — a closed list, in a comment about a function whose whole
+# subject is a predicate that must not guess.
 #
 # So the guard stays for what it actually buys, which is not survival: the correct `it exists but
 # could not be read` / `Make CLAUDE.md readable` pair instead of a marker diagnosis about a file
@@ -1107,8 +1118,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # narrowings are load-bearing, and the wording above earns neither:
   #   - This branch has no discriminator for who wrote the file. On a re-run the file present is the
   #     toolkit's, written by the previous run, so "yours" is false in the installer's own upgrade
-  #     path. The CLAUDE.md branch may say "yours" because :274's marker test has already proved the
-  #     file is not ours; .mcp.json, which has no such test either, correctly claims nothing.
+  #     path. The CLAUDE.md branch may say "yours" because `claude_md_marker_state`'s test has
+  #     already proved the file is not ours; .mcp.json, which has no such test either, correctly
+  #     claims nothing. (This read line 274 until 2026-08-14, by which point line 274 was a comment
+  #     about the scripts write group.)
   #   - "contents", because that is the whole of what this branch can vouch for. It cannot speak to
   #     ownership: Step 8c decides that by comparing the file on disk against the toolkit's copy and
   #     against the previous receipt's checksum, and doing either here would be a second copy of

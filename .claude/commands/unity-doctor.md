@@ -75,11 +75,17 @@ Kinglet installer from the toolkit checkout.
 
 ## Check 3: What the doctor script does not read
 
-Check 2 covers the install. These five are outside what it reads — and only these, so the duplication
-Check 2 removed does not creep back in:
+Check 2 covers the install. These five are outside what it **reports** — and only these, so the
+duplication Check 2 removed does not creep back in. *Reports*, not *reads*: item 1 below is falsified
+by "outside what it reads", because the script does read those directories — it counts them and
+prints the counts as `INFO`, which is not a verdict a reader can act on.
 
-1. **The payload directories exist.** `.claude/commands/`, `.claude/agents/`, `.claude/hooks/`,
-   `.claude/skills/`, `.claude/rules/`. Any one missing → **ERROR**, naming which.
+1. **The payload directories exist and are not empty.** `.claude/commands/`, `.claude/agents/`,
+   `.claude/hooks/`, `.claude/skills/`, `.claude/rules/`. Any one missing → **ERROR**, naming which.
+   **Test contents, not just existence.** An empty-but-present `.claude/agents/` passes a bare
+   existence test and passes the doctor script too, which prints `INFO agents=0`, `0 failure(s)` and
+   exits 0 — a project with no agents at all reported healthy by both. Any one present and empty →
+   **ERROR**, naming which.
    **This is also the first thing to check when Check 2 produced no summary line**, because the
    script's count block reads four of these five directories in a row and cannot survive one of them
    being absent — so a missing directory is both the most likely cause of an aborted run and a check

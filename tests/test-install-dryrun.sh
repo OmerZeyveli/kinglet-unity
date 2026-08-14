@@ -147,13 +147,24 @@
 #     WHY THE MODE ONE MATTERS, corrected 2026-08-13 — the reason first written here was false in
 #     all three of its clauses, which is the exact defect this file exists to catch, committed by
 #     this file, in the round that withdrew the previous one. It claimed install.sh writes
-#     `stat -c '%a'` into EVERY receipt row and that uninstall.sh ACTS on it. Measured: of the eight
-#     row writers, five read the mode and THREE HARDCODE IT — the scripts-toolkit row (`755`),
+#     `stat -c '%a'` into EVERY receipt row and that uninstall.sh ACTS on it. Measured: of the nine
+#     row writers, six read the mode and THREE HARDCODE IT — the scripts-toolkit row (`755`),
 #     `.mcp.json` (`644`) and `MCP-SETUP.md` (`644`); and `grep -n 'chmod\|_mode' uninstall.sh`
 #     returns exactly one line, the destructuring read `read -r rel recorded _mode origin`, whose
 #     underscore is this repo's discard convention. There is no `chmod` in that file at all. The
 #     mutation above compounds it: `ProjectSettings/ProjectVersion.txt` never enters a receipt row,
 #     so the receipt-mode story did not even connect to the thing measured.
+#
+#     THE COUNTS ABOVE READ eight/five UNTIL 2026-08-14, and the correction is the same shape as the
+#     defect they describe: the installer-ownership wave added a ninth writer (the `.gitignore` row,
+#     which reads the mode rather than hardcoding it), and a number written into a comment moved with
+#     nothing watching it. Re-derive both rather than trusting this line — the writers are the
+#     `>> "$RECEIPT_TMP"` sites and the readers are the subset carrying `stat -c '%a'`:
+#
+#       grep -c '>> "\$RECEIPT_TMP"' install.sh
+#       grep -c "stat -c '%a'" install.sh
+#
+#     The THREE HARDCODED rows and their three names are unchanged and were right.
 #
 #     The honest version is smaller and still worth the disclosure: the mode is RECORDED by
 #     install.sh, on most rows, and CURRENTLY UNUSED by uninstall.sh — so the exposure is a

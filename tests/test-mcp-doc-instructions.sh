@@ -44,7 +44,8 @@
 #
 # Two OTHER references to settings.json + MCP are legitimate and must survive
 # any future sweep:
-#   scripts/studio-doctor.sh:85 (comment) and MCP-SETUP.md:120 (prose) both
+#   scripts/studio-doctor.sh (the `last-resort fallback` comment above its
+#   settings-file loop) and MCP-SETUP.md (its opening paragraph) both
 #   EXPLAIN why settings.json is a last-resort / broken fallback — history,
 #   not instruction. Neither file lives under .claude/, so this guard's scope
 #   already excludes both without needing a named exclusion list. That is not

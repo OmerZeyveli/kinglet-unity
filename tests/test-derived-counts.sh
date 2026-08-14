@@ -29,6 +29,13 @@ DC_VERBATIM=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $6 == "verbatim"' "$REPO
 DC_MODIFIED=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $6 == "modified"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
 DC_ORIGINAL=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $6 == "original"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
 
+# Rules and repo-level templates. Both are quoted as counts in README.md, and `.claude/rules/*` is
+# the one count `docs/ARCHITECTURE.md` still calls hand-maintained — correctly, until this line
+# existed. `templates/` is the repo-root C# scaffold directory, not `.claude/templates/`, which does
+# not exist; README.md says so in the same row it quotes the number.
+DCS_RULES=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -c . || true)
+DCS_TEMPLATES=$(ls -1 "$REPO_DIR"/templates/* 2>/dev/null | grep -c . || true)
+
 # Every prose file that quotes the split. Adding a fourth quoting file without adding it here
 # recreates the gap, so the list is short and explicit rather than a glob.
 DC_QUOTING_FILES="CREDITS.md
@@ -71,7 +78,7 @@ while IFS= read -r rel; do
   #
   # That is verbatim the recurrence this file's own header records at :9-13 ("a fix wave corrected
   # it to 30/71, and that wave's own NEXT commit ... made it 29/72 without re-deriving the prose"),
-  # and the same shape as the round-1 finding recorded in the ECU-footprint block at :113-118: one
+  # and the same shape as the round-1 finding recorded in the ECU-footprint block at :163-168: one
   # correct occurrence and one stale occurrence in a DIFFERENT phrasing, guard calls it clean.
   #
   # The sentence is the one that tells the reader the number is derived and hands them the command
@@ -156,7 +163,7 @@ assert_eq "0" "$(printf '%s' "$DC_VACUOUS" | grep -c . || true)" \
 # ROUND 1: this block shipped reading ONE phrasing per file, and the phrasing it did not read was the
 # one that was wrong. README.md:184 said "71 of 101 ECU-origin files now `modified`" thirteen lines
 # below its own correct "99 files from ECU", and the per-file vacuity check was satisfied by the
-# correct occurrence. That is verbatim the failure this file's header records at :37-41 — one correct
+# correct occurrence. That is verbatim the failure this file's header records at :44-48 — one correct
 # occurrence and one stale occurrence in a different phrasing, guard calls it clean — reproduced by
 # the commit that cites it.
 #
@@ -168,7 +175,8 @@ assert_eq "0" "$(printf '%s' "$DC_VACUOUS" | grep -c . || true)" \
 #      sentence" from silent narrowing into a failure that names the file and the phrasing.
 #
 #   2. Every match runs against the file with newlines collapsed to spaces. `71 of 101` sat at the
-#      end of README.md:184 and `ECU-origin files now \`modified\`` began :185, so NO line-oriented
+#      end of README.md:184 and `ECU-origin files now \`modified\`` began README.md:185 — both
+#      2026-08-11 line numbers into the PRE-FIX file, kept as history — so NO line-oriented
 #      grep could have read it at any point. Measured 2026-08-11 on the pre-fix file:
 #        $ grep -oE '[0-9]+ of [0-9]+ ECU-origin files' README.md      -> no match
 #        $ tr '\n' ' ' < README.md | tr -s ' ' | grep -oE '...'        -> 71 of 101 ECU-origin files
@@ -236,7 +244,10 @@ assert_eq "0" "$(printf '%s' "$DCF_VACUOUS" | grep -c . || true)" \
 # ============================================================================
 # The second derived number in this repository: how much of ECU survives in `unity-brainstorming`.
 #
-# `provenance.tsv:71` rules `origin=ecu` for a file that was rewritten on 2026-08-10, and its stated
+# `provenance.tsv:54` — the `.claude/skills/unity-brainstorming/SKILL.md` row, which is what to grep
+# for; it was cited as line 71 until 2026-08-14, by which point line 71 held a different file's
+# checksum —
+# rules `origin=ecu` for a file that was rewritten on 2026-08-10, and its stated
 # reason is a quantity — "32 of ECU's 69 substantive lines surviving verbatim, which is what
 # origin=ecu rests on". MERGE-NOTES.md repeats the figure.
 #
@@ -376,7 +387,9 @@ assert_eq "ok" "$DCS_DERIVATION" \
 # Every phrasing, in every file that quotes one, each with its own floor. A per-FILE floor cannot see
 # a single phrasing going unread — README.md would keep three table rows matching while its pool
 # sentence was reworded into invisibility — which is finding 1 of this wave's round 1, recorded at
-# :113-125 above and not repeated here by hand.
+# :163-183 above and not repeated here by hand. (Both self-citations in this file pointed at line 113
+# until 2026-08-14, by which point line 113 was the paragraph about the original-row count — a
+# self-citation rots exactly like any other, and no sweep shaped like a path saw either of these.)
 #
 # Field 3 is the value the first captured number must equal; field 4 the second, or `-` for the
 # single-number phrasings, which is all of these.
@@ -409,7 +422,13 @@ docs/ARCHITECTURE.md	[0-9]+ in total, flat	$DCS_SKILLS	-
 docs/ARCHITECTURE.md	stripped from every skill . all [0-9]+ of them	$DCS_SKILLS	-
 docs/ARCHITECTURE.md	[0-9]+ agents total	$DCS_AGENTS	-
 docs/SKILL-CATALOG.md	[0-9]+ skills, one directory each	$DCS_SKILLS	-
-docs/SKILL-CATALOG.md	Current Skills \([0-9]+, flat\)	$DCS_SKILLS	-"
+docs/SKILL-CATALOG.md	Current Skills \([0-9]+, flat\)	$DCS_SKILLS	-
+docs/GETTING-STARTED.md	agents/ [0-9]+ specialized sub-agents	$DCS_AGENTS	-
+docs/GETTING-STARTED.md	commands/ [0-9]+ slash commands	$DCS_COMMANDS	-
+docs/GETTING-STARTED.md	skills/ [0-9]+ knowledge modules	$DCS_SKILLS	-
+docs/GETTING-STARTED.md	rules/ [0-9]+ always-loaded coding standards	$DCS_RULES	-
+README.md	\*\*Rules\*\* [|] [0-9]+	$DCS_RULES	-
+README.md	\*\*Templates\*\* [|] [0-9]+	$DCS_TEMPLATES	-"
 
 DCS_BAD=""
 DCS_VACUOUS=""
@@ -440,10 +459,10 @@ done <<< "$DCS_CLAIMS"
 
 if [ -n "$DCS_BAD" ]; then
   printf '%s' "$DCS_BAD"
-  printf '     %s\n' "Re-derive with: ls .claude/agents/*.md | wc -l ; ls .claude/commands/*.md | wc -l ; ls .claude/skills/*/SKILL.md | wc -l"
+  printf '     %s\n' "Re-derive with: ls .claude/agents/*.md | wc -l ; ls .claude/commands/*.md | wc -l ; ls .claude/skills/*/SKILL.md | wc -l ; ls .claude/rules/*.md | wc -l ; ls templates/* | wc -l"
 fi
 assert_eq "0" "$(printf '%s' "$DCS_BAD" | grep -c . || true)" \
-  "every surface count quoted in prose matches the tree ($DCS_AGENTS agents, $DCS_COMMANDS commands, $DCS_SKILLS skills, $DCS_TOTAL total)"
+  "every surface count quoted in prose matches the tree ($DCS_AGENTS agents, $DCS_COMMANDS commands, $DCS_SKILLS skills, $DCS_TOTAL total, $DCS_RULES rules, $DCS_TEMPLATES templates)"
 
 if [ -n "$DCS_VACUOUS" ]; then
   printf '%s' "$DCS_VACUOUS"
@@ -457,7 +476,8 @@ assert_eq "0" "$(printf '%s' "$DCS_VACUOUS" | grep -c . || true)" \
 #
 # The 2026-08-03 cut applied "does it do something the model cannot do unaided?" to agents, commands
 # and skills; hooks and scripts/ were out of scope and every one survived. When the criterion was
-# applied to them on 2026-08-13, 15 of 27 hooks and 4 of 10 installed scripts left in one commit —
+# applied to them on 2026-08-13, 15 of 27 hooks and 5 of 10 installed scripts left in one commit, of
+# which one script (detect-missing-refs.sh) was restored two rounds later, leaving 4 —
 # and `grep -c hook tests/test-derived-counts.sh` returned 0 the morning of that commit, so seven
 # quoted numbers across three shipped documents would have gone wrong simultaneously with the suite
 # green. That is verbatim the failure the surface-pool block above was written for after the
@@ -478,6 +498,34 @@ echo "--- derived counts: hooks and installed scripts ---"
 # `grep -l HOOK_PROFILE_LEVEL=` overcounts: _lib.sh defines the constant it reads.
 DCK_DISK=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | sed 's|.*/||' | grep -vx '_lib.sh' | sort)
 DCK_HOOKS=$(printf '%s\n' "$DCK_DISK" | grep -c . || true)
+# Files in the directory INCLUDING _lib.sh. README.md quotes both numbers in one row and derives one
+# from the other in prose ("N files on disk — _lib.sh is a shared library, not a hook"), so the row
+# was internally consistent and wrong in both halves for a day: 27/28 against a tree of 12/13.
+# Falsifying it further, to 999 registered / 777 files, left the whole suite green.
+DCK_HOOK_FILES=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | grep -c . || true)
+
+# How many hooks get the kill switches by sourcing _lib.sh. The complement carries them inline;
+# tests/test-hooks.sh asserts that every hook does one or the other, and this is the number three
+# shipped documents quote in a sentence that read "All hooks source a shared library" until
+# 2026-08-14 — false since the ECU vendor commit, and contradicted by two of those documents' own
+# text a hundred lines away.
+#
+# Matched on the SOURCE STATEMENT, not on the string `_lib.sh`: every one of those documents now
+# explains the exception in prose, and `session-brief.sh`'s own header names the library four times
+# while sourcing it never.
+DCK_LIB_SOURCERS=$(
+  while IFS= read -r dck_h; do
+    [ -n "$dck_h" ] || continue
+    # HERE-STRING, NOT A PIPE. `grep -q` exits the instant it matches without draining stdin, and
+    # every hook sources the library on line 6 — so awk is still writing when grep closes the read
+    # end, dies of SIGPIPE, and pipefail turns 141 into a failed AND-list. Measured with the pipe
+    # form: this returned 10 for a tree where 11 hooks source it, the one miscount landing on
+    # whichever file was long enough to still be writing. A silent undercount inside a guard whose
+    # job is to catch a wrong count.
+    dck_code="$(awk '!/^[[:space:]]*#/' "$REPO_DIR/.claude/hooks/$dck_h")"
+    grep -qE 'source[[:space:]]+"?\$\{?SCRIPT_DIR\}?/_lib\.sh"?' <<< "$dck_code" && printf 'x\n'
+  done <<< "$DCK_DISK" | grep -c . || true
+)
 
 # Hooks registered in settings.json. Read with grep+sed rather than a JSON parser: this suite has no
 # python/jq dependency anywhere else, and the shape here is one `"command": ".claude/hooks/x.sh"` per
@@ -795,7 +843,13 @@ DCK_TRACKING_NAMED=$(
         if (n >= 4) {
             w = f[4]
             gsub(/^[ \t]+|[ \t]+$/, "", w)
-            if (w ~ /^`[a-z0-9-]+\.sh`$/) { gsub(/`/, "", w); print w }
+            # BACKTICKS OPTIONAL, and that is the whole repair. Requiring them meant a
+            # de-backticked writer cell simply left the set this loop builds — measured by Task 10:
+            # repoint the session-edits.txt row writer cell at a lowercase, de-backticked,
+            # NONEXISTENT hook and
+            # both assertions below stayed green. They are not needed to exclude the `Various hooks`
+            # row, which fails `[a-z0-9-]+\.sh` on its own either way.
+            if (w ~ /^`?[a-z0-9-]+\.sh`?$/) { gsub(/`/, "", w); print w }
         }
     }
   ' "$REPO_DIR/docs/ARCHITECTURE.md" 2>/dev/null | sort -u
@@ -831,7 +885,12 @@ assert_eq "0" "$(printf '%s' "$DCK_TRACKING_GONE" | grep -c . || true)" \
 # sentence is reworded, keep the leading verb.
 #
 # docs/ARCHITECTURE.md   "hooks/ 12 registered shell scripts"          total
-# docs/ARCHITECTURE.md   "All 12 registered hooks source"              total
+# docs/ARCHITECTURE.md   "Of the 12 registered hooks, 11 source"       total, _lib.sh sourcers
+# README.md              "**Hooks** | 12 registered"                   total
+# README.md              "(5 blocking"                                 blocking
+# README.md              "13 files on disk"                            files incl. _lib.sh
+# docs/HOOK-REFERENCE.md "11 of the 12 hooks source a shared library"  sourcers, total (two phrasings)
+# docs/ARCHITECTURE.md   "11 of the 12 get them by sourcing"           sourcers, total
 # docs/ARCHITECTURE.md   "minimal (4 cumulative"                       minimal tier
 # docs/ARCHITECTURE.md   "standard (12 cumulative)"                    standard tier
 # docs/ARCHITECTURE.md   "strict (12 cumulative"                       strict tier
@@ -842,7 +901,7 @@ assert_eq "0" "$(printf '%s' "$DCK_TRACKING_GONE" | grep -c . || true)" \
 # docs/HOOK-REFERENCE.md  "includes 12 hooks"                          total
 # docs/HOOK-REFERENCE.md  "standard profile 12 hooks"                  standard tier
 DCK_CLAIMS="docs/ARCHITECTURE.md	hooks/ [0-9]+ registered shell scripts	$DCK_HOOKS	-
-docs/ARCHITECTURE.md	All [0-9]+ registered hooks source	$DCK_HOOKS	-
+docs/ARCHITECTURE.md	Of the [0-9]+ registered hooks, [0-9]+ source	$DCK_HOOKS	$DCK_LIB_SOURCERS
 docs/ARCHITECTURE.md	.minimal. \([0-9]+ cumulative	$DCK_MINIMAL	-
 docs/ARCHITECTURE.md	.standard. \([0-9]+ cumulative\)	$DCK_STANDARD	-
 docs/ARCHITECTURE.md	.strict. \([0-9]+ cumulative	$DCK_STRICT	-
@@ -850,6 +909,12 @@ docs/GETTING-STARTED.md	hooks/ [0-9]+ hooks [+] _lib.sh	$DCK_HOOKS	-
 docs/GETTING-STARTED.md	[0-9]+ of them blocking	$DCK_BLOCKING	-
 docs/GETTING-STARTED.md	repo has [0-9]+ scripts; an installed project has [0-9]+	$DCK_REPO_SCRIPTS	$DCK_INSTALLED_SCRIPTS
 docs/GETTING-STARTED.md	[0-9]+ of the [0-9]+ installed scripts are named	$DCK_NAMED_SCRIPTS	$DCK_INSTALLED_SCRIPTS
+README.md	\*\*Hooks\*\* [|] [0-9]+ registered	$DCK_HOOKS	-
+README.md	\([0-9]+ blocking	$DCK_BLOCKING	-
+README.md	[0-9]+ files on disk	$DCK_HOOK_FILES	-
+docs/HOOK-REFERENCE.md	[0-9]+ of the [0-9]+ hooks source a shared library	$DCK_LIB_SOURCERS	$DCK_HOOKS
+docs/HOOK-REFERENCE.md	[0-9]+ of the [0-9]+ hooks source .\.claude/hooks/_lib\.sh.	$DCK_LIB_SOURCERS	$DCK_HOOKS
+docs/ARCHITECTURE.md	[0-9]+ of the [0-9]+ get them by sourcing	$DCK_LIB_SOURCERS	$DCK_HOOKS
 docs/HOOK-REFERENCE.md	includes [0-9]+ hooks	$DCK_HOOKS	-
 docs/HOOK-REFERENCE.md	runs [0-9]+ of the [0-9]+	$DCK_MINIMAL	$DCK_HOOKS
 docs/HOOK-REFERENCE.md	all [0-9]+ hooks run	$DCK_STANDARD	-
@@ -876,7 +941,14 @@ while IFS=$'\t' read -r dck_rel dck_pat dck_want1 dck_want2; do
     dck_got1=$(printf '%s' "$dck_claim" | grep -oE '[0-9]+' | sed -n 1p)
     dck_got2=$(printf '%s' "$dck_claim" | grep -oE '[0-9]+' | sed -n 2p)
     if [ "$dck_got1" != "$dck_want1" ] || { [ "$dck_want2" != "-" ] && [ "$dck_got2" != "$dck_want2" ]; }; then
-      DCK_BAD="${DCK_BAD}${dck_rel} claims '${dck_claim}' — the tree has ${dck_want1}"$([ "$dck_want2" != "-" ] && printf ' and %s' "$dck_want2")$'\n'
+      # NOT `"$([ … ] && printf …)"`. For the claim rows whose second column is `-` that AND-list
+      # short-circuits, the command substitution exits 1, and an assignment site is one of the two
+      # places `set -e` reaches that people expect it not to. Inert under the runner (which does
+      # `set +e` before sourcing this runner-provided file) and reachable only on the failure path —
+      # both harness accidents, not a design.
+      dck_extra=""
+      [ "$dck_want2" = "-" ] || dck_extra=" and $dck_want2"
+      DCK_BAD="${DCK_BAD}${dck_rel} claims '${dck_claim}' — the tree has ${dck_want1}${dck_extra}"$'\n'
     fi
   done <<< "$(grep -oE "$dck_pat" <<< "$dck_flat" || true)"
 
@@ -912,3 +984,73 @@ assert_eq "0" "$(printf '%s' "$DCK_VACUOUS" | grep -c . || true)" \
 #     shipped ("32 surfaces: ... 27 registered hooks"), and a guard that forbids recording a former
 #     state stops this repository writing its own history — the ruling field note 81 already made and
 #     tests/test-mcp-naming.sh already applies to docs/research/.
+
+# ============================================================================
+# THE FOUR PROSE CLAIMS ABOUT NAMED HOOKS THAT NO GUARD READ.
+#
+# `docs/ARCHITECTURE.md` states, outside every count and every table this file already reads: which
+# events have registrations, which state-file paths `_lib.sh` still defines, which of them
+# `session-restore.sh` clears, and how the session TTL is configured. All four were TRUE and all four
+# were proved SILENT when falsified — the file states no profile, event or matcher per hook, so the
+# narrowed sentence that licenses it holds, and these fall outside it in a direction nothing covered.
+#
+# The ruling taken here is guard, not delete. Deleting them would leave the only written account of
+# why `_lib.sh` still carries paths for hooks that no longer exist.
+#
+# WHAT THIS BLOCK CANNOT SEE: it reads NAMES, not behaviour. `session-restore.sh` naming
+# `UNITY_COST_FILE` in an `rm -f` is not proof the file is removed, and a rename that changes both
+# the hook and this document together passes. It closes the direction that actually failed — a
+# document naming a hook, an event or a variable the tree no longer has.
+echo "--- derived counts: hook facts stated as prose ---"
+
+# 1. The Event Types table is the set of events with registrations, in both directions.
+#    `PreCompact` had a row here for a day after its last registration was cut, twelve lines above a
+#    paragraph saying there was none. Adjacent, not contradictory, and invisible to every guard.
+DCE_EVENTS_REG=$(printf '%s\n' "$DCK_REG_TRIPLES" | awk -F'\t' '{ print $2 }' | sort -u | grep -v '^$' || true)
+DCE_EVENTS_DOC=$(
+  awk '
+    /^### Event Types/ { intable = 1; next }
+    intable && /^###/  { intable = 0 }
+    intable && /^\|[[:space:]]*[A-Za-z]+[[:space:]]*\|/ {
+        split($0, f, "|"); e = f[2]
+        gsub(/^[ \t]+|[ \t]+$/, "", e)
+        if (e != "Event" && e !~ /^-+$/) { print e }
+    }
+  ' "$REPO_DIR/docs/ARCHITECTURE.md" 2>/dev/null | sort -u
+)
+assert_eq "yes" "$([ -n "$DCE_EVENTS_DOC" ] && echo yes || echo no)" \
+  "docs/ARCHITECTURE.md still has a readable Event Types table"
+assert_eq "$DCE_EVENTS_REG" "$DCE_EVENTS_DOC" \
+  "the Event Types table is exactly the events .claude/settings.json registers"
+
+# 2. The two negatives that table's neighbouring paragraph asserts, derived rather than trusted.
+DCE_NEG=""
+printf '%s\n' "$DCE_EVENTS_REG" | grep -qxF 'PreCompact' && DCE_NEG="${DCE_NEG}a PreCompact registration exists; docs/ARCHITECTURE.md says none is left"$'\n'
+printf '%s\n' "$DCK_REG_TRIPLES" | awk -F'\t' '$2 == "PostToolUse" && $3 == "Bash"' | grep -q . && DCE_NEG="${DCE_NEG}a PostToolUse-on-Bash registration exists; docs/ARCHITECTURE.md says none is left"$'\n'
+if [ -n "$DCE_NEG" ]; then printf '%s' "$DCE_NEG"; fi
+assert_eq "0" "$(printf '%s' "$DCE_NEG" | grep -c . || true)" \
+  "no PreCompact and no PostToolUse-on-Bash registration, as docs/ARCHITECTURE.md states"
+
+# 3. The state-file paths ARCHITECTURE.md says _lib.sh still defines for removed hooks, and the three
+#    session-restore.sh still clears. Read as names, from the files, in the direction that failed.
+DCE_ORPHAN_PATHS="gateguard-reads.txt
+session-cost.jsonl
+learnings.jsonl
+notify-event.json"
+DCE_MISSING=""
+while IFS= read -r dce_f; do
+  [ -n "$dce_f" ] || continue
+  grep -qF -- "$dce_f" "$REPO_DIR/.claude/hooks/_lib.sh" \
+    || DCE_MISSING="${DCE_MISSING}_lib.sh no longer defines a path for $dce_f, and docs/ARCHITECTURE.md says it does"$'\n'
+done <<< "$DCE_ORPHAN_PATHS"
+for dce_v in UNITY_READS_FILE UNITY_COST_FILE UNITY_LEARNING_FILE; do
+  grep -qF -- "$dce_v" "$REPO_DIR/.claude/hooks/session-restore.sh" \
+    || DCE_MISSING="${DCE_MISSING}session-restore.sh no longer names $dce_v, and docs/ARCHITECTURE.md says it clears it"$'\n'
+done
+for dce_v in UNITY_SESSION_TTL_HOURS saved_at; do
+  grep -qF -- "$dce_v" "$REPO_DIR/.claude/hooks/session-restore.sh" \
+    || DCE_MISSING="${DCE_MISSING}session-restore.sh no longer names $dce_v, and docs/ARCHITECTURE.md's Session TTL section says it does"$'\n'
+done
+if [ -n "$DCE_MISSING" ]; then printf '%s' "$DCE_MISSING"; fi
+assert_eq "0" "$(printf '%s' "$DCE_MISSING" | grep -c . || true)" \
+  "every hook variable and state path docs/ARCHITECTURE.md names in prose is still in the tree"

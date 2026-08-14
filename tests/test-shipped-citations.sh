@@ -151,7 +151,7 @@ while IFS= read -r md; do
   #
   # Deduped on the (line, token) PAIR, not on the token, which is what un-collapses the second case.
   # `awk '!seen[$0]++'` rather than `sort -u` so the report comes out in line order rather than
-  # lexicographic — `:10` before `:9` is a needless stumble in a list a human reads top to bottom.
+  # lexicographic — line 10 before line 9 is a needless stumble in a list a human reads top to bottom.
   # A token cannot contain a colon (the character class excludes it), so `%%:` / `#*:` split the
   # pair unambiguously. Every stage here drains its input — no `head`, no `grep -q` — so there is no
   # SIGPIPE for pipefail to turn into a failure.
@@ -237,20 +237,35 @@ while IFS= read -r md; do
 done <<< "$SHIPPED_MD"
 
 # A coverage floor, for the reason rule 0 gives two rules up: an all-clear over an empty token set is
-# indistinguishable from an all-clear over a real one. Measured on a green tree the day it was
-# written; the floor is set well below that, and the live count is printed rather than assumed, so a
-# reader never has to trust this comment. Raise it when the tree grows; never lower one to make a run
-# pass. The reverse-direction assertion below would also redden if every reference vanished at once —
-# but not if the token EXPRESSION broke while the references stayed, which is what this catches.
+# indistinguishable from an all-clear over a real one. The live count is printed rather than assumed,
+# so a reader never has to trust this comment. The reverse-direction assertion below would also
+# redden if every reference vanished at once — but not if the token EXPRESSION broke while the
+# references stayed, which is what this catches.
 #
-# Raised 4 -> 8 on 2026-08-14, honouring the instruction above rather than leaving it as advice:
-# /unity-init gained two references to generate-claude-md.sh that day and the live count went 7 -> 9,
-# so a floor of 4 had come to sit at less than half the tree and would have sat through the loss of
-# five references without a word.
-if [ "$SC_TOKENS_N" -ge 8 ]; then
-  pass "guard examined $SC_TOKENS_N .claude/scripts/ path reference(s) in shipped surfaces (floor 8)"
+# THE FLOOR IS THE NUMBER OF DISTINCT SCRIPTS NAMED, NOT THE NUMBER OF MENTIONS, and that criterion
+# is the whole of the value. Rule 0 says raise a floor when the tree grows and never lower one to
+# make a run pass; this floor was raised 4 -> 8 on 2026-08-14 under exactly that instruction, and the
+# raise was measured wrong twice over:
+#
+#   * it buys NO detection. The failure it names — a broken token expression — yields 0, which trips
+#     any floor at all, including the old 4. Nothing detectable at 8 is undetectable at 5.
+#   * it creates a FALSE POSITIVE, and a likely one. The live count is 9 across 6 distinct scripts:
+#     `unity-fixer` names detect-missing-refs.sh on two consecutive lines, `unity-review` names
+#     validate-serialization.sh on two consecutive lines, and `/unity-init` names
+#     generate-claude-md.sh twice. Consolidating any two of those duplicate pairs — an edit that
+#     removes no wiring and leaves every script still named — drops the count to 7 and reds this
+#     assertion with a message whose two disjuncts are both false.
+#
+# So the floor is 6: one reference per distinct installed script that a shipped surface names. Below
+# 6 a script really has stopped being named, which is a finding. Between 6 and 9 the tree has lost
+# redundancy, which is not. Re-derive both numbers rather than trusting them:
+#
+#   grep -rhoE '\.claude/scripts/[A-Za-z0-9_.-]+\.sh' .claude --include='*.md' | sort | uniq -c
+#
+if [ "$SC_TOKENS_N" -ge 6 ]; then
+  pass "guard examined $SC_TOKENS_N .claude/scripts/ path reference(s) in shipped surfaces (floor 6 — one per distinct installed script named)"
 else
-  fail "guard examined only $SC_TOKENS_N .claude/scripts/ path reference(s) — expected at least 8; either the wiring has been removed or the token expression has stopped matching"
+  fail "guard examined only $SC_TOKENS_N .claude/scripts/ path reference(s) — expected at least 6, one per distinct installed script a shipped surface names; either the wiring has been removed or the token expression has stopped matching"
 fi
 
 # A token cannot contain a colon (the character class excludes it), so `##*:` recovers it from the
@@ -344,6 +359,133 @@ else
   printf '       A script nothing names is reachable only by a user who goes looking for it. Either\n'
   printf '       name it from the surface whose job it belongs to, or cut it — those are the two\n'
   printf '       answers the surface criterion admits. Do not add it to SC_REACH_PENDING.\n'
+fi
+
+# 4. `.claude/UPSTREAM` ships and is not Markdown, so rules 1-3 never read it.
+#
+# It is the file that tells an installed reader where this build came from, and until 2026-08-14 it
+# pointed at FOUR files that are not in an installed project. Measured against a real install built
+# by tests/fixtures/mkproject.sh + install.sh: the provenance manifest, its skip companion, the merge
+# record and the provenance verifier are all absent; only .claude/NOTICE.md and .mcp.json are there.
+# That is the identical defect rule 2 exists for, in a file rule 2 cannot see because its tokens are
+# not backticked and its extension is not .md.
+#
+# THE RULE IS A MARKER, NOT AN ALLOW-LIST. A repository-only path may be named -- the pins are a
+# record and the record is worth keeping -- but it must be marked `not installed`. An allow-list
+# would go stale silently the first time a path moved into or out of the payload; the marker cannot,
+# because what counts as installed is derived below from the same payload derivation rules 2 and 3
+# use, plus the root paths install.sh writes receipt rows for.
+#
+# THE MARKER IS TOKEN-SCOPED, NOT LINE-SCOPED, AND ROUND 1 GOT THAT WRONG IN THIS FILE WHILE FIXING
+# IT ONE FILE OVER. A line-scoped `case "$up_l" in *"not installed"*)` waves through every other
+# token on a marked line: measured, appending ` Also see MERGE-NOTES.md for the build record.` to an
+# already-marked line stayed GREEN with the token count rising 11 -> 12, so the token was read and
+# passed. Not hypothetical either -- two lines here carried two and three repository paths under a
+# single marker. So each in-scope token OWNS THE SPAN from itself to the next in-scope token (or end
+# of line), and the marker must sit in that span.
+#
+# AND IT CHECKS BOTH DIRECTIONS. A payload file marked `not installed` is a false claim too -- it
+# under-promises rather than dangling, but this is the file whose subject is truthful claims.
+#
+# BARE BASENAMES RESOLVE. `superpowers_pin_note` names the verifier as `check-provenance.sh`, with no
+# directory, and there is no such file at the repository root -- so under an `[ -e ]` test the fourth
+# of the four paths this rule exists for never entered scope at all. Measured: removing its marker
+# stayed green; writing it as `scripts/check-provenance.sh` and removing the marker reddened. A
+# basename resolves when exactly one tracked file carries it, which is the same rule
+# tests/test-citations-resolve.sh uses.
+#
+# WHAT THIS DOES NOT COVER, and it is deliberate, not an oversight. It reads ONE file. The payload
+# has 67 entries, 44 Markdown (rules 1-3) and 23 not; this is one of the 23. Applying the same
+# criterion to the other 22 leaves SIX unmarked repository-only paths, all naming `tests/` files,
+# which never install: five in `.claude/hooks/bash-gate.sh` and one in `.claude/hooks/_lib.sh`. Both
+# are pre-existing. It was nine across four files until 2026-08-14; the other three were written by
+# the task that added this rule, in `.claude/hooks/session-brief.sh` and
+# `.claude/settings.local.json.template`, and are marked now -- which is also what makes the marker
+# wording canonical, the precondition for widening. Widening is a separate change: it needs a
+# decision about `install.sh` and `uninstall.sh`, which the payload does not contain but which are
+# legitimately named as the commands a user ran.
+#
+# Re-derive the six rather than trusting this comment -- the criterion is the whole of it:
+#
+#   for every non-Markdown payload file, every `*.tsv|md|sh|json` token naming a real file here
+#   that is neither in the payload nor a project-root file install.sh writes, on a line whose
+#   following text does not say `not installed`.
+UP_FILE="$REPO/.claude/UPSTREAM"
+
+# What an installed reader can open: the payload, plus the project-root files install.sh writes
+# receipt rows for. Derived from install.sh's own row-writing printf formats rather than listed --
+# `.mcp.json` and `MCP-SETUP.md` are installed and live nowhere near `.claude/`, so a payload-only
+# test would demand a `not installed` marker on two files that are.
+UP_ROOT_INSTALLED="$(grep -oE "printf '[A-Za-z0-9_.-]+\\\\t" "$REPO/install.sh" \
+                     | sed "s/printf '//; s/\\\\t//" | grep -vx 'path' | sort -u)"
+# CLAUDE.md is generated rather than copied, which is why rule 2 already allows it by name.
+UP_INSTALLED="$(printf '%s\n%s\nCLAUDE.md\n' "$PAYLOAD" "$UP_ROOT_INSTALLED" | grep -v '^$' | sort -u)"
+
+if [ "$(printf '%s\n' "$UP_ROOT_INSTALLED" | grep -c . || true)" -ge 2 ]; then
+  pass "rule 4 derived the project-root installed set from install.sh ($(printf '%s' "$UP_ROOT_INSTALLED" | tr '\n' ' '))"
+else
+  fail "rule 4 could not derive the project-root installed set from install.sh — its receipt-row printf formats have changed shape, and every verdict below is now guessing"
+fi
+
+# Classify every token the file names: out of scope (names no file here), installed, or repo-only.
+up_map="$(mktemp "${TMPDIR:-/tmp}/kinglet-up-map.XXXXXX")"
+for up_t in $(grep -ohE '[A-Za-z0-9_./-]+\.(tsv|md|sh|json)' "$UP_FILE" | sort -u); do
+  up_res=""
+  if [ -e "$REPO/$up_t" ]; then
+    up_res="$up_t"
+  else
+    case "$up_t" in
+      */*) : ;;
+      *)   up_m="$(git -C "$REPO" ls-files | grep -E "(^|/)$(printf '%s' "$up_t" | sed 's/[.[\*^$]/\\&/g')\$" || true)"
+           [ "$(printf '%s\n' "$up_m" | grep -c . || true)" = "1" ] && up_res="$up_m" ;;
+    esac
+  fi
+  [ -n "$up_res" ] || continue
+  if grep -qxF -- "$up_res" <<< "$UP_INSTALLED" || grep -qxF -- "$up_t" <<< "$UP_INSTALLED"; then
+    printf '%s\tinstalled\n' "$up_t" >> "$up_map"
+  else
+    printf '%s\trepo-only\t%s\n' "$up_t" "$up_res" >> "$up_map"
+  fi
+done
+
+up_seen="$(grep -c . "$up_map" 2>/dev/null || true)"
+up_bad="$(awk -F'\t' '
+  FILENAME == MAP { cls[$1] = $2; res[$1] = ($3 == "" ? $1 : $3); next }
+  {
+    # Walk the line left to right, recording every in-scope token and where it starts.
+    n = 0; pos = 1
+    while (match(substr($0, pos), /[A-Za-z0-9_.\/-]+\.(tsv|md|sh|json)/)) {
+      st = pos + RSTART - 1; tk = substr($0, st, RLENGTH); pos = st + RLENGTH
+      if (tk in cls) { n++; T[n] = tk; S[n] = st; E[n] = pos }
+    }
+    for (i = 1; i <= n; i++) {
+      span = (i < n) ? substr($0, E[i], S[i+1] - E[i]) : substr($0, E[i])
+      marked = (index(span, "not installed") > 0)
+      if (cls[T[i]] == "repo-only" && !marked)
+        printf "       .claude/UPSTREAM:%d names %s (%s), which install.sh does not copy, and the text after it does not say `not installed` before the next path\n", FNR, T[i], res[T[i]]
+      if (cls[T[i]] == "installed" && marked)
+        printf "       .claude/UPSTREAM:%d says %s is `not installed`, and it is\n", FNR, T[i]
+    }
+  }
+' MAP="$up_map" "$up_map" "$UP_FILE")"
+rm -f "$up_map"
+
+# Anti-vacuity: a rewrite that drops every repository path from this file would otherwise report a
+# clean result over nothing. The floor is 1 because the point is that the sweep read SOMETHING; the
+# marker check above is what carries the meaning.
+if [ "$up_seen" -ge 1 ]; then
+  pass "rule 4 examined $up_seen repository path(s) named in .claude/UPSTREAM"
+else
+  fail "rule 4 found no repository path in .claude/UPSTREAM — the token expression has stopped matching, or the file no longer names one"
+fi
+
+if [ -z "$up_bad" ]; then
+  pass ".claude/UPSTREAM marks every repository-only path it names, and claims that of no installed one"
+else
+  fail "shipped .claude/UPSTREAM misdescribes what an installed reader can open:"
+  printf '%s\n' "$up_bad"
+  printf '       .claude/UPSTREAM installs. A path here that install.sh does not copy is a dangling\n'
+  printf '       pointer in every project. Say `not installed` after it, before the next path.\n'
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1

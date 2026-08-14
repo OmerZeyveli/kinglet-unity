@@ -2057,6 +2057,62 @@ does **not** synthesise the runner's backstop line, which is the whole of disagr
 faithful driver and the real runner disagree in exactly one place, and knowing which place is worth
 more than either number.**
 
+**From Task 11's implementation and fix round 1 (2026-08-14). Task 11 is complete.**
+
+198. **The doctor passes a payload directory that exists and is empty, and this half of ledger 75 is
+     the half that was left.** Task 11 corrected the *claim* — `/unity-doctor` Check 3 now says the
+     five items are outside what the script **reports** (not what it *reads*, which its own item 1
+     falsifies), and item 1 now requires the directories to be non-empty. It did **not** change
+     `scripts/studio-doctor.sh`, which still prints `INFO agents=0`, `0 failure(s)`, rc=0 on a
+     project whose `.claude/agents/` exists and holds nothing. Four consecutive count assignments
+     share the shape; the repair is a non-empty test beside each. **Left because changing the
+     doctor's verdict on a real project state is a behaviour change to a shipped script that
+     `tests/test-studio-doctor.sh` needs a new state for — larger than the claim correction Task 11
+     was scoped to, per ruling R11-scope. → the next owner of `scripts/`.** *(Recorded as a row
+     because Task 11's report deferred it in a paragraph, and a deferral with no row is a finding
+     that did not happen — this ledger's own standing rule, applied to the task that exists to
+     enforce it.)*
+
+199. **The inline kill-switch copy in `session-brief.sh` is two gates, not three, and that is
+     currently correct.** `_lib.sh` carries three: the profile-level gate, `DISABLE_UNITY_HOOKS`, and
+     `DISABLE_HOOK_<NAME>`. The inline copy carries the last two. It is right today because
+     `session-brief.sh` declares no `HOOK_PROFILE_LEVEL`, so the profile gate would be a no-op for
+     it. **A drift that gave this hook a level would be caught five ways by
+     `tests/test-derived-counts.sh`** (the minimal-keeps set, the per-hook `Profile:` lines, the
+     Summary Table column, and the two tier counts) — **but a drift that also updated
+     `docs/HOOK-REFERENCE.md` in the same commit would not be**, and it would silently make the
+     profile setting inert for the one hook that runs at every session start. **→ the same hook
+     pass.**
+
+200. **A `source _lib.sh` that never runs is classified as a sourcer, so nothing probes it, and the
+     hook is gone rather than disabled.** Task 11's new kill-switch set identity matches the source
+     STATEMENT, not whether it executes. Measured on `.claude/hooks/warn-filename.sh` with
+     `if [ "1" = "2" ]; then source "${SCRIPT_DIR}/_lib.sh"; fi`: rc=0 and **zero bytes** with no
+     switch set, with `DISABLE_UNITY_HOOKS=1`, and with `DISABLE_HOOK_WARN_FILENAME=1`, and
+     `tests/test-hooks.sh` reports **0 failures**. The kill-switch property is vacuously satisfied
+     because the hook does nothing in every state. **No probe framed as "is it silent when disabled"
+     can draw this distinction, because silence is the passing condition** — closing it needs a
+     per-hook positive that each hook still ACTS with no switch set. Pre-existing, but the new set
+     identity depends on the classifier, so it is recorded at the code. **→ the hook pass.**
+
+201. **Two hooks are named by no test file at all: `warn-platform-defines.sh` and
+     `warn-serialization.sh`.** Derived while sizing 200 (`grep -lq "$b" tests/*.sh` per hook), and
+     *named by* is an upper bound on *asserted to act*, so the uncovered set is at least these two.
+     **`warn-serialization.sh` is the hook whose absence is the silent-data-loss case
+     `.claude/rules/serialization.md` opens with**, and the one `docs/HOOK-REFERENCE.md` singles out
+     as the reason `minimal` is a safety setting rather than a speed setting — guarded by name in
+     three documents and by behaviour nowhere. **→ the hook pass, and it is the first item in it.**
+
+202. **The rule-4 criterion applied to the rest of the payload leaves six unmarked repository-only
+     paths, and the number moved because three of the nine were this task's own.** Five in
+     `.claude/hooks/bash-gate.sh` and one in `.claude/hooks/_lib.sh`, all naming `tests/` files that
+     never install; both files pre-existing. The three in `.claude/hooks/session-brief.sh` and
+     `.claude/settings.local.json.template` were written by Task 11 round 0 and are marked now,
+     which is what makes the marker wording canonical. **Widening rule 4 to the other 22
+     non-Markdown payload files needs one decision first: `install.sh` and `uninstall.sh` are not in
+     the payload but are legitimately named as the commands a user ran, so a widened rule needs
+     them exempt by role rather than by marker.** **→ a later payload-citation pass.**
+
 ## The honest limits, carried forward to EE
 
 - **Nothing in either audit proves the toolkit works inside Claude Code.** No scout ran a command

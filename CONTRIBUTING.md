@@ -85,7 +85,8 @@ directory — that separation is gone; `provenance.tsv` tracks origin now, not t
   that was fixed. `tests/test-skill-discovery.sh` §1 rejects it now.
 - **Frontmatter is `name` and `description`, nothing else.** `alwaysApply` and `globs` are **Cursor**
   rule keys. Nothing in Claude Code has ever read either one; they were stripped from every skill on
-  2026-08-03 and `tests/test-no-mobile.sh:96` fails if one returns. This file used to say only
+  2026-08-03 and `tests/test-no-mobile.sh` fails if one returns, at the assertion reading *"no skill
+  carries alwaysApply or globs"*. This file used to say only
   `core/` skills may set `alwaysApply: true` and cite that same test as *asserting* the permission —
   it asserts the prohibition. A key that reads as a control but controls nothing is worse than no
   key, because it gets believed. `description` is the entire selection mechanism: write it as the

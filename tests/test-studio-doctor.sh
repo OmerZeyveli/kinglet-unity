@@ -104,8 +104,9 @@ rm -rf "$TSD_STALE"
 # '"superpowers@claude-plugins-official"[[:space:]]*:[[:space:]]*true' against
 # $CLAUDE_USER_SETTINGS. Doctor's check must agree, or a provider the user has
 # switched off would be reported as usable. (Cited as "install.sh line ~327" until
-# 2026-08-12, by which point :327 was dry-run commentary about .mcp.json and the
-# grep was far below it. Anchors do not move; line numbers into install.sh do.)
+# 2026-08-12, by which point install.sh:327 was dry-run commentary about .mcp.json
+# and the grep was far below it — a 2026-08-12 line number, kept as history rather
+# than re-derived. Anchors do not move; line numbers into install.sh do.)
 echo ""
 echo "--- Test: declared provider present but disabled ---"
 TSD_DISABLED="/tmp/kinglet-doctor-disabled-$$"

@@ -220,9 +220,10 @@ S2S_SENTINELS
 #                                            is frontmatter to a YAML parser;
 #   * adding a third key (`alwaysApply: true`)
 #                                          — CLAUDE.md says the frontmatter is `name` and
-#                                            `description`, "nothing else"; test-no-mobile.sh:96
-#                                            catches those two specific inert Cursor keys by name and
-#                                            nothing catches any OTHER third key;
+#                                            `description`, "nothing else"; test-no-mobile.sh catches
+#                                            those two specific inert Cursor keys by name, at the
+#                                            assertion reading "no skill carries alwaysApply or
+#                                            globs", and nothing catches any OTHER third key;
 #   * moving the opening `---` off line 1  — a document that begins with anything else has no
 #                                            frontmatter at all, and `name:`/`description:` sitting
 #                                            in the body still satisfied sections 3 and 4.

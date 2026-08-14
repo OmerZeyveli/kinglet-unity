@@ -87,7 +87,7 @@ Installed into your project's `.claude/`:
 | **Agents** | 8 | ECU-origin `unity-*` implementers: `unity-coder`, `unity-reviewer`, `unity-optimizer`, `unity-fixer`, `unity-prototyper`, `unity-scene-builder`, `unity-test-runner`, `unity-ui-builder` |
 | **Commands** | 9 | All `/unity-*` — see `.claude/commands/` |
 | **Skills** | 16 | Unity subsystems and cross-cutting process skills, flat at `.claude/skills/<name>/SKILL.md` |
-| **Hooks** | 27 registered | Prompt-time guards (some blocking, the rest advisory). 28 files on disk — `_lib.sh` is a shared library, not a hook |
+| **Hooks** | 12 registered | Prompt-time guards (5 blocking, the rest advisory). 13 files on disk — `_lib.sh` is a shared library, not a hook |
 | **Rules** | 6 | 5 spine rules + `pc-console.md` |
 | **Templates** | 10 | C# templates for the MVS pattern (`Model`, `View`, `System`, `LifetimeScope`, `Message`, tests, …) at the repo-level `templates/`. `.claude/templates/` (design-doc templates) does not exist — that layer was removed 2026-08-03. |
 
@@ -120,10 +120,11 @@ an auto-detected facts section. Use `--dry-run` to see what it would do, `--yes`
 non-interactive.
 
 **Re-installing is safe.** `.claude/state/install-receipt.tsv` records every file the toolkit owns,
-with its checksum — what is ours to remove again, rather than a log of what any one run wrote. Your
-`.gitignore` is not in it: the installer creates or appends to that file and never claims it. On
-upgrade, files you edited are reported and kept. In `CLAUDE.md`, only the region between the
-`kinglet:generated` markers is refreshed — your prose is left byte-for-byte.
+with its checksum — what is ours to remove again, rather than a log of what any one run wrote. A
+`.gitignore` you already had is not in it: the installer appends to that one and never claims it. One
+this installer **created** is ours, until you edit it. On upgrade, files you edited are reported and
+kept. In `CLAUDE.md`, only the region between the `kinglet:generated` markers is refreshed — your
+prose is left byte-for-byte.
 
 ### Then set up the MCP bridge
 
