@@ -83,7 +83,11 @@ grep -qE "$LEGACY" <<< "$NEW_CONTENT" || exit 0
 # guards its legacy branch behind ENABLE_LEGACY_INPUT_MANAGER (and reads the new
 # system under ENABLE_INPUT_SYSTEM) works on both, which is exactly what you want
 # in editor-only tooling that must survive either project setting.
-if grep -qE '#if\s+(ENABLE_LEGACY_INPUT_MANAGER|UNITY_EDITOR)' <<< "$NEW_CONTENT" \
+#
+# `\s` was here, one line below the comment above that forbids GNU-only atoms — the standard
+# stated and then broken in the same file. [[:space:]] is what GNU `\s` matches, and BSD grep
+# has it too.
+if grep -qE '#if[[:space:]]+(ENABLE_LEGACY_INPUT_MANAGER|UNITY_EDITOR)' <<< "$NEW_CONTENT" \
    && grep -qE 'ENABLE_INPUT_SYSTEM' <<< "$NEW_CONTENT"; then
     exit 0
 fi

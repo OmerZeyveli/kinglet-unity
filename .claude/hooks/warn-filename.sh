@@ -43,19 +43,42 @@ fi
 
 # Check if the file contains a class/struct matching the filename
 # Look for: public/internal/sealed class/struct FileName
-if grep -qE "(class|struct|interface)\s+$FILENAME\b" <<< "$CONTENT"; then
+#
+# POSIX classes, not \s and \b. block-legacy-input.sh states the standard at its own LEGACY
+# pattern — "\b is a GNU extension and .claude/UPSTREAM plans a macOS host pass, where grep is
+# BSD" — and writes an explicit character class instead. This file used \s and \b anyway, and
+# THIS LINE is the one that costs the most if the standard is right: it is the hook's real gate
+# (does the file define any type named like the file), so a pattern that stops matching sends
+# every call to `exit 0` below and the hook WARNS NOTHING, SILENTLY. It does not error. Not
+# measured on BSD — there is no macOS host here — so this is a consistency fix against a written
+# standard, not a repair of observed breakage.
+#
+# \s -> [[:space:]] and \w -> [[:alnum:]_] are exact equivalents of what GNU grep matches.
+# \b is a zero-width assertion with no POSIX spelling, so it becomes a CONSUMED boundary
+# character class — the same instrument block-legacy-input.sh uses, spelled [^[:alnum:]_] rather
+# than its [^A-Za-z0-9_] so that the three replacements agree with each other (\b is exactly a
+# transition at the complement of \w). For every C# identifier the two spellings are identical.
+#
+# $FILENAME is still interpolated raw, and a file whose name carries a regex metacharacter still
+# misbehaves — `Foo(1).cs` builds a pattern that matches `class Foo1`, `Foo(.cs` builds an
+# invalid one that grep rejects with rc 2 and the `if` reads as "no match". That is a
+# PRE-EXISTING defect, deliberately not fixed here: escaping it changes behaviour, and this
+# change's whole justification is that it changes none. A C# type name cannot contain a regex
+# metacharacter, so the only reachable cases are filenames that could never match a type name
+# anyway.
+if grep -qE "(class|struct|interface)[[:space:]]+${FILENAME}([^[:alnum:]_]|\$)" <<< "$CONTENT"; then
     exit 0
 fi
 
 # Check if there's any MonoBehaviour or ScriptableObject subclass
-if grep -qE ':\s*(MonoBehaviour|ScriptableObject|NetworkBehaviour|StateMachineBehaviour)' <<< "$CONTENT"; then
+if grep -qE ':[[:space:]]*(MonoBehaviour|ScriptableObject|NetworkBehaviour|StateMachineBehaviour)' <<< "$CONTENT"; then
     # There IS a Unity component but the name doesn't match.
     # awk (not head) picks the first match — head would stop reading before
     # grep finished writing the rest, risking SIGPIPE on a large file.
     #
     # `|| true` is load-bearing, and the header above is the contract it restores.
     # The guard on the line before proves ONE pattern (`: MonoBehaviour`) and this
-    # line runs a DIFFERENT one (`(class|struct)\s+\w+`), so the match the guard
+    # line runs a DIFFERENT one (`(class|struct)[[:space:]]+[[:alnum:]_]+`), so the match the guard
     # established says nothing about whether this grep matches. An Edit fragment
     # like `    : MonoBehaviour, IDamageable` satisfies the guard and carries no
     # `class` keyword at all: grep exits 1, pipefail propagates it past awk, and
@@ -74,7 +97,7 @@ if grep -qE ':\s*(MonoBehaviour|ScriptableObject|NetworkBehaviour|StateMachineBe
     # This silences no real failure: an empty CLASS_NAME is the "cannot tell"
     # answer, and the `[ -n "$CLASS_NAME" ]` guard below was already written to
     # print nothing and fall through to `exit 0` when it gets one.
-    CLASS_NAME=$(grep -oE '(class|struct)\s+\w+' <<< "$CONTENT" | awk 'NR==1{print $2}' || true)
+    CLASS_NAME=$(grep -oE '(class|struct)[[:space:]]+[[:alnum:]_]+' <<< "$CONTENT" | awk 'NR==1{print $2}' || true)
     if [ -n "$CLASS_NAME" ] && [ "$CLASS_NAME" != "$FILENAME" ]; then
         echo "WARNING: File name '$FILENAME.cs' does not match class name '$CLASS_NAME'." >&2
         echo "" >&2

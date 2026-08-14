@@ -34,8 +34,13 @@ if [ -z "$OLD_STRING" ] || [ -z "$NEW_STRING" ]; then
 fi
 
 # Extract field names from [SerializeField] declarations in old and new content
-OLD_FIELDS=$(echo "$OLD_STRING" | grep -oE '\[SerializeField\].*\s+(\w+)\s*[;=]' | grep -oE '\w+\s*[;=]' | sed 's/[;= ]//g' || true)
-NEW_FIELDS=$(echo "$NEW_STRING" | grep -oE '\[SerializeField\].*\s+(\w+)\s*[;=]' | grep -oE '\w+\s*[;=]' | sed 's/[;= ]//g' || true)
+#
+# POSIX classes, not \s and \w — the standard block-legacy-input.sh states at its LEGACY pattern
+# ("\b is a GNU extension and .claude/UPSTREAM plans a macOS host pass, where grep is BSD").
+# [[:space:]] and [[:alnum:]_] are what GNU grep's \s and \w match, so the extraction is
+# unchanged; `\[` and `\]` stay escaped because they are POSIX ERE, not a GNU extension.
+OLD_FIELDS=$(echo "$OLD_STRING" | grep -oE '\[SerializeField\].*[[:space:]]+([[:alnum:]_]+)[[:space:]]*[;=]' | grep -oE '[[:alnum:]_]+[[:space:]]*[;=]' | sed 's/[;= ]//g' || true)
+NEW_FIELDS=$(echo "$NEW_STRING" | grep -oE '\[SerializeField\].*[[:space:]]+([[:alnum:]_]+)[[:space:]]*[;=]' | grep -oE '[[:alnum:]_]+[[:space:]]*[;=]' | sed 's/[;= ]//g' || true)
 
 if [ -z "$OLD_FIELDS" ] || [ -z "$NEW_FIELDS" ]; then
     exit 0

@@ -911,7 +911,12 @@ if grep -qE "${CMD_START}git${GIT_OPTS}[[:space:]]+clean[[:space:]]+-[fFdDxX]+" 
     DANGER_MSG="git clean -fdx deletes untracked files including Library/, potentially .meta files, and local-only assets the team may have asked you to keep."
 fi
 if grep -qE "${CMD_START}git${GIT_OPTS}[[:space:]]+push${SAME_CMD}(--force|-f)([[:space:]]|$)" <<< "$COMMAND"; then
-    if grep -qE '\b(main|master|develop|release)\b' <<< "$COMMAND"; then
+    # An explicit boundary class rather than \b, which is a GNU extension — the standard
+    # block-legacy-input.sh states at its LEGACY pattern, and .claude/UPSTREAM plans a macOS
+    # host pass where grep is BSD. The class is CONSUMED where \b was zero-width, which is
+    # invisible to `grep -q`: this decides one boolean, not a match offset. Both sides are
+    # needed — without the right-hand one `mainline` would classify as protected.
+    if grep -qE '(^|[^[:alnum:]_])(main|master|develop|release)([^[:alnum:]_]|$)' <<< "$COMMAND"; then
         DANGER_KIND="git-force-push-protected"
         DANGER_MSG="Force-pushing to a protected branch rewrites shared history — every teammate's local copy becomes inconsistent."
     else

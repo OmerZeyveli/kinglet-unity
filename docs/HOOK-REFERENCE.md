@@ -192,7 +192,7 @@ These hooks run after every Edit or Write tool invocation. They warn but do not 
 - **File:** `warn-platform-defines.sh`
 - **Profile:** standard
 - **Type:** Advisory (exit 0)
-- **What it does:** Checks for `#if UNITY_PS5` / `UNITY_GAMECORE` / `UNITY_STANDALONE_*` etc. without `#else` fallback. Code inside platform defines is silently excluded on other platforms -- a block guarded for console vanishes in the Standalone build and vice versa.
+- **What it does:** Checks for `#if UNITY_PS5` / `UNITY_GAMECORE` / `UNITY_STANDALONE_*` etc. without `#else` fallback. Code inside platform defines is silently excluded on other platforms -- a block guarded for console vanishes in the Standalone build and vice versa. Exempt since 2026-08-15: third-party and vendored code, the same skip list `block-legacy-input` has always carried. On a shipping project of 1417 C# files this hook fired 4 times and every one was under `Assets/Extensions/Feel/`, a vendored asset -- and a hook that fires on files you must never edit trains you to ignore the hook.
 - **Environment variables:** None
 
 #### track-edits

@@ -123,6 +123,53 @@ assert_eq "2" "$(tbg_run 'git push --force origin main')" \
 assert_eq "2" "$(tbg_run 'git push -f origin spike/x')" \
     "still blocks a short-flag force push"
 
+# --- the protected-branch CLASSIFICATION, which no assertion here could see -----------------
+# Added 2026-08-15, with the change that rewrote its `\b(main|master|develop|release)\b` as an
+# explicit boundary class — `\b` is a GNU extension and .claude/UPSTREAM plans a macOS host
+# pass, which is the standard block-legacy-input.sh states at its own LEGACY pattern.
+#
+# Nothing in this file could have caught getting that wrong. Both arms of the branch exit 2, so
+# every rc assertion above passes whichever one is taken, and the corpus checks rc only: the
+# regex could have been deleted outright and this file would have stayed green. What the branch
+# decides is the DEMAND — `git-force-push-protected` tells the agent to stop and ask the user
+# before retrying, `git-force-push` only to check whether a teammate has pulled. Losing the
+# distinction silently downgrades a shared-history rewrite to a routine one.
+#
+# Both directions, because a boundary that is slightly wrong fails in both: without the LEFT
+# side any branch ending in `main` classifies as protected, and without the RIGHT side
+# `mainline` does. Distinct command strings throughout — this gate is keyed on a hash of the
+# whole command and every string above has already been sent through $TBG_STATE_DIR, so a reused
+# one would answer from memory rather than from the classifier.
+#
+# EQUALITY, NOT CONTAINMENT, and that is not a style choice: `git-force-push` is a PREFIX of
+# `git-force-push-protected`, so an assert_contains for the ordinary verdict is satisfied by the
+# protected one and all three negative arms would pass over a classifier stuck at "protected" —
+# the vacuous half of a two-directional check, in the check written to be two-directional.
+#
+# Self-contained rather than built on tbg_stderr, and with its own fresh state dir: tbg_stderr is
+# defined two hundred lines below this block and shares $TBG_STATE_DIR. Calling it from up here
+# cost one round — `tbg_stderr: command not found`, four FAILs with an empty actual, which reads
+# exactly like a classifier that stopped classifying. `grep -F` here reads its input to the end,
+# so there is no early-exiting reader on the write end of a pipe.
+tbg_class() {  # tbg_class <command> -> the gate's classification, or "" if it did not classify
+    local _sd _line
+    _sd="$(mktemp -d "${TMPDIR:-/tmp}/bash-gate-class.XXXXXX")"
+    _line="$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":%s}}' \
+                "$(printf '%s' "$1" | jq -Rs .)" \
+             | UNITY_HOOK_STATE_DIR="$_sd" bash "$TBG_HOOK" 2>&1 >/dev/null \
+             | grep -F 'Classification: ' || true)"
+    rm -rf "$_sd"
+    printf '%s' "${_line##*Classification: }"
+}
+assert_eq "git-force-push-protected" "$(tbg_class 'git push --force origin develop')" \
+    "classifies a force push to a protected branch as protected, not merely as a force push"
+assert_eq "git-force-push" "$(tbg_class 'git push --force origin feature/hud-polish')" \
+    "classifies a force push to an ordinary branch as an ordinary force push"
+assert_eq "git-force-push" "$(tbg_class 'git push --force origin mainline')" \
+    "does not read 'mainline' as the protected branch 'main' — the right boundary is real"
+assert_eq "git-force-push" "$(tbg_class 'git push --force origin submaster')" \
+    "does not read 'submaster' as the protected branch 'master' — the left boundary is real"
+
 # --- O1 row 3: a grep for the prefs-wipe API ------------------------------------------------
 # `PlayerPrefs.DeleteAll` is a C# member expression. No shell command position exists for it,
 # so every Bash command containing it was text about the wipe; the acts that do erase

@@ -206,7 +206,11 @@ select_probe() {
             NEEDLE="File name 'Player.cs' does not match class name 'Enemy'"
             ;;
         warn-platform-defines)
-            PAYLOAD='{"tool_name":"Write","tool_input":{"file_path":"Assets/A.cs","new_string":"#if UNITY_PS5\nX();\n#endif\n"}}'
+            # Absolute path under Assets/, for the same reason block-legacy-input's probe is:
+            # this hook gained a third-party skip anchored as */Assets/Extensions/* on
+            # 2026-08-15, and a relative `Assets/A.cs` exercises a path shape Claude Code never
+            # sends. The acting probe has to travel the branch a real payload travels.
+            PAYLOAD='{"tool_name":"Write","tool_input":{"file_path":"/p/Assets/Scripts/A.cs","new_string":"#if UNITY_PS5\nX();\n#endif\n"}}'
             NEEDLE='Platform-specific code without #else fallback'
             ;;
         track-edits)
@@ -376,6 +380,174 @@ for HOOK in $REGISTERED_HOOKS; do
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$HOOK" "$KIND" "$ACT_BYTES" "$ACT_RC" "$OFF_ALL_BYTES" "$OFF_OWN_BYTES" >> "$PROBE_RECORD"
     echo "  HOOK-PROBE ${HOOK} kind=${KIND} act=${ACT_BYTES}B rc=${ACT_RC} off_all=${OFF_ALL_BYTES}B off_own=${OFF_OWN_BYTES}B"
+done
+
+# --- warn-filename's line-46 gate, in the silence direction -----------------
+#
+# Added 2026-08-15, with the change that rewrote that gate's `(class|struct|interface)\s+NAME\b`
+# in POSIX classes — `\s` and `\b` are GNU extensions and .claude/UPSTREAM plans a macOS host
+# pass, which is the standard block-legacy-input.sh states at its own LEGACY pattern.
+#
+# THE LOOP ABOVE CANNOT SEE THIS LINE. Its probe is `class Enemy` in `Player.cs`, chosen so the
+# names DISAGREE — which is precisely the input that line 46 must not match. Every assertion in
+# this file about warn-filename is about what it says when it warns; nothing asserted that a
+# correctly-named file makes it say nothing, so the gate could have been deleted outright and the
+# file would have stayed green. That gate is the hook: a file whose class matches its name is the
+# overwhelmingly common case, and a hook that warns on all of them is a hook you switch off.
+#
+# The four `must warn` arms are not decoration either. `[^[:alnum:]_]` replaces a zero-width `\b`
+# with a consumed character, and the two ways to get that wrong both END IN SILENCE — drop the
+# class and `Player` matches inside `PlayerController`; drop the `_` from it and `Player` matches
+# inside `Player_2`. In both cases line 46 swallows a real mismatch and the hook returns 0.
+WF_HOOK='warn-filename'
+
+STATE_FILE=''
+PROBE_ENV=''
+PROBE_SETUP=''
+
+wf_probe() {  # $1 = declaration text — sets PROBE_BYTES / PROBE_RC / PROBE_TEXT
+    PAYLOAD='{"tool_name":"Write","tool_input":{"file_path":"/p/Assets/Scripts/Player.cs","new_string":"'"$1"'\n"}}'
+    run_probe "$WF_HOOK" ''
+}
+
+# The non-silent baseline for the zeros below.
+wf_probe 'public sealed class Enemy : MonoBehaviour { }'
+WF_BASE_BYTES="$PROBE_BYTES"
+WF_BASE_VERDICT="silent"
+[ "$WF_BASE_BYTES" -gt 0 ] && WF_BASE_VERDICT="warns"
+assert_eq "warns" "$WF_BASE_VERDICT" \
+    "${WF_HOOK} baseline: a real name mismatch still warns (${WF_BASE_BYTES} B)"
+
+# Silence: the gate matched, so the hook has nothing to say. All three keywords, because they are
+# one alternation and an untested branch can be dropped without any assertion moving.
+#
+# EVERY PAYLOAD OPENS WITH A HELPER TYPE, AND THAT IS THE WHOLE DESIGN OF THIS GROUP. The bare
+# `class Player : MonoBehaviour` is silent for TWO independent reasons — line 46 matches, and if
+# it did not, the fallback would extract `Player` and compare it to `Player` — so it discriminates
+# nothing. Measured: with line 46's pattern mutated so it cannot match at all, a probe built from
+# bare declarations stayed at 105 pass / 0 fail, a full green over a deleted gate, which is the
+# defect this block was added to close reproduced inside the block itself. A leading
+# `class Helper : MonoBehaviour` separates the two: line 46 still matches the file's own type
+# wherever it sits, and the fallback — which takes the FIRST `class|struct` token — would report
+# `Helper`. That shape is ordinary C#, and it is why warn-filename's 0 warnings over 1417 real
+# files is the correct answer rather than a silent one.
+for WF_DECL in \
+    'public sealed class Helper : MonoBehaviour { }\npublic sealed class Player : MonoBehaviour { }' \
+    'public sealed class Helper : MonoBehaviour { }\npublic readonly struct Player { }' \
+    'public sealed class Helper : MonoBehaviour { }\npublic interface Player { }'
+do
+    wf_probe "$WF_DECL"
+    assert_eq "0B rc0" "${PROBE_BYTES}B rc${PROBE_RC}" \
+        "${WF_HOOK} says nothing about '${WF_DECL}' in Player.cs (baseline ${WF_BASE_BYTES} B)"
+done
+
+# Noise it must still make: the consumed boundary has to end the name, on both kinds of character
+# that continue a C# identifier.
+for WF_DECL in \
+    'public sealed class PlayerController : MonoBehaviour { }' \
+    'public sealed class Player_2 : MonoBehaviour { }'
+do
+    wf_probe "$WF_DECL"
+    WF_VERDICT="silent"
+    [ "$PROBE_BYTES" -gt 0 ] && WF_VERDICT="warns"
+    assert_eq "warns" "$WF_VERDICT" \
+        "${WF_HOOK} still warns on '${WF_DECL}' in Player.cs — the boundary ends the name (${PROBE_BYTES} B)"
+done
+
+# --- warn-platform-defines's third-party skip, probed as a PAIR -------------
+#
+# Added 2026-08-15 with the skip itself. On a shipping project of 1417 C# files this hook fired
+# 4 times and all four were under Assets/Extensions/Feel/ — a vendored asset nobody may edit. It
+# now carries the same skip list block-legacy-input.sh has always had.
+#
+# WHY A PAIR, AND WHY NEITHER HALF SHIPS ALONE. "The Extensions path produced nothing" is
+# satisfied by a hook that produces nothing for ANY input — by deleting the hook, by breaking
+# its pattern, by an `exit 0` on line 1. It is the passing-by-silence shape this file's header
+# is about, and the skip is precisely a change that makes a hook go quiet, so a one-sided probe
+# would certify the fix and the accident identically. The first-party arm is the non-silent
+# baseline, its byte count is printed beside every zero, and the two are asserted in the same
+# block so removing one is a visible deletion rather than a quiet weakening.
+#
+# The loop's own probe already proves the hook responds and carries its message. What is new
+# here is that the response depends on the PATH, which no assertion in this file could see.
+TP_HOOK='warn-platform-defines'
+TP_BODY='#if UNITY_PS5\nSetup();\n#endif\n'
+
+STATE_FILE=''
+PROBE_ENV=''
+PROBE_SETUP=''
+
+tp_probe() {  # $1 = absolute file path — sets PROBE_BYTES / PROBE_RC / PROBE_TEXT
+    PAYLOAD='{"tool_name":"Write","tool_input":{"file_path":"'"$1"'","new_string":"'"$TP_BODY"'"}}'
+    run_probe "$TP_HOOK" ''
+}
+
+# a) The baseline. First-party code with the same body must still warn — and with the hook's own
+#    message, so a surviving stray echo cannot stand in for it.
+tp_probe '/p/Assets/Scripts/Boot.cs'
+TP_BASE_BYTES="$PROBE_BYTES"
+TP_BASE_VERDICT="silent"
+[ "$TP_BASE_BYTES" -gt 0 ] && TP_BASE_VERDICT="warns"
+assert_eq "warns" "$TP_BASE_VERDICT" \
+    "${TP_HOOK} still warns on first-party code after the third-party skip (${TP_BASE_BYTES} B)"
+assert_contains "$PROBE_TEXT" 'Platform-specific code without #else fallback' \
+    "${TP_HOOK} first-party baseline is the hook's own warning, not stray output"
+
+# b) The skip. Every segment of the list, not just the measured one: a skip list is a union and
+#    an untested alternative can be dropped without any assertion moving.
+for TP_PATH in \
+    /p/Assets/Extensions/Feel/MMTools/Core/MMHelpers/MMDebug.cs \
+    /p/Assets/Plugins/Vendor/Thing.cs \
+    /p/Assets/ThirdParty/Vendor/Thing.cs \
+    /p/Assets/PlayerPrefsEditor/Editor/Prefs.cs \
+    /p/Packages/com.vendor.thing/Runtime/Thing.cs \
+    /p/Library/PackageCache/com.vendor.thing/Thing.cs
+do
+    tp_probe "$TP_PATH"
+    assert_eq "0B rc0" "${PROBE_BYTES}B rc${PROBE_RC}" \
+        "${TP_HOOK} passes over ${TP_PATH#/p/} (first-party baseline ${TP_BASE_BYTES} B)"
+done
+
+# c) The four Assets/-anchored entries are ANCHORED, and this is what keeps them so. FILE_PATH is
+#    absolute, so an unanchored `*/Plugins/*` would match a checkout kept in an ordinary
+#    ~/Projects/Plugins/ directory and switch the hook off for every file in that project at
+#    once. block-legacy-input.sh's Editor/Tests skips were re-anchored for exactly this on
+#    2026-08-13; the four `*/Assets/…/*` entries inherit the anchoring and now inherit the guard.
+for TP_PATH in \
+    /home/dev/Plugins/MyGame/Assets/Scripts/Boot.cs \
+    /home/dev/Extensions/MyGame/Assets/Scripts/Boot.cs \
+    /home/dev/ThirdParty/MyGame/Assets/Scripts/Boot.cs
+do
+    tp_probe "$TP_PATH"
+    TP_ANCHOR_VERDICT="silent"
+    [ "$PROBE_BYTES" -gt 0 ] && TP_ANCHOR_VERDICT="warns"
+    assert_eq "warns" "$TP_ANCHOR_VERDICT" \
+        "${TP_HOOK} still warns when the CHECKOUT sits under ${TP_PATH} (${PROBE_BYTES} B)"
+done
+
+# d) A KNOWN HOLE, RECORDED RATHER THAN HIDDEN — the corpus convention in
+#    tests/test-bash-gate-precision.sh, applied here.
+#
+#    `*/Packages/*` and `*/Library/*` are the two entries of the list that are NOT anchored under
+#    Assets/, and they cannot be: in a real project those are siblings of Assets/ at the project
+#    root, and the hook is given a path with no idea where that root is. The consequence is
+#    measured and it is the 2026-08-13 defect still live: a checkout kept in ~/Projects/Packages/
+#    or ~/dev/Library/ switches the hook off for every file in it.
+#
+#    THIS IS INHERITED, NOT INTRODUCED. block-legacy-input.sh has shipped the identical two
+#    entries since it was written, and the identical hole: measured on the same paths, it exits 0
+#    on a plain `Input.GetKeyDown` under /Users/dev/Projects/Packages/Game/Assets/Scripts/ and
+#    under /home/dev/Library/MyGame/Assets/Scripts/, while blocking correctly under
+#    /home/dev/Plugins/MyGame/Assets/Scripts/. Copying the list copied the hole, and asserting
+#    the current answer is what makes closing it a deliberate edit to this block rather than a
+#    silent behaviour change.
+for TP_PATH in \
+    /Users/dev/Projects/Packages/Game/Assets/Scripts/Boot.cs \
+    /home/dev/Library/MyGame/Assets/Scripts/Boot.cs
+do
+    tp_probe "$TP_PATH"
+    assert_eq "0B rc0" "${PROBE_BYTES}B rc${PROBE_RC}" \
+        "KNOWN HOLE (inherited): a checkout under ${TP_PATH%%/Assets/*} silences ${TP_HOOK} (baseline ${TP_BASE_BYTES} B)"
 done
 
 # --- Coverage, keyed on execution ------------------------------------------
