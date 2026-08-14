@@ -46,6 +46,56 @@ connected.**
 
 ---
 
+## What `install.sh`'s exit status means
+
+This section is here rather than in `README.md` or `docs/GETTING-STARTED.md` because this is the only
+one of the three that `install.sh` copies into your project. Read it before scripting the installer.
+
+`install.sh` **exits 0 for every outcome it can report, and 1 for every outcome it cannot.** That is
+narrower than "everything you asked for happened" — and the two paragraphs above are already two
+cases where the installer deliberately does less than you asked and still ends green: a `.mcp.json`
+it will not merge, and a `--with-mcp` whose package edit it can decline.
+
+| status | what it means |
+|---|---|
+| **0** | The run reached its end and **reported what it did.** The `.claude/` payload is on disk and `.claude/state/install-receipt.tsv` lists every file the toolkit owns, so `uninstall.sh` can reverse it exactly. It does **not** mean every requested step succeeded. |
+| **1** | The install did not happen, or did not finish. A precondition failed — not a Unity project, no payload beside `install.sh`, an unknown argument — or the run died part-way. A part-way death still writes a receipt for whatever had already been written and says so on stderr, so `uninstall.sh` can still clean up. |
+
+**What a caller can rely on:** on an exit-0 run, everything `install.sh` was asked to do and did not
+do is listed under a **`Not done:`** block, printed immediately before `Next steps:`. Every entry is
+one line and names the consequence and the remedy.
+
+> **No `Not done:` block on an exit-0 run means nothing was abandoned.**
+
+That is the machine-readable half of the contract; the status is the other half, and neither answers
+the other's question.
+
+So a script that must not proceed on a half-install checks both:
+
+```bash
+# status answers "did it run at all"; the block answers "did all of it happen"
+out="$(./install.sh --project-dir "$p" --with-mcp --yes)" || exit 1
+printf '%s\n' "$out"
+case "$out" in *"Not done:"*) exit 1 ;; esac
+```
+
+Capturing the output is also what makes the `case` reliable: `install.sh` colours its headings only
+when stdout is a terminal, so inside `$( )` the block header is the plain bytes `Not done:`.
+
+**What is deliberately *not* in that block: a file kept because *you* edited it.** Those are reported
+separately, as `keeping yours:` with the paths listed under it. The payload landed and the file on
+disk is the one you chose — that is the ownership rule working, not work the installer abandoned.
+Two keeps are exceptions and *are* in the block, because the keep leaves something *else* absent or
+inert: a kept `.claude/settings.json` leaves this version's new hooks on disk and unregistered, since
+that file is the only place a hook is registered; and a receipt row whose origin column cannot be
+read means the file was kept without anyone having chosen it.
+
+**One exit-0 run is not an install and prints no block:** `--dry-run`, which ends with
+`Dry run complete — nothing written.` Answering *2* at the "existing `.claude/`" prompt is not the
+same case — it prints the block, with the whole installation in it.
+
+---
+
 ## Prerequisites
 
 - **Unity 6** (the project's target; the bridge supports 2021.3 LTS+).
