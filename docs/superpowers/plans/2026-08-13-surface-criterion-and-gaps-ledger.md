@@ -471,7 +471,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 1 | Twenty surfaces leave, and the counts get a guard | **done** | `818b2bd`…`38dec6c` | **19, not 20** — cut is 15 hooks + 4 scripts. 3 fix rounds. `detect-missing-refs.sh` restored by ruling; wiring is Task 3's. Whole-task audit ran after closure → F1–F13 |
 | 2 | The two gates block the act and permit the prose | **adjudicated at cap → 2b** | `5041b4b`…`3fd22dc` | 5 rounds; each fixed the previous round's fix. Inverted to a read-only allowlist in round 3, positional argument read in round 5 |
 | 2b | The tokeniser gets a quote model, and a corpus stops the next hole | **done, merged** | `5b636d3`…`c050743` | **New.** Data loss: a quoted operator truncates the arg list, dropping the write flag. Requires a regression corpus checked against `546870f` / `06883cc` / `3fd22dc` |
-| 2c | What decides the route, and what the allowlist vouches for | open | — | **New.** Both holes exist at all four hook versions; `./evil/grep` destroyed 3/3 `.meta` files with the gate at 0 |
+| 2c | What decides the route, and what the allowlist vouches for | **done, merged** | `51b1b42`…`b932064` | **New.** Both holes exist at all four hook versions; `./evil/grep` destroyed 3/3 `.meta` files with the gate at 0 |
 | 3 | The surviving scripts become reachable | **done, merged** | `75ea1de`…`d607839` | **R2**: leaves `scripts/` entirely. **R8**: no `Bash` for `unity-reviewer`. **R7** if it lands second |
 | **Stage 2 — installer correctness** | | | | |
 | 4 | The receipt exists before anything that can abort | **done, merged** | `5b636d3`…`8056f53` | The only permanent-damage path in the wave. **R1**: gains the five `stat -c` sites |
@@ -1494,6 +1494,30 @@ ADDRESSED, none returned to the fix loop.**
      and `tests/test-provenance-origins.sh`, both pointing into `scripts/studio-doctor.sh`, **both
      already wrong at `b3eb097`.** Comment-only. **→ Tasks 10/11.** *Sixth and seventh instances of
      the rot the cite-by-anchor rule exists for.*
+
+**Task 2c COMPLETE at `b932064`, merged. Final ledger from its closing confirmation.**
+
+146. **Five classes stay open, all four of the original ones re-priced and one new one declined with
+     its cost.** (a) **Quoted introducer** — executed-destructive, three corpus records, held by the
+     `H` ceiling; **its consequence widened in this task**: a quote does not sit *beside* the identity
+     check, it **routes around** it, and quoting a path is a thing people do for no reason at all.
+     (b) **The direct shape** — **49 of a 343-member enumeration permit, every one that arm**; fixing
+     it means tokenising command position. (c) **Globs that match without saying** — closing it means
+     modelling the filesystem; carries the recorded asymmetry that `-name '?????'` **blocks** while
+     `-name '*'` **permits**. (d) **Variable expansion** — inherited, 0 unless the assignment spells
+     the extension. (e) **The all-wildcard window** — requiring a surviving literal would close the
+     sed-script false positive **free** and cost `-name '?????'`, *trading a block on a read for a
+     permit on a write, which is the wrong side of this file's own rule.* Three records pin it, **one
+     of which reds an over-widening "fix"** — verified by two distinct over-widening mutants.
+147. **The documentation round proved itself the right way: the ceilings did not move.** Corpus diff
+     across it — 6 added, 0 removed, hist2 219 → 219, X 45 → 45, H 4 → 4, **and no existing record's
+     `exp`/`hist`/`exempt` changed.** *That is the real test of a documentation round, and it is what
+     the hook's comment-stripped byte-identical check confirms from the other side.*
+148. **Two reconciliations that looked like disagreements and were not — the same shape twice in one
+     wave.** Task 2c's `B3` at **33 vs 35**: the same measurement at 325 and 331 records, the
+     difference being the two route-decided records added between. Task 6's `raw-argcmp` at **1 vs
+     7**: the same mutation before and after the symlink arms existed. **A count taken at two tree
+     states is not a contradiction; it is a missing timestamp.**
 
 **Inherited from earlier waves, still open:**
 
