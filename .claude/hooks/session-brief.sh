@@ -33,8 +33,9 @@
 # hook honoured neither switch, and it is the loudest hook in the toolkit by volume of injected text
 # — the most likely reason someone reaches for the switch in the first place.
 #
-# `tests/test-hooks.sh` asserts the behaviour for EVERY hook in the directory rather than for this
-# implementation, so the inline copy cannot drift from `_lib.sh`'s without something going red.
+# `tests/test-hooks.sh` — not installed; it lives in the toolkit repository — asserts the behaviour
+# for EVERY hook in the directory rather than for this implementation, so the inline copy cannot
+# drift from `_lib.sh`'s without something going red.
 set -euo pipefail
 
 if [ "${DISABLE_UNITY_HOOKS:-}" = "1" ]; then

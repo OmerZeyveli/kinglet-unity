@@ -145,6 +145,27 @@ assert_eq "0" "$EXIT_CODE" "track-edits exits 0"
 #   * a SET identity between the hooks that do not source `_lib.sh` and the hooks this file probes
 #     behaviourally. A new inline hook reds here until someone writes its probe, which is the only
 #     way an inline copy of the switch logic can be held to the behaviour rather than to a string.
+#
+# WHAT THE CLASSIFIER STILL CANNOT SEE, and the set identity above now depends on it. It matches the
+# `source` STATEMENT, not whether that statement RUNS. Wrap a hook's source line in a never-true
+# conditional and it is still classified as a sourcer: it stays out of the inline-derived set, so
+# nothing probes it, and it is not the hook probe 1 uses, so nothing else covers it either.
+# Measured on `warn-filename.sh` with `if [ "1" = "2" ]; then source …; fi` -- rc=0 and ZERO BYTES of
+# output with no switch set, with `DISABLE_UNITY_HOOKS=1`, and with `DISABLE_HOOK_WARN_FILENAME=1`,
+# and this whole file reports 0 failures. The kill-switch property is vacuously satisfied because
+# the hook does nothing at all in every state. WHAT IS LOST IS THE HOOK, NOT THE SWITCH -- a
+# distinction no probe framed as "is it silent when disabled" can draw, because silence is the
+# passing condition. Closing it needs a per-hook positive: proof that each hook still ACTS when no
+# switch is set. Probe 1 is that proof for one hook; the rest are covered only by their own
+# behaviour assertions elsewhere in the suite, and TWO HOOKS ARE NAMED BY NO TEST FILE AT ALL --
+# `warn-platform-defines.sh` and `warn-serialization.sh`. The second is the hook whose absence is the
+# silent-data-loss case `.claude/rules/serialization.md` opens with, and which
+# `docs/HOOK-REFERENCE.md` singles out as the reason the `minimal` profile is a safety setting.
+# Derive that pair rather than trusting this line, and note it is an UPPER bound on coverage --
+# being named by a test file is weaker than being asserted to act:
+#
+#   for h in .claude/hooks/*.sh; do b=$(basename "$h"); [ "$b" = _lib.sh ] && continue
+#     grep -lq "$b" tests/*.sh 2>/dev/null || echo "$b"; done
 KS_BAD=""
 KS_SEEN=0
 #

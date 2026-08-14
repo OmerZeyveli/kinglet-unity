@@ -1892,6 +1892,35 @@ more than either number.**
      profile setting inert for the one hook that runs at every session start. **→ the same hook
      pass.**
 
+200. **A `source _lib.sh` that never runs is classified as a sourcer, so nothing probes it, and the
+     hook is gone rather than disabled.** Task 11's new kill-switch set identity matches the source
+     STATEMENT, not whether it executes. Measured on `.claude/hooks/warn-filename.sh` with
+     `if [ "1" = "2" ]; then source "${SCRIPT_DIR}/_lib.sh"; fi`: rc=0 and **zero bytes** with no
+     switch set, with `DISABLE_UNITY_HOOKS=1`, and with `DISABLE_HOOK_WARN_FILENAME=1`, and
+     `tests/test-hooks.sh` reports **0 failures**. The kill-switch property is vacuously satisfied
+     because the hook does nothing in every state. **No probe framed as "is it silent when disabled"
+     can draw this distinction, because silence is the passing condition** — closing it needs a
+     per-hook positive that each hook still ACTS with no switch set. Pre-existing, but the new set
+     identity depends on the classifier, so it is recorded at the code. **→ the hook pass.**
+
+201. **Two hooks are named by no test file at all: `warn-platform-defines.sh` and
+     `warn-serialization.sh`.** Derived while sizing 200 (`grep -lq "$b" tests/*.sh` per hook), and
+     *named by* is an upper bound on *asserted to act*, so the uncovered set is at least these two.
+     **`warn-serialization.sh` is the hook whose absence is the silent-data-loss case
+     `.claude/rules/serialization.md` opens with**, and the one `docs/HOOK-REFERENCE.md` singles out
+     as the reason `minimal` is a safety setting rather than a speed setting — guarded by name in
+     three documents and by behaviour nowhere. **→ the hook pass, and it is the first item in it.**
+
+202. **The rule-4 criterion applied to the rest of the payload leaves six unmarked repository-only
+     paths, and the number moved because three of the nine were this task's own.** Five in
+     `.claude/hooks/bash-gate.sh` and one in `.claude/hooks/_lib.sh`, all naming `tests/` files that
+     never install; both files pre-existing. The three in `.claude/hooks/session-brief.sh` and
+     `.claude/settings.local.json.template` were written by Task 11 round 0 and are marked now,
+     which is what makes the marker wording canonical. **Widening rule 4 to the other 22
+     non-Markdown payload files needs one decision first: `install.sh` and `uninstall.sh` are not in
+     the payload but are legitimately named as the commands a user ran, so a widened rule needs
+     them exempt by role rather than by marker.** **→ a later payload-citation pass.**
+
 ## The honest limits, carried forward to EE
 
 - **Nothing in either audit proves the toolkit works inside Claude Code.** No scout ran a command

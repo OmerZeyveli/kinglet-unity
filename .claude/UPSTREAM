@@ -2,12 +2,18 @@
 # key=value, dependency-free to parse. This is the summary only.
 #
 # THIS FILE SHIPS, AND UNTIL 2026-08-14 IT NAMED FOUR FILES THAT ARE NOT IN AN INSTALLED PROJECT.
-# Measured against a real install, these four are not installed: provenance.tsv, provenance-skip.tsv, MERGE-NOTES.md, check-provenance.sh.
-# These two are installed: .claude/NOTICE.md and .mcp.json.
+# Measured against a real install:
+#   provenance.tsv       — not installed
+#   provenance-skip.tsv  — not installed
+#   MERGE-NOTES.md       — not installed
+#   check-provenance.sh  — not installed
+# and .claude/NOTICE.md and .mcp.json are both there.
 #
-# So EVERY LINE HERE THAT NAMES A REPOSITORY-ONLY PATH CARRIES THE WORDS `not installed`, on that
-# line and not on its neighbour, and the shipped-citation guard's rule 4 fails on any that does not.
-# What an installed reader can actually open for attribution is .claude/NOTICE.md.
+# So EVERY REPOSITORY-ONLY PATH NAMED HERE IS FOLLOWED BY THE WORDS `not installed` BEFORE THE NEXT
+# PATH APPEARS, and the shipped-citation guard's rule 4 fails on any that is not. The marker is
+# token-scoped on purpose: it shipped line-scoped for one round, and a line-scoped marker waves
+# through every other path on a marked line — which is what the four names on one line above used to
+# do. What an installed reader can actually open for attribution is .claude/NOTICE.md.
 toolkit=kinglet
 edition=pioneer
 toolkit_version=3.0.0-pioneer.1
@@ -25,7 +31,7 @@ superpowers_pin_verified=no
 superpowers_pin_note=nothing verifies this pin. Every adapted row is status=modified, so the check-provenance.sh verifier -- not installed -- never reaches it under --online; --online reads the ecu= line only. Recorded as a record, not a checked fact.
 donchitos=984023ddac0d5e27624f2baacde6105e45de375f
 donchitos_repo=https://github.com/Donchitos/Claude-Code-Game-Studios
-donchitos_note=REMOVED 2026-08-03; 0 files ship from this upstream, so nothing here needs attribution in .claude/NOTICE.md. The pin is kept because the toolkit repository's MERGE-NOTES.md Part 1 and its provenance-skip.tsv record what was adapted and at which commit, every path rule=absent; those two are not installed.
+donchitos_note=REMOVED 2026-08-03; 0 files ship from this upstream, so nothing here needs attribution in .claude/NOTICE.md. The pin is kept because MERGE-NOTES.md -- not installed -- Part 1 and provenance-skip.tsv -- not installed -- record what was adapted and at which commit, every path rule=absent.
 unity_mcp_repo=https://github.com/CoplayDev/unity-mcp
 unity_mcp_note=not vendored; .mcp.json (project root) points at it on localhost:8080
 unity_mcp_ref=c14de1e6dc01ab42d2bb358730cff954bce0ce6b

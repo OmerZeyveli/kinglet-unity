@@ -370,35 +370,105 @@ fi
 # That is the identical defect rule 2 exists for, in a file rule 2 cannot see because its tokens are
 # not backticked and its extension is not .md.
 #
-# THE RULE IS A MARKER, NOT AN ALLOW-LIST. A repository-only path may be named — the pins are a
-# record and the record is worth keeping — but the line that names it must also carry the words
-# `not installed`, on that line. An allow-list would go stale silently the first time a path moved
-# into or out of the payload; the marker cannot, because it is read off the same payload derivation
-# rules 2 and 3 use.
+# THE RULE IS A MARKER, NOT AN ALLOW-LIST. A repository-only path may be named -- the pins are a
+# record and the record is worth keeping -- but it must be marked `not installed`. An allow-list
+# would go stale silently the first time a path moved into or out of the payload; the marker cannot,
+# because what counts as installed is derived below from the same payload derivation rules 2 and 3
+# use, plus the root paths install.sh writes receipt rows for.
+#
+# THE MARKER IS TOKEN-SCOPED, NOT LINE-SCOPED, AND ROUND 1 GOT THAT WRONG IN THIS FILE WHILE FIXING
+# IT ONE FILE OVER. A line-scoped `case "$up_l" in *"not installed"*)` waves through every other
+# token on a marked line: measured, appending ` Also see MERGE-NOTES.md for the build record.` to an
+# already-marked line stayed GREEN with the token count rising 11 -> 12, so the token was read and
+# passed. Not hypothetical either -- two lines here carried two and three repository paths under a
+# single marker. So each in-scope token OWNS THE SPAN from itself to the next in-scope token (or end
+# of line), and the marker must sit in that span.
+#
+# AND IT CHECKS BOTH DIRECTIONS. A payload file marked `not installed` is a false claim too -- it
+# under-promises rather than dangling, but this is the file whose subject is truthful claims.
+#
+# BARE BASENAMES RESOLVE. `superpowers_pin_note` names the verifier as `check-provenance.sh`, with no
+# directory, and there is no such file at the repository root -- so under an `[ -e ]` test the fourth
+# of the four paths this rule exists for never entered scope at all. Measured: removing its marker
+# stayed green; writing it as `scripts/check-provenance.sh` and removing the marker reddened. A
+# basename resolves when exactly one tracked file carries it, which is the same rule
+# tests/test-citations-resolve.sh uses.
+#
+# WHAT THIS DOES NOT COVER, and it is deliberate, not an oversight. It reads ONE file. The payload
+# has 67 entries, 44 Markdown (rules 1-3) and 23 not; this is one of the 23. Applying the same
+# criterion to the other 22 leaves SIX unmarked repository-only paths, all naming `tests/` files,
+# which never install: five in `.claude/hooks/bash-gate.sh` and one in `.claude/hooks/_lib.sh`. Both
+# are pre-existing. It was nine across four files until 2026-08-14; the other three were written by
+# the task that added this rule, in `.claude/hooks/session-brief.sh` and
+# `.claude/settings.local.json.template`, and are marked now -- which is also what makes the marker
+# wording canonical, the precondition for widening. Widening is a separate change: it needs a
+# decision about `install.sh` and `uninstall.sh`, which the payload does not contain but which are
+# legitimately named as the commands a user ran.
+#
+# Re-derive the six rather than trusting this comment -- the criterion is the whole of it:
+#
+#   for every non-Markdown payload file, every `*.tsv|md|sh|json` token naming a real file here
+#   that is neither in the payload nor a project-root file install.sh writes, on a line whose
+#   following text does not say `not installed`.
 UP_FILE="$REPO/.claude/UPSTREAM"
-up_bad=""
-up_seen=0
-if [ ! -f "$UP_FILE" ]; then
-  fail ".claude/UPSTREAM is missing — rule 4 read nothing"
+
+# What an installed reader can open: the payload, plus the project-root files install.sh writes
+# receipt rows for. Derived from install.sh's own row-writing printf formats rather than listed --
+# `.mcp.json` and `MCP-SETUP.md` are installed and live nowhere near `.claude/`, so a payload-only
+# test would demand a `not installed` marker on two files that are.
+UP_ROOT_INSTALLED="$(grep -oE "printf '[A-Za-z0-9_.-]+\\\\t" "$REPO/install.sh" \
+                     | sed "s/printf '//; s/\\\\t//" | grep -vx 'path' | sort -u)"
+# CLAUDE.md is generated rather than copied, which is why rule 2 already allows it by name.
+UP_INSTALLED="$(printf '%s\n%s\nCLAUDE.md\n' "$PAYLOAD" "$UP_ROOT_INSTALLED" | grep -v '^$' | sort -u)"
+
+if [ "$(printf '%s\n' "$UP_ROOT_INSTALLED" | grep -c . || true)" -ge 2 ]; then
+  pass "rule 4 derived the project-root installed set from install.sh ($(printf '%s' "$UP_ROOT_INSTALLED" | tr '\n' ' '))"
 else
-  up_line=0
-  while IFS= read -r up_l; do
-    up_line=$((up_line + 1))
-    up_toks="$(printf '%s' "$up_l" | grep -oE '[A-Za-z0-9_./-]+\.(tsv|md|sh|json)' || true)"
-    [ -n "$up_toks" ] || continue
-    while IFS= read -r up_t; do
-      [ -n "$up_t" ] || continue
-      # Only paths that exist in THIS repository are in scope: `.mcp.json` at the project root and a
-      # user-project path name nothing here and are not this rule's business.
-      [ -e "$REPO/$up_t" ] || continue
-      up_seen=$((up_seen + 1))
-      grep -qxF -- "$up_t" <<< "$PAYLOAD" && continue
-      case "$up_l" in *"not installed"*) continue ;; esac
-      up_bad="${up_bad}
-       .claude/UPSTREAM:${up_line} names ${up_t}, which install.sh does not copy, on a line that does not say \`not installed\`"
-    done <<< "$up_toks"
-  done < "$UP_FILE"
+  fail "rule 4 could not derive the project-root installed set from install.sh — its receipt-row printf formats have changed shape, and every verdict below is now guessing"
 fi
+
+# Classify every token the file names: out of scope (names no file here), installed, or repo-only.
+up_map="$(mktemp "${TMPDIR:-/tmp}/kinglet-up-map.XXXXXX")"
+for up_t in $(grep -ohE '[A-Za-z0-9_./-]+\.(tsv|md|sh|json)' "$UP_FILE" | sort -u); do
+  up_res=""
+  if [ -e "$REPO/$up_t" ]; then
+    up_res="$up_t"
+  else
+    case "$up_t" in
+      */*) : ;;
+      *)   up_m="$(git -C "$REPO" ls-files | grep -E "(^|/)$(printf '%s' "$up_t" | sed 's/[.[\*^$]/\\&/g')\$" || true)"
+           [ "$(printf '%s\n' "$up_m" | grep -c . || true)" = "1" ] && up_res="$up_m" ;;
+    esac
+  fi
+  [ -n "$up_res" ] || continue
+  if grep -qxF -- "$up_res" <<< "$UP_INSTALLED" || grep -qxF -- "$up_t" <<< "$UP_INSTALLED"; then
+    printf '%s\tinstalled\n' "$up_t" >> "$up_map"
+  else
+    printf '%s\trepo-only\t%s\n' "$up_t" "$up_res" >> "$up_map"
+  fi
+done
+
+up_seen="$(grep -c . "$up_map" 2>/dev/null || true)"
+up_bad="$(awk -F'\t' '
+  FILENAME == MAP { cls[$1] = $2; res[$1] = ($3 == "" ? $1 : $3); next }
+  {
+    # Walk the line left to right, recording every in-scope token and where it starts.
+    n = 0; pos = 1
+    while (match(substr($0, pos), /[A-Za-z0-9_.\/-]+\.(tsv|md|sh|json)/)) {
+      st = pos + RSTART - 1; tk = substr($0, st, RLENGTH); pos = st + RLENGTH
+      if (tk in cls) { n++; T[n] = tk; S[n] = st; E[n] = pos }
+    }
+    for (i = 1; i <= n; i++) {
+      span = (i < n) ? substr($0, E[i], S[i+1] - E[i]) : substr($0, E[i])
+      marked = (index(span, "not installed") > 0)
+      if (cls[T[i]] == "repo-only" && !marked)
+        printf "       .claude/UPSTREAM:%d names %s (%s), which install.sh does not copy, and the text after it does not say `not installed` before the next path\n", FNR, T[i], res[T[i]]
+      if (cls[T[i]] == "installed" && marked)
+        printf "       .claude/UPSTREAM:%d says %s is `not installed`, and it is\n", FNR, T[i]
+    }
+  }
+' MAP="$up_map" "$up_map" "$UP_FILE")"
+rm -f "$up_map"
 
 # Anti-vacuity: a rewrite that drops every repository path from this file would otherwise report a
 # clean result over nothing. The floor is 1 because the point is that the sweep read SOMETHING; the
@@ -410,11 +480,12 @@ else
 fi
 
 if [ -z "$up_bad" ]; then
-  pass ".claude/UPSTREAM names no repository-only file without saying it is not installed"
+  pass ".claude/UPSTREAM marks every repository-only path it names, and claims that of no installed one"
 else
-  fail "shipped .claude/UPSTREAM points an installed reader at file(s) that are not there:$up_bad"
+  fail "shipped .claude/UPSTREAM misdescribes what an installed reader can open:"
+  printf '%s\n' "$up_bad"
   printf '       .claude/UPSTREAM installs. A path here that install.sh does not copy is a dangling\n'
-  printf '       pointer in every project. Either drop it, or say `not installed` on the same line.\n'
+  printf '       pointer in every project. Say `not installed` after it, before the next path.\n'
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
