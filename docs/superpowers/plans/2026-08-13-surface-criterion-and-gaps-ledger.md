@@ -1296,6 +1296,37 @@ ADDRESSED, none returned to the fix loop.**
      this exploit explicitly above its own ceiling.** *Consistent with the earlier ruling that a
      two-sided forgery is the structural limit of a count — recorded as verified, not as a finding.*
 
+**From Task 6's review (2026-08-14). In fix round 1.**
+
+114. **A guard whose removal leaves the suite entirely green, standing between an arm and the exact
+     destruction that got `c2d27f1f` reverted.** `install.sh`'s `[ -f "$ref" ]`: `sha_of` returns the
+     **empty string** for a missing file, so without it a `user-modified` row for a **retired
+     surface** (no shipped copy) whose project file is unreadable matches `"" = ""`, is reclaimed out
+     of `MODIFIED_FILES`, and is **deleted by the orphan prune** — measured `head: survives` →
+     `mutant: DELETED`. **The doctor's analogous guard IS asserted, so the coverage is asymmetric in
+     the destructive direction.** → in Task 6's fix round.
+115. **`--toolkit-dir` pointed at the project reports every live edit as reverted.** The
+     `!= "$PROJECT_DIR"` guard exists **only in the auto-detect branch**; the explicit branch
+     validates `cd` and `.claude/VERSION` and nothing else. **Every file trivially equals itself**,
+     so every `user-modified` row reports as put-back — *precisely the direction the arm's own
+     comment forbids*: "reporting a live edit as reverted tells the user their work is not at risk
+     when it is." No shipped surface passes the flag today. → in the fix round.
+116. **The two-arm mapping is duplicated and nothing would notice it drifting.** `install.sh`'s
+     `user-modified)` arm and `scripts/studio-doctor.sh`'s `toolkit_ref` each carry it; both are
+     self-consistent and separately asserted, and **no assertion would notice them disagreeing about
+     a specific file. A third write loop breaks both silently.** **→ open, no owner.**
+117. **A pre-existing prune exposure gains one crafted shape.** A hand-written
+     `.claude/../README.md` row marked `user-modified`, with the toolkit's bytes on disk, is now
+     reclaimed and orphan-pruned (`base: PRESENT` → `head: DELETED`). **An equivalently crafted
+     `toolkit` row already deletes it at base**, no producer writes `..` paths, and **no path
+     normalisation exists anywhere in `install.sh`.** → open.
+118. **A reviewer's own probe artifact, reported rather than filed as a finding.** Its first suite run
+     copied the worktree with `cp -a`, carrying a `.git` **file** pointing back at the real repo;
+     severing it made **15 assertions fail because git was gone** (`Total: 3115 / Failed: 50`).
+     **`git clone` reproduces the reported numbers exactly.** *Sixth measured instance in this wave
+     of a result that meant something other than what it looked like — and the first where the
+     measurer caught it in its own harness before reporting.*
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
