@@ -12,44 +12,101 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-### MERGED AND GREEN — fifteen units are in the branch
+### ALL UNITS MERGED — the whole-branch review has run and its verdict is MERGE
 
-**1, 2b, 2c, 3, 4, 4b, 4c, 5, 6, 7, 8, 9, 10, 12, 13.** Both gates pass on the merged tree:
+**1, 2b, 2c, 3, 4, 4b, 4c, 5, 6, 7, 8, 9, 10, 11, 12, 13 — sixteen.** Task 2 is not in that list: it
+was adjudicated at its cap into 2b, and the ledger records it as capped, not completed. **The plan
+had twelve units.** 2b, 2c, 4b, 4c and 13 each came from a measured defect the plan did not foresee.
 
-- `bash tests/run-tests.sh` → **rc=0, `Total: 3304  Passed: 3301  Failed: 0  Skipped: 3`**,
-  **37** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **37**.
+Both gates on the merged tree at **`7a4acd8`**:
+
+- `bash tests/run-tests.sh` → **rc=0, `Total: 3326  Passed: 3323  Failed: 0  Skipped: 3`**,
+  **38** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **38**.
 - `bash scripts/check-provenance.sh` → **`provenance OK`**.
-- **Zero baseline drift at this merge** — `install.sh` and `tests/` are outside the inventory.
+- **`main` is 0 ahead, this branch 143 ahead — the merge is a fast-forward.**
 - **Four `provenance.tsv` conflicts across the wave, all note-column appends on different rows**,
   resolved by hand exactly as the scout predicted.
-- **The plan had twelve units; the wave has seventeen.** 2b, 2c, 4b, 4c and 13 each came from a
-  measured defect the plan did not foresee.
 
-### STILL IN FLIGHT — one
+**A figure this ledger has been quoting wrongly all wave, and the correction matters more than the
+number.** The whole-branch review measured the suite **in a fresh clone** and got
+`Total: 3325  Passed: 3303  Skipped: 22` — also green. The gap is **19 assertions that run for the
+author and skip for everyone else**, because `spikes/platform/clients/probe-host/dist/` is an
+untracked gitignored artifact. Pre-existing, and not a defect in itself. **What is a defect is that
+the loop gated sixteen units on a total nobody but this checkout can obtain** — every "N/N" in this
+file is a figure from a privileged tree. Re-derive in a clone before quoting one anywhere else.
 
-| task | worktree | branch | scratch root | state |
-|---|---|---|---|---|
-| 11 | `…/kinglet-wt/task-11` | `task/11` | `/tmp/kinglet-t11-Nafx3L` | dispatched from `de8abf7` |
+### The whole-branch review — verdict and disposition
 
-**Task 11 is the wave's inheritance: thirty-one ledger entries name it**, and its plan section was
-written before any of the fifteen completed units existed. **Task 4c's reviewer named what a Task 11
-merge invalidates and what it does not** — suite totals and the six-site character-class derivation
-must be **re-derived** on the merged tree; everything behavioural carries, because `install.sh` is
-byte-identical and `.claude/` is untouched across 4c's whole range.
+**MERGE, after a prose-only correction pass. No Critical. No data-loss path. No behaviour change
+required.** Report: `.superpowers/sdd/2026-08-13-surface-criterion/final-review.md` (1150 lines);
+§5 is the worklist, each item citing the § that measured it.
 
-### After both merge
+The behavioural work is sound and was re-verified by execution — gates re-run, guards mutated, hooks
+executed. **Every defect it found is a claim**: a sentence, a count, a category list, or a comment
+asserting coverage that measurement does not support. **Seven of them were introduced by the commits
+that repaired the same class elsewhere.**
 
-**One whole-branch review from `3e4c6e5`**, per `final-reviewer-prompt.md` — which Task 13 extended
-with the **aggregate sweep**: the removal sweeps during this wave were keyed on **names**, and a bare
-numeral, a category word, a capability sentence and a scope claim contain no removed name, **so that
-sweep has never run.** Then triage its findings and merge.
+Job 1 triage of this ledger: **19 routed items verified genuinely closed**; **7 routed to an owner
+that closed without taking them**; 6 open and correctly parked; 4 stale as recorded. **Four of the
+six open items share one cause — `→ whoever next opens that file`, a deferral with no owner**, which
+is the same defect entry 71 filed against elsewhere the same night.
 
-### Remaining, in batch order
+### IN FLIGHT — the correction pass
 
-**None.** All fourteen planned and unplanned units are merged or in flight. The five units this
-wave added to itself — 2b, 2c, 4b, 4c, 13 — each came from a measured defect the plan did not
-foresee. **Re-derive every figure at each
-boundary; nothing above this line is inherited.**
+One implementer, dispatched against the main repo (clean, no worktree), doing all three of §5's
+tiers: the three pre-merge prose fixes, the three "not cosmetic" ones, and the cheap repo-facing
+batch. **Scope is prose only** — the follow-ups below are explicitly out of its scope, and it is
+instructed to re-derive every finding rather than take the review's word. Baseline regenerate is its
+**last** step with a drift figure it derives itself; the review says 4, a controller count says it
+could be 8, and neither is authority.
+
+### Follow-ups the review spun out — not blocking the merge, in its priority order
+
+1. **Behavioural probes for the three never-executed hooks**, and repair `warn-filename.sh`'s
+   rc=1-on-a-routine-Edit against its own `# Exit: 0 always` header. **The only place on this branch
+   where a wholly unmeasured surface turned out to be broken** — which is the answer to the question
+   entries 200–201 kept circling.
+2. **Anchor the unanchored `git ls-files '*.md'` pathspecs in BOTH guards** (`test-citations-resolve.sh`,
+   `test-mcp-doc-instructions.sh`) and correct the blind-spot list that names two trees it scans.
+   **This one has a clock on it — a live false-failure vector.**
+3. Replace entries 201/204's **name-keyed** hook-coverage derivation with an **execution-keyed** one.
+4. Apply the surface criterion to hooks in `CONTRIBUTING.md` — the residual `CLAUDE.md` names, in the
+   file a contributor actually opens.
+5. **A written rule for anti-vacuity floors**, and close the last two vacuous-green members.
+   `test-no-mobile.sh` and `test-bash32-compat.sh` are the only two of 38 that stay green over a
+   fully emptied payload, and **both fail for the same reason: a floor over a summed subject.** One
+   shape fixes both — assert per source, not per union.
+6. A heading inventory for `docs/` (`ARCHITECTURE.md` lost a whole `##` section unnoticed) and a
+   `UB_SECTIONS_EXPECTED` for `unity-brainstorming`.
+7. Assert `studio-doctor.sh`'s dead-registration check; make it fail on empty-but-present payload
+   directories.
+8. **Make this loop refuse a deferral routed to a role rather than a named task.**
+9. Record the fresh-clone gate figures, or make the spike skips loud.
+
+### The house defect, named
+
+**Nine instances this wave of a probe whose own text satisfies the condition it tests.** It is no
+longer a recurring surprise. The rule that would have caught all nine is one line:
+
+> **A derivation whose scope includes the file recording its result is not a derivation.**
+
+Filter by something the recording cannot match. Its companion, which §3.1 paid for: **a probe whose
+passing condition is silence must first prove its own baseline is not silent.**
+
+The single most instructive artifact on the branch is `tests/test-hooks.sh`'s kill-switch comment —
+twelve lines failing three ways at once: a measured fact that is **inverted** (the hook is live and
+*unkillable*, not inert, measured against a silent baseline); a printed re-derivation command that
+now returns the **opposite**, because writing the two hook names into a `tests/*.sh` file is exactly
+what the command matches; and a row **already half-false when written**, because two concurrent
+worktrees each measured a tree lacking the other's tests.
+
+### Two measurement traps found during the review — standing facts from here on
+
+- **`cmd > log 2>&1; echo "EXIT=$?"` reports the `echo`'s status, not the command's.** It
+  misreported a four-failure suite run as green during the review itself.
+- **A window-scanning `awk` that uses `getline` consumes the lines it looks ahead at**, so the next
+  iteration never sees them. A first attempt at deriving the anti-vacuity floor class this way
+  **silently missed 14 of ~28 members and looked complete.** Build the window from an array.
 
 ---
 
