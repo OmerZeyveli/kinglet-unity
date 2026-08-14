@@ -35,6 +35,61 @@ die()  { err "$*"; exit 1; }
 
 usage() { sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
+# ── Work this run was asked for and did not do ───────────────────────────────
+# ONE ACCUMULATOR, ONE EMITTER, AND THE REASON IS THAT MANY BRANCHES CAN ABANDON WORK AND EXACTLY
+# ONE OF THEM USED TO REACH THE USER'S SUMMARY. `Installation complete.` and exit 0 are true
+# of every one of them — the payload lands, the receipt is written — so the only trace of an
+# abandoned --with-* flag, an ungenerated CLAUDE.md, an unwritten .gitignore or a hook that will
+# never fire was a warn line up to five hundred lines above the green banner, in output nobody
+# scrolls back through and no caller can act on. `MANIFEST_DECLINED` was this mechanism for one of
+# them; this is the same mechanism with the rest routed through it.
+#
+# THERE ARE FEWER RECORDING POINTS THAN THERE ARE BRANCHES, and every collapse is one outcome reached
+# more than one way: each `add_manifest_dependency` site fires for either --with-* flag, and
+# CLAUDE.md's `skipped` is reached four ways that differ only in which warn line printed.
+#
+# NO COUNT IS WRITTEN HERE, and that is this comment's own rule applied to itself — the number went
+# stale at the emitter within one round of being written down, in the file that forbids quoting it.
+# Exclude comments when you derive it, or the derivation counts the very line you are reading. It
+# did, for the length of one measurement:
+#
+#   awk '!/^[[:space:]]*#/ && /note_not_done "/ { n++ } END { print n + 0 }' install.sh
+#
+# THE CONTRACT THIS BLOCK MAKES GOOD ON IS WRITTEN DOWN, in MCP-SETUP.md § "What install.sh's exit
+# status means" — the one document of the three candidates that installs into a project. It says
+# exit 0 means the run reached its end and reported what it did, and that everything asked for and
+# not done is listed HERE. A new abandonment site that only warns falsifies that sentence, so a new
+# site is a `note_not_done` call and not just a `warn`.
+#
+# WHAT DOES NOT BELONG HERE: a file kept because YOU edited it. The payload landed, the file is on
+# disk, and its contents are your own choice — that is the `keeping yours` report a few steps up,
+# not work the installer abandoned. A keep enters this list only where it leaves a SECOND artifact
+# absent or inert (a kept settings.json leaves this version's hooks on disk and unregistered) or
+# where nobody chose anything (a receipt origin this installer cannot read).
+#
+# ONE LINE PER ENTRY. A site that needs a remedy sentence puts it on the same line: the block is read
+# once, at the end of a run, by someone deciding what to do next, and an entry split across lines
+# stops being countable by eye.
+NOT_DONE=""
+note_not_done() { NOT_DONE="${NOT_DONE}$1"$'\n'; }
+# `if`, not `[ -n "$NOT_DONE" ] || return`: a false test as a function's last command is a `set -e`
+# kill at the CALL SITE, and one of the two call sites is the abort path, where the run is supposed
+# to end 0. `while read` over a here-string rather than a pipe — the loop drains its input either
+# way, so there is no SIGPIPE hazard, but a here-string keeps the body out of a subshell.
+#
+# NOT REACHED ON A DRY RUN. Step 4's unreadable-origin scan runs before the `Would install:` block
+# and can call note_not_done there, but that block exits 0 without calling this — deliberately: a
+# dry run does not abandon work, it announces what a real run would do, and it has its own line for
+# that same state. Nothing else accumulates before the dry-run exit.
+print_not_done() {
+  if [ -n "$NOT_DONE" ]; then
+    printf '\n%s\n' "${BOLD}${YELLOW}Not done:${NC}"
+    while IFS= read -r nd_line; do
+      if [ -n "$nd_line" ]; then printf '  %s\n' "$nd_line"; fi
+    done <<< "$NOT_DONE"
+  fi
+}
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 TOOLKIT_VERSION="$(cat "$SCRIPT_DIR/.claude/VERSION" 2>/dev/null || echo unknown)"
 
@@ -189,7 +244,17 @@ case "$MODE" in
     fi
     case "${REPLY_CHOICE:-2}" in
       1) BACKUP_DIR="$PROJECT_DIR/.claude.backup.$(date +%Y%m%d%H%M%S)" ;;
-      *) info "Aborted."; exit 0 ;;
+      # THE MOST COMPLETE ABANDONMENT THIS SCRIPT HAS, AND IT EXITED 0 WITH ONE WORD OF PROSE.
+      # Nothing is installed, no receipt is written, and `install.sh --yes && start_unity` proceeds
+      # as though a toolkit were there. The status stays 0 — it is the user's own answer to a
+      # question this run asked, not a failure — so the block is what carries it, and this is the
+      # only site that emits the block anywhere but the summary. It is also the only site the guard
+      # in tests/test-install-not-done.sh cannot reach: the prompt above is skipped entirely unless
+      # stdin is a tty, so reaching this arm needs a pty rather than a fixture.
+      *) info "Aborted."
+         note_not_done "the whole installation — you chose to abort at the existing $CLAUDE_DIR prompt, so nothing was written and no receipt exists."
+         print_not_done
+         exit 0 ;;
     esac
     ;;
 esac
@@ -459,6 +524,12 @@ if [ "$MODE" = ours ]; then
     # `--purge` does. Both halves are therefore stated, and both are asserted in state Q.
     warn "Their provenance cannot be established, so they are kept rather than replaced — and"
     warn "recorded as yours. Plain 'uninstall.sh' will leave them; 'uninstall.sh --purge' removes them."
+    # IN THE BLOCK, WHERE `keeping yours` DELIBERATELY IS NOT. The distinction is who decided: an
+    # edited file is kept because the user edited it, and the file on disk is the one they want. Here
+    # nobody decided anything — the origin column is unreadable — so what is on disk may be this
+    # version's copy or a stale one, and the run cannot say which. That is the installer failing to
+    # deliver a payload file, not honouring a choice.
+    note_not_done "$UNREADABLE_COUNT installed file(s) listed above were NOT replaced with this version's copies — their receipt origin cannot be read, so they were kept and recorded as yours. Fix the origin column in $RECEIPT_REL, or delete those rows and re-install, to get this version's copies."
   fi
 fi
 
@@ -1087,6 +1158,12 @@ fi
 if [ "$ORPHAN_KEPT_COUNT" -gt 0 ]; then
   warn "$ORPHAN_KEPT_COUNT file(s) dropped from the payload have your edits — left in place:"
   printf '%s' "$ORPHANS_KEPT" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done
+  # THE ABANDONED WORK HERE IS THE REMOVAL, NOT THE FILE — which is why this is in the block while
+  # `keeping yours` is not. Keeping the edited bytes is right; what did not happen is the retirement
+  # this payload asked for, and the comment on the ORPHANS scan above states the cost in the words
+  # that matter: "An upgrade that leaves a deleted agent reachable is worse than no upgrade: the
+  # model still sees it."
+  note_not_done "$ORPHAN_KEPT_COUNT retired surface(s) listed above were NOT removed — this payload no longer ships them, but you edited them, so they stay on disk and stay selectable by the model. Delete them yourself once you have salvaged the edits."
 fi
 
 # A kept settings.json is the one file whose staleness is silent and total.
@@ -1110,6 +1187,11 @@ if is_modified ".claude/settings.json" && [ -f "$CLAUDE_DIR/settings.json" ]; th
     printf '%s' "$UNREG" | while IFS= read -r h; do [ -n "$h" ] && printf '       %s\n' "$h"; done
     warn "They are on disk but will never fire. Add them to \"hooks\" in .claude/settings.json,"
     warn "or diff yours against $SCRIPT_DIR/.claude/settings.json."
+    # THE KEPT FILE IS NOT THE ABANDONED WORK; THE REGISTRATION IS. settings.json itself landed and
+    # is the user's, exactly as the ownership rule intends — but a second artifact, the hook scripts
+    # this version ships, is on disk and inert, and no amount of reading settings.json tells you so.
+    # That is the boundary this block draws between a keep that belongs here and one that does not.
+    note_not_done "$UNREG_COUNT hook(s) listed above are installed but NOT registered — your .claude/settings.json was kept, and it is the only place a hook is registered, so they will never fire. Add them to \"hooks\" there, or diff yours against $SCRIPT_DIR/.claude/settings.json."
   fi
 fi
 
@@ -1255,7 +1337,52 @@ if [ -f "$GEN" ]; then
       rm -f "$TMP_MD"; warn "CLAUDE.md generation failed — skipped."
     fi
   fi
+else
+  # THE SUMMARY'S `*)` ARM ALREADY SAID "see the warning above" ON THIS PATH, AND THERE WAS NO
+  # WARNING ABOVE. Measured on a scratch toolkit with the generator removed: the only line in the
+  # whole run mentioning CLAUDE.md was `2. CLAUDE.md generation was skipped — see the warning
+  # above.` — a summary pointing at output that was never printed, on the one path where the file
+  # the toolkit's entire configuration lives in does not exist at all.
+  warn "$GEN not found — CLAUDE.md was not generated."
 fi
+
+# ONE RECORDING POINT FOR FOUR BRANCHES, KEYED ON THE VALUE THEY ALREADY SET. `skipped` is reached
+# four ways — the generator is absent, or it failed on the fresh-file arm, the refresh arm or the
+# beside-yours arm — and each of those printed its own warn line naming which. Restating that here
+# would be a second copy of a decision made above, so the entry points at the warning instead and
+# the `else` branch above exists to guarantee there is one.
+#
+# `separate` IS HERE, AND THIS COMMENT ARGUED THE OPPOSITE FOR ONE ROUND. It read: "that arm writes
+# CLAUDE.md.generated, announces it, and the Next-steps line names it. Work done differently is not
+# work abandoned." Two things are wrong with that.
+#
+# THE FIRST IS THAT IT INVENTS A CRITERION TO ESCAPE THE STATED ONE. The criterion in this file's own
+# header is "absent or INERT", and CLAUDE.md.generated on this branch is inert in exactly the sense an
+# unregistered hook is: on disk, doing nothing, until the user acts. Claude Code reads CLAUDE.md.
+# Until the block is merged into it, not one line of the toolkit's configuration applies — measured on
+# a urp fixture whose CLAUDE.md is the user's own: rc=0, no block, and `grep -c kinglet:generated
+# CLAUDE.md` is 0. A caller running the snippet MCP-SETUP.md prints got a clean pass on that project.
+#
+# THE SECOND IS THAT IT IS NOT A KEEP AT ALL. The header's exemption is for a file kept because the
+# user edited it; here the installer WROTE a file, to a path the user must act on. And every project
+# that already has a CLAUDE.md takes this branch, which is most projects that are not new.
+#
+# THE ALTERNATIVE WAS TO NAME `separate` IN MCP-SETUP.md AS A SECOND STATED EXCEPTION beside
+# --dry-run, and it was rejected: an exception at the one outcome a scripted caller most needs to
+# hear about is a contract nobody can script against. This entry is also SELF-CLEARING — the moment
+# the user takes its advice and adds the markers, the branch becomes `refreshed` and the entry stops —
+# which is the shape a recurring entry has to have to be worth printing.
+case "$CLAUDE_MD_BRANCH" in
+  skipped)
+    note_not_done "CLAUDE.md — not generated, so this project has no toolkit configuration file and the FILL: markers never landed. The warn line above says which of the four ways it failed; re-run install.sh once that is fixed."
+    ;;
+  kept-yours)
+    note_not_done "CLAUDE.md.generated — yours was kept untouched, so no generated file was produced this run. Rename or delete it and re-run to get one."
+    ;;
+  separate)
+    note_not_done "CLAUDE.md — yours has no generated markers, so the toolkit's configuration went to CLAUDE.md.generated beside it. Claude Code reads CLAUDE.md: none of it applies until you merge that block in, or paste the kinglet:generated markers into your CLAUDE.md and re-run to have it refreshed in place."
+    ;;
+esac
 
 # CLAUDE.md.generated is the second file this installer creates, keeps, announces — and, until
 # 2026-08-13, never recorded. Same defect as Packages/manifest.json.bak one step earlier, on the
@@ -1352,6 +1479,21 @@ case "${GITIGNORE_PLAN%%"$NL"*}" in
     # agree on the branch neither of them can reach today.
     warn "gitignore_plan gave an unusable verdict (${GITIGNORE_PLAN%%"$NL"*}) — .gitignore left alone, and the install continues." ;;
 esac
+# THE CONSEQUENCE, NAMED. The warn above says what the installer did (nothing) and not what that
+# costs, and the cost is specific: these are the paths that leak local state into someone's commits.
+# The entries are listed from $GITIGNORE_ENTRIES rather than written out, so this line cannot drift
+# from the set Step 7 would have appended — the drift this whole plan/act split exists to prevent.
+#
+# INSIDE AN `if`, NOT AS A FIFTH `case` ARM: the `*)` arm above is the fallback, and a second `*)`
+# is not a thing. Reading $GITIGNORE_PLAN once more here is reading the same variable the case just
+# read, not recomputing the plan.
+case "${GITIGNORE_PLAN%%"$NL"*}" in
+  covered|present|append) ;;
+  *)
+    # awk drains its input to the end, so this pipeline cannot SIGPIPE the writer.
+    note_not_done ".gitignore — its plan could not be computed, so nothing was written to it and these are NOT ignored: $(printf '%s\n' "$GITIGNORE_ENTRIES" | awk 'NF { if (n++) printf ", "; printf "%s", $0 } END { printf "\n" }'). Add them by hand, or your local settings and session state land in your commits."
+    ;;
+esac
 
 # A .gitignore THIS INSTALLER CREATED is a file we own. One the user already had is not, whatever we
 # appended to it — appending is not authorship, and claiming their file would let uninstall.sh delete
@@ -1394,14 +1536,17 @@ fi
 # to be able to name it. One definition, derived from $MANIFEST, so the receipt row, the
 # announcement and the file they both name cannot disagree.
 MANIFEST_BAK_KEPT=0
-# Newline-terminated, one flag per line, in the idiom MODIFIED_FILES and ORPHANS already use here.
-# Set unconditionally so the summary's `[ -n ... ]` test is not an unbound-variable death under
-# `set -u` on the ordinary run that passes no --with-* flag at all.
-MANIFEST_DECLINED=""
+# MANIFEST_DECLINED USED TO BE DECLARED HERE, one flag per line, read by a `Not done:` block at the
+# bottom of the file that knew about this function and nothing else. It is now `$NOT_DONE` at the top
+# — same idiom, same "set where the decision is made, read where the run speaks to the user", every
+# other abandonment site as well. All three abandonment outcomes in this function record through it, and the fourth
+# outcome (the package is already there) is not an abandonment: the manifest ends the run in the
+# state the flag asked for.
 add_manifest_dependency() {
   local pkg_name="$1" pkg_value="$2" flag_name="$3"
   if [ ! -f "$MANIFEST" ]; then
     warn "No Packages/manifest.json — skipping $flag_name."
+    note_not_done "$flag_name — skipped: this project has no Packages/manifest.json, so $pkg_name was not added. Open the project in Unity once to create the manifest, then re-run with $flag_name."
     return
   fi
   if grep -q "$pkg_name" "$MANIFEST"; then
@@ -1444,17 +1589,19 @@ add_manifest_dependency() {
   # one of four such outcomes non-zero would leave the status meaning different things on different
   # flag failures, which is a new inconsistency in place of the one being fixed.
   #
-  # What the status genuinely cannot carry, the summary must. MANIFEST_DECLINED is global on purpose
-  # — the function is called once per flag — and drives a `Not done:` block beside the green banner,
-  # the same mechanism CLAUDE_MD_BRANCH uses one writer over: set where the decision is made, read
-  # where the run speaks to the user. Without it the only trace of an abandoned flag was four warn
-  # lines a dozen lines above `Installation complete.` and an exit status of 0.
+  # What the status genuinely cannot carry, the summary must. `note_not_done` appends to the global
+  # $NOT_DONE — this function is called once per flag, so two flags can record two lines — and that
+  # drives the `Not done:` block beside the green banner: set where the decision is made, read where
+  # the run speaks to the user. Without it the only trace of an abandoned flag was four warn lines a
+  # dozen lines above `Installation complete.` and an exit status of 0. The mechanism was
+  # MANIFEST_DECLINED, private to this function; it is now the shared one every site uses, and
+  # the exit contract in MCP-SETUP.md is what says out loud that the block is complete.
   if [ -e "$MANIFEST.bak" ] && [ "$MANIFEST_BAK_KEPT" -ne 1 ] && ! owned_by_installer "$MANIFEST_BAK_REL" ''; then
     warn "$MANIFEST_BAK_REL exists and is not ours — declining $flag_name rather than overwriting it."
     warn "That file is the backup this edit needs to stay undoable. Move it aside and re-run with"
     warn "$flag_name, or add this under \"dependencies\" yourself:"
     warn "    \"$pkg_name\": \"$pkg_value\""
-    MANIFEST_DECLINED="${MANIFEST_DECLINED}${flag_name}"$'\n'
+    note_not_done "$flag_name — declined: $MANIFEST_BAK_REL is not ours to overwrite, so the manifest was not edited. Move that file aside and re-run with $flag_name, or add \"$pkg_name\": \"$pkg_value\" under \"dependencies\" by hand."
     return 0
   fi
   # Surgical insert. The old installer round-tripped the JSON through a re-indenting dump, which
@@ -1499,6 +1646,12 @@ add_manifest_dependency() {
     MANIFEST_BAK_KEPT=0
     warn "Could not edit manifest.json safely — add this under \"dependencies\" yourself:"
     warn "    \"$pkg_name\": \"$pkg_value\""
+    # THE THIRD MEMBER OF THE FAMILY THE COMMENT ABOVE ENUMERATES, and until now the only one of the
+    # four with no trace in the summary at all. The surgical `sed` matches nothing in a manifest with
+    # no "dependencies" key — a real shape, and the one the plan reproduced — and the failure arm
+    # restores the original, so the run ends with the manifest byte-identical and the flag silently
+    # gone. `$MANIFEST_BAK_REL` is not offered as a remedy here: the `mv` above has just consumed it.
+    note_not_done "$flag_name — the manifest could not be edited safely, so it is unchanged and $pkg_name was not added. Add \"$pkg_name\": \"$pkg_value\" under \"dependencies\" in Packages/manifest.json yourself."
   fi
 }
 
@@ -1571,6 +1724,11 @@ else
   warn '      "type": "http",'
   warn '      "url": "http://localhost:8080/mcp"'
   warn '    }'
+  # NOT A `keeping yours` KEEP. Nothing of ours is on disk at that path to keep — the file is
+  # entirely the user's, and what is missing is the server entry every unity-* agent's
+  # mcp__UnityMCP__* tools resolve through. Without it those agents load with tools that cannot be
+  # called, which is silent at install time and looks like a broken bridge later.
+  note_not_done ".mcp.json — yours has no UnityMCP entry and was not rewritten, so the unity-* agents have no MCP server to reach. Add the \"UnityMCP\" block printed above under \"mcpServers\"."
 fi
 # Outside the branches on purpose — see owned_by_installer. The "already has a UnityMCP entry" arm
 # above is exactly where the two cases are indistinguishable by inspection: our own file from the
@@ -1589,6 +1747,25 @@ MCP_SETUP_MD="$PROJECT_DIR/MCP-SETUP.md"
 if [ -f "$SCRIPT_DIR/MCP-SETUP.md" ] && [ ! -f "$MCP_SETUP_MD" ]; then
   cp "$SCRIPT_DIR/MCP-SETUP.md" "$MCP_SETUP_MD"
   ok "Installed MCP-SETUP.md"
+# THE ONLY KEEP IN THIS FILE THAT SAID NOTHING AT ALL. Every other one reports: `keeping yours` lists
+# the payload files, the CLAUDE.md.generated arm warns twice, .mcp.json prints the block it did not
+# write. This branch printed no line in the entire run, while the "Next steps" summary below went on
+# pointing at MCP-SETUP.md — which now resolves to the user's file, and which is where this
+# installer's exit contract is written down.
+#
+# A REPORT, NOT A `Not done:` ENTRY, and the boundary is the one $NOT_DONE's header states. The file
+# at that path is the user's own — either they wrote it or they edited ours — and keeping it is the
+# ownership rule working, not work abandoned. It belongs in the same class as `keeping yours`, which
+# is reported and counted and stays out of the block.
+#
+# `owned_by_installer` is CALLED rather than restated; it is the same predicate, with the same
+# reference copy, that the row below decides ownership with. On the ordinary re-install it answers
+# yes and this branch is silent, which is the point: the warning fires where the toolkit's guide is
+# genuinely not the file on disk.
+elif [ -f "$SCRIPT_DIR/MCP-SETUP.md" ] && ! owned_by_installer 'MCP-SETUP.md' "$SCRIPT_DIR/MCP-SETUP.md"; then
+  warn "MCP-SETUP.md at the project root is not ours — keeping yours, untouched."
+  warn "This version's bridge-setup guide was not installed, and the 'Next steps' pointer below"
+  warn "resolves to your file. Compare it against $SCRIPT_DIR/MCP-SETUP.md if the bridge misbehaves."
 fi
 # Same shape as .mcp.json's row above, and for the same reason: the row states what we own at the
 # end of the run, not what this run happened to write.
@@ -1643,37 +1820,21 @@ case "$CLAUDE_MD_BRANCH" in
     ;;
 esac
 # Work this run was asked for and did not do. `Installation complete.` is true — the payload landed,
-# the receipt is written — but on its own it read as "everything you asked for happened", and a
-# declined --with-* flag left no trace down here at all: four warn lines a dozen lines up, above the
-# green banner, and an exit status of 0. This block is the manifest side of what the `kept-yours`
-# arm ABOVE does for CLAUDE.md.generated — above, in the `case` that sets CLAUDE_MD_STEP, not below.
-# It read "below" for as long as this comment existed; `grep -n 'kept-yours)' install.sh` locates it.
+# the receipt is written — but on its own it read as "everything you asked for happened", and every
+# abandonment left its only trace as warn lines up to five hundred lines above the green banner.
 #
-# WHAT THE TWO SHARE IS THE MECHANISM, NOT THE PRESENTATION, and the sentence here used to claim
-# both: "the two writers' declines end the run the same way". Measured, they do not. Shared: a global
-# set where the decision is made ($MANIFEST_DECLINED, $CLAUDE_MD_BRANCH) and read where the run
-# speaks to the user, so neither decline can be silently dropped on the way out. Not shared: this one
-# prints its own `Not done:` block before the summary, while the CLAUDE.md side rewrites `Next
-# steps: 2.` in place and adds no block at all. A reader who took "the same way" literally would go
-# looking for a `Not done:` entry on a `kept-yours` run and find none.
+# THE BLOCK IS NOW THE `Not done:` CONTRACT MCP-SETUP.md STATES, not the manifest's private summary.
+# The sites record into $NOT_DONE; this prints them. Derive their number where the accumulator is
+# defined, and it writes no number down either. This sentence read "Twelve sites" for one round while
+# the file's own header said eleven and forbade quoting the figure — in the place a reader tracing
+# the mechanism arrives FIRST, which is how a stale count gets believed. The
+# CLAUDE.md side is one of the sites now rather than the exception it used to be — it still ALSO
+# rewrites `Next steps: 2.` in place, so a kept-yours or `separate` run says it twice, in the two
+# places a reader looks.
 #
-# `while read` over a here-string rather than a pipe: the loop drains its input, so there is no
-# SIGPIPE hazard either way, but a here-string keeps the body out of a subshell. `if`, not
-# `[ -n "$f" ] && printf`, because a false test as a loop body's last command is a `set -e` kill.
-if [ -n "$MANIFEST_DECLINED" ]; then
-  printf '\n%s\n' "${BOLD}${YELLOW}Not done:${NC}"
-  while IFS= read -r f; do
-    if [ -n "$f" ]; then
-      printf '  %s — declined: %s is not ours to overwrite.\n' "$f" "$MANIFEST_BAK_REL"
-    fi
-  done <<< "$MANIFEST_DECLINED"
-  # PLURAL-NEUTRAL, because the loop above can print two lines. One foreign Packages/manifest.json.bak
-  # declines EVERY --with-* flag the run passed, so `--with-mcp --with-input-system` reaches here with
-  # both listed while this trailer said "the flag" and "the package" — singular, and pointing at
-  # neither of them in particular.
-  printf '  Move that file aside and re-run with the flag(s) listed here, or add their packages to\n'
-  printf '  Packages/manifest.json by hand. The manifest was not edited.\n'
-fi
+# BEFORE `Next steps:`, DELIBERATELY. What a user does next depends on what did not happen, and a
+# block printed after the numbered list reads as a footnote to it.
+print_not_done
 cat <<EOF
 
 Next steps:
