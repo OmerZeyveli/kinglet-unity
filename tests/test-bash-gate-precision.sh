@@ -1268,6 +1268,62 @@ find Assets -name '*.me*' -exec sed -i s/guid/XXXX/ {} \;
 find Assets -name '*' -exec sed -i s/guid/XXXX/ {} \;
 2 0000 - the route decision reads the token an unterminated quote left pending, not only the tokens that closed: without that the only .meta reference on the line is invisible and the whole command routes nowhere
 find Assets -exec sed -i s/guid/XXXX/ {} \; -name '*.meta
+2 0000 - metacharacter set: a backslash inside double quotes survives the scanner, bash keeps it and find's fnmatch eats it as an escape; executed, it left no .meta files at all
+find Assets -name "*.\meta" -delete
+2 0000 - metacharacter set: the same escape inside single quotes, one character further in; executed, it left no .meta files at all
+find Assets -name '*.m\eta' -delete
+2 0000 - metacharacter set: every letter of the extension escaped; executed, it left no .meta files at all
+find Assets -name "*.\m\e\t\a" -delete
+2 0000 - metacharacter set: a one-character bracket class is a literal, and this spelling says .meta with a metacharacter standing inside it - the exact phrase the first cut of meta_ref claimed to test; executed, it left no .meta files at all
+find Assets -name '*.me[t]a' -delete
+2 0000 - metacharacter set, the rewriting twin of the backslash form; rewrote 3 of 3 real files
+find Assets -name "*.\meta" -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - metacharacter set, the rewriting twin of the bracket form; rewrote 3 of 3 real files
+find Assets -name '*.me[t]a' -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - metacharacter set on the xargs arm, so the fix is not a rule about -exec; rewrote 3 of 3 real files
+find Assets -name '*.me[t]a' -print0 | xargs -0 sed -i s/guid/XXXX/
+2 0000 - metacharacter set on -path with the bracket over the first letter; rewrote 3 of 3 real files
+find Assets -path '*.[m]eta' -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - a bracket RANGE, which a first-member reduction would miss and a one-character wildcard catches; rewrote 3 of 3 real files
+find Assets -name '*.m[a-z]ta' -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - a bracket with two members, same reason; rewrote 3 of 3 real files
+find Assets -name "*.me[tT]a" -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - the question mark matches EXACTLY one character, so deleting it the way a star is deleted loses this match; rewrote 3 of 3 real files
+find Assets -name '*.m?ta' -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - a bracket whose first member is a literal close-bracket, which the naive bracket regex ends early on; rewrote 3 of 3 real files
+find Assets -name '*.me[]t]a' -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - the same bracket class with no find at all, so both round-1 findings meet in one payload; rewrote 3 of 3 real files
+ls Assets/*.me[t]a | xargs sed -i s/guid/XXXX/
+0 0000 - the read twin of the bracket spelling: widening what counts as a .meta reference must not turn an allowlisted read into a block
+find Assets -name '*.me[t]a' -exec grep -l guid {} \;
+0 0000 - the count twin of the backslash spelling
+find Assets -name "*.\meta" | wc -l
+0 0000 - the over-widening guard: a bracket glob that does NOT name .meta must still not route, or the wildcard rule has swallowed every glob on the machine
+find docs -name '*.m[dk]' -exec sed -i s/a/b/ {} \;
+0 0000 - the same guard without a bracket: a write to .md files is not this gate's business
+find docs -name '*.md' -exec sed -i s/a/b/ {} \;
+2 0000 - an introducer that is itself a program: ./evil/xargs was admitted purely because its last path component spells xargs, and it destroyed all three .meta files, 119 B to 6 B, while the gate classified the grep it never ran
+find Assets -name '*.meta' -print0 | ./evil/xargs -0 grep -l guid
+2 0000 - the same with a different innocent-looking trailing command, so the record is about the introducer and not about grep; destroyed all three, 119 B to 6 B
+find Assets -name '*.meta' -print0 | ./evil/xargs -0 stat
+2 0000 - the same from an absolute path outside the trusted directories; destroyed all three, 119 B to 6 B
+find Assets -name '*.meta' -print0 | /tmp/evil/xargs -0 grep -l guid
+2 2222 - the discriminator that says where the hole was NOT: reached through -exec rather than a pipe, an untrusted xargs has always blocked, because xargs is not on the read-only list; only the pipeline site was open
+find Assets -name '*.meta' -exec ./evil/xargs -0 grep -l guid {} \;
+0 0000 - LIVE HOLE, deliberate: the route scan ignores the unparseable marker, because routing on it would send every command containing a dollar-paren into a classification that ends in a block; the cost of that choice is this ANSI-C spelling, which rewrote 3 of 3 real files
+find Assets -name $'*.\155eta' -exec sed -i s/guid/XXXX/ {} \;
+0 0000 - LIVE HOLE, same choice, command-substitution spelling; rewrote 3 of 3 real files
+find Assets -name "*.$(printf m)eta" -exec sed -i s/guid/XXXX/ {} \;
+0 0000 - LIVE HOLE, same choice, backtick spelling; rewrote 3 of 3 real files
+find Assets -name "*.`printf m`eta" -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - the metacharacter pre-test's own discriminator: no star anywhere, so admitting a backslash to the slow path is the only thing that routes this - every other backslash payload here also carries a star and is caught by the star alone
+find Assets -name "Player.cs.\meta" -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - the same for a bracket class with no star: rewrote 3 of 3 real files
+find Assets -name 'Player.cs.me[t]a' -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - the same for a lone question mark with no star: rewrote 3 of 3 real files
+find Assets -name 'Player.cs.m?ta' -exec sed -i s/guid/XXXX/ {} \;
+2 0000 - the IN-ARGS introducer site's own discriminator: an untrusted path-qualified xargs appearing while another command is pending must be classified, not allowed to introduce a read-only stat that then vouches for the clause. Not destructive as written - grep never runs it - but it is the only payload that separates the two introducer sites, and removing the identity test at that site alone was a silent no-op until it existed
+find Assets -name '*.meta' -print0 | xargs -0 grep -l guid ./evil/xargs -0 stat
 TBG_CORPUS
 }
 
@@ -1408,21 +1464,27 @@ assert_eq "45" "$tbg_fp" \
 # It is a fixed number for the same reason the two ceilings are: it is not derived from the
 # tree, so it cannot go stale on its own, and moving it costs an edit in front of a reviewer.
 #
-# IT MOVED IN TASK 2C, FROM 211 TO 218, AND EVERY PART OF THAT IS DELIBERATE. Three came from
-# the column's new fourth digit: three payloads that no version before task 2b had ever blocked
-# now carry a block in their history. Three came from new records that an earlier version did
-# block (`./evil/sed -n 1p`, `/usr/bin/sed -n 1p`, `/usr/bin/sed -i`). The other 32 records task
-# 2c adds are all `0000` — every one of them is a hole that was open at every version, which is
-# what a task that closes a hole is supposed to add. The 218th is the quoted-introducer record
-# under the `H` ceiling above: r5 blocked it, so it carries a block in its history and a permit
-# here, which is exactly the shape this column exists to make impossible to add silently.
+# IT MOVED IN TASK 2C, FROM 211 TO 219, AND EVERY PART OF THAT IS DELIBERATE, so the arithmetic
+# is written out rather than asserted and forgotten. 211 + 3 + 5 = 219.
 #
-# The record count moved 256 -> 297 across the same change, and that number is deliberately NOT
+#   +3   the column's new FOURTH digit: three payloads that no version before task 2b had ever
+#        blocked now carry a block in their history (`-exec sort -'o' {} {}`, a command
+#        substitution in the find's own path, a backtick in an otherwise read-only clause).
+#   +5   new records an earlier version did block: `./evil/sed -n 1p`, `/usr/bin/sed -n 1p`,
+#        `/usr/bin/sed -i`, the quoted-introducer record under the `H` ceiling above, and — from
+#        round 1 of review — `-exec ./evil/xargs -0 grep -l guid {} \;`, which EVERY version has
+#        blocked. That last one is a discriminator rather than a fix: it says where the
+#        introducer hole was NOT, because only the PIPELINE site was ever open.
+#
+# The other 64 of the 69 records task 2c adds are `0000` — a hole that was open at every version
+# is what a task that closes a hole is supposed to add.
+#
+# The record count moved 256 -> 325 across the same change, and that number is deliberately NOT
 # asserted: it is the one figure here that a legitimate addition moves every time, so a ceiling
 # on it would be edited on every commit and would stop being read. The three counts above are
 # ceilings on DIVERGENCE, which is the thing that must only ever shrink.
-assert_eq "218" "$tbg_hist2" \
-    "the frozen hist column still records 218 payloads that an earlier hook version blocked"
+assert_eq "219" "$tbg_hist2" \
+    "the frozen hist column still records 219 payloads that an earlier hook version blocked"
 
 # --- the quote model's own direct evidence --------------------------------------------------
 # The corpus checks verdicts. These two check the tokeniser's output shape, which is where the
@@ -1447,15 +1509,22 @@ assert_contains "$(tbg_stderr 'find "$(pwd)/Assets" -name "*.meta" -exec grep -n
 # (no awk, a broken awk), not on anything a command string can say. So it is asserted here, by
 # putting an awk that exits non-zero at the front of PATH.
 #
-# WHAT IS MEASURED, AND THE PART THAT IS NOT COMFORTABLE. With that stub in place this hook
-# exits 3 — a PreToolUse hook error, which the harness reports and then lets the tool run. It
-# does that on EVERY command now, where task 2b's version did it only on commands it classified,
-# because the scan is what became universal. The dying happens further down, at the two-stage
-# gate's own `awk` in CMD_HASH, and that line is inherited and untouched here. The branch below
-# is still worth asserting, because the alternative is strictly worse: with the fallback flipped
-# to `0` the same destructive payload exits 0 — a SILENT permit rather than a loud error.
-# Measured, all three, on this host: task 2b exits 3 / this version exits 3 / the flipped
-# fallback exits 0.
+# WHAT IS MEASURED, AND WHAT THIS ASSERTION DOES NOT CLAIM. With that stub in place the hook
+# exits 3. **Exit 3 IS NOT A BLOCK.** `_lib.sh` and docs/HOOK-REFERENCE.md both fix 2 as the
+# blocking code, so 3 is a hook ERROR and the tool call proceeds — the destructive payload runs.
+# Nor is it loud: the full capture on this host is rc=3, stdout 0 bytes, stderr 0 bytes. The
+# first version of this assertion was labelled "a destructive .meta command is not permitted",
+# which claims a safety property this gate does not have, and the label is now what it measures.
+#
+# It does that on EVERY command now, where task 2b's version did it only on commands it
+# classified, because the scan is what became universal. The dying happens further down, at the
+# two-stage gate's own `awk` in CMD_HASH, and that line is inherited and untouched here.
+#
+# The branch is still worth asserting, because the alternative is measurably worse: with the
+# fallback flipped to `0` the same destructive payload exits **0**, which is an explicit PERMIT
+# that the harness acts on, rather than an error it reports. Measured, all three, on this host:
+# task 2b exits 3 / this version exits 3 / the flipped fallback exits 0. Silent-error versus
+# silent-permit is a real difference and it is the only one this assertion holds.
 tbg_no_awk() { # tbg_no_awk <payload> -> the hook's exit code with a failing awk on PATH
     local _sd _rc _stub
     _stub="$(mktemp -d "${TMPDIR:-/tmp}/bash-gate-noawk.XXXXXX")"
@@ -1469,10 +1538,10 @@ tbg_no_awk() { # tbg_no_awk <payload> -> the hook's exit code with a failing awk
     rm -rf "$_sd" "$_stub"
     printf '%s' "$_rc"
 }
-assert_eq "not-permitted" \
+assert_eq "non-zero" \
     "$(_r="$(tbg_no_awk 'find Assets -name "*.meta" -exec sed -i s/guid/x/ {} \;')"; \
-       [ "$_r" != "0" ] && echo not-permitted || echo "permitted (exit 0)")" \
-    "a destructive .meta command is not permitted when the route scan cannot run"
+       [ "$_r" != "0" ] && echo non-zero || echo "exit 0 - the gate returned a PERMIT")" \
+    "the route scan failing exits non-zero rather than returning a permit (this is NOT a block)"
 
 # --- a command spanning lines, which the corpus block cannot carry --------------------------
 # A backslash-continued line is the ordinary way a long find gets formatted, so the tokeniser
@@ -1583,3 +1652,25 @@ tbg_d3="$(tbg_dbl ' -exec grep -l guid {} \;' 9)"
 tbg_cost "find Assets -name '*.meta'$tbg_d3" "0" \
     "D3: 512 read-only -exec clauses"
 unset tbg_d3
+
+# D4 — THE DIMENSION TASK 2C INTRODUCED, and the one every payload above is blind to.
+#
+# D1..D3 all name .meta, so all three measure the route AFTER it has fired. The route scan now
+# runs on EVERY Bash call, including the overwhelming majority that this gate has nothing to say
+# about, and until this block existed nothing here measured that at all — a cost guard that
+# varies only the dimensions the previous author was thinking about is the exact shape the
+# header above warns against, and this file had just reproduced it.
+#
+# Measured on this host, end to end: a 1 MB command with no .meta in it cost 567 ms at task 2b
+# and 1 088 ms here. The same 10 000 ms ceiling, and the verdict assertion is `0` — a permit,
+# which is the point: the expensive path must end in the gate saying nothing.
+tbg_d4="$(LC_ALL=C printf '%*s' 1048576 '' | LC_ALL=C tr ' ' 'a')"
+tbg_cost "echo $tbg_d4" "0" \
+    "D4: a 1 MB command the gate has nothing to say about"
+unset tbg_d4
+# and the same shape as many tokens rather than one, since the scan is per character but the
+# route decision is per token
+tbg_d4b="$(tbg_dbl ' bbbbbbbbbb' 14)"
+tbg_cost "echo$tbg_d4b" "0" \
+    "D4: 16 384 tokens the gate has nothing to say about"
+unset tbg_d4b

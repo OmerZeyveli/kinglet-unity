@@ -300,11 +300,50 @@ find_exec_tokens() {
         # metacharacters standing inside it — `*.m*eta` is what `"*.m"*"eta"` dequotes to, and
         # it is a real glob that really does match Player.cs.meta. The cheap containment test
         # runs first because it is the spelling almost every real command uses.
+        #
+        # THE METACHARACTER SET IS `* ? [ ] \`, AND THE FIRST CUT OF THIS FUNCTION TESTED `*?`.
+        # That was not a near-miss, it was five destructive spellings, and the review that found
+        # them executed every one against real files while this function returned 0:
+        #
+        #   -name "*.\meta"      the scanner deliberately PRESERVES a backslash before an
+        #   -name (single-quoted) ordinary character (`else { tok = tok BS d }`), bash preserves
+        #   -name "*.\m\e\t\a"   it, and find gives it to fnmatch, which consumes it as an
+        #   -name (bracket forms) escape. So the two halves of this file disagreed about what a
+        #                        backslash means. A one-character bracket class is a literal too.
+        #
+        # `*.me\ta` UNQUOTED was already caught, because bash consumes that backslash before the
+        # gate ever sees it. Its quoted twins are one character away and were not among the
+        # twelve spellings first measured here — a round closing the spellings it imagined, which
+        # is the pattern that put an earlier task at its five-round cap.
+        #
+        # EACH METACHARACTER GETS THE TREATMENT ITS SEMANTICS DESERVE, and getting that wrong is
+        # how `?` was nearly missed a second time:
+        #   `*` matches zero or more, so DELETING it is the right over-approximation.
+        #   `\` is an escape, so deleting it leaves the literal it protected.
+        #   `?` matches EXACTLY ONE character, so deleting it turns `*.m?ta` into `.mta` and
+        #       loses a real match. It becomes a one-character WILDCARD instead.
+        #   a bracket expression also matches exactly one character, whatever is inside it, so
+        #       the whole thing becomes the same wildcard. One rule covers `[t]`, `[tT]`,
+        #       `[a-z]`, `[!x]` and the `]`-first form `[]t]`.
+        # The final test is one regex over a five-character window in which each position is
+        # either its own literal or that wildcard.
+        #
+        # EVERY PATTERN IS A DYNAMIC STRING, NOT A REGEX LITERAL, and that is portability rather
+        # than style: `"[][*?" BS "]"` compiles to a class ending `\]`, an escaped bracket, so
+        # the class never closes — gawk and mawk both die at runtime with `invalid regexp` while
+        # busybox awk accepts it, which is the worst way to find out. The backslash is matched by
+        # an alternation outside any bracket expression instead. Verified byte-identical output
+        # on 26 token values under gawk, gawk --posix, gawk --traditional, mawk and busybox awk.
         function meta_ref(v,   s) {
             if (index(v, ".meta") > 0) return 1
-            if (v !~ /[*?]/) return 0
-            s = v; gsub(/[*?]/, "", s)
-            return index(s, ".meta") > 0
+            if (v !~ GLOBCH) return 0
+            s = v
+            gsub(STRIP, "", s)
+            if (index(s, ".meta") > 0) return 1
+            if (s !~ ONECH) return 0
+            gsub(BRACKET, WILD, s)
+            gsub(QMARK, WILD, s)
+            return (s ~ METARE)
         }
         function emit(   L, c) {
             if (!started) return
@@ -320,7 +359,14 @@ find_exec_tokens() {
             tok = ""; started = 0; q = 0; b = 0
         }
         BEGIN { SQ = "\047"; DQ = "\042"; BS = "\\"; st = 0; tok = ""; started = 0
-                q = 0; b = 0; bad = ""; hit = 0 }
+                q = 0; b = 0; bad = ""; hit = 0
+                WILD    = sprintf("%c", 1)
+                GLOBCH  = "[][*?]|" BS BS
+                STRIP   = "[*]|" BS BS
+                ONECH   = "[][?]"
+                QMARK   = "[?]"
+                BRACKET = "\\[[!^]?\\]?[^]]*\\]"
+                METARE  = "[." WILD "][m" WILD "][e" WILD "][t" WILD "][a" WILD "]" }
         {
             line = $0; n = length(line); i = 1; cont = 0
             while (i <= n) {
@@ -422,6 +468,34 @@ find_exec_tokens() {
 # times as much. An array append is O(1) and one `printf` over the array is O(n); the same
 # payloads now cost 245 ms and 1 231 ms (see the cost block in tests/test-bash-gate-precision.sh).
 #
+# find_exec_trusted_path — can this gate place the path this token names?
+#
+# TRUE for a bare name (no `/` at all) and for the exact strings `/bin/<basename>` and
+# `/usr/bin/<basename>`. FALSE for everything else, and false means "the table cannot speak for
+# this", which costs a block on a read and never a pass on a write.
+#
+# COMPARED WHOLE, NOT AS A `/usr/bin/*` PREFIX GLOB. `/usr/bin/../../tmp/evil/grep` matches that
+# glob, is not in /usr/bin at all, and destroyed 3 of 3 real .meta files when it was executed.
+#
+# DELIBERATELY NOT TRUSTED: /usr/local/bin and /opt/homebrew/bin, where a macOS host keeps gsed,
+# gawk, yq and rg. Both are user-writable on the very platform this toolkit plans to support
+# next, and the cost of leaving them out is one first-attempt block on a read that spells such a
+# tool with its full path. A bare `gsed` is unaffected; only the path-qualified spelling pays.
+#
+# `command -v` was the third option considered and it is the wrong one: it resolves through PATH,
+# which is attacker-controlled in exactly the scenario this defends against. (A second reason
+# offered for it — that a shell function can shadow the binary, so `command -v grep` prints
+# `grep` — is real in a profile-initialised interactive shell and NOT real in the `bash -c` this
+# hook runs under. The PATH reason is the one that stands on its own. Note also that the
+# surviving bare-name arm still resolves through that same PATH; what this function buys is that
+# a caller cannot name an arbitrary path OUTRIGHT, not that PATH is trustworthy.)
+find_exec_trusted_path() {
+    case "$1" in
+        */*) [ "$1" = "/bin/$2" ] || [ "$1" = "/usr/bin/$2" ] ;;
+        *)   return 0 ;;
+    esac
+}
+
 # Bash is dynamically scoped, so this reads find_exec_commands' locals directly. That is the
 # reason it is a separate function at all: the same six lines appeared at five flush sites and
 # one of them is easy to get wrong.
@@ -501,8 +575,23 @@ tokeniser-failed"
                 *)  case "$tok" in
                         -exec|-execdir|-ok|-okdir)
                             find_exec_flush; want=1; route="find"; continue ;;
+                        # AN INTRODUCER THAT IS ITSELF A PROGRAM NEEDS THE SAME IDENTITY TEST AS
+                        # A COMMAND. `-exec` and friends are find's own predicates and run
+                        # nothing; `xargs` IS a program, and admitting `./evil/xargs` as an
+                        # introducer means admitting it by basename — the exact defect the
+                        # allowlist arm below exists to close, one position over. Executed:
+                        # `find Assets -name '*.meta' -print0 | ./evil/xargs -0 grep -l guid`
+                        # destroyed all three .meta files, 119 B -> 6 B, at every version
+                        # including this file's first cut, while the gate classified the
+                        # perfectly innocent `grep` that ./evil/xargs never ran.
+                        # So an untrusted path-qualified xargs is armed as a COMMAND instead,
+                        # which puts it in front of the read-only list, where no entry has a `/`.
                         xargs|*/xargs)
-                            find_exec_flush; want=1; route="xargs"; continue ;;
+                            if find_exec_trusted_path "$tok" "$cand"; then
+                                find_exec_flush; want=1; route="xargs"; continue
+                            fi
+                            find_exec_flush
+                            pend="$tok"; args=(); want=0; route="xargs"; prevbrace=0; continue ;;
                     esac ;;
             esac
             args+=("$tok")
@@ -533,27 +622,13 @@ tokeniser-failed"
             # THE TRUSTED SET IS /bin AND /usr/bin, COMPARED WHOLE. `/usr/bin/grep` is a
             # spelling careful people write on purpose — this repository's own guide mandates
             # it, and 56 such spellings are in its tracked tree — so rejecting every `/` would
-            # charge a block for following the house style. The comparison is against the exact
-            # string `/usr/bin/<basename>`, not a `/usr/bin/*` prefix glob, because
-            # `/usr/bin/../../tmp/evil/grep` matches that glob and is not in /usr/bin at all.
-            #
-            # DELIBERATELY NOT TRUSTED: /usr/local/bin and /opt/homebrew/bin, where a macOS host
-            # keeps gsed, gawk, yq and rg. Both are user-writable on the very platform this
-            # toolkit plans to support next, and the cost of leaving them out is one
-            # first-attempt block on a read that spells such a tool with its full path — while
-            # the cost of putting them in is vouching for whatever a session dropped there.
-            # Bare `gsed` is unaffected; only the path-qualified spelling pays.
-            #
-            # `command -v` was the third option and it is the wrong one here: it resolves
-            # through PATH, which is attacker-controlled in exactly the scenario this defends
-            # against, and on this host `command -v grep` prints `grep` because a shell function
-            # shadows the binary — an identity test that cannot even name the file it resolved.
-            case "$tok" in
-                */*)
-                    if [ "$tok" != "/bin/$cand" ] && [ "$tok" != "/usr/bin/$cand" ]; then
-                        cmd="$tok"
-                    fi ;;
-            esac
+            # charge a block for following the house style. The rule itself, the trusted set and
+            # the reason `command -v` was refused all live on find_exec_trusted_path above; this
+            # is its first of two call sites, and the other is the xargs introducer, which is a
+            # program and needs the same question asked of it.
+            if ! find_exec_trusted_path "$tok" "$cand"; then
+                cmd="$tok"
+            fi
             case "$cmd" in
                 # The same prefix vocabulary CMD_START uses: these run the NEXT word.
                 env|sudo|doas|nice|nohup|command|time|exec|'') continue ;;
@@ -569,7 +644,17 @@ tokeniser-failed"
         esac
         case "$tok" in
             -exec|-execdir|-ok|-okdir) want=1; route="find" ;;
-            xargs|*/xargs)             want=1; route="xargs" ;;
+            # THE IDLE SITE IS THE ONE THE PIPELINE ROUTE ACTUALLY USES, and it is where the
+            # measured damage was: `… -print0 | ./evil/xargs -0 grep -l guid` reaches here, not
+            # the in-args site. Both sites carry the identity test, and BOTH are needed —
+            # changing one alone is the single-site no-op this file has already been bitten by
+            # twice (route tracking, and the paired args=() reset).
+            xargs|*/xargs)
+                if find_exec_trusted_path "$tok" "$cand"; then
+                    want=1; route="xargs"
+                else
+                    pend="$tok"; args=(); want=0; route="xargs"; prevbrace=0
+                fi ;;
         esac
     done <<< "$toks"
     # A clause that runs to the end of the line has no terminator to flush it. An `if`, not an
@@ -664,15 +749,19 @@ tokeniser-failed"
 # unparseable, which blocks.
 #
 # AND THIS WIDENS AN INHERITED FAILURE, WHICH IS SAID HERE RATHER THAN LEFT TO BE FOUND. With a
-# deliberately broken `awk` on PATH, this file exits 3 — a hook error, which the harness reports
-# and then lets the tool run. Task 2b's version did that only on the commands it classified;
-# this one does it on EVERY command, because the scan is what became universal. The dying is not
-# here: it is further down at the two-stage gate's own `awk` in CMD_HASH, a line this task did
-# not touch, where `set -e` reaches a bare assignment. Measured on this host: task 2b exits 3 on
-# a destructive .meta payload and 0 on `echo hello`; this version exits 3 on both; flipping the
-# fallback above to `0` exits 0 on both, which is a silent permit and strictly worse. The
-# assertion that holds this direction is in tests/test-bash-gate-precision.sh, and no corpus
-# payload can reach it — the scan fails on the environment, not on anything a command can say.
+# deliberately broken `awk` on PATH this file exits 3, and **3 is not a block** — `unity_hook_block`
+# below exits 2, HOOK-REFERENCE.md says the same, so 3 is a hook error and the tool call proceeds.
+# It is not a loud one either: measured here as rc=3 with **0 bytes on stdout and 0 on stderr**.
+# Task 2b's version did that only on the commands it classified; this one does it on EVERY
+# command, because the scan is what became universal. The dying is not here: it is further down
+# at the two-stage gate's own `awk` in CMD_HASH, a line this task did not touch, where `set -e`
+# reaches a bare assignment. Measured on this host: task 2b exits 3 on a destructive .meta
+# payload and 0 on `echo hello`; this version exits 3 on both; flipping the fallback above to
+# `0` exits 0 on both — an explicit PERMIT the harness acts on rather than an error it reports,
+# which is the only difference the `||` above actually buys. That difference is real and it is
+# worth having; a block it is not. The assertion holding it is in
+# tests/test-bash-gate-precision.sh with the same caveat above it, and no corpus payload can
+# reach it — the scan fails on the environment, not on anything a command string can say.
 # ============================================================================================
 META_ROUTE="$(find_exec_tokens "$COMMAND" meta)" || META_ROUTE="1"
 if [ "$META_ROUTE" = "1" ]; then
