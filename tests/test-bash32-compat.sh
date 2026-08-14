@@ -120,33 +120,110 @@ shipped_scripts() {
     done
 }
 
-# ── Discovery integrity: neither scope may be empty ──────────────────────────
+# ── Discovery integrity: no SOURCE of either scope may be empty ──────────────
 #
 # Every assertion in this file is `assert_eq "" "$MATCHES"`, which is green when the sweep found
 # nothing — and a sweep that READ nothing also finds nothing. `shipped_scripts` skips a missing
 # directory (`[ -d ... ] || continue`) and a missing file, by design, so a renamed directory, a
-# moved repo layout or a typo in either array silently shrinks the scope to zero and every
-# assertion below passes over it.
+# moved repo layout or a typo in either array silently shrinks the scope and every assertion below
+# passes over what is left.
 #
-# Measured 2026-08-14, before this block existed: pointing PIPE_CHECK_DIRS at `nonexistent-dir` and
-# PIPE_CHECK_FILES at `nonexistent-file.sh` gave **7 pass / 0 fail** — the same output as a clean
-# tree. That is the runner's own `Total: 0 Passed: 0 Failed: 0, exit 0` failure one level down, and
-# tests/run-tests.sh's header is explicit that it is worse than a red.
+# Measured 2026-08-14, before any of this block existed: pointing PIPE_CHECK_DIRS at
+# `nonexistent-dir` and PIPE_CHECK_FILES at `nonexistent-file.sh` gave **7 pass / 0 fail** — the
+# same output as a clean tree. That is the runner's own `Total: 0 Passed: 0 Failed: 0, exit 0`
+# failure one level down, and tests/run-tests.sh's header is explicit that it is worse than a red.
 #
-# Asserted for BOTH scopes, because they are two different arrays and either can empty on its own.
-# The counts are not written down here — that is the same staleness this file exists to avoid; only
-# "more than zero" is asserted, which is the property that cannot be satisfied by an accident.
+# PER SOURCE, NOT PER UNION — what changed on 2026-08-14, and why the first fix was not enough.
+#
+# The first fix was two totals: `SS_ALL_N > 0` over SHIPPED_SCRIPT_DIRS + ROOT_SCRIPTS, and
+# `SS_PIPE_N > 0` over PIPE_CHECK_DIRS + PIPE_CHECK_FILES. Five sources summed into one number and
+# four into another. `tests/` alone holds 39 files and `scripts/` holds 8, so BOTH totals cleared
+# with `.claude/hooks/` — the directory this file was originally written for — completely empty.
+# MEASURED 2026-08-14 in a clone with ZERO files under `.claude/`: **8 passed, 0 failed, rc 0**,
+# byte-identical in verdict to a healthy tree. The bash-4 and early-exit sweeps certified a payload
+# that was not there.
+#
+# A floor over a summed multi-source subject cannot detect one source dying, however tight the
+# number — see docs/ANTI-VACUITY.md. So the census is per source: every directory in either array
+# and every file in either array reports its own count, and any one of them at zero reds. The
+# counts themselves are still not written down; only "at least one, each" is asserted, which is the
+# property that cannot go stale and cannot be satisfied by an accident.
+source_census() {
+    local selection="$1"
+    local dir f n
+    local -a dirs
+    local -a files
+    case "$selection" in
+        PIPE_CHECK_DIRS) dirs=("${PIPE_CHECK_DIRS[@]}"); files=("${PIPE_CHECK_FILES[@]}") ;;
+        *)               dirs=("${SHIPPED_SCRIPT_DIRS[@]}"); files=("${ROOT_SCRIPTS[@]}") ;;
+    esac
+    for dir in "${dirs[@]}"; do
+        n=0
+        if [ -d "$dir" ]; then
+            for f in "$dir"/*.sh; do
+                [ -f "$f" ] && n=$((n + 1))
+            done
+        fi
+        printf '%s\t%s\t%s\n' "$selection" "${dir#$REPO_DIR/}" "$n"
+    done
+    for f in "${files[@]}"; do
+        n=0
+        [ -f "$f" ] && n=1
+        printf '%s\t%s\t%s\n' "$selection" "${f#$REPO_DIR/}" "$n"
+    done
+}
+
 SS_ALL_N=$(shipped_scripts SHIPPED_SCRIPT_DIRS | grep -c . || true)
 SS_PIPE_N=$(shipped_scripts PIPE_CHECK_DIRS | grep -c . || true)
 
 SS_SCOPE="ok"
-[ "$SS_ALL_N"  -gt 0 ] || SS_SCOPE="the bash-4 sweep resolved to 0 files — SHIPPED_SCRIPT_DIRS/ROOT_SCRIPTS point at nothing that exists, so every assertion below is green over an empty set"
-[ "$SS_PIPE_N" -gt 0 ] || SS_SCOPE="the early-exit-reader sweep resolved to 0 files — PIPE_CHECK_DIRS/PIPE_CHECK_FILES point at nothing that exists, so every assertion below is green over an empty set"
+SS_CENSUS=""
+SS_DEAD=""
+SS_ROWS=0
+while IFS=$'\t' read -r ss_scope_name ss_src ss_n; do
+    [ -n "$ss_src" ] || continue
+    SS_ROWS=$((SS_ROWS + 1))
+    SS_CENSUS="${SS_CENSUS}${ss_scope_name%%_*}:${ss_src}=${ss_n} "
+    # Accumulated rather than overwritten, so a scope that loses two sources names both. A
+    # reassigned sentinel reports only the last one, and which one that is depends on array order.
+    [ "$ss_n" -ge 1 ] || SS_DEAD="${SS_DEAD}${ss_scope_name}:${ss_src} "
+done <<< "$(source_census SHIPPED_SCRIPT_DIRS; source_census PIPE_CHECK_DIRS)"
+[ -z "$SS_DEAD" ] || SS_SCOPE="source(s) resolving to 0 files: ${SS_DEAD}— every assertion below is green over them while the remaining sources keep this check passing"
+
+# THE FLOOR ON THE CENSUS ITSELF. If `source_census` ever emits nothing the loop above runs zero
+# times, SS_SCOPE stays "ok", and the per-source check reports green over no sources — the same
+# defect one level up, reintroduced inside its own fix. The reference is an IDENTITY against the
+# four array lengths, which are properties of this file rather than of the tree: an emptied tree
+# cannot move them, and adding an entry to any array moves both sides together, so it cannot go
+# stale. This is the shape tests/test-hook-behaviour.sh's floor uses — two independent derivations
+# of the same quantity, no ratio to size by feel.
+SS_EXPECTED_ROWS=$(( ${#SHIPPED_SCRIPT_DIRS[@]} + ${#ROOT_SCRIPTS[@]} + ${#PIPE_CHECK_DIRS[@]} + ${#PIPE_CHECK_FILES[@]} ))
+assert_eq \
+    "$SS_EXPECTED_ROWS" \
+    "$SS_ROWS" \
+    "the per-source census covered every declared scope entry ($SS_EXPECTED_ROWS declared across the four arrays)"
+
+# ...AND EACH ARRAY IS NON-EMPTY, which the identity above cannot see. A FLOOR WHOSE REFERENCE THE
+# MUTATION ALSO MOVES IS NOT A FLOOR: emptying `SHIPPED_SCRIPT_DIRS` drops three rows from BOTH
+# sides at once, so the identity still holds, every surviving per-source count is >= 1, and the
+# bash-4 sweep quietly falls from 62 files to install.sh and uninstall.sh — green over a scope that
+# lost three directories. The same mutation on tests/test-no-mobile.sh's SCAN_DIRS was measured at
+# 17 pass / 0 fail before its own absolute floor was added. Four arrays, four floors, no relative
+# reference. docs/ANTI-VACUITY.md records this as rule F4.
+SS_ARRAYS="ok"
+[ "${#SHIPPED_SCRIPT_DIRS[@]}" -ge 1 ] || SS_ARRAYS="SHIPPED_SCRIPT_DIRS is empty, so the bash-4 sweep reads only the root scripts"
+[ "${#ROOT_SCRIPTS[@]}"        -ge 1 ] || SS_ARRAYS="ROOT_SCRIPTS is empty, so install.sh and uninstall.sh are swept by nothing"
+[ "${#PIPE_CHECK_DIRS[@]}"     -ge 1 ] || SS_ARRAYS="PIPE_CHECK_DIRS is empty, so the early-exit-reader sweep reads only the root scripts"
+[ "${#PIPE_CHECK_FILES[@]}"    -ge 1 ] || SS_ARRAYS="PIPE_CHECK_FILES is empty, so install.sh and uninstall.sh are outside the early-exit-reader sweep"
+assert_eq \
+    "ok" \
+    "$SS_ARRAYS" \
+    "all four scope arrays are non-empty (${#SHIPPED_SCRIPT_DIRS[@]}/${#ROOT_SCRIPTS[@]}/${#PIPE_CHECK_DIRS[@]}/${#PIPE_CHECK_FILES[@]} entries)"
 
 assert_eq \
     "ok" \
     "$SS_SCOPE" \
-    "both sweeps resolve to a non-empty file set ($SS_ALL_N shipped, $SS_PIPE_N in the early-exit-reader scope), so the empty results below mean something"
+    "every source of both sweeps resolves to at least one file — $SS_CENSUS($SS_ALL_N shipped, $SS_PIPE_N in the early-exit-reader scope) — so the empty results below mean something"
 
 # Reports every shipped script (except this guard itself) that matches the given grep arguments on
 # a non-comment line. Two things would otherwise self-defeat a substring/regex sweep like this one:
