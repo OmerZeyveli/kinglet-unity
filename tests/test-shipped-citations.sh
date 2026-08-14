@@ -209,5 +209,95 @@ else
   printf '       citations, and a citation added to it stops being checked in every file at once.\n'
 fi
 
+# 3. Every `.claude/scripts/<name>.sh` a shipped surface names must be a script install.sh copies.
+#
+# RULE 2 CANNOT SEE THESE, and the reason is structural rather than an oversight. Its first test is
+# `[ -f "$REPO/$t" ]` — only a token naming a real file in THIS repository can dangle in a user's —
+# and `.claude/scripts/` does not exist in this repository at all: install.sh builds it by copying
+# the repo-root `scripts/`. So every `.claude/scripts/...` token falls out of rule 2 at that line
+# and is never examined. A surface naming `.claude/scripts/studio-doctar.sh` resolves to nothing in
+# every installed project and rule 2 reports green. That is the same shape as the citation defect
+# rule 2 exists for, one directory over.
+#
+# Matched on the path form and only on it. `scripts/<name>.sh` (the repository form) is rule 2's:
+# it maps that to `.claude/<token>` and checks the payload, which is the right answer for a token
+# that names a real file here. This rule is for the form a shipped surface should actually use,
+# which names no file here and so reaches nothing today.
+SC_TOKENS=""
+while IFS= read -r md; do
+  [ -n "$md" ] || continue
+  rel="${md#"$REPO"/}"
+  hits="$(grep -noE '\.claude/scripts/[A-Za-z0-9_.-]+\.sh' "$md" || true)"
+  while IFS= read -r ln_tok; do
+    [ -n "$ln_tok" ] || continue
+    SC_TOKENS="${SC_TOKENS}${rel}:${ln_tok}"$'\n'
+  done <<< "$hits"
+done <<< "$SHIPPED_MD"
+
+# A token cannot contain a colon (the character class excludes it), so `##*:` recovers it from the
+# `file:line:token` triple unambiguously.
+sc_bad=""
+sc_bad_n=0
+SC_NAMED=""
+while IFS= read -r entry; do
+  [ -n "$entry" ] || continue
+  t="${entry##*:}"
+  if grep -qxF -- "$t" <<< "$PAYLOAD"; then
+    SC_NAMED="${SC_NAMED}${t}"$'\n'
+    continue
+  fi
+  sc_bad="$sc_bad       $entry"$'\n'
+  sc_bad_n=$((sc_bad_n + 1))
+done <<< "$SC_TOKENS"
+
+if [ "$sc_bad_n" -eq 0 ]; then
+  pass "every .claude/scripts/ path a shipped surface names is a script install.sh copies"
+else
+  fail "$sc_bad_n shipped surface citation(s) name a .claude/scripts/ path no install has:"
+  printf '%s' "$sc_bad"
+  printf '       install.sh copies scripts/*.sh into .claude/scripts/ with one exclusion,\n'
+  printf '       check-provenance.sh. A path here that is not in that set resolves to nothing in\n'
+  printf '       every installed project, however well it reads in the repository.\n'
+fi
+
+# The other direction: a script that ships and that no shipped surface names is reachable only by a
+# user who goes looking. Asserted as a SUBSET rather than as a count, so that wiring one more script
+# up can never redden this, and unwiring one always does. A name may be REMOVED from the pending
+# list; adding one is undoing work this list exists to finish.
+#
+#   generate-claude-md.sh — Task 7 of the 2026-08-13 surface-criterion wave owns naming it from
+#                           `/unity-init`. Until that lands it is reachable from install.sh only,
+#                           which is a run the user makes once and not a surface a model can call.
+SC_REACH_PENDING="generate-claude-md.sh"
+
+SC_UNREF=""
+SC_INSTALLED_N=0
+while IFS= read -r p; do
+  [ -n "$p" ] || continue
+  case "$p" in .claude/scripts/*) ;; *) continue ;; esac
+  SC_INSTALLED_N=$((SC_INSTALLED_N + 1))
+  if grep -qxF -- "$p" <<< "$SC_NAMED"; then continue; fi
+  SC_UNREF="${SC_UNREF}${p##*/}"$'\n'
+done <<< "$PAYLOAD"
+
+sc_unref_bad=""
+while IFS= read -r b; do
+  [ -n "$b" ] || continue
+  case " $SC_REACH_PENDING " in *" $b "*) continue ;; esac
+  sc_unref_bad="$sc_unref_bad $b"
+done <<< "$SC_UNREF"
+
+SC_NAMED_N="$(printf '%s\n' "$SC_NAMED" | sort -u | grep -c . || true)"
+
+if [ -z "$sc_unref_bad" ]; then
+  pass "$SC_NAMED_N of $SC_INSTALLED_N installed scripts are named by a shipped surface; the rest are on the recorded pending list"
+else
+  fail "installed script(s) named by no agent, command or skill and not on the pending list:$sc_unref_bad"
+  printf '       %s of %s installed scripts are currently named by a shipped surface.\n' "$SC_NAMED_N" "$SC_INSTALLED_N"
+  printf '       A script nothing names is reachable only by a user who goes looking for it. Either\n'
+  printf '       name it from the surface whose job it belongs to, or cut it — those are the two\n'
+  printf '       answers the surface criterion admits. Do not add it to SC_REACH_PENDING.\n'
+fi
+
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all shipped-citation assertions passed\n'

@@ -27,12 +27,47 @@ Perform a comprehensive code review with Unity-specific checks.
 If the user specified a scope: review **$ARGUMENTS**
 If no scope: review recently changed files (`git diff` or all `.cs` files in `Assets/Scripts/`).
 
+## Before dispatching: the rename check the agent cannot run
+
+Run this yourself, here, before the agent starts:
+
+```bash
+bash .claude/scripts/validate-serialization.sh          # whole Assets/ tree
+bash .claude/scripts/validate-serialization.sh --staged # only what is staged for commit
+```
+
+**Why here and not in the agent.** `unity-reviewer` is read-only — `Skill, Read, Glob, Grep`, no
+`Bash` — and that is the shape it is meant to have. This command runs where a script can be
+executed, so the script runs at this level and its findings go into the review as evidence.
+
+**Why a script and not a read.** A rename is a difference between two versions of a file. The script
+diffs each file's `[SerializeField]` and public field names against `git show HEAD:<file>` and
+reports every name that disappeared without a matching `[FormerlySerializedAs("oldName")]`. Reading
+the file as it stands now cannot see a name that is no longer in it — the old name exists only in
+history — so critical issue 1 below is otherwise reviewed against whatever the diff happens to show.
+
+Use `--staged` when the review is scoped to a commit about to be made; otherwise let it scan
+`Assets/`. Two things to know before reading its result:
+
+- **It always exits 0.** Read the output, not the status: `Found N serialization warning(s)` is the
+  finding, `All serialized field renames have proper FormerlySerializedAs attributes` is the clean
+  result.
+- **It needs git and a Unity project root.** Outside a git repository it prints
+  `Not a git repository. Cannot compare against history.` and exits 1. Report that as a check that
+  did not run — not as a clean result, and not as a review finding.
+
+Every warning it prints belongs in the review under critical issue 1, naming the field and file it
+named. It supplements the agent's read rather than replacing it: it sees only what git can show it,
+so a field renamed several commits ago, or one in an untracked file, is invisible to it and still
+yours to catch.
+
 ## Workflow
 
 Use the `unity-reviewer` agent to check:
 
 ### 1. Critical Issues (must fix)
-- `[SerializeField]` field renamed without `[FormerlySerializedAs]`
+- `[SerializeField]` field renamed without `[FormerlySerializedAs]` (the script above is the
+  history-aware half of this check; the agent still reads the code)
 - `?.` or `is null` used on Unity objects (must use `== null`)
 - `UnityEditor` namespace in runtime code without `#if UNITY_EDITOR`
 - MonoBehaviour class name doesn't match file name
