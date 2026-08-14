@@ -883,6 +883,30 @@ ADDRESSED, none returned to the fix loop.**
     receipt row betrayed it. **Measure this class on an edited file, or by reading the row. Never by
     the bytes.**
 
+**From Task 3's implementation (2026-08-14, `6928a43`, in review).**
+
+56. **`docs/GETTING-STARTED.md`'s reachability sentence is now false, and nothing guards it.** Task 3
+    took the count from **1 of 6** to **5 of 6**, which falsifies *"The other five are named by no
+    agent, command or skill"*. **Ruling R7 stands: it goes to whichever of Tasks 3 and 7 lands
+    SECOND, and must become a derived claim row rather than corrected prose** — corrected prose
+    falsifies again on the next reachability change, which is this wave's own D5 thesis. Task 3's new
+    guard already prints the derived replacement figure on every run. **→ Task 7.**
+57. **`docs/GETTING-STARTED.md` still credits `/unity-doctor` with "skill/package alignment"**, a
+    check deleted on 2026-08-03. **→ Task 11.**
+58. **`tests/test-shipped-citations.sh` rule 2 was structurally blind to `.claude/scripts/…`
+    paths** — its first test requires the token to name a real file **in this repository**, and that
+    directory does not exist here, so **a misspelled installed-script path resolved to nothing in
+    every installed project with the suite green.** Task 3 added rule 3 for it. *Recorded because the
+    shape is the wave's own subject: a guard whose scanned set is not the reality it claims to
+    guard.*
+59. **Handed to Task 12 while it was running** (forwarded directly, not left in a report): every
+    `--help` string names `./scripts/…`, **10 hits across 7 files**, wrong in an installed project —
+    and Task 3 made it *more* visible by wiring four surfaces to send readers there. Plus the
+    `grep -q` form of the early-exit trap live at **six sites** (`detect-missing-refs.sh` and five in
+    `validate-asmdefs.sh`), found by reading rather than by sweeping, so **Task 12 must treat the
+    list as a cross-check on its own derivation — if its sweep finds fewer than six, that gap is the
+    finding.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
