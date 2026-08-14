@@ -1865,6 +1865,33 @@ does **not** synthesise the runner's backstop line, which is the whole of disagr
 faithful driver and the real runner disagree in exactly one place, and knowing which place is worth
 more than either number.**
 
+**From Task 11's implementation and fix round 1 (2026-08-14). Task 11 is complete.**
+
+198. **The doctor passes a payload directory that exists and is empty, and this half of ledger 75 is
+     the half that was left.** Task 11 corrected the *claim* — `/unity-doctor` Check 3 now says the
+     five items are outside what the script **reports** (not what it *reads*, which its own item 1
+     falsifies), and item 1 now requires the directories to be non-empty. It did **not** change
+     `scripts/studio-doctor.sh`, which still prints `INFO agents=0`, `0 failure(s)`, rc=0 on a
+     project whose `.claude/agents/` exists and holds nothing. Four consecutive count assignments
+     share the shape; the repair is a non-empty test beside each. **Left because changing the
+     doctor's verdict on a real project state is a behaviour change to a shipped script that
+     `tests/test-studio-doctor.sh` needs a new state for — larger than the claim correction Task 11
+     was scoped to, per ruling R11-scope. → the next owner of `scripts/`.** *(Recorded as a row
+     because Task 11's report deferred it in a paragraph, and a deferral with no row is a finding
+     that did not happen — this ledger's own standing rule, applied to the task that exists to
+     enforce it.)*
+
+199. **The inline kill-switch copy in `session-brief.sh` is two gates, not three, and that is
+     currently correct.** `_lib.sh` carries three: the profile-level gate, `DISABLE_UNITY_HOOKS`, and
+     `DISABLE_HOOK_<NAME>`. The inline copy carries the last two. It is right today because
+     `session-brief.sh` declares no `HOOK_PROFILE_LEVEL`, so the profile gate would be a no-op for
+     it. **A drift that gave this hook a level would be caught five ways by
+     `tests/test-derived-counts.sh`** (the minimal-keeps set, the per-hook `Profile:` lines, the
+     Summary Table column, and the two tier counts) — **but a drift that also updated
+     `docs/HOOK-REFERENCE.md` in the same commit would not be**, and it would silently make the
+     profile setting inert for the one hook that runs at every session start. **→ the same hook
+     pass.**
+
 ## The honest limits, carried forward to EE
 
 - **Nothing in either audit proves the toolkit works inside Claude Code.** No scout ran a command

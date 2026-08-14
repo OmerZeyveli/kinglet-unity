@@ -11,10 +11,18 @@
 #
 # KILL SWITCHES, INLINE, AND SOURCING _lib.sh INSTEAD WOULD BE THE WRONG TRADE. Every other hook gets
 # `DISABLE_UNITY_HOOKS` and `DISABLE_HOOK_<NAME>` by sourcing `_lib.sh`. This one runs at
-# SessionStart, and `_lib.sh` resolves a state directory (`git rev-parse`, `mkdir -p`) before it
-# returns — under `set -euo pipefail` that is failure surface on the one path where failing means the
-# session does not start, which the contract above exists to prevent. So the two switches are
-# implemented here, in five lines, with no dependency.
+# SessionStart, and `_lib.sh` ends its state-directory resolution with an UNGUARDED `mkdir -p` —
+# under `set -euo pipefail` that is failure surface on the one path where failing means the session
+# does not start, which the contract above exists to prevent.
+#
+# MEASURED, with UNITY_HOOK_STATE_DIR pointed inside a `chmod 555` directory: a `_lib.sh` sourcer
+# (`track-edits.sh`) dies rc=1 at the mkdir; this hook survives and prints its full brief, rc=0.
+#
+# THE MKDIR ALONE, and this comment named two causes until a reviewer checked: the `git rev-parse`
+# above it is already `|| true`'d, so it cannot kill anything. One unguarded command is the whole
+# argument, which is a stronger claim than the two-cause version it replaced.
+#
+# So the two switches are implemented here, in five lines, with no dependency.
 #
 # The alternative was to document the exception instead, and it was rejected on blast radius: five
 # shipped places tell a user that `DISABLE_UNITY_HOOKS=1` bypasses ALL hooks: `_lib.sh`'s own header,

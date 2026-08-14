@@ -484,22 +484,23 @@ Issues requiring human judgment (architecture, design patterns, ambiguous trade-
 
 ---
 
-## Benchmarking
-
-The `benchmarks/` directory contains structural correctness benchmarks for agent output. Each benchmark scenario defines a prompt, expected files, required patterns, and forbidden patterns.
-
-Benchmarks do not invoke Claude Code directly. The workflow is:
-
-1. Run Claude Code manually with a scenario prompt in a scratch Unity project.
-2. Run `bash benchmarks/run-benchmarks.sh --workdir /path/to/output` to score the result.
-3. Use `--compare` to diff against a previous run and detect regressions.
-
-Results are written to `benchmarks/results/` as timestamped JSON files. Use benchmarks to validate that changes to agents, skills, or rules do not degrade output quality.
-
-See [BENCHMARK-GUIDE.md](BENCHMARK-GUIDE.md) for the full reference.
-
----
-
 ## Version Management
 
-The `.claude/VERSION` file tracks the installed version. The `upgrade.sh` script compares source and target versions, creates a backup, preserves user customizations (settings.local.json, custom agents/commands/skills), and reports a diff of changes.
+`.claude/VERSION` carries the toolkit version, and the installer reads it and stamps it into the
+receipt's `# toolkit-version:` header.
+
+**There is no separate upgrade path — upgrading is re-running `install.sh`.** It reads
+`.claude/state/install-receipt.tsv`, recognises the existing install, and prints the version it is
+moving from and to. Files you edited are reported and kept; untouched toolkit files are replaced.
+Measured on a real install with one payload file edited: *"Existing Kinglet install found (version
+3.0.0-pioneer.1) — upgrading to 3.0.0-pioneer.1"*, then *"Installed 66 file(s), kept 1 of yours."*
+Your `settings.local.json` is never in the payload, so nothing overwrites it.
+
+**Two sections used to sit here and both described paths this repository forbids.** A `## Benchmarking`
+section documented `benchmarks/run-benchmarks.sh`, `benchmarks/results/` and a `BENCHMARK-GUIDE.md`;
+this paragraph's own predecessor described an `upgrade.sh` that "compares source and target versions,
+creates a backup, preserves user customizations". `benchmarks/`, `upgrade.sh` and
+`docs/BENCHMARK-GUIDE.md` are all `rule=absent` in `provenance-skip.tsv` — paths that must **never**
+exist here — and `scripts/check-provenance.sh` fails if any reappears. The one-line directory-listing
+entries for two of them were removed on 2026-08-14 and these sections were left standing in the same
+file, which is why the removal is recorded here rather than only in the manifest.

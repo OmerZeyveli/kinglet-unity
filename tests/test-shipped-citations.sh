@@ -361,5 +361,61 @@ else
   printf '       answers the surface criterion admits. Do not add it to SC_REACH_PENDING.\n'
 fi
 
+# 4. `.claude/UPSTREAM` ships and is not Markdown, so rules 1-3 never read it.
+#
+# It is the file that tells an installed reader where this build came from, and until 2026-08-14 it
+# pointed at FOUR files that are not in an installed project. Measured against a real install built
+# by tests/fixtures/mkproject.sh + install.sh: the provenance manifest, its skip companion, the merge
+# record and the provenance verifier are all absent; only .claude/NOTICE.md and .mcp.json are there.
+# That is the identical defect rule 2 exists for, in a file rule 2 cannot see because its tokens are
+# not backticked and its extension is not .md.
+#
+# THE RULE IS A MARKER, NOT AN ALLOW-LIST. A repository-only path may be named — the pins are a
+# record and the record is worth keeping — but the line that names it must also carry the words
+# `not installed`, on that line. An allow-list would go stale silently the first time a path moved
+# into or out of the payload; the marker cannot, because it is read off the same payload derivation
+# rules 2 and 3 use.
+UP_FILE="$REPO/.claude/UPSTREAM"
+up_bad=""
+up_seen=0
+if [ ! -f "$UP_FILE" ]; then
+  fail ".claude/UPSTREAM is missing — rule 4 read nothing"
+else
+  up_line=0
+  while IFS= read -r up_l; do
+    up_line=$((up_line + 1))
+    up_toks="$(printf '%s' "$up_l" | grep -oE '[A-Za-z0-9_./-]+\.(tsv|md|sh|json)' || true)"
+    [ -n "$up_toks" ] || continue
+    while IFS= read -r up_t; do
+      [ -n "$up_t" ] || continue
+      # Only paths that exist in THIS repository are in scope: `.mcp.json` at the project root and a
+      # user-project path name nothing here and are not this rule's business.
+      [ -e "$REPO/$up_t" ] || continue
+      up_seen=$((up_seen + 1))
+      grep -qxF -- "$up_t" <<< "$PAYLOAD" && continue
+      case "$up_l" in *"not installed"*) continue ;; esac
+      up_bad="${up_bad}
+       .claude/UPSTREAM:${up_line} names ${up_t}, which install.sh does not copy, on a line that does not say \`not installed\`"
+    done <<< "$up_toks"
+  done < "$UP_FILE"
+fi
+
+# Anti-vacuity: a rewrite that drops every repository path from this file would otherwise report a
+# clean result over nothing. The floor is 1 because the point is that the sweep read SOMETHING; the
+# marker check above is what carries the meaning.
+if [ "$up_seen" -ge 1 ]; then
+  pass "rule 4 examined $up_seen repository path(s) named in .claude/UPSTREAM"
+else
+  fail "rule 4 found no repository path in .claude/UPSTREAM — the token expression has stopped matching, or the file no longer names one"
+fi
+
+if [ -z "$up_bad" ]; then
+  pass ".claude/UPSTREAM names no repository-only file without saying it is not installed"
+else
+  fail "shipped .claude/UPSTREAM points an installed reader at file(s) that are not there:$up_bad"
+  printf '       .claude/UPSTREAM installs. A path here that install.sh does not copy is a dangling\n'
+  printf '       pointer in every project. Either drop it, or say `not installed` on the same line.\n'
+fi
+
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all shipped-citation assertions passed\n'

@@ -125,6 +125,26 @@ assert_eq "0" "$EXIT_CODE" "track-edits exits 0"
 # now explains the switches at length, so a needle of `DISABLE_UNITY_HOOKS` alone would be satisfied
 # by prose describing a check that had been deleted -- a probe whose subject can satisfy it by
 # talking about itself.
+#
+# AND THE STRUCTURAL SWEEP ALONE WAS COVERED BACKWARDS, WHICH IS WHY THERE ARE TWO BEHAVIOURAL
+# PROBES BELOW. Its first version proved the mechanism with ONE user -- `session-brief.sh`, the
+# inline one -- and took the eleven `_lib.sh` sourcers on faith, because seeing a `source` line was
+# enough to `continue`. Measured: delete both `if` blocks from `_lib.sh`'s kill-switch section and
+# `block-meta-edit.sh` still BLOCKS, rc=2, with `DISABLE_UNITY_HOOKS=1` set -- and this file stayed
+# fully green, including the assertion by name. Eleven of twelve hooks were vouched for by a check
+# that could not see the thing they all depend on.
+#
+# The needles are also satisfiable by EXCESS. A hook honouring neither switch but carrying both
+# strings as inert code -- `MSG="ignores ${DISABLE_UNITY_HOOKS:-} and DISABLE_HOOK_ZZ entirely"` --
+# passed the structural sweep while running to completion with the switch set. Stripping comments
+# anticipates the prose version of that; it does not anticipate the dead-code version, which is what
+# a half-finished copy-paste produces.
+#
+# So the structural sweep is now a FIRST FILTER, and the load is carried by:
+#   * one behavioural probe of a `_lib.sh` sourcer, which is what makes the eleven mean anything; and
+#   * a SET identity between the hooks that do not source `_lib.sh` and the hooks this file probes
+#     behaviourally. A new inline hook reds here until someone writes its probe, which is the only
+#     way an inline copy of the switch logic can be held to the behaviour rather than to a string.
 KS_BAD=""
 KS_SEEN=0
 #
@@ -164,9 +184,41 @@ fi
 assert_eq "0" "$(printf '%s' "$KS_BAD" | grep -c . || true)" \
     "every hook honours DISABLE_UNITY_HOOKS and DISABLE_HOOK_<NAME>, by _lib.sh or inline"
 
-# And the one hook with the inline copy, behaviourally -- because the structural check above cannot
-# tell a working check from a misspelled one. `session-brief.sh` prints unconditionally when the
-# skill file exists, so the baseline is non-empty and the probe is not measuring silence twice.
+# --- Behavioural probe 1: a `_lib.sh` SOURCER. ---
+#
+# This is the one that makes the structural `continue` above mean anything. `block-meta-edit.sh` is
+# the representative: it blocks on a payload this file already uses, so the baseline is rc=2 and the
+# probe is not comparing two silences. With the switch set it must reach exit 0.
+KS_META_PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"Assets/Scripts/Player.cs.meta","old_string":"a","new_string":"b"}}'
+KS_META_BASE="$(run_hook "block-meta-edit.sh" "$KS_META_PAYLOAD")"
+KS_META_OFF="$(run_hook "block-meta-edit.sh" "$KS_META_PAYLOAD" "DISABLE_UNITY_HOOKS=1")"
+KS_META_ONE="$(run_hook "block-meta-edit.sh" "$KS_META_PAYLOAD" "DISABLE_HOOK_BLOCK_META_EDIT=1")"
+assert_eq "2" "${KS_META_BASE%%|*}" \
+    "block-meta-edit blocks with no switch set — the two probes below are not measuring an inert hook"
+assert_eq "0" "${KS_META_OFF%%|*}" \
+    "DISABLE_UNITY_HOOKS=1 reaches a _lib.sh sourcer (block-meta-edit stops blocking)"
+assert_eq "0" "${KS_META_ONE%%|*}" \
+    "DISABLE_HOOK_BLOCK_META_EDIT=1 reaches a _lib.sh sourcer"
+
+# --- Behavioural probe 2: every hook that does NOT source `_lib.sh`, as a set. ---
+#
+# The inline arm cannot be trusted to a string match, so each non-sourcer must be probed by name in
+# this file, and the two sets are compared. Adding an inline hook without a probe reds here.
+KS_INLINE_DERIVED="$(
+  for ks_h in "$HOOKS_DIR"/*.sh; do
+    [ -f "$ks_h" ] || continue
+    ks_b="$(basename "$ks_h")"
+    [ "$ks_b" = "_lib.sh" ] && continue
+    ks_code="$(awk '!/^[[:space:]]*#/' "$ks_h")"
+    grep -qE 'source[[:space:]]+"?\$\{?SCRIPT_DIR\}?/_lib\.sh"?' <<< "$ks_code" || printf '%s\n' "${ks_b%.sh}"
+  done | sort
+)"
+KS_INLINE_PROBED="session-brief"
+assert_eq "$KS_INLINE_DERIVED" "$KS_INLINE_PROBED" \
+    "every hook that does not source _lib.sh is probed behaviourally below, and no other"
+
+# `session-brief.sh` prints unconditionally when the skill file exists, so the baseline is non-empty
+# and the probe is not measuring silence twice.
 KS_BASE=$(CLAUDE_PROJECT_DIR="$REPO_DIR" bash "$HOOKS_DIR/session-brief.sh" 2>&1 | grep -c . || true)
 KS_OFF_ALL=$(CLAUDE_PROJECT_DIR="$REPO_DIR" DISABLE_UNITY_HOOKS=1 bash "$HOOKS_DIR/session-brief.sh" 2>&1 | grep -c . || true)
 KS_OFF_ONE=$(CLAUDE_PROJECT_DIR="$REPO_DIR" DISABLE_HOOK_SESSION_BRIEF=1 bash "$HOOKS_DIR/session-brief.sh" 2>&1 | grep -c . || true)

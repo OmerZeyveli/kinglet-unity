@@ -1,5 +1,13 @@
 # Kinglet Pioneer — vendored upstream pins
-# key=value, dependency-free to parse. provenance.tsv holds the per-file truth; this is the summary.
+# key=value, dependency-free to parse. This is the summary only.
+#
+# THIS FILE SHIPS, AND UNTIL 2026-08-14 IT NAMED FOUR FILES THAT ARE NOT IN AN INSTALLED PROJECT.
+# Measured against a real install, these four are not installed: provenance.tsv, provenance-skip.tsv, MERGE-NOTES.md, check-provenance.sh.
+# These two are installed: .claude/NOTICE.md and .mcp.json.
+#
+# So EVERY LINE HERE THAT NAMES A REPOSITORY-ONLY PATH CARRIES THE WORDS `not installed`, on that
+# line and not on its neighbour, and the shipped-citation guard's rule 4 fails on any that does not.
+# What an installed reader can actually open for attribution is .claude/NOTICE.md.
 toolkit=kinglet
 edition=pioneer
 toolkit_version=3.0.0-pioneer.1
@@ -8,16 +16,16 @@ supported_hosts=linux-x64
 ecu=1.5.0
 ecu_commit=bb28ccbd40b065b0958b02df0c03fb91c4fb7c5b
 ecu_repo=https://github.com/XeldarAlz/everything-claude-unity
-ecu_note=vendored; mobile content removed; some files modified (see provenance.tsv status=modified)
+ecu_note=vendored; mobile content removed; some files modified. Per-file status is the provenance.tsv manifest, not installed; what ships with attribution is .claude/NOTICE.md
 superpowers=6.2.0
 superpowers_commit=3dcbd5c4b48e02263fbf4a3c01e3fe4f81d584d9
 superpowers_repo=https://github.com/obra/superpowers
 superpowers_note=adapted 2026-08-10, not vendored; the process chain (unity-planning, unity-execution, unity-brainstorming) rewritten for Unity at the expression level. See .claude/NOTICE.md section 3.
 superpowers_pin_verified=no
-superpowers_pin_note=nothing verifies this pin. Every adapted row is status=modified, so check-provenance.sh --online never reaches it; --online reads the ecu= line only. Recorded as a record, not a checked fact.
+superpowers_pin_note=nothing verifies this pin. Every adapted row is status=modified, so the check-provenance.sh verifier -- not installed -- never reaches it under --online; --online reads the ecu= line only. Recorded as a record, not a checked fact.
 donchitos=984023ddac0d5e27624f2baacde6105e45de375f
 donchitos_repo=https://github.com/Donchitos/Claude-Code-Game-Studios
-donchitos_note=REMOVED 2026-08-03; 0 files ship from this upstream. The pin is kept because MERGE-NOTES.md Part 1 and provenance-skip.tsv describe what was adapted from it and at which commit. See provenance-skip.tsv for the paths, all rule=absent.
+donchitos_note=REMOVED 2026-08-03; 0 files ship from this upstream, so nothing here needs attribution in .claude/NOTICE.md. The pin is kept because the toolkit repository's MERGE-NOTES.md Part 1 and its provenance-skip.tsv record what was adapted and at which commit, every path rule=absent; those two are not installed.
 unity_mcp_repo=https://github.com/CoplayDev/unity-mcp
 unity_mcp_note=not vendored; .mcp.json (project root) points at it on localhost:8080
 unity_mcp_ref=c14de1e6dc01ab42d2bb358730cff954bce0ce6b
