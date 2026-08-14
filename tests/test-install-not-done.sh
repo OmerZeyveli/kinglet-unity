@@ -86,45 +86,67 @@ INSTALLER="$REPO/install.sh"
 # different reason (MODE=foreign is defined by the receipt's ABSENCE, so an unconditional write would
 # destroy that mode), and its oracle is a fixture rather than the source.
 
-# receipt_write_report <file> — prints `fn=<0|1> inside=<n> outside=<n> unclassified=<n>`.
+# receipt_write_report <file> — prints `fn=<0|1> inside=<n> outside=<n> unclassified=<n>`,
+# with ` lines=<n,n,…>` appended whenever `outside` or `unclassified` is non-zero, so a red names the
+# logical lines that caused it instead of leaving the reader to find them.
 #
 #   fn            1 if a `write_receipt() {` opening and a column-0 `}` closing were both found.
 #                 Guards the whole check against going vacuous after a rename or a re-indent.
 #   inside        writes to $RECEIPT inside write_receipt's body.
 #   outside       writes to $RECEIPT anywhere else. This is the invariant.
-#   unclassified  lines referencing $RECEIPT that are neither a recognised write nor a recognised
-#                 read. Fail-closed: an unrecognised shape is a red, not a shrug.
+#   unclassified  references to $RECEIPT that are neither a recognised write nor a recognised read.
+#                 Fail-closed: an unrecognised shape is a red, not a shrug.
 #
 # THE FIRST VERSION OF THIS COUNTED ONE SPELLING — `> "$RECEIPT"` — AND THE REVIEWER BROKE IT SIX
 # WAYS IN A ROW. `> "${RECEIPT}"`, `> $RECEIPT`, `| tee "$RECEIPT"`, `cp /dev/null "$RECEIPT"`,
 # `mv "$RECEIPT_TMP" "$RECEIPT"` and `>| "$RECEIPT"` each added a second commit point outside the
-# function with the check still reporting clean, and the whole file still printing 36/36. The one
+# function with the check still reporting clean, and the whole file still printing green. The one
 # that mattered was `cp "$RECEIPT_TMP" "$RECEIPT"` before the `write_receipt` call: behaviour
 # unchanged, invariant destroyed, suite green. `mv "$RECEIPT_TMP" "$RECEIPT"` is the single most
 # natural idiom for committing a temp file, so this was not a contrived evasion — it is the shape
 # the next owner reaches for first.
 #
-# SO WRITES ARE DETECTED THREE WAYS, AND THE THIRD IS THE VERB-INDEPENDENT ONE:
+# THE SECOND VERSION CLASSIFIED PHYSICAL LINES, AND A BACKSLASH BROKE IT:
+#
+#     mv "$RECEIPT_TMP" \
+#        "$RECEIPT"
+#
+# reported clean. The first physical line names only $RECEIPT_TMP, which the reference pattern
+# correctly excludes; the second is `   "$RECEIPT"`, which trips the trailing-token read rule. That
+# bypass was OUTSIDE the limit this header stated — the verb IS listed and the temp IS named — and
+# it is not hypothetical: install.sh carries 25 non-comment continuation lines, and one of them
+# already splits a command whose argument list contains "$RECEIPT". **So continuations are folded
+# into one logical line BEFORE anything is classified.** Extending the stated limit instead was
+# rejected: the honesty of that limit is what makes this guard worth trusting, and a second entry in
+# it starts to read as a list of things the guard does not do.
+#
+# WRITES ARE DETECTED THREE WAYS, AND THE THIRD IS THE VERB-INDEPENDENT ONE:
 #
 #   1. Any output redirection whose target is the reference — `>`, `>>`, `>|`, `N>`, `exec N>` —
 #      quoted, braced or bare.
-#   2. A mutating command word on the line. A spelling list, and therefore the weak one.
-#   3. ANY LINE NAMING BOTH $RECEIPT_TMP AND $RECEIPT. That is what committing a temp file IS,
-#      whatever verb does it, and it catches `mv`, `cp`, `install`, `tee`, `rsync` and a command
+#   2. A mutating command word on the logical line. A spelling list, and therefore the weak one.
+#   3. ANY LOGICAL LINE NAMING BOTH $RECEIPT_TMP AND $RECEIPT. That is what committing a temp file
+#      IS, whatever verb does it, and it catches `mv`, `cp`, `install`, `tee`, `rsync` and a command
 #      held in a variable with one rule and no list. install.sh's own commit does NOT trip it:
-#      `sort … "$RECEIPT_TMP"` and `} > "$RECEIPT"` are different lines.
+#      `sort … "$RECEIPT_TMP"` and `} > "$RECEIPT"` are separate logical lines.
+#
+#      RULE 3 SHORT-CIRCUITS, AND THAT MISDIAGNOSES ONE SHAPE. A line that only READS both — a
+#      `diff "$RECEIPT_TMP" "$RECEIPT"`, or a log line naming the pair — is counted as a write before
+#      the read tests run, so A.1 reds and blames the ownership invariant for a diff. The direction is
+#      safe (fail-closed and loud) and the `lines=` field points straight at it; if that is what you
+#      are looking at, this paragraph is the answer, and rule 3 is still worth its cost.
 #
 # READS ARE RECOGNISED NARROWLY: a file-test operator, a reader command word, an input redirection,
-# or the reference as the line's final token. Everything else is `unclassified` and reds — which is
-# how a write through an interpreter (`python3 -c "open('$RECEIPT','w')"`) is caught without naming
-# python.
+# or the reference as the logical line's final token. Everything else is `unclassified` and reds —
+# which is how a write through an interpreter (`python3 -c "open('$RECEIPT','w')"`) is caught without
+# naming python, and where `[ -n "$RECEIPT" ]` and `jq . "$RECEIPT"` land too.
 #
 # THE STATED LIMIT, because a guard's blind spot belongs beside it: rule 4's trailing-token
 # concession exists for one real line — the closing line of a multi-line awk program, where the
 # reference is a bare file argument with no command word in sight. A mutating command that (a) is
 # spelled in no list, (b) does not mention $RECEIPT_TMP, and (c) takes $RECEIPT as its last argument
 # would pass. `$SOME_CMD /dev/null "$RECEIPT"` is that shape; it is measured and reported, not
-# claimed away.
+# claimed away. It is the ONLY entry in this limit, and folding is what keeps it that way.
 #
 # `[$]RECEIPT`, not `\$RECEIPT`: a backslash-dollar inside an awk ERE is an escape whose meaning is
 # not portable, and a bracket expression says the same thing in every awk. The reference pattern
@@ -132,33 +154,50 @@ INSTALLER="$REPO/install.sh"
 # `$RECEIPT_ROWS` and `$RECEIPT_WRITTEN` are not mistaken for it.
 receipt_write_report() {
   awk '
+    function classify(L, ln, inside,    w, r, i) {
+      if (L !~ refw) return
+      if (L ~ /^[[:space:]]*RECEIPT=/) return
+      w = 0
+      if (L ~ ("[0-9]*>>?\\|?[[:space:]]*" ref)) w = 1
+      for (i in wv) if (L ~ ("(^|[^A-Za-z0-9_./-])" wv[i] "([^A-Za-z0-9_./-]|$)")) w = 1
+      if (L ~ /[$]\{?RECEIPT_TMP\}?([^A-Za-z0-9_]|$)/) w = 1
+      if (w) {
+        if (inside) { ins++ } else { out++; where = where (where == "" ? "" : ",") ln }
+        return
+      }
+      r = 0
+      if (L ~ /\[[[:space:]]+-[fsehr][[:space:]]/) r = 1
+      for (i in rv) if (L ~ ("(^|[^A-Za-z0-9_./-])" rv[i] "([^A-Za-z0-9_./-]|$)")) r = 1
+      if (L ~ ("<[[:space:]]*" ref)) r = 1
+      if (L ~ (ref "[[:space:]]*$")) r = 1
+      if (!r) { unc++; where = where (where == "" ? "" : ",") ln }
+    }
     BEGIN {
       ref  = "\"?[$]\\{?RECEIPT\\}?\"?"
       refw = "[$]\\{?RECEIPT\\}?([^A-Za-z0-9_]|$)"
       split("cp mv ln install dd truncate touch shred rsync tee sponge", wv, " ")
       split("grep awk sed cat wc sort comm cut tail head sha256sum stat dirname basename test", rv, " ")
+      buf = ""; bufline = 0
     }
     /^[[:space:]]*#/ { next }
     /^write_receipt\(\)[[:space:]]*\{/ { infn = 1; opened = 1 }
     infn && /^\}[[:space:]]*$/ { infn = 0; closed = 1 }
-    $0 !~ refw { next }
-    /^[[:space:]]*RECEIPT=/ { next }
     {
-      w = 0
-      if ($0 ~ ("[0-9]*>>?\\|?[[:space:]]*" ref)) w = 1
-      for (i in wv) if ($0 ~ ("(^|[^A-Za-z0-9_./-])" wv[i] "([^A-Za-z0-9_./-]|$)")) w = 1
-      if ($0 ~ /[$]\{?RECEIPT_TMP\}?([^A-Za-z0-9_]|$)/) w = 1
-      if (w) { if (infn) ins++; else out++; next }
-      r = 0
-      if ($0 ~ /\[[[:space:]]+-[fsehr][[:space:]]/) r = 1
-      for (i in rv) if ($0 ~ ("(^|[^A-Za-z0-9_./-])" rv[i] "([^A-Za-z0-9_./-]|$)")) r = 1
-      if ($0 ~ ("<[[:space:]]*" ref)) r = 1
-      if ($0 ~ (ref "[[:space:]]*$")) r = 1
-      if (!r) unc++
+      seg = $0
+      cont = (seg ~ /\\$/)
+      sub(/[[:space:]]*\\$/, "", seg)
+      if (buf == "") { buf = seg; bufline = NR } else { buf = buf " " seg }
+      if (cont) next
+      classify(buf, bufline, infn)
+      buf = ""
     }
     END {
-      printf "fn=%d inside=%d outside=%d unclassified=%d\n", \
+      # A file whose last line is a continuation never reaches the flush above.
+      if (buf != "") classify(buf, bufline, infn)
+      printf "fn=%d inside=%d outside=%d unclassified=%d", \
         (opened && closed) ? 1 : 0, ins + 0, out + 0, unc + 0
+      if (where != "") printf " lines=%s", where
+      printf "\n"
     }
   ' "$1"
 }
@@ -171,13 +210,22 @@ else
   fail "A.1: install.sh's receipt write points are not what the ownership invariant requires — expected '$A_GOOD', got '$A_REPORT'. Four owned_by_installer call sites read \$RECEIPT expecting the PREVIOUS run's rows"
 fi
 
-# ── A.2: eleven mutants, each a second commit point outside the function ────
+# ── A.2: one mutant per row of the table below, each a second commit point ──
 # A guard that has never been shown to redden is a guard that has been read, not tested — and the
-# first version of this one passed six of these eleven. Every mutant is applied to a COPY in
-# $SCRATCH; nothing here touches the repository's install.sh. The insertion point is the line
-# immediately before the real commit, which is where a second one would most plausibly be added.
+# first version of this one passed half the table, while the second passed the two continuation rows.
+# Every mutant is applied to a COPY in $SCRATCH; nothing here touches the repository's install.sh.
+# The insertion point is the line immediately before the real commit, which is where a second one
+# would most plausibly be added.
 #
-# The table is `name<TAB>shell line`. A tab, because every line here carries quotes and spaces.
+# NO COUNT IS WRITTEN IN THIS HEADING, and that is not fastidiousness. The round that stripped every
+# stale site-count out of install.sh wrote `eleven mutants` here in the same commit, and the table
+# was twelve rows before the ink dried. Derive it:
+#
+#   sed -n '/^done <<MUTANTS$/,/^MUTANTS$/p' tests/test-install-not-done.sh | grep -c "$(printf '\t')"
+#
+# The table is `name<TAB>shell line`. A tab, because every line here carries quotes and spaces. A
+# literal `\n` in the second field becomes a real newline, which is how the continuation rows inject
+# a two-physical-line command.
 A_MUT_ANCHOR='write_receipt || die'
 a_mutant_report() {
   local nm="$1"
@@ -188,7 +236,7 @@ import sys
 src, dst, injected, anchor = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 s = open(src).read()
 assert s.count(anchor) == 1, 'the write_receipt call site is not unique'
-open(dst, 'w').write(s.replace(anchor, injected + '\n' + anchor, 1))
+open(dst, 'w').write(s.replace(anchor, injected.replace('\\n', '\n') + '\n' + anchor, 1))
 PY
   receipt_write_report "$dst"
 }
@@ -214,6 +262,9 @@ cp-tmp	cp "\$RECEIPT_TMP" "\$RECEIPT"
 mv-tmp	mv "\$RECEIPT_TMP" "\$RECEIPT"
 install-tmp	install -m 644 "\$RECEIPT_TMP" "\$RECEIPT"
 python-open	python3 -c "open('\$RECEIPT','w')"
+mv-continued	mv "\$RECEIPT_TMP" \\\n   "\$RECEIPT"
+cp-continued	cp "\$RECEIPT_TMP" \\\n   "\$RECEIPT"
+redirect-continued	printf "" \\\n  > "\$RECEIPT"
 MUTANTS
 
 # ── A.3: the commit point moved OUT of write_receipt ────────────────────────
