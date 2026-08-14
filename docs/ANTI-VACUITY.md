@@ -32,9 +32,25 @@ A construct is an **anti-vacuity floor** if and only if all four hold.
 | **C4 — vacuity is its purpose** | The assertions it guards would **pass** over the empty subject. A bound that is itself the claim under test is not a floor: *"0 mobile terms found"*, *"0 dangling references"*, *"0 orphan rows"* are all **satisfied** by emptiness rather than defeated by it, and each needs a floor of its own. |
 
 **Scope.** Files that *execute* assertions: `tests/*.sh`, `tests/kinglet/**`, `scripts/*.sh`,
-`.claude/hooks/*.sh`, `install.sh`, `uninstall.sh`. (`tests/kinglet/**` holds no floor today; it is
-named because the scope written before counting named it, and a shipped scope that quietly drops a
-segment is how a segment stops being swept.) A Markdown file can never satisfy C3, so **this
+`.claude/hooks/*.sh`, `install.sh`, `uninstall.sh`.
+
+**Four of those six segments hold no floor today, and that is now established by criterion rather
+than assumed** — a shipped scope that quietly drops a segment is how a segment stops being swept, so
+each is stated:
+
+- `tests/kinglet/**` — none. Named because the scope written before counting named it.
+- `install.sh` and `uninstall.sh` — none. Every count they derive (`MOD_COUNT`, `RECLAIMED_COUNT`,
+  `UNREADABLE_COUNT`, `ORPHAN_COUNT`, `DRY_MOD`, …) reaches only `info` / `warn` / `printf` /
+  `note_not_done`, so **C3 fails**; and every numeric guard is `-gt 0`, which fires when the subject
+  is *non*-empty. That is the claim being reported, not a floor under it, so **C2 and C4 fail** too.
+  The only non-zero exits in either file are `die()`'s and one argument check.
+- `.claude/hooks/*.sh` — none, across all 13 files. The single non-zero exit in the segment is
+  `_lib.sh`'s `unity_hook_block` → `exit 2`, which is the block verdict, i.e. the claim under test,
+  **excluded by C4**. And a hook's subject is the JSON payload on stdin, not the tree, so **C1 fails
+  for every one of them.**
+
+`scripts/*.sh` holds exactly one, `scripts/check-provenance.sh`'s, tabled below. `tests/*.sh` holds
+the rest. A Markdown file can never satisfy C3, so **this
 document is outside the
 derivation's scope by construction** — not by an exclusion pattern. That matters: the standard remedy
 for a derivation that matches its own record is an exclusion, and an exclusion anchored `^\./`
@@ -462,17 +478,25 @@ unstated gets read as a guarantee:**
 
 ## The floor set
 
-The tables below carry **83 rows**, one per BOUND. Two of them are the same bound listed in two
-tables, so: **at least 81 distinct bounds** meet the criterion in the current tree. **This is a lower
-bound and is written as one deliberately** — the count has now been wrong twice in the same
-direction, and a third confident total would be the artifact repeating its own subject's defect.
+The tables below carry **83 rows**, one per BOUND. **Three of those rows restate a bound another row
+already carries**, so: **at least 80 distinct bounds** meet the criterion in the current tree. **This
+is a lower bound and is written as one deliberately** — the count has now been wrong three times, and
+a fourth confident total would be the artifact repeating its own subject's defect.
+
+The three restatements, each identified by reading the assertion rather than the wording:
+`test-bash32-compat.sh`'s and `test-no-mobile.sh`'s per-source census identities, each listed under
+*Converted* and again under *Identity floors*; and `DCE_VACUOUS`, listed under *Sites* and again
+inside the six-accumulator row under *Presence floors*. A fourth,
+`test-pipeline-detector.sh`'s empty-index arm, was listed under *Sites* **and** *Presence floors*
+until 2026-08-14 and is now one row.
 
 **That is a count of bounds, and not of assertion sites.** This line read *"at least 83 assertion
 sites"* until 2026-08-14: 83 is the row count, stated in the unit the *"one row per BOUND"* ruling
 below explicitly forbids — the section warning that rows are not sites opened by counting rows and
-calling them sites. Rows and sites diverge in **both** directions here (five rows
-are two `assert_eq` calls in `tests/test-no-mobile.sh`; one row is the six `_VACUOUS` accumulators),
-so no site total is written down. Deriving one means reading every row's assertion, which nobody has
+calling them sites. It then read *"at least 81 distinct bounds"* for one round, from a restatement
+set of two that was really four. Rows and sites diverge in **both** directions here (five rows are
+two `assert_eq` calls in `tests/test-no-mobile.sh`; one row is the six `_VACUOUS` accumulators), so
+no site total is written down. Deriving one means reading every row's assertion, which nobody has
 done.
 
 - The wave carried **~28**. A first derivation under C1–C4 gave **68**. A reviewer sweeping the same
@@ -484,7 +508,9 @@ done.
   swept** — the declared scope names `scripts/*.sh`, `install.sh`, `uninstall.sh` and
   `.claude/hooks/*.sh`, and the first table had zero rows from any of them.
   `scripts/check-provenance.sh` — the file the second gate of every task in this wave runs — carries
-  a floor, and it was missed.
+  a floor, and it was missed. **The other three have since been run through C1–C4 and hold none**;
+  the grounds are under *Scope* above. Zero rows from a segment now means *swept and empty*, and it
+  says which — for one round it meant neither, and a reader could not tell the two apart.
 - The ~28 was low for a different reason: a window scan with no written criterion, which had already
   lost 14 members to an `awk` `getline` window and looked complete.
 
@@ -503,13 +529,33 @@ table as a census of sites will **overcount** — and, in one row, undercount. T
 `test-no-mobile.sh` rows (four under *Converted*, one repeated under *Identity floors*) are **two**
 sites: one `assert_eq` on `SCAN_STATE`, one on the census identity. The four
 `test-bash32-compat.sh` census rows — three under *Converted*, one repeated under *Identity floors* —
-are three. **Those two are the only bounds stated twice, and a textual dedup will not find them** —
-they are worded differently in the two tables. Conversely the two `test-no-mobile.sh` rows that *do*
-share an anchor (*same assertion, array floor (F4)*) are not a repeat: one site, two different
-bounds, `SCAN_DIRS` and `PAYLOAD_DIRS`, which is the rule working as intended. Corrected from an earlier draft
-that got this exactly backwards: the four `test-bash-gate-precision.sh` rows are **four independent
-`assert_eq` calls, four sites.** And in the other direction, the `_VACUOUS` accumulators are
-**six** sites in **one** row — not five, and not one.
+are three. A third bound is restated across tables in different words: `DCE_VACUOUS` under *Sites*
+is one of the six accumulators under *Presence floors*, and is marked in its own row as cross-listed.
+Corrected from an earlier draft that got this exactly backwards: the four
+`test-bash-gate-precision.sh` rows are **four independent `assert_eq` calls, four sites.** And in the
+other direction, the `_VACUOUS` accumulators are **six** sites in **one** row — not five, and not
+one.
+
+**RUN THE DEDUP. It takes five seconds and it has already caught a duplicate this paragraph missed:**
+
+```bash
+awk '/^## The floor set/{f=1;next} /^## Proof/{f=0} f && /^\| `/{split($0,a,"|"); k=a[2]; gsub(/^ +| +$/,"",k); print k}' \
+  docs/ANTI-VACUITY.md | sed 's|`tests/|`|' | sort | uniq -d
+```
+
+**The `sed` is load-bearing.** The *Sites* table writes `tests/test-pipeline-detector.sh` while every
+other table writes the bare basename, and on the raw column that one inconsistency hid a bound listed
+in two tables under a **verbatim-identical** anchor — through three rounds and four reviews. Today
+the command returns **one** line, the `same assertion, array floor (F4)` pair, and that pair is
+**not** a repeat: one site, two different bounds (`SCAN_DIRS`, `PAYLOAD_DIRS`), the rule working as
+intended.
+
+What the dedup cannot see is a bound restated in *different words*, which is the other two.
+**That is a reason to run it and then read, not a reason to skip it** — and this paragraph said
+*"a textual dedup will not find them"* for exactly one round, which is advice to skip the only cheap
+check available, written in the sentence where running it would have found the duplicate the
+paragraph did not know it had. Do not accept a table's own account of its coverage as the coverage
+measurement; that rule is in this repository's ledger and it applies to this table.
 
 **Subject sizes are dated 2026-08-14, derived IN A CLEAN CLONE, and drift.** Two of them moved by one
 at `4578854`, the commit that shipped this file, because `docs/ANTI-VACUITY.md` is itself matched by
@@ -618,6 +664,7 @@ feature is that the first scan's C2 had no clause for them.**
 | `tests/test-help-ranges.sh` · *this file's entire input set comes from git, and it could not be read* | tracked `*.sh` | (f) + (a) | rc == 0, count > 0 |
 | `tests/test-pipeline-detector.sh` · *could not list tracked files under the roots* | the sweep's file list | (f) | `SWEEP_RC_NO_INDEX` |
 | `tests/test-pipeline-detector.sh` · *git tracks no files at all under the roots* | the same list, empty | (a) | `SWEEP_RC_EMPTY_INDEX` |
+| `tests/test-pipeline-detector.sh` · *the sweep for '$needle' exited N instead of searching* | the same sweep, broken rather than empty | **(f)** | `SWEEP_RC >= 2` — **added 2026-08-14; no row in any table before** |
 | `tests/test-install-dryrun.sh` · *withmcp: the real run kept no backup — oracle 1's subject is absent* | a run-produced backup file | **(g)** | present |
 | `tests/test-install-dryrun.sh` · *mcpthen: the backup is gone after the flagless run* | the same, second arm | **(g)** | present |
 | `tests/test-install-not-done.sh` · *B.0: a clean install printed the block* | the negative control | **(g)** | absent |
@@ -625,7 +672,7 @@ feature is that the first scan's C2 had no clause for them.**
 | `tests/test-install-ownership.sh` · *F: git does not track the manifest* | the fixture's git state | **(g)** | tracked |
 | `tests/test-install-ownership.sh` · *L: the fixture has no manifest* | the fixture | **(g)** | present |
 | `tests/test-install-ownership.sh` · *install 1 did not produce exactly one marker pair* | the thing the mutation damages | **(g)** + (a) | == 1 |
-| `tests/test-derived-counts.sh` · `DCE_VACUOUS` | ECU-survival phrasing, per quoting file | (a) | 3 files |
+| `tests/test-derived-counts.sh` · `DCE_VACUOUS` | ECU-survival phrasing, per quoting file | (a) | 3 files — **cross-listed**: one of the six `_VACUOUS` accumulators tabled under *Presence floors*. Kept in both because this table records what the first sweep missed and that one records the set; **counted once** |
 
 **And the residual this row set exposes**: `scripts/check-provenance.sh`'s `ENFORCED` counter — the
 number of `rule=absent` entries it enforces — has **no floor**. An unreadable or reshaped
@@ -648,8 +695,14 @@ was in the worked example's. Not fixed here; it is the second gate of every task
 | `test-provenance-origins.sh` · *carries exactly one 40-hex pin* | the ECU pin in `provenance.tsv` |
 | `test-stack-arbitration.sh` · *the generator still emits the block every surface now points at* | the heading in `scripts/generate-claude-md.sh` |
 | `test-surface-references.sh` · *every .md the absence check opened flattened to something* | per file |
-| `test-pipeline-detector.sh` · *git tracks no files at all under the roots* | the sweep's index |
 | `run-tests.sh` · *started a python suite that never printed an OK/FAILED outcome* | the suite's outcome line |
+
+`tests/test-pipeline-detector.sh` · *git tracks no files at all under the roots* **was a fourteenth
+row here and is deleted, not moved**: it is the same bound as the row of that name in *Sites the
+first derivation missed*, set by the one `[ ! -s "$SWEEP_LIST" ]` in the file. The Sites row is kept
+because it carries the mechanism clause and the sentinel name, and because that guard's other two
+arms live beside it — splitting one arm of a three-arm block into a different table is what made two
+rows look like two bounds for three rounds, and is why the third arm's absence went unnoticed.
 
 ---
 
