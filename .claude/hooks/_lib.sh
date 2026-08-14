@@ -142,27 +142,43 @@ unity_track_edit() {
 # This comment named TWO of them until 2026-08-14 — as a closed list, which is the direction that
 # rots unsafely: a reader takes "the dead ones are these" as the whole answer and stops looking.
 #
-#   unity_track_read        (here)  — only caller was track-reads.sh
-#   unity_was_read          (below) — only caller was gateguard.sh
-#   unity_project_hash      (above) — no reference anywhere in the tree, not even a document
-#   unity_state_read        (below) — named only by the hook reference, which is not installed
-#   unity_state_write       (below) — same
-#   unity_state_plan_update (below) — no reference anywhere in the tree, not even a document
+#   unity_track_read        (here)  — its caller was track-reads.sh
+#   unity_was_read          (below) — its caller was gateguard.sh
+#   unity_project_hash      (above) — no caller on record
+#   unity_state_read        (below) — no caller on record
+#   unity_state_write       (below) — no caller on record
+#   unity_state_plan_update (below) — no caller on record
+#
+# All six are NAMED by the hook reference, which is not installed, and called by nothing. Two of
+# these rows read "no reference anywhere in the tree, not even a document" until 2026-08-14, and
+# they were false FROM THE COMMIT THAT WROTE THEM: the same commit added both names to that
+# reference. The derivation printed below returns 1 for each — a claim of absence refuted by its own
+# check, in the list rewritten to stop a closed list rotting. Run the check; do not write the answer.
 #
 # Their callers were the hooks the surface criterion removed: track-reads.sh, gateguard.sh, the
 # instinct-* pair, pre-compact.sh, stop-validate.sh, quality-gate.sh. What is still LIVE is the
 # other four: unity_hook_block (every blocking hook), unity_track_edit (track-edits.sh),
-# unity_track_warning (bash-gate.sh, and it is the only caller), advisory_exit_guard (the warn
-# hooks) — plus the two leading-underscore helpers this file calls itself.
+# unity_track_warning (bash-gate.sh), advisory_exit_guard (session-save.sh) — each of those last
+# three has exactly ONE caller, and for advisory_exit_guard that is worth knowing, because the
+# header at its definition says to call it in every advisory hook and one hook does. Plus the two
+# leading-underscore helpers this file calls itself.
 #
 # DERIVE THE SET; DO NOT TRUST THIS LIST EITHER. The scope has to exclude this file, or the list
-# below matches itself and every dead function reads as referenced:
+# above matches itself and every dead function reads as referenced. It also has to exclude the dated
+# record trees, which discuss these names without calling them:
 #
 #   for f in $(grep -oE '^[a-z_]+\(\)' .claude/hooks/_lib.sh | tr -d '()'); do
 #     printf '%-24s %s\n' "$f" \
-#       "$(grep -rn --include='*.sh' --include='*.md' --include='*.tsv' -- "$f" . \
-#          | grep -vc '^\./\.claude/hooks/_lib\.sh:')"
+#       "$(grep -rn --include='*.sh' --include='*.md' --include='*.tsv' \
+#             --exclude-dir=.superpowers --exclude-dir=superpowers -- "$f" . \
+#          | grep -vc '\.claude/hooks/_lib\.sh:')"
 #   done
+#
+# DO NOT ANCHOR THAT EXCLUSION TO `^\./`. It was written that way until 2026-08-14 and matched
+# NOTHING under a grep front-end that prints paths without the `./` prefix, so the filter passed this
+# file's own three hits straight through and every count came out inflated by three. An exclusion
+# that excludes nothing cannot say so -- it reports a larger number, not an error. The form above was
+# run under both GNU grep and the interactive wrapper and made to agree before being written here.
 #
 # All six are retained because retiring them is a decision about this library's surface rather than
 # a side effect of the hook cut, and nothing forced it. UNITY_READS_FILE below is a separate case:

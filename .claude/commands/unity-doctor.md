@@ -100,11 +100,13 @@ prints the counts as `INFO`, which is not a verdict a reader can act on.
    `PreToolUse` or `PostToolUse` in `.claude/settings.json`. Unregistered → **WARNING** (that hook
    never fires).
 3. **Executable bit.** Every hook file should be `-x`. Missing → **WARNING**.
-4. **Placement.** A hook that can block a tool call belongs in `PreToolUse`; a hook that only warns
-   or records belongs in `PostToolUse`. **Classify by what the hook does with its exit status, not
-   by its filename** — `block-*.sh` and `warn-*.sh` are the only self-describing prefixes, and
-   `bash-gate.sh` and `guard-project-config.sh` (both blocking) and `track-edits.sh` (recording)
-   match neither. Misplaced → **WARNING**.
+4. **Placement.** This rule covers only the hooks registered on `PreToolUse` and `PostToolUse`. **A
+   hook registered on any other event — `SessionStart`, `Stop` — is correctly placed by definition;
+   do not report it.** Among the tool-event hooks: one that can block a tool call belongs in
+   `PreToolUse`; one that only warns or records belongs in `PostToolUse`. **Classify by what the
+   hook does with its exit status, not by its filename** — `block-*.sh` and `warn-*.sh` are the only
+   self-describing prefixes, and `bash-gate.sh` and `guard-project-config.sh` (both blocking) and
+   `track-edits.sh` (recording) match neither. Misplaced → **WARNING**.
 5. **Frontmatter.** Each file in `.claude/commands/` has `name` and `description`; each in
    `.claude/agents/` has `name`, `description`, `model` and `tools`. Invalid → **WARNING**.
 

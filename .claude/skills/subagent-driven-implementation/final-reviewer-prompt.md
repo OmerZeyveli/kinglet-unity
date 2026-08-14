@@ -53,10 +53,13 @@ artifact does.
 
      This bullet used to prescribe the digit-proximity form
      `grep -rniE '[0-9]+[^0-9]{0,40}NOUN|NOUN[^0-9]{0,40}[0-9]+'`, which does the opposite of the
-     sentence that introduces it. Measured on one branch of the toolkit this skill came from, with
-     `NOUN=hooks` over two documents: the digit form returned **10** lines where the plain noun search
-     returned **28**, and that branch's highest-value bare-numeral defect was among the 18 it
-     discarded — its count and its noun were split by a wrap. **This is the highest-cost shape of the
+     sentence that introduces it. Measured with `NOUN=hooks` over two documents of the toolkit this
+     skill came from, **at commit `b9f2711`**: the digit form returned **11** lines against the plain
+     search's **29** — it discards **18**, and that branch's highest-value bare-numeral defect was
+     among the 18, its count and its noun split by a line wrap. **The pair is pinned to a commit
+     because it moves.** Written first as 10/28, it was stale in the commit that wrote it: the same
+     commit edited one of the two documents it was measured over. The *discarded* count held at 18
+     across the whole range, and that is the figure the argument rests on. **This is the highest-cost shape of the
      four** — see below.
    - **Category words.** A list of kinds ("meta, code quality, workflow") that a removal emptied or
      shortened. A list survives the deletion of its last member without one word changing.

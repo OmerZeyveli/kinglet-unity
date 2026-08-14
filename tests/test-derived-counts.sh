@@ -29,10 +29,13 @@ DC_VERBATIM=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $6 == "verbatim"' "$REPO
 DC_MODIFIED=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $6 == "modified"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
 DC_ORIGINAL=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $6 == "original"' "$REPO_DIR/provenance.tsv" | grep -c . || true)
 
-# Rules and repo-level templates. Both are quoted as counts in README.md, and `.claude/rules/*` is
-# the one count `docs/ARCHITECTURE.md` still calls hand-maintained — correctly, until this line
-# existed. `templates/` is the repo-root C# scaffold directory, not `.claude/templates/`, which does
-# not exist; README.md says so in the same row it quotes the number.
+# Rules and repo-level templates. Both are quoted as counts in README.md. `docs/ARCHITECTURE.md`
+# called `.claude/rules/*` hand-maintained until 2026-08-14 — wrongly from the moment this line
+# existed, since the derivation and the sentence denying it landed in one commit. That file now says
+# the derivation exists and that no row below reads ITS copy of the count, which is the true residual:
+# the rules rows name README.md and docs/GETTING-STARTED.md only. `templates/` is the repo-root C#
+# scaffold directory, not `.claude/templates/`, which does not exist; README.md says so in the same
+# row it quotes the number.
 DCS_RULES=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -c . || true)
 DCS_TEMPLATES=$(ls -1 "$REPO_DIR"/templates/* 2>/dev/null | grep -c . || true)
 
