@@ -7,10 +7,12 @@
 
 ## RESUME HERE
 
-**Task 1 is merged and both gates are green on the branch.** `Total: 3412  Passed: 3409  Failed: 0
-Skipped: 3`, rc=0, **39** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **39**; `provenance
-OK`. Baseline regenerated outside a worktree at `--expect-drift 2`, as the carried obligation
-required. Next: Tasks 3 and 5.
+**Tasks 1, 3, 4 and 5 are merged and both gates are green on the branch.** `Total: 3458  Passed:
+3455  Failed: 0  Skipped: 3`, rc=0, **39** ANSI-stripped headers == `ls tests/test-*.sh | wc -l`
+**39**; `provenance OK`. Baseline regenerated outside a worktree twice, at `--expect-drift 2` each
+time (Task 1, then Task 4); Tasks 3 and 5 changed no `.claude/` file and contribute no drift.
+
+**The cut is complete. Next: Endless Evolution, with Tasks 2, 6, 7 and 8 running alongside it.**
 
 **A merge-time trap worth the line.** Regenerating the baseline and running the suite *before
 committing it* produced **18 failures**, none of them real: `tools/kinglet_spike/inventory.py`
@@ -26,7 +28,7 @@ who ever runs the suite with a dirty `migration/` and is therefore the only one 
 | 2 — execution-keyed hook coverage | open *(brief pending — consumes Task 1's output)* | |
 | 3 — anchor the unanchored pathspecs | **DONE**, merged `3cc8aa8` | `4e299b6..ef8a7ab` |
 | 4 — the doctor's two remaining compensations | **DONE**, merged `22c232e` | `4e299b6..f868677` |
-| 5 — anti-vacuity floors, written | open | |
+| 5 — anti-vacuity floors, written | **DONE**, merged `1b948c6` | `4e299b6..34880d0` |
 | 6 — a heading inventory for `docs/` | open *(brief pending — cites Task 5)* | |
 | 7 — the claims with no owner | open *(brief pending — cites Task 5)* | |
 | 8 — record what a second reader can reproduce | open | |
@@ -182,6 +184,49 @@ Print the non-silent byte count beside every zero.
   ledger from a description rather than from a measurement, told a later task to cite it as its worked
   example, and it took two agents reporting contradictory verdicts to surface it. **A ledger entry is
   a claim with the same shelf life as any other, and this file is read as if it were not.**
+
+## Task 5 — adjudicated at the cap, merged, and the standing risk it leaves
+
+**Five fix rounds, the cap. Rounds 1–3 resumed the original implementer; rounds 4–5 went to fresh
+eyes**, because three consecutive rounds produced **the same class of finding — wrong figures in this
+document's tables** — which is exactly the condition the loop names for switching.
+
+**The switch paid for itself immediately.** The fresh implementer found the fifth instance of the
+house defect that **four reviews had missed**: the floor set's head said *"at least 83 assertion
+**sites**"*, and 83 is the tables' **row** count, in the section that rules one row per **bound** and
+warns that reading it as a census of sites will overcount. It also reported an unsettled scope
+question rather than editing around it.
+
+**The last blocker is the one worth remembering.** Round 4 wrote: *"Those two are the only bounds
+stated twice, and a textual dedup will not find them — they are worded differently in the two
+tables."* **False in both clauses** — there were four, and an exact-string dedup finds one of the two
+it missed. **The sentence told a maintainer that the cheapest available check does not work here, and
+that check is what catches the instance the sentence missed.**
+
+And round 5 found why it survived three rounds: the *Sites* table writes `tests/test-…` on 14 of 16
+rows while every other table writes the bare basename, so the raw dedup returns **one** collision and
+the second appears only after normalising the prefix. **The duplicate was verbatim-identical and
+invisible to the obvious check because of a formatting inconsistency nobody had reason to look at.**
+
+### The standing risk, named rather than closed
+
+**Nothing in the tree reads a number in this document.** Proven by falsifying four headline figures at
+once — `83 rows`→`999`, `81`→`4242`, the S2S subject `6`→`11`, Shape 1's `62`→`60` — and running the
+nine guards that could plausibly read it: **all nine fully green.** Three files cite it, all in
+comments. **A wrong figure here ships silently, which is why it shipped four times.** The dedup
+command the document now carries is its only mechanical check, **and it is one a human has to choose
+to run.** → the follow-up that gives `docs/` a guard (Task 6).
+
+### Settled by criterion, not by needle
+
+`install.sh`, `uninstall.sh` and `.claude/hooks/*.sh` hold **zero floors**, established by running
+C1–C4 over all three rather than by one grep: install's fourteen count derivations reach only
+`info`/`warn`/`printf` (**C3 fails**) and every numeric guard is `-gt 0`, which fires when the subject
+is **non**-empty — that is the claim, not a floor (**C2/C4 fail**); the only non-zero exit in the whole
+hook segment is `unity_hook_block`'s `exit 2`, the claim under test (**C4**), and hooks derive from the
+stdin payload, not the tree (**C1**). For one round the document said *"holds no floor today"* only for
+`tests/kinglet/**`, so zero rows from a segment meant **either** swept-and-empty **or** never-swept and
+a reader could not tell which. It now says which.
 
 ## Task 3 — deferred
 
