@@ -598,8 +598,8 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 | Guard · assertion anchor | The two derivations | Today |
 |---|---|---|
 | `test-hook-behaviour.sh` · *settings.json registers every hook file present in .claude/hooks* | `.claude/hooks/*.sh` less `_lib.sh` **vs** distinct commands in `settings.json` | 12 == 12 |
-| `run-tests.sh` · *Test discovery is inconsistent* | the `test-*.sh` glob **vs** `find -type f -name 'test-*.sh'` | 39 == 39 |
-| `run-tests.sh` · *ran N test files but M match* | files actually executed **vs** files discovered | 39 == 39 |
+| `run-tests.sh` · *Test discovery is inconsistent* | the `test-*.sh` glob **vs** `find -type f -name 'test-*.sh'` | 40 == 40 |
+| `run-tests.sh` · *ran N test files but M match* | files actually executed **vs** files discovered | 40 == 40 |
 | `test-bash32-compat.sh` · per-source census | census rows **vs** four array lengths | 9 == 9 |
 | `test-no-mobile.sh` · per-source census | census rows written **vs** sources the derivation produced | 11 == 11 |
 
@@ -643,7 +643,7 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 | `test-install-ownership.sh` · *K: install 1's CLAUDE.md.generated carries the FILL: markers* | `FILL:` markers | > 0 | **9** | 11 % | no |
 | `test-install-ownership.sh` · *L: the run wrote N file(s) under .claude/* | files installed before the stop | > 0 | 67 | **1.5 %** | yes |
 | `test-install-dryrun.sh` · *dirty: the foreign .claude/ holds N user file(s)* | fixture files | ≥ 2 | 2 | 100 % | no |
-| `run-tests.sh` · *No test files found* | discovered test files | ≥ 1 | 39 | **2.6 %** | yes |
+| `run-tests.sh` · *No test files found* | discovered test files | ≥ 1 | 40 | **2.5 %** | yes |
 | `run-tests.sh` · *ran a python suite that discovered 0 tests* | python results | > 0 | 1444 | **0.07 %** | yes |
 | `test-derived-counts.sh` · *the surface counts are derived from a tree that actually has surfaces* | agents / commands / skills | ≥ 1 **each** | 8/9/16 | 13 % / 11 % / 6 % | per source — no |
 | `test-derived-counts.sh` · *the hook and script counts are derived from a tree that actually has hooks and scripts* | hooks / registrations / scripts / skipped | ≥ 1 / ≥ 1 / ≥ 1 / == 1 | 12/12/7/1 | 8 % / 8 % / 14 % / 100 % | per source — no |

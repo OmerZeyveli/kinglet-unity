@@ -81,8 +81,12 @@ prose that is not there.
      Unity records that in `ProjectSettings/GraphicsSettings.asset`, which nothing in this toolkit
      reads.
    - It needs no MCP bridge; it reads files. Run it even if Unity is closed. If the bridge *is* up,
-     MCP `project_info` is a useful cross-check on the Unity version — but the generated block is
-     what the rest of the toolkit reads, so the generator's answer is the one that ships.
+     the MCP **resource** `mcpforunity://project/info` is a useful cross-check on the Unity version
+     — **read it as a resource, at that exact URI.** `project_info` is not a tool: calling it
+     answers `Unknown tool: 'project_info'` (measured 2026-08-14 against
+     `mcp-for-unity-server 3.4.5`), and the server's instructions state that resource names and URIs
+     are not interchangeable. But the generated block is what the rest of the toolkit reads, so the
+     generator's answer is the one that ships.
 
 2. **Place the output. Which branch you take depends on what `CLAUDE.md` is right now.**
 

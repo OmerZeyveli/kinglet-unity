@@ -53,13 +53,48 @@ After writing scripts, creating objects, or modifying components, always check t
 
 The console is your feedback loop. Don't assume operations succeeded.
 
+### The failure that looks like a success — read the body, not the error flag
+
+**A call naming an action the tool does not have is not reported as an error.** Measured
+2026-08-14 against `mcp-for-unity-server 3.4.5` on Unity 6000.0.68f1:
+
+```
+manage_profiler action:"start_session"    # NOT A REAL ACTION — demonstration of the failure shape
+  → MCP layer:  isError: false          ← the call "succeeded"
+  → body:       {"success": false, "message": "Unknown action ..."}
+```
+
+So a caller that branches on the tool-call error flag — which is the natural thing to do, and what a
+model does by default — sees a clean call, records a profile it never took, and reasons from
+nothing. Nothing appears in `read_console` either: the action never ran, so it logged no error.
+
+This is the shape that hid four dead action names inside `unity-optimizer`'s profiling recipe from
+the day it was written until the day someone executed them. **After any tool call, read `success` in
+the body.** `isError` tells you the transport worked; `success` tells you the operation did. A
+misspelled action, a wrong enum value, and a genuinely unsupported operation all arrive this way.
+
+Two corollaries worth stating separately, because they are what makes the shape survive:
+
+- **A wrong action name is indistinguishable from an unactivated tool group by feel, and not by
+  message.** An inactive tool fails as *unknown tool* (Rule 4); a bad action succeeds at the MCP
+  layer and fails in the body. Different diagnoses, different fixes.
+- **Do not invent action names from the tool's name.** `get_rendering_stats` and `memory_snapshot`
+  are both plausible and both nonexistent; the real ones are `stats_get` and `memory_take_snapshot`.
+  When unsure, ask the live server rather than your memory of it.
+
 ## Rule 3: project_info Before Assumptions
 
 Before making decisions about the project, read its state:
 
 ```
-project_info resource → Unity version, platform, render pipeline
+resources/read mcpforunity://project/info
+  → projectRoot, projectName, unityVersion, platform, assetsPath
 ```
+
+**`project_info` is a resource, not a tool.** `tools/call project_info` answers
+`Unknown tool: 'project_info'` — measured 2026-08-14 on server 3.4.5. Resource names and URIs are
+not interchangeable, and the server's own instructions warn that guessing a URI by swapping
+separators 404s, so read the URI above verbatim rather than deriving one from a name.
 
 Don't assume:
 - The project uses URP (might be Built-in or HDRP)
@@ -77,8 +112,15 @@ activate the group first:
 manage_tools(action="activate", group="vfx")     # then manage_shader / manage_vfx exist
 ```
 
-Verified against MCP for Unity 10.1.0 (server 3.4.4): 29 tools before activation, 42 after.
-`mcpforunity://tool-groups` reports the live mapping.
+Verified against MCP for Unity 10.1.0 (server 3.4.5) on 2026-08-14, by executing against a live
+bridge: all ten groups below, every `Default` value, every membership, and `default_enabled =
+['core']`. One row had drifted since the previous check and is corrected — `asset_gen` ships five
+tools, not four.
+
+**The two tool counts are dated, not current.** *29 before activation, 42 after* was measured on
+server 3.4.4; the 3.4.5 host exposed **48** tools with every group active. Treat both as a record of
+a day rather than as this server's numbers, and re-derive: `mcpforunity://tool-groups` reports the
+live mapping, and it is the answer that wins over this table.
 
 | Group | Default | Tools |
 |-------|---------|-------|
@@ -91,7 +133,7 @@ Verified against MCP for Unity 10.1.0 (server 3.4.4): 29 tools before activation
 | `scripting_ext` | off | `manage_scriptable_object`, `execute_code` |
 | `docs` | off | `unity_reflect`, `unity_docs` |
 | `probuilder` | off | `manage_probuilder` |
-| `asset_gen` | off | `generate_image`, `generate_model`, `generate_audio`, `import_model` |
+| `asset_gen` | off | `generate_image`, `generate_model`, `generate_audio`, `import_model`, `import_model_file` |
 
 ## Rule 5: Tool Selection Guide
 

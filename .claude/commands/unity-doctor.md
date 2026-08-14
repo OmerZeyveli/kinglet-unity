@@ -10,9 +10,18 @@ Run a comprehensive diagnostic check on the everything-claude-unity installation
 
 ## Check 1: Unity MCP Server Connectivity
 
-1. Attempt to call `project_info` via MCP to get Unity version and project state.
-2. If it succeeds: report Unity version, platform, and play mode state → **PASS**
-3. If it fails: report the error → **ERROR** with suggestions:
+1. **Read the MCP resource `mcpforunity://project/info`.** Use that URI verbatim.
+
+   `project_info` is a **resource, not a tool.** Measured 2026-08-14 against
+   `mcp-for-unity-server 3.4.5`: `tools/call project_info` answers
+   `Unknown tool: 'project_info'`, while reading the URI above returns `projectRoot`,
+   `projectName`, `unityVersion`, `platform` and `assetsPath`. The server's own instructions say
+   resource names and URIs are not interchangeable, and that guessing a URI by swapping separators
+   404s — so do not derive one from the name. In Claude Code, reach it by listing the server's
+   resources and reading that URI, not by calling a tool.
+2. If it reads: report the Unity version, platform, and play mode state → **PASS**
+3. **If the bridge is genuinely unreachable** — the server does not answer, or the resource read
+   itself errors — report the error → **ERROR** with suggestions:
    - Is the unity-mcp package installed in Unity?
    - Is the Unity Editor running and the project open?
    - Is the MCP server running on the expected port?

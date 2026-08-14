@@ -41,12 +41,21 @@ loading too many.
 
 ### Step 1: Capture Profile Data
 ```
-manage_profiler action:"start_session" → begin profiling
+manage_profiler action:"profiler_start" → begin profiling
 manage_profiler action:"get_frame_timing" → CPU/GPU frame times
 manage_profiler action:"get_counters" → specific performance counters
-manage_profiler action:"memory_snapshot" → detailed memory breakdown
-manage_graphics action:"get_rendering_stats" → draw calls, batches, triangles, set passes
+manage_profiler action:"memory_take_snapshot" → detailed memory breakdown — REQUIRES the com.unity.memoryprofiler package; read Packages/manifest.json first and skip this line if it is absent
+manage_graphics action:"stats_get" → draw calls, batches, triangles, set passes
 ```
+
+**Every one of those names was executed against a live bridge** (`mcp-for-unity-server 3.4.5`, Unity
+6000.0.68f1, 2026-08-14). Three of them used to be `start_session`, `memory_snapshot` and
+`get_rendering_stats`, and **none of those three exists** — they had sat here since the agent was
+written, in the agent's own first action. What let them survive is the shape of the failure: an
+unknown action comes back `isError: false` with `"success": false` in the body, so a caller that
+branches on the tool-call error flag reads a dead call as a successful one and profiles nothing. Read
+the body, not the flag — `unity-mcp-patterns` Rule 2. If you need an action not listed here, get it
+from `manage_profiler action:"ping"` or the live tool schema rather than from memory.
 
 ### Step 2: Identify Bottleneck Type
 
@@ -87,7 +96,7 @@ whole-project sweep. Narrow to the files the profiler named, then Grep for:
 
 Apply fixes, then re-profile to confirm improvement:
 ```
-manage_profiler action:"start_session" → new profile after fix
+manage_profiler action:"profiler_start" → new profile after fix
 manage_profiler action:"get_frame_timing" → compare before/after
 ```
 
