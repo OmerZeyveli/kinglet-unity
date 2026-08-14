@@ -149,10 +149,39 @@ Print the non-silent byte count beside every zero.
 - **Coverage is execution-keyed, and it is proven so.** Renaming only the `case` label — leaving the
   hook's name in the file three times — dropped the probed count to 11. A name-keyed sweep would have
   reported full coverage.
-- **The anti-vacuity floor here has no ratio, and that is the point.** It is an identity between two
-  independently derived tree quantities — `.claude/hooks/*.sh` less `_lib.sh` versus distinct
-  commands in `settings.json`, currently 12 == 12. A 100 % floor that moves with the tree cannot go
-  stale and cannot have been sized by feel. **Task 5 should cite this as its worked example.**
+- **The anti-vacuity floor here has no ratio, and that is the point.** It is an identity between
+  `.claude/hooks/*.sh` less `_lib.sh` and the distinct commands in `settings.json`, currently
+  12 == 12. A 100 % floor that moves with the tree cannot go stale and cannot have been sized by feel.
+
+  **CORRECTION, 2026-08-14 — this entry originally read "two *independently* derived tree quantities"
+  and that word is false.** Settled by execution during Task 5's second re-review, after the
+  implementer and its first reviewer reported **opposite verdicts for what looked like the same
+  state**. Both were right; the discriminator is `settings.json`, not the hooks directory:
+
+  | state | verdict | file |
+  |---|---|---|
+  | `.claude/hooks` **deleted**, `settings.json` intact | `FAIL … (0 present)` | 25 / 61 |
+  | `.claude/hooks` **emptied**, `settings.json` intact | `FAIL … (0 present)` | 25 / 61 |
+  | `find .claude -type f -delete` — `settings.json` gone too | **`PASS … (0 present)`** | **2 / 0** |
+
+  `PRESENT_COUNT` is 0 in all three; `REGISTERED_COUNT` is 12 while the file exists and **0 once it is
+  deleted**, so the identity is `0 == 12` (red) twice and `0 == 0` (green) once. **The two sides die
+  together when the payload as a whole goes, and the file falls from 86 assertions to 2 while
+  reporting green.**
+
+  **What survives:** the floor is not stale, was not sized by feel, and catches every failure it was
+  written for — deleted, emptied and mis-registered hooks all red it. **What does not:** the word
+  *independently*, and with it the claim that this is the unqualified worked example. It is an example
+  of an identity **and of Shape 3 (oracle collapse)** — the shape Task 5 discovered and named because
+  of this. `docs/ANTI-VACUITY.md`'s F2 rules the repair — *an identity needs an absolute floor on one
+  side* — and **that repair is not applied to `tests/test-hook-behaviour.sh`, nor is the file listed
+  under what the document does not close.** → **Task 2**, which already owns that file's coverage
+  derivation.
+
+  **The lesson is the controller's, not Task 1's.** I wrote a property — *independence* — into the
+  ledger from a description rather than from a measurement, told a later task to cite it as its worked
+  example, and it took two agents reporting contradictory verdicts to surface it. **A ledger entry is
+  a claim with the same shelf life as any other, and this file is read as if it were not.**
 
 ## Inherited state, measured at the base commit
 
