@@ -467,7 +467,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 5 | A run that abandons work says so, and something asserts it | **done, merged** | `75ea1de`…`0755d2a` | **R3**: contract goes in `MCP-SETUP.md`. **R11**: exit code stays 0; ≥10 sites, not 4 |
 | 6 | A reverted file stops being sticky | open | — | **R10**: shape (iii), `--toolkit-dir`. Shape (ii) silently breaks three origin readers |
 | **Stage 3 — the generated block** | | | | |
-| 7 | `/unity-init` names the generator, markers become a contract | open | — | Sixteen surfaces rest on that region. **R7** if it lands second |
+| 7 | `/unity-init` names the generator, markers become a contract | **done, merged** | `05d9cfe`…`f804913` | Sixteen surfaces rest on that region. **R7** if it lands second |
 | 8 | `/unity-ui` and `/unity-scene` stop reading as entry points | open | — | A HARD-GATE bypass, not a tidiness fix |
 | 9 | The Ambiguity Score says what it does not know | **done, merged** | `5b636d3`…`d038ca9` | Must be a **new** heading; six sections are frozen. **The score has no code path at all** — Step 1 may not be executable |
 | **Stage 4 — guards, claims, and the loop** | | | | |
@@ -1138,6 +1138,45 @@ ADDRESSED, none returned to the fix loop.**
     row, not corrected prose"* and assigns it to whichever of Tasks 3 and 7 lands second. **Obeying
     R4's file ownership strictly would have required violating R7's explicit instruction.** No
     concurrent writer existed (`task-11` worktree confirmed absent) and the change is additive.
+
+**From Task 7's closing re-review (2026-08-14). COMPLETE at `f804913`, merged.**
+
+94. **The controller relayed a Minor that made a guard worse, and this is the record of it.** Round
+    0's review noted the reference floor in `tests/test-shipped-citations.sh` had been left at 4
+    while the live count rose 7 → 9; the controller relayed *"raise it"*; the implementer raised it
+    to **8**. Measured in round 1: the raise **buys no detection** — a broken token expression yields
+    **0** and trips any floor — while **creating a false-positive path.** The 9 references cover only
+    **6 distinct scripts** (three files name one twice); dropping the two *duplicate* mentions leaves
+    **6 of 6 scripts still named** and the floor reds with
+    `expected at least 8; either the wiring has been removed or the token expression has stopped
+    matching` — **neither disjunct true.** The reverse-direction arm, which actually owns wiring
+    loss, stays green, and it reddens on its own when a script really is unwired. **And the retained
+    sentence "the floor is set well below that" is now false in the same block that was edited.**
+    Suggested value **6** — above half the tree, below the duplicate-consolidation cliff — or
+    reconcile the sentence. **Nothing fails today. → whoever next opens that file.**
+    *The lesson is the controller's: a Minor relayed without its measurement is a change made on
+    someone else's confidence.*
+95. **The `.claude/scripts/` precondition sits in step 2 while the rc=127 happens in step 1.** The
+    bullet back-references step 1 explicitly, so a model reading on finds the explanation — but the
+    guidance is not at the first point of failure. **And step 4's report contract was not extended to
+    carry the package-gap item**, so Important 2's escape hangs entirely on step 1's own sentence and
+    the two places disagree about what the report contains. **→ whoever next opens that command.**
+96. **The citation form was forced by a guard, not chosen for style — and the reviewer proved it
+    rather than reading it.** `docs/GETTING-STARTED.md` is named in prose because backticking it
+    reds rule 2 (`FAIL: 1 shipped citation(s) name a file install.sh does not copy`), **the same
+    guard that caught this task's `install.sh` citations in round 0.** *Recorded because a future
+    reader will otherwise "tidy" the prose reference into a path.*
+97. **`ProjectSettings/GraphicsSettings.asset` is a pre-existing token that resolves in a real Unity
+    project but not in the fixture** — inherited, not this task's. **→ open.**
+
+**Two Task 7 sentences are keyed to Task 4b and must be told to it:**
+
+- *"One known disagreement, and it is the installer's, not the generator's"* — **the whole paragraph
+  is deletable the moment 4b removes the `print ""` from the `/kinglet:generated:end/` arm.** Until
+  then it is **the only place the delta is written down**, and nothing in the suite reddens on it.
+- *"on every run that finds a well-formed one"* — **the qualifier can revert to the unconditional
+  form once 4b makes the installer decline a malformed pair**, since the guarantee will then hold for
+  every run that merges anything.
 
 **Inherited from earlier waves, still open:**
 
