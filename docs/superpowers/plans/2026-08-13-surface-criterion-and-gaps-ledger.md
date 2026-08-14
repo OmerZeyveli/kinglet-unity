@@ -83,6 +83,38 @@ could be 8, and neither is authority.
 8. **Make this loop refuse a deferral routed to a role rather than a named task.**
 9. Record the fresh-clone gate figures, or make the spike skips loud.
 
+### Routed to the ledger by the correction pass's re-review — not blocking the merge
+
+203. **The `drops N of the M` guard protects the digit, not the sentence.** Mutating
+     `docs/HOOK-REFERENCE.md`'s `drops 8 of the 12` to `drops 3 of the 12` reds
+     `tests/test-derived-counts.sh` at 31/32 — so the correction pass's claim *"the number is now
+     checked"* is **true**. But reverting that sentence to its **exact pre-fix prose form** — *"drops
+     the four warning and session hooks that declare `standard`"*, spelled out, no digits — stays
+     **fully green**, because a sibling `drops 8 of the 12` at `:45` in the same file satisfies the
+     per-file vacuity check on its own. **The defect this branch fixed can be reintroduced verbatim
+     without reddening anything.** → the follow-up that writes the anti-vacuity floor rule (5).
+
+204. **`unity-doctor.md` Check 3 **item 2** tells the reader to confirm every hook appears in
+     `PreToolUse` or `PostToolUse`. Three do not** — `session-save.sh` is on `Stop`,
+     `session-restore.sh` and `session-brief.sh` on `SessionStart`. Pre-existing, not introduced by
+     the correction pass, and the same shape as the item-4 defect the pass is fixing this round.
+     **A literal operator emits three spurious WARNINGs on a healthy install, from a shipped payload
+     command.** → the `studio-doctor` follow-up (7), which retires these compensations anyway.
+
+205. **`tests/test-shipped-citations.sh` says its fifteen was derived by "applying the same
+     criterion", and it was not.** An independent re-derivation over the 23 non-Markdown payload
+     entries returns **13** — `.claude/hooks/` 6 (identical) and `.claude/scripts/` **7**, not 9. The
+     two-row gap is exactly the tokens rule 2's own code resolves and declines to flag
+     (`case "$t" in scripts/*) p=".claude/$t"`). **Both numbers are right under their own rule; the
+     comment names neither.** Say which resolution rule the figure was derived under. → the payload-
+     citation pass (with 202).
+
+206. **§2.7's residual is still live and still false, and it now sits four lines below a freshly
+     re-measured table.** `tests/test-hooks.sh` states *"TWO HOOKS ARE NAMED BY NO TEST FILE AT ALL"*
+     and prints a recipe that returns **nothing** at HEAD — confirmed by running it. The correction
+     pass correctly left it (it needs an execution-keyed replacement, not a prose edit), but proximity
+     to a correct measurement lends it borrowed credibility. **Raise follow-up 3's priority.**
+
 ### The house defect, named
 
 **Nine instances this wave of a probe whose own text satisfies the condition it tests.** It is no
