@@ -412,12 +412,16 @@ while IFS= read -r dead_f; do
   # rather than a code change. All 7 real introducers under the scanned globs use a LITERAL or QUOTED
   # delimiter, exactly one per line:
   #
-  #   scripts/detect-missing-refs.sh:29        cat <<EOF
-  #   scripts/generate-claude-md.sh:137        $(cat <<'PKGS'
-  #   scripts/generate-claude-md.sh:321        cat <<MDEOF
-  #   scripts/generate-claude-md.sh:519,553    cat <<'MDEOF'
-  #   scripts/validate-asmdefs.sh:31           cat <<EOF
-  #   scripts/validate-serialization.sh:30     cat <<EOF
+  #   scripts/detect-missing-refs.sh:30        cat <<EOF
+  #   scripts/generate-claude-md.sh:150        $(cat <<'PKGS'
+  #   scripts/generate-claude-md.sh:366        cat <<MDEOF
+  #   scripts/generate-claude-md.sh:564,598    cat <<'MDEOF'
+  #   scripts/validate-asmdefs.sh:32           cat <<EOF
+  #   scripts/validate-serialization.sh:31     cat <<EOF
+  #
+  # Every number in that table was one to thirteen lines low until 2026-08-14: the six shipped
+  # scripts gained `--help` blocks and each introducer moved. The delimiters are the anchor and the
+  # numbers are the convenience, which is the order to read them in.
   #
   # Re-derive rather than trusting that list — it is the same class of claim this wave exists to
   # guard, and nothing asserts it:
@@ -488,8 +492,17 @@ done <<< "$dead_scan"
 # reach for that `case` first, and a request is not a guard.
 #
 # The scripts/ floor moved from 8 to 5 on 2026-08-13. `scripts/` held 12 tracked files when the floor
-# was written and holds 7 now, because the surface criterion was applied to it and removed 5 by a
-# decision recorded in provenance-skip.tsv and enforced path by path by scripts/check-provenance.sh.
+# was written and holds 8 now: the surface criterion removed 5 in one commit and round 2 restored one
+# of them (scripts/detect-missing-refs.sh), leaving 4 recorded `rule=absent` in provenance-skip.tsv
+# and enforced path by path by scripts/check-provenance.sh.
+#
+# THAT SENTENCE READ "holds 7 now ... removed 5" UNTIL 2026-08-14, and both numbers were falsified by
+# this same wave's own round 2 — a lowered coverage floor defended by an arithmetic that no longer
+# held, in the file whose subject is guards that stopped reading their subject. This file's own
+# runtime output contradicted it on every run (`8 scripts`). Derive both, never transcribe:
+#
+#   git ls-files 'scripts/*' | wc -l
+#   awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $3 == "absent" && $1 ~ /^scripts\//' provenance-skip.tsv | wc -l
 # Lowering a coverage floor is normally the exact move that hides a broken pathspec, so: the tree
 # shrank by a cut a second guard polices, not by a glob that stopped matching, and the sentinel
 # below — which no count can substitute for — is unchanged and still read.

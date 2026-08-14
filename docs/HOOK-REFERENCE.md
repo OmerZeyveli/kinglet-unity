@@ -6,7 +6,7 @@ Complete catalog of hooks in Kinglet Pioneer.
 
 ## Overview
 
-Kinglet Pioneer includes 12 hooks that provide safety enforcement, quality warnings and session management. Hooks are bash scripts in `.claude/hooks/` configured in `.claude/settings.json`. Every hook sources a shared library (`_lib.sh`) that provides kill switches, profile filtering, state paths, and utility functions — **except `session-brief.sh`**, which sources nothing and therefore honours no kill switch.
+Kinglet Pioneer includes 12 hooks that provide safety enforcement, quality warnings and session management. Hooks are bash scripts in `.claude/hooks/` configured in `.claude/settings.json`. 11 of the 12 hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, state paths, and utility functions. **`session-brief.sh` sources nothing** — it runs at `SessionStart`, where a library failure is a session that does not start — and carries `DISABLE_UNITY_HOOKS` and `DISABLE_HOOK_SESSION_BRIEF` inline instead. Until 2026-08-14 it carried neither, and was the one hook the kill switch did not reach.
 
 `_lib.sh` is that shared library and not itself a hook, which is why the count is one less than the number of `.sh` files in the directory. Derive it rather than trusting this sentence:
 
@@ -202,7 +202,7 @@ These hooks run after every Edit or Write tool invocation. They warn but do not 
 - **File:** `session-restore.sh`
 - **Profile:** standard
 - **Type:** Advisory (exit 0)
-- **What it does:** Restores prior session state on conversation start. Loads branch context, previously modified files, workflow phase, plan steps, and last agent so the agent can resume where it left off. Clears stale tracking files from previous sessions. Respects a configurable TTL for session expiry.
+- **What it does:** Restores prior session state on conversation start. **What it actually prints today:** branch context and previously modified files. It also reads `workflow_phase`, `plan.description`, `plan.steps`, `verification.last_iteration` and `agent_context.last_agent`, and each print is guarded on the value being non-empty — so with `session-save.sh` emitting those five empty (see its entry above), none of those lines is ever printed. Clears stale tracking files from previous sessions. Respects a configurable TTL for session expiry.
 - **Environment variables:** `UNITY_SESSION_TTL_HOURS` (default: 4) -- sessions older than this are discarded
 
 #### session-brief
@@ -225,7 +225,7 @@ These hooks run when the agent stops (conversation ends or user exits).
 - **File:** `session-save.sh`
 - **Profile:** standard
 - **Type:** Advisory (exit 0)
-- **What it does:** Saves session state when the agent stops so subsequent conversations can resume context. Captures branch, modified files, workflow phase, plan state, verification state, duration, tool call count, and warning count.
+- **What it does:** Saves session state when the agent stops so subsequent conversations can resume context. **What it actually captures today:** branch, modified files (from `track-edits.sh`), recent commits, session duration, warning count, and a `saved_at` timestamp. It also emits `workflow_phase`, `tool_calls`, `plan`, `verification` and `agent_context` — and **all five are permanently empty**, because nothing writes the files they read. `workflow_phase` lost its only writer (`pre-compact.sh`) in the 2026-08-13 cut; `tool_calls` reads `session-cost.jsonl`, whose writer (`cost-tracker.sh`) declared `strict` and therefore never ran even before the cut; `plan`, `verification` and `agent_context` had no writer at any point in this toolkit's history. The schema keeps them so a future writer needs no consumer change; the reader should expect `""`, `0` and `{}`.
 - **Environment variables:** Reads `UNITY_EDITS_FILE`, `UNITY_COST_FILE`, `UNITY_WARNINGS_FILE`. Writes `UNITY_SESSION_FILE`
 
 ## Summary Table
@@ -249,7 +249,11 @@ These hooks run when the agent stops (conversation ends or user exits).
 
 ## Shared Library: _lib.sh
 
-All hooks source `.claude/hooks/_lib.sh` after setting `HOOK_PROFILE_LEVEL`. The library provides:
+11 of the 12 hooks source `.claude/hooks/_lib.sh` after setting `HOOK_PROFILE_LEVEL`;
+`session-brief.sh` is the exception described in the Overview. Which hooks source it is derived and
+asserted by `tests/test-derived-counts.sh`, in both directions, so this sentence cannot go stale
+silently the way it did between 2026-08-13 and 2026-08-14 — the Overview above was corrected and this
+one was not, in the same file. The library provides:
 
 - **Profile filtering** -- compares the hook's declared level against the active profile and exits silently if the hook should not run
 - **Kill switch checks** -- `DISABLE_UNITY_HOOKS` and per-hook `DISABLE_HOOK_<NAME>`

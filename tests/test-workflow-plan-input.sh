@@ -137,9 +137,17 @@ assert_has "$ADOPT" "Hard stop" "an unreadable named plan is a hard stop"
 # blah whatever" stayed green, and deleting the two lines that name the two branches
 # stayed green. The skill tells the planner this text is fixed and guarded; that claim
 # has to be true.
+#
+# Updated 2026-08-14. The old text labelled `subagent-driven-implementation` "(recommended)"
+# unconditionally, while `unity-execution` and `subagent-driven-implementation` both carried the same
+# threshold verbatim in their own descriptions — three surfaces, two answers, and this frozen string
+# is what held the odd one in place. The threshold sentence is now the same in all three.
 HANDOFF_EXPECTED='**For agentic workers:** REQUIRED SUB-SKILL — execute this plan task by task with
-`subagent-driven-implementation` (recommended) or `unity-execution` (inline). Do not
-implement directly from this file.'
+`subagent-driven-implementation` (a fresh implementer and a review gate per task) or
+`unity-execution` (inline, in this session). Take `subagent-driven-implementation` when the plan
+has more than one substantial task, or when a single task is large enough that its own context
+would crowd out the review of it; take `unity-execution` otherwise.
+Do not implement directly from this file.'
 HANDOFF_ACTUAL="$(awk '/^\*\*For agentic workers:\*\*/{f=1} f{print} f && /implement directly from this file\.$/{exit}' "$PLANNING" 2>/dev/null || true)"
 assert_same "$HANDOFF_EXPECTED" "$HANDOFF_ACTUAL" \
     "the plan template's handoff is the fixed text, character for character"
@@ -184,8 +192,9 @@ assert_has "$BODY" '"Similar to Task N" — repeat the code' \
     "repeat-the-code survives, because a fresh implementer reads exactly one task"
 assert_has "$BODY" "Type consistency" "the self-review checks names across tasks"
 
-# The `### Task N` template, because provenance.tsv:555 CLAIMS the Files:/Interfaces:
-# blocks are carried from writing-plans.
+# The `### Task N` template, because the `.claude/skills/unity-planning/SKILL.md` row of
+# provenance.tsv:536 CLAIMS the Files:/Interfaces: blocks are carried from writing-plans.
+# (Cited as line 555 until 2026-08-14 — past the end of a 551-line file.)
 #
 # This is the criterion, and it is narrower than "guard what matters": guard what the
 # manifest asserts. check-provenance.sh validates paths, checksums and field agreement and
@@ -195,8 +204,16 @@ assert_has "$BODY" "Type consistency" "the self-review checks names across tasks
 # idea being lost. Measured before this block existed: deleting the whole 23-line template
 # left 27/27 green with the row still claiming both blocks.
 assert_has "$BODY" "### Task N: [Component Name]" "the task template survives"
-assert_has "$BODY" '- Modify: `Assets/Scripts/Existing.cs:123-145`' \
-    "the Files: block shows exact paths with line ranges"
+# Changed 2026-08-14 with the template it reads. The old assertion froze
+# `- Modify: \`Assets/Scripts/Existing.cs:123-145\`` — a LINE RANGE — which is the citation form
+# `.claude/skills/subagent-driven-implementation/SKILL.md` forbids under *Cite by anchor*, taught by
+# the skill that writes the plans that skill executes. The assertion was holding the defect in place:
+# fixing the template without this line reds the suite, which is the correct coupling and the reason
+# the two move together.
+assert_has "$BODY" '- Modify: `Assets/Scripts/Existing.cs` — the `Move()` method' \
+    "the Files: block locates an edit by anchor, not by a line range that rots"
+assert_has "$BODY" 'Locate by anchor in `Files:`, not by line number' \
+    "the template says why, so a planner copying the shape copies the reason too"
 assert_has "$BODY" "- Consumes: what this task uses from earlier tasks — exact signatures" \
     "the Interfaces: block names what a task consumes"
 assert_has "$BODY" "A task's implementer sees only their own task; this block is how they learn the names and types" \

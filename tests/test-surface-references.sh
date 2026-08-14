@@ -162,7 +162,8 @@ assert_eq "0" "$(printf '%s' "$BAD_CMD_REFS" | grep -c . || true)" \
 # exception. That is a claim about three OTHER files, and on 2026-08-10 it was shipped false: the
 # process-chain wave rewrote `unity-brainstorming`, the sentence was updated on the belief that the
 # section had been removed with the exemption list, and the payload then steered readers away from
-# a section that was sitting at `:183` under a new title the whole time. D2 removed the five-item
+# a section that was sitting at `unity-brainstorming/SKILL.md:183` under a new title the whole time
+# (a 2026-08-10 line number, pinned here as history and not re-derived). D2 removed the five-item
 # exemption LIST; the red-flag section was retitled, not deleted.
 #
 # Matched on the stable prefix, not the full heading. The tails differ by design and one of them
@@ -514,7 +515,8 @@ assert_eq "$UB_GATE_EXPECTED" "$UB_GATE_ACTUAL" \
   "unity-brainstorming's HARD-GATE is D3's text, character for character"
 
 # ============================================================================
-# The blocks `provenance.tsv:71` and its MERGE-NOTES.md section name by name.
+# The blocks the `.claude/skills/unity-brainstorming/SKILL.md` row of `provenance.tsv:54` and its
+# MERGE-NOTES.md section name by name.
 #
 # The note says ECU's Ambiguity Score is what survives and that this is what `origin=ecu` rests on;
 # MERGE-NOTES.md enumerates the 0-2 scale, the five dimensions, the >= 6 threshold, the interview
@@ -726,8 +728,10 @@ assert_eq "ecu" "$UB_ROW_ORIGIN" \
   "unity-brainstorming's row records origin=ecu in FIELD 2 (D10) — not merely somewhere in its note"
 # The rationale here read "so no checksum comparison is silently skipped" until 2026-08-11, and it
 # had the direction backwards. `check-provenance.sh` gates BOTH of its comparisons on
-# `[ "$status" = verbatim ] || continue` — the offline sha256 check at :84 and the --online `cmp` at
-# :170 — so `verbatim` is what TRIGGERS a comparison and `modified` is what skips it. Flipping this
+# `[ "$status" = verbatim ] || continue` — the offline sha256 check at
+# scripts/check-provenance.sh:115 and the --online `cmp` at scripts/check-provenance.sh:201, cited
+# bare as lines 84 and 170 until 2026-08-14 and both moved by then — so `verbatim` is what TRIGGERS a
+# comparison and `modified` is what skips it. Flipping this
 # field to `verbatim` runs a check rather than skipping one, and the check fails, because the file
 # was rewritten on 2026-08-10 and cannot match ECU's bytes. Measured, offline, no --online needed:
 #
@@ -1259,8 +1263,9 @@ assert_contains "$UK_INJECTED" 'Invoke the surface **before any response or acti
 #     description, which is the one thing selection actually reads;
 #   - the NEGATIVE reads EVERY `.md` UNDER `.claude/`, because it asks "does anything the payload
 #     ships say the wrong thing". Ambiguity returns from wherever it is written, and
-#     `unity-execution`'s BODY states this same boundary a third time — at :10-11, wrapped, `:10`
-#     ending "…has more than one" and `:11` opening "substantial task, or when…". Neither the spec
+#     `unity-execution`'s BODY states this same boundary a third time — at
+#     .claude/skills/unity-execution/SKILL.md:10-11, wrapped, with line 10 ending "…has more than
+#     one" and line 11 opening "substantial task, or when…". Neither the spec
 #     nor the plan for this wave knew that third statement existed; a frontmatter-scoped absence
 #     check cannot see it at all.
 #

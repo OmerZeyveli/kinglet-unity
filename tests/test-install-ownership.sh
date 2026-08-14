@@ -2777,9 +2777,13 @@ s_assert_declined "$S3_DIR" "S3 (install 3)" "$S3_SHA" 'comes before'
 # THE ACTION WAS NEVER IN QUESTION HERE AND THE DIAGNOSIS WAS. One line carrying both tokens has one
 # begin and one end, so it fails only `bl < el` — and it therefore fell through to the ordering arm,
 # which told the user their end marker came before their begin marker. That is not true of one line.
-# The file was declined and its bytes were safe throughout; what a reader could not do was check the
-# sentence against their own file. `malformed-same-line` exists so they can, and this state is what
-# stops the token quietly losing its message again.
+# The file is declined and its bytes are safe — WITH THE FIX. This header said "were safe throughout"
+# until 2026-08-14 and that is false of the baseline it is contrasted against: before the same-line
+# pair got its own arm, this state did not merely carry the wrong diagnosis, it AMPUTATED the file,
+# which is why the fix landed in the install.sh lane rather than as a wording change. What a reader
+# still could not do, even once the bytes were safe, was check the sentence against their own file.
+# `malformed-same-line` exists so they can, and this state is what stops the token quietly losing its
+# message again.
 s_setup state-s3a sameline
 S3A_DIR="$S_DIR_OUT"
 S3A_SHA="$(sha_of "$S3A_DIR/CLAUDE.md")"

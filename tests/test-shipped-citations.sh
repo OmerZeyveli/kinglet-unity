@@ -151,7 +151,7 @@ while IFS= read -r md; do
   #
   # Deduped on the (line, token) PAIR, not on the token, which is what un-collapses the second case.
   # `awk '!seen[$0]++'` rather than `sort -u` so the report comes out in line order rather than
-  # lexicographic — `:10` before `:9` is a needless stumble in a list a human reads top to bottom.
+  # lexicographic — line 10 before line 9 is a needless stumble in a list a human reads top to bottom.
   # A token cannot contain a colon (the character class excludes it), so `%%:` / `#*:` split the
   # pair unambiguously. Every stage here drains its input — no `head`, no `grep -q` — so there is no
   # SIGPIPE for pipefail to turn into a failure.
@@ -237,20 +237,35 @@ while IFS= read -r md; do
 done <<< "$SHIPPED_MD"
 
 # A coverage floor, for the reason rule 0 gives two rules up: an all-clear over an empty token set is
-# indistinguishable from an all-clear over a real one. Measured on a green tree the day it was
-# written; the floor is set well below that, and the live count is printed rather than assumed, so a
-# reader never has to trust this comment. Raise it when the tree grows; never lower one to make a run
-# pass. The reverse-direction assertion below would also redden if every reference vanished at once —
-# but not if the token EXPRESSION broke while the references stayed, which is what this catches.
+# indistinguishable from an all-clear over a real one. The live count is printed rather than assumed,
+# so a reader never has to trust this comment. The reverse-direction assertion below would also
+# redden if every reference vanished at once — but not if the token EXPRESSION broke while the
+# references stayed, which is what this catches.
 #
-# Raised 4 -> 8 on 2026-08-14, honouring the instruction above rather than leaving it as advice:
-# /unity-init gained two references to generate-claude-md.sh that day and the live count went 7 -> 9,
-# so a floor of 4 had come to sit at less than half the tree and would have sat through the loss of
-# five references without a word.
-if [ "$SC_TOKENS_N" -ge 8 ]; then
-  pass "guard examined $SC_TOKENS_N .claude/scripts/ path reference(s) in shipped surfaces (floor 8)"
+# THE FLOOR IS THE NUMBER OF DISTINCT SCRIPTS NAMED, NOT THE NUMBER OF MENTIONS, and that criterion
+# is the whole of the value. Rule 0 says raise a floor when the tree grows and never lower one to
+# make a run pass; this floor was raised 4 -> 8 on 2026-08-14 under exactly that instruction, and the
+# raise was measured wrong twice over:
+#
+#   * it buys NO detection. The failure it names — a broken token expression — yields 0, which trips
+#     any floor at all, including the old 4. Nothing detectable at 8 is undetectable at 5.
+#   * it creates a FALSE POSITIVE, and a likely one. The live count is 9 across 6 distinct scripts:
+#     `unity-fixer` names detect-missing-refs.sh on two consecutive lines, `unity-review` names
+#     validate-serialization.sh on two consecutive lines, and `/unity-init` names
+#     generate-claude-md.sh twice. Consolidating any two of those duplicate pairs — an edit that
+#     removes no wiring and leaves every script still named — drops the count to 7 and reds this
+#     assertion with a message whose two disjuncts are both false.
+#
+# So the floor is 6: one reference per distinct installed script that a shipped surface names. Below
+# 6 a script really has stopped being named, which is a finding. Between 6 and 9 the tree has lost
+# redundancy, which is not. Re-derive both numbers rather than trusting them:
+#
+#   grep -rhoE '\.claude/scripts/[A-Za-z0-9_.-]+\.sh' .claude --include='*.md' | sort | uniq -c
+#
+if [ "$SC_TOKENS_N" -ge 6 ]; then
+  pass "guard examined $SC_TOKENS_N .claude/scripts/ path reference(s) in shipped surfaces (floor 6 — one per distinct installed script named)"
 else
-  fail "guard examined only $SC_TOKENS_N .claude/scripts/ path reference(s) — expected at least 8; either the wiring has been removed or the token expression has stopped matching"
+  fail "guard examined only $SC_TOKENS_N .claude/scripts/ path reference(s) — expected at least 6, one per distinct installed script a shipped surface names; either the wiring has been removed or the token expression has stopped matching"
 fi
 
 # A token cannot contain a colon (the character class excludes it), so `##*:` recovers it from the

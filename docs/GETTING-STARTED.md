@@ -75,10 +75,9 @@ Each cost below was measured against a manual copy, not assumed:
   (6 of the 6 installed scripts are named by some agent, command or skill, so a model can reach
   them; any that were not would be reachable only by a user who went looking for them. That count
   is derived by `tests/test-derived-counts.sh` rather than maintained by hand.) To match Option A,
-  copy them yourself — **all except
-  `check-provenance.sh`**, which Option A deliberately skips in both its announcement and its write
-  loop, because it validates *this repository's* `provenance.tsv` and expects the repo's layout. The
-  repo has 7 scripts; an installed project has 6:
+  copy them yourself — **all except `check-provenance.sh`**, which Option A deliberately skips in
+  both its announcement and its write loop, because it validates *this repository's* `provenance.tsv`
+  and expects the repo's layout. The repo has 7 scripts; an installed project has 6:
 
   ```bash
   mkdir -p your-unity-project/.claude/scripts
@@ -134,7 +133,8 @@ anything that must reach every session.
 
 Run `/unity-init` to auto-generate a `CLAUDE.md` tailored to your project. It scans:
 
-- Unity version and active platform
+- Unity version (the active build platform is **not** among the facts it writes — the generated
+  table has four rows: Unity version, render pipeline, assembly definitions, scenes in build settings)
 - Installed packages (render pipeline, Input System, Addressables, etc.)
 - Networking stack (Netcode, Mirror, Photon, Fish-Net)
 - Third-party packages (DOTween, UniTask, VContainer, Zenject, Odin)
@@ -215,7 +215,7 @@ That applies to `/unity-scene` in the table above, and equally to `/unity-ui`, w
 
 ### Quick Diagnostic
 
-Run `/unity-doctor` as a first troubleshooting step. It checks MCP connectivity, .claude/ integrity, hook registration, project structure, and skill/package alignment — and provides actionable fixes for any issues found.
+Run `/unity-doctor` as a first troubleshooting step. Its four checks are MCP connectivity, the install itself (via `.claude/scripts/studio-doctor.sh`, which covers `.claude/` integrity and hook registration), what that script does not read, and Unity project structure — and it reports actionable fixes rather than changing anything. It listed a fifth, *skill/package alignment*, until 2026-08-14; that check's package-to-skill mapping table was deleted in the 2026-08-03 surface cut.
 
 ### Hooks Not Firing
 

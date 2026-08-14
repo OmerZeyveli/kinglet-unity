@@ -72,7 +72,7 @@ and watch it fail, write the minimal code, run it and watch it pass, commit.
 
 **Files:**
 - Create: `Assets/Scripts/Exact/Path.cs`
-- Modify: `Assets/Scripts/Existing.cs:123-145`
+- Modify: `Assets/Scripts/Existing.cs` — the `Move()` method
 - Test: `Assets/Tests/EditMode/ExactPathTests.cs`
 
 **Interfaces:**
@@ -90,6 +90,13 @@ public void SetMoveInput_WithRightVector_MovesPositiveX() { }
 
 - [ ] **Step 2: Run it and watch it fail**
 ````
+
+**Locate by anchor in `Files:`, not by line number.** `Existing.cs` — the `Move()` method, not
+`Existing.cs:123-145`. This template shipped the range form, and it is the rot path
+`.claude/skills/subagent-driven-implementation/SKILL.md` describes under *Cite by anchor*: the plan
+is written here, carried into a dispatch, and read after earlier tasks have already moved the file.
+Measured in that skill's own record — a controller forwarded a range citing lines 410–423 of a
+378-line file. A line number is allowed only as a convenience beside an anchor, never alone.
 
 Steps use checkbox (`- [ ]`) syntax so an executor can track them.
 
@@ -137,8 +144,11 @@ ledger will land. One directory holds what was decided, what was planned and whe
 # [Feature Name] Implementation Plan
 
 **For agentic workers:** REQUIRED SUB-SKILL — execute this plan task by task with
-`subagent-driven-implementation` (recommended) or `unity-execution` (inline). Do not
-implement directly from this file.
+`subagent-driven-implementation` (a fresh implementer and a review gate per task) or
+`unity-execution` (inline, in this session). Take `subagent-driven-implementation` when the plan
+has more than one substantial task, or when a single task is large enough that its own context
+would crowd out the review of it; take `unity-execution` otherwise.
+Do not implement directly from this file.
 
 **Goal:** [one sentence describing what this builds]
 

@@ -78,8 +78,10 @@ never exist here; `rule=ours-wins` means upstream has the path and we ship our o
   until 2026-08-03, makes all 39 invisible with no error of any kind. `name:` must match the
   directory, `description:` must be non-empty (it is the entire selection mechanism). No skill may
   carry `alwaysApply` or `globs` either — both are inert Cursor keys that get read as guarantees —
-  but that one is asserted in `tests/test-no-mobile.sh:96`, not here; this guide cited the wrong file
-  for it until 2026-08-11.
+  but that one is asserted in `tests/test-no-mobile.sh`, by the assertion reading
+  *"no skill carries alwaysApply or globs"*, not here; this guide cited the wrong file for it until
+  2026-08-11 and then the wrong line in the right file until 2026-08-14, which is why it now names
+  the assertion instead of a number.
   Every skill an agent, a command, **or another skill** names by path must exist. The skill→skill
   direction was added 2026-08-11 (section 6 of that test) and it is the one the process chain is
   built out of: during the 2026-08-10 wave three surfaces named each other by path *before the
@@ -104,10 +106,16 @@ never exist here; `rule=ours-wins` means upstream has the path and we ship our o
   This bullet read *"the surface pool is 32 by design"* from the 2026-08-03 cut until 2026-08-11, and
   the tree had moved on without it — a stale count in the file that warns against stale counts, in a
   sentence stating a *number* where the load-bearing content was the *criterion*. The criterion was
-  applied to agents, commands, and skills; hooks were out of scope for that wave. Every hook survived
-  untouched — they are the `.claude/hooks/*.sh` files less `_lib.sh`, which is a shared library and
-  not a hook, and each real one is registered in `.claude/settings.json` — and applying the same test
-  to them is an open question for the next pass, not a settled one. `tests/test-surface-references.sh`
+  applied to agents, commands, and skills; hooks were out of scope for **that** wave, and every hook
+  survived it untouched — they are the `.claude/hooks/*.sh` files less `_lib.sh`, which is a shared
+  library and not a hook, and each real one is registered in `.claude/settings.json`. **That question
+  is now settled.** `818b2bd` applied the same criterion to this directory on 2026-08-13 and removed
+  15 of 27 hooks: seven had never run (they declared `strict` while nothing sets
+  `UNITY_HOOK_PROFILE`), four were structurally broken, four were net-negative. `provenance-skip.tsv`
+  carries the ground for each as `rule=absent`, so restoring one hits a red gate rather than a silent
+  regression. What is **not** settled is the next hook added: nothing forces the criterion to be
+  answered for it, which is the residual risk this paragraph now names instead of the closed one it
+  named until 2026-08-14. `tests/test-surface-references.sh`
   guards bare-name skill references (a skill named without its `.claude/skills/<name>/SKILL.md`
   path); `tests/test-skill-discovery.sh` only matches path-form references and misses those entirely
   — that gap shipped nine dangling bare-name references on 2026-08-03 before the guard existed.

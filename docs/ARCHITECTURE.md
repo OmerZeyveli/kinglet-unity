@@ -38,18 +38,22 @@ it used to say nothing enforced these numbers, and while it said so, four of the
 The pool itself came from the 2026-08-03 surface cut, which reduced 103 surfaces — agents, commands,
 skills and hooks — to 32 on the criterion "a surface survives only if it does something the model
 cannot do unaided"; the `process-layer-2` wave then added a fourteenth skill, and the 2026-08-10
-process-chain wave traded two commands for two skills. The **hook and rule counts are still
-hand-maintained and unguarded** — that gap is named here rather than implied.)
+process-chain wave traded two commands for two skills. The **hook counts here are derived and
+guarded** by the same file — see "How Hooks Work" below, which says so 150 lines down; this sentence
+claimed the opposite until 2026-08-14, because the commit that added the guard and the commit that
+documented it were the first and last of one task and neither reread this one. **The rule count is
+still hand-maintained and unguarded** — nothing derives `.claude/rules/*`, and that is the gap this
+parenthetical still names.)
 
 Supporting files outside `.claude/`:
 
 ```
-scripts/             Shell scripts for validation (meta, code quality, serialization, architecture)
+scripts/             Shell scripts: the two surviving validators (serialization, assembly
+                     definitions), the pipeline detector, the CLAUDE.md generator, the doctor,
+                     the dangling-reference sweep, and this repo's provenance check
 install.sh           One-command installer
-upgrade.sh           Version-aware upgrade with backup and customization preservation
-uninstall.sh         Clean removal with backup option
+uninstall.sh         Receipt-driven removal — the installer's inverse, not a separate flow
 templates/           C# templates for MVS pattern (Model, View, System, LifetimeScope, Message)
-benchmarks/          Structural correctness benchmarks for agent output
 ```
 
 ---
@@ -169,9 +173,11 @@ already live.
 
 Hooks are shell scripts in `.claude/hooks/` configured in `settings.json`. They run automatically at various lifecycle events: before/after tool invocations, before context compaction, on session start, and on session stop.
 
-All 12 registered hooks source a shared library (`_lib.sh`, a sourced library and not itself a hook)
-that provides kill switches, profile filtering, and utility functions -- except one, which sources
-nothing and therefore honours no kill switch. Hooks are organized into three
+Of the 12 registered hooks, 11 source a shared library (`_lib.sh`, a sourced library and not itself
+a hook) that provides kill switches, profile filtering, and utility functions. `session-brief.sh`
+sources nothing and carries the two kill switches inline instead; until 2026-08-14 it carried
+neither, which made it the one hook `DISABLE_UNITY_HOOKS=1` did not reach. Hooks are organized into
+three
 **profile levels** -- `minimal` (4 cumulative, one of which declares no `HOOK_PROFILE_LEVEL` at all
 and therefore runs under every profile), `standard` (12 cumulative), and `strict` (12 cumulative).
 Set the active profile via `UNITY_HOOK_PROFILE=standard`.
@@ -198,11 +204,16 @@ that every hook named there still exists.)
 
 ### Event Types
 
+These are the events this toolkit registers, not every event Claude Code emits. The set is asserted
+against `.claude/settings.json` in both directions by `tests/test-derived-counts.sh`: a row here that
+no registration uses, and a registration whose event has no row, both fail. `PreCompact` had a row
+here after its last registration was removed on 2026-08-13, twelve lines above a paragraph that said
+so.
+
 | Event | When | Hook Types |
 |-------|------|------------|
 | PreToolUse | Before a tool executes | Blocking (exit 2) or allow (exit 0) |
 | PostToolUse | After a tool executes | Advisory warnings and tracking (exit 0) |
-| PreCompact | Before context compaction | State preservation (exit 0) |
 | SessionStart | When a conversation begins | State restoration (exit 0) |
 | Stop | When the agent stops | Validation, persistence, learning, notifications (exit 0) |
 
@@ -360,7 +371,12 @@ Each component is a standalone Markdown file. No build step, no compilation, no 
 
 ## Hook Kill Switch System
 
-All hooks source a shared library (`.claude/hooks/_lib.sh`) that provides environment variable overrides:
+Every hook honours the overrides below. 11 of the 12 get them by sourcing a shared library
+(`.claude/hooks/_lib.sh`); `session-brief.sh` implements the two kill switches inline and sources
+nothing, deliberately — it runs at `SessionStart`, and a library failure there is a session that does
+not start. This sentence read *"All hooks source a shared library"* until 2026-08-14, contradicting
+this file's own *"except one, which sources nothing"* 190 lines above, and at that point the
+exception honoured no kill switch at all.
 
 ```
 DISABLE_UNITY_HOOKS=1              All hooks exit 0 immediately

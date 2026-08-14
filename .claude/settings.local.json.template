@@ -8,7 +8,7 @@
     "// MCP_PORT": "Override unity-mcp port (default: 8080)",
     "// DISABLE_UNITY_HOOKS": "Set to 1 to bypass ALL safety hooks",
     "// UNITY_HOOK_MODE": "Set to 'warn' to downgrade blocking hooks to warnings",
-    "// UNITY_HOOK_PROFILE": "minimal | standard | strict (default: standard). No hook declares strict, so strict and standard are identical. WARNING: minimal drops 8 of the 12 hooks INCLUDING bash-gate, the destructive-command gate, and warn-serialization. It is a safety setting, not a speed setting -- see docs/HOOK-REFERENCE.md for the full dropped set.",
+    "// UNITY_HOOK_PROFILE": "minimal | standard | strict (default: standard). No hook declares strict, so strict and standard are identical. WARNING: minimal drops 8 of the 12 hooks INCLUDING bash-gate, the destructive-command gate, and warn-serialization. It is a safety setting, not a speed setting. For the full dropped set, derive it from the hooks themselves -- .claude/hooks/_lib.sh's header carries the three commands. This used to point at docs/HOOK-REFERENCE.md, which install.sh never copies into a project, so it was a dangling pointer in every install.",
     "// DISABLE_HOOK_BLOCK_SCENE_EDIT": "Set to 1 to disable this specific hook",
     "// DISABLE_HOOK_BLOCK_META_EDIT": "Set to 1 to disable this specific hook",
     "// DISABLE_HOOK_BLOCK_LEGACY_INPUT": "Set to 1 to disable this specific hook",
