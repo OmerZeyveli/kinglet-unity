@@ -115,4 +115,20 @@ Print the non-silent byte count beside every zero.
 
 ## Deferred, parked, and rulings
 
-*(empty)*
+1. **The controller broke the provenance gate on its own two commits, and did not notice.**
+   `a5085f7` added this wave's plan and `3ca4327` added this ledger — **both new files, neither with a
+   `provenance.tsv` row**, which the contract fails as orphans. Verified afterwards at `3ca4327`:
+   `provenance check FAILED — 2 problem(s)`. Task 1's implementer found it in a clean clone, repaired
+   it by the existing convention (31 plan/ledger rows precede it), and flagged that it was not its
+   work.
+
+   **The ruling is about the class, not the instance.** This ledger's own standing facts say *"Gates,
+   both, every task"* — and the controller read that as binding on **implementers**. It is not; it is
+   binding on **commits**, and the controller makes commits. The plan/ledger pair at the start of a
+   wave is the most likely place for this to happen again, because it is the one pair of files nobody
+   dispatches a task for. **Run both gates after any controller commit that adds a file.**
+
+   Cost: an implementer spent effort on someone else's defect, and the base commit every later task
+   branches from was red for a reason unrelated to any of them. **A ledger asserting "both gates green
+   at `e17f310`" was true for `e17f310` and false for the commit tasks actually branch from** — which
+   is the same shelf-life problem this wave exists to fix, committed by the file that documents it.
