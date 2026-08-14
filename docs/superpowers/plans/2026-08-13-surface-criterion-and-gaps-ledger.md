@@ -248,6 +248,14 @@ stands. It has now gone stale twice.
   equal length. **A size-only probe would have called all three harmless.** Earlier payloads in this
   same wave *did* change size (127 B → 6 B, 104 B → 39 B), so both behaviours are real and a probe
   must assume neither.
+- **A derived number is regenerated LAST, or it is wrong.** Task 2c's provenance note shipped wrong
+  figures twice, and **the two failures have different causes — only the second is instructive.**
+  The first was recall. The second was **ordering**: the generator ran once, correctly, at 321
+  records; then the sweep added four payloads and a fix round added one, and **nothing re-ran it.**
+  **A generator that is correct and stale is worse than a number that was always wrong, because it
+  carries a sentence claiming it was derived.** And nothing in this suite guards such a note —
+  `assert_eq` on any of those figures returns zero hits, and `tests/test-derived-counts.sh` reads
+  only provenance's status split.
 - **Every dispatch gets its own `mktemp -d` scratch root, and no shared temp path.** Round 5 of Task 2
   had its `probe.sh` and `mutate.sh` replaced mid-task by another agent writing to a shared
   scratchpad, and the measurements it took afterwards were of the other agent's harness.
