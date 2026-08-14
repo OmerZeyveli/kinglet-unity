@@ -442,7 +442,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | **Stage 1 — the cut** | | | | |
 | 1 | Twenty surfaces leave, and the counts get a guard | **done** | `818b2bd`…`38dec6c` | **19, not 20** — cut is 15 hooks + 4 scripts. 3 fix rounds. `detect-missing-refs.sh` restored by ruling; wiring is Task 3's. Whole-task audit ran after closure → F1–F13 |
 | 2 | The two gates block the act and permit the prose | **adjudicated at cap → 2b** | `5041b4b`…`3fd22dc` | 5 rounds; each fixed the previous round's fix. Inverted to a read-only allowlist in round 3, positional argument read in round 5 |
-| 2b | The tokeniser gets a quote model, and a corpus stops the next hole | open | — | **New.** Data loss: a quoted operator truncates the arg list, dropping the write flag. Requires a regression corpus checked against `546870f` / `06883cc` / `3fd22dc` |
+| 2b | The tokeniser gets a quote model, and a corpus stops the next hole | **done, merged** | `5b636d3`…`c050743` | **New.** Data loss: a quoted operator truncates the arg list, dropping the write flag. Requires a regression corpus checked against `546870f` / `06883cc` / `3fd22dc` |
 | 2c | What decides the route, and what the allowlist vouches for | open | — | **New.** Both holes exist at all four hook versions; `./evil/grep` destroyed 3/3 `.meta` files with the gate at 0 |
 | 3 | The surviving scripts become reachable | **done, merged** | `75ea1de`…`d607839` | **R2**: leaves `scripts/` entirely. **R8**: no `Bash` for `unity-reviewer`. **R7** if it lands second |
 | **Stage 2 — installer correctness** | | | | |
@@ -1037,6 +1037,28 @@ ADDRESSED, none returned to the fix loop.**
     is sound, not merely observed** — which is what makes Task 3's three-state table a real
     invariant. The table's third row reads *"no summary line, **any exit status**"*, and that clause
     is what makes it survive a **SIGTERM (rc=143)**; "exit 1" would have been wrong there.
+
+**From Task 2b's closing confirmation (2026-08-14). COMPLETE at `c050743`, merged.**
+
+77. **A two-sided `hist` forgery is invisible to any count.** Rewriting one record `222`→`000` and
+    another `000`→`222` in the same edit keeps the total at 211 and reds nothing. **This is the
+    structural limit of a count, not a gap in the guard** — recorded so nobody "fixes" it with a
+    third count. The one-sided directions *are* caught, in both senses: inventing protection on a
+    permit reds **two** assertions (the hist count and the no-unexplained-permit rule); inventing it
+    on a block reds one.
+78. **The three `H` records are live holes and two are verified destructive by execution** —
+    `awk -f script.awk` (127 B → 40 B) and `sed --in-pl` (all three files rewritten). **The ceiling
+    of 3 is the only thing keeping them from growing.**
+79. **Two accepted false positives, both blocking reads and both clearing a byte-identical retry:**
+    any `$(…)` inside a `find … .meta` command, and an unbalanced apostrophe on any line of a
+    multi-line one.
+80. **The cost residual is documented and has no cliff.** 1.4 MB / 131 072 tokens still exceeds the
+    10 000 ms ceiling, but the law is linear at ~75–90 µs/token across every constructed shape
+    including a 4.2 MB one, with **~6× headroom at every asserted point**. *The character of the
+    finding changed between rounds: round 1 broke the ceiling at 248 KB with a shape-dependent
+    blowup.*
+81. **bash 3.2 was never executed.** `local -a`, `args+=()` and `${#args[@]}` under `set -u` are
+    reasoned, not measured — awaits the macOS host pass. Documented in the hook beside the guard.
 
 **Inherited from earlier waves, still open:**
 
