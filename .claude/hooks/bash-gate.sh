@@ -373,8 +373,43 @@ find_exec_tokens() {
 #   - a write flag decided by regexing the whole raw command string, so `sed -i''` walked past
 #     the pattern's right boundary. Fixed by reading the exec'd command's own arguments.
 #   - and the one this rewrite is for: an operator inside a quoted program read as a clause end.
+
+# find_exec_flush — emit the pending command and its collected arguments, and re-arm.
+#
+# THE ARGUMENT LIST IS AN ARRAY, NOT A STRING, AND THAT IS A COST FIX RATHER THAN A STYLE ONE.
+# It used to accumulate with `args="$args$SEP$tok"`, which copies the whole accumulator on every
+# append and is therefore O(n^2) in the number of arguments in ONE clause. Measured on this host
+# against `find … -exec grep -l <N args> {} \;`, end to end through the hook:
+#
+#     N =  2 000    2 052 ms        N = 16 000     80 975 ms
+#     N =  8 000   32 605 ms        N = 20 000    >10 minutes
+#
+# Length was never the variable that mattered here — 8 000 arguments is only 248 KB, a fifth of
+# the 1 MB single token this file's cost assertion used to be built from, and it cost sixteen
+# times as much. An array append is O(1) and one `printf` over the array is O(n); the same
+# payloads now cost 245 ms and 1 231 ms (see the cost block in tests/test-bash-gate-precision.sh).
+#
+# Bash is dynamically scoped, so this reads find_exec_commands' locals directly. That is the
+# reason it is a separate function at all: the same six lines appeared at five flush sites and
+# one of them is easy to get wrong.
+find_exec_flush() {
+    printf '%s' "$pend"
+    # `"${args[@]}"` on an EMPTY array is an unbound-variable error under `set -u` in bash before
+    # 4.4, and macOS ships 3.2. The count test is the portable guard.
+    if [ "${#args[@]}" -gt 0 ]; then
+        printf '\t%s' "${args[@]}"
+    fi
+    printf '\n'
+    pend=""
+    args=()
+    route=""
+    prevbrace=0
+}
+
 find_exec_commands() {
-    local flags len cand tok cmd want=0 pend="" args="" route="" skipnext=0 prevbrace=0 toks
+    local flags len cand tok cmd want=0 pend="" route="" skipnext=0 prevbrace=0 toks
+    local -a args
+    args=()
     # An `||`, because a failed tokenisation under `set -e` would otherwise kill the hook and
     # fail it OPEN. Unparseable is a block, whichever way the parse failed.
     toks="$(find_exec_tokens "$1")" || toks="!! 0 !!
@@ -391,15 +426,13 @@ tokeniser-failed"
             # Collecting the pending command's own arguments.
             if [ "$route" = "find" ]; then
                 if [ "$tok" = ";" ] || { [ "$tok" = "+" ] && [ "$prevbrace" = "1" ]; }; then
-                    printf '%s\t%s\n' "$pend" "$args"
-                    pend=""; args=""; route=""; prevbrace=0; continue
+                    find_exec_flush; continue
                 fi
             fi
             if [ "$flags" = "--" ]; then
                 case "$tok" in
                     ';'|'|'|'||'|'&&'|'&')
-                        printf '%s\t%s\n' "$pend" "$args"
-                        pend=""; args=""; route=""; prevbrace=0; continue ;;
+                        find_exec_flush; continue ;;
                     # A redirection is the shell's, not the command's. SKIPPED rather than
                     # treated as a clause end, because the shell strips it wherever it sits:
                     # `xargs -0 sed 2>/dev/null -i s/a/b/` really does run `sed -i`.
@@ -419,14 +452,12 @@ tokeniser-failed"
                 q*) ;;                                 # a quoted run never introduces anything
                 *)  case "$tok" in
                         -exec|-execdir|-ok|-okdir)
-                            printf '%s\t%s\n' "$pend" "$args"
-                            pend=""; args=""; want=1; route="find"; prevbrace=0; continue ;;
+                            find_exec_flush; want=1; route="find"; continue ;;
                         xargs|*/xargs)
-                            printf '%s\t%s\n' "$pend" "$args"
-                            pend=""; args=""; want=1; route="xargs"; prevbrace=0; continue ;;
+                            find_exec_flush; want=1; route="xargs"; continue ;;
                     esac ;;
             esac
-            args="$args$FIND_TOK_SEP$tok"
+            args+=("$tok")
             if [ "$tok" = "{}" ]; then prevbrace=1; else prevbrace=0; fi
             continue
         fi
@@ -443,7 +474,7 @@ tokeniser-failed"
                 env|sudo|doas|nice|nohup|command|time|exec|'') continue ;;
             esac
             pend="$cmd"
-            args=""
+            args=()
             want=0
             prevbrace=0
             continue
@@ -460,7 +491,7 @@ tokeniser-failed"
     # AND-list: under `set -e` a trailing `[ -n "$x" ] && printf` fails the function when the
     # test is false.
     if [ -n "$pend" ]; then
-        printf '%s\t%s\n' "$pend" "$args"
+        find_exec_flush
     fi
     return 0
 }

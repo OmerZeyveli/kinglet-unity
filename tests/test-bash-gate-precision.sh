@@ -580,6 +580,25 @@ assert_eq "2" "$(tbg_run 'git status && find Assets -name "*.meta" -exec git rm 
 # new one. Nothing here would have caught the round-5 Critical before it was written, because no
 # earlier version had ever been sent a quoted awk program either.
 #
+# AND IT ONLY CATCHES THE MUTANTS ITS AUTHOR IMAGINED — which is why the payload list was not
+# written by imagining them. Every deliberate branch in `find_exec_tokens`,
+# `find_exec_commands` and `find_exec_is_read_only` was mutated one at a time, 50 in all, and
+# the corpus was run against each. Fifteen branches turned out to be branches nothing here
+# measured; the sharpest was `*/xargs`, which the hook handles deliberately in two places and
+# whose deletion left this file entirely green while
+# `find … -print0 | /usr/bin/xargs -0 sed -i s/a/b/` went from blocked to permitted and
+# destroyed three real .meta files. Payloads for those fifteen are in the list below and each
+# names the branch it exists for.
+#
+# Two of the fifty have NO payload and cannot have one, and that is a finding rather than an
+# omission: the double-quote backslash escape (`\"` inside `"…"`) and the newline-to-space
+# substitution inside a quoted run change the token's VALUE but no arm's decision depends on the
+# difference, in either direction. Removing either only ever lengthens a token, which can add a
+# block and never remove one. They are correctness of the token, not of the verdict.
+#
+# To repeat the sweep: mutate one branch, run this corpus, and record how many assertions go
+# red. A branch with zero is a branch this file does not measure.
+#
 # HOW TO REGENERATE THE `hist` COLUMN (it is data, not derivation — the permanent test runs
 # inside a `git archive` scratch copy and cannot shell out to git):
 #
@@ -592,7 +611,21 @@ assert_eq "2" "$(tbg_run 'git status && find Assets -name "*.meta" -exec git rm 
 # RECORD FORMAT — two lines each, so a payload never has to be escaped or quoted:
 #   line 1:  <expected-rc> <hist> <exempt> <one-line reason>
 #   line 2:  the payload, verbatim, leading whitespace significant
-# `exempt` is `-`, or `X` when this version permits something an earlier version blocked.
+# `exempt` is one of THREE values, and the distinction is the guard, not decoration:
+#   `-`  nothing to explain — this version agrees with every earlier one, or blocks where they did
+#   `X`  a VERIFIED FALSE POSITIVE: an earlier version blocked it and it cannot write. Each one
+#        was executed against real .meta files by the round-1 reviewer; 42 of 42 left byte length
+#        and cksum identical.
+#   `H`  a KNOWN LIVE HOLE: an earlier version blocked it, it really can write, and this version
+#        permits it anyway. These are inherited, they are recorded rather than hidden, and THEIR
+#        NUMBER IS ASSERTED BELOW so one cannot be added by typing a note.
+#
+# The brief's property is "except payloads recorded as VERIFIED FALSE POSITIVES". A single flag
+# plus any non-empty string does not express that: it accepts "this is a known live hole" as a
+# monotonic waiver, which would let a future round downgrade a real block to a permit and stay
+# green — the exact mechanism this column exists to prevent. Two of the three `H` records below
+# were executed and do destroy files (`awk -f`: 127 B -> 40 B on all three; `sed --in-pl`: all
+# three rewritten), which is why they may not sit under the same marker as the other 42.
 # ============================================================================================
 
 # A FRESH STATE DIR PER PROBE. The corpus deliberately repeats payloads that assertions above
@@ -1054,11 +1087,11 @@ find Assets -name '*.meta' | xargs grep -l guid | xargs sed -i s/a/b/
 find Assets -name '*.meta' -exec \env \rm {} \;
 0 222 X the shell reads ./\grep as ./grep, and ./grep with no backslash is permitted at r3, r4 and r5 too - measured
 find Assets -name '*.meta' -exec ./\grep -l guid {} \;
-0 200 X KNOWN HOLE, inherited: an awk program in a -f file can write and no arm models it
+0 200 H KNOWN HOLE, inherited: an awk program in a -f file can write and no arm models it
 find Assets -name '*.meta' -exec awk -f script.awk {} \;
-0 200 X KNOWN HOLE, inherited: an awk write through a pipe to an external command is not modelled
+0 200 H KNOWN HOLE, inherited: an awk write through a pipe to an external command is not modelled
 find Assets -name '*.meta' -exec awk '{print | "tee " FILENAME}' {} \;
-0 200 X KNOWN HOLE, inherited: GNU long-option abbreviation; a wider glob would false-positive on yq --input-format
+0 200 H KNOWN HOLE, inherited: GNU long-option abbreviation; a wider glob would false-positive on yq --input-format
 find Assets -name '*.meta' -exec sed --in-pl s/guid/x/ {} \;
 2 222 - KNOWN FALSE POSITIVE: cp is decided by argument position, which this gate does not parse
 find Assets -name '*.meta' -exec cp {} /tmp/backup/ \;
@@ -1096,6 +1129,32 @@ find Assets -name '*.meta' -print0 | xargs -0 sed > /tmp/o.txt -i s/a/b/
 find Assets -name '*.meta' -print0 | xargs -0 awk '{print}' > /tmp/o.txt
 0 222 X the appending spelling of the same shell redirect, same reason
 find Assets -name '*.meta' -print0 | xargs -0 awk '{print}' >> /tmp/o.txt
+2 222 - a PATH-QUALIFIED xargs is still an introducer: deleting the */xargs arm left the whole corpus green while this payload went 2 to 0 and destroyed 3 of 3 real files
+find Assets -name '*.meta' -print0 | /usr/bin/xargs -0 sed -i s/a/b/
+0 000 - its read-only twin, so the path-qualified arm cannot be satisfied by blocking every absolute path
+find Assets -name '*.meta' -print0 | /usr/bin/xargs -0 grep -l guid
+2 222 - a path-qualified xargs reached through -exec rather than through a pipe
+find Assets -name '*.meta' -exec /usr/bin/xargs -0 gzip {} \;
+2 000 - a backtick in an otherwise read-only clause: without the detection the substitution decides what runs and the gate never sees it
+find Assets -name '*.meta' -exec grep -l `echo guid` {} \;
+2 220 - a backslash-escaped semicolon on the xargs route is an argument, not a shell operator; without the backslash flag the clause ends and the -i after it is lost
+find Assets -name '*.meta' -print0 | xargs -0 sed \; -i s/a/b/
+0 020 X an unquoted operator really does end the clause, so a later -o is not sort's; r4 regexed the whole line and blocked it
+find Assets -name '*.meta' -print0 | xargs -0 sort {} && echo -o
+0 022 X a redirect's operand is a filename, not an argument: skipping the operand is what keeps this -o out of sort's own arguments
+find Assets -name '*.meta' -print0 | xargs -0 sort > -o {} {}
+2 222 - a second -exec with the first clause's terminator missing: the in-args introducer arm is the only thing that flushes here
+find Assets -name '*.meta' -exec grep -l guid -exec gzip {} \;
+2 222 - a second bare xargs with no operator between, so the in-args arm rather than the idle arm has to catch it
+find Assets -name '*.meta' -print0 | xargs -0 grep -l guid xargs -0 gzip
+2 222 - the same shape with the second xargs path-qualified, which is a different pattern in the same arm
+find Assets -name '*.meta' -print0 | xargs -0 grep -l guid /usr/bin/xargs -0 gzip
+0 000 - a read-only command behind an env prefix: the prefix vocabulary must step over env rather than reporting it as the command
+find Assets -name '*.meta' -exec env grep -l guid {} \;
+0 002 X a quoted introducer-shaped word in idle position introduces nothing; r5 dequoted it and read the next word as the command
+find Assets -name '*.meta' -o -name 'xargs' gzip -exec grep -l guid {} \;
+2 222 - git reached with no arguments at all, which is the one path to the git arm's final refusal
+find Assets -name '*.meta' -print0 | xargs -0 git
 TBG_CORPUS
 }
 
@@ -1107,8 +1166,11 @@ tbg_ran=0
 tbg_blocks=0
 tbg_permits=0
 tbg_protected=0
+tbg_fp=0
+tbg_holes=0
 tbg_unexplained=""
 tbg_reasonless=""
+tbg_badflag=""
 while read -r tbg_exp tbg_hist tbg_ex tbg_note; do
     IFS= read -r tbg_payload || break
     case "$tbg_exp" in ''|'#'*) continue ;; esac
@@ -1117,16 +1179,24 @@ while read -r tbg_exp tbg_hist tbg_ex tbg_note; do
 
     # The monotonic property, checked as data rather than as a second probe: a payload any
     # earlier version blocked may not be permitted here without an `X` and a written reason.
+    case "$tbg_ex" in
+        '-') ;;
+        X) tbg_fp=$((tbg_fp + 1)) ;;
+        H) tbg_holes=$((tbg_holes + 1)) ;;
+        *) tbg_badflag="${tbg_badflag}${tbg_ex} ${tbg_payload}
+" ;;
+    esac
     case "$tbg_hist" in
         *2*)
             if [ "$tbg_exp" = "2" ]; then
                 tbg_protected=$((tbg_protected + 1))
-            elif [ "$tbg_ex" != "X" ]; then
-                tbg_unexplained="${tbg_unexplained}${tbg_payload}
-"
-            elif [ -z "$tbg_note" ]; then
-                tbg_reasonless="${tbg_reasonless}${tbg_payload}
-"
+            else
+                case "$tbg_ex" in
+                    X|H) [ -n "$tbg_note" ] || tbg_reasonless="${tbg_reasonless}${tbg_payload}
+" ;;
+                    *) tbg_unexplained="${tbg_unexplained}${tbg_payload}
+" ;;
+                esac
             fi
             ;;
     esac
@@ -1150,6 +1220,31 @@ assert_eq "" "$tbg_unexplained" \
     "no payload an earlier version blocked is permitted here without a recorded exemption"
 assert_eq "" "$tbg_reasonless" \
     "every recorded exemption carries a reason"
+assert_eq "" "$tbg_badflag" \
+    "every exemption flag is one of - (none), X (verified false positive) or H (known live hole)"
+
+# THE ONE HARDCODED NUMBER IN THIS FILE, AND IT IS HARDCODED ON PURPOSE.
+# `H` says "this payload really can write and we permit it anyway". Three such records exist, all
+# inherited, all named in the corpus above:
+#     -exec awk -f script.awk {} \;              an awk program in a -f file
+#     -exec awk '{print | "tee " FILENAME}' {} \;  an awk write through a pipe
+#     -exec sed --in-pl s/guid/x/ {} \;           GNU long-option abbreviation
+# Everywhere else this repository forbids writing a count down, because a derived count goes stale.
+# This one is not derived from the tree — it is a CEILING on a category that must only ever shrink,
+# and a ceiling that moves silently is not a ceiling. Adding a fourth live hole must cost an edit
+# here, with a reviewer looking at the diff.
+assert_eq "3" "$tbg_holes" \
+    "the number of payloads recorded as known live holes has not grown"
+# And the same ceiling on `X`, for the reason the round-1 review gave: marking a live hole `H`
+# now reds the count above, but a future round could still downgrade a real block to a permit by
+# calling it a VERIFIED false positive instead. That lie is only caught by the verdict assertion
+# while the hook still blocks — so the moment someone changes the hook to permit it as well, the
+# lie goes green. Both counts are therefore ceilings on the same thing: divergence from what an
+# earlier version of this hook blocked. Any new divergence, whatever it is labelled, costs an
+# edit here in front of a reviewer. Neither number is derived from the tree, so neither can go
+# stale on its own; both move only when someone means them to.
+assert_eq "45" "$tbg_fp" \
+    "the number of payloads recorded as verified false positives has not grown"
 
 # --- the quote model's own direct evidence --------------------------------------------------
 # The corpus checks verdicts. These two check the tokeniser's output shape, which is where the
@@ -1181,33 +1276,89 @@ assert_eq "2" "$(tbg_run_fresh 'find Assets -name "*.meta" \
 assert_eq "2" "$(tbg_run_fresh 'find Assets -name "*.meta" -exec awk "{ print > FILENAME
 }" {} \;')" \
     "still blocks a quoted program whose newline is inside the quotes"
+# The splice's OWN evidence, which the two assertions above do not provide: both of those parse
+# identically with or without the splice, because the backslash sits between whole tokens. This
+# one needs it — the token `-i` is itself split by the line break, and without the splice it
+# arrives as `-` and `i` and the in-place flag is never seen. Measured: 2 here, 0 with the splice
+# removed, 2 at r3, 0 at r4 and r5.
+assert_eq "2" "$(tbg_run_fresh 'find Assets -name "*.meta" -exec sed -\
+i s/guid/x/ {} \;')" \
+    "still blocks a write flag that a backslash-newline splits in half"
 
 # ============================================================================================
-# THE COST, WITH A BOUND THAT IS ASSERTED RATHER THAN HOPED FOR.
+# THE COST, IN EVERY DIMENSION THAT MOVES IT — NOT ONLY THE ONE THAT WAS OPTIMISED.
 #
-# This hook runs on EVERY Bash tool call, so its worst case is a user-visible hang. Round 4 and
-# round 5 both shipped one, and neither had a cost assertion. Measured on this host (bash 5.2,
-# en_US.UTF-8, gawk 5.2.1) with a 1 048 576-character quote-leading token on the .meta find
-# route, one run each:
+# This hook runs on EVERY Bash tool call, so its worst case is a user-visible hang. Rounds 4 and
+# 5 both shipped one and neither had a cost assertion. The first version of THIS block had one,
+# and it was wrong in the way this whole task is about: it varied a single dimension — total
+# length, as one enormous quoted token — which is the dimension the awk tokeniser fixed. A
+# command line a QUARTER that size, differing only in the number of arguments, blew straight
+# through the same ceiling:
 #
-#     r3 546870f   1 144 ms
-#     r4 06883cc  44 632 ms
-#     r5 3fd22dc 123 504 ms      <- a PreToolUse hook this slow reads as a frozen session
-#     here        1 976 ms
+#     8 000 args in one clause   (248 KB)    32 605 ms      <- ceiling was 10 000 ms
+#    16 000 args in one clause   (496 KB)    80 975 ms
+#    20 000 args in one clause   (620 KB)   > 10 minutes
 #
-# The bound below is 10 000 ms: five times the measurement, and more than four times BELOW the
-# cheaper of the two versions it exists to catch. It is deliberately loose, because this
-# repository already documents its suite going flaky under CPU contention and a tight
-# wall-clock guard is the kind that gets deleted the first time CI is busy. A loose guard that
-# survives is worth more than a tight one that does not.
+# Attribution, measured by timing the two functions separately on the 8 000-arg payload: the awk
+# scan cost 114 ms and the bash loop cost 19 612 ms. The tokeniser was never the problem. It was
+# `args="$args$SEP$tok"` — O(n^2) in arguments per clause — and it is now an array append plus
+# one printf (see find_exec_flush). A cutoff was the other option the brief offers; making the
+# accumulation linear is strictly better and it is what shipped.
+#
+# So the guard now varies THREE dimensions, because a guard that varies one is a guard that
+# confirms the idea its author already had:
+#
+#                                          r3        r4         r5      here
+#   D1  1 MB in a single quoted token     831     48 964    162 951     2 961
+#   D2  16 384 args in one clause           -          -          -     1 401   (was > 10 min)
+#   D3  500 -exec clauses                 272        590        289       472
+#
+# ONE CEILING, 10 000 ms, for all three. Deliberately loose: this repository documents its suite
+# going flaky under CPU contention — the same commit measured 195 700 ms and 389 425 ms for the
+# whole suite — and a tight wall-clock guard is the kind that gets deleted the first time CI is
+# busy. 10 000 ms is >3x above the worst of the three and >4x below the cheapest version this
+# check exists to catch.
+#
+# WHAT IT STILL DOES NOT VARY, said plainly: the PRODUCT of D2 and D3 (many clauses each with
+# many arguments), and the number of unparseable markers. Measured once by hand at 200 clauses x
+# 100 args: 1 060 ms, i.e. it behaves as the sum rather than the product. Nothing asserts that.
 # ============================================================================================
-tbg_big="$(LC_ALL=C printf '%*s' 1048576 '' | LC_ALL=C tr ' ' 'a')"
-tbg_t0=$(( $(date +%s%N) / 1000000 ))
-tbg_bigrc="$(tbg_run_fresh "find Assets -name '*.meta' -exec grep -l '$tbg_big' {} \\;")"
-tbg_t1=$(( $(date +%s%N) / 1000000 ))
-tbg_elapsed=$(( tbg_t1 - tbg_t0 ))
-assert_eq "0" "$tbg_bigrc" \
-    "a megabyte-long quoted grep pattern is still a read"
-assert_eq "under" "$([ "$tbg_elapsed" -lt 10000 ] && echo under || echo "over: ${tbg_elapsed} ms")" \
-    "a 1 MB quote-leading command line costs under 10 000 ms end to end"
-unset tbg_big
+
+# Built by doubling — `s="$s $tok"` in a loop is the same O(n^2) this block is about, and a test
+# that takes a minute to build its own payload teaches the wrong lesson.
+tbg_dbl() { # tbg_dbl <seed> <times>
+    local _s="$1" _n="$2"
+    while [ "$_n" -gt 0 ]; do _s="$_s$_s"; _n=$(( _n - 1 )); done
+    printf '%s' "$_s"
+}
+tbg_cost() { # tbg_cost <payload> <expected-rc> <label>
+    local _t0 _t1 _rc _ms
+    _t0=$(( $(date +%s%N) / 1000000 ))
+    _rc="$(tbg_run_fresh "$1")"
+    _t1=$(( $(date +%s%N) / 1000000 ))
+    _ms=$(( _t1 - _t0 ))
+    assert_eq "$2" "$_rc" "$3 — the verdict, so the timing cannot pass by the hook doing nothing"
+    assert_eq "under" "$([ "$_ms" -lt 10000 ] && echo under || echo "over: ${_ms} ms")" \
+        "$3 — under 10 000 ms end to end"
+}
+
+# D1 — total length, as one quoted token. 2^20 characters.
+tbg_d1="$(LC_ALL=C printf '%*s' 1048576 '' | LC_ALL=C tr ' ' 'a')"
+tbg_cost "find Assets -name '*.meta' -exec grep -l '$tbg_d1' {} \\;" "0" \
+    "D1: a 1 MB quote-leading command line"
+unset tbg_d1
+
+# D2 — argument count in ONE clause. 2^14 = 16 384 arguments, 180 KB.
+tbg_d2="$(tbg_dbl ' aaaaaaaaaa' 14)"
+tbg_cost "find Assets -name '*.meta' -exec grep -l$tbg_d2 {} \\;" "0" \
+    "D2: 16 384 arguments in one clause"
+# and the destructive twin, so the flag is still found after 16 384 arguments
+tbg_cost "find Assets -name '*.meta' -exec sed$tbg_d2 -i {} \\;" "2" \
+    "D2: an in-place flag after 16 384 arguments"
+unset tbg_d2
+
+# D3 — clause count. 2^9 = 512 clauses.
+tbg_d3="$(tbg_dbl ' -exec grep -l guid {} \;' 9)"
+tbg_cost "find Assets -name '*.meta'$tbg_d3" "0" \
+    "D3: 512 read-only -exec clauses"
+unset tbg_d3
