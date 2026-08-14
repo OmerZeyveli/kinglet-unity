@@ -45,24 +45,53 @@ do not re-check:
 - live counts of agents, commands, skills and rules
 - the process provider `CLAUDE.md` declares still being installed for this user
 
-Map its output straight through: its `PASS` lines are **PASS**, its `WARN` lines are **WARNING**,
-its `FAIL` lines are **ERROR**. It exits 1 when anything FAILed and 0 otherwise. If the script is
-missing, that is itself an **ERROR** — the install is incomplete; re-run the Kinglet installer from
-the toolkit checkout.
+Map its output straight through: its `PASS` lines are **PASS**, its `WARN` lines are **WARNING**, its
+`FAIL` lines are **ERROR**, and its single `INFO agents=… commands=… skills=… rules=…` line is where
+the counts in the report below come from — do not re-derive those either.
+
+**Read the last line first.** A run that finished always ends with a summary of the form
+`N passed · N warning(s) · N failure(s)`. Three states, and the exit status alone does not separate
+them:
+
+| what you see | what it means |
+|---|---|
+| summary line, exit 0 | every check ran; nothing failed |
+| summary line, exit 1 | every check ran; at least one FAILed |
+| **no summary line, any exit status** | **the script aborted part-way through** |
+
+**An aborted run is an ERROR in its own right, and it is not the same finding as the last warning it
+printed.** Report it as such: *the health check aborted after `<the last line it printed>`; every
+check after that point did not run.* Do not treat what it never reached as passing, and do not offer
+its final warning as the diagnosis.
+
+That last row is not hypothetical. Measured on an otherwise healthy install with `.claude/rules/`
+deleted and the receipt absent: exit 1, **zero `FAIL` lines and no summary**, the run stopping just
+after the receipt check. A reader mapping only PASS/WARN/FAIL concludes *"no install receipt"* about
+a project whose five binding spine rules are gone. **Check 3's first item is the check that names
+that cause** — run it whenever the summary line is missing.
+
+If the script is missing altogether, that is an **ERROR** too — the install is incomplete; re-run the
+Kinglet installer from the toolkit checkout.
 
 ## Check 3: What the doctor script does not read
 
-Check 2 covers the install. These four are outside what it reads, so they are yours — and only
-these, so the duplication Check 2 removed does not creep back in:
+Check 2 covers the install. These five are outside what it reads — and only these, so the duplication
+Check 2 removed does not creep back in:
 
-1. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
+1. **The payload directories exist.** `.claude/commands/`, `.claude/agents/`, `.claude/hooks/`,
+   `.claude/skills/`, `.claude/rules/`. Any one missing → **ERROR**, naming which.
+   **This is also the first thing to check when Check 2 produced no summary line**, because the
+   script's count block reads four of these five directories in a row and cannot survive one of them
+   being absent — so a missing directory is both the most likely cause of an aborted run and a check
+   that run never reached.
+2. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
    other direction: for every `.sh` in `.claude/hooks/` except `_lib.sh`, confirm it appears in
    `PreToolUse` or `PostToolUse` in `.claude/settings.json`. Unregistered → **WARNING** (that hook
    never fires).
-2. **Executable bit.** Every hook file should be `-x`. Missing → **WARNING**.
-3. **Placement.** Blocking hooks (`block-*.sh`) belong in `PreToolUse`; warning hooks (`warn-*.sh`,
+3. **Executable bit.** Every hook file should be `-x`. Missing → **WARNING**.
+4. **Placement.** Blocking hooks (`block-*.sh`) belong in `PreToolUse`; warning hooks (`warn-*.sh`,
    `validate-*.sh`, `suggest-*.sh`) in `PostToolUse`. Misplaced → **WARNING**.
-4. **Frontmatter.** Each file in `.claude/commands/` has `name` and `description`; each in
+5. **Frontmatter.** Each file in `.claude/commands/` has `name` and `description`; each in
    `.claude/agents/` has `name`, `description`, `model` and `tools`. Invalid → **WARNING**.
 
 ## Check 4: Unity Project Structure
@@ -97,8 +126,8 @@ Present a summary report:
 === Unity Doctor Report ===
 
 MCP Server:        PASS  (Unity 2022.3.20f1, StandaloneWindows64)
-Install (script):   PASS  (N file(s) verified against the receipt; N agents, N commands, N skills, N rules — counts reflect the live install, not a fixed number)
-Hooks & frontmatter: PASS  (every hook registered, executable and correctly placed)
+Install (script):   PASS  (N file(s) verified against the receipt; N agents, N commands, N skills, N rules — read off the INFO line, not re-derived, and not a fixed number)
+Payload & hooks:    PASS  (all five directories present; every hook registered, executable and correctly placed)
 Project Structure:  WARNING — no test assembly definitions found
 
 Overall: 1 warning, 0 errors
