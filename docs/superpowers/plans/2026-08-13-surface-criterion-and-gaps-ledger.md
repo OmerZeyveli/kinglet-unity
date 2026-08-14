@@ -1204,6 +1204,30 @@ ADDRESSED, none returned to the fix loop.**
      and would build the artifact the skill explicitly refuses to build.** Row 4 left alone; whether
      it is legitimate or a hole is **a design question above this task**. **→ open, no owner.**
 
+**From Task 6's implementation (2026-08-14, `ac98925`, in review).**
+
+101. **The brief's stated reason for root rows staying sticky is wrong, and the implementer reported
+     rather than resolved it.** **No `install.sh` writer emits `user-modified` for any project-root
+     path** — all five write `toolkit` or nothing — so those rows can **never reach** the changed
+     arm; the outcome the brief wanted is right and its mechanism is not. And **`MCP-SETUP.md` *does*
+     ship a static reference copy**, contradicting the brief's *"no static reference copy"*, so
+     giving it an arm would be **behaviour with no producer**. **→ the plan sentence is wrong; fix
+     the plan, not the tree.**
+102. **Why `c2d27f1f` failed, stated precisely enough to reuse.** That attempt compared against the
+     **recorded** sha — and for a `user-modified` row the recorded sha **is the edited file's**, so it
+     matched **while the work was still there**. The new comparison is against the toolkit's shipped
+     copy, and **an edited file never equals the toolkit's bytes**, so it cannot answer yes while the
+     work exists. *Two comparisons that look alike and differ in exactly the direction that loses
+     data.*
+103. **A ledger item came back narrower than recorded.** The doctor's unreadable-directory undercount
+     (rc=0, `0 failure(s)`) reproduces **only when the receipt is absent**; with a receipt present the
+     missing-files check fires first and it exits 1. **A ledger item wider than the truth is as much
+     a defect as one that is narrower** — corrected here.
+104. **Two more line-number citations shifted further** (`tests/test-mcp-doc-instructions.sh`,
+     `tests/test-provenance-origins.sh`), comment-only, **already stale before this diff moved
+     them**. **→ Tasks 10/11.** *Fourth and fifth instances in this repository of the rot the
+     cite-by-anchor rule exists for.*
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
