@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "9e0cc0d9bed2630058419d44b45f841783a26a43",
+  "source_commit": "0038015f9c87762ffa0db8f944515781a01f6f78",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 62,
@@ -113,12 +113,12 @@
       },
       {
         "path": ".claude/hooks/bash-gate.sh",
-        "sha256": "709fe23af349346b6ee5d14d421b018325372375016cc08eb2a6b8952eba028a",
+        "sha256": "9ec98e8859e526491b0cbc1c4735eaff6803799796311a4b066068d8d6718085",
         "git_mode": "100755"
       },
       {
         "path": ".claude/hooks/block-legacy-input.sh",
-        "sha256": "20866ed4c6772c8fe5a0abff942e447fb84b14f943d9ef97ee128b1e9c2d68d0",
+        "sha256": "43366d638fba2baaa5a0e3739f8cfafdc77e1028e1f851e829861754606a98d9",
         "git_mode": "100755"
       },
       {
@@ -158,17 +158,17 @@
       },
       {
         "path": ".claude/hooks/warn-filename.sh",
-        "sha256": "60e529cb34e2c22718dae28def21227d6c3423725735ecbb5454020c48875109",
+        "sha256": "1167e2098f3b50af545b312f8f542e775d44737542b04eeed4d0a0a7933bc100",
         "git_mode": "100755"
       },
       {
         "path": ".claude/hooks/warn-platform-defines.sh",
-        "sha256": "ab8de70cfb21304db8b9f17f406ac7425735fe7bfaaa2bceacd31b1e7abc9570",
+        "sha256": "5667ccd8029f73edf285858f9c7ea7bc8fd69c4d7e55cb4d1f124c743cd9d1b6",
         "git_mode": "100755"
       },
       {
         "path": ".claude/hooks/warn-serialization.sh",
-        "sha256": "5453cfcf2e867384995b049bb5e638d3f677dcc2a60aca4d7fc83cf680fbc7f3",
+        "sha256": "4d1fd9b6bf3cf67c070a0ea55901ed1802df7ebb74669bf65737573262f8f3d9",
         "git_mode": "100755"
       },
       {
@@ -508,12 +508,12 @@
       "files": [
         {
           "path": ".claude/hooks/bash-gate.sh",
-          "sha256": "709fe23af349346b6ee5d14d421b018325372375016cc08eb2a6b8952eba028a",
+          "sha256": "9ec98e8859e526491b0cbc1c4735eaff6803799796311a4b066068d8d6718085",
           "git_mode": "100755"
         },
         {
           "path": ".claude/hooks/block-legacy-input.sh",
-          "sha256": "20866ed4c6772c8fe5a0abff942e447fb84b14f943d9ef97ee128b1e9c2d68d0",
+          "sha256": "43366d638fba2baaa5a0e3739f8cfafdc77e1028e1f851e829861754606a98d9",
           "git_mode": "100755"
         },
         {
@@ -553,17 +553,17 @@
         },
         {
           "path": ".claude/hooks/warn-filename.sh",
-          "sha256": "60e529cb34e2c22718dae28def21227d6c3423725735ecbb5454020c48875109",
+          "sha256": "1167e2098f3b50af545b312f8f542e775d44737542b04eeed4d0a0a7933bc100",
           "git_mode": "100755"
         },
         {
           "path": ".claude/hooks/warn-platform-defines.sh",
-          "sha256": "ab8de70cfb21304db8b9f17f406ac7425735fe7bfaaa2bceacd31b1e7abc9570",
+          "sha256": "5667ccd8029f73edf285858f9c7ea7bc8fd69c4d7e55cb4d1f124c743cd9d1b6",
           "git_mode": "100755"
         },
         {
           "path": ".claude/hooks/warn-serialization.sh",
-          "sha256": "5453cfcf2e867384995b049bb5e638d3f677dcc2a60aca4d7fc83cf680fbc7f3",
+          "sha256": "4d1fd9b6bf3cf67c070a0ea55901ed1802df7ebb74669bf65737573262f8f3d9",
           "git_mode": "100755"
         }
       ]
