@@ -179,41 +179,105 @@ rm -rf "$SHRUNK/.claude/state"
 # defect this fixture is about, pointed the other way. python3 rather than sed:
 # the entry is nested three deep in JSON and a text deletion can leave a file that
 # parses nowhere. The suite already depends on python3 in test-install-not-done.sh.
+# TWO hooks leave the payload, and the difference between them is the whole point.
+#
+# CUT_HOOK is untouched, so the prune deletes it and its registration is left
+# naming nothing. KEPT_HOOK the user has edited, so ORPHAN_KEPT leaves it on disk
+# — and a registration whose file is still there STILL FIRES, whatever the payload
+# now says. One fixture, both answers, on a state this installer creates itself.
+#
+# Without KEPT_HOOK this section pins that the check FIRES, not what it TESTS.
+# Measured: an install.sh whose predicate asked "is it still in the payload?"
+# instead of "is it still on disk?" passed every other assertion here. That
+# predicate is wrong on exactly this state, and self-contradictory within one run
+# — it warns that the file is not there while the summary beside it counts the
+# same hook live.
 CUT_HOOK='warn-filename.sh'
-rm -f "$SHRUNK/.claude/hooks/$CUT_HOOK"
-python3 - "$SHRUNK/.claude/settings.json" "$CUT_HOOK" <<'PY'
+KEPT_HOOK='warn-platform-defines.sh'
+UPG_CUT_HOOKS="$CUT_HOOK
+$KEPT_HOOK"
+UPG_CUT_N="$(printf '%s\n' "$UPG_CUT_HOOKS" | grep -c . || true)"
+
+while IFS= read -r upg_h; do
+  [ -n "$upg_h" ] || continue
+  rm -f "$SHRUNK/.claude/hooks/$upg_h"
+done <<< "$UPG_CUT_HOOKS"
+python3 - "$SHRUNK/.claude/settings.json" $UPG_CUT_HOOKS <<'PY'
 import json, sys
-path, hook = sys.argv[1], sys.argv[2]
-target = ".claude/hooks/" + hook
+path, hooks = sys.argv[1], sys.argv[2:]
+targets = [".claude/hooks/" + h for h in hooks]
 with open(path) as fh:
     doc = json.load(fh)
 events = doc.get("hooks", {})
 for event, groups in events.items():
     for group in groups:
-        group["hooks"] = [h for h in group.get("hooks", []) if target not in h.get("command", "")]
+        group["hooks"] = [h for h in group.get("hooks", [])
+                          if not any(t in h.get("command", "") for t in targets)]
 doc["hooks"] = {e: [g for g in gs if g.get("hooks")] for e, gs in events.items()}
 with open(path, "w") as fh:
     json.dump(doc, fh, indent=2)
     fh.write("\n")
 PY
 
+# `>>` CREATES. Either append below would manufacture the very file whose state it
+# is supposed to be perturbing, had the install above failed, so each is preceded
+# by the check that makes it an edit rather than a fixture.
+assert_file_exists "$UPG_DIR/.claude/settings.json" \
+  "the first install left a settings.json to edit — the append below perturbs it, it does not create it"
+assert_file_exists "$UPG_DIR/.claude/hooks/$KEPT_HOOK" \
+  "the first install left the hook the user is about to edit"
+
 # One appended newline is the entire difference between "ours" and "yours". This
 # is not a contrived edit: settings.json is where a plugin gets disabled or a
 # permission widened, so on a real project it has drifted long before the upgrade.
 printf '\n' >> "$UPG_DIR/.claude/settings.json"
+printf '\n# a line the user added\n' >> "$UPG_DIR/.claude/hooks/$KEPT_HOOK"
 UPG_SETTINGS_BEFORE="$(sha256sum "$UPG_DIR/.claude/settings.json" | cut -d' ' -f1)"
 
-UPG_OUT="$(bash "$SHRUNK/install.sh" --project-dir "$UPG_DIR" --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
-CTL_OUT="$(bash "$SHRUNK/install.sh" --project-dir "$CTL_DIR" --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+# The status is captured, not swallowed. `$(cmd | sed)` reports sed's rc, and exit
+# 0 is half the contract this section defends: the point of the Not done: block is
+# that a run which abandons work still ends 0 and says so. `|| UPG_RC=$?` rather
+# than a bare call, so the capture survives a future `set -e` in this file.
+UPG_RC=0
+CTL_RC=0
+bash "$SHRUNK/install.sh" --project-dir "$UPG_DIR" --yes > "$UPG_ROOT/upgrade.log" 2>&1 || UPG_RC=$?
+bash "$SHRUNK/install.sh" --project-dir "$CTL_DIR" --yes > "$UPG_ROOT/control.log" 2>&1 || CTL_RC=$?
+UPG_OUT="$(sed $'s/\x1b\\[[0-9;]*m//g' "$UPG_ROOT/upgrade.log")"
+CTL_OUT="$(sed $'s/\x1b\\[[0-9;]*m//g' "$UPG_ROOT/control.log")"
+
+# The dead-registration block's OWN list, not the whole log. Three blocks in this
+# run print a 7-space indented path — kept orphans, unregistered hooks, dead
+# registrations — so a log-wide grep for a hook name answers a different question
+# than the one being asked, and answers it wrongly for KEPT_HOOK, which appears
+# under kept orphans by design.
+UPG_DEAD_LIST="$(printf '%s\n' "$UPG_OUT" | awk '
+  /^warn Your settings.json was kept, so [0-9]+ hook registration\(s\)/ { inb = 1; next }
+  inb && /^ +\.claude\// { sub(/^ +/, ""); print; next }
+  inb { inb = 0 }
+')"
+
+assert_eq "0" "$UPG_RC" \
+  "the upgrade ends 0 — a run that reports abandoned work still succeeds"
 
 # The precondition, asserted rather than assumed: without the prune actually
 # removing the script, every assertion below would be green for the wrong reason.
 assert_eq "removed" "$([ -e "$UPG_DIR/.claude/hooks/$CUT_HOOK" ] && echo present || echo removed)" \
   "the retired hook's script is pruned even though the kept settings.json still names it"
 
+# The other precondition, and the one that gives the assertion after it something
+# to be about: the edited hook survives the cut, so its registration is live.
+assert_eq "present" "$([ -e "$UPG_DIR/.claude/hooks/$KEPT_HOOK" ] && echo present || echo removed)" \
+  "a hook the user edited survives the payload dropping it, so its registration still fires"
+
 # The warning names the dead entry, by path, on its own line.
-assert_eq "1" "$(printf '%s\n' "$UPG_OUT" | grep -cxF "       .claude/hooks/$CUT_HOOK" || true)" \
+assert_eq "1" "$(printf '%s\n' "$UPG_DEAD_LIST" | grep -cxF ".claude/hooks/$CUT_HOOK" || true)" \
   "the upgrade names the registration left pointing at a file the payload dropped"
+
+# And does NOT name the other one. This is the assertion that separates "is it on
+# disk?" from "is it in the payload?" — the two predicates agree everywhere except
+# on this state, and everything else in this section passes under either.
+assert_eq "0" "$(printf '%s\n' "$UPG_DEAD_LIST" | grep -cxF ".claude/hooks/$KEPT_HOOK" || true)" \
+  "a registration whose file is still there is not called dead, even though the payload dropped it"
 
 # And names ONLY it. Asserting that the cut hook appears is satisfied by a check
 # that reports every registration in the file as dead, which is a live mutant:
@@ -225,8 +289,8 @@ assert_eq "1" \
   "exactly one registration is reported dead — the ones whose files are still there are not"
 
 # The summary is honest about it. Derived from the tree, never typed: the
-# registration total is whatever this version's settings.json carries, and the cut
-# above removed exactly one of them from the payload while the project kept all.
+# registration total is whatever this version's settings.json carries, and of the
+# hooks cut from the payload above exactly one lost its file.
 UPG_REG_TOTAL="$(grep -oE '\.claude/hooks/[a-z_-]+\.sh' "$REPO_DIR/.claude/settings.json" | sort -u | grep -c . || true)"
 assert_eq "$((UPG_REG_TOTAL - 1)) ($UPG_REG_TOTAL registered, 1 dead)" \
   "$(printf '%s\n' "$UPG_OUT" | sed -n 's/^  Hooks  *//p')" \
@@ -236,8 +300,14 @@ assert_eq "$((UPG_REG_TOTAL - 1)) ($UPG_REG_TOTAL registered, 1 dead)" \
 # abandoned nothing. A registration this installer will not repair is abandoned
 # work, so it belongs in the block and not only in a warn line the reader scrolled
 # past four hundred lines ago.
+#
+# The decision is made in END and not by an `exit` inside the body. An awk that
+# exits early stops draining, the `printf` on the left of the pipe takes SIGPIPE,
+# and `pipefail` promotes 141 — the standing constraint this repository keeps
+# relearning. It is inert here only because the runner clears errexit before
+# sourcing, which is not a property to build on.
 assert_eq "found" \
-  "$(printf '%s\n' "$UPG_OUT" | awk '/^Not done:$/ { f = 1; next } f && /hook registration\(s\) listed above/ { print "found"; exit }')" \
+  "$(printf '%s\n' "$UPG_OUT" | awk '/^Not done:$/ { f = 1; next } f && /hook registration\(s\) listed above/ { hit = 1 } END { if (hit) print "found" }')" \
   "the dead registration reaches the Not done: block, not just a warn line"
 
 # WARN, DO NOT EDIT. The file was kept because it is the user's; measured by
@@ -247,13 +317,16 @@ assert_eq "found" \
 assert_eq "$UPG_SETTINGS_BEFORE" "$(sha256sum "$UPG_DIR/.claude/settings.json" | cut -d' ' -f1)" \
   "the kept settings.json is reported on and never rewritten"
 
-# The control. Same shrunk payload, same retired hook, a settings.json that is
-# still ours — so it is replaced, the entry goes with it, and there is nothing to
+# The control. Same shrunk payload, same retired hooks, a settings.json that is
+# still ours — so it is replaced, the entries go with it, and there is nothing to
 # report. A check that also fired here would fire on every ordinary upgrade.
+assert_eq "0" "$CTL_RC" \
+  "the control upgrade ends 0 too"
+
 assert_eq "0" "$(printf '%s\n' "$CTL_OUT" | grep -cxF "       .claude/hooks/$CUT_HOOK" || true)" \
   "a project that never edited settings.json gets the cut applied and is warned about nothing"
 
-assert_eq "$((UPG_REG_TOTAL - 1))" "$(printf '%s\n' "$CTL_OUT" | sed -n 's/^  Hooks  *//p')" \
+assert_eq "$((UPG_REG_TOTAL - UPG_CUT_N))" "$(printf '%s\n' "$CTL_OUT" | sed -n 's/^  Hooks  *//p')" \
   "the honest count collapses to a bare number when no registration is dead"
 
 rm -rf "$UPG_ROOT"
