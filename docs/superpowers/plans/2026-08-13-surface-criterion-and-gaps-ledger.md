@@ -1770,6 +1770,45 @@ ADDRESSED, none returned to the fix loop.**
      a Minor relayed without its measurement, which raised the floor to one below live and created a
      false positive whose message had two disjuncts and neither was true.*
 
+**From Task 11's review (2026-08-14). Spec ❌ — in fix round 1.**
+
+190. **A step was dropped silently, and that is the shape the loop exists to stop.** `.claude/UPSTREAM`
+     names **four** paths absent from an installed project — `provenance.tsv`, `provenance-skip.tsv`,
+     `MERGE-NOTES.md`, `check-provenance.sh` — exactly as the brief predicted, verified against a
+     real install. **`.claude/UPSTREAM` does install**, so it tells every user those things about
+     files that are not there. **It is the identical class as F4, which the same task fixed three
+     files away.** *A step not done is a finding; a step not done and not reported is the shape.*
+191. **The guard that closes the citation class understates its own blind spot by ~16×, and the
+     number in the sentence is itself underived.** Run at HEAD against the base tree with
+     `EXEMPT=""`, it catches **1** of the rotted live pointers mechanically — the six heredoc
+     introducers, three duplicate copies, two more, and **all five bare self-citations** land
+     in-range and non-blank. **And the enumeration adds to 19, not the "seventeen" written into the
+     shipped file twice with no derivation.** *An underived count, in the task whose subject is
+     underived counts.*
+192. **A guard probed the mechanism with one user and took the mechanism with eleven on faith.**
+     Deleting the kill switch from `_lib.sh` leaves `block-meta-edit.sh` **blocking at rc=2 with
+     `DISABLE_UNITY_HOOKS=1` set** while `tests/test-hooks.sh` stays **fully green**, because the
+     structural arm sees a `source` line and `continue`s. **One behavioural probe of any sourcer
+     closes it.**
+193. **"A new hook that does neither is named in the failure" is satisfiable by excess.** A hook
+     honouring **neither** switch but carrying both needles as **inert code** passes. *The header
+     anticipates the comment-prose version and strips comments; it does not anticipate the dead-code
+     version, which is what a half-finished copy-paste produces.*
+194. **Line-scoped exemptions exempt everything on the line.** `install.sh:999999` appended to an
+     exempt line is **green**; byte-identical on the adjacent line, **red**. **Eighteen exempt lines
+     are permanent blind spots for anything added to them — and they are exactly the lines a
+     maintainer edits when rewording a citation narrative.**
+195. **Two whole `docs/ARCHITECTURE.md` sections still document paths recorded `rule=absent`** —
+     `## Benchmarking` and `## Version Management`, naming `benchmarks/run-benchmarks.sh`,
+     `benchmarks/results/` and `upgrade.sh`. The round removed the two **directory-listing** entries
+     and generalised. **Shape (1), exactly: the sweep covered the block being edited.**
+196. **`xargs -a /dev/stdin` is a GNU extension and the flag is a measured no-op here** — `sweep` is
+     only ever called with the file list already on stdin, both forms checksummed byte-identical.
+     **Deleting it is a no-op on Linux and a fix on macOS.**
+197. **The fourth citation shape exists and it is `.gitignore:43`** — reachable by **no** sweep: A and
+     C need a non-empty path segment before the `.`, B needs a non-path character before the colon
+     and gets `e`. **It resolves today and will rot silently the next time a line is added above it.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
