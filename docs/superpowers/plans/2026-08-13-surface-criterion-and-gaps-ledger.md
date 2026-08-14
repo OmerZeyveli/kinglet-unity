@@ -1456,6 +1456,37 @@ ADDRESSED, none returned to the fix loop.**
      check is never consulted.** Class still correctly deferred; **its consequence widened and the
      disclosure had not.**
 
+**From Task 6's fix-round re-review (2026-08-14). Approved; one one-token round in flight.**
+
+141. **`cd`+`pwd` is logical, not physical, so the `--toolkit-dir` self-guard misses the symlink
+     class.** `cd <symlink-to-project> && pwd` returns the link path; `pwd -P` returns the target.
+     Three aliases — symlink → project, the project given as the symlink, a symlinked parent — each
+     `rc=0`, unrefused, **reporting a live edit as reverted**, which is the exact fail-open the guard
+     exists to prevent. **Remedy verified: `[ ! "$TOOLKIT_DIR" -ef "$PROJECT_DIR" ]`, one token,
+     bash 3.2 safe, refuses all four aliases and still allows the real checkout.** → in flight.
+142. **The duplicated two-arm mapping is RE-SCOPED, and the re-scoping corrects both the implementer
+     and the controller.** *"'Nothing would notice' overstates the danger and understates the
+     remedy."* A third write loop makes both mappings wrong **identically, not divergently**, and it
+     fails in the **sticky (safe)** direction; the real risk is **one file being fixed and not the
+     other**, whose cost is a wrong diagnostic, not data loss. **Dedup-by-extraction genuinely has no
+     home** — neither script sources anything and `.claude/hooks/_lib.sh` reaches neither. **The
+     cheap guard is ~6 lines on fixtures that already exist:** one assertion reading **both** verdicts
+     on **one** `.claude/scripts/*` fixture, which reds the moment either mapping moves without the
+     other. **And the hazard spans TWO `for group in scripts` loops** — the dry-run's and the real
+     one — one wider than the cross-comments say. **→ a sized, named item for whoever owns
+     cross-reader consistency, not an open-ended structural caveat.**
+143. **A naive fix was falsified rather than argued against.** The reviewer wrote the mutation *a
+     naive implementer would have shipped* — a raw-argument string comparison instead of the
+     resolved one — and got **1 failing, the relative-spelling arm.** *That is how you show an
+     assertion arm does distinct work.*
+144. **The `$EPROJ` fixture choice is verified, not merely plausible.** With the guard neutered, on a
+     **reverted** project the correct and degenerate answers are **the identical sentence**; only a
+     **live edit** discriminates. **A test written on the reverted fixture could not have failed.**
+145. **Two more stale line-number citations shifted further** — `tests/test-mcp-doc-instructions.sh`
+     and `tests/test-provenance-origins.sh`, both pointing into `scripts/studio-doctor.sh`, **both
+     already wrong at `b3eb097`.** Comment-only. **→ Tasks 10/11.** *Sixth and seventh instances of
+     the rot the cite-by-anchor rule exists for.*
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
