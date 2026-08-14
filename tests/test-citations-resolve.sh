@@ -60,16 +60,71 @@
 #   * IT CANNOT SEE A CITATION IT DOES NOT ENUMERATE. A fifth shape may exist. The fourth — a dotfile
 #     citation, `.gitignore:43` — was found by a reviewer while this bullet said "a fourth shape
 #     exists somewhere", and it was one line away in tests/test-pipeline-detector.sh.
-#   * IT READS THE LIVE SURFACES ONLY, AND THAT IS 141 OF 540 TRACKED FILES. `docs/superpowers/` and
-#     `docs/research/` are dated records of what was measured on a day; their citations are pinned to
-#     that day by construction and renumbering them would be the falsification this guard exists to
-#     prevent. But the unscanned 399 also include `templates/`, `migration/`, `tools/`, `spikes/`,
-#     `tests/kinglet*/` and every non-`.md` file at the root — a rotted citation appended to
+#   * IT READS THE LIVE SURFACES ONLY, AND THAT IS 125 OF 543 TRACKED FILES (measured 2026-08-14).
+#     `docs/superpowers/` and `docs/research/` are dated records of what was measured on a day; their
+#     citations are pinned to that day by construction and renumbering them would be the
+#     falsification this guard exists to prevent. The unscanned 418 also include `templates/`,
+#     `migration/`, `tools/`, `spikes/`, `tests/kinglet*/` and FIVE OF THE NINE non-`.md` files at
+#     the root — `.gitattributes`, `.gitignore`, `.shellcheckrc`, `LICENSE`, `VERSION`. The other
+#     four are scanned, because each is an explicit pathspec element below: `install.sh`,
+#     `uninstall.sh`, `provenance.tsv`, `provenance-skip.tsv`. A rotted citation appended to
 #     `templates/Model.cs.template` is green here. Derive both numbers, never transcribe them:
 #     `git ls-files | wc -l` against the pathspec below.
-#   * THE FLOOR BELOW IS A THRESHOLD, NOT A SCOPE CHECK. `LIVE_N >= 30` against a live set of 141
-#     survives losing three quarters of the pathspec. It catches a pathspec that empties, which is
-#     the failure it was written for; it does not catch one that narrows.
+#
+#     THAT CLAUSE READ "and every non-`.md` file at the root" until 2026-08-14, which was false for
+#     four files this guard has scanned since the day it was written — and false in a BLIND-SPOT
+#     LIST, the one place a maintainer reads to learn what is not covered. Understating coverage is
+#     the safe direction for a bug and the wrong direction for this list: it invites someone to add
+#     a second guard for ground already held.
+#
+#     UNTIL 2026-08-14 THAT SENTENCE WAS FALSE FOR TWO OF THE FIVE TREES IT NAMES, and the reason is
+#     one character of git pathspec semantics. `*` in a git pathspec CROSSES `/` unless the element
+#     carries `:(glob)` magic. So `'*.md'` — the element that reads as "root-level Markdown" — was
+#     matching Markdown at every depth, and this guard was reading SEVENTEEN files the bullet above
+#     declares out of scope: 13 under `spikes/` and 4 under `tests/kinglet/`. `tools/` and
+#     `tests/kinglet_spike/` are named in that list too and leaked nothing, but only because neither
+#     tracks a single `.md` — they were one file away from the same hole, not outside it.
+#     The element is now `:(glob)*.md`. See the depth note at the pathspec itself.
+#   * THE FLOOR BELOW IS A THRESHOLD, NOT A SCOPE CHECK, AND IT DOES NOT DETECT LOST COVERAGE.
+#     The floor compares `LIVE_N` against a constant, so it catches a narrowing that falls BELOW the
+#     constant and misses one that does not. Raising the constant MOVES that line; it does not remove
+#     it. Measured 2026-08-14 against the pathspec below: a floor of 100 catches the `.claude/*` drop
+#     at 63 and still misses the `docs/*.md` drop at 119. NO CONSTANT CLOSES THE CLASS, because for
+#     any constant there is a smaller narrowing above it — that, and not the size of whatever
+#     constant is in the code today, is why a bigger number is the wrong instrument.
+#
+#     HOW MUCH IT MISSES WAS MEASURED, 2026-08-14, and it is worse than "misses a small narrowing".
+#     Delete the `.claude/*` element from the pathspec below — the entire shipped payload, half the
+#     live set — and run this file. Every one of its five assertions still passes. The only counter
+#     that moves at all is shape C, by two, and BOTH of those are exemption-table rows, so the
+#     resolved-citation count does not move either: 26 before, 26 after.
+#
+#     AND AN UNMOVED COUNTER IS NOT PROOF THERE WAS NOTHING TO LOSE, so that is not where this rests.
+#     Plant a rotted pointer inside the dropped tree and the capability loss is direct: appending
+#     `<!-- probe: see .claude/NOTICE.md:999999 -->` to `.claude/rules/pc-console.md` fails this
+#     guard, by name, with `that file has 199 lines`, RC=1. Drop `.claude/*` from the pathspec and
+#     the identical tree goes fully green, RC=0, without mentioning the pointer at all. The 62 files
+#     were CHECKABLE, not merely counted — real detection disappears and nothing in the output says
+#     so. Re-derive rather than trusting any of these figures: delete an element, and diff the
+#     `sweep read`, `A=/B=/C=/D=` and `resolved` lines against a pristine run.
+#
+#     UNTIL 2026-08-14 THIS BULLET READ "a live set of 141", while the bullet above it had been
+#     corrected in the same commit to 125 — two figures for the same quantity in one comment block,
+#     in the file whose whole subject is numbers that rot where they were written. 141 was not even
+#     the old value: the pre-anchor measurement is 142. No set size is transcribed here now.
+#
+#     AND THE REPLACEMENT WAS FALSE, which is why this paragraph is longer than the fix. It read "a
+#     narrowing leaves the count above the threshold by construction, so raising 30 does not close
+#     it". Both halves were falsified by execution the same day. Narrow the pathspec to
+#     `scripts/*.sh install.sh uninstall.sh :(glob)*.md provenance*.tsv` and `LIVE_N` is 17: the
+#     floor FIRES, RC=1, so a narrowing plainly can go below it. And raising the floor to 100 catches
+#     the `.claude/*` drop this bullet uses as its own worked example. A stale NUMBER was replaced
+#     with a confident ARGUMENT, and the argument was wrong — in the bullet describing this guard's
+#     own coverage, in the file whose subject is exactly that. The surviving claim is the one above,
+#     which quantifies over all constants rather than reasoning about any one of them. Note also that
+#     nothing here now depends on the constant's value, because Task 5 owns it: an earlier draft of
+#     this bullet transcribed `30` three times, so changing the code would have rotted the prose in
+#     three places while every test stayed green.
 #   * IT CANNOT TELL A POINTER FROM A NARRATIVE. That judgement is the exemption table, written by
 #     hand, and a wrong row silences a real pointer. Each row names the exact token it exempts, so a
 #     wrong row silences one citation rather than a line.
@@ -101,9 +156,39 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # reach. What stands in for it is the exemption audit at the bottom — every row must still match text
 # that exists — plus the three shape floors above, which is thinner cover than the rest of the tree
 # gets. A reader adding a live `file:line` pointer to this file should resolve it by hand.
+#
+# DEPTH IS PER ELEMENT, AND IT IS NOT THE SHELL'S RULES. In a git pathspec `*` crosses `/`; only
+# under `:(glob)` magic does `*` stop at `/` (and `**` cross). Four elements below use `*` and they
+# do not all want the same thing, so each one says which:
+#
+#   'tests/*.sh'                 CROSSES deliberately, and it has a subject TODAY: anchoring it drops
+#                                exactly one file, `tests/fixtures/mkproject.sh`, which CLAUDE.md's
+#                                testing section documents as the way the installer gets exercised.
+#                                Measured, 41 unanchored against 40 anchored.
+#   'scripts/*.sh'               CROSSES deliberately and drops NOTHING if anchored — measured, 0 of
+#                                7, because nothing under `scripts/` is nested today. It is left
+#                                crossing for the first `scripts/<sub>/foo.sh`, not because of
+#                                anything in the tree now. Stated separately from the row above
+#                                rather than sharing its sentence, which is what it did until
+#                                2026-08-14: one plural verb over two elements, borrowing evidence
+#                                from the element that had some for the element that had none.
+#   '.claude/*'                  CROSSES deliberately. The payload is the whole nested tree.
+#   'docs/*.md'                  CROSSES deliberately: `docs/**/*.md`, less the two record trees the
+#                                `grep -vE` below strips.
+#   ':(glob)*.md'                MUST NOT CROSS. This is the root-level Markdown element. Unanchored
+#                                it read 17 files under `spikes/` and `tests/kinglet/` — see the
+#                                blind-spot bullet above. Its own neighbour is the tell, and that
+#                                tell is derivable without reading any comment: if `'*.md'` were
+#                                meant to cross, `'docs/*.md'` beside it would be dead code.
+#
+# `:(glob)` rather than a frozen six-file list, because this set has to keep moving with the tree: a
+# `SECURITY.md` added at the root tomorrow is a live surface, and an explicit list would leave it
+# unscanned with nothing to notice — the same hole, re-dug one commit later. It also keeps the
+# correction inside the pathspec instead of bolting a second mechanism onto the first (a downstream
+# `grep -v '/'`), which is one more pattern to get wrong on a host whose `grep` is not GNU's.
 LIVE_FILES="$(git ls-files \
   'tests/*.sh' 'scripts/*.sh' 'install.sh' 'uninstall.sh' \
-  '.claude/*' 'docs/*.md' '*.md' 'provenance.tsv' 'provenance-skip.tsv' 2>/dev/null \
+  '.claude/*' 'docs/*.md' ':(glob)*.md' 'provenance.tsv' 'provenance-skip.tsv' 2>/dev/null \
   | grep -vE '^docs/(superpowers|research)/' \
   | grep -vxF 'tests/test-citations-resolve.sh' | sort -u || true)"
 LIVE_N="$(printf '%s\n' "$LIVE_FILES" | grep -c . || true)"
