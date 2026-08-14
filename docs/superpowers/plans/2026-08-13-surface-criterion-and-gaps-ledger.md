@@ -1690,6 +1690,43 @@ ADDRESSED, none returned to the fix loop.**
      are common. *This is the audit's fourth durable shape, measured a second time: the check that
      catches a defect existing in a script nothing calls.*
 
+**From Task 4c's review (2026-08-14). In fix round 1.**
+
+177. **A guard that pins THAT a check fires rather than WHAT it tests — M5's shape from the other
+     side.** Swapping the project-disk existence test for a **payload** comparison leaves the whole
+     section **19/19 green**, and the two predicates diverge **on a state the installer itself
+     creates**: a user edits a hook, the next payload drops it, **`ORPHAN_KEPT` keeps the edited
+     script on disk**, the kept `settings.json` still registers it, **and the hook still fires.** The
+     shipped behaviour is correct and reports nothing dead; the payload comparison prints *"1 hook
+     registration(s) name files that are not there"* **beside a summary counting it live.** Coverage
+     gap, not defect. → in fix round.
+178. **Task 5's receipt-write guard has a SECOND blind spot beyond the one it declares as its only
+     one.** Its `STATED LIMIT` says the sole evasion is a command **spelled in no list** taking
+     `$RECEIPT` as its **last** argument. Measured counter-example:
+     `sed -i '' "$RECEIPT" 2>/dev/null || true` before `write_receipt || die` — **a verb from the
+     guard's own *reader* list, with `$RECEIPT` not final** — is a genuine second commit point and
+     the guard reports **58/58 green, `fn=1 inside=1 outside=0 unclassified=0`.** *A stated limit
+     that claims to be exhaustive is a claim like any other.* **→ open, for that guard's owner.**
+179. **The dead-registration predicate now exists three times and nothing asserts they agree** — the
+     new reverse block, `count_hooks()`, and `scripts/studio-doctor.sh`. **The failure mode is
+     already visible in a mutant's output: a warning that the file is not there, printed beside a
+     summary counting it live, in one run, with no test red.** Cheapest fix needs **no shared file
+     and no new provenance row**: compute the dead set once and let `count_hooks` consume it. **→
+     open.**
+180. **The character-class divergence is ruled a REAL hazard, and the derivation found six sites in
+     four files, not three in three.** `install.sh` ×3, `scripts/studio-doctor.sh` ×1,
+     `tests/test-install-prune.sh` ×1 (added by this task) all use `[a-z_-]+`;
+     `tests/test-derived-counts.sh` ×1 uses `[a-z0-9-]+`. **They split on exactly one file —
+     `_lib.sh` — which is registered nowhere.** Measured consequence: a registered-and-missing
+     `warn-2d.sh` is **invisible to the installer** while the membership guard sees it; `warn_x.sh`
+     is the reverse. **And it is one residual falsifier of `MCP-SETUP.md`'s absolute sentence** — a
+     dead registration outside the class yields exit 0 with no block. **→ open.**
+181. **The doctor's copy is still unasserted, and is now three lines away.** `scripts/studio-doctor.sh`
+     prints **15** `FAIL settings.json references a missing hook:` lines and exits **1** on the
+     broken upgrade; `/usr/bin/grep -rn 'missing hook' tests/` is empty and
+     `tests/test-studio-doctor.sh` contains **zero** occurrences of "hook". **Task 4c's new fixture
+     already builds a project with exactly one dead registration.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
