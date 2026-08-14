@@ -24,7 +24,7 @@ who ever runs the suite with a dirty `migration/` and is therefore the only one 
 |---|---|---|
 | 1 — the three hooks nothing has ever executed | **DONE**, merged `d770bf5` | `3ca4327..1ff204a` |
 | 2 — execution-keyed hook coverage | open *(brief pending — consumes Task 1's output)* | |
-| 3 — anchor the unanchored pathspecs | open | |
+| 3 — anchor the unanchored pathspecs | **DONE**, merged `3cc8aa8` | `4e299b6..ef8a7ab` |
 | 4 — the doctor's two remaining compensations | **DONE**, merged `22c232e` | `4e299b6..f868677` |
 | 5 — anti-vacuity floors, written | open | |
 | 6 — a heading inventory for `docs/` | open *(brief pending — cites Task 5)* | |
@@ -182,6 +182,31 @@ Print the non-silent byte count beside every zero.
   ledger from a description rather than from a measurement, told a later task to cite it as its worked
   example, and it took two agents reporting contradictory verdicts to surface it. **A ledger entry is
   a claim with the same shelf life as any other, and this file is read as if it were not.**
+
+## Task 3 — deferred
+
+**The surviving universal is literally false at one value, and the exception is self-excluding.**
+`tests/test-citations-resolve.sh`'s corrected bullet says *"no constant closes the class, because for
+any constant there is a smaller narrowing above it."* Measured: set the floor to `LIVE_N` itself —
+**125 green on pristine, 124 red on the smallest possible narrowing** (dropping
+`provenance-skip.tsv`, which contributes 1). **A constant does close it: the one equal to the live set
+size.**
+
+**Ruling: carried, cosmetic, one word.** The only closing constant is a **transcription of the live
+set size** — exactly what the two paragraphs above it forbid, in the bullet that exists *because*
+`141`/`125`/`142` rotted. At that value the floor stops being a floor: it fires on every legitimate
+file removal, and it stops closing the class the moment the tree grows. **No maintainer action
+changes** — Task 5 owns the constant, and both the written and the strictly-correct versions steer it
+away from "raise the number". `durably`, or `without transcribing the live set size`, makes it exact.
+
+**`tests/test-mcp-naming.sh`'s `TMN_LIST` is a frozen four-name root list** that already omits
+`CREDITS.md` and `MERGE-NOTES.md`, both tracked root Markdown — and `MERGE-NOTES.md` discusses MCP at
+length. **This is the decay Task 3's own `:(glob)` justification predicts, already realized in a
+sibling guard.** Routed here rather than fixed, because it is outside the brief's two-file scope.
+
+**The three transcriptions of the code constant are closed, not deferred** — the bullet now carries
+zero. The two surviving `30`s are a verbatim quotation of the withdrawn text and a historical
+statement about it; both stay true if Task 5 changes the constant.
 
 ## Task 4 — deferred, and one obligation the shipped comment already cites
 
