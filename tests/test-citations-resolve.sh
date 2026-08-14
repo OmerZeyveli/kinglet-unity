@@ -64,9 +64,18 @@
 #     `docs/superpowers/` and `docs/research/` are dated records of what was measured on a day; their
 #     citations are pinned to that day by construction and renumbering them would be the
 #     falsification this guard exists to prevent. The unscanned 418 also include `templates/`,
-#     `migration/`, `tools/`, `spikes/`, `tests/kinglet*/` and every non-`.md` file at the root — a
-#     rotted citation appended to `templates/Model.cs.template` is green here. Derive both numbers,
-#     never transcribe them: `git ls-files | wc -l` against the pathspec below.
+#     `migration/`, `tools/`, `spikes/`, `tests/kinglet*/` and FIVE OF THE NINE non-`.md` files at
+#     the root — `.gitattributes`, `.gitignore`, `.shellcheckrc`, `LICENSE`, `VERSION`. The other
+#     four are scanned, because each is an explicit pathspec element below: `install.sh`,
+#     `uninstall.sh`, `provenance.tsv`, `provenance-skip.tsv`. A rotted citation appended to
+#     `templates/Model.cs.template` is green here. Derive both numbers, never transcribe them:
+#     `git ls-files | wc -l` against the pathspec below.
+#
+#     THAT CLAUSE READ "and every non-`.md` file at the root" until 2026-08-14, which was false for
+#     four files this guard has scanned since the day it was written — and false in a BLIND-SPOT
+#     LIST, the one place a maintainer reads to learn what is not covered. Understating coverage is
+#     the safe direction for a bug and the wrong direction for this list: it invites someone to add
+#     a second guard for ground already held.
 #
 #     UNTIL 2026-08-14 THAT SENTENCE WAS FALSE FOR TWO OF THE FIVE TREES IT NAMES, and the reason is
 #     one character of git pathspec semantics. `*` in a git pathspec CROSSES `/` unless the element
@@ -76,9 +85,25 @@
 #     `tests/kinglet_spike/` are named in that list too and leaked nothing, but only because neither
 #     tracks a single `.md` — they were one file away from the same hole, not outside it.
 #     The element is now `:(glob)*.md`. See the depth note at the pathspec itself.
-#   * THE FLOOR BELOW IS A THRESHOLD, NOT A SCOPE CHECK. `LIVE_N >= 30` against a live set of 141
-#     survives losing three quarters of the pathspec. It catches a pathspec that empties, which is
-#     the failure it was written for; it does not catch one that narrows.
+#   * THE FLOOR BELOW IS A THRESHOLD, NOT A SCOPE CHECK, AND IT DOES NOT DETECT LOST COVERAGE.
+#     `LIVE_N >= 30` fires only when the pathspec collapses under thirty files. It cannot see a
+#     NARROWING, and that is a property of comparing against a CONSTANT rather than of the constant's
+#     value — a narrowing leaves the count above the threshold by construction, so raising 30 does
+#     not close it and is the wrong instrument.
+#
+#     HOW MUCH IT MISSES WAS MEASURED, 2026-08-14, and it is worse than "does not catch a narrowing".
+#     Delete the `.claude/*` element from the pathspec below — the entire shipped payload, half the
+#     live set — and run this file. Every one of its five assertions still passes. The only counter
+#     that moves at all is shape C, by two, and BOTH of those are exemption-table rows, so the
+#     resolved-citation count does not move either: 26 before, 26 after. This guard cannot tell that
+#     half its subject stopped existing. Re-derive rather than trusting these figures: delete an
+#     element, and diff the `sweep read`, `A=/B=/C=/D=` and `resolved` lines against a pristine run.
+#
+#     UNTIL 2026-08-14 THIS BULLET READ "a live set of 141", while the bullet above it had been
+#     corrected in the same commit to 125 — two figures for the same quantity in one comment block,
+#     in the file whose whole subject is numbers that rot where they were written. 141 was not even
+#     the old value: the pre-anchor measurement is 142. No set size is transcribed here now, which is
+#     the only version of this sentence that cannot go stale again.
 #   * IT CANNOT TELL A POINTER FROM A NARRATIVE. That judgement is the exemption table, written by
 #     hand, and a wrong row silences a real pointer. Each row names the exact token it exempts, so a
 #     wrong row silences one citation rather than a line.
@@ -115,9 +140,17 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # under `:(glob)` magic does `*` stop at `/` (and `**` cross). Four elements below use `*` and they
 # do not all want the same thing, so each one says which:
 #
-#   'tests/*.sh' 'scripts/*.sh'  CROSS deliberately. `tests/fixtures/mkproject.sh` is a live surface
-#                                — CLAUDE.md's testing section documents it as the way the installer
-#                                gets exercised — and anchoring these would silently drop it.
+#   'tests/*.sh'                 CROSSES deliberately, and it has a subject TODAY: anchoring it drops
+#                                exactly one file, `tests/fixtures/mkproject.sh`, which CLAUDE.md's
+#                                testing section documents as the way the installer gets exercised.
+#                                Measured, 41 unanchored against 40 anchored.
+#   'scripts/*.sh'               CROSSES deliberately and drops NOTHING if anchored — measured, 0 of
+#                                7, because nothing under `scripts/` is nested today. It is left
+#                                crossing for the first `scripts/<sub>/foo.sh`, not because of
+#                                anything in the tree now. Stated separately from the row above
+#                                rather than sharing its sentence, which is what it did until
+#                                2026-08-14: one plural verb over two elements, borrowing evidence
+#                                from the element that had some for the element that had none.
 #   '.claude/*'                  CROSSES deliberately. The payload is the whole nested tree.
 #   'docs/*.md'                  CROSSES deliberately: `docs/**/*.md`, less the two record trees the
 #                                `grep -vE` below strips.
