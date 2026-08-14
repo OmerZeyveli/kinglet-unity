@@ -1,6 +1,6 @@
 ---
 name: unity-ui
-description: "Use when the user wants a UI screen built — menu, HUD, settings panel, inventory screen. Writes the backing code and sets up the visual hierarchy via MCP; supports both UGUI Canvas and UI Toolkit."
+description: "Use after a design for the screen is approved — this is the build step for a menu, HUD, settings panel or inventory screen, not where a screen gets decided. Writes the backing code and sets up the visual hierarchy via MCP; supports both UGUI Canvas and UI Toolkit."
 user-invocable: true
 args: screen_description
 ---
@@ -34,14 +34,19 @@ ls -1 docs/features/*/design.md 2>/dev/null || true
   `.claude/skills/unity-brainstorming/SKILL.md` and come back with one. Do not dispatch the agent.
 - **Something listed** — open the one that covers this screen and build what it specifies. If none
   of them covers it, that is the same stop.
+- **Listed, but you cannot point to where the user approved it** — ask, and wait for the answer
+  before dispatching. The gate turns on "presented **and** approved", and your own reading of the
+  file is not the approval.
+
+**What the listing cannot tell you.** It reports that a design exists. It does not report that this
+one covers the screen you were asked for, and it cannot report an approval at all — approval happens
+in the conversation, not on disk. The three branches above are how each of those is settled; the
+listing is a necessary condition, never a sufficient one.
 
 **Why here and not in the agent.** `unity-ui-builder`'s tools are `Skill, Read, Write, Edit, Glob,
 Grep, mcp__UnityMCP__*` — no `Bash`, so it cannot run that check. This command body is executed by
-the session that dispatches it, which is where the check can actually run.
-
-**What the check cannot tell you.** A file on disk records a design; it does not record an approval,
-and it does not know which screen you were asked for. Both halves are yours to establish before
-dispatching — the listing is a necessary condition, never a sufficient one.
+the session that dispatches it, which is where the check can actually run. The agent carries the
+same precondition in prose, because it can also be dispatched directly and then never sees this file.
 
 ## Workflow
 

@@ -207,7 +207,7 @@ See [MCP-SETUP.md](../MCP-SETUP.md) for detailed setup and troubleshooting.
 
 **To build something:** don't type a command. Start at `unity-brainstorming`, which hands to `unity-planning`, where how the work gets executed is decided. The one exception is a throwaway scene made to try a mechanic — `/unity-prototype` — and that is a choice made before the work starts, never from part-way in.
 
-That applies to `/unity-scene` and `/unity-ui` above as much as to anything else. Both dispatch an agent that writes to your project through the MCP bridge, so both are the step that *builds* a screen or scene an approved design already specifies — never the step that decides one. Each states that precondition at the top of its own file.
+That applies to `/unity-scene` in the table above, and equally to `/unity-ui`, which is not listed there at all. Both dispatch an agent that writes to your project through the MCP bridge, so both are the step that *builds* a screen or scene an approved design already specifies — never the step that decides one. Each states that precondition in its own description and again at the top of its own file, and the two agents they dispatch state it a third time, for the case where another agent calls them directly.
 
 ---
 

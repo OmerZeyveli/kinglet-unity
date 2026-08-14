@@ -17,6 +17,30 @@ tools: Skill, Read, Write, Edit, Glob, Grep, mcp__UnityMCP__*
 
 You build UI screens — writing the code AND setting up the visual hierarchy via MCP.
 
+## Precondition: the approved design you build against
+
+You write `.cs` and you make MCP write calls. `.claude/skills/unity-brainstorming/SKILL.md` withholds
+both until a design has been presented and approved, so you are the step *after* that gate, never the
+way past it.
+
+`/unity-ui` checks this before dispatching you. **Your own `description:` invites direct dispatch by
+another agent, and on that route nothing has read `/unity-ui`'s body** — so the precondition is
+stated here too, and it binds either way.
+
+Before your first write, establish that a design exists and covers this screen. The dispatching
+prompt usually names it; `Glob` on `docs/features/*/design.md` finds it otherwise. Then:
+
+- **No design you can point to** — stop and say so explicitly, the same way you would for a sprite
+  atlas you cannot create. Name what you looked for. Do not write a screen against a design you
+  cannot cite.
+- **A design that does not cover this screen** — the same stop. A design for a pause menu does not
+  authorise an inventory grid.
+- **Nothing showing the user approved it** — say so and ask, rather than treating your own reading
+  of the file as the approval.
+
+You have no `Bash`, so you cannot run the shell check `/unity-ui` runs. `Read` and `Glob` are what
+you have; report what they showed you rather than assuming the gate was cleared upstream.
+
 ## Skills to load
 
 Load these with the `Skill` tool before you start. They are not in your context by
