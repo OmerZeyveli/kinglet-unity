@@ -11,6 +11,9 @@
 #
 # Usage:
 #   ./scripts/studio-doctor.sh [--project-dir /path/to/UnityProject]
+#   In an installed Unity project this file is ./.claude/scripts/studio-doctor.sh — which is the
+#   invocation install.sh's own closing "Next steps" prints, and the one most readers of this help
+#   are actually holding.
 #
 # Exits 1 if any check FAILs, 0 otherwise. (This used to always exit 0, which made it useless in CI.)
 #
@@ -51,7 +54,7 @@ print_first_5() {
   awk 'NF && NR <= 5 { printf "       %s\n", $0 }' <<< "$1"
 }
 
-usage() { sed -n '3,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 PROJECT_DIR="$(pwd)"
 while [ $# -gt 0 ]; do
@@ -385,10 +388,30 @@ fi
 
 # ── Payload sanity ───────────────────────────────────────────────────────────
 if [ -d "$CLAUDE_DIR" ]; then
-  A=$(find "$CLAUDE_DIR/agents" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-  C=$(find "$CLAUDE_DIR/commands" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-  S=$(find "$CLAUDE_DIR/skills" -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ')
-  R=$(find "$CLAUDE_DIR/rules" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+  # THE OTHER HALF OF THE PIPEFAIL TRAP, and the half no needle in the suite looks for. Everything
+  # else in this wave is about a READER that exits early and SIGPIPEs its writer. Here the WRITER
+  # fails and pipefail promotes THAT: `find` returns 1 for a path that does not exist, and
+  # `2>/dev/null` hides the message, not the status. `wc -l` still prints the correct `0`, so the
+  # VALUE was never wrong — only the pipeline's status, which a bare assignment under `set -e` acts
+  # on. Same consequence as SIGPIPE, opposite cause.
+  #
+  # The `if [ -d "$CLAUDE_DIR" ]` above is not the guard it looks like: it establishes the PARENT,
+  # and these four walk CHILDREN it says nothing about. Measured 2026-08-14 on a project with
+  # `.claude/` but no `.claude/agents/` — this health check died right here at rc=1 with no INFO
+  # line, no NOTICE.md check, no hook-existence check and NO SUMMARY. The toolkit's own diagnostic,
+  # dying on exactly the broken install it exists to diagnose.
+  #
+  # `|| true` rather than a `[ -d ]` per line: the count is already correct in every case, so there
+  # is nothing to repair but the status. It does also absorb a genuine mid-walk failure (a
+  # permission error deep in the tree), whose cost is an undercount reported as a count — acceptable
+  # here, because the alternative on today's code is no number and no report at all.
+  #
+  # uninstall.sh carries the same `find … | wc -l | tr` shape and does NOT need this: its guard is
+  # `if [ -d "$CLAUDE_DIR" ]` on the line immediately above it and it walks that same directory.
+  A=$(find "$CLAUDE_DIR/agents" -name '*.md' 2>/dev/null | wc -l | tr -d ' ' || true)
+  C=$(find "$CLAUDE_DIR/commands" -name '*.md' 2>/dev/null | wc -l | tr -d ' ' || true)
+  S=$(find "$CLAUDE_DIR/skills" -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ' || true)
+  R=$(find "$CLAUDE_DIR/rules" -name '*.md' 2>/dev/null | wc -l | tr -d ' ' || true)
   printf 'INFO agents=%s commands=%s skills=%s rules=%s\n' "$A" "$C" "$S" "$R"
   [ -f "$CLAUDE_DIR/NOTICE.md" ] && pass "NOTICE.md present (third-party licenses travel with the copy)" \
                                  || fail "NOTICE.md missing — the vendored MIT notices must ship with .claude/"

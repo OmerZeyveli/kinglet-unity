@@ -11,6 +11,7 @@ set -euo pipefail
 #
 # Usage:
 #   ./scripts/validate-asmdefs.sh [--all]
+#   In an installed Unity project this file is ./.claude/scripts/validate-asmdefs.sh.
 #   --all   Include detailed per-assembly output.
 # =============================================================================
 
@@ -33,6 +34,7 @@ ${BOLD}validate-asmdefs.sh${RESET} - Assembly definition graph checker for Unity
 
 ${BOLD}Usage:${RESET}
   ./scripts/validate-asmdefs.sh [--all]
+  ./.claude/scripts/validate-asmdefs.sh [--all]  (the installed copy)
 
 ${BOLD}Options:${RESET}
   --all    Show detailed per-assembly information.
@@ -175,25 +177,45 @@ while IFS= read -r -d '' asmdef_file; do
     refs_raw=$(jq -r '(.references // [])[] | select(startswith("GUID:") | not)' "$asmdef_file" 2>/dev/null || true)
     ASMDEF_REFS[idx]=$(printf '%s' "$refs_raw" | tr '\n' ' ')
 
+    # HERE-STRINGS, NOT `echo "$VAR" | grep -q…`, throughout this block. `grep -q` exits the instant
+    # it matches without draining stdin; if the writer is still writing it takes SIGPIPE, pipefail
+    # reports 141 for the whole pipeline, and because these all sit in an `if` CONDITION (where
+    # `set -e` is suspended) the script does not die — it takes the `else` branch. A match that IS
+    # there is reported as absent. That is fail-open: an Editor/Runtime violation goes unreported and
+    # the run still says "No violations".
+    #
+    # WHAT DECIDES IT IS SHAPE, NOT SIZE — measured 2026-08-14 at 1 KB / 50 KB / 120 KB / 400 KB.
+    # A ONE-LINE haystack never fires at any size: grep cannot decide a line until it has all of it,
+    # so it drains its input and the writer never sees a closed pipe. The SAME BYTES
+    # newline-separated fail open from about 50 KB up. `$include_platforms` and
+    # `$define_constraints` are `jq -r '…[]'` output — one array element per line, i.e. exactly the
+    # multi-line shape — and defineConstraints is author-written with no ceiling. `$name` is one
+    # short token. None of them is large enough today; the point is that nothing keeps them small,
+    # and the here-string costs nothing. bash writes a here-string out before grep is exec'd, so
+    # there is no live writer for grep's early exit to signal.
+    #
+    # tests/test-bash32-compat.sh now sweeps scripts/ for both readers, so this shape cannot return
+    # here unnoticed.
+
     # Determine if Editor assembly
     asmdef_dir_lower=$(echo "${ASMDEF_DIRS[idx]}" | tr '[:upper:]' '[:lower:]')
     include_platforms=$(jq -r '(.includePlatforms // [])[]' "$asmdef_file" 2>/dev/null || true)
     is_editor=false
-    if echo "$include_platforms" | grep -qi 'editor'; then
+    if grep -qi 'editor' <<< "$include_platforms"; then
         is_editor=true
-    elif [[ "$asmdef_dir_lower" == */editor* ]] || echo "$name" | grep -qi '\.editor'; then
+    elif [[ "$asmdef_dir_lower" == */editor* ]] || grep -qi '\.editor' <<< "$name"; then
         is_editor=true
     fi
     ASMDEF_IS_EDITOR[idx]="$is_editor"
 
     # Determine if Test assembly
     is_test=false
-    if [[ "$asmdef_dir_lower" == */tests* ]] || [[ "$asmdef_dir_lower" == */test* ]] || echo "$name" | grep -qi '\.tests\|\.test'; then
+    if [[ "$asmdef_dir_lower" == */tests* ]] || [[ "$asmdef_dir_lower" == */test* ]] || grep -qi '\.tests\|\.test' <<< "$name"; then
         is_test=true
     fi
     override_refs=$(jq -r '(.overrideReferences // false)' "$asmdef_file" 2>/dev/null || true)
     define_constraints=$(jq -r '(.defineConstraints // [])[]' "$asmdef_file" 2>/dev/null || true)
-    if echo "$define_constraints" | grep -q 'UNITY_INCLUDE_TESTS'; then
+    if grep -q 'UNITY_INCLUDE_TESTS' <<< "$define_constraints"; then
         is_test=true
     fi
     ASMDEF_IS_TEST[idx]="$is_test"
@@ -201,7 +223,7 @@ while IFS= read -r -d '' asmdef_file; do
     # testOnly field (Unity doesn't have this natively, but some projects use defineConstraints)
     # We consider it "test only" if defineConstraints includes UNITY_INCLUDE_TESTS
     test_only=false
-    if echo "$define_constraints" | grep -q 'UNITY_INCLUDE_TESTS'; then
+    if grep -q 'UNITY_INCLUDE_TESTS' <<< "$define_constraints"; then
         test_only=true
     fi
     ASMDEF_TEST_ONLY[idx]="$test_only"
@@ -293,10 +315,19 @@ for ((ei = 0; ei < ${#ASMDEF_NAMES[@]}; ei++)); do
 
             other_name="${ASMDEF_NAMES[$ej]}"
             other_refs="${ASMDEF_REFS[$ej]:-}"
-            # Left as `echo | grep -qw` — Task 9 examined this exact line (an asmdef's own
-            # reference list, jq-derived, bounded in practice) and classified it clean; not
-            # redone here.
-            if echo "$other_refs" | grep -qw "$name"; then
+            # Task 9 left this as `echo "$other_refs" | grep -qw "$name"` on the ground that the
+            # reference list is "bounded in practice". Re-run 2026-08-14, that ground is the wrong
+            # reason for a right answer: measured at 1 KB / 50 KB / 120 KB / 400 KB, the one-line
+            # form of this pipeline never fires at ANY size (grep must read a whole line before it
+            # can decide, so it drains its writer), while the same bytes newline-separated fail open
+            # from ~50 KB. What makes this line safe is therefore the `tr '\n' ' '` at the
+            # ASMDEF_REFS assignment above, which flattens jq's per-line output into a single line —
+            # not the number of references. Delete that `tr` and this becomes a live fail-open bug
+            # at a size no test in this repo constructs.
+            #
+            # Converted anyway: a here-string is safe under BOTH shapes, so it stops depending on a
+            # property of a line seventy lines away that nothing asserts.
+            if grep -qw "$name" <<< "$other_refs"; then
                 err "Runtime assembly '$other_name' references Editor assembly '$name'."
                 editor_issues=true
             fi

@@ -6,6 +6,7 @@
 #
 # Usage:
 #   ./scripts/generate-claude-md.sh [--facts-only] [project-dir]   > CLAUDE.md
+#   In an installed Unity project this file is ./.claude/scripts/generate-claude-md.sh.
 #
 #   --facts-only   Emit ONLY the auto-generated facts block (the content that
 #                  lives between the generated:begin/end markers). Used to
@@ -38,15 +39,27 @@ info()  { echo "${CYAN}[INFO]${RESET}  $*" >&2; }
 warn()  { echo "${YELLOW}[WARN]${RESET}  $*" >&2; }
 error() { echo "${RED}[ERROR]${RESET} $*" >&2; }
 
-# 3,24 is the header block between its two `# ====` rules, and both numbers are derived from the
-# file rather than guessed at: the first line that is neither a comment nor blank is 27
-# (`set -euo pipefail`), the last comment line before it is the closing rule at 25, and the slice
-# already starts one past the opening rule at 2 — so it ends one before the closing one, at 24.
+# A newline held in a variable, so no `$'…'` appears inside a parameter-expansion pattern below.
+# install.sh and scripts/studio-doctor.sh carry the reasoning at their own `NL=`: bash 3.2's parser
+# cannot be exercised from this host, a macOS pass is planned, and `"$NL"` inside the pattern is
+# unambiguous in every bash. Used by the asmdef-name read further down.
+NL=$'\n'
+
+# 3,25 is the header block between its two `# ====` rules, and both numbers are derived from the
+# file rather than guessed at: the first line that is neither a comment nor blank is the
+# `set -euo pipefail` below the header, the last comment line before it is the closing rule, and the
+# slice already starts one past the opening rule at 2 — so it ends one before the closing one.
 # It read `3,17` until 2026-08-13, which is the FIRST line of the eight-line paragraph below, so the
 # shipped `--help` stopped at "…had this script write" and the sentence never finished. This script
 # is one of the ones install.sh copies into $PROJECT_DIR/.claude/scripts/, so that reached users.
+# It became `3,25` on 2026-08-14 when the Usage block gained the installed-path line — the end
+# number moves with the header and there is nothing but this comment and the guard to move it.
 # tests/test-help-ranges.sh now renders this `--help` and every other one built the same way.
-usage() { sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+#
+# The line numbers above were REMOVED from this paragraph deliberately. It used to name 27, 25, 2
+# and 24 by hand, and one added header line made three of the four wrong at once while the fourth
+# stayed right by luck. The guard derives A and B from the line below, so the prose does not have to.
+usage() { sed -n '3,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 # ---------------------------------------------------------------------------
 # Args
@@ -254,7 +267,39 @@ info "Architecture stack: VContainer=$VC_PRESENT MessagePipe=$MP_PRESENT UniTask
 ASMDEF_LIST=""
 while IFS= read -r asmdef; do
     [ -n "$asmdef" ] || continue
-    name=$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$asmdef" 2>/dev/null | head -1)
+    # NOT `sed -n '…' "$asmdef" | head -1`, which is what this replaced, and which killed the whole
+    # script. `head -1` exits the instant it has one line, without draining stdin; sed keeps writing;
+    # once sed's output exceeds the pipe capacity sed takes SIGPIPE, pipefail promotes 141 to the
+    # substitution's status, and a BARE `name=$(…)` assignment is not exempt from `set -e`. The
+    # document goes to stdout, so the caller gets ZERO BYTES — and install.sh runs this inside
+    # `if bash "$GEN" … 2>/dev/null`, which swallows the diagnostic and writes no CLAUDE.md at all.
+    #
+    # Measured 2026-08-14 on a .asmdef with 4000 versionDefines entries (sed emits 80 KB, over the
+    # 64 KiB pipe capacity): exit 141, 0 bytes of document, dying immediately after the
+    # "Architecture stack" line. The same file cut to 20 entries (413 B) exits 0 — which is the
+    # whole shape of this trap: it passes every test written against a healthy project.
+    #
+    # sed's full output is captured — command substitution drains its writer, there is no reader to
+    # exit early — and the first line is taken with a parameter expansion. On every input sed can
+    # READ, that is byte-for-byte what `| head -1` produced: verified across pretty-printed,
+    # minified, versionDefines-only, no-name, empty, no-trailing-newline, CRLF and multibyte asmdefs.
+    #
+    # THE `|| true` IS A DELIBERATE BEHAVIOUR CHANGE, and an unreadable file is the one input on
+    # which old and new differ. It closes a SECOND silent-death path that has nothing to do with
+    # SIGPIPE: when sed cannot read the file at all it exits non-zero, and the old bare assignment
+    # let `set -e` kill the script exactly as the pipe did. Measured 2026-08-14 on a `chmod 000`
+    # .asmdef — old: rc=1, zero bytes of document; new: rc=0, whole document, with the
+    # `[ -n "$name" ] || name=$(basename …)` line below supplying the name from the filename.
+    # Strictly better, and written down rather than left as a nicety because `|| true` also absorbs
+    # a genuine failure: an unreadable asmdef is now indistinguishable HERE from one carrying no
+    # "name" field. Both land on the basename fallback, which is the right answer for both — but
+    # anyone adding a different fallback needs to know the two cases arrive together.
+    #
+    # The greedy `.*"name"` prefix is left exactly as it was: on a pretty-printed asmdef it picks the
+    # assembly name, on a minified one it picks the LAST "name" on the line, and changing that is a
+    # behaviour question this fix deliberately does not open.
+    name_lines=$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$asmdef" 2>/dev/null || true)
+    name=${name_lines%%"$NL"*}
     [ -n "$name" ] || name=$(basename "$asmdef" .asmdef)
     rel_path="${asmdef#"$PROJECT_DIR"/}"
     ASMDEF_LIST="${ASMDEF_LIST}${name} (${rel_path})"$'\n'

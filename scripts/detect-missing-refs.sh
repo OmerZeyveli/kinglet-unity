@@ -9,6 +9,7 @@ set -euo pipefail
 #
 # Usage:
 #   ./scripts/detect-missing-refs.sh [--path <dir>]
+#   In an installed Unity project this file is ./.claude/scripts/detect-missing-refs.sh.
 #   Defaults to Assets/ under the nearest Unity project root.
 # =============================================================================
 
@@ -31,6 +32,7 @@ ${BOLD}detect-missing-refs.sh${RESET} - Find broken references in Unity YAML fil
 
 ${BOLD}Usage:${RESET}
   ./scripts/detect-missing-refs.sh [--path <dir>]
+  ./.claude/scripts/detect-missing-refs.sh [--path <dir>]  (the installed copy)
 
 ${BOLD}Options:${RESET}
   --path <dir>   Directory to scan (defaults to Assets/).
@@ -184,7 +186,19 @@ process_file() {
     while IFS=: read -r lineno line; do
         [[ -z "$lineno" ]] && continue
         # Match guid: followed by all zeros (either 16 or 32 hex digits)
-        if echo "$line" | grep -qE 'guid:\s*(0{16}|0{32})'; then
+        #
+        # Here-string, not `echo "$line" | grep -qE …`. `grep -q` exits on its first match without
+        # draining stdin; the writer then takes SIGPIPE, pipefail promotes 141, and because this is
+        # an `if` CONDITION (where `set -e` is suspended) the effect is not a crash but a wrong
+        # answer — a null GUID that IS present is reported as absent, and the scan still says clean.
+        # Measured 2026-08-14: what decides is shape, not size. A ONE-LINE haystack never fires at
+        # any size, because grep must read the whole line before it can decide and therefore drains
+        # its writer; newline-separated content of the same size fails open from ~50 KB. `$line` here
+        # is one line of Unity YAML by construction (`IFS=: read` off `grep -n`), so this site could
+        # not fire — but that is a property of the loop above it, not of this line, and the
+        # here-string is safe under either. tests/test-bash32-compat.sh now sweeps scripts/ for the
+        # shape, so the distinction no longer has to be re-derived by each reader.
+        if grep -qE 'guid:\s*(0{16}|0{32})' <<< "$line"; then
             report "NULL GUID" "$filepath" "$lineno" "$(echo "$line" | sed 's/^[[:space:]]*//')"
             (( null_guid_count += 1 ))
         fi
