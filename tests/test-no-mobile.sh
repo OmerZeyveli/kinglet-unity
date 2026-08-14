@@ -87,18 +87,74 @@ SCAN_DIRS=(.claude/ docs/ scripts/ examples/ templates/)
 # which is the no-op direction this block exists for — not that every alternative in it still binds.
 # Covering all eleven would mean a canary per alternative and a list that has to be kept in step
 # with the pattern by hand, which is the shape this file's own history argues against.
-SCAN_STATE="ok"
-for SCAN_D in "${SCAN_DIRS[@]}"; do
-  [ -d "$SCAN_D" ] || SCAN_STATE="scan root $SCAN_D does not exist, so every sweep below silently read nothing from it"
-done
+#
+# PER SOURCE, NOT PER UNION — and that is the whole of what changed here on 2026-08-14.
+#
+# The roots check above USED TO BE `SCAN_FILES=$(find "${SCAN_DIRS[@]}" -type f | wc -l)` followed
+# by `[ "$SCAN_FILES" -ge 1 ]`. One number over five roots. `docs/` alone holds 186 files, so that
+# floor cleared with every one of `.claude/agents`, `.claude/commands`, `.claude/hooks`,
+# `.claude/rules` and `.claude/skills` emptied — MEASURED 2026-08-14 in a clone with ZERO files
+# under `.claude/`: **17 passed, 0 failed, rc 0**, byte-identical in verdict to a healthy tree.
+# `assert_absent`'s nine calls in section 1 are all trivially true on an empty tree, which is what
+# made that green look plausible. See docs/ANTI-VACUITY.md: a floor over a summed multi-source
+# subject cannot detect one source dying, however tight the number — 1 or 60, the union floor sees
+# `docs/` and stops.
+#
+# THE SOURCE SET IS DERIVED, NOT LISTED. Every scan root, plus every immediate subdirectory of
+# `.claude/` — because `.claude/` is a container whose children die independently, and it is those
+# children that hold the payload. A subdirectory added to `.claude/` becomes a source the day it
+# lands, with nobody editing a list here. `.claude/state/` is IN the set deliberately: it is tracked
+# through `.gitkeep`, so it is non-empty in every fresh clone, and if that file goes the directory
+# disappears from every checkout — which is a change someone should have to make on purpose.
+#
 # `{ find …; } | wc -l`, with find's non-zero status swallowed INSIDE the braces. A missing root
 # makes find exit 1, pipefail promotes it, and at a bare assignment site `set -e` ends the file —
-# measured while writing this block: with one root renamed, this file died here silently after
-# section 1 and reported no failure of its own. The very check written to catch an absent root was
-# killed by the absent root.
-SCAN_FILES=$( { find "${SCAN_DIRS[@]}" -type f 2>/dev/null || true; } | wc -l | tr -d ' ')
-[ "$SCAN_FILES" -ge 1 ] || SCAN_STATE="the five scan roots hold no files at all"
-assert_eq "$SCAN_STATE" "ok" "the mobile sweep has roots to read ($SCAN_FILES file(s)) — an absent payload must not read as a clean one"
+# measured while writing the previous version of this block: with one root renamed, this file died
+# here silently after section 1 and reported no failure of its own. The very check written to catch
+# an absent root was killed by the absent root.
+SCAN_SOURCES=$( { printf '%s\n' "${SCAN_DIRS[@]}"
+                  find .claude -mindepth 1 -maxdepth 1 -type d 2>/dev/null || true
+                } | sed 's#/*$##' | sort -u )
+SCAN_SOURCE_N=$(printf '%s\n' "$SCAN_SOURCES" | grep -c . || true)
+
+SCAN_STATE="ok"
+SCAN_CENSUS=""
+SCAN_DEAD=""
+SCAN_FILES=0
+while IFS= read -r SCAN_D; do
+  [ -n "$SCAN_D" ] || continue
+  if [ ! -d "$SCAN_D" ]; then
+    SCAN_STATE="scan source $SCAN_D does not exist, so every sweep below silently read nothing from it"
+    continue
+  fi
+  SCAN_N=$( { find "$SCAN_D" -type f 2>/dev/null || true; } | wc -l | tr -d ' ')
+  SCAN_CENSUS="${SCAN_CENSUS}${SCAN_D}=${SCAN_N} "
+  SCAN_FILES=$((SCAN_FILES + SCAN_N))
+  # ACCUMULATED, not overwritten. A sentinel that is reassigned reports only the LAST dead source,
+  # and on a fully emptied payload that named `.claude/state` — the least interesting of the seven —
+  # while the six that matter went unmentioned. The census beside it carries the numbers either way;
+  # this carries the names.
+  [ "$SCAN_N" -ge 1 ] || SCAN_DEAD="${SCAN_DEAD}${SCAN_D} "
+done <<< "$SCAN_SOURCES"
+[ -z "$SCAN_DEAD" ] || SCAN_STATE="scan source(s) holding no files at all: ${SCAN_DEAD}— every sweep below read nothing from them while the remaining sources kept this check green"
+
+# THE FLOOR ON THE CENSUS ITSELF, one level up, and it is not decoration: if SCAN_SOURCES ever
+# resolves to nothing the loop above runs zero times, SCAN_STATE stays "ok", and the per-source
+# check reports a serene green over no sources at all — the same defect it was just written to
+# close. `${#SCAN_DIRS[@]}` is a property of this file, not of the tree, so an emptied tree cannot
+# move it: the census must carry at least one row per declared root. It moves with the array, so it
+# cannot go stale either.
+[ "$SCAN_SOURCE_N" -ge "${#SCAN_DIRS[@]}" ] || SCAN_STATE="the source derivation produced $SCAN_SOURCE_N source(s) for ${#SCAN_DIRS[@]} declared scan root(s) — the per-source check below has no sources to check"
+
+# A FLOOR WHOSE REFERENCE THE MUTATION ALSO MOVES IS NOT A FLOOR — measured on the line above, on
+# its first mutation run. `SCAN_DIRS=()` drives `${#SCAN_DIRS[@]}` to 0, so `-ge 0` is trivially
+# true; SCAN_SOURCES still holds the six `.claude/` subdirectories the `find` contributes, so every
+# per-source check passes; and sections 3, 4 and 5 then sweep NO ROOTS AT ALL. Result: **17 pass /
+# 0 fail**, a full green over a sweep with nothing in its scope, from the block written to stop
+# exactly that. The array is the scope of the real `grep -r` calls below, so it gets its own
+# absolute floor rather than a relative one. docs/ANTI-VACUITY.md records this as rule F4.
+[ "${#SCAN_DIRS[@]}" -ge 1 ] || SCAN_STATE="SCAN_DIRS is empty, so sections 3, 4 and 5 sweep no roots at all and every clean result below is worthless"
+assert_eq "$SCAN_STATE" "ok" "every mobile-sweep source has files in it — $SCAN_CENSUS(total $SCAN_FILES) — an emptied payload must not read as a clean one"
 
 # `ASTC 6x6`, not `ASTC_6x6`: `_` is a word character, so `\bASTC\b` does NOT match inside
 # `ASTC_6x6` — measured while writing this canary, which is the canary earning its keep on its first
