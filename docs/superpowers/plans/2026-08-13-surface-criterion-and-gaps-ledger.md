@@ -12,47 +12,44 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-### MERGED AND GREEN as of 2026-08-14 — Tasks 9, 13 and 10 are in the branch
+### MERGED AND GREEN — seven tasks are in the branch
 
-`git log --oneline -8` from `c27b21f`. **Both gates pass on the merged tree:**
+**1, 3, 4, 9, 10, 12, 13.** Both gates pass on the merged tree, re-measured after every merge:
 
-- `bash tests/run-tests.sh` → **`Total: 2654  Passed: 2651  Failed: 0  Skipped: 3`, rc=0**, of which
-  **1444** results came from 2 python suites. **35** ANSI-stripped headers == `ls tests/test-*.sh |
-  wc -l` **35**.
+- `bash tests/run-tests.sh` → **rc=0, `Total: 2758  Passed: 2755  Failed: 0  Skipped: 3`**, of which
+  1444 results came from 2 python suites. **35** ANSI-stripped headers == `ls tests/test-*.sh | wc -l`
+  **35**.
 - `bash scripts/check-provenance.sh` → **`provenance OK`**.
-- Baseline regenerated twice against committed merged trees, which is **the one situation where
-  `--dry-run` is trustworthy** (R6's defect is that it reads the anchor commit's tree; after the
-  merge commit that tree is the right one): **11 records** for Tasks 9 + 13 (2 + 9, exactly what the
-  two reports derived), then **1** for Task 10's `_lib.sh`.
-- **H2 is resolved by measurement, not by hope.** Task 9's approach rests on `ub_section`'s
-  `/^#{1,3} /` boundary in a file Task 10 edited, and that collision is invisible in either worktree.
-  On the merged tree `tests/test-surface-references.sh` is **111 PASS / 0 FAIL**, Task 9's section is
-  present, and the interval is untouched at both sites.
-- **The suite total moved as predicted and every quoted figure before this line is now invalid.**
-  Task 10 changed the runner's tally arithmetic: 1189 → 2654, with python results counted per result
-  instead of per file.
+- Baseline regenerated at each merge against the **committed merged tree** — the one situation where
+  `--dry-run` is trustworthy, since R6's defect is that it reads the anchor commit's tree and after a
+  merge commit that *is* the right tree. Drift so far: **11** (Tasks 9 + 13), **1** (Task 10), **0**
+  (Task 4), **6** (Task 3), **0** (Task 12).
+- **H2 resolved by measurement.** Task 9's approach rested on `ub_section`'s `/^#{1,3} /` boundary in
+  a file Task 10 edited, and that collision is invisible from inside either worktree. On the merged
+  tree the guard is **111 PASS / 0 FAIL**, Task 9's section is present, the interval is untouched at
+  both sites.
+- **Every suite total written before Task 10 merged is invalid.** It changed the runner's tally
+  arithmetic — python results counted per result rather than per file — so 1189 became 2653 and has
+  moved with each merge since. **Re-measure; never transcribe.**
 
 ### STILL IN FLIGHT
 
-**Task 4 is merged too** (`5b636d3`…`8056f53`, three commits) and **drifts no baseline** — confirmed
-by a `--dry-run` against the committed merged tree returning `0 change(s)`.
-
 | task | worktree | branch | scratch root | state |
 |---|---|---|---|---|
-| 2b | `…/kinglet-wt/task-2b` | `task/2b-tokeniser-quote-model` | `/tmp/kinglet-2b-NprXPW` | fix round 1; based on `5b636d3` |
-| 3 | `…/kinglet-wt/task-3` | `task/3` | `/tmp/kinglet-t3-jquDlJ` | dispatched from `75ea1de` |
-| 12 | `…/kinglet-wt/task-12` | `task/12` | `/tmp/kinglet-t12-rmvH9V` | dispatched from `75ea1de` |
-| 5 | `…/kinglet-wt/task-5` | `task/5` | `/tmp/kinglet-t5-vCm1jg` | dispatched from `75ea1de` |
+| 2b | `…/kinglet-wt/task-2b` | `task/2b-tokeniser-quote-model` | `/tmp/kinglet-2b-NprXPW` | fix round **2** (two one-line guard additions); based on `5b636d3` |
+| 5 | `…/kinglet-wt/task-5` | `task/5` | `/tmp/kinglet-t5-vCm1jg` | fix round **1** (three Important); based on `75ea1de` |
+| 7 | `…/kinglet-wt/task-7` | `task/7` | `/tmp/kinglet-t7-Co4LNJ` | dispatched from `05d9cfe` |
 
-**Task 5 is the only one touching `install.sh`, and it is the first task to build on Task 4's
-rewrite** — the `EXIT`-trap receipt, the origin trim on both `install.sh` readers, and the
-`MODIFIED_FILES` / `EDITED_FILES` / `UNREADABLE_ORIGINS` split. **It also carries ledger item 18**:
-the `> "$RECEIPT"` structural guard, which is the single edit the three remaining `install.sh` owners
-cannot make silently.
+**Task 5 owns `install.sh`; Task 7 only runs it.** Both are based on trees the branch has since
+moved past — `provenance.tsv` is the shared file and the rows are disjoint, so concatenate the note
+appends by hand and **keep apostrophes straight**.
 
 ### Remaining, in batch order
 
-`{5, 3, 12}` → `{6, 7}` → `{8, 4b, 4c, 2c}` → `{11}` alone. **Re-derive every figure at each
+**2c, 4b, 4c, 6, 8, 11.** Task 6 waits on Task 5 (`install.sh`); Task 8 waits on Task 7;
+2c waits on 2b; 4b and 4c are the `install.sh` lane after 6. **Task 11 runs alone and last** — it
+conflicts with nearly every other task on a file, **and its subject is the claims the others
+falsify.** **Re-derive every figure at each
 boundary; nothing above this line is inherited.**
 
 ---
