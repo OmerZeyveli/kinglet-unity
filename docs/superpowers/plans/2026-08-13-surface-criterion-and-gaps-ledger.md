@@ -932,6 +932,59 @@ ADDRESSED, none returned to the fix loop.**
     **six** read the mode, not the "eight/five" it records. **That second one is a live stale claim
     inside a test file. → Task 11.**
 
+**From Task 3's and Task 12's reviews (2026-08-14). Both are in fix round 1.**
+
+63. **A new class nobody has swept: the pipeline whose LEFT side fails.** `scripts/studio-doctor.sh`
+    dies at `A=$(find "$CLAUDE_DIR/agents" -name '*.md' 2>/dev/null | wc -l | tr -d ' ')` when the
+    directory is missing — `find` exits 1, `pipefail` promotes it, `set -e` kills the script:
+    **rc=1, zero `FAIL` lines, no summary.** Four consecutive assignments share the shape. **This is
+    the opposite cause from the trap Task 12 owns** — there a *reader* exits early and SIGPIPEs its
+    writer; here the *writer* fails — and **neither of Task 12's needles reaches it.** Task 12's
+    reviewer swept for early-exiting readers and found none beyond `tail -1`; **that is the wrong
+    direction for this one.** Routed to Task 12 to rule on scope and to derive whether other swept
+    pipelines have a failure-capable left side.
+64. **`/unity-doctor` Check 2 says `It exits 1 when anything FAILed and 0 otherwise`, and that is
+    false** — the death above produces rc=1 with no FAIL and no summary, and a model following Check
+    2's own `PASS`/`WARN`/`FAIL` mapping reports **WARNING** on a project whose entire
+    `.claude/rules/` is gone. **The text Task 3 deleted caught exactly this** (*"Verify expected
+    directories exist … Any missing directories → ERROR"*). **The duplication removal was right and
+    a coverage narrowed silently underneath it, while the commit's own text claims coverage.** → in
+    Task 3's fix round.
+65. **A satisfied exemption is stale by definition, and the handover made keeping it the default.**
+    `tests/test-shipped-citations.sh`'s `SC_REACH_PENDING` entry is consulted **only** for scripts
+    already found unreferenced, so once Task 7 wires the generator the entry goes inert **and
+    stays** — from then on that script can be wired *and unwired again* with no red, permanently.
+    Measured: entry present + reference added → green; entry present + reference absent → green.
+    **They differ by a reference and agree on green.** Task 3's report said *"you may delete it; you
+    are not required to"*, which makes a quiet permanent relaxation the expected outcome. → in Task
+    3's fix round, with the guard failing when a pending name **is** already named.
+66. **Two shipped statements in Task 12's own commit name the wrong reason.**
+    `provenance.tsv`'s `generate-claude-md.sh` row and `tests/test-bash32-compat.sh`'s ruling block
+    both say the failing install *"prints no diagnostic"*. **It prints two** — a generic
+    `warn CLAUDE.md generation failed — skipped.` and a Next-steps line. What `2>/dev/null` swallows
+    is **the generator's own diagnostic**, so the install exits 0 with no `CLAUDE.md` and only a
+    warning that does not name the cause. **This is the defect class the task is about, committed in
+    the round that names it** — the same round that overturned an exclusion for exactly this shape.
+67. **The widened pipe sweep reports green over zero files**, and the sibling guard from the same
+    wave already carries the fix. Mutation verified applied: scope pointed at a nonexistent directory
+    → **7 pass / 0 fail over an empty file set**. The round's own comment claims the derived glob
+    means *"no list here can go stale"* — **true for additions, false for an emptied scope.**
+    `tests/test-help-ranges.sh` opens with a non-empty index assertion; one line closes it.
+68. **`tests/test-install-dryrun.sh`'s own record went stale when Task 4 landed, and nothing guards
+    it.** It says *"of the eight row writers, five read the mode and three hardcode it"*. Derived at
+    HEAD: **nine** writers, **six** read the mode, **three** hardcode — the *three* half and the
+    three names are right, the other two figures are wrong. **It is Task 4's rot** (Task 4 added the
+    ninth writer and the sixth `stat -c`), and Task 12 correctly measured it and handed it back
+    rather than editing a file outside its Files line from a concurrent worktree. **→ whichever task
+    owns `install.sh`'s numbers next.**
+69. **Three smaller measured facts worth not re-deriving.** `test-help-ranges.sh`'s "six" is a
+    **different six** from the six installed scripts — only three overlap, so "green on all six"
+    does not mean what it reads like. The **heredoc `--help` texts** in three scripts are unguarded:
+    corrupting one leaves the suite green, documented as out of scope, so *"the suite checks every
+    `--help`"* is not true. And **all six scripts genuinely run from both `./scripts/` and
+    `./.claude/scripts/`**, so Task 12's additive fix was the right shape — a flat rewrite would have
+    been wrong in the other direction.
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
