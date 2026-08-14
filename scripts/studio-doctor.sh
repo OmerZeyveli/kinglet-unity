@@ -573,6 +573,58 @@ if [ -d "$CLAUDE_DIR" ]; then
   S=$(find "$CLAUDE_DIR/skills" -name 'SKILL.md' 2>/dev/null | wc -l | tr -d ' ' || true)
   R=$(find "$CLAUDE_DIR/rules" -name '*.md' 2>/dev/null | wc -l | tr -d ' ' || true)
   printf 'INFO agents=%s commands=%s skills=%s rules=%s\n' "$A" "$C" "$S" "$R"
+
+  # ── The payload directories, as a VERDICT and not as four numbers ──────────
+  #
+  # THE COUNTS ABOVE ARE NOT A FINDING A READER CAN ACT ON, AND FOR TWO OF THE FIVE DIRECTORIES THEY
+  # ARE NOT PRINTED AT ALL. `.claude/hooks/` is walked nowhere above; `.claude/agents/` is walked and
+  # its count is printed as INFO, which no reader maps to WARN or FAIL. Measured 2026-08-14 on a
+  # --variant urp fixture with the receipt removed — the teammate's-git-clone shape this file's own
+  # receipt branch names, where the receipt cannot notice the files are gone:
+  #
+  #   `.claude/agents/*.md` deleted → `INFO agents=0`, `0 failure(s)`, exit 0.
+  #   `.claude/rules/` deleted      → `INFO rules=0`,  `0 failure(s)`, exit 0.
+  #
+  # A project with no agents at all, and a project with none of the five binding spine rules, both
+  # certified healthy by the toolkit's own health check. `/unity-doctor` carried a hand-written
+  # compensation for exactly this — "read those four numbers yourself: any zero is this item's
+  # ERROR" — which is a check performed by a model against a script that was already holding the
+  # answer. The script issues the verdict now and that item is deleted rather than kept alongside.
+  #
+  # PRESENT-BUT-EMPTY IS A SEPARATE STATE FROM MISSING and both are reported, because they arrive by
+  # different routes: an interrupted install, a partial `git rm`, or a `.gitignore` that swallowed a
+  # payload directory's contents leaves the directory itself behind. A bare `[ -d ]` existence test
+  # passes on all of them.
+  #
+  # WHY `fail` AND NOT `warn`: a payload directory with nothing in it is not a degraded install, it
+  # is a surface the model cannot reach at all — an empty `.claude/rules/` means every spine rule
+  # this toolkit binds on is absent from the project while `.claude/` looks installed.
+  #
+  # The glob per directory is the one that makes a file COUNT there: skills are directories, so the
+  # payload file is `<name>/SKILL.md`, and a `.claude/skills/` holding empty directories holds no
+  # skills. Same `find … | wc -l` shape as the counts above, `|| true` inside the substitution for
+  # the same reason.
+  PAYLOAD_BAD=0
+  for pd_spec in "agents:*.md" "commands:*.md" "hooks:*.sh" "rules:*.md" "skills:SKILL.md"; do
+    pd_name="${pd_spec%%:*}"
+    pd_glob="${pd_spec#*:}"
+    if [ ! -d "$CLAUDE_DIR/$pd_name" ]; then
+      fail "Payload directory .claude/$pd_name/ is missing — re-run install.sh --project-dir \"$PROJECT_DIR\""
+      PAYLOAD_BAD=$((PAYLOAD_BAD + 1))
+    else
+      pd_n=$(find "$CLAUDE_DIR/$pd_name" -name "$pd_glob" 2>/dev/null | wc -l | tr -d ' ' || true)
+      if [ "$pd_n" -eq 0 ]; then
+        fail "Payload directory .claude/$pd_name/ is present but holds no $pd_glob — re-run install.sh --project-dir \"$PROJECT_DIR\""
+        PAYLOAD_BAD=$((PAYLOAD_BAD + 1))
+      fi
+    fi
+  done
+  # `if`, not `[ … ] && pass …`: a false test as the last command of this block is a status the next
+  # edit should not have to reason about. Same choice, same reason, as the STICKY arm above.
+  if [ "$PAYLOAD_BAD" -eq 0 ]; then
+    pass "Payload complete: agents, commands, hooks, rules and skills all present and non-empty"
+  fi
+
   [ -f "$CLAUDE_DIR/NOTICE.md" ] && pass "NOTICE.md present (third-party licenses travel with the copy)" \
                                  || fail "NOTICE.md missing — the vendored MIT notices must ship with .claude/"
   # Every hook settings.json references must exist, or the hook silently never fires.

@@ -42,6 +42,9 @@ do not re-check:
   origin it cannot read
 - `.claude/NOTICE.md` present
 - every hook `settings.json` references existing on disk
+- the five payload directories — `agents/`, `commands/`, `hooks/`, `rules/`, `skills/` — each
+  present **and holding at least one file of its own kind**, reported as a `FAIL` naming the
+  directory, not as a count
 - live counts of agents, commands, skills and rules
 - the process provider `CLAUDE.md` declares still being installed for this user
 
@@ -68,46 +71,45 @@ The third row is why you read the last line rather than the exit status — but 
 produces it today**, so do not go looking for one. The case that used to, an otherwise healthy
 install with `.claude/rules/` deleted and the receipt absent, no longer does: measured 2026-08-14,
 that run **exits 0, prints a full summary, and reaches every later check**, because the count block
-now tolerates a missing directory instead of dying on it. What it prints instead is `rules=0` inside
-its `INFO` line, and a reader mapping only PASS/WARN/FAIL still concludes *"no install receipt"*
-about a project whose five binding spine rules are gone. **A zero on the `INFO` line is a finding
-and the script reports it as neither WARN nor FAIL** — which is Check 3's first item, and the reason
-to run that item on every run, not only when the summary line is missing.
+now tolerates a missing directory instead of dying on it. For a while it then said nothing else
+about it either — `rules=0` inside the `INFO` line and no verdict — so a reader mapping only
+PASS/WARN/FAIL concluded *"no install receipt"* about a project whose five binding spine rules were
+gone, and Check 3 carried a hand-written compensation telling you to read those numbers yourself.
+**The script issues that verdict itself now:** measured 2026-08-14 on the same fixture,
+`FAIL Payload directory .claude/rules/ is missing`, `1 failure(s)`, exit 1. The compensation is
+deleted rather than kept beside it. The `INFO` line is still counts and only counts — take the
+report's numbers from it, never a verdict.
 
 If the script is missing altogether, that is an **ERROR** too — the install is incomplete; re-run the
 Kinglet installer from the toolkit checkout.
 
 ## Check 3: What the doctor script does not read
 
-Check 2 covers the install. These five are outside what it **reports** — and only these, so the
-duplication Check 2 removed does not creep back in. *Reports*, not *reads*: item 1 below is falsified
-by "outside what it reads", because the script does read those directories — it counts them and
-prints the counts as `INFO`, which is not a verdict a reader can act on.
+Check 2 covers the install. These four are outside what it **reports** — and only these, so the
+duplication Check 2 removed does not creep back in. The list was five until 2026-08-14: the
+payload-directory item is gone because the script issues that verdict itself now, and that is the
+direction to take every time one of these becomes something the script reports — delete the item,
+do not keep both.
 
-1. **The payload directories exist and are not empty.** `.claude/commands/`, `.claude/agents/`,
-   `.claude/hooks/`, `.claude/skills/`, `.claude/rules/`. Any one missing → **ERROR**, naming which.
-   **Test contents, not just existence.** An empty-but-present `.claude/agents/` passes a bare
-   existence test and passes the doctor script too, which prints `INFO agents=0`, `0 failure(s)` and
-   exits 0 — a project with no agents at all reported healthy by both. Any one present and empty →
-   **ERROR**, naming which.
-   **The script's `INFO` line is not a substitute for this item.** Its count block reads four of
-   these five — `agents`, `commands`, `skills`, `rules`, never `hooks` — and prints what it finds,
-   absent and empty alike, as `INFO agents=… commands=… skills=… rules=…`. It issues no verdict on
-   any of them, so a payload directory that is gone shows up as a zero and never as a `FAIL`. Read
-   those four numbers yourself: any zero is this item's **ERROR**, whatever the summary line says.
-2. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
+1. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
    other direction: for every `.sh` in `.claude/hooks/` except `_lib.sh`, confirm it appears in
-   `PreToolUse` or `PostToolUse` in `.claude/settings.json`. Unregistered → **WARNING** (that hook
-   never fires).
-3. **Executable bit.** Every hook file should be `-x`. Missing → **WARNING**.
-4. **Placement.** This rule covers only the hooks registered on `PreToolUse` and `PostToolUse`. **A
+   `.claude/settings.json` under **some** event. **A hook registered on any event — `PreToolUse`,
+   `PostToolUse`, `SessionStart`, `Stop` — fires on that event and is registered by definition; do
+   not report it.** Registered under no event at all → **WARNING** (that hook never fires). This is
+   the same axis the **Placement** item below draws its line on, and for the same reason: the
+   session hooks this toolkit ships sit on `SessionStart` and `Stop`, so a rule keyed on
+   `PreToolUse`/`PostToolUse` alone reports every one of them on a completely healthy install.
+2. **Executable bit.** Every hook file should be `-x`. Missing → **WARNING**.
+3. **Placement.** This rule covers only the hooks registered on `PreToolUse` and `PostToolUse`. **A
    hook registered on any other event — `SessionStart`, `Stop` — is correctly placed by definition;
-   do not report it.** Among the tool-event hooks: one that can block a tool call belongs in
-   `PreToolUse`; one that only warns or records belongs in `PostToolUse`. **Classify by what the
-   hook does with its exit status, not by its filename** — `block-*.sh` and `warn-*.sh` are the only
-   self-describing prefixes, and `bash-gate.sh` and `guard-project-config.sh` (both blocking) and
-   `track-edits.sh` (recording) match neither. Misplaced → **WARNING**.
-5. **Frontmatter.** Each file in `.claude/commands/` has `name` and `description`; each in
+   do not report it.** (The registration item above draws the same line on the same axis. Change one
+   and change the other; they were four lines apart and disagreeing until 2026-08-14.) Among the
+   tool-event hooks: one that can block a tool call belongs in `PreToolUse`; one that only warns or
+   records belongs in `PostToolUse`. **Classify by what the hook does with its exit status, not by
+   its filename** — `block-*.sh` and `warn-*.sh` are the only self-describing prefixes, and
+   `bash-gate.sh` and `guard-project-config.sh` (both blocking) and `track-edits.sh` (recording)
+   match neither. Misplaced → **WARNING**.
+4. **Frontmatter.** Each file in `.claude/commands/` has `name` and `description`; each in
    `.claude/agents/` has `name`, `description`, `model` and `tools`. Invalid → **WARNING**.
 
 ## Check 4: Unity Project Structure
@@ -142,8 +144,8 @@ Present a summary report:
 === Unity Doctor Report ===
 
 MCP Server:         PASS  (Unity 2022.3.20f1, StandaloneWindows64)
-Install (script):   PASS  (N file(s) verified against the receipt; N agents, N commands, N skills, N rules)
-Payload & hooks:    PASS  (all five directories present; every hook registered, executable and correctly placed)
+Install (script):   PASS  (N file(s) verified against the receipt; payload complete; N agents, N commands, N skills, N rules)
+Hooks & metadata:   PASS  (every hook registered, executable and correctly placed; frontmatter valid)
 Project Structure:  WARNING — no test assembly definitions found
 
 Overall: 1 warning, 0 errors

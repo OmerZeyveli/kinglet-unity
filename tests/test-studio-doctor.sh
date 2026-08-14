@@ -345,4 +345,159 @@ TSD_HEAD_HITS=$(grep -v '^[[:space:]]*#' "$TSD_DOCTOR" | grep -c '|[[:space:]]*h
 assert_eq "0" "$TSD_HEAD_HITS" \
     'no `| head` remains in studio-doctor.sh outside its comments (spec criterion 12)'
 
+# ── Two helpers, and why neither of them is an assertion ───────────────────
+#
+# NEITHER MAY PUT A VERDICT TOKEN INTO AN ASSERTION'S ARGUMENTS. The runner tallies each file's
+# results by grepping its output for `(^|[[:space:]])(PASS|FAIL|SKIP)(:|[[:space:]])`
+# (anchor: `grep -n 'file_fail=' tests/run-tests.sh`), and both `assert_contains` and `assert_eq`
+# echo their needle or their expected/actual values in the FAILURE branch. So an assertion written
+# directly against the doctor's `PASS All hooks referenced…` line would, on the day it went red,
+# print that token and be counted as a passing result — a red assertion inflating the pass count.
+# This file already records the same trap one level out, for assertion MESSAGES. So the doctor's
+# verdict lines are reduced to a token-free value BEFORE they reach an assertion: a 0/1 flag, or a
+# count.
+#
+# tsd_verdict <output> <line substring> — the verdict word the doctor printed on the line carrying
+# that substring, or the empty string when it printed no such line at all. Colour codes are empty
+# here because the doctor's `[ -t 1 ]` is false inside `$( )`.
+tsd_verdict() { awk -v needle="$2" 'index($0, needle) { print $1 }' <<< "$1"; }
+
+# tsd_failures <output> — the failure count off the summary line, exactly, never by substring.
+# `assert_contains "$out" "1 failure(s)"` is satisfied by `11 failure(s)`, which is the same defect
+# measured in this file on 2026-08-13 against `1500` matching `11500`. Splitting the summary line on
+# whitespace and taking the field before the `failure(s)` token is exact and stays ASCII — the `·`
+# separators are multibyte and are never made a field separator here.
+tsd_failures() { awk '{ for (i = 1; i <= NF; i++) if ($i == "failure(s)") print $(i - 1) }' <<< "$1"; }
+
+# ── The hook-registration sweep: settings.json → disk ──────────────────────
+#
+# ASSERTED BY NOTHING UNTIL 2026-08-14. `scripts/studio-doctor.sh` has had this check all along, and
+# it is the one that diagnoses the state a cross-version upgrade produces: install.sh keeps the
+# user's `settings.json`, the payload drops a hook, and the kept file goes on registering a script
+# that is no longer there — a registration Claude Code reports nothing about, ever. The doctor prints
+# `FAIL settings.json references a missing hook:` per dead entry and exits 1. Measured on the
+# 2026-08-14 tree before this section existed: `/usr/bin/grep -rn 'missing hook' tests/` returned
+# nothing and this file contained zero occurrences of the string `hook`, so the check that catches
+# the defect lived in a script no test ever questioned.
+#
+# THE COUNT IS PINNED TO EXACTLY ONE, not merely to the planted name being present. A mutant that
+# deletes the existence test reports EVERY registration as dead, and "the dead hook is named" is
+# satisfied by naming all twelve. That exact mutant survived the first version of the sibling guard
+# in `tests/test-install-prune.sh`; it is cheaper to pin the count than to rediscover why.
+echo ""
+echo "--- Test: the hook-registration sweep, settings.json → disk ---"
+TSD_DEAD="/tmp/kinglet-doctor-deadhook-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_DEAD" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_DEAD" --yes >/dev/null 2>&1
+TSD_DEAD_SETTINGS="$TSD_DEAD/.claude/settings.json"
+
+# (a) The healthy control. Without it, every assertion below is satisfied by a doctor that reports
+#     every registration dead on every project, and the passing condition of the mutation check is
+#     silence about a state that was never quiet.
+TSD_DEAD_OK_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_DEAD" 2>&1)
+TSD_DEAD_OK_RC=$?
+if [ "$(tsd_verdict "$TSD_DEAD_OK_OUT" 'hooks referenced by settings.json exist')" = "PASS" ]
+then TSD_DEAD_OK_VERDICT=1; else TSD_DEAD_OK_VERDICT=0; fi
+assert_eq "1" "$TSD_DEAD_OK_VERDICT" \
+    "the sweep issues a verdict on a healthy install, rather than being silent about the registrations"
+TSD_DEAD_OK_N=$(awk '/references a missing hook/ { n++ } END { print n + 0 }' <<< "$TSD_DEAD_OK_OUT")
+assert_eq "0" "$TSD_DEAD_OK_N" \
+    "…and names no dead registration on a project whose payload and settings.json arrived together"
+assert_eq "0" "$TSD_DEAD_OK_RC" \
+    "…and a healthy project's registrations do not make the doctor exit non-zero"
+
+# (b) One registration pointed at a script that is not there. Rewriting an existing entry rather
+#     than appending one keeps the JSON valid without a parser — this suite has none — and the
+#     sweep reads settings.json with a grep, so the state under test is reached either way.
+#     The name is lowercase-and-hyphens on purpose: the sweep's own `[a-z_-]+` character class is
+#     what decides whether a registration is visible to it at all.
+awk '{ gsub(/\.claude\/hooks\/track-edits\.sh/, ".claude/hooks/warn-does-not-exist.sh"); print }' \
+    "$TSD_DEAD_SETTINGS" > "${TSD_DEAD_SETTINGS}.probe"
+mv "${TSD_DEAD_SETTINGS}.probe" "$TSD_DEAD_SETTINGS"
+TSD_DEAD_PLANTED=$(grep -cF 'warn-does-not-exist.sh' "$TSD_DEAD_SETTINGS" || true)
+assert_eq "1" "$TSD_DEAD_PLANTED" \
+    "the fixture reaches the state under test — settings.json now registers exactly one hook by a name it did not before"
+assert_eq "absent" \
+    "$([ -f "$TSD_DEAD/.claude/hooks/warn-does-not-exist.sh" ] && echo present || echo absent)" \
+    "…and no file answers to that name, which is what makes the registration dead"
+
+TSD_DEAD_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_DEAD" 2>&1)
+TSD_DEAD_RC=$?
+TSD_DEAD_N=$(awk '/references a missing hook/ { n++ } END { print n + 0 }' <<< "$TSD_DEAD_OUT")
+assert_eq "1" "$TSD_DEAD_N" \
+    "the sweep reports exactly one dead registration — not every registration, which is what a deleted existence test prints"
+TSD_DEAD_NAMED=$(awk '/references a missing hook/ { print $NF }' <<< "$TSD_DEAD_OUT")
+assert_eq ".claude/hooks/warn-does-not-exist.sh" "$TSD_DEAD_NAMED" \
+    "…and names the registration, so the user can find it in their own settings.json"
+if [ -n "$(tsd_verdict "$TSD_DEAD_OUT" 'hooks referenced by settings.json exist')" ]
+then TSD_DEAD_STILL_OK=1; else TSD_DEAD_STILL_OK=0; fi
+assert_eq "0" "$TSD_DEAD_STILL_OK" \
+    "…and the all-present line is gone, so the two verdicts cannot both print on one run"
+assert_eq "1" "$TSD_DEAD_RC" \
+    "a dead hook registration makes the doctor exit 1 — a hook that never fires is a broken install"
+assert_contains "$TSD_DEAD_OUT" "passed ·" \
+    "…and the run still reaches its summary line, so a project with many dead registrations is diagnosed rather than abandoned"
+rm -rf "$TSD_DEAD"
+
+# ── An empty-but-present payload directory is a FAILURE, not a count ───────
+#
+# Measured 2026-08-14 on a --variant urp fixture with the receipt removed — the teammate's-git-clone
+# shape the doctor's own receipt branch names, and the only shape in which the receipt cannot notice
+# the files are gone: `.claude/agents/*.md` deleted gave `INFO agents=0`, `0 failure(s)`, exit 0. A
+# project with no agents at all, reported healthy. `.claude/commands/unity-doctor.md` carried the
+# compensation — "read those four numbers yourself: any zero is this item's ERROR" — a check
+# performed by a model against a script already holding the answer. That item is deleted in the same
+# commit as this section: two sources for one fact is how the duplication its Check 2 removed creeps
+# back.
+#
+# THREE STATES, IN ONE FIXTURE, AND THE FIRST ONE IS THE CONTROL. Receipt gone and payload intact
+# must still be zero failures — otherwise everything below is satisfied by a doctor that fails on
+# the missing receipt and has never looked at a directory. Then one directory emptied, then a second
+# one removed outright, with the failure count read exactly at each step: 0 → 1 → 2. A count that
+# moves with the damage is what separates this from a guard pinned to a single hardcoded failure.
+echo ""
+echo "--- Test: an empty-but-present payload directory is a failure ---"
+TSD_PAY="/tmp/kinglet-doctor-payload-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_PAY" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_PAY" --yes >/dev/null 2>&1
+rm -f "$TSD_PAY/.claude/state/install-receipt.tsv"
+
+TSD_PAY_OK_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_PAY" 2>&1)
+TSD_PAY_OK_RC=$?
+if [ "$(tsd_verdict "$TSD_PAY_OK_OUT" 'Payload complete')" = "PASS" ]
+then TSD_PAY_OK_VERDICT=1; else TSD_PAY_OK_VERDICT=0; fi
+assert_eq "1" "$TSD_PAY_OK_VERDICT" \
+    "the payload check issues a verdict on a complete payload, so its silence later means something"
+assert_eq "0" "$(tsd_failures "$TSD_PAY_OK_OUT")" \
+    "…and a project with no receipt but a complete payload still has zero failures — the control this section rests on"
+assert_eq "0" "$TSD_PAY_OK_RC" \
+    "…and exits 0, so the failures below belong to the directories and not to the missing receipt"
+
+rm -f "$TSD_PAY/.claude/agents/"*.md
+TSD_PAY_EMPTY_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_PAY" 2>&1)
+TSD_PAY_EMPTY_RC=$?
+assert_eq "0" "$(find "$TSD_PAY/.claude/agents" -name '*.md' | wc -l | tr -d ' ')" \
+    "the fixture reaches the state under test — .claude/agents/ is present and holds no agent"
+assert_contains "$TSD_PAY_EMPTY_OUT" "Payload directory .claude/agents/ is present but holds no *.md" \
+    "an empty-but-present payload directory is reported, naming the directory and what it should hold"
+assert_eq "1" "$(tsd_failures "$TSD_PAY_EMPTY_OUT")" \
+    "…as exactly one failure — an empty directory is one finding, not a cascade"
+assert_not_contains "$TSD_PAY_EMPTY_OUT" "Payload complete:" \
+    "…and the complete-payload line does not print beside it"
+assert_eq "1" "$TSD_PAY_EMPTY_RC" \
+    "…and the doctor exits 1: measured 2026-08-14 before this check, the same project exited 0 with INFO agents=0"
+
+rm -rf "$TSD_PAY/.claude/rules"
+TSD_PAY_GONE_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_PAY" 2>&1)
+TSD_PAY_GONE_RC=$?
+assert_contains "$TSD_PAY_GONE_OUT" "Payload directory .claude/rules/ is missing" \
+    "a payload directory that is gone is reported as missing, distinctly from one that is merely empty"
+assert_contains "$TSD_PAY_GONE_OUT" "Payload directory .claude/agents/ is present but holds no *.md" \
+    "…without swallowing the empty directory already reported"
+assert_eq "2" "$(tsd_failures "$TSD_PAY_GONE_OUT")" \
+    "…and the failure count moves with the damage, 1 → 2, rather than being pinned to one finding"
+assert_eq "1" "$TSD_PAY_GONE_RC" \
+    "…and the doctor still exits 1"
+rm -rf "$TSD_PAY"
+
 rm -rf "$TSD_MOCK"
