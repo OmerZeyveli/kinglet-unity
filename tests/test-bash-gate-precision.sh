@@ -559,3 +559,858 @@ assert_eq "2" "$(tbg_run 'find Assets -name "*.meta" -exec gzip -1 {} \; -exec g
     "blocks the first clause when the second one is read-only"
 assert_eq "2" "$(tbg_run 'git status && find Assets -name "*.meta" -exec git rm {} \;')" \
     "does not let a git status ahead of the find vouch for the git rm inside it"
+
+# ============================================================================================
+# 2026-08-14 task 2b — THE TOKENISER HAS A QUOTE MODEL, AND THIS CORPUS IS WHAT HOLDS IT.
+#
+# Rounds 3, 4 and 5 of this hook each closed one hole in the find route and opened another, and
+# every round's own probes passed. What caught each hole was a reader who had a DIFFERENT idea.
+# Round 5's implementer wrote the sentence: "A test built from the same idea as the code
+# confirms the idea, not the behaviour."
+#
+# A corpus cannot have a different idea on its own. It can be checked against HISTORY, which is
+# a different idea by construction — so every record below carries a frozen `hist` column: the
+# exit codes the same payload got from the hook at 546870f (r3), 06883cc (r4) and 3fd22dc (r5),
+# in that order. A payload an earlier version BLOCKED and this one PERMITS is a regression by
+# definition, and it may only be recorded as `X` with a written reason. That is the mechanism
+# that makes the r3 -> r4 -> r5 pattern impossible to repeat by accident.
+#
+# WHAT THIS CANNOT SEE, stated plainly because a check's silence is only as wide as what it
+# read: it freezes the PAST. It catches re-opening an old hole and says exactly nothing about a
+# new one. Nothing here would have caught the round-5 Critical before it was written, because no
+# earlier version had ever been sent a quoted awk program either.
+#
+# AND IT ONLY CATCHES THE MUTANTS ITS AUTHOR IMAGINED — which is why the payload list was not
+# written by imagining them. Every deliberate branch in `find_exec_tokens`,
+# `find_exec_commands` and `find_exec_is_read_only` was mutated one at a time, 50 in all, and
+# the corpus was run against each. Fifteen branches turned out to be branches nothing here
+# measured; the sharpest was `*/xargs`, which the hook handles deliberately in two places and
+# whose deletion left this file entirely green while
+# `find … -print0 | /usr/bin/xargs -0 sed -i s/a/b/` went from blocked to permitted and
+# destroyed three real .meta files. Payloads for those fifteen are in the list below and each
+# names the branch it exists for.
+#
+# Two of the fifty have NO payload, and that is a finding rather than an omission: the
+# double-quote backslash escape (`\"` inside `"…"`) and the newline-to-space substitution inside
+# a quoted run change the token's VALUE, and no arm's decision depends on the difference.
+#
+# BUT THE REASON FIRST WRITTEN HERE WAS WRONG, AND THE CORRECTION MATTERS MORE THAN THE
+# CONCLUSION. It said "removing either only ever lengthens a token, which can add a block and
+# never remove one". That is true of the gentle mutation (leave a stray backslash in the value)
+# and FALSE of the one that matters: delete the whole backslash branch inside `"…"` and the `"`
+# in `\"` is no longer consumed, so it CLOSES the quoted run. Quote parity flips for the rest of
+# the line. On `-exec sed "pat\" ; " -i {} \;` that really does end the clause before `-i` is
+# collected — the verdict is still a block, but because the parse now ends `unterminated-quote`,
+# not because the token got longer. Conclusion unchanged, mechanism different, and a reason that
+# is wrong about the mechanism is a reason that will be trusted somewhere it does not hold.
+#
+# AND "46 OF 49 BRANCHES ARE MEASURED" IS REALLY "46 OF 49 CHOSEN MUTATIONS ARE MEASURED". A
+# branch can red under one mutation and not another: making `prevbrace` never set — so find's
+# `+` can never terminate a clause — runs this file 442/0, and no hole could be constructed for
+# it, because every path it changes is conservative. The sweep measures the mutations someone
+# wrote, which is a weaker claim than the one the numbers look like.
+#
+# To repeat the sweep: mutate one branch, run this corpus, and record how many assertions go
+# red. A branch with zero is a branch this file does not measure — and mutate it more than one
+# way, because a single-site mutation of a branch that appears twice is a no-op. That happened
+# twice in this file's own tooling: once on the route-tracking branch, and once on the clause's
+# argument reset, where removing EITHER `args=()` alone is masked by the other.
+#
+# HOW TO REGENERATE THE `hist` COLUMN (it is data, not derivation — the permanent test runs
+# inside a `git archive` scratch copy and cannot shell out to git):
+#
+#   for rev in 546870f 06883cc 3fd22dc; do
+#       git show "$rev:.claude/hooks/bash-gate.sh" > "/tmp/gate-$rev.sh"
+#   done
+#   # then, for each payload below, send it to each of the three with a FRESH
+#   # UNITY_HOOK_STATE_DIR (see tbg_run_fresh) and record the three exit codes in that order.
+#
+# RECORD FORMAT — two lines each, so a payload never has to be escaped or quoted:
+#   line 1:  <expected-rc> <hist> <exempt> <one-line reason>
+#   line 2:  the payload, verbatim, leading whitespace significant
+# `exempt` is one of THREE values, and the distinction is the guard, not decoration:
+#   `-`  nothing to explain — this version agrees with every earlier one, or blocks where they did
+#   `X`  a VERIFIED FALSE POSITIVE: an earlier version blocked it and it cannot write. Each one
+#        was executed against real .meta files by the round-1 reviewer; 42 of 42 left byte length
+#        and cksum identical.
+#   `H`  a KNOWN LIVE HOLE: an earlier version blocked it, it really can write, and this version
+#        permits it anyway. These are inherited, they are recorded rather than hidden, and THEIR
+#        NUMBER IS ASSERTED BELOW so one cannot be added by typing a note.
+#
+# The brief's property is "except payloads recorded as VERIFIED FALSE POSITIVES". A single flag
+# plus any non-empty string does not express that: it accepts "this is a known live hole" as a
+# monotonic waiver, which would let a future round downgrade a real block to a permit and stay
+# green — the exact mechanism this column exists to prevent. Two of the three `H` records below
+# were executed and do destroy files (`awk -f`: 127 B -> 40 B on all three; `sed --in-pl`: all
+# three rewritten), which is why they may not sit under the same marker as the other 42.
+# ============================================================================================
+
+# A FRESH STATE DIR PER PROBE. The corpus deliberately repeats payloads that assertions above
+# have already sent, and bash-gate is a two-stage gate keyed on a hash of the whole command:
+# reusing $TBG_STATE_DIR here would make the second send pass by MEMORY rather than by
+# classification, which is the exact failure this file's own header warns about.
+tbg_run_fresh() {
+    local _sd _rc
+    _sd="$(mktemp -d "${TMPDIR:-/tmp}/bash-gate-corpus.XXXXXX")"
+    printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":%s}}' \
+        "$(printf '%s' "$1" | jq -Rs .)" \
+        | UNITY_HOOK_STATE_DIR="$_sd" bash "$TBG_HOOK" > /dev/null 2>&1
+    _rc=$?
+    rm -rf "$_sd"
+    printf '%s' "$_rc"
+}
+
+tbg_corpus() {
+    cat <<'TBG_CORPUS'
+2 222 - still blocks a real redirect into ProjectSettings
+echo hi > ProjectSettings/ProjectSettings.asset
+2 222 - still blocks a real .meta deletion
+rm -f Assets/Player.cs.meta
+0 000 - does not block a grep that merely names ProjectSettings
+grep -n ProjectSettings/ProjectSettings.asset notes.txt
+0 000 - does not block an echo that merely mentions the path
+echo "see ProjectSettings/ProjectSettings.asset for details"
+0 000 - does not block reading history of a .meta file
+git log -- Assets/Player.cs.meta
+0 000 - does not block a JSON argument that merely contains the word cp and the path as data
+curl -s https://api.example.com/report -d "{\"reason\": \"cp shows drift\", \"target\":\"ProjectSettings/ProjectSettings.asset\"}"
+0 000 - does not block an unrelated grep chained after a redirect to a different file
+echo build > build.log; grep ProjectSettings/ProjectSettings.asset build.log
+2 222 - still blocks rm -rf Library/ with leading whitespace
+  rm -rf Library/
+2 222 - still blocks rm -rf Library/ behind a sudo prefix
+sudo rm -rf Library/
+2 222 - still blocks rm -rf Library/ inside a subshell
+(rm -rf Library/)
+2 222 - still blocks a .meta deletion reached through xargs
+echo x | xargs -I{} rm -f Assets/Player.cs.meta
+0 000 - does not block an echo warning against the hard reset
+echo "never run git reset --hard here"
+2 222 - still blocks the hard reset itself
+git reset --hard HEAD~1
+2 222 - still blocks the hard reset after a control operator
+cd Assets && git reset --hard
+2 222 - still blocks the hard reset behind a git -C option
+git -C /repo reset --hard
+2 222 - still blocks git clean behind a --git-dir option
+git --git-dir=/r/.git clean -fdx
+2 222 - still blocks the hard reset behind stacked git global options
+git --no-pager -c core.pager=cat reset --hard
+0 000 - does not block a commit message that quotes the hard reset
+git commit -m "docs: warn about git reset --hard"
+0 000 - does not block a commit message that quotes git clean
+git commit -m "chore: describe git clean -fdx in the runbook"
+2 222 - still blocks git clean itself
+git clean -fdx
+0 000 - does not block an echo warning against a force push
+echo "never git push --force to main"
+2 222 - still blocks a force push to a protected branch
+git push --force origin main
+2 222 - still blocks a short-flag force push
+git push -f origin spike/x
+0 000 - does not block a grep for the prefs-wipe API
+grep -rn PlayerPrefs.DeleteAll Assets/
+0 000 - does not block a commit message naming the prefs-wipe API
+git commit -m "fix: stop calling PlayerPrefs.DeleteAll on load"
+2 222 - still blocks the macOS defaults delete of a unity domain
+defaults delete unity.Acme.Game
+2 222 - still blocks deleting the Linux unity3d prefs directory
+rm -rf ~/.config/unity3d/Acme/Game
+0 000 - does not block a grep for destructive SQL
+grep -rn "DROP TABLE" migrations/
+2 222 - still blocks destructive SQL passed to a client
+psql -c "DROP TABLE users"
+2 222 - still blocks destructive SQL passed to sqlite3
+sqlite3 save.db "drop database main"
+0 000 - does not block a find that counts .meta files
+find Assets -name "*.meta" | wc -l
+0 000 - does not block a find that lists .meta files
+find Assets -name "*.meta" -newer Assets/Player.cs -print
+2 222 - still blocks find -delete on .meta files
+find Assets -name "*.meta" -delete
+2 222 - still blocks find -exec rm on .meta files
+find Assets -name "*.meta" -exec rm {} \;
+2 222 - still blocks find piped into xargs rm on .meta files
+find Assets -name "*.meta" -print0 | xargs -0 rm
+2 222 - still blocks the find route to a mass .meta rename
+find Assets -name "*.meta" -exec mv {} /tmp \;
+2 222 - still blocks find -exec with a path-prefixed rm
+find Assets -name "*.meta" -exec /bin/rm {} \;
+2 222 - still blocks find -exec git rm
+find Assets -name "*.meta" -exec git rm {} \;
+2 222 - still blocks find -exec through a shell wrapper
+find Assets -name "*.meta" -exec sh -c "rm \$1" _ {} \;
+0 000 - does not block find -exec with a read-only command
+find Assets -name "*.meta" -exec stat {} \;
+2 222 - still blocks find -exec rm
+find Assets -name '*.meta' -exec rm {} \;
+2 222 - still blocks find -exec unlink
+find Assets -name '*.meta' -exec unlink {} \;
+2 222 - still blocks find -exec shred
+find Assets -name '*.meta' -exec shred {} \;
+2 222 - still blocks find -exec truncate
+find Assets -name '*.meta' -exec truncate {} \;
+2 222 - still blocks find -exec mv
+find Assets -name '*.meta' -exec mv {} \;
+2 222 - still blocks find -exec rename
+find Assets -name '*.meta' -exec rename {} \;
+2 222 - still blocks find -exec prename
+find Assets -name '*.meta' -exec prename {} \;
+2 222 - still blocks find -exec mmv
+find Assets -name '*.meta' -exec mmv {} \;
+2 222 - blocks find -exec perl-rename — the alias that proved a denylist cannot be finished
+find Assets -name "*.meta" -exec perl-rename s/meta/bak/ {} \;
+2 222 - blocks find -exec file-rename, the same tool under its third name
+find Assets -name "*.meta" -exec file-rename s/meta/bak/ {} \;
+2 222 - blocks find -exec gzip, which no denylist this task wrote contained
+find Assets -name "*.meta" -exec gzip {} \;
+2 222 - blocks find -exec dd
+find Assets -name "*.meta" -exec dd if=/dev/null of={} \;
+2 222 - blocks find -exec sed, which rewrites in place and is deliberately not allowlisted
+find Assets -name "*.meta" -exec sed -i s/guid/x/ {} \;
+2 222 - blocks find -exec python3 — an interpreter is not a read-only command
+find Assets -name "*.meta" -exec python3 wipe.py {} \;
+2 222 - blocks the -execdir route
+find Assets -name "*.meta" -execdir gzip {} \;
+2 222 - blocks the -ok route
+find Assets -name "*.meta" -ok gzip {} \;
+2 222 - blocks the -exec {} + route
+find Assets -name "*.meta" -exec gzip {} +
+2 222 - blocks the xargs -0 route
+find Assets -name "*.meta" -print0 | xargs -0 gzip
+2 222 - blocks the xargs -I route, whose placeholder must not be read as the command
+find Assets -name "*.meta" | xargs -I{} gzip {}
+2 222 - blocks a path-prefixed command
+find Assets -name "*.meta" -exec /usr/bin/gzip {} \;
+2 222 - blocks a command behind an env prefix
+find Assets -name "*.meta" -exec env gzip {} \;
+2 222 - blocks a command behind a shell wrapper, because sh is not read-only
+find Assets -name "*.meta" -exec sh -c "gzip \$1" _ {} \;
+0 000 - does not block find -exec grep, which reads the GUIDs it names
+find Assets -name "*.meta" -exec grep -l guid {} \;
+0 000 - does not block a path-prefixed read-only command
+find Assets -name "*.meta" -exec /usr/bin/grep -l guid {} \;
+0 000 - does not block find -exec md5sum
+find Assets -name "*.meta" -exec md5sum {} \;
+0 000 - does not block find -exec basename
+find Assets -name "*.meta" -exec basename {} \;
+0 000 - does not block a read-only command reached through xargs
+find Assets -name "*.meta" -print0 | xargs -0 grep -l guid
+0 000 - does not block a grep whose PATTERN is a destructive verb
+find Assets -name "*.meta" -exec grep -l rm {} \;
+0 000 - does not block a grep searching for the other one
+find Assets -name "*.meta" -exec grep -l mv {} \;
+2 222 - blocks a direct unlink — the verb the classification is named after
+unlink Assets/Player.cs.meta
+2 222 - blocks a direct shred
+shred -u Assets/Player.cs.meta
+2 222 - blocks a direct truncate
+truncate -s 0 Assets/Player.cs.meta
+2 222 - blocks a direct perl-rename
+perl-rename s/meta/bak/ Assets/Player.cs.meta
+2 222 - blocks a direct mmv
+mmv "Assets/*.cs.meta" "Assets/#1.bak"
+0 000 - does not block reading a .meta file
+cat Assets/Player.cs.meta
+2 222 - still blocks a direct .meta rename
+mv Assets/Player.cs.meta Assets/Enemy.cs.meta
+0 000 - does not block reading the history of a renamed .meta file
+git log --follow -- Assets/Player.cs.meta
+2 222 - still blocks a redirect over Packages/manifest.json
+echo {} > Packages/manifest.json
+2 222 - still blocks deleting Packages/manifest.json
+rm -f Packages/manifest.json
+0 000 - does not block reading Packages/manifest.json
+jq .dependencies Packages/manifest.json
+2 222 - still blocks a Library/Temp wipe
+rm -rf Library/ Temp/
+0 000 - does not block prose about wiping Library/
+echo "delete Library/ only when the editor is closed"
+0 000 - does not block measuring the directories a wipe would remove
+du -sh Library/ Temp/ Logs/
+2 222 - still blocks copying over a ProjectSettings asset
+cp /tmp/staged.asset ProjectSettings/ProjectSettings.asset
+2 222 - still blocks deleting a ProjectSettings asset
+rm -f ProjectSettings/QualitySettings.asset
+2 022 - blocks find -exec on a backslash-escaped rm
+find Assets -name "*.meta" -exec \rm {} \;
+2 022 - blocks xargs on a backslash-escaped rm
+find Assets -name "*.meta" -print0 | xargs -0 \rm
+2 022 - blocks a backslash-escaped verb that was never on any denylist
+find Assets -name "*.meta" -exec \gzip {} \;
+2 022 - blocks a backslash-escaped perl-rename
+find Assets -name "*.meta" -exec \perl-rename s/meta/bak/ {} \;
+2 022 - blocks a backslash-escaped xargs — the INTRODUCER hides behind one too
+find Assets -name "*.meta" | \xargs -0 rm
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec \grep -l guid {} \;
+0 000 - does not block a backslash-escaped xargs running a read-only command
+find Assets -name "*.meta" -print0 | \xargs -0 \grep -l guid
+2 222 - blocks a find whose terminator is quoted rather than escaped
+find Assets -name '*.meta' -exec rm {} ';'
+0 000 - does not block the read-only twin of the quoted-terminator form
+find Assets -name '*.meta' -exec grep -c guid {} ';'
+2 022 - blocks a backslash-escaped direct .meta deletion
+\rm Assets/Enemy.cs.meta
+2 022 - blocks a backslash-escaped Library wipe
+\rm -rf Library/
+2 022 - blocks a backslash-escaped direct .meta rename
+\mv Assets/A.cs.meta Assets/B.cs.meta
+2 022 - blocks a backslash-escaped hard reset
+\git reset --hard HEAD~2
+2 022 - blocks a backslash-escaped find -delete
+\find Assets -name "*.meta" -delete
+0 000 - does not block prose that quotes the alias-bypass spelling
+echo "use \rm to bypass the alias, but not in this repo"
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -print0 | xargs -0 -n 1 grep -l guid
+2 222 - still blocks the destructive twin of that same xargs form
+find Assets -name "*.meta" -print0 | xargs -0 -n 1 gzip
+2 222 - still blocks xargs -i rm, whose next word IS the command
+find Assets -name "*.meta" | xargs -i rm {}
+2 222 - still blocks xargs -I with a separate replacement string
+find Assets -name "*.meta" | xargs -I {} rm {}
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec du -h {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec b2sum {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec sha512sum {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec identify {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec [ -s {} ] \;
+2 022 - blocks find -exec touch, which rewrites mtime and triggers a reimport
+find Assets -name "*.meta" -exec touch {} \;
+2 022 - blocks sort -o, which is the documented in-place rewrite
+find Assets -name "*.meta" -exec sort -o {} {} \;
+0 000 - does not block a sort with no output flag
+find Assets -name "*.meta" -exec sort {} \;
+2 222 - blocks dos2unix, which converts in place unless told otherwise
+find Assets -name "*.meta" -exec dos2unix {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec openssl dgst -sha256 {} \;
+2 222 - blocks openssl when it is given an output file
+find Assets -name "*.meta" -exec openssl rand -out {} 32 \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec sed -n /guid/p {} \;
+2 222 - blocks sed -i with a backup suffix attached
+find Assets -name "*.meta" -exec sed -i.bak s/guid/x/ {} \;
+2 222 - blocks the long spelling of sed's in-place flag
+find Assets -name "*.meta" -exec sed --in-place s/guid/x/ {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -iname "*.meta" -exec sed -n 1p {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec git log --oneline {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec git blame -L 1,2 {} \;
+2 222 - still blocks git mv, which is not on the read-only subcommand list
+find Assets -name "*.meta" -exec git mv {} /tmp/bak \;
+2 222 - does not let an unrelated git log later on the line vouch for git rm
+find Assets -name "*.meta" -exec git rm --cached {} \; && git log --oneline
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec awk /guid/ {} \;
+2 222 - blocks an awk program containing a redirect
+find Assets -name "*.meta" -exec awk "{print > \"o.txt\"}" {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -exec yq .guid {} \;
+2 222 - blocks yq -i, which writes the file back
+find Assets -name "*.meta" -exec yq -i .guid=1 {} \;
+2 202 - blocks sed -i'' — the cross-platform spelling, quoted away to nothing
+find Assets -name '*.meta' -exec sed -i'' -e s/guid/x/ {} \;
+2 202 - blocks sed -i with an empty double-quoted suffix
+find Assets -name "*.meta" -exec sed -i"" s/guid/x/ {} \;
+2 202 - blocks sed when the flag itself is quoted
+find Assets -name "*.meta" -exec sed "-i" s/guid/x/ {} \;
+2 202 - blocks sed -ibak, whose suffix is attached with no separator at all
+find Assets -name "*.meta" -exec sed -ibak s/guid/x/ {} \;
+2 202 - blocks sed -i~, whose suffix is not a word character
+find Assets -name "*.meta" -exec sed -i~ s/guid/x/ {} \;
+2 202 - blocks sed -i with a quoted suffix
+find Assets -name '*.meta' -exec sed -i'.bak' s/guid/x/ {} \;
+2 202 - blocks the same spelling under the GNU-on-macOS name
+find Assets -name '*.meta' -exec gsed -i'' s/guid/x/ {} \;
+2 202 - blocks the same spelling for yq
+find Assets -name '*.meta' -exec yq -i'' .guid=1 {} \;
+2 202 - blocks gawk -i inplace, where the flag and its value are a separate pair
+find Assets -name "*.meta" -exec gawk -i inplace "{print}" {} \;
+2 202 - blocks awk -i inplace under the unprefixed name
+find Assets -name "*.meta" -exec awk -i inplace "{print $0}" {} \;
+2 002 - blocks sort with its output file attached to the flag
+find Assets -name "*.meta" -exec sort -o{} {} \;
+0 220 X r4 decided the write flag by regexing the whole line; r5 positional read closed this on purpose
+find Assets -name "*.meta" -exec sed -n /guid/p {} \; | grep -i guid
+0 220 X r4 decided the write flag by regexing the whole line; r5 positional read closed this on purpose
+find Assets -name "*.meta" -print0 | xargs -0 -i sed -n 1p {}
+0 220 X r4 decided the write flag by regexing the whole line; r5 positional read closed this on purpose
+find Assets -name "*.meta" -exec awk "{print}" {} \; > /tmp/o.txt
+0 220 X r4 decided the write flag by regexing the whole line; r5 positional read closed this on purpose
+find Assets -name "*.meta" -exec awk "{print}" {} \; 2>/dev/null
+0 020 X r4 decided the write flag by regexing the whole line; r5 positional read closed this on purpose
+find Assets \( -name "*.meta" -o -name "*.asset" \) -exec sort {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -ipath "*/Art/*.meta" -exec sed -n 1p {} \;
+0 000 - does not read find's -not as an output flag
+find Assets -not -name "*.cs" -name "*.meta" -exec sort {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name "*.meta" -print0 -follow -exec sed -n 1p {} \;
+0 220 X r4 decided the write flag by regexing the whole line; r5 positional read closed this on purpose
+find Assets -name "*.meta" -exec git -C /repo log --oneline {} \;
+0 220 X r4 decided the write flag by regexing the whole line; r5 positional read closed this on purpose
+find Assets -name "*.meta" -exec git --git-dir=/r/.git log {} \;
+2 222 - still blocks git rm reached past a global option
+find Assets -name "*.meta" -exec git -C /repo rm {} \;
+2 222 - blocks sed -i when the flag comes after the expression
+find Assets -name "*.meta" -exec sed -e s/a/b/ -i {} \;
+2 022 - blocks sort -o when another flag comes first
+find Assets -name "*.meta" -exec sort -u -o {} {} \;
+2 222 - blocks the long spelling of yq's in-place flag
+find Assets -name "*.meta" -exec yq --inplace .guid=1 {} \;
+2 202 - blocks gawk's long spelling of the in-place include
+find Assets -name "*.meta" -exec gawk --include=inplace "{print}" {} \;
+2 222 - blocks the second clause when the first one is read-only
+find Assets -name "*.meta" -exec grep -l guid {} \; -exec gzip -9 {} \;
+2 222 - blocks the first clause when the second one is read-only
+find Assets -name "*.meta" -exec gzip -1 {} \; -exec grep -l guid {} \;
+2 222 - does not let a git status ahead of the find vouch for the git rm inside it
+git status && find Assets -name "*.meta" -exec git rm {} \;
+2 222 - the gate must still classify this, and its message is asserted above
+find Assets -name "*.meta" -exec \mv {} /tmp/bak \;
+2 222 - the gate must still classify this, and its message is asserted above
+find Assets -name "*.meta" -exec pandoc {} \;
+2 222 - the gate must still classify this, and its message is asserted above
+find Assets -name "*.meta" -exec pandoc -t plain {} \;
+2 222 - the gate must still classify this, and its message is asserted above
+find Assets -name "*.meta" -exec pandoc -t html {} \;
+2 222 - the gate must still classify this, and its message is asserted above
+find Assets/Art -name "*.meta" -delete
+2 222 - the gate must still classify this, and its message is asserted above
+find Assets/Art -name "*.meta" -newer x -delete
+2 220 - an operator inside a quoted awk program is not a clause end — verified: truncated 3 of 3 real .meta files 119 B to 39 B
+find Assets -name '*.meta' -exec awk '/guid/ && /:/ {print > FILENAME}' {} \;
+2 220 - the same shape calling system(rm) — verified: deleted all 3 real .meta files
+find Assets -name '*.meta' -exec awk '/guid/ && /:/ {system("rm " FILENAME)}' {} \;
+2 220 - a quoted semicolon inside an awk program is not find's terminator
+find Assets -name '*.meta' -exec awk '{ x=1 ; print > FILENAME }' {} \;
+2 220 - a quoted double-pipe inside an awk program is not a shell operator
+find Assets -name '*.meta' -exec awk '/a/ || /b/ {print > FILENAME}' {} \;
+2 220 - a quoted single-ampersand-pair inside an awk program, with a subscript
+find Assets -name '*.meta' -exec awk '!seen[$0]++ && /guid/ {print > FILENAME}' {} \;
+2 220 - the same, reached past gawk's -v assignment
+find Assets -name '*.meta' -exec gawk -v x=1 'x && /guid/ {print > FILENAME}' {} \;
+2 220 - a quoted single pipe inside a sed expression must not hide the -i that follows
+find Assets -name '*.meta' -exec sed -E 's/(a | b)/x/' -i {} \;
+2 220 - the same sed shape, verified: rewrote the guid line of 3 of 3 real .meta files
+find Assets -name '*.meta' -exec sed -E 's/guid: | zzz/X/' -i {} \;
+0 220 X find stops at the first bare-value ; argument: measured rc=1, "unknown predicate -i", 0 of 3 real files written
+find Assets -name '*.meta' -exec sed -e ';' -i {} \;
+2 020 - find's '+' terminator needs a preceding {} — verified: sort really receives -o {} here
+find Assets -name '*.meta' -exec sort -u '+' -o {} {} \;
+2 220 - the same quoted-operator hole reached through xargs rather than -exec
+find Assets -name '*.meta' -print0 | xargs -0 awk '/guid/ && /:/ {print > FILENAME}'
+2 220 - the same quoted-operator hole reached through -execdir
+find Assets -name '*.meta' -execdir awk '/guid/ && /:/ {print > FILENAME}' {} \;
+2 200 - an interior quote inside the flag itself — sed -'i'
+find Assets -name '*.meta' -exec sed -'i' s/guid/x/ {} \;
+2 200 - an interior quote around the dash — sed "-"i
+find Assets -name '*.meta' -exec sed "-"i s/guid/x/ {} \;
+2 200 - an interior quote inside the long spelling — sed --in-'place'
+find Assets -name '*.meta' -exec sed --in-'place' s/guid/x/ {} \;
+2 200 - an interior quote in gawk's in-place flag
+find Assets -name '*.meta' -exec gawk -'i' inplace '{print}' {} \;
+2 000 - an interior quote in sort's output flag
+find Assets -name '*.meta' -exec sort -'o' {} {} \;
+0 002 X r5 dequoted per token, so a word inside a quoted pattern was read as an introducer
+find Assets -name '*.meta' -exec grep -l 'xargs gzip' {} \;
+0 002 X r5 dequoted per token, so a word inside a quoted pattern was read as an introducer
+find Assets -name '*.meta' -exec grep -l 'xargs' gzip {} \;
+2 222 - in-place flag before a separate -e expression, plus-terminated
+find Assets -name '*.meta' -exec sed -i -e s/guid/x/ {} +
+2 222 - the flag is the last token before the terminator
+find Assets -name '*.meta' -exec sed -e s/guid/x/ {} -i \;
+2 222 - the long spelling with an attached backup suffix
+find Assets -name '*.meta' -exec sed --in-place=.bak s/guid/x/ {} \;
+2 222 - perl -i is an in-place rewrite and perl is not read-only anyway
+find Assets -name '*.meta' -exec perl -i.bak -pe s/guid/x/ {} \;
+2 222 - ed edits in place and is on no list
+find Assets -name '*.meta' -exec ed -s {} \;
+2 222 - the -execdir route to sed -i
+find Assets -name '*.meta' -execdir sed -i s/guid/x/ {} \;
+2 222 - the -ok route to sed -i
+find Assets -name '*.meta' -ok sed -i s/guid/x/ {} \;
+2 222 - the -okdir route to sed -i
+find Assets -name '*.meta' -okdir sed -i s/guid/x/ {} \;
+2 222 - the xargs route to sed -i
+find Assets -name '*.meta' -print0 | xargs -0 sed -i s/guid/x/
+2 202 - the xargs route to the quoted-away cross-platform spelling
+find Assets -name '*.meta' -print0 | xargs -0 sed -i'' s/guid/x/
+2 202 - the xargs route to gawk's in-place extension
+find Assets -name '*.meta' -print0 | xargs -0 gawk -i inplace '{print}'
+2 022 - the xargs route to sort's output flag
+find Assets -name '*.meta' -print0 | xargs -0 sort -o out.txt
+2 202 - gawk -i inplace, plus-terminated
+find Assets -name '*.meta' -exec gawk -i inplace "{print}" {} +
+2 022 - sort's output flag after the placeholder
+find Assets -name '*.meta' -exec sort {} -o {} \;
+2 202 - yq's in-place flag with a double-quoted suffix
+find Assets -name '*.meta' -exec yq -i".bak" .guid=1 {} \;
+2 222 - sed's in-place flag bundled with -n
+find Assets -name '*.meta' -exec sed -ni s/guid/x/ {} \;
+2 222 - sed's in-place flag as a separate token after -n
+find Assets -name '*.meta' -exec sed -n -i s/guid/x/ {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec awk '/guid/{print FILENAME}' {} \;
+0 000 - FP: sort -c only checks order — r3 had no second stage and blocked every sort
+find Assets -name '*.meta' -exec sort -c {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec git log --oneline -- {} \;
+0 000 - a quoted command name still resolves to the command
+find Assets -name '*.meta' -exec 'grep' -l guid {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec git blame -- {} \;
+0 220 X r4 decided the write flag by regexing the whole line; r5 positional read closed this on purpose
+find Assets -name '*.meta' -exec git --no-pager show HEAD -- {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec sed -n "1,5p" {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec sed --quiet -e '/guid/p' {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec yq ".guid" {} \;
+0 000 - FP: sort -u writes nothing — r3 blocked every sort
+find Assets -name '*.meta' -exec sort -u {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec openssl dgst -md5 -hex {} \;
+0 000 - a shell-operator character inside a quoted grep pattern is data
+find Assets -name '*.meta' -exec grep -l 'a|b' {} \;
+0 000 - a quoted semicolon inside a grep pattern is data
+find Assets -name '*.meta' -exec grep -l ';' {} \;
+0 000 - a quoted double-ampersand inside a grep pattern is data
+find Assets -name '*.meta' -exec grep -l '&&' {} \;
+0 000 - a quoted in-place flag inside a grep pattern is data
+find Assets -name '*.meta' -exec grep -l '-i' {} \;
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec sed -n '/&&/p' {} \;
+2 220 - a quoted double-ampersand must not end sed's clause and hide the -i after it
+find Assets -name '*.meta' -exec sed -n '&&' -i {} \;
+2 222 - two clauses, plus-terminated first, destructive second
+find Assets -name '*.meta' -exec grep -l guid {} + -exec gzip {} \;
+2 222 - a parenthesised find expression with a destructive exec
+find Assets \( -name '*.meta' \) -exec gzip {} \;
+2 222 - a destructive exec with a trailing shell redirect
+find Assets -name '*.meta' -exec gzip {} \; > /tmp/o.txt
+2 222 - two chained xargs stages, the second one destructive
+find Assets -name '*.meta' | xargs grep -l guid | xargs sed -i s/a/b/
+2 022 - an escaped prefix in front of an escaped verb
+find Assets -name '*.meta' -exec \env \rm {} \;
+0 222 X the shell reads ./\grep as ./grep, and ./grep with no backslash is permitted at r3, r4 and r5 too - measured
+find Assets -name '*.meta' -exec ./\grep -l guid {} \;
+0 200 H KNOWN HOLE, inherited: an awk program in a -f file can write and no arm models it
+find Assets -name '*.meta' -exec awk -f script.awk {} \;
+0 200 H KNOWN HOLE, inherited: an awk write through a pipe to an external command is not modelled
+find Assets -name '*.meta' -exec awk '{print | "tee " FILENAME}' {} \;
+0 200 H KNOWN HOLE, inherited: GNU long-option abbreviation; a wider glob would false-positive on yq --input-format
+find Assets -name '*.meta' -exec sed --in-pl s/guid/x/ {} \;
+2 222 - KNOWN FALSE POSITIVE: cp is decided by argument position, which this gate does not parse
+find Assets -name '*.meta' -exec cp {} /tmp/backup/ \;
+2 222 - KNOWN FALSE POSITIVE: rsync, same reason as cp
+find Assets -name '*.meta' -exec rsync {} /tmp/backup/ \;
+2 000 - NEW FALSE POSITIVE: command substitution makes the token stream unparseable, so it blocks
+find "$(pwd)/Assets" -name '*.meta' -exec grep -l guid {} \;
+0 000 - command substitution inside single quotes is inert and must not trip the unparseable arm
+find Assets -name '*.meta' -exec grep -l '$(rm -rf /)' {} \;
+2 222 - a command hidden behind command substitution blocks as unparseable
+find Assets -name '*.meta' -exec $(echo sed) -i {} \;
+2 222 - a command hidden behind backticks blocks as unparseable
+find Assets -name '*.meta' -exec `echo sed` -i {} \;
+2 200 - ANSI-C quoting is not decoded, so it blocks as unparseable
+find Assets -name '*.meta' -exec sed $'-i' s/guid/x/ {} \;
+2 200 - an unterminated quote blocks rather than being parsed on a guess
+find Assets -name '*.meta' -exec sed -e 's/guid/x/ {} \;
+2 220 - a quoted semicolon on the xargs route is an argument, not a clause end
+find Assets -name '*.meta' -print0 | xargs -0 sed -e ';' -i
+0 222 X the ledgered round-4 residual: a shell redirect on an xargs pipeline is not awk s own argument
+find Assets -name '*.meta' -print0 | xargs -0 awk '{print}' 2>/dev/null
+2 222 - a redirect must be skipped, not treated as a clause end that hides the -i after it
+find Assets -name '*.meta' -print0 | xargs -0 sed 2>/dev/null -i s/a/b/
+0 200 X r3 had no second stage, so it blocked every sed/awk/git/sort/openssl/yq; r4 closed this on purpose
+find Assets -name '*.meta' -exec sed -n 1p {} \; 2>/dev/null
+2 222 - a stderr redirect after the terminator does not excuse the in-place flag before it
+find Assets -name '*.meta' -exec sed -i s/guid/x/ {} \; 2>/dev/null
+0 222 X the tokeniser keeps a quoted argument whole, so git's -c value is one token and the subcommand is still reached; every earlier version split it on the space and read B as the subcommand
+find Assets -name '*.meta' -exec git -c 'user.name=A B' log --oneline {} \;
+0 202 X a literal in-place flag inside a quoted sed expression is data; the arms re-split on the tokeniser's TAB, so it stays one argument instead of becoming a flag
+find Assets -name '*.meta' -exec sed -n -e 's/a/b -i/p' {} \;
+2 222 - a bare redirect and its operand belong to the shell, so skipping them must not end the clause and hide the flag after it
+find Assets -name '*.meta' -print0 | xargs -0 sed > /tmp/o.txt -i s/a/b/
+0 222 X a bare redirect and its operand are the shell's, not awk's; every earlier version read the > as awk's own write form
+find Assets -name '*.meta' -print0 | xargs -0 awk '{print}' > /tmp/o.txt
+0 222 X the appending spelling of the same shell redirect, same reason
+find Assets -name '*.meta' -print0 | xargs -0 awk '{print}' >> /tmp/o.txt
+2 222 - a PATH-QUALIFIED xargs is still an introducer: deleting the */xargs arm left the whole corpus green while this payload went 2 to 0 and destroyed 3 of 3 real files
+find Assets -name '*.meta' -print0 | /usr/bin/xargs -0 sed -i s/a/b/
+0 000 - its read-only twin, so the path-qualified arm cannot be satisfied by blocking every absolute path
+find Assets -name '*.meta' -print0 | /usr/bin/xargs -0 grep -l guid
+2 222 - a path-qualified xargs reached through -exec rather than through a pipe
+find Assets -name '*.meta' -exec /usr/bin/xargs -0 gzip {} \;
+2 000 - a backtick in an otherwise read-only clause: without the detection the substitution decides what runs and the gate never sees it
+find Assets -name '*.meta' -exec grep -l `echo guid` {} \;
+2 220 - a backslash-escaped semicolon on the xargs route is an argument, not a shell operator; without the backslash flag the clause ends and the -i after it is lost
+find Assets -name '*.meta' -print0 | xargs -0 sed \; -i s/a/b/
+0 020 X an unquoted operator really does end the clause, so a later -o is not sort's; r4 regexed the whole line and blocked it
+find Assets -name '*.meta' -print0 | xargs -0 sort {} && echo -o
+0 022 X a redirect's operand is a filename, not an argument: skipping the operand is what keeps this -o out of sort's own arguments
+find Assets -name '*.meta' -print0 | xargs -0 sort > -o {} {}
+2 222 - a second -exec with the first clause's terminator missing: the in-args introducer arm is the only thing that flushes here
+find Assets -name '*.meta' -exec grep -l guid -exec gzip {} \;
+2 222 - a second bare xargs with no operator between, so the in-args arm rather than the idle arm has to catch it
+find Assets -name '*.meta' -print0 | xargs -0 grep -l guid xargs -0 gzip
+2 222 - the same shape with the second xargs path-qualified, which is a different pattern in the same arm
+find Assets -name '*.meta' -print0 | xargs -0 grep -l guid /usr/bin/xargs -0 gzip
+0 000 - a read-only command behind an env prefix: the prefix vocabulary must step over env rather than reporting it as the command
+find Assets -name '*.meta' -exec env grep -l guid {} \;
+0 002 X a quoted introducer-shaped word in idle position introduces nothing; r5 dequoted it and read the next word as the command
+find Assets -name '*.meta' -o -name 'xargs' gzip -exec grep -l guid {} \;
+2 222 - git reached with no arguments at all, which is the one path to the git arm's final refusal
+find Assets -name '*.meta' -print0 | xargs -0 git
+2 222 - a clause's arguments must not survive into the next one: with both args=() sites removed the first clause's read-only git log vouches for the second clause's git rm
+find Assets -name '*.meta' -exec git log {} \; -exec git rm {} \;
+TBG_CORPUS
+}
+
+# --- the corpus runs, one assertion per payload ---------------------------------------------
+# One assertion per payload on purpose rather than one aggregate: a mutation that reddens an
+# aggregate has isolated nothing, and the whole point of this block is being able to say WHICH
+# payloads a change moved.
+tbg_ran=0
+tbg_blocks=0
+tbg_permits=0
+tbg_protected=0
+tbg_fp=0
+tbg_holes=0
+tbg_hist2=0
+tbg_unexplained=""
+tbg_reasonless=""
+tbg_badflag=""
+while read -r tbg_exp tbg_hist tbg_ex tbg_note; do
+    IFS= read -r tbg_payload || break
+    case "$tbg_exp" in ''|'#'*) continue ;; esac
+    tbg_ran=$((tbg_ran + 1))
+    if [ "$tbg_exp" = "2" ]; then tbg_blocks=$((tbg_blocks + 1)); else tbg_permits=$((tbg_permits + 1)); fi
+
+    # The monotonic property, checked as data rather than as a second probe: a payload any
+    # earlier version blocked may not be permitted here without an `X` and a written reason.
+    case "$tbg_ex" in
+        '-') ;;
+        X) tbg_fp=$((tbg_fp + 1)) ;;
+        H) tbg_holes=$((tbg_holes + 1)) ;;
+        *) tbg_badflag="${tbg_badflag}${tbg_ex} ${tbg_payload}
+" ;;
+    esac
+    case "$tbg_hist" in
+        *2*)
+            tbg_hist2=$((tbg_hist2 + 1))
+            if [ "$tbg_exp" = "2" ]; then
+                tbg_protected=$((tbg_protected + 1))
+            else
+                case "$tbg_ex" in
+                    X|H) [ -n "$tbg_note" ] || tbg_reasonless="${tbg_reasonless}${tbg_payload}
+" ;;
+                    *) tbg_unexplained="${tbg_unexplained}${tbg_payload}
+" ;;
+                esac
+            fi
+            ;;
+    esac
+
+    assert_eq "$tbg_exp" "$(tbg_run_fresh "$tbg_payload")" "corpus [hist $tbg_hist]: $tbg_note"
+done <<< "$(tbg_corpus)"
+
+# --- the corpus's own integrity, so it cannot pass by being empty ---------------------------
+# This repository's worst guard shape is one that is green because it scanned nothing. Emptying
+# the payload list above must FAIL here, not report a green zero — and so must deleting only
+# the blocking half, or only the permitting half, or every historically-blocked payload.
+assert_eq "yes" "$([ "$tbg_ran" -gt 0 ] && echo yes || echo "no: the corpus ran $tbg_ran payloads")" \
+    "the corpus is not empty"
+assert_eq "yes" "$([ "$tbg_blocks" -gt 0 ] && echo yes || echo "no: $tbg_blocks payloads expect a block")" \
+    "the corpus still contains payloads that must be blocked"
+assert_eq "yes" "$([ "$tbg_permits" -gt 0 ] && echo yes || echo "no: $tbg_permits payloads expect a pass")" \
+    "the corpus still contains payloads that must be permitted"
+assert_eq "yes" "$([ "$tbg_protected" -gt 0 ] && echo yes || echo "no: $tbg_protected payloads are monotonically protected")" \
+    "the corpus still contains payloads an earlier hook version blocked and this one must too"
+assert_eq "" "$tbg_unexplained" \
+    "no payload an earlier version blocked is permitted here without a recorded exemption"
+assert_eq "" "$tbg_reasonless" \
+    "every recorded exemption carries a reason"
+assert_eq "" "$tbg_badflag" \
+    "every exemption flag is one of - (none), X (verified false positive) or H (known live hole)"
+
+# THE ONE HARDCODED NUMBER IN THIS FILE, AND IT IS HARDCODED ON PURPOSE.
+# `H` says "this payload really can write and we permit it anyway". Three such records exist, all
+# inherited, all named in the corpus above:
+#     -exec awk -f script.awk {} \;              an awk program in a -f file
+#     -exec awk '{print | "tee " FILENAME}' {} \;  an awk write through a pipe
+#     -exec sed --in-pl s/guid/x/ {} \;           GNU long-option abbreviation
+# Everywhere else this repository forbids writing a count down, because a derived count goes stale.
+# This one is not derived from the tree — it is a CEILING on a category that must only ever shrink,
+# and a ceiling that moves silently is not a ceiling. Adding a fourth live hole must cost an edit
+# here, with a reviewer looking at the diff.
+assert_eq "3" "$tbg_holes" \
+    "the number of payloads recorded as known live holes has not grown"
+# And the same ceiling on `X`, for the reason the round-1 review gave: marking a live hole `H`
+# now reds the count above, but a future round could still downgrade a real block to a permit by
+# calling it a VERIFIED false positive instead. That lie is only caught by the verdict assertion
+# while the hook still blocks — so the moment someone changes the hook to permit it as well, the
+# lie goes green. Both counts are therefore ceilings on the same thing: divergence from what an
+# earlier version of this hook blocked. Any new divergence, whatever it is labelled, costs an
+# edit here in front of a reviewer. Neither number is derived from the tree, so neither can go
+# stale on its own; both move only when someone means them to.
+assert_eq "45" "$tbg_fp" \
+    "the number of payloads recorded as verified false positives has not grown"
+
+# AND THE FROZEN HISTORY ITSELF, WHICH THE TWO CEILINGS ABOVE DO NOT GUARD.
+#
+# Everything monotonic here is derived from the `hist` column, and until this assertion existed
+# the column was unguarded. Rewrite one protected record's hist from `202` to `000` and its
+# expected verdict from `2` to `0`, then change the hook to permit it, and every corpus
+# assertion, both ceilings, the unexplained/reasonless/badflag lists and all four non-emptiness
+# assertions stay green. Deleting the record outright has the identical signature. The property
+# was resting on a column nothing counted.
+#
+# WHY THIS COUNT AND NOT `tbg_protected`. Either reds on a hist rewrite and on a record
+# deletion, so both close the reported evasion. This one is a property of the frozen column
+# ALONE, and that makes it strictly wider: erasing the history behind an EXEMPTION — an `X`
+# record whose hist goes `200` -> `000`, expected still 0, marker and reason untouched — reds
+# here and is invisible to `tbg_protected`, because that record was never protected. An
+# exemption whose historical evidence has been deleted is an exemption nobody can check.
+#
+# It is a fixed number for the same reason the two ceilings are: it is not derived from the
+# tree, so it cannot go stale on its own, and moving it costs an edit in front of a reviewer.
+assert_eq "211" "$tbg_hist2" \
+    "the frozen hist column still records 211 payloads that an earlier hook version blocked"
+
+# --- the quote model's own direct evidence --------------------------------------------------
+# The corpus checks verdicts. These two check the tokeniser's output shape, which is where the
+# defect actually lived: a quoted run must arrive as ONE argument, not as five.
+assert_contains "$(tbg_stderr "find Assets -name '*.meta' -exec pandoc '/a/ && /b/ {print > X}' {} \\;")" \
+    "is not on this gate's read-only list" \
+    "a quoted program does not end the clause it sits in"
+# The unparseable marker is emitted after the tokens, so it is the verdict only when every
+# command ahead of it was read-only — which is exactly the case where the gate would otherwise
+# have to guess at a clause boundary. When a non-read-only command is present too, that
+# command's name wins the message, and both still block.
+assert_contains "$(tbg_stderr 'find "$(pwd)/Assets" -name "*.meta" -exec grep -c guid {} \;')" \
+    "could not parse this command's quoting" \
+    "says it could not parse rather than guessing at a clause boundary"
+assert_contains "$(tbg_stderr 'find "$(pwd)/Assets" -name "*.meta" -exec grep -n guid {} \;')" \
+    "substitution-or-ansi-c-quoting" \
+    "names which construct it could not parse"
+
+# --- a command spanning lines, which the corpus block cannot carry --------------------------
+# A backslash-continued line is the ordinary way a long find gets formatted, so the tokeniser
+# splices it rather than declaring it unparseable. Both directions, because splicing wrongly
+# would either block every multi-line read or hide a write flag on the next line.
+assert_eq "0" "$(tbg_run_fresh 'find Assets -name "*.meta" \
+    -exec grep -l guid {} \;')" \
+    "does not block a read-only find split across lines with a backslash"
+assert_eq "2" "$(tbg_run_fresh 'find Assets -name "*.meta" \
+    -exec sed -i s/guid/x/ {} \;')" \
+    "still blocks a write whose flag is on the continued line"
+assert_eq "2" "$(tbg_run_fresh 'find Assets -name "*.meta" -exec awk "{ print > FILENAME
+}" {} \;')" \
+    "still blocks a quoted program whose newline is inside the quotes"
+# The splice's OWN evidence, which the two assertions above do not provide: both of those parse
+# identically with or without the splice, because the backslash sits between whole tokens. This
+# one needs it — the token `-i` is itself split by the line break, and without the splice it
+# arrives as `-` and `i` and the in-place flag is never seen. Measured: 2 here, 0 with the splice
+# removed, 2 at r3, 0 at r4 and r5.
+assert_eq "2" "$(tbg_run_fresh 'find Assets -name "*.meta" -exec sed -\
+i s/guid/x/ {} \;')" \
+    "still blocks a write flag that a backslash-newline splits in half"
+
+# ============================================================================================
+# THE COST, IN EVERY DIMENSION THAT MOVES IT — NOT ONLY THE ONE THAT WAS OPTIMISED.
+#
+# This hook runs on EVERY Bash tool call, so its worst case is a user-visible hang. Rounds 4 and
+# 5 both shipped one and neither had a cost assertion. The first version of THIS block had one,
+# and it was wrong in the way this whole task is about: it varied a single dimension — total
+# length, as one enormous quoted token — which is the dimension the awk tokeniser fixed. A
+# command line a QUARTER that size, differing only in the number of arguments, blew straight
+# through the same ceiling:
+#
+#     8 000 args in one clause   (248 KB)    32 605 ms      <- ceiling was 10 000 ms
+#    16 000 args in one clause   (496 KB)    80 975 ms
+#    20 000 args in one clause   (620 KB)   > 10 minutes
+#
+# Attribution, measured by timing the two functions separately on the 8 000-arg payload: the awk
+# scan cost 114 ms and the bash loop cost 19 612 ms. The tokeniser was never the problem. It was
+# `args="$args$SEP$tok"` — O(n^2) in arguments per clause — and it is now an array append plus
+# one printf (see find_exec_flush). A cutoff was the other option the brief offers; making the
+# accumulation linear is strictly better and it is what shipped.
+#
+# So the guard now varies THREE dimensions, because a guard that varies one is a guard that
+# confirms the idea its author already had:
+#
+#                                          r3        r4         r5      here
+#   D1  1 MB in a single quoted token     831     48 964    162 951     2 961
+#   D2  16 384 args in one clause           -          -          -     1 401   (was > 10 min)
+#   D3  500 -exec clauses                 272        590        289       472
+#
+# ONE CEILING, 10 000 ms, for all three. Deliberately loose: this repository documents its suite
+# going flaky under CPU contention — the same commit measured 195 700 ms and 389 425 ms for the
+# whole suite — and a tight wall-clock guard is the kind that gets deleted the first time CI is
+# busy. 10 000 ms is >3x above the worst of the three and >4x below the cheapest version this
+# check exists to catch.
+#
+# WHAT IT STILL DOES NOT VARY, said plainly: the PRODUCT of D2 and D3 (many clauses each with
+# many arguments), and the number of unparseable markers. Measured once by hand at 200 clauses x
+# 100 args: 1 060 ms, i.e. it behaves as the sum rather than the product. Nothing asserts that.
+# The round-2 review re-measured that product at 5-8x this size, including a 4.2 MB line of 256
+# clauses x one 16 KB quoted token, and found the same: cost stays linear at roughly 75-90 us
+# per token in every shape it could construct.
+#
+# AND THE CEILING IS STILL EXCEEDABLE — the character of that changed rather than the fact. The
+# first version of this block was broken at 248 KB by a shape-dependent blowup. The smallest
+# input that now exceeds 10 000 ms is 1.4 MB / 131 072 tokens at 11 737 ms, the law is linear in
+# every shape anyone has constructed, and every point asserted below has about 6x headroom. A
+# guard that a 1.4 MB command line can trip is a different object from one a 248 KB command line
+# could trip, and the difference is that this one has no cliff to fall off.
+# ============================================================================================
+
+# Built by doubling — `s="$s $tok"` in a loop is the same O(n^2) this block is about, and a test
+# that takes a minute to build its own payload teaches the wrong lesson.
+tbg_dbl() { # tbg_dbl <seed> <times>
+    local _s="$1" _n="$2"
+    while [ "$_n" -gt 0 ]; do _s="$_s$_s"; _n=$(( _n - 1 )); done
+    printf '%s' "$_s"
+}
+tbg_cost() { # tbg_cost <payload> <expected-rc> <label>
+    local _t0 _t1 _rc _ms
+    _t0=$(( $(date +%s%N) / 1000000 ))
+    _rc="$(tbg_run_fresh "$1")"
+    _t1=$(( $(date +%s%N) / 1000000 ))
+    _ms=$(( _t1 - _t0 ))
+    assert_eq "$2" "$_rc" "$3 — the verdict, so the timing cannot pass by the hook doing nothing"
+    assert_eq "under" "$([ "$_ms" -lt 10000 ] && echo under || echo "over: ${_ms} ms")" \
+        "$3 — under 10 000 ms end to end"
+}
+
+# D1 — total length, as one quoted token. 2^20 characters.
+tbg_d1="$(LC_ALL=C printf '%*s' 1048576 '' | LC_ALL=C tr ' ' 'a')"
+tbg_cost "find Assets -name '*.meta' -exec grep -l '$tbg_d1' {} \\;" "0" \
+    "D1: a 1 MB quote-leading command line"
+unset tbg_d1
+
+# D2 — argument count in ONE clause. 2^14 = 16 384 arguments, 180 KB.
+tbg_d2="$(tbg_dbl ' aaaaaaaaaa' 14)"
+tbg_cost "find Assets -name '*.meta' -exec grep -l$tbg_d2 {} \\;" "0" \
+    "D2: 16 384 arguments in one clause"
+# and the destructive twin, so the flag is still found after 16 384 arguments
+tbg_cost "find Assets -name '*.meta' -exec sed$tbg_d2 -i {} \\;" "2" \
+    "D2: an in-place flag after 16 384 arguments"
+unset tbg_d2
+
+# D3 — clause count. 2^9 = 512 clauses.
+tbg_d3="$(tbg_dbl ' -exec grep -l guid {} \;' 9)"
+tbg_cost "find Assets -name '*.meta'$tbg_d3" "0" \
+    "D3: 512 read-only -exec clauses"
+unset tbg_d3
