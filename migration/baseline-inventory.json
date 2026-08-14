@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "30222b8f59822eb1b094312b4413d54da96e90e2",
+  "source_commit": "6b13948786508a34e147366954d35da6b0e9cc40",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 62,
@@ -118,7 +118,7 @@
       },
       {
         "path": ".claude/hooks/block-legacy-input.sh",
-        "sha256": "43366d638fba2baaa5a0e3739f8cfafdc77e1028e1f851e829861754606a98d9",
+        "sha256": "f7d2a852d99354a451274898e5c2486ff23209214fb95fef44ed4ee0d1011cee",
         "git_mode": "100755"
       },
       {
@@ -163,7 +163,7 @@
       },
       {
         "path": ".claude/hooks/warn-platform-defines.sh",
-        "sha256": "5667ccd8029f73edf285858f9c7ea7bc8fd69c4d7e55cb4d1f124c743cd9d1b6",
+        "sha256": "e41b70d87fa964d70fe8a3cd00829e600a4fe32e7f2e9cd32a1aa3ca168ddddf",
         "git_mode": "100755"
       },
       {
@@ -513,7 +513,7 @@
         },
         {
           "path": ".claude/hooks/block-legacy-input.sh",
-          "sha256": "43366d638fba2baaa5a0e3739f8cfafdc77e1028e1f851e829861754606a98d9",
+          "sha256": "f7d2a852d99354a451274898e5c2486ff23209214fb95fef44ed4ee0d1011cee",
           "git_mode": "100755"
         },
         {
@@ -558,7 +558,7 @@
         },
         {
           "path": ".claude/hooks/warn-platform-defines.sh",
-          "sha256": "5667ccd8029f73edf285858f9c7ea7bc8fd69c4d7e55cb4d1f124c743cd9d1b6",
+          "sha256": "e41b70d87fa964d70fe8a3cd00829e600a4fe32e7f2e9cd32a1aa3ca168ddddf",
           "git_mode": "100755"
         },
         {
