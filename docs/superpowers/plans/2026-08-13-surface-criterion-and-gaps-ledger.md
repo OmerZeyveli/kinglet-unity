@@ -1741,6 +1741,35 @@ ADDRESSED, none returned to the fix loop.**
      lands in the dead list, which the new assertion forbids **by name**, while the headline count
      catches it **by number.**
 
+**From Task 11's implementation (2026-08-14, `1bec7c2`, in review).**
+
+185. **The plan's own citation pattern was entirely redundant, and F11's prediction held exactly.**
+     Over 141 live surface files: **A=29, B=22, C=32**, with **`A ⊆ C` and an empty difference** —
+     *the shape the plan told the implementer to run found nothing the other two did not.* Only **C**
+     saw `unity-planning`'s `Existing.cs:123-145`, the assertion freezing that exact string, and the
+     anchor rule's own illustration; only **B** saw **five rotted bare citations, two of them
+     self-citations.** **Seventeen live pointers had rotted — two onto a blank line, one past EOF.**
+186. **The citation guard read its own exemption table, and it cost a second commit.** Tracking it
+     produced **10 self-reads, 8 of them the exemption table describing itself.** *Seventh instance
+     in this wave of a probe whose own text satisfies the condition it tests — and the second by this
+     implementer, in the task whose whole subject is citations.*
+187. **`session-brief.sh` gets its kill switches INLINE rather than by sourcing `_lib.sh`, and the
+     reason is a startup-path argument, not a style one.** Sourcing the library would put
+     **`git rev-parse` and `mkdir -p` on the one path where failure means the session does not
+     start.** Five shipped places claimed `DISABLE_UNITY_HOOKS=1` bypasses **ALL** hooks; the claim
+     is now true, and `tests/test-hooks.sh` asserts the property for **every** hook **by either
+     mechanism**, so the inline copy cannot drift out of agreement with the library one.
+188. **Three of the implementer's own probes were caught by its own guards, and it reports them as
+     measurements rather than hiding them:** repair notes citing themselves in citation form; **a
+     `grep -q` SIGPIPE undercount inside a count guard** — the exact shape this wave has been closing
+     all night, in the guard that counts; and a `nullglob` literal that an anti-vacuity mutation
+     found before the guard shipped.
+189. **The floor is 6, on a criterion rather than a number** — *one reference per distinct installed
+     script named; live 9 across 6 scripts, three adjacent duplicate pairs* — **and the "well below
+     that" sentence was rewritten rather than patched.** *This closes the controller's own error:
+     a Minor relayed without its measurement, which raised the floor to one below live and created a
+     false positive whose message had two disjuncts and neither was true.*
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
