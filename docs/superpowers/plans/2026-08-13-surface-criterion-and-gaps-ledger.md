@@ -214,6 +214,12 @@ stands. It has now gone stale twice.
 - **The interactive `find` is a `bfs 4.1.1` wrapper, the same trap as `grep`→`ugrep`.** Use
   `/usr/bin/find` (GNU 4.9.0) for any behaviour or absence claim. Discovered 2026-08-14 by a
   reviewer measuring real file damage.
+- **`set -e` does NOT propagate into a command substitution** unless `shopt -s inherit_errexit` is
+  set, and `install.sh` sets it nowhere. Measured 2026-08-14 while checking a claim that a failing
+  `X="$(fn)"` would kill the run: **rc=0, the run completed.** The two shapes where the death IS
+  real: a function whose **last** command is the failing assignment, and the same printf-last shape
+  **under `inherit_errexit`**. *A `set -e` claim in this repository must name which of the three it
+  means.*
 - **The general form, and it recurred four times tonight in four disguises: a probe whose own text
   satisfies the condition it is testing.** The route regex that matched the raw string it was meant
   to reason about; the damage harness whose `evil/xargs` measured arguments instead of stdin; the
@@ -1581,6 +1587,36 @@ ADDRESSED, none returned to the fix loop.**
 159. **A red-first state was already half-green and the implementer said so.** `S2`'s bytes survived
      pre-fix; only its diagnosis and beside-file assertions were red. *Reporting a partial red-first
      is worth more than a clean one, because the clean number is what a reader would have believed.*
+
+**From Task 4b's review (2026-08-14). In fix round 1.**
+
+160. **A claim that the fix averted a `set -e` death was falsified by construction, and the guard is
+     still right.** Reverting the predicate and running against a `chmod 000` `CLAUDE.md` gives
+     **rc=0, the run completes, the receipt is written, and it declines** — because `printf` is the
+     function's last command and **`set -e` does not reach into a command substitution**. **Keep the
+     guard** (it produces the correct *"exists but could not be read"* remedy rather than a generic
+     one, and is robust under a future `inherit_errexit`); **correct the claim.** *A shipped comment
+     in this repository is a measured claim, and this one was in the fix for a data-loss path.*
+161. **The rejected repair was rejected for the wrong reason, and the right reason is stronger.** The
+     **literal** `END { skip=0 }` is a **no-op** — identical shas to the unrepaired installer, fixing
+     **zero** states, not one. The **effective** form saves the sentinel in both states but is
+     **non-convergent**: it promotes the stale region into the user's prose and re-emits the facts
+     block every run (`124 → 176 → 228` lines, headings 10 → 11 → 12), **never converging, never
+     repairing the pair, and still printing `your prose untouched`.** *Refusal is correct because the
+     repair reinterprets toolkit content as the user's prose forever — not because it destroys work.*
+162. **Task 7's two sentences are routed in opposite directions, and the reviewer's ruling reverses
+     one of them.** **Keep** *"on every run that finds a well-formed one"* — it is **now precisely
+     true and would be false without it**, since the installer demonstrably does not refresh a
+     malformed pair. **Delete** the *"One known disagreement… one extra blank line"* paragraph — it
+     is **false at HEAD**.
+163. **A guard's evasion set was tested by three mutants the guard's own author did not write**, all
+     caught: a verb held in a variable (rule 3, `outside=1`), a heredoc write with no redirection and
+     no temp name (`unclassified=1`), and an `eval`-wrapped redirection (`outside=1`). The one not
+     caught is **exactly the documented limit and no wider.**
+164. **One pre-existing fail-OPEN corner remains in the marker contract:** a first install into a
+     hand-written `CLAUDE.md` that **quotes** exactly one begin and one end in order has its quoted
+     content **replaced**, and the dry run announces a plain refresh for it. Measured identical
+     before and after — out of scope, **and it is the last open corner.** **→ open, no owner.**
 
 **Inherited from earlier waves, still open:**
 
