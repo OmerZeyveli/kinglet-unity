@@ -7,11 +7,22 @@
 
 ## RESUME HERE
 
-**Nothing dispatched yet.** Task 1 is next.
+**Task 1 is merged and both gates are green on the branch.** `Total: 3412  Passed: 3409  Failed: 0
+Skipped: 3`, rc=0, **39** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **39**; `provenance
+OK`. Baseline regenerated outside a worktree at `--expect-drift 2`, as the carried obligation
+required. Next: Tasks 3 and 5.
+
+**A merge-time trap worth the line.** Regenerating the baseline and running the suite *before
+committing it* produced **18 failures**, none of them real: `tools/kinglet_spike/inventory.py`
+**refuses to inventory a dirty foundation** and named the uncommitted file in every message. Loud,
+correctly signposted, and invisible to every implementer — **the spike suite skips in a fresh
+checkout and in every worktree**, so only this checkout can see it. The controller is the only party
+who ever runs the suite with a dirty `migration/` and is therefore the only one this can bite.
+**Commit the baseline before running the suite.**
 
 | task | state | commit range |
 |---|---|---|
-| 1 — the three hooks nothing has ever executed | open | |
+| 1 — the three hooks nothing has ever executed | **DONE**, merged `d770bf5` | `3ca4327..1ff204a` |
 | 2 — execution-keyed hook coverage | open *(brief pending — consumes Task 1's output)* | |
 | 3 — anchor the unanchored pathspecs | open | |
 | 4 — the doctor's two remaining compensations | open | |
@@ -164,4 +175,34 @@ Print the non-silent byte count beside every zero.
    Task 1 is **2** — `.claude/hooks/warn-filename.sh` in `full_claude_tree/files` and again in
    `categories/hooks/files`, independently confirmed by the reviewer against the two observed
    failures. **Recorded here so it is not discovered at the whole-branch review**, which is where an
-   unregenerated baseline would otherwise surface as a mystery.
+   unregenerated baseline would otherwise surface as a mystery. **Discharged** at `f54e2f6`.
+
+4. **Task 1, Minor — the needle floor rejects `""` and nothing else.** Its predicate is `[ -n
+   "$NEEDLE" ]`, so its covered set is the singleton `{""}`; the needle's real requirement is
+   *discriminating*, a strictly smaller set. Measured: `' '`, `'e'` and `$'\n'` all pass the floor and
+   all match anything — and **`grep -qF -- $'\n' <<< ""` matches an empty haystack**, because
+   `grep -F` splits the pattern on newlines into two empty patterns, so a newline needle is
+   behaviourally identical to the empty one the floor exists to reject. The decisive combination:
+   gutting `warn-serialization`'s warning — **the exact mutation this file's header cites as its
+   reason for existing** — with a whitespace needle gives **86 pass / 0 fail**.
+
+   **Ruling: carried.** The uncaught cases require deliberately *typing* a degenerate value rather
+   than omitting a line, and the floor does close omission in every reachable form, including the
+   header's own "adding a hook" scenario. Measured under a written criterion — a needle is degenerate
+   if it matches the one-character haystack `x` — **all twelve shipped needles are 15–70 bytes and
+   none is degenerate.** → Task 5, which is writing the floor criterion anyway.
+
+5. **Task 1, Minor — two more needles carry the weakness `block-scene-edit` was repointed for.**
+   `block-meta-edit` and `guard-project-config` match **static explanation lines printed beside the
+   computed reason**, not the reason itself: replacing each hook's `$MSG` / `unity_hook_block` text
+   with a placeholder leaves the file at **86 pass / 0 fail**. So the provenance note's superlative —
+   *"block-scene-edit's needle was the weakest of the twelve"* — is false; it was **one of three**.
+   The repoint itself is correct and proven by A/B (old needle 0 failures, new needle 1, byte
+   assertion passing both ways). → Task 2, which is already in this file.
+
+6. **Task 1, Minor — one sentence, two counting criteria.** The header says the three `warn-*` hooks
+   appear *"SIX times across FOUR files — tests/test-hooks.sh (three, all in comments)"*. **Six is the
+   line count; `test-hooks.sh` has two lines** (one of which names two hooks). Under the *occurrence*
+   criterion the total is **seven** and `test-hooks.sh`'s "three" is right. Both numbers are correct
+   under their own criterion and the sentence names neither — **the same shape as ledger 205 in the
+   previous wave**, which is now the second instance. → Task 7, with 205.
