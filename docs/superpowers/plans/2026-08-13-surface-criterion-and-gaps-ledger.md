@@ -51,7 +51,39 @@ that closed without taking them**; 6 open and correctly parked; 4 stale as recor
 six open items share one cause — `→ whoever next opens that file`, a deferral with no owner**, which
 is the same defect entry 71 filed against elsewhere the same night.
 
-### IN FLIGHT — the correction pass
+### THE CORRECTION PASS IS CLOSED — two rounds, both re-reviewed, verdict MERGE
+
+**Round 1** `f8fab22`+`b9f2711` — all fourteen §5 items, 17 sites, 11 files. **Round 2**
+`741eeaf`+`ce17c5d` — the five defects round 1 introduced while fixing those fourteen.
+
+Both re-reviews returned **merge**, and both were run the way this wave learned to run them: the
+`/unity-doctor` **"Measured:"** sentence — the one thing on the branch falsifiable by execution — was
+**re-run from a fresh fixture by the reviewer** and re-measured true to the byte; **prose-only was
+proved by md5 over comment-stripped content with the instrument controlled in both directions**
+(a synthetic code-line change flips the hash, a synthetic comment change does not); and five separate
+falsifications were injected into the merged tree at once — **none of the five fixed claims is
+protected by any gate**, which the reviewer stated explicitly rather than letting a green suite imply
+otherwise. **That is the honest state of a prose-only brief, and saying so is the finding.**
+
+**Defect ratio across the two rounds: 5 introduced per 14 fixed, then 1 per 5 — and the one is a
+comment about a comment.** That closure is what justified stopping rather than dispatching a round 3.
+
+**The round's own best discovery is not on any finding list.** Its printed re-derivation recipe —
+the standard remedy for this branch's house defect, `grep -v '^\./path/to/self:'` — **excluded
+nothing**, because interactive `grep` here is ugrep and ugrep prints paths **without** the `./`
+prefix. It does not error; it reports a **larger** number, which reads as a real finding.
+`unity_project_hash` came back **4** where the truth is **1**, the three extra hits being the
+recording file's own text. **The cure for the house defect was itself silently broken on this host.**
+Recipe now unanchored and verified identical under both front-ends across all twelve functions.
+
+### Baseline drift is a property of the file set, not a constant
+
+**6 at round 1, 4 at round 2, from identical reasoning over different sets** — independently
+reproduced from the criterion by the re-reviewer, with controls at 3/6/8 each refusing with
+`found 4`. Neither the whole-branch review's **4** nor the controller's **8** was right at round 1;
+**the guard was the only party that knew**, in both directions.
+
+### SUPERSEDED — the correction pass while it was in flight
 
 One implementer, dispatched against the main repo (clean, no worktree), doing all three of §5's
 tiers: the three pre-merge prose fixes, the three "not cosmetic" ones, and the cheap repo-facing
@@ -114,6 +146,43 @@ could be 8, and neither is authority.
      and prints a recipe that returns **nothing** at HEAD — confirmed by running it. The correction
      pass correctly left it (it needs an execution-keyed replacement, not a prose edit), but proximity
      to a correct measurement lends it borrowed credibility. **Raise follow-up 3's priority.**
+
+207. **`.claude/hooks/_lib.sh` says the ugrep-blind exclusion left "every count inflated by three".
+     Six of twelve were inflated by 2 or 4.** The inflation is each function's own self-hit count in
+     `_lib.sh`, not a constant — and the clause is false for **one of the two rows the paragraph is
+     written about** (`unity_state_plan_update`: 4, not 3). A written answer, inside a paragraph
+     whose two preceding sentences are *"DERIVE THE SET; DO NOT TRUST THIS LIST EITHER"* and *"Run
+     the check; do not write the answer."*
+
+     **Ruling: carried, and the owner is follow-up 1 — the hook pass — not "whoever next opens the
+     file."** The recipe immediately above it is correct and agrees under both front-ends, so a
+     reader following the file's own instruction never reads the clause as a fact. Fixing it alone
+     costs a `.claude/` byte change and therefore a second baseline-regeneration commit; the hook
+     pass touches `_lib.sh` anyway and regenerates once for all of it. **Naming an owner is the
+     point** — 1E recorded four items lost to a deferral with no owner, and this is the first one
+     routed under that finding.
+
+208. **`unity-doctor.md` Check 3 **item 2** carries the identical defect item 4 was just fixed for,
+     four lines above it.** It instructs the reader to confirm every hook appears in `PreToolUse` or
+     `PostToolUse`; `session-brief.sh`, `session-restore.sh` and `session-save.sh` appear in neither.
+     Same three hooks, same three spurious WARNINGs on a healthy install, immediately above the rule
+     that was rescoped **by event** to stop exactly this. Deliberately left alone this round because
+     it is pre-existing rather than introduced. **The re-reviewer calls it the highest-value item on
+     its list, and it is right** — a shipped payload command telling an operator to report healthy
+     state as a warning. → follow-up 7 (`studio-doctor`), or sooner.
+
+209. **A pin to a commit without a pin to a file set is half a pin.** `final-reviewer-prompt.md`'s
+     `11/29` is pinned to `b9f2711` but never names the two documents it was measured over. The
+     re-reviewer reproduced it only by trying pairs — `README.md` + `docs/ARCHITECTURE.md` gives
+     11/29; four other pairings give 3/15, 12/38, 15/35 and 24/58. Name the file set beside the
+     commit.
+
+210. **The `_lib.sh` recipe's directory exclusions are name-based, and the two `grep` front-ends walk
+     different trees.** `--exclude-dir=.superpowers --exclude-dir=superpowers` does not cover
+     `.research/superpowers-6.2.0`, `.research/superpowers-skills` or `.research/superpowers-evals`;
+     ugrep's `--ignore-files` skips gitignored `.research/` while GNU grep walks it. **They agree
+     today only because `.research/` happens to contain none of these names** — verified, 0 hits.
+     The agreement is a fact about today's tree, not a property of the recipe.
 
 ### The house defect, named
 
