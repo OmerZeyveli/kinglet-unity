@@ -39,6 +39,8 @@
 #   * IT CANNOT TELL A POINTER FROM A NARRATIVE. That judgement is the exemption table, written by
 #     hand, and a wrong row silences a real pointer. Each row carries its reason so the next reader
 #     can re-judge it rather than inherit it.
+#   * IT DOES NOT READ ITSELF. See the exclusion at the file list below for why, and for what that
+#     costs.
 # ============================================================================
 
 set -euo pipefail
@@ -54,10 +56,22 @@ pass() { printf 'PASS: %s\n' "$1"; }
 #
 # `git ls-files` and not `find`: an untracked scratch file is not a surface, and the index is the
 # same oracle every other guard in this suite uses.
+#
+# AND THIS FILE EXCLUDES ITSELF, which is not a convenience. Its header quotes rotted citations as
+# the finding and its exemption table below is, by construction, a list of citations that do not
+# resolve — every needle has to contain the citation it exempts in order to match the line carrying
+# it. Measured the moment this file was first tracked: it reported ten failures, all of them its own
+# subject matter, and eight of the ten were the exemption table describing itself.
+#
+# THE COST IS REAL AND IT IS STATED: a genuine live pointer written into THIS file is outside its own
+# reach. What stands in for it is the exemption audit at the bottom — every row must still match text
+# that exists — plus the three shape floors above, which is thinner cover than the rest of the tree
+# gets. A reader adding a live `file:line` pointer to this file should resolve it by hand.
 LIVE_FILES="$(git ls-files \
   'tests/*.sh' 'scripts/*.sh' 'install.sh' 'uninstall.sh' \
   '.claude/*' 'docs/*.md' '*.md' 'provenance.tsv' 'provenance-skip.tsv' 2>/dev/null \
-  | grep -vE '^docs/(superpowers|research)/' | sort -u || true)"
+  | grep -vE '^docs/(superpowers|research)/' \
+  | grep -vxF 'tests/test-citations-resolve.sh' | sort -u || true)"
 LIVE_N="$(printf '%s\n' "$LIVE_FILES" | grep -c . || true)"
 
 # Anti-vacuity, before anything is compared. A sweep over an empty file set finds no bad citation and
