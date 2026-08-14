@@ -400,7 +400,13 @@ owned_by_installer() {
   #   scripts/studio-doctor.sh                   — DOES NOT TRIM. Same `case` shape; reports an
   #                                                unreadable origin on its own line rather than
   #                                                counting it verified. Diagnostic only, writes
-  #                                                nothing, so it cannot destroy anything.
+  #                                                nothing, so it cannot destroy anything. Its
+  #                                                `user-modified` arm now makes the same
+  #                                                reference-copy comparison the MODIFIED_FILES loop
+  #                                                below does, so the two cannot disagree about
+  #                                                whether a file has been put back — but only when
+  #                                                --toolkit-dir gives it a checkout to compare
+  #                                                against, which an installed project has not got.
   #
   # Keep this list in step with the file if you add a reader, and do not shorten it to "the origin
   # column is trimmed" — that sentence is true of two readers and false of four.
@@ -429,9 +435,16 @@ owned_by_installer() {
 #
 # The comment below this one already argued that "kept-because-yours and kept-because-unreadable are
 # different futures, and a single count would describe neither" — and then the count described both.
+#
+# A FOURTH LIST, AND IT IS A SUBTRACTION FROM THE UNION RATHER THAN A PARTITION OF IT.
+# `RECLAIMED_FILES` names files whose row says `user-modified` and whose bytes are now byte-for-byte
+# the copy this toolkit ships — the user put the file back. They are deliberately NOT in
+# MODIFIED_FILES: the whole point is that the payload loop writes them again and records them
+# `toolkit`, so the sticky flag stops surviving its own reason. See the arm below.
 MODIFIED_FILES=""
 EDITED_FILES=""
 UNREADABLE_ORIGINS=""
+RECLAIMED_FILES=""
 if [ "$MODE" = ours ]; then
   while IFS=$'\t' read -r rel recorded _mode origin; do
     case "$rel" in ''|\#*) continue ;; esac
@@ -472,6 +485,50 @@ if [ "$MODE" = ours ]; then
     # single count would describe neither.
     case "$origin_clean" in
       user-modified)
+        # STICKY UNTIL THE BYTES COME BACK — AND THE COMPARISON IS AGAINST THE TOOLKIT'S COPY, NOT
+        # THE RECORDED SHA. Once a run keeps your edit it records the file AS EDITED, and the arm
+        # above reads that row on every later run. Nothing ever took the flag off, so reverting the
+        # file — `git checkout`, an undo, pasting the shipped text back — left it permanently yours:
+        # measured 2026-08-14 on a --variant urp fixture, install → edit → install → revert to the
+        # toolkit's exact bytes → install, and the run still printed `1 installed file(s) have local
+        # edits — keeping yours` about a file with no local edits, rewriting the row `user-modified`
+        # with the TOOLKIT'S OWN checksum in it. The cost is not the wrong sentence: this version's
+        # copy of that file never lands again, so every later fix to it silently skips the project.
+        # A second fixture that never touched the file received the bump in the same run.
+        #
+        # THIS IS NOT THE COMPARISON THAT FAILED IN c2d27f1f. That one tested the file against its
+        # RECORDED sha, which for a `user-modified` row is the sha of the edited file — so it matched
+        # while the edit was still in place, concluded "untouched", and the payload loop destroyed
+        # the edit on the next run. An EDITED file never equals the toolkit's bytes, so the test here
+        # cannot answer yes while the work is still there. The two directions are asserted together
+        # in tests/test-install-ownership.sh's states R…R3, and the second is the regression check:
+        # edit, then three consecutive installs, and the edit survives all three.
+        #
+        # WHICH FILES HAVE A REFERENCE COPY, AND WHY THE MAPPING IS TWO ARMS AND NOT ONE. Step 5's
+        # payload loop takes `.claude/<rel>` from `$SCRIPT_DIR/.claude/<rel>`; the scripts loop takes
+        # `.claude/scripts/<name>` from the repo-root `$SCRIPT_DIR/scripts/<name>`, because there is
+        # no `.claude/scripts/` in this repository at all. Collapsing them to one arm makes every
+        # scripts row look referenceless and the flag stays stuck there for a reason that reads as
+        # deliberate.
+        #
+        # EVERYTHING ELSE KEEPS THE FLAG, and that is the fail-closed direction. A row with no
+        # reference copy on disk — a retired surface this payload no longer ships, or a project-root
+        # path — cannot be proved reverted, so it is not. Note that no writer in this file emits a
+        # `user-modified` row for a project-root path (.mcp.json, MCP-SETUP.md, CLAUDE.md.generated,
+        # .gitignore and the manifest backup are all written `toolkit` or not at all), so the only
+        # way one reaches this arm is a hand-edited receipt — where declining to act is the whole
+        # policy. MCP-SETUP.md does ship a static copy at $SCRIPT_DIR/MCP-SETUP.md and is still not
+        # given a reference here: adding one would be a behaviour with no producer.
+        ref=''
+        case "$rel" in
+          .claude/scripts/*) ref="$SCRIPT_DIR/scripts/${rel#.claude/scripts/}" ;;
+          .claude/*)         ref="$SCRIPT_DIR/.claude/${rel#.claude/}" ;;
+        esac
+        if [ -n "$ref" ] && [ -f "$ref" ] \
+           && [ "$(sha_of "$PROJECT_DIR/$rel")" = "$(sha_of "$ref")" ]; then
+          RECLAIMED_FILES="${RECLAIMED_FILES}${rel}"$'\n'
+          continue
+        fi
         MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
         EDITED_FILES="${EDITED_FILES}${rel}"$'\n'
         continue
@@ -496,6 +553,20 @@ if [ "$MODE" = ours ]; then
   if [ "$MOD_COUNT" -gt 0 ]; then
     warn "$MOD_COUNT installed file(s) have local edits — keeping yours:"
     printf '%s' "$EDITED_FILES" | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+  fi
+  # SAID ALOUD, because the previous run said the opposite about the same file. A user who has seen
+  # `keeping yours: .claude/rules/pc-console.md` on every install since they edited it, and who then
+  # put the file back, is owed the sentence that closes that thread — otherwise the line simply stops
+  # appearing and the kept-count silently drops by one. `info`, not `warn`: nothing here needs
+  # attention and nothing was abandoned, so this is deliberately NOT a `note_not_done` entry either
+  # (see that block's "what does not belong here").
+  RECLAIMED_COUNT=$(printf '%s' "$RECLAIMED_FILES" | grep -c . || true)
+  if [ "$RECLAIMED_COUNT" -gt 0 ]; then
+    info "$RECLAIMED_COUNT file(s) you had edited are back to this version's bytes — no longer kept as yours:"
+    printf '%s' "$RECLAIMED_FILES" | while IFS= read -r r; do
+      if [ -n "$r" ]; then printf '       %s\n' "$r"; fi
+    done
+    info "This version's copies land again, and future updates to them will reach this project."
   fi
   # `if`, not `[ -n "$u" ] && printf`, inside the loop body: a false test as a loop body's last
   # command is a `set -e` kill, and this block is new enough not to inherit the older idiom's luck.

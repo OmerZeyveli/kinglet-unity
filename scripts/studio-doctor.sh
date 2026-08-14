@@ -10,10 +10,17 @@
 # edited, files nobody installed — instead of just "present / not present".
 #
 # Usage:
-#   ./scripts/studio-doctor.sh [--project-dir /path/to/UnityProject]
+#   ./scripts/studio-doctor.sh [--project-dir /path/to/UnityProject] [--toolkit-dir /path/to/kinglet]
 #   In an installed Unity project this file is ./.claude/scripts/studio-doctor.sh — which is the
 #   invocation install.sh's own closing "Next steps" prints, and the one most readers of this help
 #   are actually holding.
+#
+# --toolkit-dir points at the kinglet-unity checkout this project was installed from. The receipt's
+# origin column records that a file is yours; it cannot record that you have since put it back. With
+# a checkout to compare against, a file whose bytes are once again the shipped ones is reported as
+# reverted rather than as modified. Without one this check reads the column alone and says so rather
+# than repeating a claim it cannot support. Run from a checkout it defaults to that checkout; run
+# from ./.claude/scripts/ inside a project there is nothing to default to, which is the common case.
 #
 # Exits 1 if any check FAILs, 0 otherwise. (This used to always exit 0, which made it useless in CI.)
 #
@@ -54,13 +61,18 @@ print_first_5() {
   awk 'NF && NR <= 5 { printf "       %s\n", $0 }' <<< "$1"
 }
 
-usage() { sed -n '3,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '3,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 PROJECT_DIR="$(pwd)"
+TOOLKIT_DIR=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --project-dir) [ $# -ge 2 ] || { printf 'err: --project-dir requires a path\n' >&2; exit 2; }
                    PROJECT_DIR="$2"; shift 2 ;;
+    # Validated BEFORE `shift 2`, like --project-dir above: `shift 2` with one argument left fails
+    # under `set -u` before any error message of ours can print, and the user gets a silent exit 1.
+    --toolkit-dir) [ $# -ge 2 ] || { printf 'err: --toolkit-dir requires a path\n' >&2; exit 2; }
+                   TOOLKIT_DIR="$2"; shift 2 ;;
     -h|--help)     usage ;;
     *)             printf 'Unknown argument: %s (use --help)\n' "$1" >&2; exit 2 ;;
   esac
@@ -68,6 +80,50 @@ done
 PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd)" || { printf 'Project directory not found.\n' >&2; exit 2; }
 CLAUDE_DIR="$PROJECT_DIR/.claude"
 RECEIPT="$CLAUDE_DIR/state/install-receipt.tsv"
+
+# ── The toolkit checkout, when there is one to point at ──────────────────────
+# An explicit --toolkit-dir is validated and refused loudly: a path that is not a checkout would
+# otherwise silently supply no reference copy for anything, and the run would read exactly like one
+# where the flag had never been passed — a flag that appears to work and changes nothing.
+#
+# THE DEFAULT IS DERIVED FROM WHERE THIS FILE IS, and it lands on the only shape that can answer.
+# In a checkout this file is <repo>/scripts/studio-doctor.sh, so `dirname $0`/.. is the repo and
+# carries .claude/VERSION. In an installed project it is <project>/.claude/scripts/studio-doctor.sh,
+# so the same expression is <project>/.claude, which carries no .claude/VERSION of its own — no
+# default, which is correct, because an installed project HAS no second copy to compare against. The
+# `!= "$PROJECT_DIR"` guard covers the degenerate case of pointing the checkout's own doctor at the
+# checkout, where every file would trivially equal itself.
+if [ -n "$TOOLKIT_DIR" ]; then
+  TOOLKIT_DIR="$(cd "$TOOLKIT_DIR" 2>/dev/null && pwd)" || { printf 'Toolkit directory not found.\n' >&2; exit 2; }
+  [ -f "$TOOLKIT_DIR/.claude/VERSION" ] \
+    || { printf 'Not a kinglet-unity checkout (no .claude/VERSION): %s\n' "$TOOLKIT_DIR" >&2; exit 2; }
+else
+  TOOLKIT_CAND="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)" || TOOLKIT_CAND=""
+  if [ -n "$TOOLKIT_CAND" ] && [ -f "$TOOLKIT_CAND/.claude/VERSION" ] && [ "$TOOLKIT_CAND" != "$PROJECT_DIR" ]; then
+    TOOLKIT_DIR="$TOOLKIT_CAND"
+  fi
+fi
+
+# toolkit_ref <project-relative path> — the toolkit's shipped copy of that path, or nothing.
+#
+# MIRRORS install.sh'S TWO WRITE LOOPS AND HAS TO KEEP MIRRORING THEM. Step 5's payload loop takes
+# `.claude/<rel>` from `<checkout>/.claude/<rel>`; the scripts loop takes `.claude/scripts/<name>`
+# from the repo-root `<checkout>/scripts/<name>`, because no `.claude/scripts/` exists in the
+# checkout at all. Anchor: the `user-modified)` arm of install.sh's MODIFIED_FILES loop carries the
+# same two-arm case and the reasoning behind it. One arm instead of two would make every
+# `.claude/scripts/*` row look referenceless, and a referenceless row is reported as still-modified —
+# wrong in the quiet direction.
+#
+# Returns 0 on every path, including the no-match one: the caller does `REF="$(toolkit_ref "$rel")"`,
+# a bare assignment, where a non-zero status is a `set -e` kill in the middle of the receipt loop.
+toolkit_ref() {
+  [ -n "$TOOLKIT_DIR" ] || return 0
+  case "$1" in
+    .claude/scripts/*) printf '%s/scripts/%s' "$TOOLKIT_DIR" "${1#.claude/scripts/}" ;;
+    .claude/*)         printf '%s/.claude/%s' "$TOOLKIT_DIR" "${1#.claude/}" ;;
+  esac
+  return 0
+}
 
 printf '%s\n' "${BOLD}Kinglet Pioneer — studio-doctor${NC}"
 printf 'Project: %s\n' "$PROJECT_DIR"
@@ -293,7 +349,12 @@ else
   #                                         `user-modified` is safe — but a mangled `toolkit ` on an
   #                                         UNEDITED file is classified as the user's and never
   #                                         removed. That mirror is still open on that side.
-  #   this file                           — DOES NOT TRIM. Same `case` shape, reporting only.
+  #   this file                           — DOES NOT TRIM. Same `case` shape, reporting only. Since
+  #                                         2026-08-14 the column no longer DECIDES for a
+  #                                         `user-modified` row: it selects the row for a byte
+  #                                         comparison against the toolkit's shipped copy, when
+  #                                         --toolkit-dir names one. A row with no reference copy is
+  #                                         still decided by the column, and the report says which.
   #
   # So `install.sh will keep your versions` is now true of every bucket this loop can produce. These
   # rows still get their own line, for the reason that outlives the fix: this file writes nothing and
@@ -304,8 +365,8 @@ else
   # The sha comparison stays fail-closed the same way uninstall.sh's `sha_of` is: an unreadable file
   # yields the empty string, which never equals a recorded checksum, so the row lands in MODIFIED and
   # is reported rather than silently passed.
-  VERIFIED=0; MODIFIED=0; MISSING=0; UNREADABLE=0
-  MODIFIED_LIST=""; MISSING_LIST=""; UNREADABLE_LIST=""
+  VERIFIED=0; MODIFIED=0; MISSING=0; UNREADABLE=0; REVERTED=0; STICKY=0
+  MODIFIED_LIST=""; MISSING_LIST=""; UNREADABLE_LIST=""; REVERTED_LIST=""
   while IFS=$'\t' read -r rel recorded _mode origin; do
     case "$rel" in ''|\#*|path) continue ;; esac
     abs="$PROJECT_DIR/$rel"
@@ -315,7 +376,49 @@ else
     fi
     case "$origin" in
       user-modified)
-        MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+        # A `user-modified` ROW IS A RECORD OF WHAT A PAST RUN FOUND, NOT OF WHAT IS ON DISK NOW, and
+        # this arm classified by the column alone until 2026-08-14 — no bytes were ever compared. So
+        # a file the user had put back to the shipped text was reported under `modified since
+        # install` forever: measured that day on a --variant urp fixture, install → edit → install →
+        # revert to the toolkit's exact bytes, `WARN 1 file(s) modified since install` about a file
+        # byte-identical to the toolkit's own copy.
+        #
+        # THE SHA ON THE ROW CANNOT ANSWER THIS, WHICH IS WHY THE REFERENCE COPY IS NEEDED. The row
+        # records the file AS EDITED, so `$2` matched the edited bytes; after a further install it
+        # records the REVERTED bytes and matches those instead. Either way a row-versus-disk
+        # comparison says "unchanged" and says nothing about whose the file is. Only the toolkit's
+        # shipped copy discriminates, and install.sh's fix for the same defect makes exactly this
+        # comparison — deliberately the same one, so the installer and this check cannot drift into
+        # disagreeing about the same file.
+        #
+        # WITH NO CHECKOUT TO POINT AT, NOTHING IS PROVED AND THE FILE STAYS IN MODIFIED. That is the
+        # fail-closed direction: reporting an edit that has been reverted costs a stale warning;
+        # reporting a live edit as reverted tells the user their work is not at risk when it is. The
+        # count of rows that took this branch unproved is kept so the report can say so out loud
+        # rather than leaving the reader to assume the bytes were looked at.
+        REF="$(toolkit_ref "$rel")"
+        REF_HAVE=""; REF_WANT=""
+        if [ -n "$REF" ] && [ -f "$REF" ]; then
+          REF_HAVE="$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1 || true)"
+          REF_WANT="$(sha256sum "$REF" 2>/dev/null | cut -d' ' -f1 || true)"
+        fi
+        # `-n "$REF_HAVE"` is load-bearing: an unreadable file and an unreadable reference both hash
+        # to the empty string, and without this an I/O error on both sides would read as a match.
+        if [ -n "$REF_HAVE" ] && [ "$REF_HAVE" = "$REF_WANT" ]; then
+          REVERTED=$((REVERTED + 1)); REVERTED_LIST="${REVERTED_LIST}${rel}"$'\n'
+        else
+          MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+          # COUNTED ON THE REFERENCE, NOT ON THE HASH, because the report says `no shipped copy to
+          # compare against` and that has to be true of every row it counts. An UNREADABLE project
+          # file also yields an empty hash — measured 2026-08-14 with a payload file at mode 000 —
+          # and it has a shipped copy; it lands in MODIFIED for the same fail-closed reason the
+          # `toolkit` arm below puts it there, and is not claimed to be a row nobody could source.
+          #
+          # `if`, not `[ -n … ] || STICKY=…`: a test as the last command of a loop body is a `set -e`
+          # kill whenever it is false, and the `||` form only escapes that by accident of the
+          # assignment always succeeding. The next edit to this arm should not have to know that.
+          if [ -z "$REF" ] || [ ! -f "$REF" ]; then STICKY=$((STICKY + 1)); fi
+        fi
         ;;
       toolkit)
         if [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
@@ -346,6 +449,30 @@ else
     # comment above.
     warn "$MODIFIED file(s) modified since install — install.sh will keep your versions:"
     print_first_5 "$MODIFIED_LIST"
+    # WHAT THIS COUNT IS BUILT FROM, WHEN PART OF IT IS BUILT FROM AN ASSUMPTION. A `toolkit` row in
+    # this list was decided by comparing bytes. A `user-modified` row with no shipped copy to compare
+    # against was decided by the column alone, and the column cannot know the file was put back. The
+    # line above is a claim about both; these lines are the boundary of the evidence behind it, and
+    # printing the number rather than a hedge is what makes it checkable.
+    if [ "$STICKY" -gt 0 ]; then
+      warn "     $STICKY of those carry a 'user-modified' row with no shipped copy to compare against,"
+      warn "     so the receipt's origin column alone put them here — a file you have PUT BACK reads"
+      warn "     exactly like one you are still editing."
+      if [ -z "$TOOLKIT_DIR" ]; then
+        warn "     Re-run with --toolkit-dir <kinglet-unity checkout> to tell the two apart."
+      fi
+    fi
+  fi
+  if [ "$REVERTED" -gt 0 ]; then
+    # NOT A FAILURE AND NOT A PASS. Nothing is broken — the bytes on disk are this toolkit's own —
+    # but the receipt still claims the file as the user's, and while it does, install.sh keeps it
+    # rather than delivering later versions of it. That is a real, actionable staleness with a
+    # one-command remedy, which is what `warn` is for here. It stops being true after one install:
+    # install.sh's MODIFIED_FILES loop makes the same comparison and rewrites the row `toolkit`.
+    warn "$REVERTED file(s) recorded as yours are byte-identical to this toolkit's copy:"
+    print_first_5 "$REVERTED_LIST"
+    warn "     You put them back. Until the next install.sh run rewrites those rows, this project is"
+    warn "     still cut off from updates to them."
   fi
   if [ "$UNREADABLE" -gt 0 ]; then
     # Also not a failure, and deliberately not a claim about what happens to the file next. The

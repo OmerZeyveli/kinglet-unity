@@ -88,6 +88,16 @@
 #   K2  the user's own file, first install ever, twice             bytes survive, NO row
 #   K3  ours, the user edits the backup, a second --with-* flag    bytes survive, manifest unedited
 #
+# States R–R4 ask the question the whole index above cannot: HOW DOES A FILE STOP BEING THE USER'S?
+# Until 2026-08-14 it never did — a `user-modified` row was read on every later run, so putting the
+# file back to the shipped bytes left the flag in place forever and the project silently stopped
+# receiving that file. Their own header sits above them.
+#
+#   R   ours, edited, then reverted to the shipped bytes   row → `toolkit`, no false `keeping yours`
+#   R2  ours, edited, three consecutive installs           edit survives all three, row stays yours
+#   R3  the same for `.claude/scripts/*`                   the OTHER reference root
+#   R4  a toolkit whose copy moved on                      lands in the reclaimed project
+#
 # WHAT THIS FILE CANNOT SEE
 #   * Named paths, not an enumeration. A–D assert MCP-SETUP.md and .mcp.json; E, F and J assert
 #     Packages/manifest.json.bak; I–I5 assert CLAUDE.md.generated. A FIFTH unrecorded project-root
@@ -2211,6 +2221,273 @@ if [ -n "$Q_SHA" ] && [ "$(sha_of "$Q_DIR/$Q_REL")" = "$Q_SHA" ]; then
   pass "Q2: the unreadable-origin file survived"
 else
   fail "Q2: the unreadable-origin file was overwritten — splitting the display lists changed what is_modified reads"
+fi
+
+# ── States R…R4: `user-modified` was sticky forever, and forever is too long ─
+#
+# Every state above asks whether the origin column is written and read correctly. R asks the
+# question none of them could: HOW DOES A FILE STOP BEING THE USER'S? The answer up to 2026-08-14
+# was that it never did. Once a run kept an edit it recorded the file as edited, and the
+# MODIFIED_FILES loop read that row on every later run — so reverting the file, by `git checkout`,
+# by an undo, or by pasting the shipped text back, left the flag in place for the life of the
+# project.
+#
+# Measured that day on a --variant urp fixture, install → edit → install → revert to the toolkit's
+# exact bytes → install:
+#
+#   * the run printed `1 installed file(s) have local edits — keeping yours` about a file with no
+#     local edits, and
+#   * rewrote the row `user-modified` carrying THE TOOLKIT'S OWN checksum, and
+#   * a toolkit whose copy of that file had moved on then did not deliver it — while a second
+#     fixture that never touched the file received the bump in the same run.
+#
+# The third bullet is the cost. The wrong sentence is cosmetic; a project silently excluded from
+# every future fix to a file it no longer differs from is not.
+#
+# THE COMPARISON IS AGAINST THE TOOLKIT'S SHIPPED COPY, AND R2 IS WHY THAT DISTINCTION IS THE WHOLE
+# TASK. An earlier attempt at this — commit c2d27f1f — compared the file against its RECORDED sha,
+# which for a `user-modified` row is the sha of the EDITED file. That matched while the edit was
+# still in place, concluded "untouched", and the payload loop destroyed the edit on the next run. An
+# edited file never equals the toolkit's bytes, so the comparison used here cannot answer yes while
+# the work is still there. R2 is the regression check stated in the task that added this block: edit,
+# then THREE consecutive installs, and the edit survives all three.
+#
+#   R   ours, edited, then reverted to the shipped bytes   row → `toolkit`, no false `keeping yours`
+#   R2  ours, edited, three consecutive installs           edit survives all three, row stays yours
+#   R3  the same for `.claude/scripts/*`                   the OTHER reference root
+#   R4  a toolkit whose copy moved on                      lands in the reclaimed project
+#
+# WHAT R CANNOT SEE
+#   * One payload file per state. A project with several reverted files at once, and any interaction
+#     with the unreadable-origin arm, are untested — a row whose origin cannot be READ is never
+#     reclaimed, by construction, and nothing here asserts that.
+#   * R3 covers the `.claude/scripts/` reference root because it is the one a single-arm mapping
+#     would break. `.claude/hooks/*`, `.claude/agents/*` and every other payload subtree share R's
+#     root and are not separately exercised.
+#   * PROJECT-ROOT ROWS ARE OUTSIDE ALL OF THIS AND THE REASON IS STRUCTURAL, not a gap this file
+#     could close. No writer in install.sh emits a `user-modified` row for .mcp.json, MCP-SETUP.md,
+#     CLAUDE.md.generated, .gitignore or the manifest backup — every one of them is written
+#     `toolkit` or not written at all — so no fixture can produce a project-root row that reaches
+#     the arm R exercises. They stay sticky by construction and never become sticky in the first
+#     place. Nothing here asserts that, because there is no input that would make it observable.
+#   * R4 builds its second toolkit by copying FOUR paths out of the checkout — .claude/, scripts/,
+#     MCP-SETUP.md and install.sh. That set is derived from `grep -o 'SCRIPT_DIR/[^ ]*' install.sh`
+#     as it stood 2026-08-14. If install.sh starts reading a fifth path out of SCRIPT_DIR, this
+#     toolkit copy becomes incomplete and R4 fails for a reason that has nothing to do with
+#     ownership. That is the intended failure direction — loud, and at the copy rather than silently
+#     mid-install — but it is a maintenance edge worth naming.
+#   * Whether the reclaimed file is later removable. R asserts the ROW, not what uninstall.sh does
+#     with it; states A–D and G own that direction.
+#   * scripts/studio-doctor.sh makes the same comparison and is not exercised here at all;
+#     tests/test-studio-doctor.sh owns that reader.
+RECLAIM_HDR='no longer kept as yours'
+
+# r_setup <name> — install, edit P_REL, install again, so the row is a genuine `user-modified` one
+# carrying the EDITED checksum. Returns with R_DIR set and R_EDIT_SHA holding that checksum.
+#
+# Each `local` is its own statement: bash expands ALL of a `local`'s arguments before performing any
+# assignment, so `local d="$SCRATCH/$1" f="$d/$P_REL"` would take `$d` from the enclosing scope.
+R_DIR=''; R_EDIT_SHA=''
+r_setup() {
+  local name="$1"
+  local d
+  d="$SCRATCH/$name"
+  local rc=0
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" >/dev/null
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  R_DIR="$d"; R_EDIT_SHA=''
+  if [ ! -f "$d/$P_REL" ]; then
+    fail "$name: the payload did not install $P_REL — this state has nothing to edit"
+    return 0
+  fi
+  printf '\n<!-- the user edited this -->\n' >> "$d/$P_REL"
+  R_EDIT_SHA="$(sha_of "$d/$P_REL")"
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  return 0
+}
+
+# r_install_out <project-dir> — run an install and print its output with the colours stripped.
+r_install_out() {
+  local d="$1"
+  local rc=0
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes </dev/null 2>&1 \
+    | sed $'s/\x1b\\[[0-9;]*m//g' || rc=$?
+  return 0
+}
+
+# ── State R: the revert stops being invisible ────────────────────────────────
+r_setup state-r
+R_ROW="$(own_row "$(receipt_of "$R_DIR")" "$P_REL")"
+if [ "$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$R_ROW")" = user-modified ] \
+   && [ -n "$R_EDIT_SHA" ] \
+   && [ "$(awk -F'\t' 'NR == 1 { print $2 }' <<< "$R_ROW")" = "$R_EDIT_SHA" ]; then
+  pass "R: the control row is 'user-modified' and carries the EDITED checksum — the state a revert has to escape"
+else
+  fail "R: the control row is not a user-modified row carrying the edited checksum, so the revert below would be reverting nothing. Row: $R_ROW"
+fi
+
+# The revert itself: the toolkit's exact bytes, which is the only input the fix may act on.
+R_RECLAIMED_DIR="$R_DIR"
+cp "$REPO/$P_REL" "$R_RECLAIMED_DIR/$P_REL"
+R_TOOLKIT_SHA="$(sha_of "$REPO/$P_REL")"
+R_OUT="$(r_install_out "$R_RECLAIMED_DIR")"
+R_ROW2="$(own_row "$(receipt_of "$R_RECLAIMED_DIR")" "$P_REL")"
+R_ORIGIN2="$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$R_ROW2")"
+if [ "$R_ORIGIN2" = toolkit ]; then
+  pass "R: the row is rewritten 'toolkit' — the file has stopped being the user's, so this version's copy lands again"
+else
+  fail "R: the row's origin is '$R_ORIGIN2' after the file was put back to the shipped bytes — the sticky flag outlived its reason, and every later fix to this file will skip this project"
+fi
+if [ -n "$R_TOOLKIT_SHA" ] && [ "$(awk -F'\t' 'NR == 1 { print $2 }' <<< "$R_ROW2")" = "$R_TOOLKIT_SHA" ]; then
+  pass "R: …recording the toolkit's checksum, which is what the file now is"
+else
+  fail "R: the row's checksum is not the toolkit's, so the row and the file disagree. Row: $R_ROW2"
+fi
+if [ -n "$R_TOOLKIT_SHA" ] && [ "$(sha_of "$R_RECLAIMED_DIR/$P_REL")" = "$R_TOOLKIT_SHA" ]; then
+  pass "R: the file on disk is the toolkit's copy"
+else
+  fail "R: the file on disk is neither the user's edit nor the toolkit's copy — the payload loop wrote something else"
+fi
+if grep -qxF -- "       $P_REL" <<< "$(warn_block "$R_OUT" "$EDITS_HDR")"; then
+  fail "R: the run still reports the file under the local-edits header — a sentence about local edits, printed about a file with none"
+else
+  pass "R: the run does NOT report the file as having local edits, because it has none"
+fi
+if grep -qxF -- "       $P_REL" <<< "$(warn_block "$R_OUT" "$RECLAIM_HDR")"; then
+  pass "R: …and says so on its own line, closing the thread the earlier runs opened"
+else
+  fail "R: the run says nothing about the file — the 'keeping yours' line simply stops appearing and the kept count drops with no explanation"
+fi
+
+# ── State R2: three consecutive installs, and the edit survives all three ────
+# THE ANTI-c2d27f1f DIRECTION, and the one the task that added this block named as deciding it. A
+# comparison against the RECORDED sha rather than against the toolkit's copy passes state R and
+# destroys the user's work here, on run 1 of the 3.
+r_setup state-r2
+R2_DIR="$R_DIR"
+R2_OK=1
+for r2_n in 1 2 3; do
+  R2_OUT="$(r_install_out "$R2_DIR")"
+  R2_ROW="$(own_row "$(receipt_of "$R2_DIR")" "$P_REL")"
+  if [ -n "$R_EDIT_SHA" ] && [ "$(sha_of "$R2_DIR/$P_REL")" = "$R_EDIT_SHA" ]; then
+    pass "R2: install $r2_n of 3 — the user's edit is still on disk"
+  else
+    R2_OK=0
+    fail "R2: install $r2_n of 3 DESTROYED the user's edit — the reclaim test is matching a file that still carries their work, which is commit c2d27f1f reintroduced"
+  fi
+  if [ "$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$R2_ROW")" = user-modified ] \
+     && [ -n "$R_EDIT_SHA" ] \
+     && [ "$(awk -F'\t' 'NR == 1 { print $2 }' <<< "$R2_ROW")" = "$R_EDIT_SHA" ]; then
+    pass "R2: install $r2_n of 3 — the row still says 'user-modified' and still carries the edited checksum"
+  else
+    R2_OK=0
+    fail "R2: install $r2_n of 3 left the row as '$R2_ROW' — the next run will no longer recognise the edit as the user's"
+  fi
+  if grep -qxF -- "       $P_REL" <<< "$(warn_block "$R2_OUT" "$EDITS_HDR")"; then
+    pass "R2: install $r2_n of 3 — the run reports the file under the local-edits header, which is true of it"
+  else
+    R2_OK=0
+    fail "R2: install $r2_n of 3 did not report the kept file — the user is not told an edit of theirs was at stake"
+  fi
+done
+if [ "$R2_OK" -eq 1 ]; then
+  pass "R2: the edit survived three consecutive installs"
+fi
+
+# ── State R3: the scripts loop's reference root is a different directory ─────
+# `.claude/scripts/<name>` is written from the repo-root `scripts/<name>`; there is no
+# `.claude/scripts/` in the checkout at all. A single-arm mapping that looked for
+# `$SCRIPT_DIR/.claude/scripts/<name>` would find nothing, silently decline to reclaim every script,
+# and pass state R — which is exactly the shape state H exists for on the other side of this loop.
+R3_REL='.claude/scripts/studio-doctor.sh'
+R3_SRC="$REPO/scripts/studio-doctor.sh"
+R3_DIR="$SCRATCH/state-r3"
+bash "$REPO/tests/fixtures/mkproject.sh" "$R3_DIR" >/dev/null
+R3_RC=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$REPO/install.sh" --project-dir "$R3_DIR" --yes >/dev/null 2>&1 </dev/null || R3_RC=$?
+if [ -f "$R3_DIR/$R3_REL" ]; then
+  printf '\n# the user edited this script\n' >> "$R3_DIR/$R3_REL"
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$R3_DIR" --yes >/dev/null 2>&1 </dev/null || R3_RC=$?
+  R3_ROW1="$(own_row "$(receipt_of "$R3_DIR")" "$R3_REL")"
+  if [ "$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$R3_ROW1")" = user-modified ]; then
+    pass "R3: the control row for the edited script is 'user-modified'"
+  else
+    fail "R3: the scripts loop did not record the edit — this state cannot test a revert. Row: $R3_ROW1"
+  fi
+  cp "$R3_SRC" "$R3_DIR/$R3_REL"
+  R3_OUT="$(r_install_out "$R3_DIR")"
+  R3_ROW2="$(own_row "$(receipt_of "$R3_DIR")" "$R3_REL")"
+  R3_ORIGIN2="$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$R3_ROW2")"
+  if [ "$R3_ORIGIN2" = toolkit ]; then
+    pass "R3: a reverted .claude/scripts/ file is reclaimed too — the second reference root resolves"
+  else
+    fail "R3: the row's origin is '$R3_ORIGIN2' — the reference copy for a .claude/scripts/ path was not found, so every script stays the user's forever once edited"
+  fi
+  if grep -qxF -- "       $R3_REL" <<< "$(warn_block "$R3_OUT" "$EDITS_HDR")"; then
+    fail "R3: the run still reports the reverted script as having local edits"
+  else
+    pass "R3: the run does not report the reverted script as having local edits"
+  fi
+else
+  fail "R3: the payload did not install $R3_REL — this state has nothing to edit"
+fi
+
+# ── State R4: what the whole thing is for — a moved payload actually lands ───
+# R asserts the ROW. R4 asserts the CONSEQUENCE, with a second toolkit whose copy of the file has
+# moved on, and it carries its own anti-vacuity arms: the control proves the bump is real and the
+# installer delivers it, and the still-edited arm proves the fix has not become "overwrite
+# everything".
+R4_TK="$SCRATCH/toolkit-v2"
+mkdir -p "$R4_TK"
+cp -a "$REPO/.claude" "$R4_TK/.claude"
+cp -a "$REPO/scripts" "$R4_TK/scripts"
+cp -a "$REPO/MCP-SETUP.md" "$R4_TK/MCP-SETUP.md"
+cp -a "$REPO/install.sh" "$R4_TK/install.sh"
+R4_MARK='<!-- toolkit v2 moved this file -->'
+printf '\n%s\n' "$R4_MARK" >> "$R4_TK/$P_REL"
+
+r4_install() {
+  local d="$1"
+  local rc=0
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$R4_TK/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  return 0
+}
+# `grep -qF` on a FILE argument, not on a pipe: it is the pipe that lets an early-exiting reader
+# SIGPIPE its writer, and there is no writer here.
+r4_has_mark() { grep -qF -- "$R4_MARK" "$1"; }
+
+# Arm 1 — the reclaimed project, which state R left reverted with its row rewritten `toolkit`.
+r4_install "$R_RECLAIMED_DIR"
+if r4_has_mark "$R_RECLAIMED_DIR/$P_REL"; then
+  pass "R4: the reclaimed project receives the toolkit's new copy — which is the entire point of dropping the flag"
+else
+  fail "R4: the reclaimed project did NOT receive the toolkit's new copy, so it is still silently excluded from every future fix to this file"
+fi
+
+# Arm 2 — a project that never touched the file. Proves the bump and the delivery are real.
+R4_CTRL="$SCRATCH/state-r4-control"
+bash "$REPO/tests/fixtures/mkproject.sh" "$R4_CTRL" >/dev/null
+r4_install "$R4_CTRL"
+if r4_has_mark "$R4_CTRL/$P_REL"; then
+  pass "R4: a project that never touched the file receives it too — the control that keeps arm 1 from passing vacuously"
+else
+  fail "R4: even the untouched control did not receive the new copy, so this state proves nothing about arm 1 — the second toolkit or its install is broken"
+fi
+
+# Arm 3 — a live edit. The anti-"overwrite everything" direction, against the SAME bumped toolkit.
+r_setup state-r4-edited
+R4_EDITED="$R_DIR"
+r4_install "$R4_EDITED"
+if [ -n "$R_EDIT_SHA" ] && [ "$(sha_of "$R4_EDITED/$P_REL")" = "$R_EDIT_SHA" ]; then
+  pass "R4: a live edit still survives the bumped toolkit — reclaiming a reverted file did not become reclaiming every file"
+else
+  fail "R4: the bumped toolkit destroyed a live edit — the reclaim test is matching files that still carry the user's work"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1
