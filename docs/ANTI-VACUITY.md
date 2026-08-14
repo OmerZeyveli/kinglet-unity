@@ -97,8 +97,9 @@ passes with the 13 gone.
 
 Two of the eleven above are green for exactly this reason, and they are the two converted here:
 
-- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to 329 files. `docs/` alone
-  holds 187, so the floor cleared with **zero files under `.claude/`**. Measured in a clone:
+- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **271** files (the guard
+  printed its own answer: `the mobile sweep has roots to read (271 file(s))`). `docs/` alone holds
+  187, so the floor cleared with **zero files under `.claude/`**. Measured in a clone:
   **17 passed, 0 failed, rc 0** — identical in verdict to a healthy tree.
 - `tests/test-bash32-compat.sh` — `SS_ALL_N > 0` over five sources and `SS_PIPE_N > 0` over four.
   `tests/` holds 40 `.sh` files, so both totals cleared with `.claude/hooks/` — the directory the
@@ -120,13 +121,34 @@ by `LIVE_N >= 30`. **Every number below was re-measured on this branch at `28f4a
 draft carried three sizes for one subject (142, 125, 63) taken partly from another branch, which is
 the wave's own *"do not carry numbers across trees"* rule landing on the artifact:
 
+**EVERY FIGURE BELOW NAMES ITS TREE, because this subject is being edited by another task right
+now and the two trees disagree.** A number without a tree is the *"do not carry numbers across
+trees"* rule waiting to happen — it has already cost this task one round.
+
+On **`task/n5-floors` @ `2df8b92`** (this branch; the pathspec is unanchored, `'*.md'` crosses `/`):
+
 | mutation | `LIVE_N` | verdict |
 |---|---|---|
 | pristine | **143** | 5 pass / 0 fail |
 | drop `'.claude/*'` | 125 | **5 / 0 — fully green**, 18 files gone |
 | drop `'*.md'` | 120 | **5 / 0 — fully green**, 23 files gone |
-| drop `'docs/*.md'` | **143** | **5 / 0 — no change at all** (see F3: redundant element) |
+| drop `'docs/*.md'` | **143** | **5 / 0 — no change at all**: redundant *on this tree* |
 | drop `'tests/*.sh'` | 103 | 4 / 1 — red, but on the *shape* sweep, not the floor |
+
+On **`task/n3-pathspecs` @ `2f3293b`**, where Task 3 has already anchored `'*.md'` to
+`':(glob)*.md'` so it no longer crosses `/`:
+
+| mutation | `LIVE_N` | verdict |
+|---|---|---|
+| pristine | **125** | 5 pass / 0 fail |
+| drop `'docs/*.md'` | 119 | **5 / 0 — fully green**; it now contributes **6 unique files** |
+| drop `':(glob)*.md'` | 119 | **5 / 0 — fully green** |
+| drop `'.claude/*'` | **63** | **5 / 0 — fully green**, 62 files gone, **half the subject** |
+
+**The redundancy example is true on this branch and false on Task 3's**, which is the point of
+naming the tree rather than the point being wrong: anchoring the pathspec is exactly what turns a
+redundant element into a contributing one. The Shape-2 conclusion is unaffected and gets *worse* on
+the anchored tree — a floor of 30 over 125 sits there while a single element takes the set to 63.
 
 So the floor never fires on a narrowing: at 30 over 143 it tolerates losing **113 of 143 files**, and
 the largest single-element loss measured is 40, well inside that. It catches an emptied pathspec and
@@ -258,8 +280,12 @@ element's files are also somebody else's.
 **The rule for an overlapping cover: attribute per element IN ISOLATION** — `git ls-files <element>`
 run for that element alone, asserted non-empty — not membership of the union. That catches the
 failure worth catching: an element whose pattern stopped matching anything. **It does not catch
-redundancy**, and should not: `'docs/*.md'` matching 187 files while adding zero unique ones is
-legitimate belt-and-braces, not a defect. Say which of the two you are asserting; the difference is
+redundancy**, and should not: on this branch `'docs/*.md'` matches **65** paths in the index (**7**
+after the guard's own two `grep -v` filters) while adding **zero unique files** to the scanned set,
+and that is legitimate belt-and-braces rather than a defect. **An earlier draft put 187 here, which
+is `find docs -type f` — a different guard's subject, and the wrong oracle for a pathspec claim.
+`git ls-files` is what the element is evaluated by, so `git ls-files` is what the number must come
+from.** Say which of the two you are asserting; the difference is
 invisible in the code and decides what the floor can see.
 
 **Accumulate the failing sources; do not overwrite a sentinel.** A reassigned sentinel names only the
@@ -362,6 +388,22 @@ covers the other's failure mode: a hand list cannot grow, a derived list cannot 
 there. Both halves then need F4's absolute floor, because emptying either array removes the property
 it was added for.
 
+**TWO BOUNDARIES OF WHAT THIS BUYS, measured rather than assumed, because a rule whose limits are
+unstated gets read as a guarantee:**
+
+- **The predicate is presence-of-any-file, not presence-of-the-right-kind.** Delete every
+  `SKILL.md` under `.claude/skills/` and leave one stray `NOTES.txt`: the directory exists, holds a
+  file, and **neither half reds — 18 pass / 0 fail.** The census answers *"is anything there?"*; the
+  guarded sweep cares about *"is the payload there?"*. Closing this means a per-source expectation
+  of the file KIND, which is a hand-maintained list — the shape F8 exists to avoid — so it is
+  stated rather than closed. `tests/test-derived-counts.sh` and `tests/test-skill-discovery.sh` are
+  what actually watch skill population; this floor is not their substitute.
+- **F4's `>= 1` cannot see a declared list SHRINK.** Remove `.claude/skills` from `PAYLOAD_DIRS` and
+  delete the directory: the array is still non-empty, the derived half never had the source, and the
+  file reports **18 pass / 0 fail** — the F8 hole reopened by an edit to the very array that closes
+  it. The honest guard for this is an identity against something outside the file, and there is
+  none; **F4 bounds an array against zero, not against yesterday.**
+
 ---
 
 ## The floor set
@@ -394,23 +436,33 @@ still pass after the subject loses a whole source (Shape 1) or most of its magni
 
 **The table has one row per BOUND, not one per site.** Where one assertion carries several bounds
 they are listed separately because each is a different claim about a different subject. Reading the
-table as a census of sites will **overcount**: the three `test-no-mobile.sh` rows are one site, the
+table as a census of sites will **overcount**: the four `test-no-mobile.sh` rows are **two** sites (one `assert_eq` on `SCAN_STATE`, one on the census identity), the
 four `test-bash32-compat.sh` census rows are three, and — corrected from an earlier draft that got
 this exactly backwards — the four `test-bash-gate-precision.sh` rows are **four independent
 `assert_eq` calls, four sites.** The `_VACUOUS` accumulators are **six**, not five.
 
-**Subject sizes are dated 2026-08-14 and drift.** Two of them moved by one on the commit that shipped
-this file, because `docs/ANTI-VACUITY.md` is itself matched by `'docs/*.md'` and `git ls-files
-docs/`. The floor-set *derivation* is out of its own scope by construction; the ratio table's
-*subject sizes* are not, and cannot be.
+**Subject sizes are dated 2026-08-14, derived IN A CLEAN CLONE, and drift.** Two of them moved by one
+on the commit that shipped this file, because `docs/ANTI-VACUITY.md` is itself matched by
+`'docs/*.md'` and `git ls-files docs/`. The floor-set *derivation* is out of its own scope by
+construction; the ratio table's *subject sizes* are not, and cannot be.
+
+**"Clean clone" is load-bearing, and `git status` will not tell you.** The `test-no-mobile.sh` census
+row shipped `.claude/state=2` and `.claude=63` for one round. Both were measurements of a **dirty
+working tree**: `.claude/state/session-edits.txt`, written by the `track-edits` hook during this
+task's own probe runs. `.gitignore` carries `.claude/state/*`, so
+`git status --porcelain --untracked-files=all` printed **nothing** and the tree looked pristine. A
+clean clone of the same commit gives `.claude/state=1`, `.claude=62`. **Any number in this table that
+comes from `find` rather than `git ls-files` must be re-derived in a fresh clone**, because the
+guards read the working tree and the working tree is where a gitignored artefact hides.
 
 ### Converted or added by this pass
 
 | Guard · assertion anchor | Subject | Bound | Today | Ratio | Survives |
 |---|---|---|---|---|---|
-| `test-no-mobile.sh` · *every mobile-sweep source has files in it* | 11 sources: 5 scan roots + 6 **declared** payload dirs + whatever `find` adds | ≥ 1 **each**, and each must EXIST (F8) | 63/8/9/13/6/20/2/**187**/4/8/10 | 100 % per source | **no** |
-| `test-no-mobile.sh` · same assertion, census floor | rows in the derived source list | ≥ `${#SCAN_DIRS[@]}` | 11 ≥ 5 | — | no |
+| `test-no-mobile.sh` · *every mobile-sweep source has files in it* | 11 sources: 5 scan roots + 6 **declared** payload dirs, unioned with whatever `find .claude` adds | ≥ 1 **each**, and each must EXIST (F8) | 62/8/9/13/6/20/1/187/4/8/10 | 100 % per source | **no** |
 | `test-no-mobile.sh` · same assertion, array floor (F4) | `SCAN_DIRS` itself | ≥ 1 | 5 | — | no |
+| `test-no-mobile.sh` · same assertion, array floor (F4) | `PAYLOAD_DIRS` itself — the declared half, without which F8 stops working | ≥ 1 | 6 | — | no |
+| `test-no-mobile.sh` · *the per-source loop read every source the derivation produced* | census rows written vs. sources derived | **identity** | 11 == 11 | 100 % | no |
 | `test-bash32-compat.sh` · *every source of both sweeps resolves to at least one file* | 9 sources across two scopes | ≥ 1 **each** | 13/7/40/1/1 + 13/7/1/1 | 100 % per source | **no** |
 | `test-bash32-compat.sh` · *the per-source census covered every declared scope entry* | census rows vs. four array lengths | **identity** | 9 == 9 | 100 % | no |
 | `test-bash32-compat.sh` · *all four scope arrays are non-empty* (F4) | the four arrays | ≥ 1 each | 3/2/2/2 | — | no |
@@ -418,7 +470,7 @@ docs/`. The floor-set *derivation* is out of its own scope by construction; the 
 | `test-derived-counts.sh` · *every surface-count claim row matches exactly one site* | sites per claim row | == 1 | 15 rows | 100 % | no |
 | `test-derived-counts.sh` · *every ECU-footprint claim row matches exactly one site* | sites per claim row | == 1 | 8 rows | 100 % | no |
 
-**What they replaced:** `SCAN_FILES >= 1` over 329 files from 5 roots (**0.3 %**, survived losing 5
+**What they replaced:** `SCAN_FILES >= 1` over **271** files from 5 roots (**0.4 %**, survived losing 5
 of 6 payload directories) and `SS_ALL_N > 0` / `SS_PIPE_N > 0` over 62 and 22 files from 5 and 4
 sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 
@@ -430,6 +482,7 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 | `run-tests.sh` · *Test discovery is inconsistent* | the `test-*.sh` glob **vs** `find -type f -name 'test-*.sh'` | 39 == 39 |
 | `run-tests.sh` · *ran N test files but M match* | files actually executed **vs** files discovered | 39 == 39 |
 | `test-bash32-compat.sh` · per-source census | census rows **vs** four array lengths | 9 == 9 |
+| `test-no-mobile.sh` · per-source census | census rows written **vs** sources the derivation produced | 11 == 11 |
 
 ### Numeric thresholds — every one implies a ratio
 
@@ -618,19 +671,24 @@ to edit it. Not *"whoever next opens the file"*: a deferral routed to a role is 
 paper trail, and a row in a reference table is not even a role. This is written out so it can be
 lifted into the ledger verbatim.
 
-**The defect.** `LIVE_N >= 30` over 143 files from a nine-element pathspec fails all three shapes at
-once: composition (one element can die), magnitude (113 of 143 files can go), and oracle mismatch
-(the floor counts index entries; the sweep opens files). Measured at `28f4a8a`: dropping
-`'.claude/*'` takes the set to 125 and the file stays **5 pass / 0 fail**.
+**The defect, measured ON TASK 3'S OWN TREE** (`task/n3-pathspecs` @ `2f3293b`), because that is the
+tree the repair lands in and the anchoring has already moved every figure: `LIVE_N >= 30` over
+**125** files from a nine-element pathspec fails all three shapes at once — composition (one element
+can die), magnitude (**95 of 125** files can go), and oracle mismatch (the floor counts index
+entries; the sweep opens files). Dropping `'.claude/*'` takes the set to **63** — half the subject —
+and the file stays **5 pass / 0 fail**. On this branch the same drop gives 125 of 143; the shape is
+identical and only the arithmetic differs, which is why each figure names its tree.
 
 **The repair, and it needs no new tree property.** F2's fallback step 1 — *bound the subject against
 a property of the guard's own source* — applies directly, and there is a working reference
-implementation forty lines away in `tests/test-bash32-compat.sh` (`SS_ROWS == SS_EXPECTED_ROWS`,
+implementation in `tests/test-bash32-compat.sh`, at the assertion reading *"the per-source census covered every declared scope entry"* (`SS_ROWS == SS_EXPECTED_ROWS`,
 census rows against the sum of four array lengths). Lift the pathspec into an array, then:
 
 1. **per element in isolation** (F3, overlapping-cover rule): `git ls-files <element>` for each
    element alone, asserted non-empty — this catches an element whose pattern stopped matching, which
-   is the failure worth catching, and does **not** flag a redundant element, which is legitimate;
+   is the failure worth catching, and does **not** flag a redundant element, which is legitimate.
+   Note that anchoring has *reduced* the redundancy: `'docs/*.md'` contributed 0 unique files before
+   it and 6 after, so this check has more to bite on than it did;
 2. **identity**: elements contributing == `${#PATHSPEC[@]}`, so an element deleted from the array
    reds rather than silently narrowing the scope;
 3. **F4**: an absolute `${#PATHSPEC[@]} >= 1`, because both checks above are relative to an array
