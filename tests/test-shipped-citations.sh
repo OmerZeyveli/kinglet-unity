@@ -279,9 +279,11 @@ fi
 # up can never redden this, and unwiring one always does. A name may be REMOVED from the pending
 # list; adding one is undoing work this list exists to finish.
 #
-#   generate-claude-md.sh — Task 7 of the 2026-08-13 surface-criterion wave owns naming it from
-#                           `/unity-init`. Until that lands it is reachable from install.sh only,
-#                           which is a run the user makes once and not a surface a model can call.
+#   The list is EMPTY as of 2026-08-14 and that is its finished state, not a gap. Its one entry was
+#   generate-claude-md.sh, waiting on Task 7 of the 2026-08-13 surface-criterion wave to name it
+#   from `/unity-init`; that landed, so the entry was deleted and the assertion below now reads
+#   every installed script as named. An empty list is not an invitation to refill it — see the next
+#   paragraph and the failure message further down: naming or cutting are the two answers.
 #
 # AN EXEMPTION THAT IS SATISFIED IS STALE, AND STALE HERE MEANS PERMANENTLY RELAXED. The list is
 # consulted only for scripts already found unreferenced, so the moment the pending script IS named
@@ -291,7 +293,7 @@ fi
 # They differ by a reference and agree on the result, which is the definition of a guard that has
 # stopped guarding. So a satisfied entry is a FAILURE with the remedy in its message: delete the
 # line. That makes retiring the exemption the only way forward rather than an optional tidy-up.
-SC_REACH_PENDING="generate-claude-md.sh"
+SC_REACH_PENDING=""
 
 SC_UNREF=""
 SC_INSTALLED_N=0
