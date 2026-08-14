@@ -34,13 +34,21 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ### STILL IN FLIGHT
 
+**Task 4 is merged too** (`5b636d3`…`8056f53`, three commits) and **drifts no baseline** — confirmed
+by a `--dry-run` against the committed merged tree returning `0 change(s)`.
+
 | task | worktree | branch | scratch root | state |
 |---|---|---|---|---|
-| 4 | `…/kinglet-wt/task-4` | `task/4` | `/tmp/kinglet-t4-WuaZVF` | fix round **2** re-review; 3 commits, `8056f53` |
-| 2b | `…/kinglet-wt/task-2b` | `task/2b-tokeniser-quote-model` | `/tmp/kinglet-2b-NprXPW` | fix round **1**; `f735fe2` |
+| 2b | `…/kinglet-wt/task-2b` | `task/2b-tokeniser-quote-model` | `/tmp/kinglet-2b-NprXPW` | fix round 1; based on `5b636d3` |
+| 3 | `…/kinglet-wt/task-3` | `task/3` | `/tmp/kinglet-t3-jquDlJ` | dispatched from `75ea1de` |
+| 12 | `…/kinglet-wt/task-12` | `task/12` | `/tmp/kinglet-t12-rmvH9V` | dispatched from `75ea1de` |
+| 5 | `…/kinglet-wt/task-5` | `task/5` | `/tmp/kinglet-t5-vCm1jg` | dispatched from `75ea1de` |
 
-**Both are based on `5b636d3` and will merge onto a moved tree.** `provenance.tsv` is the only shared
-file and the rows are disjoint — concatenate the note appends by hand, **keep apostrophes straight**.
+**Task 5 is the only one touching `install.sh`, and it is the first task to build on Task 4's
+rewrite** — the `EXIT`-trap receipt, the origin trim on both `install.sh` readers, and the
+`MODIFIED_FILES` / `EDITED_FILES` / `UNREADABLE_ORIGINS` split. **It also carries ledger item 18**:
+the `> "$RECEIPT"` structural guard, which is the single edit the three remaining `install.sh` owners
+cannot make silently.
 
 ### Remaining, in batch order
 
@@ -441,7 +449,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 2c | What decides the route, and what the allowlist vouches for | open | — | **New.** Both holes exist at all four hook versions; `./evil/grep` destroyed 3/3 `.meta` files with the gate at 0 |
 | 3 | The surviving scripts become reachable | open | — | **R2**: leaves `scripts/` entirely. **R8**: no `Bash` for `unity-reviewer`. **R7** if it lands second |
 | **Stage 2 — installer correctness** | | | | |
-| 4 | The receipt exists before anything that can abort | open | — | The only permanent-damage path in the wave. **R1**: gains the five `stat -c` sites |
+| 4 | The receipt exists before anything that can abort | **done, merged** | `5b636d3`…`8056f53` | The only permanent-damage path in the wave. **R1**: gains the five `stat -c` sites |
 | 4b | A `CLAUDE.md` missing its end marker is amputated silently | open | — | **New, R5.** Data loss, repeats on every install, prints success |
 | 4c | An upgrade across the cut leaves dead hook registrations | open | — | **New, F1.** Not a Task 1 reopen — Task 1 never opened `install.sh` |
 | 5 | A run that abandons work says so, and something asserts it | open | — | **R3**: contract goes in `MCP-SETUP.md`. **R11**: exit code stays 0; ≥10 sites, not 4 |
@@ -849,6 +857,31 @@ ADDRESSED, none returned to the fix loop.**
     with `#`), comment-stripped revisions identical, **and the awk program extracted from each
     revision `cmp`-identical** — the third is what closes the gap the first two leave. Behaviourally
     corroborated: per-file tallies across the full suite unchanged between the two commits.
+
+**From Task 4's round-2 re-review (2026-08-14). Task 4 is COMPLETE at `8056f53`.**
+
+53. **The unreadable-origin sentence is false for a path this payload no longer ships.** Constructed
+    an upgrade across a payload shrink with a mangled origin: the payload loop never reaches a path
+    that is not in the payload, so **no row is written** — *"recorded as yours"* is false and
+    `--purge` **leaves** the file. The same run also says *"dropped from the payload have your
+    edits"* about a file nobody edited (the `ORPHAN_KEPT` line, driven by the union and outside the
+    N2 split). Narrow reach (needs a shrink **and** a mangled origin), and the consequence is debris
+    the user believes is purgeable — **the inverse of the direction that was fixed, and no data
+    loss.** The repair is not a wording tweak: the sentence is right for every in-payload case, so
+    the orphan path must either write a row or be excluded from the unreadable bucket. **→ Task 4b
+    or 4c, whichever opens that region.**
+54. **A comment-precision note, not a defect.** The justification for routing a both-unreadable-and-
+    edited file under the unreadable header — *"the installer cannot know it was edited; that row is
+    precisely what it can't read"* — **overstates.** Field 2 is still readable, so a drift *does*
+    prove an edit whichever value the origin held; what the installer cannot recover is what the
+    baseline **meant**. The routing is still right for two better reasons: the unreadable header is
+    **never false** in that state and is strictly more informative, and reporting under both would
+    revive the double-count defect exactly. **→ Task 11.**
+55. **A trap for anyone re-checking a keep-or-overwrite claim, worth more than either finding.** The
+    reviewer's first option-B probe used an **unedited** file and looked survivable — the overwrite
+    *had* happened, but **the toolkit's bytes are identical to an unedited file's**, so only the
+    receipt row betrayed it. **Measure this class on an edited file, or by reading the row. Never by
+    the bytes.**
 
 **Inherited from earlier waves, still open:**
 
