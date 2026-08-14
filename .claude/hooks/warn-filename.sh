@@ -52,7 +52,29 @@ if grep -qE ':\s*(MonoBehaviour|ScriptableObject|NetworkBehaviour|StateMachineBe
     # There IS a Unity component but the name doesn't match.
     # awk (not head) picks the first match — head would stop reading before
     # grep finished writing the rest, risking SIGPIPE on a large file.
-    CLASS_NAME=$(grep -oE '(class|struct)\s+\w+' <<< "$CONTENT" | awk 'NR==1{print $2}')
+    #
+    # `|| true` is load-bearing, and the header above is the contract it restores.
+    # The guard on the line before proves ONE pattern (`: MonoBehaviour`) and this
+    # line runs a DIFFERENT one (`(class|struct)\s+\w+`), so the match the guard
+    # established says nothing about whether this grep matches. An Edit fragment
+    # like `    : MonoBehaviour, IDamageable` satisfies the guard and carries no
+    # `class` keyword at all: grep exits 1, pipefail propagates it past awk, and
+    # because the substitution is the ENTIRE right-hand side of an assignment the
+    # assignment carries that status — so `set -e` killed the script here, rc=1
+    # with zero bytes written, against a header that promises `Exit: 0 always`.
+    # (`set -e` does not reach INTO a command substitution without
+    # `inherit_errexit`; what kills it is the assignment's own status.)
+    #
+    # Same shape and same repair as the four `find … | wc -l` sites in
+    # scripts/studio-doctor.sh. The two sibling hooks that look identical do NOT
+    # need it, for the reason uninstall.sh does not: warn-platform-defines.sh and
+    # block-legacy-input.sh each re-run the very pattern their guard just proved
+    # matched, so their grep cannot come back empty.
+    #
+    # This silences no real failure: an empty CLASS_NAME is the "cannot tell"
+    # answer, and the `[ -n "$CLASS_NAME" ]` guard below was already written to
+    # print nothing and fall through to `exit 0` when it gets one.
+    CLASS_NAME=$(grep -oE '(class|struct)\s+\w+' <<< "$CONTENT" | awk 'NR==1{print $2}' || true)
     if [ -n "$CLASS_NAME" ] && [ "$CLASS_NAME" != "$FILENAME" ]; then
         echo "WARNING: File name '$FILENAME.cs' does not match class name '$CLASS_NAME'." >&2
         echo "" >&2
