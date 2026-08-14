@@ -38,8 +38,59 @@ esac
 # vendored files that use legacy input (Feel/MoreMountains alone ships 16), and
 # a hook that fires on them blocks edits you must never make anyway — it trains
 # you to ignore the hook.
+#
+# THE LIST USED TO END `|*/Packages/*|*/Library/*`, AND THOSE TWO SWITCHED THE GATE OFF FOR WHOLE
+# PROJECTS. Same shape as the 2026-08-13 */Tests/* and */Editor/* defect fixed below, reached by a
+# different route: the four Assets/-prefixed entries are anchored by that segment, but Packages/ and
+# Library/ are SIBLINGS of Assets/ at the project root and this hook is handed an absolute path with
+# no idea where that root is. Measured 2026-08-15, all with an unguarded Input.GetKeyDown:
+#
+#   /home/dev/MyGame/Assets/Scripts/Player.cs                   rc=2  794 B   blocked, correct
+#   /home/dev/Projects/Packages/Game/Assets/Scripts/Player.cs   rc=0    0 B   ALLOWED, wrong
+#   /home/dev/Library/MyGame/Assets/Scripts/Player.cs           rc=0    0 B   ALLOWED, wrong
+#
+# ~/Library/ is a standard location on macOS — iCloud Drive lives at ~/Library/Mobile Documents/ —
+# and .claude/UPSTREAM plans a macOS host pass, so the second row is not a contrived path.
+#
+# THE ANCHOR THAT REPLACES THEM IS `/Assets/` ITSELF. In a Unity project every first-party runtime
+# file has that segment and package content under <root>/Packages/ and <root>/Library/PackageCache/
+# does not, so keying on its PRESENCE classifies all five measured rows correctly where keying on the
+# ABSENCE of two unanchored names classified two of them backwards.
+#
+# TWO CASES THE ANCHOR CANNOT DECIDE FROM THE PATH ALONE. Both are decided here on purpose, because
+# leaving either undecided is what produced this finding:
+#
+#   1. A PACKAGE THAT SHIPS ITS OWN Assets/ FOLDER — <root>/Packages/com.foo/Assets/X.cs — IS TREATED
+#      AS FIRST-PARTY AND IS BLOCKED. It is character-for-character the same shape as a checkout kept
+#      under a directory named Packages (*/Packages/<anything>/Assets/*), so no pattern can separate
+#      them without knowing the project root. The two errors are not equally bad: blocking a rare
+#      vendored file is noise the author can see and switch off per-hook, while allowing a whole
+#      project is a gate that is silently dead. So the tie is broken towards acting.
+#      The Library/PackageCache/ half of the same case IS separable and is skipped below.
+#   2. A PATH WITH NO /Assets/ SEGMENT AT ALL — <root>/Packages/com.foo/Runtime/X.cs,
+#      <root>/Library/**, a build script beside the project — IS SKIPPED. Unity compiles first-party
+#      runtime code out of Assets/, and "first-party runtime code" is the scope this file's header
+#      and HOOK-REFERENCE.md both claim. This is a widening: /home/dev/MyGame/Tools/Gen.cs blocked
+#      before (rc=2, 782 B) and is skipped now.
+#
+# `Assets/*` sits beside `*/Assets/*` so a project-relative payload keeps the gate rather than losing
+# it. Claude Code sends absolute paths, so it should never be reached; if it is, the fail-safe
+# direction for THIS clause is to act, since the failure being repaired here is a silent skip.
 case "$FILE_PATH" in
-    */Assets/Extensions/*|*/Assets/Plugins/*|*/Assets/ThirdParty/*|*/Assets/PlayerPrefsEditor/*|*/Packages/*|*/Library/*)
+    # Vendored trees inside the project's own asset tree, anchored by the Assets/ segment.
+    */Assets/Extensions/*|*/Assets/Plugins/*|*/Assets/ThirdParty/*|*/Assets/PlayerPrefsEditor/*)
+        exit 0 ;;
+    # Unity's package cache. TWO generated segments in sequence, which is what makes this one
+    # genuinely anchored where a bare */Library/* was not: `Library/PackageCache` is created by
+    # Unity inside a project and nothing keeps a checkout above it (macOS's own ~/Library has no
+    # PackageCache child; Unity's global cache is ~/Library/Unity/cache). Listed before the
+    # first-party branch so a cached package carrying its own Assets/ folder is still skipped.
+    */Library/PackageCache/*)
+        exit 0 ;;
+    # First-party shape — fall through to the gate.
+    Assets/*|*/Assets/*) ;;
+    # No Assets/ segment: package code, Library/, or outside the asset tree entirely. See 2 above.
+    *)
         exit 0 ;;
 esac
 

@@ -145,6 +145,7 @@ These hooks run before any Edit or Write tool invocation. Blocking hooks (exit 2
 - **Profile:** minimal
 - **Type:** Blocking (exit 2)
 - **What it does:** Blocks the legacy Input Manager API (`Input.GetKey`, `Input.GetAxis`, `Input.GetButton`, `Input.mousePosition`, `Input.touches`) in first-party runtime C#. Three rule files stated that legacy input was "BLOCKED by hooks" before any such hook existed; this is the hook that makes the statement true. Exempt: third-party and vendored code (a hook that fires on files you must never edit trains you to ignore the hook), and `Editor/` and `Tests/` folders, which are not runtime code. It matches the API on a word boundary, so a wrapper whose name merely ends in `Input` — `MyInput.GetKey`, `XRInput.GetAxis` — is not mistaken for it.
+- **Scope, since 2026-08-15:** the gate applies to paths carrying an `Assets/` segment. Every exemption is anchored to a segment that cannot appear above a checkout — the four vendored trees to `Assets/`, the package cache to `Library/PackageCache/`. The bare `Packages/` and `Library/` entries this list used to end with were not anchored and switched the gate off for every file in any project stored under a directory of either name (`~/Library/` is standard on macOS), silently. Two consequences of the anchor are deliberate: a path with **no** `Assets/` segment is out of scope, and an `Assets/` folder **inside** `Packages/` counts as first-party, because it is indistinguishable from a checkout kept under a directory called `Packages` and a dead gate is worse than a noisy one.
 - **Environment variables:** None
 
 #### guard-project-config
@@ -192,7 +193,8 @@ These hooks run after every Edit or Write tool invocation. They warn but do not 
 - **File:** `warn-platform-defines.sh`
 - **Profile:** standard
 - **Type:** Advisory (exit 0)
-- **What it does:** Checks for `#if UNITY_PS5` / `UNITY_GAMECORE` / `UNITY_STANDALONE_*` etc. without `#else` fallback. Code inside platform defines is silently excluded on other platforms -- a block guarded for console vanishes in the Standalone build and vice versa. Exempt since 2026-08-15: third-party and vendored code, the same skip list `block-legacy-input` has always carried. On a shipping project of 1417 C# files this hook fired 4 times and every one was under `Assets/Extensions/Feel/`, a vendored asset -- and a hook that fires on files you must never edit trains you to ignore the hook.
+- **What it does:** Checks for `#if UNITY_PS5` / `UNITY_GAMECORE` / `UNITY_STANDALONE_*` etc. without `#else` fallback. Code inside platform defines is silently excluded on other platforms -- a block guarded for console vanishes in the Standalone build and vice versa. Exempt since 2026-08-15: third-party and vendored code, the same skip list `block-legacy-input` carries. On a shipping project of 1417 C# files this hook fired 4 times and every one was under `Assets/Extensions/Feel/`, a vendored asset -- and a hook that fires on files you must never edit trains you to ignore the hook.
+- **Scope:** identical to `block-legacy-input`'s, and identical on purpose -- the list is shared, and the pair disagreeing about what it means is what let the unanchored `Packages/` and `Library/` entries survive a wave after being written down. See that hook's Scope note above.
 - **Environment variables:** None
 
 #### track-edits

@@ -40,18 +40,43 @@ esac
 # project — the defect block-legacy-input.sh's Editor/Tests skips were re-anchored for on
 # 2026-08-13.
 #
-# THE LAST TWO ENTRIES ARE NOT ANCHORED, and that is inherited rather than introduced.
+# THE LAST TWO ENTRIES WERE NOT ANCHORED AND ARE NOW GONE, in this hook and in the sibling the list
+# came from, on 2026-08-15. They were recorded here as a KNOWN HOLE on the day the list was copied,
+# on the ground that fixing one hook of a pair leaves the pair disagreeing about what the same list
+# means; fixing both is what closes it, and this is that.
+#
 # `*/Packages/*` and `*/Library/*` are siblings of Assets/ at the project root, and this hook is
-# handed a path with no idea where that root is — so a checkout kept under ~/Projects/Packages/
-# or ~/dev/Library/ silences it for every file in that project. Measured 2026-08-15:
-# block-legacy-input.sh, which this list is copied from, has the same two entries and the same
-# hole (exit 0 on an unguarded Input.GetKeyDown under
-# /Users/dev/Projects/Packages/Game/Assets/Scripts/, blocked correctly under
-# /home/dev/Plugins/MyGame/Assets/Scripts/). Recorded here and asserted in
-# tests/test-hook-behaviour.sh rather than quietly fixed in one of the two hooks, which would
-# leave the pair disagreeing about what the same list means.
+# handed a path with no idea where that root is — so a checkout kept under ~/Projects/Packages/ or
+# ~/dev/Library/ silenced it for every file in that project, with no error. ~/Library/ is a standard
+# location on macOS (iCloud Drive is ~/Library/Mobile Documents/) and .claude/UPSTREAM plans a macOS
+# host pass. Measured 2026-08-15 on this hook, `#if UNITY_PS5` with no `#else`:
+#
+#   /home/dev/MyGame/Assets/Scripts/Player.cs                   443 B   warned, correct
+#   /home/dev/Projects/Packages/Game/Assets/Scripts/Player.cs     0 B   SILENT, wrong
+#   /home/dev/Library/MyGame/Assets/Scripts/Player.cs             0 B   SILENT, wrong
+#
+# THE ANCHOR THAT REPLACES THEM IS `/Assets/` ITSELF, and the two cases it cannot decide from the
+# path alone are decided the same way in both hooks. block-legacy-input.sh carries the full
+# reasoning; the rulings are: a package that ships its own Assets/ folder under <root>/Packages/ is
+# treated as FIRST-PARTY and warned about, because it is indistinguishable from a checkout kept under
+# a directory called Packages and a dead gate is worse than a noisy one; a path with NO /Assets/
+# segment is SKIPPED, because Unity compiles first-party code out of Assets/. The second is a
+# widening — /home/dev/MyGame/Tools/Gen.cs warned before (431 B) and is silent now.
+# `*/Library/PackageCache/*` stays as an explicit skip because two generated segments in sequence
+# really are anchored, and that is the half of the package case that can be separated.
 case "$FILE_PATH" in
-    */Assets/Extensions/*|*/Assets/Plugins/*|*/Assets/ThirdParty/*|*/Assets/PlayerPrefsEditor/*|*/Packages/*|*/Library/*)
+    # Vendored trees inside the project's own asset tree, anchored by the Assets/ segment.
+    */Assets/Extensions/*|*/Assets/Plugins/*|*/Assets/ThirdParty/*|*/Assets/PlayerPrefsEditor/*)
+        exit 0 ;;
+    # Unity's package cache — before the first-party branch, so a cached package carrying its own
+    # Assets/ folder is skipped rather than warned about.
+    */Library/PackageCache/*)
+        exit 0 ;;
+    # First-party shape — fall through to the check. The relative form is here so a project-relative
+    # payload keeps the check rather than losing it; Claude Code sends absolute paths.
+    Assets/*|*/Assets/*) ;;
+    # No Assets/ segment: package code, Library/, or outside the asset tree entirely.
+    *)
         exit 0 ;;
 esac
 

@@ -494,7 +494,10 @@ assert_contains "$PROBE_TEXT" 'Platform-specific code without #else fallback' \
     "${TP_HOOK} first-party baseline is the hook's own warning, not stray output"
 
 # b) The skip. Every segment of the list, not just the measured one: a skip list is a union and
-#    an untested alternative can be dropped without any assertion moving.
+#    an untested alternative can be dropped without any assertion moving. The last two rows changed
+#    clause on 2026-08-15 without changing verdict — `Packages/…/Runtime/` is now skipped for having
+#    no /Assets/ segment rather than by a `*/Packages/*` entry, and `Library/PackageCache/…` by an
+#    entry that is genuinely anchored. See the Assets/-anchor block below for why.
 for TP_PATH in \
     /p/Assets/Extensions/Feel/MMTools/Core/MMHelpers/MMDebug.cs \
     /p/Assets/Plugins/Vendor/Thing.cs \
@@ -525,29 +528,135 @@ do
         "${TP_HOOK} still warns when the CHECKOUT sits under ${TP_PATH} (${PROBE_BYTES} B)"
 done
 
-# d) A KNOWN HOLE, RECORDED RATHER THAN HIDDEN — the corpus convention in
-#    tests/test-bash-gate-precision.sh, applied here.
+# --- The Assets/ anchor, BOTH hooks, the five measured rows -----------------
 #
-#    `*/Packages/*` and `*/Library/*` are the two entries of the list that are NOT anchored under
-#    Assets/, and they cannot be: in a real project those are siblings of Assets/ at the project
-#    root, and the hook is given a path with no idea where that root is. The consequence is
-#    measured and it is the 2026-08-13 defect still live: a checkout kept in ~/Projects/Packages/
-#    or ~/dev/Library/ switches the hook off for every file in it.
+# Added 2026-08-15. THIS BLOCK REPLACES A `KNOWN HOLE` ASSERTION, and the replacement is the point:
+# the block that stood here asserted that a checkout kept under a directory named `Packages` or
+# `Library` SILENCED warn-platform-defines, recorded as inherited from block-legacy-input.sh rather
+# than fixed, on the ground that fixing one hook of a pair leaves the pair disagreeing. Both are
+# fixed now, so the recorded answer inverts and the assertions below are the real ones.
 #
-#    THIS IS INHERITED, NOT INTRODUCED. block-legacy-input.sh has shipped the identical two
-#    entries since it was written, and the identical hole: measured on the same paths, it exits 0
-#    on a plain `Input.GetKeyDown` under /Users/dev/Projects/Packages/Game/Assets/Scripts/ and
-#    under /home/dev/Library/MyGame/Assets/Scripts/, while blocking correctly under
-#    /home/dev/Plugins/MyGame/Assets/Scripts/. Copying the list copied the hole, and asserting
-#    the current answer is what makes closing it a deliberate edit to this block rather than a
-#    silent behaviour change.
-for TP_PATH in \
-    /Users/dev/Projects/Packages/Game/Assets/Scripts/Boot.cs \
-    /home/dev/Library/MyGame/Assets/Scripts/Boot.cs
+# The hole: the four `*/Assets/…/*` entries of the shared skip list are anchored by that segment;
+# `*/Packages/*` and `*/Library/*` were not, and could not be — in a real project those are SIBLINGS
+# of Assets/ at the project root, and a hook is handed an absolute path with no idea where that root
+# is. Any checkout living under a directory of either name lost the gate entirely and silently.
+# ~/Library/ is a standard macOS location and .claude/UPSTREAM plans a macOS host pass.
+#
+# The fix keys on the PRESENCE of `/Assets/` instead of on the ABSENCE of two unanchored names.
+# Measured before/after, block-legacy-input on an unguarded Input.GetKeyDown:
+#
+#   /home/dev/MyGame/Assets/Scripts/Player.cs                   rc=2 794 B  →  rc=2 794 B
+#   /home/dev/Projects/Packages/Game/Assets/Scripts/Player.cs   rc=0   0 B  →  rc=2 810 B
+#   /home/dev/Library/MyGame/Assets/Scripts/Player.cs           rc=0   0 B  →  rc=2 802 B
+#   /home/dev/MyGame/Packages/com.foo/Runtime/Player.cs         rc=0   0 B  →  rc=0   0 B
+#   /home/dev/MyGame/Assets/Extensions/Feel/Player.cs           rc=0   0 B  →  rc=0   0 B
+#
+# ALL FIVE ROWS ARE ASSERTED, INCLUDING THE THREE THAT ALREADY BEHAVED CORRECTLY, and that is not
+# padding. The fix is a change to a SKIP, so both a hook that skips nothing and a hook that skips
+# everything satisfy half the table: rows 1-3 alone are satisfied by deleting the skip list, rows
+# 4-5 alone by `exit 0` on line 1. Task 3 measured that exact failure on this file — its M2 mutant
+# gutted a hook to `exit 0` and every one-sided skip assertion stayed green; only the paired
+# "it still acts" arms went red. Neither half ships without the other.
+#
+# BOTH HOOKS, for the same reason the hole was recorded rather than half-fixed: the list is shared,
+# and a guard that watched one of the pair is how the two came to disagree in the first place.
+ANCH_BASE_BYTES=0
+
+anch_probe() {  # $1 = hook, $2 = absolute file path — sets PROBE_BYTES / PROBE_RC / PROBE_TEXT
+    local body
+    case "$1" in
+        block-legacy-input)    body='void U(){ if (Input.GetKeyDown(KeyCode.F9)) {} }' ;;
+        warn-platform-defines) body='#if UNITY_PS5\nSetup();\n#endif\n' ;;
+        *) body='' ;;
+    esac
+    PAYLOAD='{"tool_name":"Write","tool_input":{"file_path":"'"$2"'","new_string":"'"$body"'"}}'
+    run_probe "$1" ''
+}
+
+STATE_FILE=''
+PROBE_ENV=''
+PROBE_SETUP=''
+
+for ANCH_HOOK in block-legacy-input warn-platform-defines
 do
-    tp_probe "$TP_PATH"
+    # block-legacy-input blocks (exit 2); warn-platform-defines advises (exit 0). Asserting the rc
+    # alongside the byte count is what stops "acts" from being satisfied by an exit code with no
+    # explanation, or by an explanation that forgot to block.
+    case "$ANCH_HOOK" in
+        block-legacy-input) ANCH_ACT_RC=2 ;;
+        *)                  ANCH_ACT_RC=0 ;;
+    esac
+
+    # Row 1 — the control, and the non-silent baseline printed beside every zero below.
+    anch_probe "$ANCH_HOOK" /home/dev/MyGame/Assets/Scripts/Player.cs
+    ANCH_BASE_BYTES="$PROBE_BYTES"
+    ANCH_VERDICT="silent"
+    [ "$PROBE_BYTES" -gt 0 ] && ANCH_VERDICT="acts"
+    assert_eq "acts rc${ANCH_ACT_RC}" "${ANCH_VERDICT} rc${PROBE_RC}" \
+        "${ANCH_HOOK} row 1: acts on an ordinary first-party path (${PROBE_BYTES} B)"
+
+    # Rows 2 and 3 — THE HOLE. Both were rc=0 / 0 B before 2026-08-15.
+    for ANCH_PATH in \
+        /home/dev/Projects/Packages/Game/Assets/Scripts/Player.cs \
+        /home/dev/Library/MyGame/Assets/Scripts/Player.cs
+    do
+        anch_probe "$ANCH_HOOK" "$ANCH_PATH"
+        ANCH_VERDICT="silent"
+        [ "$PROBE_BYTES" -gt 0 ] && ANCH_VERDICT="acts"
+        assert_eq "acts rc${ANCH_ACT_RC}" "${ANCH_VERDICT} rc${PROBE_RC}" \
+            "${ANCH_HOOK} still acts when the CHECKOUT sits under ${ANCH_PATH%%/Assets/*} (${PROBE_BYTES} B)"
+    done
+
+    # Rows 4 and 5 — the skips the fix must not widen away. A gate that started firing on package
+    # code would be the noise the skip list exists to prevent, so these are as load-bearing as the
+    # two above.
+    for ANCH_PATH in \
+        /home/dev/MyGame/Packages/com.foo/Runtime/Player.cs \
+        /home/dev/MyGame/Assets/Extensions/Feel/Player.cs
+    do
+        anch_probe "$ANCH_HOOK" "$ANCH_PATH"
+        assert_eq "0B rc0" "${PROBE_BYTES}B rc${PROBE_RC}" \
+            "${ANCH_HOOK} passes over ${ANCH_PATH} (first-party baseline ${ANCH_BASE_BYTES} B)"
+    done
+
+    # --- The two cases the anchor cannot decide from the path alone -----------
+    #
+    # Both are DECIDED in the hooks and asserted here, because an undecided case is what produced
+    # this finding: the skip list was copied without anyone stating what its last two entries meant.
+    #
+    # DECISION 1 — <root>/Packages/<pkg>/Assets/X.cs is treated as FIRST-PARTY and acted on.
+    # It is character-for-character `*/Packages/<anything>/Assets/*`, which is also the shape of a
+    # checkout kept under a directory named Packages — row 2 above. No pattern separates them
+    # without the project root. The tie breaks towards acting because the two errors are not equal:
+    # firing on a rare vendored file is visible noise with a per-hook kill switch, while passing a
+    # whole project is a gate that is silently dead, which is the defect being repaired.
+    anch_probe "$ANCH_HOOK" /home/dev/MyGame/Packages/com.foo/Assets/Vendor.cs
+    ANCH_VERDICT="silent"
+    [ "$PROBE_BYTES" -gt 0 ] && ANCH_VERDICT="acts"
+    assert_eq "acts rc${ANCH_ACT_RC}" "${ANCH_VERDICT} rc${PROBE_RC}" \
+        "${ANCH_HOOK} DECIDED: an Assets/ folder inside <root>/Packages/ counts as first-party (${PROBE_BYTES} B)"
+
+    # ...and the half of decision 1 that IS separable: Library/PackageCache is two Unity-generated
+    # segments in sequence, and nothing keeps a checkout above it, so a cached package carrying its
+    # own Assets/ folder is skipped rather than acted on. Without the explicit entry the row below
+    # would follow decision 1 and act.
+    for ANCH_PATH in \
+        /home/dev/MyGame/Library/PackageCache/com.foo@1.0.0/Runtime/Player.cs \
+        /home/dev/MyGame/Library/PackageCache/com.foo@1.0.0/Assets/Vendor.cs
+    do
+        anch_probe "$ANCH_HOOK" "$ANCH_PATH"
+        assert_eq "0B rc0" "${PROBE_BYTES}B rc${PROBE_RC}" \
+            "${ANCH_HOOK} passes over ${ANCH_PATH} (first-party baseline ${ANCH_BASE_BYTES} B)"
+    done
+
+    # DECISION 2 — a path with NO /Assets/ segment is SKIPPED. Unity compiles first-party runtime
+    # code out of Assets/, which is the scope both hooks claim. This is a WIDENING of the skip and
+    # is asserted for that reason: /home/dev/MyGame/Tools/Gen.cs acted before the change
+    # (block-legacy-input rc=2 782 B, warn-platform-defines 431 B) and is silent now, so nothing
+    # about it is inherited and a future reader cannot mistake it for the status quo.
+    anch_probe "$ANCH_HOOK" /home/dev/MyGame/Tools/Gen.cs
     assert_eq "0B rc0" "${PROBE_BYTES}B rc${PROBE_RC}" \
-        "KNOWN HOLE (inherited): a checkout under ${TP_PATH%%/Assets/*} silences ${TP_HOOK} (baseline ${TP_BASE_BYTES} B)"
+        "${ANCH_HOOK} DECIDED: a path with no /Assets/ segment is out of scope (first-party baseline ${ANCH_BASE_BYTES} B)"
 done
 
 # --- Coverage, keyed on execution ------------------------------------------
