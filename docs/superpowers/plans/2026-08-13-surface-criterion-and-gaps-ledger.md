@@ -1261,6 +1261,41 @@ ADDRESSED, none returned to the fix loop.**
      reasoning is what gets inherited, which is why it is being corrected even though the outcome
      stands.*
 
+**From Task 2c's review (2026-08-14). In fix round 1 — two Critical, both executed-destructive.**
+
+109. **A class is derived by enumerating its mechanism space, not by listing spellings — and the
+     reviewer did it: 343 generated members across eight argument positions, all run against two
+     versions.** Every one of the round's twelve reproduced and blocked. **The divergence is what the
+     method bought:** a backslash inside a quoted run (6 spellings, 5 arms), a bracket expression
+     (2), ANSI-C quoting / `$( )` / backtick (3), and **all 27 direct-arm spellings uniformly
+     permitted.** *Generated variants that leave an unterminated quote were excluded because
+     `bash -n` rejects them — they never execute, so they are not members.* **This is the strongest
+     class derivation in the wave and the shape to copy.**
+110. **`meta_ref` tests `[*?]` while the glob metacharacter set is `* ? [ ] \`, and the scanner's own
+     double-quote arm deliberately preserves a backslash** — *the two halves of one function disagree
+     about what a backslash means.* `find Assets -name "*.\meta" -delete` returns **0 and deletes 3
+     of 3 files.** **One character from the round's own row 8**, which *is* caught because bash
+     consumes an unquoted backslash. `'*.[m]eta'` is sharper still: it **does** say `.meta` with a
+     glob metacharacter standing inside it — the exact phrase `meta_ref` is documented to test.
+111. **`exit 3` is silent and non-blocking, and an assertion labels it a block.** `_lib.sh` and
+     `docs/HOOK-REFERENCE.md` both fix **exit 2** as the blocking code. Measured with a broken `awk`:
+     **rc=3, stdout 0 bytes, stderr 0 bytes** — so the destructive payload **runs**, and the "loud
+     error" framing is wrong in both the comment and the report. **The `|| META_ROUTE="1"` fallback
+     choice is right** — the flipped version is strictly worse (silent *permit*, rc=0). **The finding
+     is the label, not the branch.**
+112. **A mutation the round recorded as "behaviour-preserving by construction, red 0" reddens 2.**
+     The `if (index(v, ".meta") > 0) return 1` early return is **the bare-path arm**, not a
+     performance guard: without it control falls to `if (v !~ /[*?]/) return 0` and any token naming
+     `.meta` with no glob metacharacter returns 0. **A future round reading the report would delete
+     it as dead weight and reopen the route.** *Fifth measured instance in this wave of a mutation
+     result that meant something other than what it looked like.*
+113. **The `X`-ceiling laundering exploit was attacked and confirmed, and is correctly disclosed
+     rather than fixed.** Replacing a genuine verified-false-positive record with an
+     executed-destructive live hole, marked `X`, leaves **every asserted count unchanged** and the
+     per-record verdict assertion passes because the hook really returns 0 on it. **The file states
+     this exploit explicitly above its own ceiling.** *Consistent with the earlier ruling that a
+     two-sided forgery is the structural limit of a count — recorded as verified, not as a finding.*
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
