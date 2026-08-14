@@ -447,7 +447,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 2 | The two gates block the act and permit the prose | **adjudicated at cap → 2b** | `5041b4b`…`3fd22dc` | 5 rounds; each fixed the previous round's fix. Inverted to a read-only allowlist in round 3, positional argument read in round 5 |
 | 2b | The tokeniser gets a quote model, and a corpus stops the next hole | open | — | **New.** Data loss: a quoted operator truncates the arg list, dropping the write flag. Requires a regression corpus checked against `546870f` / `06883cc` / `3fd22dc` |
 | 2c | What decides the route, and what the allowlist vouches for | open | — | **New.** Both holes exist at all four hook versions; `./evil/grep` destroyed 3/3 `.meta` files with the gate at 0 |
-| 3 | The surviving scripts become reachable | open | — | **R2**: leaves `scripts/` entirely. **R8**: no `Bash` for `unity-reviewer`. **R7** if it lands second |
+| 3 | The surviving scripts become reachable | **done, merged** | `75ea1de`…`d607839` | **R2**: leaves `scripts/` entirely. **R8**: no `Bash` for `unity-reviewer`. **R7** if it lands second |
 | **Stage 2 — installer correctness** | | | | |
 | 4 | The receipt exists before anything that can abort | **done, merged** | `5b636d3`…`8056f53` | The only permanent-damage path in the wave. **R1**: gains the five `stat -c` sites |
 | 4b | A `CLAUDE.md` missing its end marker is amputated silently | open | — | **New, R5.** Data loss, repeats on every install, prints success |
@@ -461,7 +461,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | **Stage 4 — guards, claims, and the loop** | | | | |
 | 10 | Six guards see the class | **done, merged** | `5b636d3`…`5db856d` | **R9**: the deliverable is the CLASS. "Nine files, not two". Changes `run-tests.sh` tally arithmetic → invalidates every quoted suite total |
 | 11 | Claims are re-derived or removed | open | — | **R4**: sole owner of `tests/test-derived-counts.sh`. **R12**: pointers vs historical narrative. **F9**: `CLAUDE.md` joins its file list. **F11**: widen Step 1's pattern *before* it runs |
-| 12 | The early-exit-reader trap leaves the shipped scripts | open | — | **R1**: leaves `install.sh` entirely. **R2**: gains the six `--help` texts |
+| 12 | The early-exit-reader trap leaves the shipped scripts | **done, merged** | `75ea1de`…`71a3965` | **R1**: leaves `install.sh` entirely. **R2**: gains the six `--help` texts |
 | 13 | The loop learns the five shapes a scoped review cannot see | **done, merged** | `234fa85`…`222e40e` | **New**, from Task 1's audit. Payload skill — drifts the baseline |
 
 ---
@@ -984,6 +984,62 @@ ADDRESSED, none returned to the fix loop.**
     `--help`"* is not true. And **all six scripts genuinely run from both `./scripts/` and
     `./.claude/scripts/`**, so Task 12's additive fix was the right shape — a flat rewrite would have
     been wrong in the other direction.
+
+**From Task 3's and Task 12's closing re-reviews (2026-08-14). Both COMPLETE and merged.**
+
+70. **`.claude/hooks/warn-filename.sh` has a fifth live writer-failure site, and the round recorded
+    "four, all `studio-doctor.sh`".** Anchor: the line beginning
+    `CLASS_NAME=$(grep -oE '(class|struct)\s+\w+'`. Measured: a payload with a declaration token →
+    rc=0 and a warning; a payload **without** one (`    : MonoBehaviour\n{\n  void Awake() {}\n}`)
+    → **rc=1, no output.** Its `if grep -qE ':\s*(MonoBehaviour|ScriptableObject|…)'` guard proves a
+    **base-class clause**; the pipeline needs a **declaration token the guard says nothing about** —
+    **character-for-character the round's own correct finding, one file over.** The payload is
+    routine: the second half of an Edit tool's `new_string` is a fragment.
+    `tests/test-hook-advisory-exit.sh` does not exercise this hook, which is why the suite is green.
+    **Important. No owner — triage at the whole-branch review.**
+71. **The deferral of the general failing-left-side needle names no retirement condition, so it is an
+    exemption that cannot ever close.** The `stat -c` precedent it invokes *does* name one (fix the
+    six sites and the needle becomes addable); here the blocker is `uninstall.sh:204`, which is
+    **correct code** and will never be "fixed", so the deferral is permanent by construction —
+    **the exact class this wave filed against another task the same night.** Two exits that do not
+    make a guard guess at control flow: **(a) needle the unprotected *form*** — flag `X=$( … | … )`
+    that does not end `|| true`, which repairs `uninstall.sh:204` with a one-token no-op and turns
+    the needle green on a tree one token from today's; or **(b) scope the needle to failing-capable
+    left sides** (`find`, `grep`, `jq`, `sha256sum`, `sort`, `git`) and carry that one site as a
+    named exception with a written retirement. **Do not carry the deferral a second time without
+    one.**
+72. **The failing-left-side derivation is not reproducible, and that is the finding.** The round
+    reported buckets summing to 39 against a stated class of 38; an independent sweep under an
+    explicit definition got **62 piped bare assignments, 26 immune by `|| true`, 36 unprotected, 27
+    builtin left sides, 9 external, 7 guarded, 1 adjacent-guarded, 1 live.** **Fourth membership
+    disagreement in this wave, and the fourth to be a definition dispute.** **Whoever inherits the
+    sweep carries a written class definition, not a count.**
+73. **Three measured residuals in shipped text, all Minor.** `rc=1` should read **`rc=2`** in two
+    places (`scripts/generate-claude-md.sh`'s `THE || true IS A DELIBERATE BEHAVIOUR CHANGE`
+    paragraph and the matching `provenance.tsv` note) — GNU `sed` exits **2** on an unreadable file,
+    reproduced twice; *a measurement written in the round that corrected another measurement in the
+    open.* `grep_pipe_check`'s new docstring **restates the membership in the same sentence that
+    tells the reader not to** — delete the `which is …` clause, keep the array names. And
+    `studio-doctor.sh`'s new comment names the cost as *"an undercount reported as a count"* but does
+    not say the permission case now returns **rc=0 with `0 failure(s)`** — i.e. reports **healthy**
+    on a project with an unreadable directory inside `.claude/`. **That last one is a caveat for
+    Task 3's command body, which maps rc=0 to healthy.**
+74. **The non-empty-scope assertion is a threshold, not a scope check.** Emptying **one** of the two
+    arrays leaves the sweep at 2 files — losing `.claude/hooks/` and `scripts/` entirely — and the
+    guard stays green. Total collapse is caught in both directions (verified independently, each
+    array with its own message, **so no OR is hiding an AND**); **partial collapse is not, and a
+    renamed directory or a repo-layout move is the likelier accident.** Documented at the code.
+75. **Two Task 3 residuals worth the next reader's time.** `/unity-doctor` Check 3's opening line
+    *"These five are outside what it reads"* is **falsified by its own item 1 two lines later** —
+    the accurate predicate is *outside what it **reports***. And Check 3 item 1 tests **existence**,
+    so an **empty-but-present** `.claude/agents/` passes both it and the script (`INFO agents=0`,
+    `0 failure(s)`, rc=0). Asserting non-empty closes it for free. **→ Task 11.**
+76. **A structural result worth keeping: "summary printed, then dies" is impossible.**
+    `scripts/studio-doctor.sh` ends `printf … summary` / `[ "$FAIL_C" -gt 0 ] && exit 1` / `exit 0`,
+    with nothing after the summary that can print or abort. **So *summary present ⇒ every check ran*
+    is sound, not merely observed** — which is what makes Task 3's three-state table a real
+    invariant. The table's third row reads *"no summary line, **any exit status**"*, and that clause
+    is what makes it survive a **SIGTERM (rc=143)**; "exit 1" would have been wrong there.
 
 **Inherited from earlier waves, still open:**
 
