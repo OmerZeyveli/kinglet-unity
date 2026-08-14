@@ -206,6 +206,7 @@ README.md	[0-9]+ of [0-9]+ ECU-origin files now .modified.	$DCF_ECU_MODIFIED	$DC
 
 DCF_BAD=""
 DCF_VACUOUS=""
+DCF_MULTISITE=""
 while IFS=$'\t' read -r dcf_rel dcf_pat dcf_want1 dcf_want2; do
   [ -n "$dcf_rel" ] || continue
   if [ ! -f "$REPO_DIR/$dcf_rel" ]; then
@@ -229,8 +230,18 @@ while IFS=$'\t' read -r dcf_rel dcf_pat dcf_want1 dcf_want2; do
 
   if [ "$dcf_hits" -lt 1 ]; then
     DCF_VACUOUS="${DCF_VACUOUS}${dcf_rel} no longer states its '${dcf_pat}' claim in a form this guard can read"$'\n'
+  elif [ "$dcf_hits" -gt 1 ]; then
+    # See the DCK_MULTISITE block for the finding this enforces (ledger 203). Applied to every
+    # claims table in this file, not only the one whose row happened to violate it.
+    DCF_MULTISITE="${DCF_MULTISITE}${dcf_rel}'s '${dcf_pat}' row matches ${dcf_hits} sites — its vacuity check is a union over them. Split it into one row per site, with lexically disjoint patterns."$'\n'
   fi
 done <<< "$DCF_CLAIMS"
+
+if [ -n "$DCF_MULTISITE" ]; then
+  printf '%s' "$DCF_MULTISITE"
+fi
+assert_eq "0" "$(printf '%s' "$DCF_MULTISITE" | grep -c . || true)" \
+  "every ECU-footprint claim row matches exactly one site, so no row's vacuity check is a union over sites"
 
 if [ -n "$DCF_BAD" ]; then
   printf '%s' "$DCF_BAD"
@@ -435,6 +446,7 @@ README.md	\*\*Templates\*\* [|] [0-9]+	$DCS_TEMPLATES	-"
 
 DCS_BAD=""
 DCS_VACUOUS=""
+DCS_MULTISITE=""
 while IFS=$'\t' read -r dcs_rel dcs_pat dcs_want1 dcs_want2; do
   [ -n "$dcs_rel" ] || continue
   if [ ! -f "$REPO_DIR/$dcs_rel" ]; then
@@ -457,8 +469,18 @@ while IFS=$'\t' read -r dcs_rel dcs_pat dcs_want1 dcs_want2; do
 
   if [ "$dcs_hits" -lt 1 ]; then
     DCS_VACUOUS="${DCS_VACUOUS}${dcs_rel} no longer states its '${dcs_pat}' claim in a form this guard can read"$'\n'
+  elif [ "$dcs_hits" -gt 1 ]; then
+    # See the DCK_MULTISITE block for the finding this enforces (ledger 203). Applied to every
+    # claims table in this file, not only the one whose row happened to violate it.
+    DCS_MULTISITE="${DCS_MULTISITE}${dcs_rel}'s '${dcs_pat}' row matches ${dcs_hits} sites — its vacuity check is a union over them. Split it into one row per site, with lexically disjoint patterns."$'\n'
   fi
 done <<< "$DCS_CLAIMS"
+
+if [ -n "$DCS_MULTISITE" ]; then
+  printf '%s' "$DCS_MULTISITE"
+fi
+assert_eq "0" "$(printf '%s' "$DCS_MULTISITE" | grep -c . || true)" \
+  "every surface-count claim row matches exactly one site, so no row's vacuity check is a union over sites"
 
 if [ -n "$DCS_BAD" ]; then
   printf '%s' "$DCS_BAD"
@@ -889,6 +911,35 @@ assert_eq "0" "$(printf '%s' "$DCK_TRACKING_GONE" | grep -c . || true)" \
 # guard failing on a correct document because two of its own patterns overlapped. If either
 # sentence is reworded, keep the leading verb.
 #
+# AND WHY docs/HOOK-REFERENCE.md HAS TWO `drops` ROWS RATHER THAN ONE — ledger 203, fixed here.
+#
+# That file states the cost of `minimal` in two places: `It drops N of the M hooks, and bash-gate is
+# one of them.` under `### What minimal actually costs`, and `which drops N of the M hooks — every
+# hook declaring standard` in the `strict` paragraph. ONE row covered both. The value check was
+# fine — it runs on every match — but the VACUITY check is `hits < 1`, a union over the two sites:
+# either sentence could lose its digits entirely and the row stayed green on its sibling.
+#
+# MEASURED 2026-08-14, before this split. Reverting the second sentence to its exact pre-fix
+# spelled-out wording — "which drops the four warning and session hooks that declare `standard`",
+# no digits at all — left this file at **32 pass / 0 fail**. The same edit applied to the first
+# sentence instead: **32 pass / 0 fail**. The control, `drops 3 of the 12`: **31 pass / 1 fail**.
+# So the digit was genuinely checked and the SENTENCE was not, in both directions — the defect the
+# previous wave fixed was reintroducible verbatim without reddening anything.
+#
+# This is the same finding at a third granularity. 2026-08-03 (finding 8) found it ACROSS FILES: a
+# combined threshold let README.md lose its occurrence while CREDITS.md's kept the total up; the
+# remedy was to count per file. `DC_PAIR_VACUOUS` above found it ACROSS PHRASINGS within one file
+# and gave CREDITS.md's third phrasing its own named check. This is ACROSS SITES within one
+# phrasing. Each time the union got smaller and each time it was still a union — which is why the
+# rule is now enforced mechanically below rather than applied by hand a fourth time.
+#
+# The two patterns are lexically disjoint by their leading words (`It drops` / `which drops`), the
+# same discipline the `runs`/`drops` note above already requires. Derive the exposure rather than
+# trusting this paragraph:
+#
+#   awk -F'\t' 'NF >= 3 { print $1 "\t" $2 }' tests/test-derived-counts.sh   # then count the
+#   matches of each pattern in the flattened file it names; every row must match exactly one site.
+#
 # docs/ARCHITECTURE.md   "hooks/ 12 registered shell scripts"          total
 # docs/ARCHITECTURE.md   "Of the 12 registered hooks, 11 source"       total, _lib.sh sourcers
 # README.md              "**Hooks** | 12 registered"                   total
@@ -924,12 +975,14 @@ docs/HOOK-REFERENCE.md	includes [0-9]+ hooks	$DCK_HOOKS	-
 docs/HOOK-REFERENCE.md	runs [0-9]+ of the [0-9]+	$DCK_MINIMAL	$DCK_HOOKS
 docs/HOOK-REFERENCE.md	all [0-9]+ hooks run	$DCK_STANDARD	-
 docs/HOOK-REFERENCE.md	same [0-9]+ hooks as	$DCK_STRICT	-
-docs/HOOK-REFERENCE.md	drops [0-9]+ of the [0-9]+	$DCK_DROPPED_MINIMAL	$DCK_HOOKS
+docs/HOOK-REFERENCE.md	It drops [0-9]+ of the [0-9]+ hooks, and	$DCK_DROPPED_MINIMAL	$DCK_HOOKS
+docs/HOOK-REFERENCE.md	which drops [0-9]+ of the [0-9]+ hooks	$DCK_DROPPED_MINIMAL	$DCK_HOOKS
 docs/ARCHITECTURE.md	drops [0-9]+ of the [0-9]+	$DCK_DROPPED_MINIMAL	$DCK_HOOKS
 .claude/settings.local.json.template	drops [0-9]+ of the [0-9]+	$DCK_DROPPED_MINIMAL	$DCK_HOOKS"
 
 DCK_BAD=""
 DCK_VACUOUS=""
+DCK_MULTISITE=""
 while IFS=$'\t' read -r dck_rel dck_pat dck_want1 dck_want2; do
   [ -n "$dck_rel" ] || continue
   if [ ! -f "$REPO_DIR/$dck_rel" ]; then
@@ -959,8 +1012,21 @@ while IFS=$'\t' read -r dck_rel dck_pat dck_want1 dck_want2; do
 
   if [ "$dck_hits" -lt 1 ]; then
     DCK_VACUOUS="${DCK_VACUOUS}${dck_rel} no longer states its '${dck_pat}' claim in a form this guard can read"$'\n'
+  elif [ "$dck_hits" -gt 1 ]; then
+    # LEDGER 203 AS A CLASS, not as an instance. A row matching N sites has a vacuity check that is
+    # a union over them: N-1 of them can be reworded out of reach and the row stays green on the
+    # last one. Splitting the one row that violated it fixes today; this fails the NEXT one, which
+    # is the difference between a fix and a rule. Measured 2026-08-14 across all 43 claim rows in
+    # this file: 42 matched exactly one site, one matched two.
+    DCK_MULTISITE="${DCK_MULTISITE}${dck_rel}'s '${dck_pat}' row matches ${dck_hits} sites — its vacuity check is a union over them, so any ${dck_hits}-1 of them can be reworded out of reach unnoticed. Split it into one row per site, with lexically disjoint patterns."$'\n'
   fi
 done <<< "$DCK_CLAIMS"
+
+if [ -n "$DCK_MULTISITE" ]; then
+  printf '%s' "$DCK_MULTISITE"
+fi
+assert_eq "0" "$(printf '%s' "$DCK_MULTISITE" | grep -c . || true)" \
+  "every hook-count claim row matches exactly one site, so no row's vacuity check is a union over sites"
 
 if [ -n "$DCK_BAD" ]; then
   printf '%s' "$DCK_BAD"
