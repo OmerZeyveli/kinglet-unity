@@ -571,6 +571,25 @@ DCK_SKIPPED=$(printf '%s\n' "$DCK_SKIP_NAMES" | grep -c . || true)
 DCK_REPO_SCRIPTS=$(ls -1 "$REPO_DIR"/scripts/*.sh 2>/dev/null | grep -c . || true)
 DCK_INSTALLED_SCRIPTS=$((DCK_REPO_SCRIPTS - DCK_SKIPPED))
 
+# How many installed scripts are named, by INSTALLED path, from a shipped surface. Same question
+# tests/test-shipped-citations.sh rule 3 asks and for the same reason; derived a second time here
+# because a NUMBER is quoted in prose and this block is where quoted numbers are held to the tree.
+#
+# The two derivations are deliberately not identical, and today they agree at 6 anyway: this one
+# recurses over ALL of .claude/, the sibling reads only the shipped *.md surfaces. They diverge the
+# day a hook or a settings file names a script that no agent, command or skill does — at which point
+# this number is the larger of the two and the prose it guards carries the more optimistic reading.
+# Stated here rather than discovered later.
+DCK_NAMED_SCRIPTS=0
+for dck_s in "$REPO_DIR"/scripts/*.sh; do
+  [ -f "$dck_s" ] || continue
+  dck_b="$(basename "$dck_s")"
+  case " $DCK_SKIP_NAMES " in *" $dck_b "*) continue ;; esac
+  if grep -rqF -- ".claude/scripts/$dck_b" "$REPO_DIR/.claude"; then
+    DCK_NAMED_SCRIPTS=$((DCK_NAMED_SCRIPTS + 1))
+  fi
+done
+
 # The derivation has to be able to fail, for the same reason the surface-pool block says so: run
 # against a tree with no payload, every number above is 0, and 0 == 0 is a green suite that read
 # nothing. Asserted before anything is compared against them.
@@ -819,6 +838,7 @@ assert_eq "0" "$(printf '%s' "$DCK_TRACKING_GONE" | grep -c . || true)" \
 # docs/GETTING-STARTED.md "hooks/ 12 hooks + _lib.sh"                  total
 # docs/GETTING-STARTED.md "5 of them blocking"                         blocking
 # docs/GETTING-STARTED.md "repo has 7 scripts; an installed project has 6"  repo, installed
+# docs/GETTING-STARTED.md "6 of the 6 installed scripts are named"        named, installed
 # docs/HOOK-REFERENCE.md  "includes 12 hooks"                          total
 # docs/HOOK-REFERENCE.md  "standard profile 12 hooks"                  standard tier
 DCK_CLAIMS="docs/ARCHITECTURE.md	hooks/ [0-9]+ registered shell scripts	$DCK_HOOKS	-
@@ -829,6 +849,7 @@ docs/ARCHITECTURE.md	.strict. \([0-9]+ cumulative	$DCK_STRICT	-
 docs/GETTING-STARTED.md	hooks/ [0-9]+ hooks [+] _lib.sh	$DCK_HOOKS	-
 docs/GETTING-STARTED.md	[0-9]+ of them blocking	$DCK_BLOCKING	-
 docs/GETTING-STARTED.md	repo has [0-9]+ scripts; an installed project has [0-9]+	$DCK_REPO_SCRIPTS	$DCK_INSTALLED_SCRIPTS
+docs/GETTING-STARTED.md	[0-9]+ of the [0-9]+ installed scripts are named	$DCK_NAMED_SCRIPTS	$DCK_INSTALLED_SCRIPTS
 docs/HOOK-REFERENCE.md	includes [0-9]+ hooks	$DCK_HOOKS	-
 docs/HOOK-REFERENCE.md	runs [0-9]+ of the [0-9]+	$DCK_MINIMAL	$DCK_HOOKS
 docs/HOOK-REFERENCE.md	all [0-9]+ hooks run	$DCK_STANDARD	-

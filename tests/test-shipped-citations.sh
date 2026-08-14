@@ -242,10 +242,15 @@ done <<< "$SHIPPED_MD"
 # reader never has to trust this comment. Raise it when the tree grows; never lower one to make a run
 # pass. The reverse-direction assertion below would also redden if every reference vanished at once —
 # but not if the token EXPRESSION broke while the references stayed, which is what this catches.
-if [ "$SC_TOKENS_N" -ge 4 ]; then
-  pass "guard examined $SC_TOKENS_N .claude/scripts/ path reference(s) in shipped surfaces (floor 4)"
+#
+# Raised 4 -> 8 on 2026-08-14, honouring the instruction above rather than leaving it as advice:
+# /unity-init gained two references to generate-claude-md.sh that day and the live count went 7 -> 9,
+# so a floor of 4 had come to sit at less than half the tree and would have sat through the loss of
+# five references without a word.
+if [ "$SC_TOKENS_N" -ge 8 ]; then
+  pass "guard examined $SC_TOKENS_N .claude/scripts/ path reference(s) in shipped surfaces (floor 8)"
 else
-  fail "guard examined only $SC_TOKENS_N .claude/scripts/ path reference(s) — expected at least 4; either the wiring has been removed or the token expression has stopped matching"
+  fail "guard examined only $SC_TOKENS_N .claude/scripts/ path reference(s) — expected at least 8; either the wiring has been removed or the token expression has stopped matching"
 fi
 
 # A token cannot contain a colon (the character class excludes it), so `##*:` recovers it from the
@@ -279,9 +284,11 @@ fi
 # up can never redden this, and unwiring one always does. A name may be REMOVED from the pending
 # list; adding one is undoing work this list exists to finish.
 #
-#   generate-claude-md.sh — Task 7 of the 2026-08-13 surface-criterion wave owns naming it from
-#                           `/unity-init`. Until that lands it is reachable from install.sh only,
-#                           which is a run the user makes once and not a surface a model can call.
+#   The list is EMPTY as of 2026-08-14 and that is its finished state, not a gap. Its one entry was
+#   generate-claude-md.sh, waiting on Task 7 of the 2026-08-13 surface-criterion wave to name it
+#   from `/unity-init`; that landed, so the entry was deleted and the assertion below now reads
+#   every installed script as named. An empty list is not an invitation to refill it — see the next
+#   paragraph and the failure message further down: naming or cutting are the two answers.
 #
 # AN EXEMPTION THAT IS SATISFIED IS STALE, AND STALE HERE MEANS PERMANENTLY RELAXED. The list is
 # consulted only for scripts already found unreferenced, so the moment the pending script IS named
@@ -291,7 +298,7 @@ fi
 # They differ by a reference and agree on the result, which is the definition of a guard that has
 # stopped guarding. So a satisfied entry is a FAILURE with the remedy in its message: delete the
 # line. That makes retiring the exemption the only way forward rather than an optional tidy-up.
-SC_REACH_PENDING="generate-claude-md.sh"
+SC_REACH_PENDING=""
 
 SC_UNREF=""
 SC_INSTALLED_N=0
@@ -311,6 +318,7 @@ while IFS= read -r b; do
 done <<< "$SC_UNREF"
 
 SC_NAMED_N="$(printf '%s\n' "$SC_NAMED" | sort -u | grep -c . || true)"
+SC_PENDING_N="$(printf '%s\n' $SC_REACH_PENDING | grep -c . || true)"
 
 sc_stale_pending=""
 for b in $SC_REACH_PENDING; do
@@ -329,7 +337,7 @@ else
 fi
 
 if [ -z "$sc_unref_bad" ]; then
-  pass "$SC_NAMED_N of $SC_INSTALLED_N installed scripts are named by a shipped surface; the rest are on the recorded pending list"
+  pass "$SC_NAMED_N of $SC_INSTALLED_N installed scripts are named by a shipped surface, bar $SC_PENDING_N on the recorded pending list"
 else
   fail "installed script(s) named by no agent, command or skill and not on the pending list:$sc_unref_bad"
   printf '       %s of %s installed scripts are currently named by a shipped surface.\n' "$SC_NAMED_N" "$SC_INSTALLED_N"
