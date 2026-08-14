@@ -224,7 +224,16 @@ while IFS=$'\t' read -r dcf_rel dcf_pat dcf_want1 dcf_want2; do
     dcf_got1=$(printf '%s' "$dcf_claim" | grep -oE '[0-9]+' | sed -n 1p)
     dcf_got2=$(printf '%s' "$dcf_claim" | grep -oE '[0-9]+' | sed -n 2p)
     if [ "$dcf_got1" != "$dcf_want1" ] || { [ "$dcf_want2" != "-" ] && [ "$dcf_got2" != "$dcf_want2" ]; }; then
-      DCF_BAD="${DCF_BAD}${dcf_rel} claims '${dcf_claim}' — provenance.tsv gives ${dcf_want1}"$([ "$dcf_want2" != "-" ] && printf ' and %s' "$dcf_want2")$'\n'
+      # NOT `"$([ … ] && printf …)"` — the shape the DCK block forty lines down documents and fixes.
+      # For rows whose second column is `-` that AND-list short-circuits, the command substitution
+      # exits 1, and an assignment site is one of the two places `set -e` reaches that people expect
+      # it not to. Inert under the runner (which does `set +e` before sourcing) and reachable only on
+      # the failure path — both harness accidents, not a design. Brought across on 2026-08-14: the
+      # commit that copied MULTISITE into this block had copied the hazard's neighbour without the
+      # neighbour's fix.
+      dcf_extra=""
+      [ "$dcf_want2" = "-" ] || dcf_extra=" and $dcf_want2"
+      DCF_BAD="${DCF_BAD}${dcf_rel} claims '${dcf_claim}' — provenance.tsv gives ${dcf_want1}${dcf_extra}"$'\n'
     fi
   done <<< "$(grep -oE "$dcf_pat" <<< "$dcf_flat" || true)"
 

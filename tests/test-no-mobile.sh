@@ -100,19 +100,48 @@ SCAN_DIRS=(.claude/ docs/ scripts/ examples/ templates/)
 # subject cannot detect one source dying, however tight the number — 1 or 60, the union floor sees
 # `docs/` and stops.
 #
-# THE SOURCE SET IS DERIVED, NOT LISTED. Every scan root, plus every immediate subdirectory of
-# `.claude/` — because `.claude/` is a container whose children die independently, and it is those
-# children that hold the payload. A subdirectory added to `.claude/` becomes a source the day it
-# lands, with nobody editing a list here. `.claude/state/` is IN the set deliberately: it is tracked
-# through `.gitkeep`, so it is non-empty in every fresh clone, and if that file goes the directory
-# disappears from every checkout — which is a change someone should have to make on purpose.
+# THE SOURCE SET IS DECLARED **AND** DERIVED, and the declared half is what closes DELETION.
 #
+# It was derived-only for one round, and that round shipped a hole the mutation battery did not
+# probe because the battery only ever EMPTIED directories. If a source is discovered by
+# `find .claude -maxdepth 1 -type d`, a **deleted** directory is not a dead source — it is not a
+# source at all, so nothing iterates it and nothing reds. MEASURED 2026-08-14 at the commit that
+# shipped the derived-only version:
+#
+#   .claude/skills EMPTIED, directory kept          16 pass / 1 fail   caught
+#   .claude/skills DELETED                          17 pass / 0 fail   NOT caught
+#   all five payload directories DELETED (62 -> 6)  17 pass / 0 fail   NOT caught
+#
+# tests/test-bash32-compat.sh was immune to the identical mutation (9/1) for one reason: its census
+# iterates a FIXED ARRAY and asks the tree about each entry, rather than asking the tree what the
+# entries are. Deletion is at least as plausible as truncation — a bad `rm`, a botched merge, an
+# install that never copied the directory — so the two halves are both needed:
+#
+#   PAYLOAD_DIRS (declared)  — always a source, present or not. A deleted one reds by name.
+#   find .claude (derived)   — a subdirectory ADDED to `.claude/` becomes a source the day it
+#                              lands, with nobody editing a list here.
+#
+# Neither half alone is enough, and each covers the other's failure: a hand list cannot grow, a
+# derived list cannot miss what is not there. `.claude/state/` is declared deliberately: it is
+# tracked through `.gitkeep`, so it is non-empty in every fresh clone, and if that file goes the
+# directory disappears from every checkout — which is a change someone should have to make on
+# purpose. See docs/ANTI-VACUITY.md rule F8.
+PAYLOAD_DIRS=(
+  .claude/agents
+  .claude/commands
+  .claude/hooks
+  .claude/rules
+  .claude/skills
+  .claude/state
+)
+
 # `{ find …; } | wc -l`, with find's non-zero status swallowed INSIDE the braces. A missing root
 # makes find exit 1, pipefail promotes it, and at a bare assignment site `set -e` ends the file —
 # measured while writing the previous version of this block: with one root renamed, this file died
 # here silently after section 1 and reported no failure of its own. The very check written to catch
 # an absent root was killed by the absent root.
 SCAN_SOURCES=$( { printf '%s\n' "${SCAN_DIRS[@]}"
+                  printf '%s\n' "${PAYLOAD_DIRS[@]}"
                   find .claude -mindepth 1 -maxdepth 1 -type d 2>/dev/null || true
                 } | sed 's#/*$##' | sort -u )
 SCAN_SOURCE_N=$(printf '%s\n' "$SCAN_SOURCES" | grep -c . || true)
@@ -120,14 +149,21 @@ SCAN_SOURCE_N=$(printf '%s\n' "$SCAN_SOURCES" | grep -c . || true)
 SCAN_STATE="ok"
 SCAN_CENSUS=""
 SCAN_DEAD=""
+SCAN_GONE=""
+SCAN_ROWS=0
 SCAN_FILES=0
 while IFS= read -r SCAN_D; do
   [ -n "$SCAN_D" ] || continue
   if [ ! -d "$SCAN_D" ]; then
-    SCAN_STATE="scan source $SCAN_D does not exist, so every sweep below silently read nothing from it"
+    # Accumulated for the same reason SCAN_DEAD is: on five deleted payload directories a
+    # reassigned sentinel names one of them and the reader repairs one of five.
+    SCAN_GONE="${SCAN_GONE}${SCAN_D} "
+    SCAN_ROWS=$((SCAN_ROWS + 1))
+    SCAN_CENSUS="${SCAN_CENSUS}${SCAN_D}=GONE "
     continue
   fi
   SCAN_N=$( { find "$SCAN_D" -type f 2>/dev/null || true; } | wc -l | tr -d ' ')
+  SCAN_ROWS=$((SCAN_ROWS + 1))
   SCAN_CENSUS="${SCAN_CENSUS}${SCAN_D}=${SCAN_N} "
   SCAN_FILES=$((SCAN_FILES + SCAN_N))
   # ACCUMULATED, not overwritten. A sentinel that is reassigned reports only the LAST dead source,
@@ -136,24 +172,34 @@ while IFS= read -r SCAN_D; do
   # this carries the names.
   [ "$SCAN_N" -ge 1 ] || SCAN_DEAD="${SCAN_DEAD}${SCAN_D} "
 done <<< "$SCAN_SOURCES"
+[ -z "$SCAN_GONE" ] || SCAN_STATE="scan source(s) that do not exist at all: ${SCAN_GONE}— a DELETED source is not a dead source, it is not a source, so a derivation-only census never iterates it"
 [ -z "$SCAN_DEAD" ] || SCAN_STATE="scan source(s) holding no files at all: ${SCAN_DEAD}— every sweep below read nothing from them while the remaining sources kept this check green"
 
-# THE FLOOR ON THE CENSUS ITSELF, one level up, and it is not decoration: if SCAN_SOURCES ever
-# resolves to nothing the loop above runs zero times, SCAN_STATE stays "ok", and the per-source
-# check reports a serene green over no sources at all — the same defect it was just written to
-# close. `${#SCAN_DIRS[@]}` is a property of this file, not of the tree, so an emptied tree cannot
-# move it: the census must carry at least one row per declared root. It moves with the array, so it
-# cannot go stale either.
-[ "$SCAN_SOURCE_N" -ge "${#SCAN_DIRS[@]}" ] || SCAN_STATE="the source derivation produced $SCAN_SOURCE_N source(s) for ${#SCAN_DIRS[@]} declared scan root(s) — the per-source check below has no sources to check"
+# THE FLOOR ON THE CENSUS ITSELF, one level up: if the loop above ever runs zero times, SCAN_STATE
+# stays "ok" and the per-source check reports a serene green over no sources — the same defect it
+# was written to close.
+#
+# THIS WAS `[ "$SCAN_SOURCE_N" -ge "${#SCAN_DIRS[@]}" ]` FOR ONE ROUND AND WAS DECORATION, in the
+# file whose own comment defines decoration. `printf '%s\n' "${SCAN_DIRS[@]}"` emits one line per
+# entry unconditionally, so SCAN_SOURCE_N is >= the array length BEFORE `find` contributes anything
+# and the bound cannot fail while the array is non-empty. Measured by deleting the line: 17/0 -> 17/0
+# pristine, 16/1 -> 16/1 emptied — no observable difference in either direction.
+#
+# The replacement is an IDENTITY between two things that move for different reasons: rows the loop
+# actually wrote, against entries the derivation actually produced. A loop that stops early, a
+# `continue` that skips a row, or a here-string that delivers nothing all break it.
+assert_eq "$SCAN_SOURCE_N" "$SCAN_ROWS" \
+  "the per-source loop read every source the derivation produced ($SCAN_SOURCE_N derived, $SCAN_ROWS censused)"
 
-# A FLOOR WHOSE REFERENCE THE MUTATION ALSO MOVES IS NOT A FLOOR — measured on the line above, on
-# its first mutation run. `SCAN_DIRS=()` drives `${#SCAN_DIRS[@]}` to 0, so `-ge 0` is trivially
-# true; SCAN_SOURCES still holds the six `.claude/` subdirectories the `find` contributes, so every
-# per-source check passes; and sections 3, 4 and 5 then sweep NO ROOTS AT ALL. Result: **17 pass /
-# 0 fail**, a full green over a sweep with nothing in its scope, from the block written to stop
-# exactly that. The array is the scope of the real `grep -r` calls below, so it gets its own
-# absolute floor rather than a relative one. docs/ANTI-VACUITY.md records this as rule F4.
-[ "${#SCAN_DIRS[@]}" -ge 1 ] || SCAN_STATE="SCAN_DIRS is empty, so sections 3, 4 and 5 sweep no roots at all and every clean result below is worthless"
+# A FLOOR WHOSE REFERENCE THE MUTATION ALSO MOVES IS NOT A FLOOR — measured on the bound this
+# replaced, on its first mutation run. `SCAN_DIRS=()` drives `${#SCAN_DIRS[@]}` to 0, so `-ge 0` is
+# trivially true; the derived `.claude/` sources still populate the census, every per-source check
+# passes; and sections 3, 4 and 5 then sweep NO ROOTS AT ALL. Result: **17 pass / 0 fail**, a full
+# green over a sweep with nothing in its scope. Both arrays are the real scope — SCAN_DIRS of the
+# `grep -r` calls below, PAYLOAD_DIRS of the deletion check above — so each gets its own ABSOLUTE
+# floor rather than a relative one. docs/ANTI-VACUITY.md records this as rule F4.
+[ "${#SCAN_DIRS[@]}"    -ge 1 ] || SCAN_STATE="SCAN_DIRS is empty, so sections 3, 4 and 5 sweep no roots at all and every clean result below is worthless"
+[ "${#PAYLOAD_DIRS[@]}" -ge 1 ] || SCAN_STATE="PAYLOAD_DIRS is empty, so a deleted payload directory is no longer a declared source and deletion stops being detectable"
 assert_eq "$SCAN_STATE" "ok" "every mobile-sweep source has files in it — $SCAN_CENSUS(total $SCAN_FILES) — an emptied payload must not read as a clean one"
 
 # `ASTC 6x6`, not `ASTC_6x6`: `_` is a word character, so `\bASTC\b` does NOT match inside
