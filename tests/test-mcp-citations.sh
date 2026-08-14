@@ -66,6 +66,15 @@
 #     text of denied commands verbatim — so a maintainer who so much as types a bad citation into a
 #     blocked shell command would fail this guard on a file no user ever sees. Runtime output is not
 #     a surface. This is a scope decision, not a hole: `.gitignore` carries `.claude/state/*`.
+#   * IT CHECKS ACTION NAMES, NOT CALLS, AND THAT GAP HAS ALREADY COST A LINE. This guard has no
+#     view of a call's ARGUMENTS, so a citation can name a real action and still be dead. Measured
+#     2026-08-14, one round after this file shipped: `manage_profiler action:"get_counters"` — cited
+#     in `unity-optimizer`'s recipe with no parameters, and classified "resolves" by the same live
+#     sweep that condemned the four dead names beside it — returns `success: false` with an EMPTY
+#     message, because `category` is required. The NAME was right and the CALL was dead, and the two
+#     verdicts were reported as one. Closing this means recording each tool's parameter schema, which
+#     is a far larger snapshot to keep true than a list of action names; it is stated rather than
+#     closed. A green run here means "no cited action name is unknown", never "these calls work".
 #   * IT CANNOT SEE AN ACTION THAT EXISTS BUT IS WRONG FOR THE JOB. `profiler_stop` where
 #     `profiler_start` was meant passes every check here.
 #   * IT CANNOT SEE A DEAD TOOL, only a dead action on a tool it knows. A cited tool absent from the

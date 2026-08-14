@@ -43,8 +43,8 @@ loading too many.
 ```
 manage_profiler action:"profiler_start" → begin profiling
 manage_profiler action:"get_frame_timing" → CPU/GPU frame times
-manage_profiler action:"get_counters" → specific performance counters
-manage_profiler action:"memory_take_snapshot" → detailed memory breakdown — REQUIRES the com.unity.memoryprofiler package; read Packages/manifest.json first and skip this line if it is absent
+manage_profiler action:"get_counters" category:"Render" → performance counters. CATEGORY IS REQUIRED — without it the call fails with an EMPTY message, the least diagnosable answer of the five. A category is large (Render returned 569 counters, Memory 44); pass the optional `counters` list to name the ones you want rather than dumping a category into a report
+manage_profiler action:"memory_take_snapshot" → detailed memory breakdown. Writes a real `.snap` into the project's MemoryCaptures/ WITHOUT com.unity.memoryprofiler — measured, 253 KB on a project whose manifest does not carry that package. The package supplies the analysis window, i.e. READING a snapshot, not taking one. `memory_compare_snapshots` was not tested
 manage_graphics action:"stats_get" → draw calls, batches, triangles, set passes
 ```
 
@@ -56,6 +56,13 @@ unknown action comes back `isError: false` with `"success": false` in the body, 
 branches on the tool-call error flag reads a dead call as a successful one and profiles nothing. Read
 the body, not the flag — `unity-mcp-patterns` Rule 2. If you need an action not listed here, get it
 from `manage_profiler action:"ping"` or the live tool schema rather than from memory.
+
+**A name that resolves is not a call that runs.** `get_counters` was on this list as a *correct* name
+for as long as the three dead ones were here, and executed as it was written — no parameters — it
+failed too, with an empty message. Its action name was never the problem; its missing required
+`category` was. So when a call comes back `success: false`, check the arguments before you conclude
+the action is wrong, and read the tool's live schema rather than assuming the recipe above is
+complete.
 
 ### Step 2: Identify Bottleneck Type
 
