@@ -473,7 +473,7 @@ is hollow and that is a Task 10 finding, filed not fixed.
 | 6 | A reverted file stops being sticky | open | — | **R10**: shape (iii), `--toolkit-dir`. Shape (ii) silently breaks three origin readers |
 | **Stage 3 — the generated block** | | | | |
 | 7 | `/unity-init` names the generator, markers become a contract | **done, merged** | `05d9cfe`…`f804913` | Sixteen surfaces rest on that region. **R7** if it lands second |
-| 8 | `/unity-ui` and `/unity-scene` stop reading as entry points | open | — | A HARD-GATE bypass, not a tidiness fix |
+| 8 | `/unity-ui` and `/unity-scene` stop reading as entry points | **done, merged** | `468c382`…`6f91053` | A HARD-GATE bypass, not a tidiness fix |
 | 9 | The Ambiguity Score says what it does not know | **done, merged** | `5b636d3`…`d038ca9` | Must be a **new** heading; six sections are frozen. **The score has no code path at all** — Step 1 may not be executable |
 | **Stage 4 — guards, claims, and the loop** | | | | |
 | 10 | Six guards see the class | **done, merged** | `5b636d3`…`5db856d` | **R9**: the deliverable is the CLASS. "Nine files, not two". Changes `run-tests.sh` tally arithmetic → invalidates every quoted suite total |
@@ -1326,6 +1326,38 @@ ADDRESSED, none returned to the fix loop.**
      **`git clone` reproduces the reported numbers exactly.** *Sixth measured instance in this wave
      of a result that meant something other than what it looked like — and the first where the
      measurer caught it in its own harness before reporting.*
+
+**From Task 8's closing re-review (2026-08-14). COMPLETE at `6f91053`, merged.**
+
+119. **Six of eight agents still gate on nothing**, and **five of those six hold `Write` *and*
+     `mcp__UnityMCP__*`**: `unity-coder`, `unity-fixer`, `unity-optimizer`, `unity-prototyper`,
+     `unity-test-runner`, `unity-reviewer`. **This is Step 1's tree-wide finding, now two-eighths
+     closed.** The residual route is a dispatcher that builds the screen or scene **itself** rather
+     than dispatching a builder — `unity-coder` and `unity-prototyper` each hold
+     `Write, Edit, Bash, Agent, mcp__UnityMCP__*`. **Correctly outside Task 8's title**: all three
+     routes *into* `/unity-ui` and `/unity-scene` are now gated, which is what the title claims;
+     `unity-coder` sits downstream of `unity-planning`'s fork by design and `unity-prototyper` **is**
+     the exemption path. **→ open, no owner.**
+120. **None of this task's prose has a semantic guard — measured three ways.** Reverting row 11 to its
+     old bypassing wording, writing an **overt exemption** into that cell, or **deleting both agent
+     precondition sections entirely** each leave `tests/test-surface-references.sh` at **111 PASS /
+     0 FAIL**. **The protection is `migration/baseline-inventory.json`'s per-file sha256 — whole-file,
+     not semantic.** *Recorded so nobody cites the green as evidence.*
+121. **`tests/test-shipped-citations.sh` is blind to a backticked path that exists nowhere** — it
+     resolves against the repo tree first, so only repo paths `install.sh` does not copy can red.
+     **That is what makes `docs/features/*/design.md` safe**, and it is a pre-existing property.
+122. **The strongest construction in the task was reusing an idiom each agent already performs.**
+     Both builders already carried *"a sprite atlas, a font asset import … stop and say so
+     explicitly"* / *"a lightmap bake, an occlusion-culling pass"*; the new precondition quotes it
+     back (*"the same way you would for a sprite atlas you cannot create"*). **The gate reuses a
+     behaviour the agent already has language for rather than introducing a novel instruction** —
+     and it avoids a false-stop loop by noting *"the dispatching prompt usually names it."*
+123. **The `description:` rewrite reclassifies both commands in the first four words**, which is what
+     survives truncation: rendered together, the nine commands now sort into *"Use when the user…"*
+     (six situation-triggered) and *"Use after / Use once…"* (`/unity-init`, `/unity-review`,
+     `/unity-scene`, `/unity-ui`). **`/unity-scene`'s negative clause is buried third in a comma
+     chain ~230 chars in** where `/unity-ui`'s sits right after the noun list — stylistic, since the
+     opening clause survives truncation in both. **→ open.**
 
 **Inherited from earlier waves, still open:**
 
