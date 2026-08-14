@@ -228,6 +228,17 @@ stands. It has now gone stale twice.
   took `$name` from the enclosing scope (`374 PASS, 0 FAIL, exit 1`, with two whole states simply
   absent); and a guard dying `rc=128` in an archive copy having asserted 14 of 47 with **no `FAIL`
   token at all**. **The exit code is the only one of the three signals that survives all three.**
+- **`git stash` is repository-global, not per-worktree. Never use it while worktrees are live.**
+  Measured 2026-08-14: a chained probe in one worktree ran `git stash` then `git stash pop`, and the
+  pop applied **a stash entry that was not its own** into that worktree. **Corrected on inspection:
+  the entry was a stale detached-HEAD stash from a session predating this wave** (`WIP on (no
+  branch): 3c18aa7`), not a concurrent agent's work — every one of the ten worktrees was clean before
+  and after, and `stash@{0}` is still present with its original contents. **The hazard is real and
+  the incident was milder than first reported; record both.** `pop` takes what is on top of a stack
+  every worktree shares, and it is shared **silently**. The alternatives are all per-invocation:
+  `git archive HEAD | tar -x -C "$(mktemp -d)"` (the documented probe method), `git clone
+  --no-hardlinks --shared .` when history or an index is needed, or a second `git worktree add`
+  under your own scratch root.
 - **Every dispatch gets its own `mktemp -d` scratch root, and no shared temp path.** Round 5 of Task 2
   had its `probe.sh` and `mutate.sh` replaced mid-task by another agent writing to a shared
   scratchpad, and the measurements it took afterwards were of the other agent's harness.
