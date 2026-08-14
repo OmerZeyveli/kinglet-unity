@@ -12,44 +12,50 @@ settled owner decisions (O1–O6) and six work decisions (D1–D6), **fifteen ac
 
 ## RESUME HERE
 
-### MERGED AND GREEN — seven tasks are in the branch
+### MERGED AND GREEN — fourteen tasks are in the branch
 
-**1, 3, 4, 9, 10, 12, 13.** Both gates pass on the merged tree, re-measured after every merge:
+**1, 2b, 2c, 3, 4, 4b, 5, 6, 7, 8, 9, 10, 12, 13.** Both gates pass on the merged tree, re-measured
+after every merge:
 
-- `bash tests/run-tests.sh` → **rc=0, `Total: 2758  Passed: 2755  Failed: 0  Skipped: 3`**, of which
-  1444 results came from 2 python suites. **35** ANSI-stripped headers == `ls tests/test-*.sh | wc -l`
-  **35**.
+- `bash tests/run-tests.sh` → **rc=0, `Total: 3290  Passed: 3287  Failed: 0  Skipped: 3`**.
+  **37** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **37**.
 - `bash scripts/check-provenance.sh` → **`provenance OK`**.
-- Baseline regenerated at each merge against the **committed merged tree** — the one situation where
-  `--dry-run` is trustworthy, since R6's defect is that it reads the anchor commit's tree and after a
-  merge commit that *is* the right tree. Drift so far: **11** (Tasks 9 + 13), **1** (Task 10), **0**
-  (Task 4), **6** (Task 3), **0** (Task 12).
-- **H2 resolved by measurement.** Task 9's approach rested on `ub_section`'s `/^#{1,3} /` boundary in
-  a file Task 10 edited, and that collision is invisible from inside either worktree. On the merged
-  tree the guard is **111 PASS / 0 FAIL**, Task 9's section is present, the interval is untouched at
-  both sites.
+- Baseline regenerated at each merge **against the committed merged tree** — the one situation where
+  `--dry-run` is trustworthy. Drift: 11 (Tasks 9+13), 1 (10), 0 (4), 6 (3), 0 (12), 2 (2b), 2 (7),
+  10 (8), 0 (5), 0 (6), 2 (2c), 0 (4b).
+- **Three `provenance.tsv` merge conflicts, all resolved by hand as the scout predicted** — note-column
+  appends on different rows, concatenated, apostrophes straight, seven fields verified each time.
 - **Every suite total written before Task 10 merged is invalid.** It changed the runner's tally
-  arithmetic — python results counted per result rather than per file — so 1189 became 2653 and has
-  moved with each merge since. **Re-measure; never transcribe.**
+  arithmetic; 1189 became 2653 and has moved with every merge since. **Re-measure; never transcribe.**
 
-### STILL IN FLIGHT
+### STILL IN FLIGHT — the last two
 
 | task | worktree | branch | scratch root | state |
 |---|---|---|---|---|
-| 2b | `…/kinglet-wt/task-2b` | `task/2b-tokeniser-quote-model` | `/tmp/kinglet-2b-NprXPW` | fix round **2** (two one-line guard additions); based on `5b636d3` |
-| 5 | `…/kinglet-wt/task-5` | `task/5` | `/tmp/kinglet-t5-vCm1jg` | fix round **1** (three Important); based on `75ea1de` |
-| 7 | `…/kinglet-wt/task-7` | `task/7` | `/tmp/kinglet-t7-Co4LNJ` | dispatched from `05d9cfe` |
+| 4c | `…/kinglet-wt/task-4c` | `task/4c` | `/tmp/kinglet-t4c-KSnW7W` | in review; `6d042bb` |
+| 11 | `…/kinglet-wt/task-11` | `task/11` | `/tmp/kinglet-t11-Nafx3L` | dispatched from `de8abf7` |
 
-**Task 5 owns `install.sh`; Task 7 only runs it.** Both are based on trees the branch has since
-moved past — `provenance.tsv` is the shared file and the rows are disjoint, so concatenate the note
-appends by hand and **keep apostrophes straight**.
+**They were dispatched concurrently against the batch plan's "11 alone and last", deliberately.** The
+plan's reason was file conflict *and* that Task 11's subject is the claims the others falsify —
+thirteen of fourteen are merged, so the second reason is nearly discharged, and the only overlap is
+`provenance.tsv` note appends. **Task 11's brief names Task 4c's pending change** (the installer now
+prints `Hooks 12 (27 registered, 15 dead)` on a broken upgrade) so it derives against the merged tree.
+
+**Task 11 is the wave's inheritance: thirty-one ledger entries name it.** Its plan section was written
+before any of the fourteen completed tasks existed.
+
+### After both merge
+
+**One whole-branch review from `3e4c6e5`**, per `final-reviewer-prompt.md` — which Task 13 extended
+with the **aggregate sweep**: the removal sweeps during this wave were keyed on **names**, and a bare
+numeral, a category word, a capability sentence and a scope claim contain no removed name, **so that
+sweep has never run.** Then triage its findings and merge.
 
 ### Remaining, in batch order
 
-**2c, 4b, 4c, 6, 8, 11.** Task 6 waits on Task 5 (`install.sh`); Task 8 waits on Task 7;
-2c waits on 2b; 4b and 4c are the `install.sh` lane after 6. **Task 11 runs alone and last** — it
-conflicts with nearly every other task on a file, **and its subject is the claims the others
-falsify.** **Re-derive every figure at each
+**None.** All fourteen planned and unplanned units are merged or in flight. The five units this
+wave added to itself — 2b, 2c, 4b, 4c, 13 — each came from a measured defect the plan did not
+foresee. **Re-derive every figure at each
 boundary; nothing above this line is inherited.**
 
 ---
