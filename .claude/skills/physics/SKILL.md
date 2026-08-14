@@ -15,6 +15,11 @@ carries the API detail — layer setup, collision detection modes, collision-vs-
 2D equivalents. Where this skill and `performance.md` disagree, the rule wins and this skill is what is
 out of date.
 
+**The rule names the 3D family.** `OverlapSphereNonAlloc` and `SphereCastNonAlloc` exist only on
+`Physics`; only `RaycastNonAlloc` appears in both families. What "non-allocating" means on `Physics2D`
+is this skill's business, and in Unity 6 the answer is **not** the same suffix — see *2D Physics
+Equivalents* below. That is a gap the rule does not cover, not a disagreement with it.
+
 ## FixedUpdate Discipline
 
 All physics code goes in `FixedUpdate`. Input reading happens in `InputView.Update` (see architecture rules) and is forwarded to the System, which applies forces in `FixedUpdate` from the cached value.
@@ -39,6 +44,9 @@ private void FixedUpdate()
 ```
 
 ## Non-Allocating Queries
+
+Everything in this section is the **3D** family, on `Physics`. Do not translate the `NonAlloc` suffix
+into `Physics2D` — it is retired there. See *2D Physics Equivalents* below before writing a 2D query.
 
 ```csharp
 // Pre-allocate buffers
@@ -123,9 +131,38 @@ Physics.SyncTransforms(); // Now raycasts see the new position
 | `Rigidbody` | `Rigidbody2D` |
 | `BoxCollider` | `BoxCollider2D` |
 | `Physics.Raycast` | `Physics2D.Raycast` |
-| `Physics.OverlapSphereNonAlloc` | `Physics2D.OverlapCircleNonAlloc` |
+| `Physics.OverlapSphereNonAlloc` | `Physics2D.OverlapCircle` — **not** `…NonAlloc`, see below |
 | `OnCollisionEnter(Collision)` | `OnCollisionEnter2D(Collision2D)` |
 | `OnTriggerEnter(Collider)` | `OnTriggerEnter2D(Collider2D)` |
+
+### The `NonAlloc` suffix is 3D-only in Unity 6
+
+**Do not carry `*NonAlloc` across into `Physics2D`.** The suffix is deprecated in the 2D family and
+untouched in the 3D one, and that asymmetry is the whole trap: the two families read as mirror images
+and are not. This row taught `Physics2D.OverlapCircleNonAlloc` until 2026-08-15 and survived review
+because it looked internally consistent — a correct left column beside a dead right one.
+
+| Call | Obsolete overloads | Unity's message |
+|---|---|---|
+| `Physics.RaycastNonAlloc` | 0 / 8 | — |
+| `Physics.OverlapSphereNonAlloc` | 0 / 3 | — |
+| `Physics2D.RaycastNonAlloc` | **4 / 5** | *"deprecated. Use Physics2D.Raycast instead."* |
+| `Physics2D.OverlapCircleNonAlloc` | **4 / 4** | *"deprecated. Use Physics2D.OverlapCircle instead."* |
+| `Physics2D.CircleCastNonAlloc` | **5 / 5** | *"deprecated. Use Physics2D.CircleCast instead."* |
+| `Physics2D.BoxCastNonAlloc` | **5 / 5** | *"deprecated. Use Physics2D.BoxCast instead."* |
+| `Physics2D.OverlapBoxNonAlloc` | **4 / 4** | *"deprecated. Use Physics2D.OverlapBox instead."* |
+
+Reflected off a live Unity 6000.0.68f1 editor on 2026-08-14. The plain 2D names carry no obsolete
+overload at all — `Physics2D.Raycast` 0 / 8, `Physics2D.OverlapCircle` 0 / 6.
+
+Unity 6 gave those plain names overloads taking a `ContactFilter2D` plus a `List<T>` or a results
+array, so **the plain name is the non-allocating call now** and the suffix was retired. Allocation
+discipline is unchanged; only the spelling moved.
+
+The exact `ContactFilter2D` overload signatures are **not** reproduced here — nothing in this toolkit
+has ever executed one, and a guessed parameter order is worse than no sample. Read Unity's 6000.0
+`Physics2D` scripting reference for the overload you want before writing the call. (Same reason the
+`urp-pipeline` skill declines to reproduce the render graph pass API.)
 
 ## Pitfalls
 

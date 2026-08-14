@@ -122,7 +122,14 @@ ALWAYS use `batch_execute` for multiple operations — it's 10-100x faster than 
 
 ### Step 5: Configure Components
 - Set transform positions, rotations, scales
-- Configure Rigidbody properties (mass, drag, gravity, constraints)
+- Configure Rigidbody properties (mass, `linearDamping`, gravity, constraints) — **not `drag`.**
+  Reflected off a live Unity 6000.0.68f1 editor on 2026-08-14: `Rigidbody.drag` and
+  `Rigidbody.angularDrag` are obsolete, `Rigidbody.linearDamping` and `Rigidbody.angularDamping` are
+  the live names (`mass` is unchanged). `.claude/skills/state-machine/SKILL.md` records the same
+  rename landing on `Rigidbody2D` alongside `velocity` → `linearVelocity`.
+  **Unverified:** whether `manage_components` wants the C# property name or the serialized field key.
+  Nothing in this toolkit has tested that, so do not assume either — if a set is rejected, read the
+  component back and match the key it actually reports.
 - Set collider sizes and offsets
 - Configure camera viewport and rendering settings
 
