@@ -26,7 +26,22 @@
 #      been burned by decays SILENTLY, because adding a thing to the tree and adding it to the list
 #      are different commits. This one decays LOUDLY: change a hook's message and its needle reds at
 #      once, so message and needle move together. The hook LIST is what must never be hand-kept, and
-#      it is not.
+#      it is not. An EMPTY needle would restore the silent kind — `grep -qF -- ""` matches anything,
+#      so `assert_contains` with an empty needle passes over any output at all, and `select_probe`'s
+#      `*)` branch forces a new hook to gain a probe branch but cannot force that branch to carry a
+#      needle. Measured, before the floor below existed: clearing one hook's needle left this file at
+#      74 pass / 0 fail, logging `PASS ... (needle: )`. The per-hook floor in the loop closes it.
+#
+#      WHAT THE NEEDLE CANNOT SEE, stated because the sentences above claim less than they look
+#      like they claim: it is matched against stdout, stderr and the named state file as ONE
+#      haystack, so it cannot tell a printed message from a written one, nor the right stream from
+#      the wrong one. Three measured consequences, none of which this file detects — a track-edits
+#      that echoes the path to stderr instead of recording it (state file never created); a
+#      session-brief that stops stripping frontmatter (4213 B, frontmatter emitted); and a
+#      session-brief whose awk is redirected to stderr (byte-identical 3993 B, stdout 0 B), which
+#      for a SessionStart hook means nothing reaches the session and its whole purpose is dead.
+#      Widening PROBE_BYTES to separate the streams is a design change, not a needle change, and is
+#      deliberately not made here.
 #   2. ITS KILL SWITCH KILLS IT.  With DISABLE_UNITY_HOOKS=1, and again with its own
 #      DISABLE_HOOK_<NAME>=1, the same input produces zero bytes and exit 0. Both halves matter:
 #      a switch that silences the message but still exits 2 has disabled the explanation and kept
@@ -105,17 +120,24 @@ assert_eq "$PRESENT_COUNT" "$REGISTERED_COUNT" \
 #
 # WHICH PAYLOADS HAD TO BE INVENTED is itself the measurement, so it is stated under a criterion:
 # a payload counts as PRE-EXISTING when some test file other than this one already RAN that hook on
-# an input that drives it into its acting branch. Being named by a test file is not enough — all
-# three warn-* hooks are named in tests/test-hooks.sh, and all three occurrences are inside a
-# comment block.
+# an input that drives it into its acting branch. Being named by a test file is not enough, and the
+# gap is wider than one file: `/usr/bin/grep -rn -F` over tests/, excluding this file, finds the
+# three warn-* hooks SIX times across FOUR files — tests/test-hooks.sh (three, all in comments),
+# tests/test-derived-counts.sh (one comment), tests/test-install-ownership.sh (a path fixture) and
+# tests/test-install-prune.sh (live code, as CUT_HOOK/KEPT_HOOK string literals compared against an
+# install listing). NONE of the six executes a hook, which is what makes "executed by zero tests"
+# true; an earlier draft of this paragraph said "inside a comment block", which is true of
+# tests/test-hooks.sh and false of the tree.
 #
 #   pre-existing (8) — block-scene-edit, block-meta-edit, guard-project-config, track-edits and
 #                      session-brief in tests/test-hooks.sh (session-brief's block there already
-#                      runs this exact three-state probe, non-silent baseline included);
-#                      block-legacy-input in tests/test-block-legacy-input.sh; bash-gate in
+#                      runs this exact three-state probe, non-silent baseline included, and
+#                      tests/test-surface-references.sh runs it too); block-legacy-input in
+#                      tests/test-block-legacy-input.sh; bash-gate in
 #                      tests/test-bash-gate-precision.sh (tbg_run_fresh, full PreToolUse envelopes
 #                      over a 331-record corpus) and tests/test-hook-large-payload.sh; session-save
-#                      in tests/test-state.sh Test 4, against a seeded session-start-time.
+#                      in tests/test-state.sh Test 4 against a seeded session-start-time, and in
+#                      tests/test-hook-advisory-exit.sh against a Stop envelope.
 #   invented (3)     — warn-filename, warn-platform-defines, warn-serialization. Nothing had ever
 #                      fed these three an input that makes them do their job.
 #   half (1)         — session-restore. tests/test-state.sh Test 5 runs it with NO session file and
@@ -138,7 +160,10 @@ select_probe() {
         block-scene-edit)
             KIND='block'
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"Assets/Scenes/Main.unity","old_string":"a","new_string":"b"}}'
-            NEEDLE='manage_scene'
+            # The block's OWN reason (its $MSG, via unity_hook_block), not the static tool menu
+            # printed above it. `manage_scene` was the needle until 2026-08-14 and it lives in that
+            # menu, so replacing the reason with a placeholder left this file fully green.
+            NEEDLE='Direct editing of scene/prefab files corrupts serialized references.'
             ;;
         block-meta-edit)
             KIND='block'
@@ -188,7 +213,9 @@ select_probe() {
             # Writes nothing to stdout or stderr; its whole observable is the edits file.
             STATE_FILE='session-edits.txt'
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"Assets/Scripts/Probe.cs"}}'
-            # The path it was asked to record, so recording the WRONG path reds.
+            # The path it was asked to record, so recording the WRONG path reds. It does NOT prove
+            # the path reached the edits file: the haystack includes stdout and stderr, so a
+            # track-edits that echoed the path instead of recording it would pass. Measured.
             NEEDLE='Assets/Scripts/Probe.cs'
             ;;
         session-restore)
@@ -204,7 +231,9 @@ select_probe() {
             # Prints the using-kinglet skill body, so it needs to be told where the project is.
             PAYLOAD='{}'
             PROBE_ENV="CLAUDE_PROJECT_DIR=${REPO_DIR}"
-            # The skill's own heading, with the frontmatter stripped as the hook promises.
+            # The skill's own heading. NOT proof that the frontmatter was stripped: the needle is
+            # matched against the whole haystack, so a hook that emitted the frontmatter too would
+            # still contain this. See the header's `WHAT THE NEEDLE CANNOT SEE`.
             NEEDLE='# Using Kinglet'
             ;;
         session-save)
@@ -279,6 +308,22 @@ for HOOK in $REGISTERED_HOOKS; do
             "registered hook '${HOOK}' has a behavioural probe in tests/test-hook-behaviour.sh"
         continue
     fi
+
+    # THE NEEDLE FLOOR, and it is the same instrument as the anti-vacuity floor above.
+    #
+    # `assert_contains` ends in `grep -qF -- "$needle" <<< "$haystack"`, and `grep -qF -- ""`
+    # matches ANY input. So a probe branch that forgets its needle does not fail — it passes over
+    # every possible output, forever, printing `(needle: )` in a line that reads like a pass.
+    # Measured on this file with one needle cleared: 74 pass / 0 fail.
+    #
+    # `select_probe`'s `*)` branch makes adding a hook require adding a probe BRANCH; nothing in it
+    # requires that branch to carry a needle. Without this check the file's defence holds for
+    # CHANGING an existing message and fails for ADDING a new hook — the silent-decay shape, in the
+    # file whose header argues against it.
+    NEEDLE_STATE="present"
+    [ -n "$NEEDLE" ] || NEEDLE_STATE="EMPTY"
+    assert_eq "present" "$NEEDLE_STATE" \
+        "probe for '${HOOK}' carries a non-empty needle (an empty one matches any output at all)"
 
     # Same derivation _lib.sh uses: basename, uppercased, hyphens to underscores.
     OWN_SWITCH="DISABLE_HOOK_$(printf '%s' "$HOOK" | tr '[:lower:]-' '[:upper:]_')"
