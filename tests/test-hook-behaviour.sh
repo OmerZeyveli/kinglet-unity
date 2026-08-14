@@ -13,9 +13,20 @@
 #
 # WHAT IT ASSERTS, per hook, for every hook settings.json registers:
 #
-#   1. IT ACTS.  Given input it is supposed to respond to, it produces the response — and the
-#      response is measured in BYTES, not in exit status alone. A hook that exits 2 while writing
-#      nothing has blocked a tool call without telling anyone why.
+#   1. IT ACTS.  Given input it is supposed to respond to, it produces THE response — asserted on a
+#      distinctive needle from the hook's own message, not merely on a non-empty stream. Bytes and
+#      exit status are each too weak alone: a hook that exits 2 while writing nothing has blocked a
+#      tool call without saying why, and a hook whose message has been gutted still writes bytes if
+#      any `echo` survives. MEASURED: replacing warn-serialization.sh's entire [FormerlySerializedAs]
+#      warning with an unrelated stderr write left the byte-only version of this file at 62 pass /
+#      0 fail — over the very hook whose missing behavioural coverage is this file's stated reason
+#      for existing.
+#
+#      The needles ARE a hand-maintained list, deliberately. The kind of list this repository has
+#      been burned by decays SILENTLY, because adding a thing to the tree and adding it to the list
+#      are different commits. This one decays LOUDLY: change a hook's message and its needle reds at
+#      once, so message and needle move together. The hook LIST is what must never be hand-kept, and
+#      it is not.
 #   2. ITS KILL SWITCH KILLS IT.  With DISABLE_UNITY_HOOKS=1, and again with its own
 #      DISABLE_HOOK_<NAME>=1, the same input produces zero bytes and exit 0. Both halves matter:
 #      a switch that silences the message but still exits 2 has disabled the explanation and kept
@@ -86,63 +97,99 @@ assert_eq "$PRESENT_COUNT" "$REGISTERED_COUNT" \
 #                Only the NAMED file is measured, so a hook that also touches unrelated bookkeeping
 #                (session-restore.sh writes session-start-time on every run) does not register as
 #                "acting" when the thing it was supposed to do did not happen.
+#   NEEDLE     — a distinctive fragment of the hook's OWN message, matched literally against the
+#                acting run. See bullet 1 above for why non-empty output is not enough.
 #   PROBE_ENV  — extra environment the payload needs
 #   PROBE_SETUP— shell run against the probe's fresh state dir before the hook, for hooks whose
 #                trigger is pre-existing state rather than the payload
 #
-# WHICH PAYLOADS HAD TO BE INVENTED is itself the measurement. block-scene-edit, block-meta-edit,
-# guard-project-config and block-legacy-input already had payloads in tests/test-hooks.sh and
-# tests/test-block-legacy-input.sh; theirs are modelled on those. Every other payload here — the
-# three warn-* hooks, bash-gate, track-edits, and all three session hooks — was written from the
-# hook's source for the first time, because nothing had ever fed these hooks an input that makes
-# them do their job.
+# WHICH PAYLOADS HAD TO BE INVENTED is itself the measurement, so it is stated under a criterion:
+# a payload counts as PRE-EXISTING when some test file other than this one already RAN that hook on
+# an input that drives it into its acting branch. Being named by a test file is not enough — all
+# three warn-* hooks are named in tests/test-hooks.sh, and all three occurrences are inside a
+# comment block.
+#
+#   pre-existing (8) — block-scene-edit, block-meta-edit, guard-project-config, track-edits and
+#                      session-brief in tests/test-hooks.sh (session-brief's block there already
+#                      runs this exact three-state probe, non-silent baseline included);
+#                      block-legacy-input in tests/test-block-legacy-input.sh; bash-gate in
+#                      tests/test-bash-gate-precision.sh (tbg_run_fresh, full PreToolUse envelopes
+#                      over a 331-record corpus) and tests/test-hook-large-payload.sh; session-save
+#                      in tests/test-state.sh Test 4, against a seeded session-start-time.
+#   invented (3)     — warn-filename, warn-platform-defines, warn-serialization. Nothing had ever
+#                      fed these three an input that makes them do their job.
+#   half (1)         — session-restore. tests/test-state.sh Test 5 runs it with NO session file and
+#                      asserts exit 0, which is the negative direction only: the hook returns at its
+#                      `[ ! -f "$UNITY_SESSION_FILE" ]` guard without reaching anything. The
+#                      positive fixture below is new.
+#
+# So: 3 invented outright, 4 counting session-restore's positive fixture. An earlier draft of this
+# paragraph claimed 8 of 12 by counting every hook whose payload was retyped here rather than every
+# hook that lacked one — four of those eight already had working payloads elsewhere in tests/, and
+# the inflated figure was the headline number the task reported.
 select_probe() {
     PAYLOAD=''
     KIND='advisory'
     STATE_FILE=''
+    NEEDLE=''
     PROBE_ENV=''
     PROBE_SETUP=''
     case "$1" in
         block-scene-edit)
             KIND='block'
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"Assets/Scenes/Main.unity","old_string":"a","new_string":"b"}}'
+            NEEDLE='manage_scene'
             ;;
         block-meta-edit)
             KIND='block'
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"Assets/Scripts/Player.cs.meta","old_string":"a","new_string":"b"}}'
+            NEEDLE='files contain GUIDs that Unity uses to track assets'
             ;;
         block-legacy-input)
             KIND='block'
             # Absolute path under Assets/: the third-party and Editor/Tests exemptions are anchored
             # under Assets/, so a bare relative name would take a different branch.
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"/p/Assets/Scripts/A.cs","new_string":"if (Input.GetKey(k)) {}\n"}}'
+            # Names the API it found, so a message gutted to a bare 'blocked' reds here.
+            NEEDLE='Legacy Input Manager API: Input.GetKey'
             ;;
         guard-project-config)
             KIND='block'
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":".editorconfig","old_string":"a","new_string":"b"}}'
+            NEEDLE='defines code quality standards for the project'
             ;;
         bash-gate)
             KIND='block'
             # First attempt at a destructive command is denied; the second proceeds. Each probe gets
             # a fresh state dir, so this is always a first attempt.
             PAYLOAD='{"tool_name":"Bash","tool_input":{"command":"rm -rf Library/"}}'
+            # The classification, not just the word BLOCKED: this gate's whole value is telling the
+            # caller WHICH danger it matched.
+            NEEDLE='Classification: unity-dir-wipe'
             ;;
         warn-serialization)
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"Assets/P.cs","old_string":"[SerializeField] private float _speed;","new_string":"[SerializeField] private float _moveSpeed;"}}'
+            # Names the renamed field AND the attribute. This is the hook the whole task exists for.
+            NEEDLE="Serialized field '_speed' was renamed without [FormerlySerializedAs]"
             ;;
         warn-filename)
             # The class name and the file name must disagree, and the content must carry a `class`
             # keyword. An Edit fragment with `: MonoBehaviour` and no `class` keyword is the input
             # that used to kill this hook outright — see its own comment at CLASS_NAME.
             PAYLOAD='{"tool_name":"Write","tool_input":{"file_path":"Assets/Player.cs","new_string":"public sealed class Enemy : MonoBehaviour { }\n"}}'
+            # Both names, so a warning that fires with an empty CLASS_NAME cannot pass.
+            NEEDLE="File name 'Player.cs' does not match class name 'Enemy'"
             ;;
         warn-platform-defines)
             PAYLOAD='{"tool_name":"Write","tool_input":{"file_path":"Assets/A.cs","new_string":"#if UNITY_PS5\nX();\n#endif\n"}}'
+            NEEDLE='Platform-specific code without #else fallback'
             ;;
         track-edits)
             # Writes nothing to stdout or stderr; its whole observable is the edits file.
             STATE_FILE='session-edits.txt'
             PAYLOAD='{"tool_name":"Edit","tool_input":{"file_path":"Assets/Scripts/Probe.cs"}}'
+            # The path it was asked to record, so recording the WRONG path reds.
+            NEEDLE='Assets/Scripts/Probe.cs'
             ;;
         session-restore)
             # Triggered by pre-existing state, not by its payload. saved_at is generated at run time
@@ -150,15 +197,21 @@ select_probe() {
             # a fixed timestamp in this file would start passing vacuously the day it went stale.
             PAYLOAD='{}'
             PROBE_SETUP='jq -n --arg s "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '"'"'{saved_at:$s,branch:"probe-branch",workflow_phase:"Execute",modified_files:["Assets/Scripts/Probe.cs"],last_command:"/unity-test",plan:{description:"probe plan",steps:[{name:"step one",status:"done"}]},verification:{last_iteration:"1"},agent_context:{last_agent:"unity-coder"}}'"'"' > "${UNITY_HOOK_STATE_DIR}/session.json"'
+            # Reads a value out of the fixture, so a brief that prints a template with no data reds.
+            NEEDLE='Previous branch: probe-branch'
             ;;
         session-brief)
             # Prints the using-kinglet skill body, so it needs to be told where the project is.
             PAYLOAD='{}'
             PROBE_ENV="CLAUDE_PROJECT_DIR=${REPO_DIR}"
+            # The skill's own heading, with the frontmatter stripped as the hook promises.
+            NEEDLE='# Using Kinglet'
             ;;
         session-save)
             STATE_FILE='session.json'
             PAYLOAD='{}'
+            # Written into the session file it produces; proves the schema, not just a file.
+            NEEDLE='"schema_version"'
             ;;
         *)
             return 1
@@ -201,6 +254,14 @@ run_probe() {
         state_bytes=$(wc -c < "${dir}/state/${STATE_FILE}")
     fi
     PROBE_BYTES=$(( out_bytes + state_bytes ))
+
+    # The same three sources as the byte count, as text, so the needle is matched against exactly
+    # what was measured. `cat` of a missing state file would be noise, hence the guard.
+    PROBE_TEXT="$(cat "${dir}/stdout" "${dir}/stderr" 2>/dev/null || true)"
+    if [ -n "${STATE_FILE}" ] && [ -f "${dir}/state/${STATE_FILE}" ]; then
+        PROBE_TEXT="${PROBE_TEXT}
+$(cat "${dir}/state/${STATE_FILE}" 2>/dev/null || true)"
+    fi
 }
 
 # --- The per-hook loop -----------------------------------------------------
@@ -225,6 +286,7 @@ for HOOK in $REGISTERED_HOOKS; do
     run_probe "$HOOK" ''
     ACT_BYTES="$PROBE_BYTES"
     ACT_RC="$PROBE_RC"
+    ACT_TEXT="$PROBE_TEXT"
 
     run_probe "$HOOK" 'DISABLE_UNITY_HOOKS=1'
     OFF_ALL_BYTES="$PROBE_BYTES"
@@ -242,6 +304,12 @@ for HOOK in $REGISTERED_HOOKS; do
     assert_eq "responds" "$ACT_VERDICT" \
         "${HOOK} responds to its trigger payload (${ACT_BYTES} B, ${KIND})"
 
+    # ...and responds with ITS OWN message. The byte count above cannot tell the hook's warning
+    # from any surviving echo; this can. assert_contains uses a here-string, so there is no
+    # early-exiting reader on the write end of a pipe.
+    assert_contains "$ACT_TEXT" "$NEEDLE" \
+        "${HOOK} emits its own message, not merely output (needle: ${NEEDLE})"
+
     # 2. It responds the way its kind promises.
     assert_eq "$EXPECT_RC" "$ACT_RC" \
         "${HOOK} exits ${EXPECT_RC} on its trigger payload (${KIND})"
@@ -256,7 +324,10 @@ for HOOK in $REGISTERED_HOOKS; do
     assert_eq "0B rc0" "${OFF_OWN_BYTES}B rc${OFF_OWN_RC}" \
         "${HOOK} fully silenced by ${OWN_SWITCH}=1 (acting baseline ${ACT_BYTES} B)"
 
-    # The execution record. Written only by a probe that ran; Task 2 reads these lines.
+    # The execution record. Written only by a probe that ran — it is what the coverage assertion
+    # below counts, and it is DELETED with $WORK_DIR at the end of this file. The durable interface
+    # for any later task is the `HOOK-PROBE ...` line printed to stdout on the next line, which the
+    # runner captures into the suite log.
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
         "$HOOK" "$KIND" "$ACT_BYTES" "$ACT_RC" "$OFF_ALL_BYTES" "$OFF_OWN_BYTES" >> "$PROBE_RECORD"
     echo "  HOOK-PROBE ${HOOK} kind=${KIND} act=${ACT_BYTES}B rc=${ACT_RC} off_all=${OFF_ALL_BYTES}B off_own=${OFF_OWN_BYTES}B"
