@@ -16,8 +16,8 @@
 #   -h, --help            Show this help
 #
 # .claude/state/install-receipt.tsv records every file the toolkit owns, with its checksum, so
-# uninstall removes exactly what is ours and leaves everything else — files you edited, files you
-# wrote, and your .gitignore — alone.
+# uninstall removes exactly what is ours and leaves everything else alone — files you edited, files
+# you wrote, and a .gitignore you already had. One this installer CREATED is ours until you edit it.
 #
 set -euo pipefail
 
@@ -296,13 +296,77 @@ owned_by_installer() {
     return 0
   fi
   [ -f "$RECEIPT" ] || return 1
+  # THE ORIGIN COLUMN IS TRIMMED BEFORE IT IS COMPARED, and the trim is not cosmetic. `$4 ==
+  # "toolkit"` is byte equality, so a row carrying one trailing space — or a CRLF line ending, which
+  # puts a \r in field 4 of the last column — is not `toolkit` and the file is not re-claimed. It is
+  # then never claimed again by any later run either, because every run reads the receipt it wrote
+  # last time: uninstall.sh removes only listed paths, so the file is permanent debris. That costs a
+  # root file its ownership FOREVER on a byte a user cannot see.
+  #
+  # THE OTHER DIRECTION IS THE ONE THAT MUST NOT MOVE, and trimming is what keeps it still. A
+  # mangled `user-modified ` trims to `user-modified`, which is still not `toolkit`, so it is still
+  # not claimed and uninstall.sh still leaves the user's file alone — the direction G.5 in
+  # tests/test-install-ownership.sh holds for the classifier, held here for the writer. Anything
+  # that is neither value after trimming — an empty column, a fifth value, a truncated row — is
+  # still not claimed. Unknown provenance is not ours, and the cost of that is a file left on disk,
+  # which the user can delete; the cost of the other answer is a file deleted, which they cannot
+  # undelete. States N and N2 assert both directions across an upgrade, which is the only shape
+  # where this awk is the whole decision (the reference-copy arm above answers otherwise).
+  #
+  # WHICH READERS OF THIS COLUMN TRIM, AND WHICH DO NOT. There are four, and the sentence above is
+  # about ONE of them, so it is stated here for the column rather than left to be read off whichever
+  # reader you happened to open. This paragraph shipped for one round saying "a CRLF line ending" is
+  # handled without saying handled BY WHOM, and the next three tasks to open this file would have
+  # read it as a property of the receipt format:
+  #
+  #   install.sh, this awk                       — TRIMS. Deciding whether to re-claim a file.
+  #   install.sh, the MODIFIED_FILES loop below  — TRIMS. Deciding whether to overwrite the user's
+  #                                                edit. This is the reader where being wrong costs
+  #                                                work that cannot be recovered, and it was the
+  #                                                untrimmed one until 2026-08-14: `user-modified `,
+  #                                                ` user-modified` and a CRLF receipt each silently
+  #                                                destroyed the edit and rewrote the row `toolkit`.
+  #   uninstall.sh's classifier                  — DOES NOT TRIM. It is fail-closed by a different
+  #                                                mechanism: a `case` whose `*)` keeps the file. So
+  #                                                a mangled `user-modified` is safe there, but a
+  #                                                mangled `toolkit ` on an UNEDITED file is
+  #                                                classified as yours and never removed — this
+  #                                                defect's mirror image, unfixed, on that side.
+  #   scripts/studio-doctor.sh                   — DOES NOT TRIM. Same `case` shape; reports an
+  #                                                unreadable origin on its own line rather than
+  #                                                counting it verified. Diagnostic only, writes
+  #                                                nothing, so it cannot destroy anything.
+  #
+  # Keep this list in step with the file if you add a reader, and do not shorten it to "the origin
+  # column is trimmed" — that sentence is true of two readers and false of four.
   awk -F'\t' -v want="$rel" -v have="$have" '
-    $1 == want && $2 == have && $4 == "toolkit" { found = 1 }
+    $1 == want && $2 == have {
+      origin = $4
+      sub(/^[[:space:]]+/, "", origin)
+      sub(/[[:space:]]+$/, "", origin)
+      if (origin == "toolkit") { found = 1 }
+    }
     END { exit !found }' "$RECEIPT"
 }
 
 # On upgrade, find files the user edited so we can leave them alone.
+#
+# THREE LISTS, AND THE SPLIT IS NOT COSMETIC. `MODIFIED_FILES` is the UNION and it is what
+# `is_modified` reads, so every path this run declines to overwrite has to be in it. `EDITED_FILES`
+# and `UNREADABLE_ORIGINS` partition that union by WHY, and they are what the run PRINTS.
+#
+# One list for both was wrong in the direction that matters: an unedited payload file whose receipt
+# row carries an unreadable origin was reported under `installed file(s) have local edits — keeping
+# yours` and named again two lines later under the unreadable block. Printed twice, counted once in
+# a number describing two different situations, and `have local edits` is simply false about a file
+# nobody edited. Measured 2026-08-14 on a --variant urp fixture with an unedited
+# .claude/rules/pc-console.md and its origin column mangled to `toolkit<TAB>deadbeef`.
+#
+# The comment below this one already argued that "kept-because-yours and kept-because-unreadable are
+# different futures, and a single count would describe neither" — and then the count described both.
 MODIFIED_FILES=""
+EDITED_FILES=""
+UNREADABLE_ORIGINS=""
 if [ "$MODE" = ours ]; then
   while IFS=$'\t' read -r rel recorded _mode origin; do
     case "$rel" in ''|\#*) continue ;; esac
@@ -312,17 +376,89 @@ if [ "$MODE" = ours ]; then
     # file is untouched and overwrites it. Your edit survived exactly one upgrade and then vanished,
     # silently. Measured twice on the same file in one day. The origin column was already written
     # for this; it was just never read.
-    if [ "$origin" = user-modified ]; then
-      MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
-      continue
-    fi
+    #
+    # TRIMMED, AND THIS IS THE READER WHERE GETTING IT WRONG COSTS THE USER'S WORK. `[ "$origin" =
+    # user-modified ]` is byte equality, and everything that reaches it has already survived a `read`
+    # that strips only IFS whitespace — which here is the TAB, not the space. So a receipt whose
+    # origin column carries one trailing space, or one leading space, or a `\r` from a Windows editor
+    # saving the file with CRLF endings, is not `user-modified` to that test. Measured 2026-08-14 on
+    # a --variant urp fixture, install → edit .claude/rules/pc-console.md → install: with any of
+    # those three bytes present the edit is GONE, no `keeping yours` line is printed, and the row is
+    # rewritten as a clean `toolkit`. The one shape that already survived is a LEADING TAB, and it
+    # survived by accident rather than by care — `read` strips it as IFS whitespace before this test
+    # ever sees it. All four are asserted in tests/test-install-ownership.sh's state P.
+    #
+    # THE TRIM IS NARROW ON PURPOSE: surrounding whitespace only, then exact equality. It must not
+    # become a prefix or substring match. A row carrying a genuine fifth column reaches this loop as
+    # `user-modified<TAB>deadbeef` — the tab is INTERNAL, so `read` does not strip it — and that is a
+    # row whose provenance we cannot read, not a `user-modified` row with decoration. State P4
+    # asserts it takes the `*)` branch below and not this one.
+    #
+    # Pure parameter expansion rather than a `sed`/`tr` per row: this loop runs once per receipt row,
+    # and bash 3.2 has to parse it, so no `${x//…}` with a class and no `$'…'` inside the pattern.
+    origin_clean="${origin#"${origin%%[![:space:]]*}"}"
+    origin_clean="${origin_clean%"${origin_clean##*[![:space:]]}"}"
+    # A `case` with an explicit catch-all, which is the grammar uninstall.sh's classifier and
+    # scripts/studio-doctor.sh both already use. The if/else this replaces let anything unrecognised
+    # fall THROUGH to the sha test, and on a mangled row the sha still matches — the row records the
+    # edited file — so the fall-through concluded "untouched" and the payload loop overwrote it. A
+    # file whose provenance we cannot read is not ours to overwrite, so it is kept and SAID ALOUD on
+    # its own line: kept-because-yours and kept-because-unreadable are different futures, and a
+    # single count would describe neither.
+    case "$origin_clean" in
+      user-modified)
+        MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+        EDITED_FILES="${EDITED_FILES}${rel}"$'\n'
+        continue
+        ;;
+      toolkit)
+        ;;
+      *)
+        UNREADABLE_ORIGINS="${UNREADABLE_ORIGINS}${rel}"$'\n'
+        MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+        continue
+        ;;
+    esac
     actual=$(sha_of "$PROJECT_DIR/$rel")
-    [ "$actual" = "$recorded" ] || MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+    if [ "$actual" != "$recorded" ]; then
+      MODIFIED_FILES="${MODIFIED_FILES}${rel}"$'\n'
+      EDITED_FILES="${EDITED_FILES}${rel}"$'\n'
+    fi
   done < <(grep -v '^#' "$RECEIPT" 2>/dev/null | tail -n +2 || true)
-  MOD_COUNT=$(printf '%s' "$MODIFIED_FILES" | grep -c . || true)
+  # EDITED_FILES, not MODIFIED_FILES — see the three-list note above. `have local edits` has to be
+  # true of every path under it.
+  MOD_COUNT=$(printf '%s' "$EDITED_FILES" | grep -c . || true)
   if [ "$MOD_COUNT" -gt 0 ]; then
     warn "$MOD_COUNT installed file(s) have local edits — keeping yours:"
-    printf '%s' "$MODIFIED_FILES" | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+    printf '%s' "$EDITED_FILES" | while IFS= read -r m; do [ -n "$m" ] && printf '       %s\n' "$m"; done
+  fi
+  # `if`, not `[ -n "$u" ] && printf`, inside the loop body: a false test as a loop body's last
+  # command is a `set -e` kill, and this block is new enough not to inherit the older idiom's luck.
+  UNREADABLE_COUNT=$(printf '%s' "$UNREADABLE_ORIGINS" | grep -c . || true)
+  if [ "$UNREADABLE_COUNT" -gt 0 ]; then
+    warn "$UNREADABLE_COUNT receipt row(s) carry an origin this installer cannot read — keeping those files:"
+    printf '%s' "$UNREADABLE_ORIGINS" | while IFS= read -r u; do
+      if [ -n "$u" ]; then printf '       %s\n' "$u"; fi
+    done
+    # THIS SENTENCE USED TO END `so they are neither replaced nor claimed`, AND THE SECOND HALF WAS
+    # FALSE. The file is kept, which puts it in MODIFIED_FILES, which sends the payload loop down its
+    # `user-modified` arm — and that arm writes a receipt row. This file's own header says what such a
+    # row means: "a `user-modified` row is still a claim of ownership, and `--purge` acts on every
+    # claim." Measured 2026-08-14: after the run printed `nor claimed`, `uninstall.sh --yes --purge`
+    # REMOVED the file. A sentence that tells the user a file is unclaimed, immediately before
+    # claiming it, is the false-reassurance half of a defect rather than a report of one.
+    #
+    # WRITING NO ROW AT ALL WAS THE OTHER CANDIDATE AND IT IS MEASURABLY WORSE. A kept file with no
+    # row is invisible to the NEXT run's loop above — nothing puts it in MODIFIED_FILES, so the
+    # payload loop overwrites it. Measured on the same fixture by deleting the row and re-running:
+    # the file was replaced, with no `keeping yours` line and no unreadable-origin line. That is the
+    # data-loss path this task closed, delayed by one run and made silent. So the row stays and the
+    # sentence changes.
+    #
+    # THE TEST THE WORDING HAS TO PASS is whether a reader who has just read it predicts what
+    # `--purge` does. Both halves are therefore stated, and both are asserted in state Q.
+    warn "Their provenance cannot be established, so they are kept rather than replaced — and"
+    warn "recorded as yours. Plain 'uninstall.sh' will leave them; 'uninstall.sh --purge' removes them."
   fi
 fi
 
@@ -512,10 +648,24 @@ if [ "$DRY_RUN" -eq 1 ]; then
     printf '%s' "$ORPHANS" | while IFS= read -r o; do [ -n "$o" ] && printf '       %s\n' "$o"; done
   fi
   [ "$ORPHAN_KEPT_COUNT" -gt 0 ] && printf '  keep %s removed-from-payload file(s) you edited\n' "$ORPHAN_KEPT_COUNT"
-  # MODIFIED_FILES is always set; KEPT/MOD_COUNT are not defined until Step 5 and would be an
-  # unbound-variable death under `set -u`.
-  DRY_MOD=$(printf '%s' "$MODIFIED_FILES" | grep -c . || true)
+  # MODIFIED_FILES / EDITED_FILES / UNREADABLE_ORIGINS are always set; KEPT/MOD_COUNT are not defined
+  # until Step 5 and would be an unbound-variable death under `set -u`.
+  #
+  # COUNTED OFF EDITED_FILES, NOT THE UNION, for the reason the real run's line is: `you modified` has
+  # to be true of every file in the number. The union includes the unreadable-origin bucket, which is
+  # kept for a different reason and gets its own line here too — an announcement that folded them
+  # together would be the dry run restating a claim the real run had just stopped making, which is
+  # exactly the drift this block exists to prevent.
+  #
+  # NEITHER LINE CARRIES A PATH, so neither mints a claim in tests/test-install-dryrun.sh's parser:
+  # that parser reads the first field, and `keep` has neither a dot nor a slash, so it classifies as
+  # prose rather than as a promise about a path.
+  DRY_MOD=$(printf '%s' "$EDITED_FILES" | grep -c . || true)
   [ "$DRY_MOD" -gt 0 ] && printf '  keep %s file(s) you modified\n' "$DRY_MOD"
+  DRY_UNREADABLE=$(printf '%s' "$UNREADABLE_ORIGINS" | grep -c . || true)
+  [ "$DRY_UNREADABLE" -gt 0 ] && \
+    printf '  keep %s file(s) whose receipt origin cannot be read — kept, and recorded as yours\n' \
+      "$DRY_UNREADABLE"
 
   # Report the CLAUDE.md branch we would actually take. This said "CLAUDE.md (generated)"
   # unconditionally, which is a lie in the one case that matters: against a project that already has
@@ -728,7 +878,86 @@ RECEIPT_TMP=$(mktemp)
 # compare — is a second definition that drifts, which is the failure this whole change is about.
 # Created here, beside RECEIPT_TMP, so both are set before the trap that removes them.
 MCP_JSON_REF=$(mktemp)
-trap 'rm -f "$RECEIPT_TMP" "$MCP_JSON_REF"' EXIT
+
+# ── The receipt, and why it is committed by a trap and not only at the end ────
+#
+# THE RECEIPT IS THE ONLY THING THAT MAKES AN INSTALL REVERSIBLE. uninstall.sh removes only the
+# paths it lists, deliberately — a previous version deleted by filename and would remove files it
+# had never installed. So a project with the payload on disk and NO receipt is a project the
+# uninstaller refuses to touch ("Refusing to guess which files are ours"), permanently, and the only
+# repair is by hand.
+#
+# EVERY STEP BETWEEN THE FIRST `cp` AND STEP 9 CAN END THE RUN. `set -euo pipefail` turns any
+# unhandled non-zero status into an exit, and this file already carries two measurements of exactly
+# that — a `return 3` injected into gitignore_plan (see Step 7) and a `return 1` injected into
+# add_manifest_dependency (see its header) — both of which ended the run after the payload was
+# written and before the receipt was. Neither is hypothetical: `cp "$MANIFEST" "$MANIFEST.bak"` in
+# add_manifest_dependency dies on a DANGLING SYMLINK at Packages/manifest.json.bak, which a user can
+# leave there by accident. `[ -e ]` is false through a dangling link, so the decline above it does
+# not fire; cp reports `not writing through dangling symlink`; the run ends rc=1 with the whole
+# payload installed and nothing to remove it. Measured on the tree this change lands on: 67 files
+# under .claude/, an empty .claude/state/, and uninstall.sh exiting 1.
+#
+# SO THE COMMIT POINT MOVES TO THE TRAP RATHER THAN EARLIER IN THE FILE. Writing $RECEIPT early and
+# rewriting it at the end was rejected: owned_by_installer reads $RECEIPT, and four call sites below
+# depend on it still holding the PREVIOUS run's receipt (the comment above that function enumerates
+# the four statements that keep it so). An early write would silently change what every one of those
+# reads. The trap fires after all of them, so on the ordinary path nothing about this file's
+# behaviour changes at all — Step 9 writes the receipt and sets RECEIPT_WRITTEN, and the trap then
+# has nothing to do.
+#
+# WHAT THE PARTIAL RECEIPT CONTAINS IS WHAT IS ON DISK, not a guess. Every writer below appends its
+# row to $RECEIPT_TMP immediately after the write it describes, so the rows present at any moment
+# are the rows for the files written up to that moment. The one comment line naming the outcome is a
+# `#` line, which every reader of this format already skips.
+#
+# AND IT IS NOT "ALWAYS WRITE A RECEIPT". `[ -s "$RECEIPT_TMP" ]` is load-bearing: MODE is decided
+# by the receipt's ABSENCE, so a run that died having written nothing must leave nothing, or a
+# foreign .claude/ — someone else's, arriving through a git clone — is read as ours on the next run.
+# State O2 in tests/test-install-ownership.sh injects a die at this very line and asserts no receipt
+# appears.
+RECEIPT_WRITTEN=0
+write_receipt() {
+  local note="${1:-}"
+  # The payload loop creates .claude/state a few lines down, so on an abort inside that loop the
+  # directory does not exist yet and the redirect below would fail.
+  mkdir -p "$(dirname "$RECEIPT")" 2>/dev/null || return 1
+  {
+    printf '# kinglet install receipt\n'
+    printf '# edition: pioneer\n'
+    printf '# Written by install.sh. uninstall.sh removes only what is listed here, and only if the\n'
+    printf '# checksum still matches — so anything you edited or added is left alone.\n'
+    printf '# toolkit-version: %s\n' "$TOOLKIT_VERSION"
+    printf '# installed-at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    [ -n "$BACKUP_DIR" ] && printf '# backup-dir: %s\n' "$(basename "$BACKUP_DIR")"
+    [ -n "$note" ] && printf '# %s\n' "$note"
+    printf 'path\tsha256\tmode\torigin\n'
+    sort -t$'\t' -k1,1 "$RECEIPT_TMP"
+  } > "$RECEIPT" || return 1
+  RECEIPT_WRITTEN=1
+  return 0
+}
+
+# `local rc=$?` FIRST, and nothing before it: the right-hand side is expanded before `local` runs,
+# so this captures the status that triggered the trap. An EXIT trap that does not itself call `exit`
+# leaves that status alone, which is why the interrupted run still reports the failure it had.
+#
+# `if write_receipt ...` rather than a bare call, because `set -e` is suspended inside a condition —
+# a failed write here must not kill the shell a second time from inside its own exit handler.
+receipt_rescue() {
+  local rc=$?
+  if [ "$RECEIPT_WRITTEN" -eq 0 ] && [ -s "$RECEIPT_TMP" ]; then
+    if write_receipt "INCOMPLETE: install.sh exited $rc before it finished. The rows below cover what was written up to that point."; then
+      err "This install did not finish (exit $rc). $RECEIPT_REL was written for what it had"
+      err "already installed, so ./uninstall.sh can still remove it. Fix the cause and re-run."
+    else
+      err "This install did not finish (exit $rc) and $RECEIPT_REL could not be written."
+      err "Remove .claude/ by hand if you want the project back as it was."
+    fi
+  fi
+  rm -f "$RECEIPT_TMP" "$MCP_JSON_REF"
+}
+trap receipt_rescue EXIT
 
 while IFS= read -r rel; do
   [ -n "$rel" ] || continue
@@ -1089,6 +1318,10 @@ fi
 # only what a receipt lists. Every path through gitignore_plan returns 0 today; capturing the status
 # makes that an invariant the installer SURVIVES the loss of rather than one it silently DEPENDS ON,
 # and the `*)` arm below turns the loss into a warning and a skipped .gitignore instead of a dead run.
+#
+# GITIGNORE_CREATED IS THE ONLY THING THAT CAN ANSWER "IS THIS FILE OURS?" ON THE RUN THAT MAKES IT,
+# and the row below is written on ownership rather than on that flag alone — see its own comment.
+GITIGNORE_CREATED=0
 GITIGNORE_PLAN_RC=0
 GITIGNORE_PLAN="$(gitignore_plan)" || GITIGNORE_PLAN_RC=$?
 [ "$GITIGNORE_PLAN_RC" -eq 0 ] || GITIGNORE_PLAN="failed with status $GITIGNORE_PLAN_RC"
@@ -1102,7 +1335,7 @@ case "${GITIGNORE_PLAN%%"$NL"*}" in
     # "already has our entries" — a write announced as a no-change.
     ok ".gitignore already has our entries." ;;
   append)
-    [ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; info "Created .gitignore"; }
+    [ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; GITIGNORE_CREATED=1; info "Created .gitignore"; }
     # Only append a newline first if the file does not already end with one; otherwise our header
     # lands on the end of their last line.
     [ -s "$GITIGNORE" ] && [ -n "$(tail -c1 "$GITIGNORE")" ] && printf '\n' >> "$GITIGNORE"
@@ -1119,6 +1352,38 @@ case "${GITIGNORE_PLAN%%"$NL"*}" in
     # agree on the branch neither of them can reach today.
     warn "gitignore_plan gave an unusable verdict (${GITIGNORE_PLAN%%"$NL"*}) — .gitignore left alone, and the install continues." ;;
 esac
+
+# A .gitignore THIS INSTALLER CREATED is a file we own. One the user already had is not, whatever we
+# appended to it — appending is not authorship, and claiming their file would let uninstall.sh delete
+# it. That asymmetry is the whole of the decision, and `GITIGNORE_CREATED` is the only thing that can
+# see it: after the write, a created file and an appended-to one are both just a .gitignore with our
+# four entries in it, and nothing on disk tells them apart.
+#
+# Without a row the created file was permanent debris. It is the fourth member of a family this file
+# has now closed three times — Packages/manifest.json.bak, CLAUDE.md.generated, MCP-SETUP.md — and
+# the one the `find`-snapshot oracle of the previous wave structurally could not see, because on
+# every fixture but `bare` the path already exists before the run and a path snapshot shows no new
+# file.
+#
+# OWNERSHIP, NOT AUTHORSHIP, so the disjunction rather than the flag alone. Run 1 creates the file;
+# run 2's plan is `present` (all four entries are already lines) and appends nothing, so a row
+# written only where the file is created would vanish on run 2 and the debris would come straight
+# back one run later. That is state B's defect, and states M and M3 hold both halves.
+#
+# THERE IS NO REFERENCE COPY — the file is the user's project's, not a payload file — so the ref
+# argument is '' and owned_by_installer's first arm is skipped by construction. What answers is the
+# previous receipt, and it is a checksum comparison: the moment the user adds a line of their own,
+# the file stops being ours and is left alone (state M3). The cost of that is our four entries
+# staying in a file we no longer claim, which is the same trade an edited MCP-SETUP.md already makes.
+#
+# The mode is read off the file rather than written as 644: `: > "$GITIGNORE"` creates under the
+# caller's umask, and a hardcoded value here would be a receipt that disagrees with its own file.
+if [ -f "$GITIGNORE" ] \
+   && { [ "$GITIGNORE_CREATED" -eq 1 ] || owned_by_installer '.gitignore' ''; }; then
+  printf '.gitignore\t%s\t%s\ttoolkit\n' \
+    "$(sha_of "$GITIGNORE")" \
+    "$(stat -c '%a' "$GITIGNORE" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+fi
 
 # ── Step 8: Optional — manifest.json package additions ───────────────────────
 # One helper for every "--with-X adds a package to Packages/manifest.json" flag, so --with-mcp and
@@ -1223,6 +1488,15 @@ add_manifest_dependency() {
     fi
   else
     mv "$MANIFEST.bak" "$MANIFEST"; rm -f "$MANIFEST.tmp"
+    # THE FLAG MUST NOT OUTLIVE THE FILE IT NAMES. The `mv` above has just consumed the backup, and
+    # this function is called once per --with-* flag: on a two-flag run where the first caller
+    # succeeded and kept its backup, MANIFEST_BAK_KEPT is already 1 when the second caller reaches
+    # this arm and deletes the file. The row below then fires on a path that is gone, and because
+    # `sha_of` sits inside a `printf` ARGUMENT — where `set -e` does not reach — the miss does not
+    # kill the run: it writes a row with an EMPTY checksum, which uninstall.sh silently declines to
+    # act on. A row that removes nothing is indistinguishable on disk from no row at all, and worse
+    # than one, because it reads as coverage.
+    MANIFEST_BAK_KEPT=0
     warn "Could not edit manifest.json safely — add this under \"dependencies\" yourself:"
     warn "    \"$pkg_name\": \"$pkg_value\""
   fi
@@ -1253,7 +1527,14 @@ add_manifest_dependency() {
 # `cp` above could still overwrite such a file before anything asked whose it was, at which point
 # this row correctly claimed bytes that were ours; the helper asks first now and declines the flag
 # outright, so the disjuncts below answer for the file whose ownership is actually in question.
-if [ "$MANIFEST_BAK_KEPT" -eq 1 ] || owned_by_installer "$MANIFEST_BAK_REL" ''; then
+#
+# THE `-f` IS THE BELT TO THAT BRACES. `owned_by_installer` already opens with an existence test, so
+# it guards only the first disjunct — this run's own knowledge, which the failure arm above can
+# invalidate between the flag being set and this line being reached. Two independent conditions have
+# to be wrong before an empty-checksum row can be written now, and the two are in different
+# functions.
+if [ -f "$PROJECT_DIR/$MANIFEST_BAK_REL" ] \
+   && { [ "$MANIFEST_BAK_KEPT" -eq 1 ] || owned_by_installer "$MANIFEST_BAK_REL" ''; }; then
   printf '%s\t%s\t%s\ttoolkit\n' \
     "$MANIFEST_BAK_REL" \
     "$(sha_of "$PROJECT_DIR/$MANIFEST_BAK_REL")" \
@@ -1316,17 +1597,12 @@ if owned_by_installer 'MCP-SETUP.md' "$SCRIPT_DIR/MCP-SETUP.md"; then
 fi
 
 # ── Step 9: Write the receipt ────────────────────────────────────────────────
-{
-  printf '# kinglet install receipt\n'
-  printf '# edition: pioneer\n'
-  printf '# Written by install.sh. uninstall.sh removes only what is listed here, and only if the\n'
-  printf '# checksum still matches — so anything you edited or added is left alone.\n'
-  printf '# toolkit-version: %s\n' "$TOOLKIT_VERSION"
-  printf '# installed-at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  [ -n "$BACKUP_DIR" ] && printf '# backup-dir: %s\n' "$(basename "$BACKUP_DIR")"
-  printf 'path\tsha256\tmode\torigin\n'
-  sort -t$'\t' -k1,1 "$RECEIPT_TMP"
-} > "$RECEIPT"
+# The body moved to write_receipt beside the trap that arms it (Step 5). Two copies of this heredoc
+# — one for the ordinary path, one for the interrupted one — would be two definitions of the receipt
+# format, and the difference between them would only ever show up in a project that already had the
+# worse problem. RECEIPT_WRITTEN is set inside the function, so the trap knows there is nothing left
+# to do.
+write_receipt || die "Could not write $RECEIPT_REL — the payload is installed and unremovable; remove .claude/ by hand."
 RECEIPT_ROWS=$(grep -vc '^#' "$RECEIPT" || true)
 ok "Receipt written: $RECEIPT_REL ($((RECEIPT_ROWS - 1)) files)"
 

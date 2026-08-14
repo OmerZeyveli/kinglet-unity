@@ -1569,5 +1569,649 @@ run_uninstall "$K3" "K3"
 assert_gone "$K3" "$MANIFEST_BAK_REL" "K3 (install 3's backup is ours)"
 assert_kept "$K3" "$K3_MINE" "$K3_SHA" "K3 (the user's backup, moved aside)"
 
+# ── States L…O2: the receipt has to exist before anything that can abort ─────
+#
+# Everything above asks whether a row is right. These ask whether the receipt EXISTS AT ALL, which
+# is the one failure in this file that cannot be undone by re-running anything.
+#
+# install.sh writes $RECEIPT at Step 9, after Steps 5–8c. Every one of those steps can die under
+# `set -euo pipefail`, and one of them dies on an input a user can produce by accident: a dangling
+# symlink at Packages/manifest.json.bak. `[ -e ]` is false through a dangling link, so the D11
+# decline does not fire; `cp "$MANIFEST" "$MANIFEST.bak"` then reports `not writing through dangling
+# symlink` and `set -e` ends the run — with the whole payload on disk and NO receipt. uninstall.sh
+# refuses to run without one ("Refusing to guess which files are ours"), so the project is stuck
+# with an install nothing can remove. Measured on the tree before this state existed: rc=1, the
+# receipt directory created and empty.
+#
+#   L   dangling symlink at the .bak path, --with-mcp   a receipt exists, covering what was written;
+#                                                       uninstall cleans the project; the user's
+#                                                       symlink is not touched
+#   M   the installer CREATES .gitignore                row present, survives a second install,
+#                                                       uninstall removes it
+#   M2  a .gitignore the user already had               NO row, uninstall leaves it and their line
+#   M3  ours, then the user edits it                    NO row, uninstall leaves it
+#   N   an unreadable origin column, across an upgrade  the row is re-claimed, not dropped
+#   N2  an unreadable `user-modified `, same recipe     NOT re-claimed — the trim opens no hole
+#   O   a foreign .claude/ (no receipt)                 still backed up, still not merged, and the
+#                                                       foreign file is not claimed
+#   O2  a run that aborts having installed NOTHING      NO receipt — this did not become "always
+#                                                       write a receipt"
+#
+# WHAT THESE CANNOT SEE
+#   * L asserts one abort site. It is the one a user reaches without doing anything unusual, but
+#     Steps 5–8c contain many commands and this file exercises exactly one of their failures. The
+#     property is structural (the trap covers every abort after it is armed); the evidence here is
+#     one instance of it.
+#   * O2 aborts immediately after the trap is armed, so it proves the empty-$RECEIPT_TMP guard and
+#     nothing about an abort partway through the payload loop.
+#   * Nothing here reads install.sh. A rewrite that made the receipt correct by writing it twice, or
+#     early enough to change what owned_by_installer reads, would pass every assertion below.
+#   * N and N2 mangle the origin column by hand, because install.sh cannot produce either shape.
+#     They assert a direction, not a live case — the same standing as G.5.
+
+new_fixture_variant() {
+  local d="$SCRATCH/$1"
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" --variant "$2" >/dev/null
+  printf '%s' "$d"
+}
+
+# ── State L: a dangling symlink where the manifest backup goes ───────────────
+L="$(new_fixture_variant state-l urp)"
+# The fixture must actually carry a manifest, or --with-mcp returns early and this state exercises
+# nothing. Asserted rather than assumed — a state that builds its own premise measures itself.
+if [ -f "$L/$MANIFEST_REL" ]; then
+  pass "L: the fixture has a $MANIFEST_REL for --with-mcp to edit"
+else
+  fail "L: the fixture has no $MANIFEST_REL — --with-mcp returns early and every L assertion below is vacuous"
+fi
+ln -s /nonexistent "$L/$MANIFEST_BAK_REL"
+if [ -L "$L/$MANIFEST_BAK_REL" ] && [ ! -e "$L/$MANIFEST_BAK_REL" ]; then
+  pass "L: $MANIFEST_BAK_REL is a dangling symlink — [ -e ] is false through it, which is what defeats the decline"
+else
+  fail "L: $MANIFEST_BAK_REL is not a dangling symlink — the abort this state is about does not happen"
+fi
+# NOT run_install_flags: this run is EXPECTED to exit non-zero today, and a helper that fails the
+# state on a non-zero status would report the defect as a red in the wrong place. The status is
+# recorded and reported; what is asserted is the receipt.
+L_RC=0
+L_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+      bash "$REPO/install.sh" --project-dir "$L" --with-mcp --yes </dev/null 2>&1 \
+      | sed $'s/\x1b\\[[0-9;]*m//g')" || L_RC=$?
+L_RECEIPT="$(receipt_of "$L")"
+# The payload landed. Without this the receipt assertion below could pass on a run that installed
+# nothing at all, which is a different (and fine) outcome.
+# `|| true` on the pipeline, not decoration: `find` on a missing directory exits 1, `pipefail`
+# promotes that past `wc`, and at an ASSIGNMENT `set -e` would end this file here — mid-state, with
+# every assertion below reading as absent rather than red.
+L_ON_DISK="$(find "$L/.claude" -type f ! -path '*/state/*' 2>/dev/null | wc -l | tr -d ' ' || true)"
+if [ "$L_ON_DISK" -gt 0 ]; then
+  pass "L: the run wrote $L_ON_DISK file(s) under .claude/ before it stopped (exit $L_RC)"
+else
+  fail "L: nothing was installed under .claude/, so this state says nothing about a receipt for an interrupted install"
+fi
+if [ -f "$L_RECEIPT" ]; then
+  pass "L: a receipt exists after the run stopped at the manifest backup"
+else
+  fail "L: no receipt after the run stopped — uninstall.sh refuses to touch a project it cannot prove is ours, so those $L_ON_DISK file(s) are permanent"
+fi
+L_ROWS="$(awk -F'\t' '$1 ~ /^\.claude\// { n++ } END { print n + 0 }' "$L_RECEIPT" 2>/dev/null || printf '0')"
+if [ "$L_ROWS" -eq "$L_ON_DISK" ]; then
+  pass "L: the receipt claims all $L_ON_DISK installed .claude/ file(s)"
+else
+  fail "L: the receipt claims $L_ROWS .claude/ file(s) but $L_ON_DISK are on disk — the difference is what uninstall.sh leaves behind"
+fi
+run_uninstall "$L" "L"
+# FILES, not the directory. An ordinary uninstall leaves empty directories behind too — uninstall.sh
+# prunes with `find ... -depth -type d -empty -exec rmdir {} +`, and the `+` batches every path into
+# one rmdir call, so a parent is attempted before its children are gone. Measured on a plain
+# install/uninstall of the default fixture: .claude/ and .claude/skills/ survive, holding nothing.
+# That is uninstall.sh's, not this task's, and asserting on the directory here would red on it.
+L_LEFT="$(find "$L/.claude" -type f 2>/dev/null | wc -l | tr -d ' ' || true)"
+if [ "$L_LEFT" -eq 0 ]; then
+  pass "L: uninstall.sh removed every file the interrupted run installed"
+else
+  fail "L: $L_LEFT file(s) from the interrupted run survived the uninstall"
+fi
+# The user's own file — a broken symlink is still theirs — is not ours to remove or repair.
+if [ -L "$L/$MANIFEST_BAK_REL" ]; then
+  pass "L: the user's dangling symlink is untouched"
+else
+  fail "L: the user's dangling symlink at $MANIFEST_BAK_REL was removed or replaced"
+fi
+
+# ── State M: a .gitignore the installer created ──────────────────────────────
+# `bare` has no .gitignore, which is the only variant that reaches the create branch. The default
+# fixture ships an empty one, so every other state in this file takes the append path and none of
+# them can see this.
+GITIGNORE_REL='.gitignore'
+M="$(new_fixture_variant state-m bare)"
+if [ -e "$M/$GITIGNORE_REL" ]; then
+  fail "M: the bare fixture already has a $GITIGNORE_REL — the installer will append rather than create, and this state tests the wrong branch"
+else
+  pass "M: the bare fixture has no $GITIGNORE_REL, so the installer must create one"
+fi
+run_install "$M" "M install 1"
+if [ -f "$M/$GITIGNORE_REL" ]; then
+  pass "M: the installer created $GITIGNORE_REL"
+else
+  fail "M: the installer did not create $GITIGNORE_REL — nothing below is about a file that exists"
+fi
+assert_owned "$M" "$GITIGNORE_REL" "M (the installer created it)"
+# Ownership, not authorship: run 2 appends nothing, so a row written where the file is CREATED
+# disappears here and the file becomes permanent debris one run later.
+run_install "$M" "M install 2"
+assert_owned "$M" "$GITIGNORE_REL" "M (second install, nothing appended)"
+run_uninstall "$M" "M"
+assert_gone "$M" "$GITIGNORE_REL" "M (a file only we ever wrote)"
+
+# ── State M2: a .gitignore the user already had ──────────────────────────────
+# The installer appends to it. Appending is not authorship, and claiming it would let
+# uninstall.sh delete a file the user wrote — the fail-closed direction C and D hold for the two
+# project-root files.
+M2="$(new_fixture_variant state-m2 bare)"
+printf '# my own ignores\n/Builds/\n' > "$M2/$GITIGNORE_REL"
+M2_MARKER='/Builds/'
+run_install "$M2" "M2 install"
+if grep -qxF -- '.claude/settings.local.json' "$M2/$GITIGNORE_REL"; then
+  pass "M2: the installer appended its entries to the user's $GITIGNORE_REL"
+else
+  fail "M2: the installer appended nothing — this state is not exercising the append branch"
+fi
+assert_not_owned "$M2" "$GITIGNORE_REL" "M2 (a $GITIGNORE_REL the user wrote)"
+run_uninstall "$M2" "M2"
+if [ -f "$M2/$GITIGNORE_REL" ] && grep -qxF -- "$M2_MARKER" "$M2/$GITIGNORE_REL"; then
+  pass "M2: the user's $GITIGNORE_REL survived uninstall with their own entry intact"
+else
+  fail "M2: the user's $GITIGNORE_REL did not survive uninstall with their own entry intact"
+fi
+
+# ── State M3: ours, then the user edits it ───────────────────────────────────
+M3="$(new_fixture_variant state-m3 bare)"
+run_install "$M3" "M3 install 1"
+printf '/MyLocalScratch/\n' >> "$M3/$GITIGNORE_REL"
+M3_MARKER='/MyLocalScratch/'
+run_install "$M3" "M3 install 2"
+assert_not_owned "$M3" "$GITIGNORE_REL" "M3 (ours until the user edited it)"
+run_uninstall "$M3" "M3"
+if [ -f "$M3/$GITIGNORE_REL" ] && grep -qxF -- "$M3_MARKER" "$M3/$GITIGNORE_REL"; then
+  pass "M3: the edited $GITIGNORE_REL survived uninstall with the user's line intact"
+else
+  fail "M3: the edited $GITIGNORE_REL did not survive uninstall with the user's line intact"
+fi
+
+# ── State N: an origin column we cannot read, across an upgrade ──────────────
+# $OLD is B2's scratch "previous version": the same payload with a different MCP-SETUP.md. That
+# difference is what makes the receipt the ONLY thing that can answer for the file — the shipped
+# reference copy no longer matches, so owned_by_installer's first arm is out of play and its awk is
+# the whole decision. Give that awk a row whose origin column carries one trailing space and the
+# `$4 == "toolkit"` test is byte-unequal: the file is never re-claimed, by this run or any later
+# one, and uninstall.sh can never remove it.
+N="$(new_fixture state-n)"
+N_RC=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$OLD/install.sh" --project-dir "$N" --yes >/dev/null 2>&1 </dev/null || N_RC=$?
+if [ "$N_RC" -eq 0 ]; then
+  pass "N install 1 (previous version): install.sh exited 0"
+else
+  fail "N install 1 (previous version): install.sh exited $N_RC"
+fi
+if [ "$(sha_of "$N/MCP-SETUP.md")" = "$(sha_of "$REPO/MCP-SETUP.md")" ]; then
+  fail "N: the scratch toolkit installed the CURRENT MCP-SETUP.md — owned_by_installer's reference-copy arm answers and its awk is never reached, so this state proves nothing"
+else
+  pass "N: the previous version installed different bytes, so only the receipt can answer for MCP-SETUP.md"
+fi
+N_RECEIPT="$(receipt_of "$N")"
+N_TMP="$SCRATCH/n-receipt.tsv"
+awk -F'\t' -v OFS='\t' '$1 == "MCP-SETUP.md" { $4 = "toolkit " } { print }' "$N_RECEIPT" > "$N_TMP"
+mv "$N_TMP" "$N_RECEIPT"
+if [ -n "$(awk -F'\t' '$1 == "MCP-SETUP.md" && $4 == "toolkit " { print }' "$N_RECEIPT")" ]; then
+  pass "N: the row now carries an unreadable origin ('toolkit' with a trailing space)"
+else
+  fail "N: the receipt rewrite did not take — the assertion below would pass for the wrong reason"
+fi
+run_install "$N" "N install 2 (current version)"
+assert_owned "$N" 'MCP-SETUP.md' "N (upgrade across an unreadable origin column)"
+run_uninstall "$N" "N"
+assert_gone "$N" 'MCP-SETUP.md' "N (upgrade across an unreadable origin column)"
+
+# ── State N2: the other direction of the same trim ───────────────────────────
+# `user-modified ` must not become `toolkit`. If it does, the next uninstall deletes a file a
+# previous run recorded as the user's — which is the data loss G.5 exists to stop, arriving through
+# this fix instead of through the classifier.
+N2="$(new_fixture state-n2)"
+N2_RC=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$OLD/install.sh" --project-dir "$N2" --yes >/dev/null 2>&1 </dev/null || N2_RC=$?
+if [ "$N2_RC" -eq 0 ]; then
+  pass "N2 install 1 (previous version): install.sh exited 0"
+else
+  fail "N2 install 1 (previous version): install.sh exited $N2_RC"
+fi
+N2_RECEIPT="$(receipt_of "$N2")"
+N2_SHA="$(sha_of "$N2/MCP-SETUP.md")"
+N2_TMP="$SCRATCH/n2-receipt.tsv"
+awk -F'\t' -v OFS='\t' '$1 == "MCP-SETUP.md" { $4 = "user-modified " } { print }' "$N2_RECEIPT" > "$N2_TMP"
+mv "$N2_TMP" "$N2_RECEIPT"
+if [ -n "$(awk -F'\t' '$1 == "MCP-SETUP.md" && $4 == "user-modified " { print }' "$N2_RECEIPT")" ]; then
+  pass "N2: the row now carries 'user-modified' with a trailing space"
+else
+  fail "N2: the receipt rewrite did not take — the assertion below would pass for the wrong reason"
+fi
+run_install "$N2" "N2 install 2 (current version)"
+assert_not_owned "$N2" 'MCP-SETUP.md' "N2 (a mangled user-modified row is still the user's)"
+run_uninstall "$N2" "N2"
+assert_kept "$N2" 'MCP-SETUP.md' "$N2_SHA" "N2 (a mangled user-modified row is still the user's)"
+
+# ── State O: a foreign .claude/ is still foreign ─────────────────────────────
+# MODE is decided by the receipt's ABSENCE, and this task makes an interrupted run write one. That
+# is correct — such a run really did install the payload — but it is one edit away from "always
+# write a receipt", which would turn somebody else's .claude/ into ours.
+O="$(new_fixture state-o)"
+mkdir -p "$O/.claude/agents"
+printf 'a teammate wrote this, and Kinglet never did\n' > "$O/.claude/agents/teammate.md"
+O_FOREIGN_REL='.claude/agents/teammate.md'
+O_FOREIGN_SHA="$(sha_of "$O/$O_FOREIGN_REL")"
+if [ ! -f "$(receipt_of "$O")" ]; then
+  pass "O: the fixture has a .claude/ and no receipt — the definition of foreign mode"
+else
+  fail "O: the fixture already has a receipt, so this state is an upgrade rather than a foreign install"
+fi
+run_install_flags "$O" "O install"
+if grep -qF -- 'Backed up existing .claude/' <<< "$INSTALL_OUT"; then
+  pass "O: the run backed the foreign .claude/ up instead of merging into it"
+else
+  fail "O: the run did not announce a backup — a foreign .claude/ was treated as ours"
+fi
+O_BACKUP="$(find "$O" -maxdepth 1 -type d -name '.claude.backup.*' | sed -n '1p')"
+if [ -n "$O_BACKUP" ] && [ "$(sha_of "$O_BACKUP/agents/teammate.md")" = "$O_FOREIGN_SHA" ]; then
+  pass "O: the teammate's file is in the backup, byte-for-byte"
+else
+  fail "O: the teammate's file is not in a .claude.backup.*/ directory — it was destroyed rather than moved aside"
+fi
+assert_not_owned "$O" "$O_FOREIGN_REL" "O (a file the toolkit never installed)"
+
+# ── State O2: a run that installs nothing writes no receipt ──────────────────
+# The mutation this task is one edit from: flush the receipt unconditionally, and a run that died
+# before writing a byte leaves a receipt behind — which reclassifies a foreign or absent .claude/
+# as ours on the next run. Injected by CONTENT, at the line that arms the trap, so the probe does
+# not rot against a line number.
+O2_KIT="$SCRATCH/o2-toolkit"
+mkdir -p "$O2_KIT"
+cp -R "$REPO/.claude" "$O2_KIT/.claude"
+cp -R "$REPO/scripts" "$O2_KIT/scripts"
+cp "$REPO/MCP-SETUP.md" "$O2_KIT/MCP-SETUP.md"
+O2_MARK='injected abort: armed the trap, installed nothing'
+awk -v ins="die \"$O2_MARK\"" '
+  { print }
+  /^trap / && !done { print ins; done = 1 }
+' "$REPO/install.sh" > "$O2_KIT/install.sh"
+if grep -qF -- "$O2_MARK" "$O2_KIT/install.sh"; then
+  pass "O2: the abort was injected into a scratch copy of install.sh"
+else
+  fail "O2: nothing was injected — install.sh no longer has a line beginning 'trap ', and the run below is an ordinary install"
+fi
+O2="$(new_fixture state-o2)"
+O2_RC=0
+KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$O2_KIT/install.sh" --project-dir "$O2" --yes >/dev/null 2>&1 </dev/null || O2_RC=$?
+if [ "$O2_RC" -ne 0 ]; then
+  pass "O2: the injected run exited $O2_RC"
+else
+  fail "O2: the injected run exited 0 — the injected die never executed and nothing below is about an aborted run"
+fi
+if [ -f "$(receipt_of "$O2")" ]; then
+  fail "O2: a run that installed nothing left a receipt — a foreign or absent .claude/ would be read as ours on the next run"
+else
+  pass "O2: a run that installed nothing left no receipt"
+fi
+
+# ── States P1…P5: the origin column has four readers, and this is the one ────
+# ── whose being wrong costs the user's work ──────────────────────────────────
+#
+# N and N2 fixed the trim in owned_by_installer, which decides whether to RE-CLAIM a file. This is
+# the other install-side reader — the MODIFIED_FILES loop that decides whether to OVERWRITE the
+# user's edit — and it was left byte-exact. The two failures are not symmetric: owned_by_installer
+# getting it wrong leaves a file on disk, which the user can delete; this one getting it wrong
+# destroys an edit, which they cannot get back.
+#
+# Everything reaching that test has already survived `read -r … origin` with `IFS=$'\t'`, and TAB is
+# the only IFS whitespace there — so `read` strips a leading tab and nothing else. Measured
+# 2026-08-14 on the tree before this fix, install → edit → install → mangle → install:
+#
+#   trailing space   `user-modified `         edit DESTROYED, no `keeping yours`, row → `toolkit`
+#   leading space    ` user-modified`         edit DESTROYED, ditto
+#   CRLF receipt     `user-modified` + \r     edit DESTROYED, ditto
+#   fifth column     `user-modified` + TAB…   edit DESTROYED, ditto
+#   leading tab      TAB + `user-modified`    edit survived — by accident; `read` ate the tab
+#
+# THE NEGATIVE DIRECTION IS P4 AND IT IS THE POINT OF THE PAIR. The fix must be a whitespace trim
+# followed by EXACT equality, never a prefix or substring match. A fifth column is not a
+# `user-modified` row with decoration; it is a row whose provenance cannot be read. So P1–P3 and P5
+# assert the edit survives WITHOUT the unreadable-origin report (the trim accepted the value), and
+# P4 asserts it survives WITH that report (the trim declined it, and the `*)` branch kept the file).
+# A greedy trim would make P4 silent and go red there — which is why both halves are asserted on the
+# run's output and not on the file alone.
+#
+# WHAT P CANNOT SEE
+#   * One payload file, one mangling per state. A receipt with several mangled rows at once, and any
+#     interaction with the `.claude/scripts/` loop, are untested.
+#   * uninstall.sh and scripts/studio-doctor.sh read this column too and do NOT trim. Their
+#     fail-closed mechanism is a `case` catch-all instead, and nothing here exercises either. The
+#     uninstall-side mirror of this defect — a mangled `toolkit ` on an UNEDITED file, classified as
+#     the user's and therefore never removed — is unasserted anywhere.
+#   * The trim is asserted through install.sh's OUTPUT and the file's bytes. Nothing here reads the
+#     parameter expansion, so a rewrite that trimmed by some other means would pass.
+
+# warn_block <output> <header substring> — the indented path lines printed under a warn header.
+# Shared by states P and Q. `awk` over a here-string: it drains its input, and there is no pipe to
+# SIGPIPE. `index()` rather than a regex, because the headers carry an em dash.
+#
+# install.sh prints kept files under TWO headers, and which one a path lands under is a claim in its
+# own right — `have local edits` says the installer knows the user edited it; the unreadable-origin
+# header says it knows only that it cannot tell. Asserting on the whole output cannot distinguish
+# them, which is how P4's `keeping yours` assertion came to encode the pre-split behaviour.
+warn_block() {
+  awk -v needle="$2" '
+    index($0, needle) { inb = 1; next }
+    inb && /^       / { print; next }
+    inb { inb = 0 }
+  ' <<< "$1"
+}
+EDITS_HDR='have local edits'
+UNREAD_HDR='origin this installer cannot read'
+
+# p_setup <name> <field-4 value> [post-filter] — install, edit a payload file, install again so the
+# row is a genuine `user-modified` one carrying the EDITED checksum, then mangle only that column.
+# That checksum is the whole point: it is the shape a sha-only fall-through misreads as "untouched".
+P_REL='.claude/rules/pc-console.md'
+P_DIR=''; P_WANT=''; P_OUT=''
+p_setup() {
+  local name="$1" v="$2" post="${3:-cat}"
+  local d="$SCRATCH/$name" f rc=0 rcpt row
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" >/dev/null
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  P_DIR="$d"; P_WANT=''; P_OUT=''
+  f="$d/$P_REL"
+  if [ ! -f "$f" ]; then
+    fail "$name: the payload did not install $P_REL — this state cannot mangle a row for a file that is not there"
+    return 0
+  fi
+  printf '\n<!-- the user edited this -->\n' >> "$f"
+  P_WANT="$(sha_of "$f")"
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  rcpt="$(receipt_of "$d")"
+  row="$(own_row "$rcpt" "$P_REL")"
+  if [ "$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$row")" = user-modified ] \
+     && [ "$(awk -F'\t' 'NR == 1 { print $2 }' <<< "$row")" = "$P_WANT" ]; then
+    pass "$name: the control row is 'user-modified' and carries the edited checksum"
+  else
+    fail "$name: the control row is not a user-modified row carrying the edited checksum — the mangling below would decorate the wrong thing. Row: $row"
+  fi
+  awk -F'\t' -v OFS='\t' -v want="$P_REL" -v v="$v" '$1 == want { $4 = v } { print }' "$rcpt" \
+    | $post > "$SCRATCH/$name-receipt.tsv"
+  mv "$SCRATCH/$name-receipt.tsv" "$rcpt"
+  P_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+        bash "$REPO/install.sh" --project-dir "$d" --yes </dev/null 2>&1 \
+        | sed $'s/\x1b\\[[0-9;]*m//g')" || rc=$?
+  return 0
+}
+
+# p_assert <name> <expect-unreadable-report: yes|no>
+p_assert() {
+  local name="$1" want_report="$2" have
+  have="$(sha_of "$P_DIR/$P_REL")"
+  if [ -n "$P_WANT" ] && [ "$have" = "$P_WANT" ]; then
+    pass "$name: the user's edit survived the install"
+  else
+    fail "$name: the user's edit was destroyed — the origin column was not read, the sha test concluded the file was untouched, and the payload loop overwrote it"
+  fi
+  # NAMED IN THE RIGHT BLOCK, not merely mentioned somewhere. Which header a path appears under is
+  # itself a claim: `have local edits` asserts the installer knows the user edited the file, and it
+  # can only know that from a readable `user-modified` row. On the fifth-column state it does NOT
+  # know — the row's provenance is exactly what it cannot read — so reporting it there would be a
+  # claim beyond the evidence. This assertion was `grep -qF 'keeping yours'` over the whole output
+  # until 2026-08-14, which passed for either block and so encoded the behaviour of a single
+  # undifferentiated list.
+  local want_hdr other_hdr want_label other_label
+  if [ "$want_report" = yes ]; then
+    want_hdr="$UNREAD_HDR";  want_label='the unreadable-origin block'
+    other_hdr="$EDITS_HDR";  other_label='the local-edits block'
+  else
+    want_hdr="$EDITS_HDR";   want_label='the local-edits block'
+    other_hdr="$UNREAD_HDR"; other_label='the unreadable-origin block'
+  fi
+  if grep -qxF -- "       $P_REL" <<< "$(warn_block "$P_OUT" "$want_hdr")"; then
+    pass "$name: $want_label names the file, so the user is told it was kept and on what grounds"
+  else
+    fail "$name: $want_label does not name the file — the user is not told a file of theirs was at stake, or is told on the wrong grounds"
+  fi
+  if grep -qxF -- "       $P_REL" <<< "$(warn_block "$P_OUT" "$other_hdr")"; then
+    fail "$name: $other_label ALSO names the file — one kept file is being reported under two different explanations"
+  else
+    pass "$name: $other_label does not also name the file"
+  fi
+  # The discriminator. `no` means the TRIM accepted the value; `yes` means the trim declined it and
+  # the catch-all kept the file. Both outcomes leave the edit intact, and only this line separates
+  # them — which is what makes a too-greedy trim detectable at all.
+  if grep -qF -- 'origin this installer cannot read' <<< "$P_OUT"; then
+    if [ "$want_report" = yes ]; then
+      pass "$name: reported as unreadable, so the trim declined it rather than accepting it"
+    else
+      fail "$name: reported as unreadable — surrounding whitespace should have been trimmed and the value accepted"
+    fi
+  else
+    if [ "$want_report" = no ]; then
+      pass "$name: not reported as unreadable — the trim accepted the value"
+    else
+      fail "$name: a malformed origin was accepted as 'user-modified' — the trim is matching more than surrounding whitespace"
+    fi
+  fi
+}
+
+p_setup state-p1 'user-modified '
+p_assert "P1 (trailing space)" no
+
+p_setup state-p2 ' user-modified'
+p_assert "P2 (leading space)" no
+
+# Every line gets a \r, not just the row under test — that is what a receipt saved by a Windows
+# editor actually looks like, and it is why this is a whole-file filter rather than a field value.
+p_setup state-p3 'user-modified' "sed s/\$/$(printf '\r')/"
+p_assert "P3 (CRLF receipt)" no
+
+p_setup state-p4 "user-modified$(printf '\t')deadbeef"
+p_assert "P4 (a fifth column)" yes
+
+# P5 passed before the fix too, and the reason is worth an assertion rather than a green line: the
+# tab is IFS whitespace to the loop's `read`, so it is gone before the comparison. Asserted so that
+# a future change to that IFS cannot move this shape into the broken set unnoticed.
+p_setup state-p5 "$(printf '\t')user-modified"
+p_assert "P5 (leading tab)" no
+
+# ── States Q…Q2: an UNEDITED file with an unreadable origin ──────────────────
+#
+# P1–P5 cannot see any of this by construction: every one of them edits the file for real, so
+# `installed file(s) have local edits — keeping yours` is legitimately true there and both of the
+# run's warn blocks are entitled to name it. Only an UNEDITED file with a mangled origin separates
+# them, and that state exposed two defects in the block P added.
+#
+# Measured 2026-08-14 before this fix, on an unedited .claude/rules/pc-console.md whose origin column
+# was mangled to `toolkit` + TAB + `deadbeef`:
+#
+#   * the file was named TWICE — once under `have local edits`, which is false about a file nobody
+#     edited, and once under the unreadable block — and counted in a MODIFIED number describing two
+#     different situations at once;
+#   * the run printed `Their provenance cannot be established, so they are neither replaced nor
+#     claimed`, and then wrote the row back as a clean `user-modified`. That IS a claim: this file's
+#     header says `--purge` acts on every claim, and `uninstall.sh --yes --purge` removed the file.
+#     A sentence telling the user a file is unclaimed, immediately before claiming it.
+#
+# WHY THE ROW STAYS AND ONLY THE SENTENCE CHANGED. Writing no row was the other candidate and it is
+# measurably worse: a kept file with no row is invisible to the NEXT run's MODIFIED_FILES loop, so
+# the payload loop overwrites it. Measured by deleting the row and re-running — the file was
+# replaced, with neither warn block printed. That is this task's own data-loss path, delayed one run
+# and made silent. Q4/Q5 assert that the sentence and the behaviour agree instead.
+#
+# WHAT Q CANNOT SEE
+#   * One mangled row, and in Q2 one edited file. A receipt with several of each is untested.
+#   * Q reads the two warn blocks by their headers and by the 7-space indent the run prints paths
+#     with. A rewrite that changed that indent would make the extractor silently return nothing — so
+#     Q2 asserts each block is NON-EMPTY as well as asserting what is in it.
+#   * Nothing here covers the ledger item: an unreadable origin becomes a plain `user-modified` row
+#     after one run, so run B and every run after it are silent. Q asserts run A only.
+
+Q_REL='.claude/rules/pc-console.md'
+Q_EDIT_REL='.claude/rules/performance.md'
+Q_MANGLE="toolkit$(printf '\t')deadbeef"
+
+# q_setup <name> <edit-a-second-file: yes|no> — install, leave $Q_REL UNTOUCHED, mangle its origin.
+Q_DIR=''; Q_OUT=''; Q_SHA=''; Q_EDIT_SHA=''
+q_setup() {
+  # TWO `local` LINES, and the split is not style. bash expands every argument to `local` BEFORE it
+  # performs any of the assignments, so `d="$SCRATCH/$name"` on the same line reads $name from the
+  # ENCLOSING scope — unset here, which under `set -u` ends the whole file with `name: unbound
+  # variable`, no FAIL token, and every state below it simply absent. That is the silent-death shape
+  # this file's own sha_of comment warns about, and it happened here on the first run: 350 PASS, 0
+  # FAIL, exit 1, with Q and Q2 never executed. p_setup above splits them; this one did not.
+  local name="$1" also_edit="$2" rc=0
+  local d="$SCRATCH/$name" rcpt row
+  bash "$REPO/tests/fixtures/mkproject.sh" "$d" >/dev/null
+  KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+    bash "$REPO/install.sh" --project-dir "$d" --yes >/dev/null 2>&1 </dev/null || rc=$?
+  Q_DIR="$d"; Q_OUT=''; Q_SHA=''; Q_EDIT_SHA=''
+  if [ ! -f "$d/$Q_REL" ] || [ ! -f "$d/$Q_EDIT_REL" ]; then
+    fail "$name: the payload did not install both $Q_REL and $Q_EDIT_REL — this state cannot run"
+    return 0
+  fi
+  # UNEDITED, and asserted so: the whole state turns on the file being byte-identical to the copy
+  # this toolkit ships, because that is what makes `have local edits` a false statement about it.
+  Q_SHA="$(sha_of "$d/$Q_REL")"
+  if [ "$Q_SHA" = "$(sha_of "$REPO/$Q_REL")" ]; then
+    pass "$name: $Q_REL is byte-for-byte the toolkit's copy — nobody edited it"
+  else
+    fail "$name: $Q_REL already differs from the toolkit's copy, so 'have local edits' would be TRUE about it and this state proves nothing"
+  fi
+  if [ "$also_edit" = yes ]; then
+    printf '\n<!-- the user really did edit this one -->\n' >> "$d/$Q_EDIT_REL"
+    Q_EDIT_SHA="$(sha_of "$d/$Q_EDIT_REL")"
+  fi
+  rcpt="$(receipt_of "$d")"
+  row="$(own_row "$rcpt" "$Q_REL")"
+  if [ "$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$row")" = toolkit ]; then
+    pass "$name: the control row for $Q_REL is a clean 'toolkit' row"
+  else
+    fail "$name: the control row for $Q_REL is not 'toolkit' — the mangling would decorate the wrong thing. Row: $row"
+  fi
+  awk -F'\t' -v OFS='\t' -v want="$Q_REL" -v v="$Q_MANGLE" '$1 == want { $4 = v } { print }' "$rcpt" \
+    > "$SCRATCH/$name-receipt.tsv"
+  mv "$SCRATCH/$name-receipt.tsv" "$rcpt"
+  Q_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+        bash "$REPO/install.sh" --project-dir "$d" --yes </dev/null 2>&1 \
+        | sed $'s/\x1b\\[[0-9;]*m//g')" || rc=$?
+  return 0
+}
+
+# ── Q: the unedited file, alone ──────────────────────────────────────────────
+q_setup state-q no
+
+# Still kept — the fix must not have become "overwrite what you cannot classify".
+if [ -n "$Q_SHA" ] && [ "$(sha_of "$Q_DIR/$Q_REL")" = "$Q_SHA" ]; then
+  pass "Q: the file with the unreadable origin was kept, not replaced"
+else
+  fail "Q: the file with the unreadable origin was replaced — an origin we cannot read is not ours to overwrite"
+fi
+# N2. Nothing was edited, so the edits block must not exist at all.
+if grep -qF -- 'have local edits' <<< "$Q_OUT"; then
+  fail "Q: the run claimed 'have local edits' with nothing edited — the unreadable row is being counted as an edit"
+else
+  pass "Q: the run made no 'have local edits' claim, because nothing was edited"
+fi
+Q_UNREAD="$(warn_block "$Q_OUT" "$UNREAD_HDR")"
+if grep -qxF -- "       $Q_REL" <<< "$Q_UNREAD"; then
+  pass "Q: the unreadable-origin block names $Q_REL"
+else
+  fail "Q: the unreadable-origin block does not name $Q_REL — the run kept a file it never reported"
+fi
+# N1, first half: the sentence has to let a reader predict --purge, so it has to say the word.
+if grep -qF -- '--purge' <<< "$Q_OUT"; then
+  pass "Q: the run tells the user that --purge will remove these files"
+else
+  fail "Q: the run does not mention --purge, so a reader cannot predict what --purge does to a file it just said was kept"
+fi
+if grep -qF -- 'nor claimed' <<< "$Q_OUT"; then
+  fail "Q: the run still says the file is not claimed, and the row below shows that it is"
+else
+  pass "Q: the run does not tell the user the file is unclaimed"
+fi
+# N1, and the reason the sentence had to change rather than the row: the row IS a claim.
+Q_ROW="$(own_row "$(receipt_of "$Q_DIR")" "$Q_REL")"
+Q_ORIGIN="$(awk -F'\t' 'NR == 1 { print $4 }' <<< "$Q_ROW")"
+if [ "$Q_ORIGIN" = user-modified ]; then
+  pass "Q: the row is rewritten as 'user-modified' — which is what 'recorded as yours' means, and why --purge acts on it"
+else
+  fail "Q: the row's origin is '$Q_ORIGIN'; the run's wording describes a 'user-modified' row and this is not one"
+fi
+
+# ── Q, second half: the two uninstall directions the sentence promises ───────
+# Two fixtures, because one project cannot be uninstalled twice. state-q-purge is built by the same
+# q_setup, so the two differ only in the uninstall flag.
+run_uninstall "$Q_DIR" "Q plain"
+assert_kept "$Q_DIR" "$Q_REL" "$Q_SHA" "Q (plain uninstall, as the run said)"
+
+q_setup state-q-purge no
+Q_PURGE_DIR="$Q_DIR"
+run_uninstall_flags "$Q_PURGE_DIR" "Q purge" --purge
+assert_gone "$Q_PURGE_DIR" "$Q_REL" "Q (--purge, as the run said)"
+
+# ── Q2: an edited file AND an unreadable one, in the same run ────────────────
+# The anti-"just suppress the edits block" direction. Q alone would stay green if the fix were to
+# stop printing edits at all; here both blocks must appear and each must name only its own file.
+q_setup state-q2 yes
+Q2_EDITS="$(warn_block "$Q_OUT" "$EDITS_HDR")"
+Q2_UNREAD="$(warn_block "$Q_OUT" "$UNREAD_HDR")"
+if [ -n "$Q2_EDITS" ]; then
+  pass "Q2: the edits block is present and non-empty"
+else
+  fail "Q2: the edits block is empty or missing — either a genuinely edited file is no longer reported, or the block's layout changed and this state can no longer read it"
+fi
+if [ -n "$Q2_UNREAD" ]; then
+  pass "Q2: the unreadable-origin block is present and non-empty"
+else
+  fail "Q2: the unreadable-origin block is empty or missing"
+fi
+if grep -qxF -- "       $Q_EDIT_REL" <<< "$Q2_EDITS"; then
+  pass "Q2: the edits block names the file the user actually edited"
+else
+  fail "Q2: the edits block does not name $Q_EDIT_REL, which the user edited"
+fi
+if grep -qxF -- "       $Q_REL" <<< "$Q2_EDITS"; then
+  fail "Q2: the edits block also names $Q_REL, which nobody edited — the two buckets are still one list"
+else
+  pass "Q2: the edits block does not name $Q_REL, which nobody edited"
+fi
+if grep -qxF -- "       $Q_REL" <<< "$Q2_UNREAD"; then
+  pass "Q2: the unreadable-origin block names $Q_REL"
+else
+  fail "Q2: the unreadable-origin block does not name $Q_REL"
+fi
+if grep -qxF -- "       $Q_EDIT_REL" <<< "$Q2_UNREAD"; then
+  fail "Q2: the unreadable-origin block also names $Q_EDIT_REL, whose origin reads fine — the two buckets are still one list"
+else
+  pass "Q2: the unreadable-origin block does not name $Q_EDIT_REL, whose origin reads fine"
+fi
+# Both files are still kept: the split is a DISPLAY fix, and is_modified must still see both.
+if [ -n "$Q_EDIT_SHA" ] && [ "$(sha_of "$Q_DIR/$Q_EDIT_REL")" = "$Q_EDIT_SHA" ]; then
+  pass "Q2: the edited file survived"
+else
+  fail "Q2: the edited file was overwritten — splitting the display lists changed what is_modified reads"
+fi
+if [ -n "$Q_SHA" ] && [ "$(sha_of "$Q_DIR/$Q_REL")" = "$Q_SHA" ]; then
+  pass "Q2: the unreadable-origin file survived"
+else
+  fail "Q2: the unreadable-origin file was overwritten — splitting the display lists changed what is_modified reads"
+fi
+
 [ "$FAILURES" -eq 0 ] || exit 1
 printf 'all install-ownership assertions passed\n'
