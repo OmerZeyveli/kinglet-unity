@@ -1385,6 +1385,46 @@ if is_modified ".claude/settings.json" && [ -f "$CLAUDE_DIR/settings.json" ]; th
     # That is the boundary this block draws between a keep that belongs here and one that does not.
     note_not_done "$UNREG_COUNT hook(s) listed above are installed but NOT registered — your .claude/settings.json was kept, and it is the only place a hook is registered, so they will never fire. Add them to \"hooks\" there, or diff yours against $SCRIPT_DIR/.claude/settings.json."
   fi
+
+  # THE OTHER DIRECTION, WHICH A PAYLOAD THAT SHRANK CREATES AND NOTHING ASKED.
+  #
+  # The scan above asks one question — "we ship this hook, is it registered?" — and a payload that
+  # only ever GREW is fully described by it. The 2026-08-03 and 2026-08-13 cuts made the reverse
+  # question real: "your file registers this, is it still there?" Step 5's prune deletes a retired
+  # hook's script because it is ours and untouched, while the entry naming it lives in the
+  # settings.json this run just kept, so the entry survives the removal and points at nothing.
+  # Claude Code does not report a hook command it cannot find. That is the same silence an
+  # unregistered hook on disk gets, arriving from the opposite side, and it does not self-heal: the
+  # kept file is kept again on every subsequent run. Measured on an upgrade across the 2026-08-13
+  # cut — 27 registrations in the kept file over 12 hooks on disk, 15 of them naming deleted files,
+  # with `Hooks 27` printed under `Installation complete.`
+  #
+  # EXISTENCE ON DISK, NOT ABSENCE FROM THE PAYLOAD, is the test. It is the condition that actually
+  # costs something, it needs no second file to be read, and it also catches a registration typed by
+  # hand at a path that never existed — which the payload comparison would call correct.
+  #
+  # WARN, DO NOT EDIT. The file was kept because it is the user's, and an installer that silently
+  # rewrites the file it has just finished reporting as preserved is a worse defect than this one.
+  # Which entry, under which matcher, under which event is a JSON-shaped question besides, and the
+  # comment above already rules that merging someone's JSON unasked is not an installer's business.
+  DEAD_REG=""
+  while IFS= read -r h; do
+    [ -n "$h" ] || continue
+    [ -f "$PROJECT_DIR/$h" ] || DEAD_REG="${DEAD_REG}${h}"$'\n'
+  done < <(grep -oE '\.claude/hooks/[a-z_-]+\.sh' "$CLAUDE_DIR/settings.json" | sort -u)
+  DEAD_REG_COUNT=$(printf '%s' "$DEAD_REG" | grep -c . || true)
+  if [ "$DEAD_REG_COUNT" -gt 0 ]; then
+    warn "Your settings.json was kept, so $DEAD_REG_COUNT hook registration(s) name files that are not there:"
+    printf '%s' "$DEAD_REG" | while IFS= read -r h; do [ -n "$h" ] && printf '       %s\n' "$h"; done
+    warn "This version does not ship them. Remove their entries from \"hooks\" in .claude/settings.json,"
+    warn "or diff yours against $SCRIPT_DIR/.claude/settings.json."
+    # SAME BOUNDARY AS THE BLOCK ABOVE, READ FROM THE OTHER END. What was abandoned is not the kept
+    # file — that is the user's and landing it is correct — but the RETIREMENT this payload asked
+    # for, which finished on disk and stopped at the registration. The `ORPHAN_KEPT` note a few
+    # steps up states the same thing about a retired surface's file; this states it about a retired
+    # surface's last remaining reference.
+    note_not_done "$DEAD_REG_COUNT hook registration(s) listed above were NOT removed — your .claude/settings.json was kept, this version no longer ships those hooks, and the entries naming them outlived the files. Delete them from \"hooks\" there, or diff yours against $SCRIPT_DIR/.claude/settings.json."
+  fi
 fi
 
 ok "Installed $WRITTEN file(s)$([ "$KEPT" -gt 0 ] && printf ', kept %s of yours' "$KEPT")."
@@ -2044,7 +2084,43 @@ ok "Receipt written: $RECEIPT_REL ($((RECEIPT_ROWS - 1)) files)"
 count_in() { find "$CLAUDE_DIR/$1" -name "$2" 2>/dev/null | wc -l | tr -d ' '; }
 # Hooks are counted from settings.json, not from *.sh on disk: hooks/ also holds _lib.sh, a sourced
 # library that is not itself a hook, so the file count and the hook count are never the same number.
-count_hooks() { grep -oE '\.claude/hooks/[a-z_-]+\.sh' "$CLAUDE_DIR/settings.json" 2>/dev/null | sort -u | wc -l | tr -d ' '; }
+# That still holds below — the sweep is settings.json's registrations, and _lib.sh is never one of
+# them — but a registration is now only counted once the file it names exists.
+#
+# THE NUMBER USED TO BE A COUNT OF REGISTRATIONS AND NOTHING ELSE, and after an upgrade across a
+# payload that shrank it printed the pre-cut figure over a tree that no longer held those files:
+# `Hooks 27` with 12 on disk, measured. It is the user's file, correctly kept, so the stale entries
+# are still there and no re-run clears them.
+#
+# BOTH NUMBERS, NOT THE SMALLER ONE. Reporting only what will fire is the honest half of the answer
+# and it is also the quiet one: `Hooks 12` agrees with a healthy tree, so the summary — the last
+# thing printed, and on a long upgrade the only thing read — would look identical to a project with
+# nothing wrong while fifteen entries in the user's file still named deleted scripts. That is the
+# same defect as the one being repaired, one digit to the left. The parenthetical appears only when
+# something is dead, so an ordinary install still prints a bare number and the warning block above
+# is what the reader is being pointed back at.
+count_hooks() {
+  local registered
+  local live
+  local dead
+  local ch_h
+  registered=$(grep -oE '\.claude/hooks/[a-z_-]+\.sh' "$CLAUDE_DIR/settings.json" 2>/dev/null | sort -u || true)
+  live=0
+  dead=0
+  # A settings.json that is missing or registers nothing yields one empty line here, which the
+  # `continue` drops — so both counters stay 0 and the bare `0` the old one-liner printed is
+  # preserved. `<<<` and not a pipe: the loop drains either way, but a here-string keeps the
+  # counters out of a subshell, where they would be incremented and then thrown away.
+  while IFS= read -r ch_h; do
+    [ -n "$ch_h" ] || continue
+    if [ -f "$PROJECT_DIR/$ch_h" ]; then live=$((live + 1)); else dead=$((dead + 1)); fi
+  done <<< "$registered"
+  if [ "$dead" -gt 0 ]; then
+    printf '%s (%s registered, %s dead)\n' "$live" "$((live + dead))" "$dead"
+  else
+    printf '%s\n' "$live"
+  fi
+}
 printf '\n%s\n' "${BOLD}${GREEN}Installation complete.${NC}"
 printf '  %sAgents%s    %s\n'   "$CYAN" "$NC" "$(count_in agents '*.md')"
 printf '  %sCommands%s  %s\n'   "$CYAN" "$NC" "$(count_in commands '*.md')"

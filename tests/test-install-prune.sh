@@ -118,3 +118,142 @@ assert_eq "present" "$([ -f "$PRUNE_DIR/.claude/scripts/studio-doctor.sh" ] && e
   "the project-facing health check does ship"
 
 rm -rf "$PRUNE_DIR"
+
+# ============================================================================
+# Upgrade across a payload that shrank — the half of the prune that lives in a
+# file the prune is forbidden to touch.
+#
+# Everything above proves the FILES are retired correctly. A hook is not a file:
+# it is a file plus an entry in settings.json, and settings.json is the
+# most-edited file in the payload, so on any real project it is the user's and
+# it is kept. The prune therefore deletes a retired hook's script and leaves the
+# entry naming it, in a file it is right not to rewrite. Claude Code reports
+# nothing about a hook command it cannot find — the registration is simply dead,
+# and it stays dead, because the kept file is kept again on every later run.
+#
+# Measured on the real upgrade across the 2026-08-13 cut, from the pre-cut
+# commit to the current tree: 27 registrations over 12 hooks on disk, 15 of them
+# naming deleted scripts, and `Hooks 27` printed under `Installation complete.`
+# One appended newline in settings.json is the whole trigger.
+#
+# THE FIXTURE IS AN UPGRADE, NOT A FRESH INSTALL, and that is the durable point
+# rather than an implementation detail: every artifact this suite reviews is a
+# repository, while the artifact that breaks is a user's project. A change to
+# the payload's SHAPE is invisible to a fresh-install fixture by construction —
+# there is no previous state for the new shape to disagree with.
+#
+# Both directions are asserted. The upgrade below must report the dead entry and
+# print an honest count; the control beside it — same shrunk payload, same cut,
+# settings.json never touched — must report nothing, because ours is overwritten
+# and the entry goes with it. A check that fires on the second project is a check
+# that would fire on every ordinary install.
+echo "--- install prune: upgrade across a payload that shrank ---"
+
+UPG_ROOT="$(mktemp -d)"
+UPG_DIR="$UPG_ROOT/proj"
+CTL_DIR="$UPG_ROOT/control"
+SHRUNK="$UPG_ROOT/payload"
+
+# A realistic project, from the fixture the suite already owns, rather than a
+# hand-built directory: mkproject.sh writes the two-line ProjectVersion.txt Unity
+# actually writes, and a one-line stand-in has hidden a real bug here before.
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$UPG_DIR" --variant urp >/dev/null 2>&1
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$CTL_DIR" --variant urp >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$UPG_DIR" --yes >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$CTL_DIR" --yes >/dev/null 2>&1
+
+# The next payload, one hook smaller. Copied from the WORKING TREE and not from
+# `git archive HEAD`: the point is to exercise the install.sh sitting on disk, and
+# an archive of HEAD would silently test the committed copy instead. Only what
+# install.sh reads from $SCRIPT_DIR is copied — .claude/, scripts/, MCP-SETUP.md
+# and install.sh itself; `cp -pR` so the hooks keep their exec bits.
+mkdir -p "$SHRUNK"
+cp -pR "$REPO_DIR/.claude" "$SHRUNK/.claude"
+cp -pR "$REPO_DIR/scripts" "$SHRUNK/scripts"
+cp -p "$REPO_DIR/MCP-SETUP.md" "$SHRUNK/MCP-SETUP.md"
+cp -p "$REPO_DIR/install.sh" "$SHRUNK/install.sh"
+rm -rf "$SHRUNK/.claude/state"
+
+# A cut removes both halves — the script and its registration. Removing only the
+# script would leave the payload registering a hook it does not ship, which is the
+# defect this fixture is about, pointed the other way. python3 rather than sed:
+# the entry is nested three deep in JSON and a text deletion can leave a file that
+# parses nowhere. The suite already depends on python3 in test-install-not-done.sh.
+CUT_HOOK='warn-filename.sh'
+rm -f "$SHRUNK/.claude/hooks/$CUT_HOOK"
+python3 - "$SHRUNK/.claude/settings.json" "$CUT_HOOK" <<'PY'
+import json, sys
+path, hook = sys.argv[1], sys.argv[2]
+target = ".claude/hooks/" + hook
+with open(path) as fh:
+    doc = json.load(fh)
+events = doc.get("hooks", {})
+for event, groups in events.items():
+    for group in groups:
+        group["hooks"] = [h for h in group.get("hooks", []) if target not in h.get("command", "")]
+doc["hooks"] = {e: [g for g in gs if g.get("hooks")] for e, gs in events.items()}
+with open(path, "w") as fh:
+    json.dump(doc, fh, indent=2)
+    fh.write("\n")
+PY
+
+# One appended newline is the entire difference between "ours" and "yours". This
+# is not a contrived edit: settings.json is where a plugin gets disabled or a
+# permission widened, so on a real project it has drifted long before the upgrade.
+printf '\n' >> "$UPG_DIR/.claude/settings.json"
+UPG_SETTINGS_BEFORE="$(sha256sum "$UPG_DIR/.claude/settings.json" | cut -d' ' -f1)"
+
+UPG_OUT="$(bash "$SHRUNK/install.sh" --project-dir "$UPG_DIR" --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+CTL_OUT="$(bash "$SHRUNK/install.sh" --project-dir "$CTL_DIR" --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+
+# The precondition, asserted rather than assumed: without the prune actually
+# removing the script, every assertion below would be green for the wrong reason.
+assert_eq "removed" "$([ -e "$UPG_DIR/.claude/hooks/$CUT_HOOK" ] && echo present || echo removed)" \
+  "the retired hook's script is pruned even though the kept settings.json still names it"
+
+# The warning names the dead entry, by path, on its own line.
+assert_eq "1" "$(printf '%s\n' "$UPG_OUT" | grep -cxF "       .claude/hooks/$CUT_HOOK" || true)" \
+  "the upgrade names the registration left pointing at a file the payload dropped"
+
+# And names ONLY it. Asserting that the cut hook appears is satisfied by a check
+# that reports every registration in the file as dead, which is a live mutant:
+# measured, the whole of this section stayed green against an install.sh whose
+# existence test had been deleted outright. The headline count is the number the
+# reader acts on, so it is the one pinned.
+assert_eq "1" \
+  "$(printf '%s\n' "$UPG_OUT" | sed -n 's/^warn Your settings.json was kept, so \([0-9][0-9]*\) hook registration(s).*/\1/p')" \
+  "exactly one registration is reported dead — the ones whose files are still there are not"
+
+# The summary is honest about it. Derived from the tree, never typed: the
+# registration total is whatever this version's settings.json carries, and the cut
+# above removed exactly one of them from the payload while the project kept all.
+UPG_REG_TOTAL="$(grep -oE '\.claude/hooks/[a-z_-]+\.sh' "$REPO_DIR/.claude/settings.json" | sort -u | grep -c . || true)"
+assert_eq "$((UPG_REG_TOTAL - 1)) ($UPG_REG_TOTAL registered, 1 dead)" \
+  "$(printf '%s\n' "$UPG_OUT" | sed -n 's/^  Hooks  *//p')" \
+  "the Hooks summary counts what will fire and says how many entries are dead"
+
+# `Not done:` is the contract MCP-SETUP.md makes: an exit-0 run with no such block
+# abandoned nothing. A registration this installer will not repair is abandoned
+# work, so it belongs in the block and not only in a warn line the reader scrolled
+# past four hundred lines ago.
+assert_eq "found" \
+  "$(printf '%s\n' "$UPG_OUT" | awk '/^Not done:$/ { f = 1; next } f && /hook registration\(s\) listed above/ { print "found"; exit }')" \
+  "the dead registration reaches the Not done: block, not just a warn line"
+
+# WARN, DO NOT EDIT. The file was kept because it is the user's; measured by
+# checksum and not by size, because a rewrite of a JSON file can land on the same
+# byte count. This is the assertion that would catch a future "fix" that helpfully
+# merges the user's settings.json.
+assert_eq "$UPG_SETTINGS_BEFORE" "$(sha256sum "$UPG_DIR/.claude/settings.json" | cut -d' ' -f1)" \
+  "the kept settings.json is reported on and never rewritten"
+
+# The control. Same shrunk payload, same retired hook, a settings.json that is
+# still ours — so it is replaced, the entry goes with it, and there is nothing to
+# report. A check that also fired here would fire on every ordinary upgrade.
+assert_eq "0" "$(printf '%s\n' "$CTL_OUT" | grep -cxF "       .claude/hooks/$CUT_HOOK" || true)" \
+  "a project that never edited settings.json gets the cut applied and is warned about nothing"
+
+assert_eq "$((UPG_REG_TOTAL - 1))" "$(printf '%s\n' "$CTL_OUT" | sed -n 's/^  Hooks  *//p')" \
+  "the honest count collapses to a bare number when no registration is dead"
+
+rm -rf "$UPG_ROOT"
