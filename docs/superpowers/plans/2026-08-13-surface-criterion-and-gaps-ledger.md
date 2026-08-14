@@ -1618,6 +1618,23 @@ ADDRESSED, none returned to the fix loop.**
      content **replaced**, and the dry run announces a plain refresh for it. Measured identical
      before and after — out of scope, **and it is the last open corner.** **→ open, no owner.**
 
+**From Task 4b's fix round 1 (2026-08-14, `32dbc49`, in re-review).**
+
+165. **A fourth data-loss state nobody had named, found while fixing the diagnosis of it.** At
+     `20c785b`, **both markers on one line amputated outright** — the begin rule fires and `next`s,
+     so the end rule never sees the line. It was being reported as an *ordering* fault; it was a
+     *destruction* path. New token `malformed-same-line`, new state **S3a**, which asserts the
+     decline **and** that no ordering claim is made.
+166. **The correction broke its own verification command, and the implementer caught it while
+     writing.** `grep -n 'shopt' install.sh` was the evidence that `inherit_errexit` is unset — and
+     **the corrected comment made that grep non-empty by quoting `shopt` twice.** The comment now
+     prescribes `awk '!/^[[:space:]]*#/ && /shopt/' install.sh`, the comments-excluded shape the
+     `note_not_done` header already uses. *Fifth instance of a probe whose own text satisfies the
+     condition it tests — and the first caught in the act of being written.*
+167. **The corrected `set -e` comment names the two shapes where the death IS real**, so a future
+     edit that looks like tidying has something to fail against: a function whose **last** command is
+     the failing assignment, and the shipped printf-last shape **under `inherit_errexit`.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
