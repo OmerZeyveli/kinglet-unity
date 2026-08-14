@@ -280,10 +280,24 @@ while IFS= read -r asmdef; do
     # whole shape of this trap: it passes every test written against a healthy project.
     #
     # sed's full output is captured — command substitution drains its writer, there is no reader to
-    # exit early — and the first line is taken with a parameter expansion, which is byte-for-byte
-    # what `head -1` produced. The greedy `.*"name"` prefix is left exactly as it was: on a
-    # pretty-printed asmdef it picks the assembly name, on a minified one it picks the LAST "name"
-    # on the line, and changing that is a behaviour question this fix deliberately does not open.
+    # exit early — and the first line is taken with a parameter expansion. On every input sed can
+    # READ, that is byte-for-byte what `| head -1` produced: verified across pretty-printed,
+    # minified, versionDefines-only, no-name, empty, no-trailing-newline, CRLF and multibyte asmdefs.
+    #
+    # THE `|| true` IS A DELIBERATE BEHAVIOUR CHANGE, and an unreadable file is the one input on
+    # which old and new differ. It closes a SECOND silent-death path that has nothing to do with
+    # SIGPIPE: when sed cannot read the file at all it exits non-zero, and the old bare assignment
+    # let `set -e` kill the script exactly as the pipe did. Measured 2026-08-14 on a `chmod 000`
+    # .asmdef — old: rc=1, zero bytes of document; new: rc=0, whole document, with the
+    # `[ -n "$name" ] || name=$(basename …)` line below supplying the name from the filename.
+    # Strictly better, and written down rather than left as a nicety because `|| true` also absorbs
+    # a genuine failure: an unreadable asmdef is now indistinguishable HERE from one carrying no
+    # "name" field. Both land on the basename fallback, which is the right answer for both — but
+    # anyone adding a different fallback needs to know the two cases arrive together.
+    #
+    # The greedy `.*"name"` prefix is left exactly as it was: on a pretty-printed asmdef it picks the
+    # assembly name, on a minified one it picks the LAST "name" on the line, and changing that is a
+    # behaviour question this fix deliberately does not open.
     name_lines=$(sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$asmdef" 2>/dev/null || true)
     name=${name_lines%%"$NL"*}
     [ -n "$name" ] || name=$(basename "$asmdef" .asmdef)

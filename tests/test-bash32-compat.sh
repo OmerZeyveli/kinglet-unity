@@ -35,7 +35,15 @@ ROOT_SCRIPTS=(
 
 # The early-exit-reader scope. This is a DIRECTORY list on purpose: the file set is derived by the
 # glob in shipped_scripts() below, so a script added to a covered directory is covered the day it
-# lands and no list here can go stale.
+# lands without anyone editing this list.
+#
+# THAT PROPERTY IS ONE-SIDED, and the first draft of this comment overclaimed it as "no list here can
+# go stale". It is true for ADDITIONS and false for an emptied scope: point these entries at paths
+# that do not exist and every assertion below compares "" against "" over a file set of zero and
+# reports green. Measured — PIPE_CHECK_DIRS → nonexistent-dir, PIPE_CHECK_FILES →
+# nonexistent-file.sh gave 7 pass / 0 fail. That is the runner's own green-zero catastrophe one level
+# down, and this repo's precedent is explicit that it is worse than a red. The non-empty assertion
+# just below shipped_scripts() closes it, in the shape tests/test-help-ranges.sh already uses.
 #
 # scripts/ WAS EXCLUDED, AND THE GROUND IT WAS EXCLUDED ON WAS WRONG. That ground read: "scripts/
 # and tests/ were already swept for this shape (Task 9) and are confined to short
@@ -53,9 +61,16 @@ ROOT_SCRIPTS=(
 #   * It was written before the current set of scripts existed. The surface-criterion cut removed
 #     four of them and `scripts/generate-claude-md.sh` grew the `| head -1` this widening now
 #     catches: on a project whose .asmdef makes sed emit more than one pipe buffer, that line took
-#     SIGPIPE, pipefail promoted 141, `set -e` killed the generator, and install.sh — which calls it
-#     inside `if ... 2>/dev/null` — wrote NO CLAUDE.md and printed no diagnostic. Measured
-#     2026-08-14: 80 KB of sed output → exit 141, zero bytes of document; 413 B → exit 0.
+#     SIGPIPE, pipefail promoted 141, and `set -e` killed the generator. install.sh calls it inside
+#     `if ... 2>/dev/null`, which swallows THE GENERATOR'S OWN DIAGNOSTIC — the install then exits 0
+#     having written no CLAUDE.md, with only a generic `warn CLAUDE.md generation failed — skipped.`
+#     and a Next-steps line, neither of which names a cause. Measured 2026-08-14: 80 KB of sed
+#     output → exit 141, zero bytes of document; 413 B → exit 0.
+#
+#     THIS PARAGRAPH SAID "printed no diagnostic" IN ITS FIRST DRAFT and that was false — the
+#     install prints two lines. Corrected in the open rather than quietly, because it is the same
+#     defect this block overturns two bullets up: a ground that names the wrong reason cannot be
+#     re-derived by the next reader. Committed in the round that says so.
 #
 # scripts/ is installed payload — install.sh copies it into the user's `.claude/scripts/` — so it is
 # exactly as much "must not fail open in the field" as .claude/hooks/ is, which is the argument this
@@ -66,8 +81,14 @@ ROOT_SCRIPTS=(
 # a wrong answer on a machine nobody is watching. The runner's own two assertion helpers were the
 # one instance that mattered and they were fixed to here-strings; tests/test-assert-helpers-under-load.sh
 # guards that specific regression under real concurrency, which is stronger evidence than a text
-# sweep. Re-derive what is left rather than trusting this sentence:
+# sweep. Re-derive what is left rather than trusting this sentence — BOTH needles, since the second
+# one is as much part of the exclusion as the first and the earlier draft of this line quoted only
+# the first:
 #   /usr/bin/grep -nE '([^|]|^)\|[[:space:]]*grep([[:space:]]+-[A-Za-z]*q[A-Za-z]*)' tests/*.sh
+#   /usr/bin/grep -nE '[[:space:]]\|[[:space:]]+head([[:space:]]|$)'                 tests/*.sh
+# Measured 2026-08-14: the first returns three files on small frontmatter/output haystacks
+# (test-cross-validation.sh, test-skills.sh, test-state.sh); the second returns one,
+# tests/test-assert-helpers-under-load.sh, bounded far below a pipe buffer.
 PIPE_CHECK_DIRS=(
     "$REPO_DIR"/.claude/hooks
     "$REPO_DIR"/scripts
@@ -98,6 +119,34 @@ shipped_scripts() {
         printf '%s\n' "$f"
     done
 }
+
+# ── Discovery integrity: neither scope may be empty ──────────────────────────
+#
+# Every assertion in this file is `assert_eq "" "$MATCHES"`, which is green when the sweep found
+# nothing — and a sweep that READ nothing also finds nothing. `shipped_scripts` skips a missing
+# directory (`[ -d ... ] || continue`) and a missing file, by design, so a renamed directory, a
+# moved repo layout or a typo in either array silently shrinks the scope to zero and every
+# assertion below passes over it.
+#
+# Measured 2026-08-14, before this block existed: pointing PIPE_CHECK_DIRS at `nonexistent-dir` and
+# PIPE_CHECK_FILES at `nonexistent-file.sh` gave **7 pass / 0 fail** — the same output as a clean
+# tree. That is the runner's own `Total: 0 Passed: 0 Failed: 0, exit 0` failure one level down, and
+# tests/run-tests.sh's header is explicit that it is worse than a red.
+#
+# Asserted for BOTH scopes, because they are two different arrays and either can empty on its own.
+# The counts are not written down here — that is the same staleness this file exists to avoid; only
+# "more than zero" is asserted, which is the property that cannot be satisfied by an accident.
+SS_ALL_N=$(shipped_scripts SHIPPED_SCRIPT_DIRS | grep -c . || true)
+SS_PIPE_N=$(shipped_scripts PIPE_CHECK_DIRS | grep -c . || true)
+
+SS_SCOPE="ok"
+[ "$SS_ALL_N"  -gt 0 ] || SS_SCOPE="the bash-4 sweep resolved to 0 files — SHIPPED_SCRIPT_DIRS/ROOT_SCRIPTS point at nothing that exists, so every assertion below is green over an empty set"
+[ "$SS_PIPE_N" -gt 0 ] || SS_SCOPE="the early-exit-reader sweep resolved to 0 files — PIPE_CHECK_DIRS/PIPE_CHECK_FILES point at nothing that exists, so every assertion below is green over an empty set"
+
+assert_eq \
+    "ok" \
+    "$SS_SCOPE" \
+    "both sweeps resolve to a non-empty file set ($SS_ALL_N shipped, $SS_PIPE_N in the early-exit-reader scope), so the empty results below mean something"
 
 # Reports every shipped script (except this guard itself) that matches the given grep arguments on
 # a non-comment line. Two things would otherwise self-defeat a substring/regex sweep like this one:
@@ -154,9 +203,12 @@ grep_shipped() {
     done
 }
 
-# Same comment-aware sweep as grep_shipped, restricted to .claude/hooks/*.sh plus install.sh and
-# uninstall.sh (see PIPE_CHECK_DIRS/PIPE_CHECK_FILES above for why the scope differs from scripts/
-# and tests/).
+# Same comment-aware sweep as grep_shipped, restricted to the early-exit-reader scope —
+# PIPE_CHECK_DIRS plus PIPE_CHECK_FILES, which is .claude/hooks/*.sh and scripts/*.sh plus
+# install.sh and uninstall.sh. See the ruling at their declaration for why `scripts/` is in and
+# `tests/` is out; do not restate the membership here. This sentence named "hooks plus install.sh
+# and uninstall.sh" and said the scope "differs from scripts/" for one round AFTER scripts/ was
+# added three lines up, which is a docstring falsified by the code it sits on.
 grep_pipe_check() {
     local self
     self="$(basename "${BASH_SOURCE[0]}")"
@@ -252,9 +304,28 @@ assert_eq \
 # does not drop it), and the looser needle matches it — a permanent red on a correct file. Requiring
 # a space on each side separates the two with no exception in the tree today.
 #
-# WHAT THAT COSTS: `foo |head -1` and `foo| head -1` are legal shell and this needle misses both.
-# That is a known hole, chosen over a guard that cannot go green. If it ever matters the repair is a
-# style rule, not a cleverer regex.
+# WHAT THAT COSTS — the list is measured, not guessed, because a disclosure that is itself unchecked
+# is the defect this file keeps finding. Written against the five shapes probed on 2026-08-14:
+#
+#   MISSED  `foo |head -1` and `foo| head -1` — whitespace on only one side.
+#   MISSED  a pipeline split so the pipe and the reader land on DIFFERENT lines:
+#             y=$(cat f |
+#               head -1)
+#           Every needle here is line-oriented; nothing in this file joins continuations.
+#   CAUGHT  a pipeline split across a backslash continuation that keeps `| head` together:
+#             x=$(cat f \
+#               | head -1)
+#           This was reported to be a miss and is not — probed, it matches. Recorded because the
+#           two continuation shapes look identical at a glance and only one of them is a hole.
+#
+# The `grep -q` needle above has a hole of its own, pre-dating this block: it matches only the
+# SHORT flag, so `| grep --quiet` and `| grep --silent` are both missed. Probed, both return 0.
+# Left rather than widened: no occurrence of either spelling exists in the swept set today, and the
+# alternation that would cover them is the kind that stops being obviously correct — which is the
+# argument the `-oP` needle above already makes for itself.
+#
+# All of it is chosen over a guard that cannot go green. If any of it starts mattering the repair is
+# a style rule, not a cleverer regex.
 PIPE_HEAD=$(grep_pipe_check -E '[[:space:]]\|[[:space:]]+head([[:space:]]|$)')
 
 assert_eq \
