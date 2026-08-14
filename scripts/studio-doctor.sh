@@ -605,20 +605,39 @@ if [ -d "$CLAUDE_DIR" ]; then
   # skills. Same `find … | wc -l` shape as the counts above, `|| true` inside the substitution for
   # the same reason.
   #
-  # THIS LIST IS HAND-MAINTAINED, SO IT IS PINNED TO ONE THAT IS NOT. `install.sh`'s completion
-  # summary counts these same five directories and no others — four through `count_in <dir> <glob>`
-  # and `hooks` through `count_hooks` — and `tests/test-studio-doctor.sh` asserts the two lists are
-  # the same set with the same globs. A sixth payload directory therefore cannot be installed
-  # without this loop growing in the same commit, which is the only thing that keeps a hand-written
-  # list from becoming an assertion that decays in silence. `.claude/state/` is deliberately not a
-  # member on either side: it is the installer's machine-local state, not a surface anything reads.
+  # THIS LIST IS HAND-MAINTAINED, SO IT IS PINNED TO ONE THAT IS NOT — AND THE FIRST VERSION OF THIS
+  # COMMENT NAMED THE WRONG ONE. It said `install.sh`'s completion summary made a sixth payload
+  # directory impossible to install without this loop growing in the same commit. That is false, and
+  # it was measured false: a real `.claude/newsurface/thing.md` with its `provenance.tsv` row is
+  # installed by `install.sh`, reported healthy by this check, and leaves `provenance OK` and this
+  # file's own guard fully green. **install.sh installs the payload from a `find`, not from its
+  # summary** — the summary is five hand-written `printf` lines — and that find is
+  # `PAYLOAD_FILES=$(cd "$SCRIPT_DIR/.claude" && find . -type f ! -path './state/*' …)`, whose own
+  # comment states why it exists: hand-synced lists drift and `find` cannot.
+  #
+  # So `tests/test-studio-doctor.sh` derives the member set from THAT expression, evaluated from
+  # install.sh's own bytes, and the claim now holds: a directory added to the payload tree is in it
+  # the moment it exists, so this loop has to grow in the same commit. The completion summary is
+  # still compared, for the one thing it can support — the per-directory GLOB, which the find has no
+  # opinion about — and that comparison is a lockstep pin between two hand-written lists, not a
+  # derivation. Both are asserted, because they fail differently, and neither is described as the
+  # other.
+  #
+  # `.claude/state/` is excluded by the find expression itself and belongs on no side: installer
+  # state, not a surface. `.claude/scripts/` is the known exception in the other direction — it IS
+  # installed, by the separate `for group in scripts` loop, and it is in neither list. That is a
+  # ledger item rather than a silent gap, and the test asserts that scope rather than trusting this
+  # sentence for it.
   #
   # `! -name '_lib.sh'` FOR THE REASON install.sh COUNTS HOOKS FROM settings.json INSTEAD OF FROM
   # DISK: `hooks/` also holds `_lib.sh`, a sourced library that is not itself a hook. Without the
-  # exclusion, a `.claude/hooks/` stripped of every real hook still passed this check on the
-  # library alone — measured 2026-08-14, `PASS Payload complete` printed beside thirteen dead
-  # registrations. The exclusion is applied to all five rather than to `hooks` alone because
-  # `_lib.sh` is not a payload member of any of them; it is only ever present in one.
+  # exclusion, a `.claude/hooks/` stripped of every real hook still passed this check on the library
+  # alone — measured 2026-08-14 on a receipt-less fixture: `PASS Payload complete` beside **twelve**
+  # `references a missing hook` failures, one per registered hook, `12 failure(s)`, exit 1. This
+  # comment read *thirteen* until it was reconstructed. Thirteen is the number of `.sh` FILES in
+  # `hooks/` — twelve hooks plus the library — which is the one quantity the sentence could not be
+  # about. The exclusion is applied to all five rather than to `hooks` alone because `_lib.sh` is not
+  # a payload member of any of them; it is only ever present in one.
   PAYLOAD_BAD=0
   for pd_spec in "agents:*.md" "commands:*.md" "hooks:*.sh" "rules:*.md" "skills:SKILL.md"; do
     pd_name="${pd_spec%%:*}"

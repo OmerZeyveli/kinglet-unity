@@ -522,19 +522,33 @@ assert_eq "1" "$TSD_PAY_GONE_RC" \
 # exactly that argument, that the INFO block "reads four of these five … never hooks" — so the one
 # new member was the one nothing asserted.
 #
-# TWO DEFENCES, BECAUSE THEY FAIL DIFFERENTLY.
+# THREE DEFENCES, BECAUSE THEY FAIL DIFFERENTLY — AND THE FIRST ONE REPLACES A CLAIM THAT WAS FALSE.
 #
-#   1. The set is pinned to a list DERIVED OUTSIDE studio-doctor.sh — install.sh's completion
-#      summary, which counts these same five directories and no others, four of them through
-#      `count_in <dir> <glob>` and `hooks` through `count_hooks`. That is the file which CREATES the
-#      tree this check reads, so a sixth payload directory cannot be installed without appearing
-#      there, and this assertion then requires the doctor's loop to grow in the same commit. A
-#      guard whose coverage list is written by the same hand as the thing it covers decays in
-#      silence; this one cannot. `.claude/state/` is absent from both sides and belongs on neither:
-#      it is the installer's machine-local state, not a surface anything reads.
-#   2. Every member is exercised BEHAVIOURALLY below. The static set assertion cannot see a member
-#      that is listed and does not work, and the behavioural probe cannot see a member that is
-#      missing from both files at once.
+#   1. THE MEMBER SET, from the expression install.sh installs the payload WITH. The first version of
+#      this section pinned the set to install.sh's completion SUMMARY and said a sixth payload
+#      directory could not be installed without appearing there. Measured false the same week: a real
+#      `.claude/newsurface/thing.md` with its provenance row installs, the doctor calls the project
+#      healthy, `check-provenance.sh` says `provenance OK`, and this file stayed 70/70 green. The
+#      summary is five hand-written `printf` lines; the INSTALL is
+#      `PAYLOAD_FILES=$(cd "$SCRIPT_DIR/.claude" && find . -type f ! -path './state/*' …)` at
+#      install.sh's Step 4, whose own comment says why it is a find: hand-synced lists drift and find
+#      cannot. So the set is derived from that expression, EVALUATED FROM INSTALL.SH'S OWN BYTES —
+#      the same idiom this file already uses to exercise `read_mcp_url` in isolation, and the reason
+#      it is not a re-implementation: a re-implementation is a third hand-written list.
+#      `.claude/state/` drops out because that expression excludes it. `.claude/scripts/` is the
+#      known exception in the other direction: it IS installed, by the separate `for group in
+#      scripts` loop, and it is on no side of this pin — asserted below as a scope statement rather
+#      than left to a comment.
+#   2. THE GLOBS, against the completion summary, which is the only thing that carries them: the find
+#      has no opinion about what makes a file count in a directory. That comparison is a LOCKSTEP PIN
+#      BETWEEN TWO HAND-WRITTEN LISTS and is not called a derivation here — it cannot see a directory
+#      that is absent from both, which is exactly what defence 1 is for.
+#   3. Every member is exercised BEHAVIOURALLY below. A static set assertion cannot see a member that
+#      is listed and does not work; and a set pinned on both sides at once still passes when both
+#      sides are loosened together — measured, `skills:SKILL.md` widened to `*.md` in the doctor AND
+#      in install.sh satisfies defences 1 and 2 completely, and only the probe below catches it,
+#      because `.claude/skills/subagent-driven-implementation/` holds four non-SKILL.md `.md` files
+#      and reads as non-empty with every SKILL.md gone.
 #
 # THE ONE THING THAT CANNOT BE DERIVED, SAID OUT LOUD: install.sh supplies no disk glob for `hooks`,
 # because it counts hooks from settings.json — precisely so `_lib.sh`, a sourced library and not a
@@ -560,12 +574,25 @@ TSD_PAY_INSTALL=$(awk -v q="'" '
       }
       if ($0 ~ /\$\(count_hooks\)/) { print "hooks:" }
     }' "${REPO_DIR}/install.sh" | sort -u)
+# Defence 1 — the payload tree, from install.sh's own enumeration expression, run as install.sh runs
+# it. `SCRIPT_DIR` is what that line reads; the repo checkout is what install.sh sets it to.
+TSD_PAY_FIND_EXPR=$(awk '/^PAYLOAD_FILES=\$\(cd /{ print; exit }' "${REPO_DIR}/install.sh")
+assert_contains "$TSD_PAY_FIND_EXPR" "find . -type f" \
+    "install.sh's payload enumeration was found and still enumerates files — an expression that moved must fail here, loudly, rather than silently deriving an empty set"
+TSD_PAY_TREE=$(SCRIPT_DIR="$REPO_DIR" bash -c "$TSD_PAY_FIND_EXPR
+printf '%s\n' \"\$PAYLOAD_FILES\"" | awk -F/ 'NF > 1 { print $1 }' | sort -u)
+assert_eq "5" "$(printf '%s\n' "$TSD_PAY_TREE" | grep -c . || true)" \
+    "the payload tree holds five directories — the derivation is non-empty, without which every comparison below is vacuously true"
+assert_eq "$TSD_PAY_TREE" "$(cut -d: -f1 <<< "$TSD_PAY_SPECS")" \
+    "the doctor checks every directory install.sh actually installs — a sixth added under .claude/ is in that find the moment it exists, so this loop must grow in the same commit"
+assert_not_contains "$TSD_PAY_TREE" "scripts" \
+    "…and the pin's scope is the payload tree: .claude/scripts/ is installed by the separate 'for group in scripts' loop, is on no side of it, and is a ledger item rather than a gap this claim hides"
 assert_eq "5" "$(printf '%s\n' "$TSD_PAY_SPECS" | grep -c . || true)" \
     "the doctor's payload list parses to five specs — a derivation that reads nothing must not be compared against another that reads nothing"
 assert_eq "5" "$(printf '%s\n' "$TSD_PAY_INSTALL" | grep -c . || true)" \
     "…and install.sh's completion summary parses to five counted directories"
 assert_eq "$(cut -d: -f1 <<< "$TSD_PAY_INSTALL")" "$(cut -d: -f1 <<< "$TSD_PAY_SPECS")" \
-    "the doctor checks exactly the payload directories install.sh reports installing — neither list may grow alone"
+    "the summary reports the same set the doctor checks — two hand-written lists held in lockstep, which is what this assertion is; the find above is the derivation"
 assert_eq "$(grep -v '^hooks:' <<< "$TSD_PAY_INSTALL" || true)" "$(grep -v '^hooks:' <<< "$TSD_PAY_SPECS" || true)" \
     "…with the same glob per directory, so the one structurally different member (skills/SKILL.md) cannot be edited to *.md unnoticed"
 assert_eq "*.sh" "$(grep '^hooks:' <<< "$TSD_PAY_SPECS" | cut -d: -f2 || true)" \
@@ -592,9 +619,12 @@ assert_contains "$TSD_PAY_SKILLS_OUT" "Payload directory .claude/skills/ is pres
     "skills/ is checked on SKILL.md and not on *.md — the skill directories are all still there, holding everything except the file that makes one a skill"
 assert_eq "4" "$(tsd_payload_fails "$TSD_PAY_SKILLS_OUT")" \
     "…and that is the fourth payload failure"
-# hooks/ keeping ONLY _lib.sh. Measured 2026-08-14 before the exclusion: `PASS Payload complete`
-# printed beside thirteen dead-registration failures — the payload verdict satisfied by the shared
-# library that CLAUDE.md and /unity-doctor's own registration item both exclude from the hook set.
+# hooks/ keeping ONLY _lib.sh. Reconstructed 2026-08-14 with the exclusion removed and nothing else
+# changed: `PASS Payload complete` beside TWELVE `references a missing hook` failures — one per
+# registered hook — `12 failure(s)`, exit 1. The payload verdict satisfied by the shared library that
+# CLAUDE.md and /unity-doctor's own registration item both exclude from the hook set. This comment
+# said thirteen in its first draft, which is the count of `.sh` FILES in hooks/ (twelve hooks plus
+# the library) and the one quantity a count of dead registrations cannot be.
 for tsd_h in "$TSD_PAY/.claude/hooks/"*.sh; do
   case "$(basename "$tsd_h")" in _lib.sh) continue ;; esac
   rm -f "$tsd_h"
