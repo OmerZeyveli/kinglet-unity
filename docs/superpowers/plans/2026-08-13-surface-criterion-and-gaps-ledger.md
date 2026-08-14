@@ -1809,6 +1809,47 @@ ADDRESSED, none returned to the fix loop.**
      C need a non-empty path segment before the `.`, B needs a non-path character before the colon
      and gets `e`. **It resolves today and will rot silently the next time a line is added above it.**
 
+**From Task 11's fix-round re-review (2026-08-14). In fix round 2 — and the six items it hands the
+whole-branch review are below, because that review is the first reader positioned to see them.**
+
+200. **One commit fixed a shape in one file and reintroduced it in the other.** It made the citation
+     guard's exemption table **token-scoped** (eighteen blind spots closed) and left the new rule 4
+     marker **line-scoped**. Appending a second repo-only path to a line that already carries the
+     marker is **GREEN**, with the token counter going 11→12 — *read and waved through.* **Not
+     hypothetical: two notes already carry two paths under one marker and a header line carries
+     three.**
+201. **A guard does not cover the fourth of the four paths it exists for.** `.claude/UPSTREAM` names
+     `check-provenance.sh` as a **bare basename**, and there is no such file at the repo root, so the
+     token **never enters scope** — removing its marker is GREEN; writing it as `scripts/…` and
+     removing the marker is RED. **No live defect; the guard simply would not notice its removal.**
+202. **A hook whose `source` line is wrapped in a never-true `if` stays classified as a sourcer, is
+     never probed, and then runs silently rc=0 in both switch states.** *The kill-switch property is
+     vacuously satisfied; what is lost is the hook.* Pre-existing — **and the new set identity now
+     depends on that classifier.**
+203. **`git ls-files '*.md'` crosses `/` in git pathspec**, so the citation guard's "live surfaces"
+     silently include `spikes/`, `tools/` and `tests/kinglet_spike/` Markdown. **Nobody intended it;
+     it is invisible per-task and appears only when the scanned set is enumerated.**
+
+**HANDED TO THE WHOLE-BRANCH REVIEW — six things a per-task review structurally could not see:**
+
+1. **The 23-file non-Markdown shipped class.** Rules 1–3 read **44 of 67** payload entries; rule 4
+   closes **one** of the remaining 23. **Nine unmarked repository-only paths sit in four files**
+   (`bash-gate.sh` ×5, `_lib.sh` ×1, `session-brief.sh` ×1, `settings.local.json.template` ×2).
+   **Only a branch-wide reader sees all 23 at once.**
+2. **One of those nine is a line Task 11 wrote in its own round 0.** *A per-task review that approves
+   round 0 and then scopes to round 1 cannot see that the round-1 fix's own class covers round-0
+   text.* **Shape (3) — a class-fix reviewed as a list of edits — applied to the very round that
+   named it.**
+3. **`install.sh`'s `provenance.tsv` note is now ~8.7 KB of clauses concatenated by four tasks**
+   (4, 4b, 4c, 11), and it is **the only file that conflicted on every merge this wave.** **No guard
+   reads it for coherence.**
+4. **The suite total moved 1189 → 2653 → 3304 → 3310 across the wave.** Every figure written before
+   the last task is invalid, **and only the branch review sees them all.**
+5. **Eleven `_lib.sh` sourcers are now vouched for by one representative probe.** Sound as a design;
+   **whether one representative is enough across the whole hook set is a branch-level question.**
+6. **The marker wording is not canonical** — one file says *"install.sh never copies into a project"*
+   where the rule expects *"not installed"*. **It must be canonical before the rule is widened.**
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
