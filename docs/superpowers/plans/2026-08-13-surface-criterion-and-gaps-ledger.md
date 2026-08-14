@@ -1228,6 +1228,39 @@ ADDRESSED, none returned to the fix loop.**
      them**. **→ Tasks 10/11.** *Fourth and fifth instances in this repository of the rot the
      cite-by-anchor rule exists for.*
 
+**From Task 8's review (2026-08-14). In fix round 1.**
+
+105. **A controller override, recorded with its reasoning.** The reviewer recommended the
+     agent-direct bypass become a **separate follow-up task**; the controller **widened Task 8's
+     scope instead.** Grounds: the two agent files have **no other owner** in this wave; the change
+     is **prose, not a capability**, so R8 does not bite; **the idiom already exists in both files**
+     (each uses *"stop and say so explicitly"* for a different unmet dependency); and **the task's own
+     title — "stop reading as entry points" — stays false if it closes one of two routes.** A
+     separate task costs a full cycle for two paragraphs. *The reviewer's stated concern was that the
+     finding not be lost when Task 8 is marked complete; widening satisfies that better than
+     deferring.*
+106. **The line that decides selection is the `description:`, and this repository already ruled so.**
+     `docs/superpowers/specs/2026-07-30-surface-trigger-rules.md` says the command should win over
+     its shadow agent *"because it is what shows up in the command palette."* The house style already
+     encodes preconditions there (`/unity-review`'s *"after"*, `/unity-init`'s *"once per project"*,
+     `/unity-fix`'s *"before proposing a fix from memory"*), and **no assertion in `tests/` reads a
+     command `description:`** — verified. **A body-level precondition does not reach a model that is
+     still choosing.**
+107. **`111 PASS / 0 FAIL` on `tests/test-surface-references.sh` carries no information about a chain
+     row's *content*.** Measured: reverting row 11 to its old bypassing wording is **111/0**, and
+     writing an **overt exemption** into that cell is **111/0** — no assertion anywhere reads those
+     characters. **The actual protection is `migration/baseline-inventory.json`'s per-file sha256,
+     and it is whole-file, not semantic.** *The reviewer drafted this as a missing-guard finding and
+     then falsified it itself* — recorded only so nobody later cites the green as evidence the row is
+     protected.
+108. **Row 4's routing is defensible and its recorded reasoning is not.** `unity-brainstorming`'s
+     `## The category, and its boundary` keeps **two** lists — the exemption list it refuses to
+     keep, **and an explicit not-an-exemption list** with two members. A handed-over plan is a **third
+     member of the second list**, where adding it falsifies nothing; mutation M9 measured that
+     section is read into `UB_BOUNDARY` but **is not frozen whole**, so the edit was available. *The
+     reasoning is what gets inherited, which is why it is being corrected even though the outcome
+     stands.*
+
 **Inherited from earlier waves, still open:**
 
 8. **`HOOK-REFERENCE.md` §Shared Library makes two false claims.** **→ Task 11.**
