@@ -1324,6 +1324,18 @@ find Assets -name 'Player.cs.me[t]a' -exec sed -i s/guid/XXXX/ {} \;
 find Assets -name 'Player.cs.m?ta' -exec sed -i s/guid/XXXX/ {} \;
 2 0000 - the IN-ARGS introducer site's own discriminator: an untrusted path-qualified xargs appearing while another command is pending must be classified, not allowed to introduce a read-only stat that then vouches for the clause. Not destructive as written - grep never runs it - but it is the only payload that separates the two introducer sites, and removing the identity test at that site alone was a silent no-op until it existed
 find Assets -name '*.meta' -print0 | xargs -0 grep -l guid ./evil/xargs -0 stat
+2 0000 - NEW FALSE POSITIVE from review round 1, pinned rather than fixed: the five-character window reads each position as literal-or-wildcard, so five adjacent bracket expressions inside a SED SCRIPT match with no literal surviving - this find is over *.log and executed it left a real .meta file byte-identical. One first-attempt block on a read; requiring a surviving literal would close it and cost the ????? row below, which is a permit on a write
+find logs -name '*.log' -exec sed -i 's/[abc][def][ghi][jkl][mno]/x/' {} \;
+2 0000 - the defensible half of the same over-approximation: ????? really can match a file named .meta, so blocking is right - but note the asymmetry it creates against the disclosed -name '*' permit two records below, where a glob that matches EVERY .meta file is allowed and this one is not
+find src -name '?????' -exec sed -i s/a/b/ {} \;
+0 0000 - the over-widening guard for the window: a five-character bracket run that is not adjacent must not route, or the wildcard rule has swallowed every sed script on the machine
+find logs -name '*.log' -exec sed -i 's/[abc]x[def]y[ghi]/x/' {} \;
+0 0000 - LIVE HOLE, widened by round 1 and recorded here: a quote ANYWHERE in the introducer token means it is never read as an introducer, so find_exec_trusted_path is never consulted - a quote inside the path is enough. Executed, it destroyed 3 of 3 real .meta files, 119 B to 6 B, while the unquoted spelling of the same path blocks
+find Assets -name '*.meta' -print0 | ./evil/'xargs' -0 grep -l guid
+0 0000 - the same, whole path single-quoted - quoting a path is a thing people do for no reason at all; destroyed 3 of 3 real .meta files
+find Assets -name '*.meta' -print0 | './evil/xargs' -0 grep -l guid
+0 0000 - the same, whole path double-quoted; destroyed 3 of 3 real .meta files
+find Assets -name '*.meta' -print0 | "./evil/xargs" -0 grep -l guid
 TBG_CORPUS
 }
 
@@ -1476,10 +1488,10 @@ assert_eq "45" "$tbg_fp" \
 #        blocked. That last one is a discriminator rather than a fix: it says where the
 #        introducer hole was NOT, because only the PIPELINE site was ever open.
 #
-# The other 64 of the 69 records task 2c adds are `0000` — a hole that was open at every version
+# The other 70 of the 75 records task 2c adds are `0000` — a hole that was open at every version
 # is what a task that closes a hole is supposed to add.
 #
-# The record count moved 256 -> 325 across the same change, and that number is deliberately NOT
+# The record count moved 256 -> 331 across the same change, and that number is deliberately NOT
 # asserted: it is the one figure here that a legitimate addition moves every time, so a ceiling
 # on it would be edited on every commit and would stop being read. The three counts above are
 # ceilings on DIVERGENCE, which is the thing that must only ever shrink.

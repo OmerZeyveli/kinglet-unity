@@ -334,6 +334,32 @@ find_exec_tokens() {
         # busybox awk accepts it, which is the worst way to find out. The backslash is matched by
         # an alternation outside any bracket expression instead. Verified byte-identical output
         # on 26 token values under gawk, gawk --posix, gawk --traditional, mawk and busybox awk.
+        # (In THIS hook that failure is not a hole, it is the gate switching off: the scan is the
+        # first thing every Bash call runs, so an awk that dies means exit 3 — silently — on every
+        # command. Four of five awks; the one that accepts it is the one nobody develops on.)
+        #
+        # THE WINDOW ACCEPTS ALL FIVE POSITIONS WILDCARD, AND THAT IS A FALSE POSITIVE THIS FILE
+        # OWNS RATHER THAN HIDES. `METARE` reads each position as literal-or-wildcard, so five
+        # adjacent one-character globs match with no literal surviving. Measured, both new at
+        # `20aa2b7` and 0 at every earlier version, both executed against a tree containing a real
+        # .meta file that neither touched:
+        #
+        #   find logs -name '*.log' -exec sed -i 's/[abc][def][ghi][jkl][mno]/x/' {} \;   -> 2
+        #   find src -name '?????' -exec sed -i s/a/b/ {} \;                              -> 2
+        #
+        # The first is a genuine false positive: five bracket expressions inside a SED SCRIPT, on
+        # a find over *.log. The second is a defensible over-approximation — `?????` really can
+        # match a file named `.meta` — but the pair produces an odd asymmetry worth knowing
+        # before trusting either: **`-name '?????'` blocks while `-name '*'`, which matches every
+        # .meta file there is, is a disclosed permit.** Both are corpus records.
+        #
+        # THE OBVIOUS TIGHTENING IS REFUSED, AND HERE IS ITS COST. Requiring at least one
+        # surviving literal in the window closes the sed-script case and costs `?????`, which is
+        # a glob that genuinely matches. Every spelling the metacharacter fix exists for keeps at
+        # least one literal (`*.me[t]a` -> `.meWa`, `*.m[a-z]ta` -> `.mWta`), so the rule would
+        # not cost those — but it trades a block on a read for a permit on a write, which is the
+        # direction this whole file refuses. The false positive costs one first-attempt block and
+        # a retry; it is left, deliberately, and written down instead.
         function meta_ref(v,   s) {
             if (index(v, ".meta") > 0) return 1
             if (v !~ GLOBCH) return 0
@@ -737,6 +763,21 @@ tokeniser-failed"
 #     one word over, and closing it is a judgement this task was not given. It is recorded in
 #     tests/test-bash-gate-precision.sh with a payload and an `H` marker rather than left in a
 #     report nobody reads next time.
+#
+#     ITS CONSEQUENCE WIDENED WHEN find_exec_trusted_path WAS ADDED, and that is the sentence
+#     this bullet was missing. A quote ANYWHERE in the introducer token means the token is never
+#     read as an introducer at all — so the identity test below is never consulted, and the
+#     three spellings that defeat it are ordinary-looking. Executed, all three destroyed 3 of 3
+#     real .meta files, 119 B -> 6 B, and all three are 0 at every version including this one:
+#
+#         | ./evil/'xargs' -0 grep -l guid          (a quote inside the path)
+#         | './evil/xargs' -0 grep -l guid          (the whole path single-quoted)
+#         | "./evil/xargs" -0 grep -l guid          (the whole path double-quoted)
+#
+#     while the unquoted `| ./evil/xargs -0 grep -l guid` blocks. So the quoting trade does not
+#     merely leave a hole beside the identity check — it is a way around the identity check, and
+#     quoting a path is a thing people do for no reason at all. The class stays deferred, for
+#     the reason above; the reason is now stated against what it actually costs.
 #   - the DIRECT shape (`rm 'Assets/Player.cs.met'a`). That arm is a raw-regex denylist over
 #     command position and the split-literal class walks past it exactly as it did here.
 #     Executed, it deleted one of three real .meta files. Fixing it means tokenising command
