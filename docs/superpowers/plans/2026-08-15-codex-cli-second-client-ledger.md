@@ -201,7 +201,7 @@ success in its own terms while the layer below it does nothing.**
 |---|---|---|---|
 | 1 | The import | **31 successes, 0 failures** | 7 of 9 commands silently dropped; rules never cross |
 | 2 | Registration | `registered N, warnings [], errors []`, `enabled: true` | — |
-| 3 | **Hook trust** | `enabled: true`, `statusMessage: None` | **Without `--dangerously-bypass-hook-trust`, the hook fires 0 times. No prompt, no warning, nothing logged.** |
+| 3 | **Hook trust** | `enabled: true`, `statusMessage: None` | **Untrusted, the hook fires 0 times. No prompt, no warning, nothing logged.** Solvable — see below |
 | 4 | The hook body | matcher fires, process runs | 8 of 9 read fields `apply_patch` does not have, and do nothing |
 
 **`enabled: true` does not mean it will run.** Layer 3 was found by the Task 3 reviewer in one run,
@@ -228,6 +228,55 @@ Two adjacent facts: `.codex/hooks.json` needs a top-level `hooks` wrapper (`desc
 optional), and `UNITY_HOOK_MODE=warn` correctly allows but its 47-byte warning is **shown zero times
 anywhere** — under Codex it is not "block downgraded to warning", it is "block downgraded to
 nothing".
+
+### Hook trust: an installer can grant it, and here is the whole shape
+
+**This supersedes the sentence that stood here until Task 3's fix round — that both block results
+were conditional on the bypass flag. They are not.** Both mechanisms were re-run with trust granted
+properly and **no bypass flag in argv** (verified by grepping the constructed argv before running),
+and neither result changed.
+
+There is no `hooks/trust` method. **Trust is config.** The installer reads each entry's `key` and
+`currentHash` from `hooks/list`, then writes to the **user home's** `config.toml`:
+
+```toml
+[hooks.state."<abs>/.codex/hooks.json:pre_tool_use:0:0"]
+enabled = true
+trusted_hash = "sha256:ab9c…"
+```
+
+Three properties Tasks 8 and 9 must design around, all measured:
+
+1. **A project cannot vouch for itself.** `trusted_hash` inside `hooks.json`'s matcher group — the
+   shape the binary's string table suggested — is not merely unhonoured, it is **invisible**: same
+   `currentHash`, `warnings: []`, still `untrusted`, with the path held constant. So Kinglet cannot
+   ship trust in a committed file. **The installer must write the user's `~/.codex/config.toml`**,
+   which means consent, a backup, and a receipt entry.
+2. **The hash cannot be precomputed** — it is path-dependent by construction, though deterministic
+   and home-independent. Install order is fixed: write `hooks.json` → query `hooks/list` → write
+   trust.
+3. **The hash covers the config entry, not the script.** Editing a hook body changed the script's
+   own sha256 and left `currentHash` untouched; changing `timeout` changed it; restoring gave back
+   the exact baseline. Trust means *"I vouch for this command line"*, **not** *"I vouch for this
+   code"* — and that sentence has to survive into anything user-facing.
+
+**4. The enterprise switch that makes all of this inert.** `allowManagedHooksOnly` exists in Codex's
+managed-configuration surface, alongside a `ManagedHooksRequirements` block with `managedDir` /
+`windowsManagedDir` and an 11-event map, and a `HookSource` enum carrying **five** routes. **If an
+organisation sets it, Kinglet's project hooks may not run at all regardless of trust.** It is
+explicitly **unmeasured** — no managed host was available — and it belongs in Tasks 8 and 9's design
+constraints, not in a footnote.
+
+### All four Kinglet hook events fire
+
+`PreToolUse`, `PostToolUse` and `Stop` were each observed firing with `fires=1`; `SessionStart` was
+observed in Task 2. Payloads differ by event, derived mechanically rather than assumed:
+`PostToolUse` carries **`tool_response`**, which `PreToolUse` lacks; `Stop` carries
+`last_assistant_message` and `stop_hook_active` and **no tool fields at all** — directly relevant to
+`session-save.sh`.
+
+**Do not quote a method count as a constant.** The app-server enumeration returned 129 to one agent
+and 123 to another on the same build.
 
 ### Codex is pinned at 0.145.0 for this wave
 
@@ -304,7 +353,7 @@ The event stream shape, measured against the real binary:
 |---|---|---|---|---|
 | 1 | The probe harness | **DONE** | `a5ec1bd..0b58d05` | general-purpose implementer; 1 fix round; all 8 findings ADDRESSED |
 | 2 | Does Codex import a `.claude/` configuration? | **DONE** | `1d8e941..89e7552` | general-purpose implementer; 2 fix rounds; F1 = **confirmed, lossy in silence** |
-| 3 | Codex's hook mechanism, measured | open | — | **RE-PLANNED: collapsed to one probe** — only the block protocol is left |
+| 3 | Codex's hook mechanism, measured | **DONE** | `1993b1b..952cd7a` | general-purpose implementer; 1 fix round; F4 **and** F5 delivered — my RE-PLANNED header had wrongly dropped F5 |
 | 4 | Kinglet's 12 hooks under Codex | open | — | **RE-PLANNED: did not shrink; now the wave's centre of gravity.** Two risks — rewriting hook bodies against the `apply_patch` envelope, and the block protocol |
 | 5 | Kinglet's 16 skills under Codex | open | — | **RE-PLANNED: shrank most** — discovery settled, only invocation left; plus an unreconciled 18-vs-16 to resolve |
 | 6 | Rules, `AGENTS.md`, commands and agents | open | — | **RE-PLANNED: split.** `AGENTS.md` and agent conversion settled; rules and commands became design work |
@@ -440,6 +489,39 @@ property of the hook, and quoting either as one was the actual defect.
 | 4 | measure whether hooks fire | **did not shrink**; the wave's centre of gravity — 8 of 9 enforce nothing and the hook bodies need rewriting against `apply_patch` |
 | 5 | measure discovery and invocation | **discovery settled**; invocation only, plus an unreconciled 18-vs-16 skill count |
 | 6 | measure four classes | **split** — two settled mechanically, two became design work |
+
+---
+
+## Task 3 — close
+
+Implementer: **general-purpose**. Report `DONE`, one fix round. Review: **Spec ✅ with one declared
+exception, Quality Approved**, one new Important — F5 undelivered, and the contradiction that let it
+slip was **mine**, in the RE-PLANNED header I wrote. Re-review: **all five verified, nothing new
+broke.** Range **`1993b1b..952cd7a`**.
+
+The reviewer built a rig deliberately unlike the implementer's — one variant per directory, one
+literal hook body, no `basename` dispatch — and ran 19 independent probes. That difference in shape
+is what makes the agreement mean something.
+
+### The entry worth keeping: a fall-through that exits 0 is indistinguishable from a measured allow
+
+The implementer **discarded one of its own `apply_patch` runs as invalid** and said so. Its probe
+dispatched on its own `basename`; one variant matched no `case` branch, fell through, and exited 0 —
+producing a clean-looking *"the block does not work on the file tool"*, which is the most
+consequential wrong answer available in this task. It was caught only because the hook logged which
+variant it had resolved.
+
+This is the same shape as the `setsid` confound the same reviewer found in its own Task 1 work: **a
+control that silently did nothing looks exactly like a subject that legitimately did nothing.** Two
+independent instances in one wave. The defence in both cases was the same — make the instrument log
+what it actually did, not what it was asked to do.
+
+### Deferred, with owners
+
+| Finding | Ruling | Owner |
+|---|---|---|
+| `codex-facts.md` records `stop` as not measured. It **fires** — the re-review observed `Stop fires=1` with a distinct payload (`last_assistant_message`, `stop_hook_active`, no tool fields) | Safe: the document understates rather than overstates, which is the harmless direction. Folding it in completes F3 — all four Kinglet hook events now observed firing | **Task 10 Step 5**, which already re-derives both research documents |
+| The enterprise switch `allowManagedHooksOnly` is missing from `codex-facts.md`'s "three properties Task 8/9 must design around" — and it is the one condition that makes the whole hook feature inert regardless of trust. Its "what it would take" also names two managed routes where the enum carries five | **Not safe to leave only in a document Task 8 might not re-read.** Carried into this ledger's Standing facts as property 4, which every Task 8/9 dispatch copies verbatim | **Task 8 and Task 9** via Standing facts, plus **Task 10 Step 5** for the document |
 
 ---
 
