@@ -7,10 +7,24 @@
 
 ## RESUME HERE
 
-**Tasks 1, 3, 4 and 5 are merged and both gates are green on the branch.** `Total: 3458  Passed:
-3455  Failed: 0  Skipped: 3`, rc=0, **39** ANSI-stripped headers == `ls tests/test-*.sh | wc -l`
-**39**; `provenance OK`. Baseline regenerated outside a worktree twice, at `--expect-drift 2` each
-time (Task 1, then Task 4); Tasks 3 and 5 changed no `.claude/` file and contribute no drift.
+**All eight tasks are merged and both gates are green on `main`.** Tasks 1, 3, 4 and 5 landed
+2026-08-14; Tasks 2, 6, 7 and 8 landed 2026-08-15 alongside the live-bridge wave. Baseline
+regenerated outside a worktree each time a `.claude/` file moved, with the drift **derived** rather
+than assumed — a `SKILL.md` is recorded twice, but `_lib.sh` and a non-`SKILL.md` skill file are
+recorded once, which is why three `.claude/` edits drifted four records and not six.
+
+**The figure that used to sit here — `Skipped: 3` — was exactly the defect Task 8 closed**, and it is
+deliberately not replaced with another one. That number was true only for a host with
+`spikes/platform/clients/probe-host/dist/` built; a fresh clone saw 22 and neither reader could tell
+from the line. Since `395ddbf` the runner prints a **skips-by-reason census** instead, so the host's
+contribution is visible in the log rather than folded into a total.
+
+Task 8 also found what nobody had: **`Total` itself differed between the two environments**, by one,
+because `tests/test-provenance-origins.sh` printed `note:` in its absent branch — a line the runner
+counts as nothing at all. **That assertion did not skip; it vanished.** With it corrected to `SKIP:`,
+`Total` measures the suite and the census measures the host, and the two environments report the same
+`Total` for the first time. So a `Total` that moves between reports now means a test file was added or
+removed — the cross-report check the wave wanted, with no absolute written down anywhere.
 
 **The cut is complete. Next: Endless Evolution, with Tasks 2, 6, 7 and 8 running alongside it.**
 
@@ -25,16 +39,53 @@ who ever runs the suite with a dirty `migration/` and is therefore the only one 
 | task | state | commit range |
 |---|---|---|
 | 1 — the three hooks nothing has ever executed | **DONE**, merged `d770bf5` | `3ca4327..1ff204a` |
-| 2 — execution-keyed hook coverage | open *(brief pending — consumes Task 1's output)* | |
+| 2 — execution-keyed hook coverage | **DONE**, merged `72f9916` | `ee1c15e..72f9916` |
 | 3 — anchor the unanchored pathspecs | **DONE**, merged `3cc8aa8` | `4e299b6..ef8a7ab` |
 | 4 — the doctor's two remaining compensations | **DONE**, merged `22c232e` | `4e299b6..f868677` |
 | 5 — anti-vacuity floors, written | **DONE**, merged `1b948c6` | `4e299b6..34880d0` |
-| 6 — a heading inventory for `docs/` | open *(brief pending — cites Task 5)* | |
-| 7 — the claims with no owner | open *(brief pending — cites Task 5)* | |
-| 8 — record what a second reader can reproduce | open | |
+| 6 — a heading inventory for `docs/` | **DONE**, merged `6e489bc` | `72f9916..6e489bc` |
+| 7 — the claims with no owner | **DONE**, merged `21d37c0` | `6e489bc..21d37c0` |
+| 8 — record what a second reader can reproduce | **DONE**, merged `395ddbf` | `21d37c0..395ddbf` |
 
 **Ordering that binds:** T1 → T2 (T2's mechanism is T1's output). T5 → T6 and T5 → T7 (both cite its
 criterion). T3, T4, T8 are independent.
+
+### Corrections the tasks returned, 2026-08-15 — this ledger was wrong twice
+
+Both were propagated from here into task briefs and both were caught by re-derivation, which is the
+whole point of the `BRIEF-WRONG` status. **A ledger is not evidence; it is a record of evidence, and
+it decays the same way anything else written down does.**
+
+- **Ledger 207's *"six of twelve"* is seven of twelve.** Re-derived at HEAD and again at `e17f310`
+  where the item was written, identically: five functions carry 3, five carry 4, two carry 2. The
+  item's *point* survives — the inflation is each function's own self-hit count, not a constant — but
+  the count attached to it was off by one.
+- **Ledger 205's *"15 sites versus 13 pairs"* does not reproduce under any tree.** At `f8fab22`, the
+  commit that wrote `FIFTEEN`, sites = 13 and pairs = 10; with rule 2's resolution clause disabled,
+  sites = 15 and pairs = 12. **13 is never a pairs count.** The real discriminator — which ledger 205
+  states and the brief garbled into a sites/pairs distinction — is whether a bare `scripts/X` token
+  resolves to its payload entry `.claude/scripts/X`.
+
+**Task 7 also reproduced the defect it was repairing, inside the repair.** Its new `_lib.sh`
+paragraph asserted that adding a check *"moved several of the twelve"* — written without running it,
+in the paragraph that exists because a count was written without being run. Measured afterwards: it
+moved exactly one. Fixed in `fb2678a` and left on the record rather than amended away.
+
+### Controller error, recorded so the next one does not repeat it
+
+**Three times this session the controller dispatched the next task on seeing the previous task's
+commit land, rather than on its report arriving.** A committing agent is not a finished agent: Task 4
+made a second `chore(baseline)` commit afterwards, Task 7 made two more commits including a
+self-correction, and F14's agent found another session writing into the tree during its final suite
+run — it handled that correctly by committing only its own files and re-running both gates in a
+`git clone --no-hardlinks --shared`, which is the remedy if it happens again. **Wait for the report.**
+
+A smaller one, hit by the controller and by three separate agents: a pre-run check for a concurrent
+suite written as `pgrep -f 'run-tests.sh'` **matches its own command line** and reports a phantom.
+The bracket form `'run-tests[.]sh'` protects the pattern but not the enclosing shell when it shares a
+compound command with the real invocation. The check has to be a separate invocation that does not
+name the suite. This is the house defect — *a derivation whose scope includes the thing recording its
+result* — wearing process clothes.
 
 ### Owner's ruling, 2026-08-14: cut to 3 + 4 + 5, then Endless Evolution
 
