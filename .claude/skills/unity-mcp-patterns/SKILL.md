@@ -5,7 +5,10 @@ description: "Use before making several unity-mcp tool calls in a row, or when a
 
 # Unity MCP Patterns
 
-*Written against Unity 6000.0 and MCP for Unity 10.1.0 (server 3.4.4), current as of 2026-08-04.*
+*Written against Unity 6000.0 and MCP for Unity 10.1.0 (server 3.4.5), current as of 2026-08-15.*
+*Restamped from `3.4.4` / 2026-08-04: every measured claim in this file below was executed against
+`3.4.5` on 2026-08-14 or 2026-08-15, and the header was the last live `3.4.4` in the tree. The one
+remaining `3.4.4` — in the verified-against block at the end — is a dated historical figure and stays.*
 
 ## Boundary with the rules
 

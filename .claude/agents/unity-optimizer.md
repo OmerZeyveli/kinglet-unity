@@ -31,7 +31,12 @@ do not invoke a skill, you are working without it.
 - `physics`
 - `urp-pipeline`
 - `addressables`
+- `unity-mcp-patterns`
 - `verification-before-completion`
+
+`unity-mcp-patterns` was named in this file's prose and absent from this list until 2026-08-15.
+Naming a skill is not loading one — an agent needs `Skill` in its `tools:` *and* an entry here,
+and nothing loads a skill implicitly. The prose pointed at a document the agent could not open.
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not

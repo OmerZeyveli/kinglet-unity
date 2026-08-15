@@ -25,7 +25,14 @@ Load these with the `Skill` tool before you start. They are not in your context 
 default, and nothing loads them for you — no glob matching, no always-apply. If you
 do not invoke a skill, you are working without it.
 
+- `physics`
 - `verification-before-completion`
+
+`physics` is here because the Performance checklist below now asks a question this agent cannot
+answer from memory: whether `NonAlloc` is the right call depends on which family the code is in, and
+that skill carries the live-editor measurement. This block listed only
+`verification-before-completion` until 2026-08-15, so the correction was unreachable from the one
+agent whose job is enforcing it.
 
 The `Skill` tool lists every skill available with a one-line description; reach for
 others when the job calls for them. Loading none is the common failure here, not
@@ -61,7 +68,16 @@ decide severity per finding, don't infer it from which section it fell under.
 - [ ] **CompareTag** — using `tag == "string"` instead of `CompareTag()`?
 - [ ] **FindObjectOfType** — called in Update? Cache the result.
 - [ ] **SendMessage** — using `SendMessage`/`BroadcastMessage`? Use events or direct refs.
-- [ ] **Physics allocations** — using `RaycastAll` instead of `RaycastNonAlloc`?
+- [ ] **Physics allocations, 3D** — using `Physics.RaycastAll` instead of `Physics.RaycastNonAlloc`?
+- [ ] **Physics allocations, 2D** — **do not ask for `NonAlloc` here.** The suffix is retired on
+  `Physics2D` and alive on `Physics`, and the unqualified form of this line asked for the wrong call
+  on every 2D project until 2026-08-15. Reflected off a live Unity 6000.0.68f1 editor on 2026-08-14:
+  `Physics.RaycastNonAlloc` has 0 of 8 overloads obsolete, while `Physics2D.RaycastNonAlloc` has
+  **4 of 5** and Unity's own message is *"deprecated. Use Physics2D.Raycast instead."* The plain 2D
+  name **is** the non-allocating call in Unity 6 — it gained `ContactFilter2D` + results-buffer
+  overloads. So in 2D code the finding is `Physics2D.RaycastAll` / `…NonAlloc` → `Physics2D.Raycast`
+  with a pre-allocated buffer. Load `physics` and read *The `NonAlloc` suffix is 3D-only in Unity 6*
+  before writing either finding; the two families read as mirror images and are not.
 - [ ] **Hash caching** — `Animator.StringToHash`/`Shader.PropertyToID` called outside `static readonly`?
 
 ### Architecture (Consider)
