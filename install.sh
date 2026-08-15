@@ -282,6 +282,7 @@ NEW_PATHS=$(
       b=$(basename "$f")
       [ "$b" = "check-provenance.sh" ] && continue
       [ "$b" = "codex-probe.sh" ] && continue
+      [ "$b" = "codex-hook-shim.sh" ] && continue
       printf '.claude/%s/%s\n' "$group" "$b"
     done
   done
@@ -1280,7 +1281,18 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 # does not ship, and its prompts are Kinglet's own surfaces. A user project has nothing for it to
 # measure. The reason of its own is that it copies ~/.codex/auth.json into a disposable CODEX_HOME —
 # correct in a harness the toolkit's maintainers run deliberately, and not something to hand every
-# installed project a copy of. Both skips use the identical one-name-per-line comparison form on
+# installed project a copy of.
+#
+# codex-hook-shim.sh joined them on 2026-08-15, and its reason is the cleanest of the three: it is
+# not part of the Claude Code payload at all. It exists to make Kinglet's hooks enforce under Codex
+# CLI, whose file tool hands them a patch envelope none of them can read; under Claude Code the
+# hooks already receive the shape they parse and the shim has nothing to do. Installing it here
+# would put a script in every project that no agent, command or skill names and that nothing in a
+# Claude Code session ever invokes. Which layer ships the Codex configuration — and therefore where
+# this script belongs at install time — is decided by the tasks that own the Codex ship list and its
+# installer, not by this loop.
+#
+# All three skips use the identical one-name-per-line comparison form on
 # purpose: tests/test-derived-counts.sh and tests/test-shipped-citations.sh both extract the skipped
 # names from these lines by matching that exact shape, and derive the installed-script set from
 # them — so a skip written any other way (a `case` list, a loop over an array) would make those
@@ -1345,6 +1357,7 @@ for group in scripts; do
     b=$(basename "$f")
     [ "$b" = "check-provenance.sh" ] && continue
     [ "$b" = "codex-probe.sh" ] && continue
+    [ "$b" = "codex-hook-shim.sh" ] && continue
     dest="$CLAUDE_DIR/$group/$b"
     if is_modified ".claude/$group/$b"; then
       # Kept, so counted as kept: WRITTEN and KEPT both appear in the summary line, and a kept file
