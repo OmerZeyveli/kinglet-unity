@@ -152,6 +152,46 @@ this wave exists to eliminate, produced by the task built to eliminate it.
 Whatever you are about to conclude from a name, measure it instead. A five-second hook registered
 with a one-unit timeout settles this one in a single probe.
 
+### THE CENTRAL FINDING SO FAR: the hooks register, fire, and do nothing
+
+Measured in Task 2's fix loop, discovered by dumping a hook's stdin — the one thing nobody had
+looked at.
+
+**Codex's file tool is `apply_patch`, and its `tool_input` carries only
+`{"command": "*** Begin Patch…"}`** — for creating a new file and for editing an existing one alike.
+There is no `file_path`, no `new_string`, no `old_string`, no `content`. `Edit` and `Write` survive as
+matcher **aliases**; the payload vocabulary underneath is Codex's own.
+
+The control, same hook, same edit, same file:
+
+| Payload | Result |
+|---|---|
+| `block-scene-edit.sh` + a Claude-shaped payload | **exit 2, 412 bytes — blocks** |
+| `block-scene-edit.sh` + the real Codex payload | **exit 0, 0 bytes — does nothing** |
+
+Class derived from `.claude/settings.json` × each hook's source: **8 of 9 tool-event hooks match,
+run, and are inert.** Only `bash-gate.sh` survives, because it reads `.tool_input.command` — still
+blocking, exit 2, 1589 bytes. **No Kinglet hook reads `tool_name`, so the break is entirely in
+`tool_input`.**
+
+**Why this is the finding the wave existed to produce.** The import reports **31 successes, 0
+failures**. All 12 hooks register with `warnings: []`. The matchers fire — measured, with per-hook
+marker files rather than stderr counts, and `shell`/`Shell`/`bash`/`Zzz` correctly never firing.
+Every observable signal says the guardrails crossed. Eight of nine do nothing. **A wave that shipped
+on the import's own success report would have shipped a toolkit whose enforcement layer is
+decoration.**
+
+Two things this does **not** mean, and a reader who takes either has been misled by framing rather
+than facts: it does not mean the hooks fail to register, and it does not mean matchers are broken.
+Both are now measured false.
+
+### `timeout: 3000` means fifty minutes — measured from both sides
+
+Kinglet's hook timeouts are milliseconds. Codex's `timeoutSec` is **seconds**, established by two
+independent brackets that solve together to `u ∈ (0.667 s, 1.5 s)` — excluding milliseconds,
+deciseconds, two-second ticks and minutes. Six of Kinglet's twelve hooks carry a timeout
+(2000 / 3000 / 5000), so the shipped values become 33, 50 and 83 minutes.
+
 ### Codex is pinned at 0.145.0 for this wave
 
 `0.147.0` is available. Do not upgrade. Record `codex --version` in every probe's metadata; a
@@ -334,7 +374,21 @@ repetition**.
 
 ## Deferred and parked findings
 
-See the Task 1 table above. Nothing is parked at a fix-loop cap; the loop closed at round 1.
+### From Task 1
+
+See the Task 1 table above. Nothing is parked at a fix-loop cap; that loop closed at round 1.
+
+### From Task 2's re-review — deferred, with owners
+
+| Finding | Ruling | Owner |
+|---|---|---|
+| **`skills/list` totals are not stable.** Task 2's home reported 24; the reviewer's reported **59** — 18 repo, 35 user, 6 system — with the 35 fetched over the network into the disposable home from `plugins/cache/openai-curated-remote/`. The **18 repo skills reproduce exactly** | Safe: the load-bearing figure is the repo count, and it is stable. A total that varies with what a home has cached is not a fact about Kinglet. **Any skills figure quoted anywhere in this wave must be the 18 repo skills, and must say so** | **Task 5**, whose entire subject is skill discovery, and **Task 10 Step 5** when it re-derives the research documents' numbers |
+| **`bash-gate.sh` blocks read-only commands as `meta-mutation`.** It blocked three of the reviewer's read-only commands, one of them because the string `.meta` appeared as JSON **test data**. There are no `.meta` files in this repository at all | Safe to carry: it fails closed, which is the correct direction for a guard, and the cost is a retry with a clearer command. But it is a false positive on a substring, and this repository has hunted unanchored substring matches on a path four times already | **Task 11**, which is already the "close the harness's residual guard gaps" task and is the only remaining task that touches guard behaviour rather than measurement. Add it there when Task 11's brief is written |
+
+**A note on the second one, since it recurred inside its own review:** the reviewer hit it while
+verifying someone else's work, which is the position with no stake in the answer — the same
+circumstance that made the `MUTANT DID NOT APPLY` lesson stick. A guard that costs a reviewer three
+retries costs every implementer the same, silently, forever.
 
 ---
 
