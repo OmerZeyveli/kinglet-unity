@@ -197,7 +197,10 @@ unity_track_edit() {
 # unity_state_plan_update, a row the paragraph above is written about, so the clause was false for a
 # case it was written to explain and not only for cases it never mentioned. Checking those two
 # commits out reproduces it; running the recipe here will not, because this paragraph is itself
-# inside the scope being counted and adding it moved several of the twelve.
+# inside the scope being counted. Measured after writing it: it moved exactly one of the twelve, from
+# 4 to 5 -- the one function this paragraph names, which is the only one it could have moved. That
+# sentence read "moved several of the twelve" for the length of one commit, asserted without being
+# run, in the paragraph that exists because someone asserted a count without running it.
 #
 # All six are retained because retiring them is a decision about this library's surface rather than
 # a side effect of the hook cut, and nothing forced it. UNITY_READS_FILE below is a separate case:
