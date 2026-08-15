@@ -21,6 +21,19 @@ Each probe writes four files here: `NAME.jsonl` (the event stream),
 `NAME.last.txt` (the final agent message), `NAME.stderr.txt`, and
 `NAME.meta.json` (the exact invocation, the codex version, the exit code).
 
+**Every probe's `NAME.stderr.txt` begins with `Reading additional input from
+stdin...`, and it is not a warning.** The harness runs codex with stdin at
+`/dev/null`, which is what stops `codex exec` blocking; measured on the first
+live run, 2026-08-15, the message is printed whenever stdin is not a terminal —
+codex then reads EOF and proceeds normally, exit 0. Read past it when looking
+for real warnings. It is not filtered, because a harness that edits its own
+evidence is worth less than one that explains it.
+
+The first live run also confirmed the event-stream shape the plan recorded:
+four line-delimited objects — `thread.started`, `turn.started`, an
+`item.completed` whose `item.type` is `agent_message`, and `turn.completed`
+carrying the token usage.
+
 **The transcripts are not committed.** They are large, they are not
 deterministic between runs, and committing them would make every re-measurement
 a diff. What is committed is the verdict, in `findings.md` and

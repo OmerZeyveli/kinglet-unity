@@ -13,6 +13,15 @@
 #   * a CODEX_HOME under /tmp makes codex warn that it refuses to create helper
 #     binaries there, polluting every probe's stderr.
 #
+# A third, measured by the first live run of this harness on 2026-08-15 and
+# correcting the first bullet: `< /dev/null` stops the BLOCK, not the message.
+# Codex prints "Reading additional input from stdin..." whenever stdin is not a
+# terminal, then reads EOF and proceeds. So that line is on the stderr of every
+# probe and is not a warning about anything. A later task reading NAME.stderr.txt
+# for real warnings must expect it. It is deliberately not filtered out here:
+# codex's stderr is evidence, and a harness that edits its own evidence is worth
+# less than one that explains it.
+#
 set -euo pipefail
 
 EXIT_USAGE=64
