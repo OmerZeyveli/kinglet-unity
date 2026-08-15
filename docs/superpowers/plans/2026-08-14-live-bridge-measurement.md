@@ -2,6 +2,51 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: `.claude/skills/subagent-driven-implementation/SKILL.md`.
 
+## STATUS — read this before believing any present tense below  *(added 2026-08-15)*
+
+**Base commit: `a0ffd91`.** Everything below describes the toolkit as it stood there. **The wave is
+finished and every finding in it is closed**, so the findings' present tense (*"names actions that
+do not exist"*, *"has no third-party exclusion"*, *"cannot get test results"*) is a record of what
+was measured on 2026-08-14/15 and **is not a description of the current tree**. The findings are
+deliberately left as written: their value is that they were true when written, and rewriting them
+would destroy the only account of what the defect looked like.
+
+| finding | closed by |
+|---|---|
+| F1 `/unity-doctor` calls a resource as a tool | `661fbf2` |
+| F2 `unity-optimizer`'s 4 dead profiling actions | `661fbf2`, corrected `9e0cc0d` |
+| F3 the failure shape (`isError:false` + `success:false`) | `661fbf2` |
+| F4 `validate-asmdefs.sh` and `.asmref` | `0c3296b` |
+| F5 GNU-only regex atoms across the hooks | `0038015` |
+| F6 `warn-platform-defines.sh`'s missing third-party skip | `0038015` |
+| F7 `asset_gen` tool-group row | `661fbf2` |
+| F8 EE's stale skill count | **in Endless-Evolution, not here** |
+| F9 `/unity-ui` names `manage_ui` for UGUI | `30222b8` |
+| F10 deprecated API in a copyable sample | `30222b8` |
+| F11 `get_counters` cited with no `category` | `9e0cc0d` |
+| F12 the agent dispatch a user-level instruction defeats | `30222b8` |
+| F13 `unity-test-runner` cannot read its own results | `f2401de` |
+| F14 unanchored `*/Packages/*` and `*/Library/*` | `6b13948` |
+| F15 the 2D `NonAlloc` family is deprecated | `04140db` |
+| F16 `unity_reflect scope="project"` on an asmdef project | `f2401de` |
+| F17 a background dispatch outlives its session | `f2401de` |
+
+**THE TASKS SECTION IS NOT THIS WAVE'S WORKLIST, and reading it as one under-counts the wave by six.**
+It has six tasks covering F1–F10 and F13. **F11, F12, F14, F15, F16 and F17 shipped with no task
+entry at all** — they were found during the wave (F11/F12 while executing Task 1 and Task 4, F14
+while executing Task 3, F15 from the same live editor, F16/F17 during the `/unity-prototype` run
+documented below) and were fixed in the commits above without the plan being amended. Six of
+seventeen findings are invisible to anyone who plans from the Tasks section.
+
+**Task 6 was executed in another repository.** Its subject is `CLAUDE.md` in **Endless-Evolution**,
+not in this one, so no commit here closes it and no gate here covers it.
+
+**Every `file:NN` citation below is AS MEASURED at `a0ffd91` and most have moved.** The fixes changed
+the very lines the findings point at — `unity-optimizer.md:44`, `save-system/SKILL.md:377`,
+`unity-mcp-patterns` Rule 5's table row and the rest. Resolve them by the surrounding text or against
+`a0ffd91`, never by line number against `main`. (`tests/test-citations-resolve.sh` does not check
+this file: its sweep excludes `docs/superpowers/`.)
+
 **What this is.** The first measurement of this toolkit against a **live Unity MCP bridge and a
 shipping game**. Everything below was executed, not read. Bridge: `mcp-for-unity-server 3.4.5`
 (`mcpforunityserver==10.1.0`) on `127.0.0.1:8080/mcp`, Unity **6000.0.68f1**, project

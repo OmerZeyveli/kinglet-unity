@@ -107,11 +107,23 @@ toolkit's claims about itself. The defensible case for them is real (`warn-seria
 hollowness was found *by* this kind of sweep) but **the marginal value is falling fast**: Task 1's
 three rounds each found a genuine defect; Tasks 6/7/8 will find a number in a comment.
 
-**And the largest gap is still untouched, as the plan's own last paragraph says: nobody has ever run
-this toolkit inside Claude Code against a live Unity project.** No agent has issued a single command
-to a real Editor. The fixture is **1 C# file, 0 `.meta` files**. So the toolkit's internal
-consistency is now heavily measured and its behaviour on a game is not measured at all — and
-continuing down this plan makes that imbalance worse, not better. That is what EE tests.
+**And the largest gap was, when this was written, still untouched: nobody had ever run this toolkit
+inside Claude Code against a live Unity project.** No agent had issued a single command to a real
+Editor. The fixture is **1 C# file, 0 `.meta` files**. So the toolkit's internal consistency was
+heavily measured and its behaviour on a game was not measured at all — and continuing down this plan
+made that imbalance worse, not better. That is what EE tests.
+
+**THAT GAP IS NOW CLOSED, AND IT WAS CLOSED ON THIS BRANCH — corrected 2026-08-15.** The paragraph
+above kept its present tense for a wave after it stopped being true, three lines from a RESUME HERE
+that already said Tasks 2, 6, 7 and 8 landed *"alongside the live-bridge wave"*: the document knew
+and the paragraph did not. See **`docs/superpowers/plans/2026-08-14-live-bridge-measurement.md`**.
+Five headless Claude Code sessions ran against a live `mcp-for-unity-server 3.4.5` on Unity
+6000.0.68f1 and the shipping game **Endless-Evolution** (1417 `.cs` files, 12 asmdefs), covering
+`/unity-doctor`, `/unity-review`, `/unity-test`, `/unity-optimize` and `/unity-prototype` — the last
+of which wrote C#, compiled it, entered Play mode and verified a prototype in the real Editor. It
+produced **17 findings**, all closed. Both halves of the imbalance this paragraph names have now
+been measured; what remains unmeasured is a **second** project, and an interactive rather than
+headless session.
 
 ---
 
