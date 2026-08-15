@@ -23,6 +23,11 @@
 #      which is the same lesson one level down).
 #   4. A HOOK IS EXECUTED — `.claude/hooks/session-brief.sh` is run and its output inspected, because
 #      what ships into a session is the hook's stdout and not the file on disk.
+#   5. DOCUMENT SHAPE — a heading inventory, compared WHOLE, for `unity-brainstorming` and for the
+#      three structural files under `docs/`. `docs/ARCHITECTURE.md` lost an entire `##` section and
+#      no guard in the suite noticed; two skills already carried this instrument and `docs/` had no
+#      analogue. SHAPE ONLY: it asserts which sections exist, at what depth and in what order, and
+#      says nothing whatever about what any of them says.
 #
 # tests/test-skill-discovery.sh already checks PATH-FORM references (`.claude/skills/<name>`).
 # It does not catch a bare name in a "Skills to load" list or a `skills:` frontmatter value,
@@ -484,6 +489,50 @@ ub_trim() {
 # claimed block owns exactly one section and every comparison below is a whole section — which is
 # what makes relocation and insertion detectable, and what a first-paragraph extractor cannot do
 # (append a sixth dimension after a blank line and it stops before reaching it).
+
+# --- The section list, which is also the section BUDGET ------------------------------------------
+# The instrument `using-kinglet` carries a few hundred lines below (`UK_SECTIONS_EXPECTED`), applied
+# to the other frozen-prose file. Every other assertion in this block compares a section that EXISTS
+# today, and `ub_section` stops at the next heading — so a NEW section is invisible to all of them at
+# once, and so is a section renamed with its content carried over under the new name. Measured on
+# `using-kinglet` when that guard was written: a section appended at EOF and a section inserted
+# between two existing ones each produced 0 failures.
+#
+# SHAPE, NOT CONTENT. This assertion says which sections exist, at what depth, in what order. It says
+# nothing about what is inside them — that is what the whole-block `assert_eq`s above and below are
+# for, and the two jobs are kept apart on purpose. Rewriting a paragraph does not touch this list;
+# adding, deleting, renaming, reordering or re-levelling a heading means editing it in the same
+# commit.
+#
+# COMPARED WHOLE, AND THAT IS THE LOAD-BEARING CHOICE. A per-heading "is it present" loop passes over
+# a document that has lost its LAST section: a list survives the deletion of its final member without
+# one word changing, so every surviving expectation is still satisfied and the guard reports green
+# over a truncated file. `assert_eq` on the joined list fails on that deletion the same way it fails
+# on any other.
+#
+# THE awk FORM IS `/^#+ /`, NOT `/^#{1,3} /`. `+` is POSIX ERE and every awk implements it; an
+# interval expression is the one construct in this file's regex vocabulary that has never been run
+# against a real BSD awk, because there is no BSD host here to run it on. This is the extractor
+# `UK_SECTIONS_EXPECTED` already uses, character for character, so the two inventories cannot drift
+# into two mechanisms. `unity-brainstorming/SKILL.md` carries no fenced code block, so no `# comment`
+# line inside one can be read as a heading here — the `docs/` inventory at the foot of this file does
+# have that problem, handles it, and says so.
+UB_SECTIONS_EXPECTED='# Brainstorming a Unity Feature Into a Design
+## The category, and its boundary
+## Checklist
+## Ambiguity Score
+### Dimensions
+### Threshold
+### What the score decides
+### What the score does not know
+## Interview Protocol
+## Exploring approaches
+## Scoring Examples
+## What `design.md` carries
+## The thought that means you are about to treat vague as clear
+## Handoff'
+assert_eq "$UB_SECTIONS_EXPECTED" "$(awk '/^#+ / { print }' "$UB_SKILL" 2>/dev/null || true)" \
+  "unity-brainstorming has exactly these sections, at these depths, in this order — shape, not content"
 
 # --- D2: the trigger is a category of work, not a judgment about the request -----------------
 # The description IS the selection mechanism — there is no glob and no always-apply — so this
@@ -1414,3 +1463,205 @@ if [ -n "$fork_loose" ]; then
 fi
 assert_eq "0" "$(printf '%s' "$fork_loose" | grep -c . || true)" \
   "no surface anywhere under .claude/ states the looser threshold with the qualifier dropped"
+
+# ==================================================================================================
+# 5. DOCUMENT SHAPE — a heading inventory for the structural files under `docs/`
+# ==================================================================================================
+# `docs/ARCHITECTURE.md` lost an entire `##` section and nothing in the suite noticed. It was the
+# second document in one wave to change shape silently. Two skills already carry this instrument —
+# `UB_SECTIONS_EXPECTED` beside `ub_section` above, `UK_SECTIONS_EXPECTED` beside `uk_section` — and
+# `docs/` had no analogue at all. This is it, and it is deliberately the SAME mechanism rather than a
+# second one: a heading list extracted by awk and compared WHOLE with `assert_eq`.
+#
+# WHAT IT ASSERTS AND WHAT IT DOES NOT — this is a SHAPE guard.
+# It asserts that these sections exist, at these depths, in this order. It asserts NOTHING about what
+# any of them contains. Prose inside a section can be rewritten from scratch without this guard
+# moving; adding, deleting, renaming, reordering or re-levelling a heading requires editing the list
+# below in the same commit. That is the whole trade, and it is the one `UK_SECTIONS_EXPECTED` makes
+# for the session brief. Content claims about these files live in `tests/test-derived-counts.sh`
+# (`docs/ARCHITECTURE.md`'s writer column and event table, `docs/HOOK-REFERENCE.md`'s profile
+# regions); this guard is not their substitute and does not overlap them.
+#
+# WHY WHOLE-LIST `assert_eq` AND NOT A PER-HEADING PRESENCE LOOP. Because a list survives the
+# deletion of its LAST member without one word changing. "Every expected heading is present" is
+# satisfied by a truncated document — every surviving expectation still holds, and the guard reports
+# green over a file that has lost its tail. That is precisely the failure this block exists for, so
+# the comparison has to be an equality over the joined list, in order, not a membership test.
+#
+# THE awk FORM IS `/^#+ /` AND `/^[[:space:]]*```/`, WITH NO INTERVAL EXPRESSION ANYWHERE.
+# `/^#{1,3} /` is not used and is not needed: `+` and `*` are POSIX ERE and every awk implements
+# them, whereas an interval expression has never been run here against a real BSD awk — there is no
+# BSD host on this machine to run it on. Nothing in this block depends on `{m,n}`.
+#
+# THE FENCE TOGGLE IS NOT DECORATION, and this is where the `docs/` inventory differs from the two
+# skill ones. `docs/HOOK-REFERENCE.md`'s Kill Switches block is a fenced `bash` snippet carrying
+# three comment lines — `# Disable all hooks temporarily`, `# Disable only the bash-gate hook`,
+# `# Downgrade blocks to warnings (hooks still run but exit 0)` — each of which a bare `/^#+ /` sweep
+# reports as a level-1 heading. Measured: the naive extractor returns 28 lines for that file and the
+# fence-aware one returns 25, and the three it drops are exactly those. Without the toggle the
+# inventory would be a list of three shell comments interleaved with real headings, and editing the
+# snippet would red a heading guard. `unity-brainstorming/SKILL.md` and `using-kinglet/SKILL.md`
+# carry no fenced block at all, which is why the extractor there is the plain one and stays that way.
+# `docs/GETTING-STARTED.md` carries INDENTED fences inside list items, so the toggle matches leading
+# whitespace; its pairs balance either way, but matching them keeps the state honest if one is ever
+# unbalanced by an edit.
+#
+# SCOPE IS A DECLARED LIST OF THREE NAMES, NOT A GLOB OVER `docs/`, and the separation is the point.
+# The subject of this guard is three files under `docs/`; the recording of what they should contain
+# is here, in `tests/`. Nothing under `docs/` can satisfy this guard by containing the guard's own
+# text, because the guard never reads a file it was not named. `docs/ANTI-VACUITY.md`,
+# `docs/AGENT-GUIDE.md`, `docs/MODEL-ROUTING.md` and `docs/SKILL-CATALOG.md` are deliberately out of
+# scope — the first because it is the document that rules on floors like this one and its scope must
+# stay separable from its subject, the other three because nothing has yet argued they are
+# structural. A glob would have swept all four in and made the recording and the subject share a
+# directory for no gain.
+DOCS_STRUCTURAL=(ARCHITECTURE.md HOOK-REFERENCE.md GETTING-STARTED.md)
+
+# The recorded shape of each. Single-quoted heredocs: these lines carry backticks and `#`, and none
+# of it may be expanded. A name in DOCS_STRUCTURAL with no arm here yields the empty string, which
+# the floor inside the loop rejects by name — so adding a file to the list and recording its shape
+# are the same edit.
+docs_sections_expected() {
+  case "$1" in
+    ARCHITECTURE.md)
+      cat <<'DOCS_ARCHITECTURE_SECTIONS'
+# Architecture
+## Design Philosophy
+## Component Overview
+## How Agents Work
+### Frontmatter Fields
+### Model Selection
+### Tool Access
+## How Commands Work
+## How Skills Work
+### Discovery
+### The two frontmatter keys that did nothing
+## How Hooks Work
+### Event Types
+### Hook Summary
+### Hook Input
+## How Rules Work
+## The MCP Integration
+### The batch_execute Pattern
+## Agent Interaction Pattern
+### Three Agent Categories (post-2026-08-03 cut, 8 agents total)
+## Settings.json Structure
+## File Organization
+## Hook Kill Switch System
+## State Management
+### session.json Schema
+### Tracking Files
+### Session TTL
+## Workflow Pipeline
+### Verify-Fix Loop
+## Version Management
+DOCS_ARCHITECTURE_SECTIONS
+      ;;
+    HOOK-REFERENCE.md)
+      cat <<'DOCS_HOOK_REFERENCE_SECTIONS'
+# Hook Reference
+## Overview
+## Hook Profiles
+### What `minimal` actually costs
+## Kill Switches
+## Hooks by Event
+### PreToolUse -- Edit|Write
+#### block-scene-edit
+#### block-meta-edit
+#### block-legacy-input
+#### guard-project-config
+### PreToolUse -- Bash
+#### bash-gate
+### PostToolUse -- Edit|Write
+#### warn-serialization
+#### warn-filename
+#### warn-platform-defines
+#### track-edits
+### SessionStart
+#### session-restore
+#### session-brief
+### Stop
+#### session-save
+## Summary Table
+## Shared Library: _lib.sh
+DOCS_HOOK_REFERENCE_SECTIONS
+      ;;
+    GETTING-STARTED.md)
+      cat <<'DOCS_GETTING_STARTED_SECTIONS'
+# Getting Started
+## Prerequisites
+## Installation
+### Option A: One-Command Install (Recommended)
+### Option B: Manual Copy — unsupported, and here is what it costs
+## First Run
+## Understanding the .claude/ Directory
+## Configuring CLAUDE.md for Your Project
+## Setting Up unity-mcp (Optional but Recommended)
+## Common First Commands
+## Troubleshooting
+### Quick Diagnostic
+### Hooks Not Firing
+### MCP Not Connecting
+### Permission Issues
+### Commands Not Showing Up
+### Claude Does Not Know About Unity
+DOCS_GETTING_STARTED_SECTIONS
+      ;;
+  esac
+}
+
+# ATX headings outside fenced code. `2>/dev/null || true` so a missing file yields the empty string
+# rather than killing the file under the `set -e` inherited from the runner — the empty string is
+# what the comparison is supposed to red on, and it cannot red if the shell is already dead.
+docs_sections_actual() {
+  awk '
+    /^[[:space:]]*```/ || /^[[:space:]]*~~~/ { fence = !fence; next }
+    !fence && /^#+ / { print }
+  ' "$1" 2>/dev/null || true
+}
+
+# --- Floors, per docs/ANTI-VACUITY.md -------------------------------------------------------------
+# F4 — an absolute bound on the declared array, ABOVE the census identity in source order. The
+# identity below counts rows written by a loop over `DOCS_STRUCTURAL` against the length of
+# `DOCS_STRUCTURAL`, so emptying that array makes it read `0 == 0` and pass while nothing at all is
+# compared. That is the same collapse `tests/test-hook-behaviour.sh`'s two identities were floored
+# for on 2026-08-15, and F2's ruling on it is general: an identity needs an absolute floor on one
+# side, and it belongs on the side the two derivations SHARE. Here they share the array.
+#
+# `if/then` rather than `[ … ] && x=yes`, which returns 1 when false and would kill this file under
+# the runner's `set -e`.
+docs_array_ok=no
+if [ "${#DOCS_STRUCTURAL[@]}" -ge 1 ]; then docs_array_ok=yes; fi
+assert_eq "yes" "$docs_array_ok" \
+  "the structural-docs list is non-empty (${#DOCS_STRUCTURAL[@]} declared) — the identity below is relative to it"
+
+docs_rows=0
+for docs_name in "${DOCS_STRUCTURAL[@]}"; do
+  docs_path="$REPO_DIR/docs/$docs_name"
+
+  assert_file_exists "$docs_path" \
+    "docs/$docs_name is present — the inventory comparison below has a file to read"
+
+  # The other half of the collapse, and the one a file-existence check cannot reach. If the recorded
+  # shape is missing (a name added to DOCS_STRUCTURAL with no arm in the case, or an arm whose label
+  # was mistyped) AND the document is empty or unreadable, both sides of the comparison are the empty
+  # string and `assert_eq` passes over a document with no sections at all. Flooring the recorded side
+  # closes it: the expected list is a literal in THIS file and cannot be emptied by anything that
+  # happens under `docs/`.
+  docs_expected="$(docs_sections_expected "$docs_name")"
+  docs_expected_ok=no
+  if [ -n "$docs_expected" ]; then docs_expected_ok=yes; fi
+  assert_eq "yes" "$docs_expected_ok" \
+    "docs/$docs_name has a recorded section inventory — otherwise the comparison below is \"\" vs \"\""
+
+  assert_eq "$docs_expected" "$(docs_sections_actual "$docs_path")" \
+    "docs/$docs_name has exactly these sections, at these depths, in this order — shape, not content"
+
+  docs_rows=$((docs_rows + 1))
+done
+
+# The census identity. It catches a loop that stops early or a `continue` that skips a document —
+# neither of which any single comparison above can see, because a comparison that never ran reports
+# nothing at all. Floored by `docs_array_ok` above, which is why that assertion precedes it.
+assert_eq "${#DOCS_STRUCTURAL[@]}" "$docs_rows" \
+  "the inventory loop compared every declared structural doc ($docs_rows of ${#DOCS_STRUCTURAL[@]})"
