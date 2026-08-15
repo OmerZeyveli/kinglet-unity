@@ -192,6 +192,43 @@ independent brackets that solve together to `u ∈ (0.667 s, 1.5 s)` — excludi
 deciseconds, two-second ticks and minutes. Six of Kinglet's twelve hooks carry a timeout
 (2000 / 3000 / 5000), so the shipped values become 33, 50 and 83 minutes.
 
+### Four silent-failure layers now, and each one reports success
+
+Every layer below is measured. What makes them a set rather than a list is that **each reports
+success in its own terms while the layer below it does nothing.**
+
+| # | Layer | What it reports | What actually happens |
+|---|---|---|---|
+| 1 | The import | **31 successes, 0 failures** | 7 of 9 commands silently dropped; rules never cross |
+| 2 | Registration | `registered N, warnings [], errors []`, `enabled: true` | — |
+| 3 | **Hook trust** | `enabled: true`, `statusMessage: None` | **Without `--dangerously-bypass-hook-trust`, the hook fires 0 times. No prompt, no warning, nothing logged.** |
+| 4 | The hook body | matcher fires, process runs | 8 of 9 read fields `apply_patch` does not have, and do nothing |
+
+**`enabled: true` does not mean it will run.** Layer 3 was found by the Task 3 reviewer in one run,
+*after* the task had declared F5 undelivered — and it subsumes the others, because every F4 block
+result was established behind the bypass flag.
+
+Add to that the shapes that fail open **and log nothing anywhere**, including under `RUST_LOG=debug`:
+`exit 2` with no output, `exit 1` with a message, plain text on stdout, malformed JSON, and an empty
+`reason`. Hooks run under `set -euo pipefail`, so **any unhandled failure exits non-zero but not 2 —
+Claude Code reads that as an error, Codex reads it as an unlogged allow.** Verified with a real
+death, not a synthetic `exit 1`. A payload shim that dies on bad JSON fails open.
+
+### The block contract, for Task 4
+
+> **exit 2 with ≥ 1 byte on stderr**, or **exit 0 printing one JSON object with `"decision":"block"`
+> and a non-empty `reason`.**
+
+Both work, on the shell tool and on `apply_patch`, each against a deliberate allow control, with the
+reason delivered to the model **verbatim** — including Kinglet's own `BLOCKED:` prefix, wrapped as
+`Command blocked by PreToolUse hook: <stderr>`. **Kinglet already ships the first form.** Both
+results are currently conditional on layer 3 being bypassed.
+
+Two adjacent facts: `.codex/hooks.json` needs a top-level `hooks` wrapper (`description` is
+optional), and `UNITY_HOOK_MODE=warn` correctly allows but its 47-byte warning is **shown zero times
+anywhere** — under Codex it is not "block downgraded to warning", it is "block downgraded to
+nothing".
+
 ### Codex is pinned at 0.145.0 for this wave
 
 `0.147.0` is available. Do not upgrade. Record `codex --version` in every probe's metadata; a

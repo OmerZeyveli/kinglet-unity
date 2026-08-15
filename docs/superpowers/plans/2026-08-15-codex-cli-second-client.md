@@ -650,8 +650,27 @@ learning that after building a port is the expensive order."
 > from both sides to `u ∈ (0.667 s, 1.5 s)`; and Codex accepts Claude Code's tool names as **matcher
 > aliases**, so `Edit|Write` and `Bash` need no translation.
 >
-> **What remains is F4 alone: the block protocol.** Does a hook emitting `decision: block` with a
-> non-empty `reason` actually stop the tool call, and does the model learn why? That is one probe.
+> **CORRECTION — this header was wrong when written, and its own task caught it.** It said *"what
+> remains is F4 alone"* while Step 5 below and the Interfaces block still required **F5**, and Task 8
+> depends on F5. A brief that contradicts itself moves the decision to whoever reads it next,
+> silently. **Two things remain, not one.**
+>
+> **F4 — the block protocol.** Does a refusing hook actually stop the tool call, and does the model
+> learn why? Note that the plan's own text describes a JSON `decision: block` shape, but Kinglet
+> ships **exit 2 + stderr** via `unity_hook_block()` in `.claude/hooks/_lib.sh`. Both must be
+> measured, separately.
+>
+> **F5 — hook trust, and it gates everything else.** `codex exec` carries
+> `--dangerously-bypass-hook-trust`. Measured after the fact: **without that flag, with the project
+> already trusted, the hook fired zero times** — the call went through, and there was no prompt, no
+> warning and nothing logged. Meanwhile `hooks/list` reported `registered 1, warnings [], errors [],
+> enabled=True, statusMessage=None`.
+>
+> **`enabled: true` does not mean it will run.** That is a fourth silent-failure layer on top of the
+> three already measured, and it subsumes them: every F4 result was established behind a flag that
+> is explicitly not a shipping answer. F5's real question is what a **non-interactive installer**
+> must do to make a hook run legitimately — and if the answer is "a human, every time", that is the
+> finding, and Task 8's ship list changes shape.
 >
 > Everything Task 2 settled is in `docs/research/codex-client/codex-facts.md` with the command that
 > produced it. Read it first; re-running a settled measurement is wasted budget, and re-deriving one
