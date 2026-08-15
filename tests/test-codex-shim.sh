@@ -798,6 +798,123 @@ done
 refuses "the control for the signal rows: the same hook stopped by the watchdog" \
   "$PATCH_OK" --hook "$SIGHOOK" --timeout 1
 
+# ============================================================================
+# 7d. THE BUDGET BOUNDS THE WHOLE INVOCATION, NOT JUST EACH HOOK RUN
+#
+# The first version bounded only the wrapped hook, once per file. Two phases
+# were left unbounded, and BOTH ran past Codex's ceiling with every individual
+# step comfortably inside its budget — so the "the shim always reports first"
+# claim was false for each:
+#
+#   * the jq normalisation is superlinear in added lines — measured 2 000 lines
+#     0.07 s, 8 000 0.34 s, 20 000 2.05 s, 40 000 8.38 s, all under `--timeout 3`
+#     and all returning 0;
+#   * the loop spawns the hook once per FILE — 200 files through
+#     block-legacy-input took 4.24 s against an emitted Codex ceiling of 4 s.
+#
+# A signal cannot rescue either: bash defers a trapped signal until the current
+# foreground command finishes, so SIGTERM delivered 1.0 s into a 40 000-line
+# parse was answered at 8.55 s.
+#
+# Each row below is paired with an UNDER-budget control, because "it refuses"
+# is worthless without "and it still allows the ordinary case".
+# ============================================================================
+echo "--- codex shim: the budget bounds the parse and the whole file loop ---"
+
+big_envelope() { # $1 = added lines
+  python3 -c "
+import json, sys
+n = int(sys.argv[1])
+lines = ['*** Begin Patch', '*** Add File: Assets/Scripts/Big.cs'] + ['+// l %d' % i for i in range(n)] + ['*** End Patch']
+print(json.dumps({'tool_name': 'apply_patch', 'cwd': '/proj', 'hook_event_name': 'PreToolUse',
+                  'tool_input': {'command': '\n'.join(lines)}}))" "$1"
+}
+many_files() { # $1 = file count
+  python3 -c "
+import json, sys
+n = int(sys.argv[1]); lines = ['*** Begin Patch']
+for i in range(n):
+    lines += ['*** Add File: Assets/Scripts/F%d.cs' % i, '+class F%d {}' % i]
+lines.append('*** End Patch')
+print(json.dumps({'tool_name': 'apply_patch', 'cwd': '/proj', 'hook_event_name': 'PreToolUse',
+                  'tool_input': {'command': '\n'.join(lines)}}))" "$1"
+}
+
+if command -v python3 >/dev/null 2>&1; then
+  NOOP="$WORK/noop-hook.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$NOOP"; chmod +x "$NOOP"
+
+  # --- the parse ---
+  BIG_START=$(date +%s)
+  big_err="$(big_envelope 40000 | bash "$SHIM" --hook "$NOOP" --timeout 2 2>&1 >/dev/null)" && big_rc=0 || big_rc=$?
+  BIG_ELAPSED=$(( $(date +%s) - BIG_START ))
+  if [ "$big_rc" -eq 2 ] && [ -n "$big_err" ]; then
+    pass "an envelope too large to parse inside the budget is refused (${BIG_ELAPSED}s, ${#big_err} bytes)"
+  else
+    fail "a 40000-line envelope was NOT refused (exit $big_rc, ${#big_err} bytes, ${BIG_ELAPSED}s) — unbounded, it parsed for 8.4s under a 3s budget and returned 0"
+  fi
+  # THE THRESHOLD MUST DISCRIMINATE, AND 8 DID NOT. Refusing is not enough: with
+  # the parse unbounded the loop's budget check refuses anyway, just SIX SECONDS
+  # LATE — long after Codex stopped waiting, which is a silent allow. Measured
+  # at this envelope size and budget: bounded 2.12 s, unbounded 8.34 s. Written
+  # as `-le 8` first, whole-second arithmetic rounded 8.34 down and the mutation
+  # survived. 5 separates them with room for a loaded machine.
+  assert_eq "yes" "$([ "$BIG_ELAPSED" -le 5 ] && echo yes || echo no)" \
+    "and it refuses NEAR the budget (${BIG_ELAPSED}s, budget 2s), rather than after the parse finally finishes"
+
+  # Control: an envelope that parses comfortably inside the budget is allowed.
+  small_out="$(big_envelope 2000 | bash "$SHIM" --hook "$NOOP" --timeout 10 2>&1 >/dev/null)" && small_rc=0 || small_rc=$?
+  assert_eq "0" "$small_rc" "a 2000-line envelope is still allowed — the bound is a budget, not a size limit"
+  assert_eq "" "$small_out" "and it says nothing on the allowed path"
+
+  # --- the loop ---
+  MANY_START=$(date +%s)
+  many_err="$(many_files 400 | bash "$SHIM" --hook "$NOOP" --timeout 2 2>&1 >/dev/null)" && many_rc=0 || many_rc=$?
+  MANY_ELAPSED=$(( $(date +%s) - MANY_START ))
+  if [ "$many_rc" -eq 2 ] && [ -n "$many_err" ]; then
+    pass "an envelope with more files than fit in the budget is refused (${MANY_ELAPSED}s, ${#many_err} bytes)"
+  else
+    fail "a 400-file envelope was NOT refused (exit $many_rc, ${#many_err} bytes, ${MANY_ELAPSED}s) — the budget is per hook run, not per invocation"
+  fi
+  assert_eq "yes" "$([ "$MANY_ELAPSED" -le 8 ] && echo yes || echo no)" \
+    "and it refuses near the budget (${MANY_ELAPSED}s) rather than running the whole envelope out"
+
+  # The refusal must say how far it got: "refused" with no count is undiagnosable.
+  if grep -qF -- "of 400 file(s)" <<< "$many_err"; then
+    pass "the refusal names how many of the envelope's files were checked"
+  else
+    fail "the refusal does not name how far it got: $many_err"
+  fi
+
+  # Control: a handful of files is well inside the budget.
+  few_out="$(many_files 5 | bash "$SHIM" --hook "$NOOP" --timeout 10 2>&1 >/dev/null)" && few_rc=0 || few_rc=$?
+  assert_eq "0" "$few_rc" "a 5-file envelope is still allowed"
+  assert_eq "" "$few_out" "and it says nothing on the allowed path"
+
+  # --- EACH HOOK RUN GETS WHAT IS LEFT, NOT THE WHOLE BUDGET AGAIN -----------
+  #
+  # The budget check before each file is not sufficient on its own: it can pass
+  # with a fraction of a second left, and if the run that follows is then handed
+  # the FULL budget the invocation overshoots by almost a whole budget. Two
+  # files against a 2 s hook under a 3 s budget separates the two cleanly —
+  # measured, remaining-budget 3.07 s and refused, full-budget-each 4.06 s and
+  # ALLOWED, against an emitted Codex ceiling of 4 s.
+  SLOW2="$WORK/slow2-hook.sh"
+  printf '#!/usr/bin/env bash\nsleep 2\nexit 0\n' > "$SLOW2"; chmod +x "$SLOW2"
+  R3_START=$(date +%s)
+  r3_err="$(many_files 2 | bash "$SHIM" --hook "$SLOW2" --timeout 3 2>&1 >/dev/null)" && r3_rc=0 || r3_rc=$?
+  R3_ELAPSED=$(( $(date +%s) - R3_START ))
+  if [ "$r3_rc" -eq 2 ] && [ -n "$r3_err" ]; then
+    pass "a second file cannot restart the budget: two 2s hooks under a 3s budget are refused (${R3_ELAPSED}s)"
+  else
+    fail "two 2s hooks under a 3s budget were NOT refused (exit $r3_rc, ${R3_ELAPSED}s) — each run is getting the full budget again, so the invocation overshoots"
+  fi
+  assert_eq "yes" "$([ "$R3_ELAPSED" -le 3 ] && echo yes || echo no)" \
+    "and the invocation stops inside its budget (${R3_ELAPSED}s of 3s), not one budget per file"
+else
+  fail "python3 unavailable — the budget bounds went unmeasured"
+fi
+
 # A signal must not be able to turn an ALLOW into a refusal either: the killer
 # subshell inherits this script's traps, and the happy path kills it on purpose.
 # Without a `trap -` reset inside it, that kill ran the signal handler in the

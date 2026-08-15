@@ -955,12 +955,21 @@ Left open by this section's first round, and reasoned about rather than measured
 produced exit 2 + stderr"). The reasoning was right and it is now a measurement.
 
 Two live runs, same rig, same never-finishing `PreToolUse` hook (`sleep 600`),
-differing only in which ceiling is allowed to fire first:
+differing **only** in which ceiling is allowed to fire first:
 
 | Which ceiling stops the hook | `file_change` items | the file | model told |
 |---|---|---|---|
-| the wrapper's own watchdog, at 3 s (Codex's is 4 s) | **0** | **ABSENT** | verbatim: `BLOCKED: … was killed by a signal (status 143) after 3s.` |
-| **Codex's `timeoutSec`**, with the wrapper's watchdog disabled | **1** | **PRESENT** | *nothing* |
+| the wrapper's own watchdog — shim 3 s, Codex 6 s | **0** | **ABSENT** | verbatim: `BLOCKED: … was killed by a signal (status 143) …` |
+| **Codex's `timeoutSec`** — shim 60 s, Codex 4 s | **1** | **PRESENT** | *nothing* |
+
+**The first version of this experiment was confounded and the numbers above are
+the re-run.** It disabled the wrapper's watchdog for the second arm, which also
+changed the construct the wrapper was blocked in — a foreground hook instead of a
+backgrounded one — so the two arms differed in the ceiling *and* in whether the
+wrapper could answer a signal at all (measured 1.0 s versus 30.0 s). Here the
+watchdog is **armed in both arms** and merely set above Codex's ceiling in the
+second, so both sit in the same interruptible `wait` and only the firing ceiling
+differs. The result did not change.
 
 So `timeoutSec` expiry is not a refusal and is not reported: the tool call
 proceeds and the model is told nothing at all, which puts it in the same

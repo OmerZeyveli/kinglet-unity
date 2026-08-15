@@ -100,21 +100,39 @@ HOOK_LABEL="(unresolved)"
 # ---------------------------------------------------------------------------
 # A PRIVATE COPY OF THE REAL STDERR, AND IT IS NOT BELT-AND-BRACES.
 #
-# Measured: when a fatal signal arrives while bash is blocked in a REDIRECTED
-# command, the EXIT trap runs — but it runs inside that command's redirection
-# context, so a refusal written to `>&2` goes wherever that command's stderr
-# went. This script blocks in `wait "$rh_pid" >/dev/null 2>&1` for essentially
-# its whole life, so the refusal landed in /dev/null:
+# When an UNTRAPPED fatal signal arrives, bash runs the EXIT trap and then
+# re-raises the signal. The trap really does run — but if the shell was blocked
+# in a **builtin** carrying redirections, the trap inherits those redirections,
+# because a builtin's redirection rewires the SHELL'S OWN descriptors for the
+# duration. This script blocks in `wait … >/dev/null 2>&1` for essentially its
+# whole life, so a refusal written to `>&2` went to /dev/null.
 #
-#   trap writes to >&2, killed during a redirected wait -> rc 143, 0 bytes
-#   the same trap writing to a FILE                      -> file written
+# THE RULE IS BUILTIN-VERSUS-EXTERNAL, NOT "REDIRECTED". An earlier version of
+# this comment said "the redirection context of the command it interrupted",
+# which is false for external commands and would mislead the next maintainer
+# about which constructs are hazardous. A redirection on an external command is
+# applied in the forked child and never touches the shell. Measured, EXIT arm
+# only, refusal written to `>&2`, killed at 0.6 s:
 #
-# The trap was running the whole time; only its message was lost. Under Codex a
-# refusal nobody can read is not a refusal — exit 2 with an empty stderr is in
-# the measured silent-allow class. So the real stderr is duplicated ONCE, here,
-# before any redirection exists to inherit, and every refusal is written to that
-# descriptor instead. A fixed number rather than `{fd}>&2`, which is bash 4.1+
-# and this repository still targets bash 3.2 for the macOS pass.
+#   /bin/sleep 20 >/dev/null 2>&1   external, redirected -> message SURVIVES (7 B)
+#   /bin/sleep 20 2>./FILE          external, redirected -> message SURVIVES (7 B)
+#   wait "$p" >/dev/null 2>&1       builtin,  redirected -> message LOST (0 B)
+#   read -r x … 2>/dev/null         builtin,  redirected -> message LOST (0 B)
+#
+# The two defences below therefore do DIFFERENT jobs, and both earn their place.
+# Same isolate, killed during a redirected `wait`:
+#
+#                        refusal to >&2        refusal to >&9
+#   EXIT arm only        rc 143, 0 bytes       rc 143, message kept
+#   explicit TERM arm    rc 2,   message kept  rc 2,   message kept
+#
+# `exec 9>&2` recovers the MESSAGE; the signal arm recovers the STATUS — and a
+# *trapped* signal's handler runs in the shell's normal descriptor context, so
+# the arm recovers the message too. Under Codex a refusal nobody can read is not
+# a refusal, and a status that is not 2 is an allow, so both halves are needed.
+#
+# A fixed descriptor number rather than `{fd}>&2`, which is bash 4.1+ and this
+# repository still targets bash 3.2 for the macOS pass.
 # ---------------------------------------------------------------------------
 exec 9>&2 || exec 9>/dev/null
 
@@ -190,6 +208,84 @@ trap 'shim_signal PIPE' PIPE
 shim_block() {
   printf 'BLOCKED: %s\n' "$1" >&9
   exit 2
+}
+
+# ---------------------------------------------------------------------------
+# THE INVOCATION BUDGET, AND WHY IT IS PER INVOCATION RATHER THAN PER STEP.
+#
+# The first version bounded only the wrapped hook, once per file. That left two
+# phases of this script unbounded, and both were reachable past Codex's ceiling
+# with every individual step well inside its budget:
+#
+#   * the jq normalisation, which is superlinear in added lines — measured
+#     2 000 lines 0.07 s, 8 000 0.34 s, 20 000 2.05 s, 40 000 8.38 s, all with
+#     `--timeout 3` in force and all returning 0;
+#   * the aggregate loop, because the hook is spawned once per FILE — measured
+#     200 files through block-legacy-input at 4.24 s against an emitted Codex
+#     ceiling of 4 s, with no single hook run anywhere near its 3 s budget.
+#
+# And a signal cannot rescue either, because bash defers a trapped signal until
+# the current foreground command finishes: SIGTERM delivered 1.0 s into a
+# 40 000-line parse was answered at 8.55 s.
+#
+# So the budget is a DEADLINE for the whole invocation, checked before every
+# step and used to bound each one. `date +%s` is whole seconds — coarse, and
+# portable to bash 3.2 without `date +%s%N` or `EPOCHREALTIME`.
+# ---------------------------------------------------------------------------
+SHIM_START="$(date +%s)"
+
+# Seconds left in the invocation budget. `-1` means "no budget was set", which
+# is `--timeout 0`, an explicit opt-out.
+shim_left() {
+  if [ "${HOOK_TIMEOUT:-0}" -le 0 ]; then printf '%s\n' '-1'; return 0; fi
+  sl_left=$(( SHIM_START + HOOK_TIMEOUT - $(date +%s) ))
+  [ "$sl_left" -lt 0 ] && sl_left=0
+  printf '%s\n' "$sl_left"
+}
+
+# Wait for an already-backgrounded child, killing it after $1 seconds. `$1 = 0`
+# arms no watchdog and waits indefinitely; the child is still a background job,
+# so this script stays interruptible either way.
+shim_watch() {
+  sw_secs="$1"; sw_pid="$2"
+  sw_killer=""
+  if [ "$sw_secs" -gt 0 ]; then
+    # `trap -` FIRST, and it is not tidiness. A subshell inherits this script's
+    # traps, and the line below kills this one deliberately on the happy path —
+    # so without the reset the killer would run shim_signal, whose FIRST act is
+    # `shim_cleanup`, an `rm -rf` of the temp directory the parent is still
+    # reading. What has been keeping that race from firing is not the closed
+    # descriptor but the deferral above: the killer sits in a foreground `sleep`,
+    # so its inherited trap cannot run until that sleep expires, by which time
+    # the parent is gone. Shorten the sleep or make it interruptible and the
+    # reset is the only thing left. Verified equivalent over 70 paired runs; kept
+    # because "currently unreachable" is not a property worth depending on.
+    #
+    # `9>&-` closes the saved stderr for the killer, and that IS a correctness
+    # fix. Descriptor 9 is a dup of the caller's stderr, so anything holding it
+    # open holds the caller's pipe open — and killing this subshell does NOT kill
+    # the `sleep` it is blocked in. While that orphan held descriptor 9, a caller
+    # reading this script through a pipe (which is how Codex reads it) blocked
+    # for the FULL timeout on every invocation, allow or refuse: the suite's own
+    # shim test went from 4 s to over 150 s.
+    ( trap - EXIT TERM INT HUP PIPE; sleep "$sw_secs"; kill -TERM "$sw_pid" ) 9>&- >/dev/null 2>&1 &
+    sw_killer=$!
+  fi
+  wait "$sw_pid" >/dev/null 2>&1
+  sw_rc=$?
+  if [ -n "$sw_killer" ]; then
+    kill -TERM "$sw_killer" >/dev/null 2>&1
+    wait "$sw_killer" >/dev/null 2>&1
+  fi
+  return "$sw_rc"
+}
+
+# Refuse if the invocation budget is gone. Called before every bounded step.
+shim_check_budget() {
+  scb_left="$(shim_left)"
+  [ "$scb_left" = "-1" ] && return 0
+  [ "$scb_left" -gt 0 ] && return 0
+  shim_block "$SHIM_NAME: the ${HOOK_TIMEOUT}s budget for $HOOK_LABEL expired $1. Refusing: a gate that did not finish checking has approved nothing, and a hook Codex stops waiting for is a silent allow. If this is a legitimately large change, split it or raise this hook's timeout in .claude/settings.json."
 }
 
 usage() {
@@ -277,12 +373,19 @@ SHIM_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SHIM_DIR=""
 # sub-second timeout must not round down to 0, which Codex's schema accepts
 # (`minimum: 0`) and which would kill every hook instantly.
 #
-# THE TWO CEILINGS ARE ORDERED, NOT MERELY BOTH PRESENT. The hook gets exactly
-# its declared budget and the shim refuses at that point; Codex's ceiling is one
-# second later, purely as a backstop:
+# THE TWO CEILINGS ARE ORDERED, NOT MERELY BOTH PRESENT. The invocation gets
+# exactly the budget settings.json declares and the shim refuses at that point;
+# Codex's ceiling is one second later, purely as a backstop:
 #
 #   shim  --timeout N     where N = ceil(ms/1000), the budget settings.json declares
 #   Codex  timeout  N+1   so the shim always reports first
+#
+# "Always" is only true because that budget bounds the WHOLE INVOCATION rather
+# than each step. The first version bounded the wrapped hook alone, which left
+# the jq parse and the aggregate loop free to run past Codex's ceiling with every
+# individual step inside its budget — 40 000 added lines parsed for 8.4 s under a
+# 3 s budget, and 200 files ran 4.24 s against a 4 s ceiling. See the budget block
+# near shim_left() for the measurements and for why a signal cannot rescue either.
 #
 # The first draft emitted the bare conversion and passed no `--timeout` at all,
 # which left the shim on its 15 s default underneath a 2–5 s Codex ceiling — so
@@ -459,7 +562,17 @@ fi
 #   Move to     -> the source AND destination paths are each checked
 if [ "$ROUTE" = "patch" ]; then
   PAYLOADS_FILE="$SHIM_TMPDIR/payloads.jsonl"
-  printf '%s' "$PAYLOAD" | jq -c '
+  # THE PARSE IS BACKGROUNDED AND BOUNDED, and jq itself is the job — not a
+  # subshell around it. `printf … | jq` would make `$!` the last element of a
+  # pipeline whose other members survive a kill, which is the same orphan
+  # problem the watchdog's own `sleep` has. The payload goes to a file so jq can
+  # be a plain background command with a redirect.
+  shim_check_budget "before the patch envelope could be parsed"
+  printf '%s' "$PAYLOAD" > "$SHIM_TMPDIR/payload.raw" \
+    || shim_block "$SHIM_NAME: could not stage the payload for $HOOK_LABEL"
+  JQ_BUDGET="$(shim_left)"
+  [ "$JQ_BUDGET" = "-1" ] && JQ_BUDGET=0
+  jq -c '
     def flush: if .cur == null then . else (.files += [.cur] | .cur = null) end;
 
     # Trailing whitespace, not just CR. A single trailing space defeated every
@@ -536,8 +649,13 @@ if [ "$ROUTE" = "patch" ]; then
               kinglet_shim: { source_tool: ($orig.tool_name // ""), op: $f.op, patch_path: $f.path } }
       ]
     | .[]
-  ' > "$PAYLOADS_FILE" 2>"$SHIM_TMPDIR/jq.err"
+  ' < "$SHIM_TMPDIR/payload.raw" > "$PAYLOADS_FILE" 2>"$SHIM_TMPDIR/jq.err" 9>&- &
+  JQ_PID=$!
+  shim_watch "$JQ_BUDGET" "$JQ_PID"
   jq_rc=$?
+  if [ "$jq_rc" -ge 128 ]; then
+    shim_block "$SHIM_NAME: parsing the patch envelope handed to $HOOK_LABEL did not finish within the ${HOOK_TIMEOUT}s budget (killed by signal, status $jq_rc). Refusing: the files it would touch are still unknown. A very large envelope is the usual cause — this parse is superlinear in added lines."
+  fi
   if [ "$jq_rc" -ne 0 ]; then
     # jq's own message names the offending directive on the unknown-directive
     # path, so it is forwarded rather than reduced to an exit code.
@@ -554,6 +672,10 @@ if [ "$ROUTE" = "patch" ]; then
   fi
 else
   PAYLOADS_FILE="$SHIM_TMPDIR/payloads.jsonl"
+  # Set on this route too: the loop below names it, and an unset variable under
+  # `set -u` would kill the script on every passthrough call — converted to a
+  # refusal by the guard, which is a gate that blocks every shell command.
+  PAYLOAD_COUNT=1
   printf '%s\n' "$PAYLOAD" > "$PAYLOADS_FILE" \
     || shim_block "$SHIM_NAME: could not stage the payload for $HOOK_LABEL"
 fi
@@ -574,36 +696,20 @@ run_hook() {
   rh_payload_file="$1"
   rh_out="$2"
   rh_err="$3"
+  rh_budget="$4"
   # 9>&- closes the saved-stderr descriptor for the wrapped hook: it is this
   # script's private refusal channel and no hook has business writing to it.
-  if [ "$HOOK_TIMEOUT" -eq 0 ]; then
-    bash "$HOOK_PATH" < "$rh_payload_file" > "$rh_out" 2> "$rh_err" 9>&-
-    return $?
-  fi
+  #
+  # ALWAYS BACKGROUNDED, even when unbounded. Bash defers a trapped signal until
+  # the current FOREGROUND command finishes, so a hook run in the foreground
+  # makes this script unable to answer a signal for as long as that hook runs —
+  # measured at 30 s against a `sleep 600` hook, versus 1.0 s when the same hook
+  # is backgrounded and waited on. `wait` is interruptible; a foreground external
+  # command is not. The watchdog is what is conditional here, never the fork.
   bash "$HOOK_PATH" < "$rh_payload_file" > "$rh_out" 2> "$rh_err" 9>&- &
   rh_pid=$!
-  # `trap -` FIRST, and it is not tidiness. A subshell inherits this script's
-  # traps, and the line below kills this one deliberately on the happy path — so
-  # without the reset the killer would run shim_signal, write a refusal to the
-  # inherited descriptor 9, and put a spurious BLOCKED line on the real stderr
-  # of a call the hook had just ALLOWED. The `>/dev/null 2>&1` on this subshell
-  # would not hide it, because descriptor 9 is not stderr.
-  #
-  # `9>&-` CLOSES THE SAVED STDERR FOR THE KILLER TOO, and that is a correctness
-  # fix rather than hygiene. Descriptor 9 is a dup of the caller's stderr, so
-  # anything holding it open holds the caller's pipe open. Killing this subshell
-  # does NOT kill the `sleep` it is blocked in — that orphan survives, and while
-  # it held descriptor 9 a caller reading the shim's output through a pipe (which
-  # is how a test captures it, and how Codex reads it) blocked for the FULL
-  # timeout on every single invocation, allow or refuse. Measured before this
-  # fix: the suite's own shim test went from 4 s to over 150 s and was killed.
-  ( trap - EXIT TERM INT HUP PIPE; sleep "$HOOK_TIMEOUT"; kill -TERM "$rh_pid" ) 9>&- >/dev/null 2>&1 &
-  rh_killer=$!
-  wait "$rh_pid" >/dev/null 2>&1
-  rh_rc=$?
-  kill -TERM "$rh_killer" >/dev/null 2>&1
-  wait "$rh_killer" >/dev/null 2>&1
-  return "$rh_rc"
+  shim_watch "$rh_budget" "$rh_pid"
+  return $?
 }
 
 ADVISORY_TEXT=""
@@ -614,8 +720,16 @@ while IFS= read -r shim_line; do
   printf '%s\n' "$shim_line" > "$SHIM_TMPDIR/payload.$LINE_NO.json" \
     || shim_block "$SHIM_NAME: could not stage payload $LINE_NO for $HOOK_LABEL"
 
+  # THE BUDGET IS SPENT ACROSS THE WHOLE ENVELOPE, NOT RESET PER FILE. One
+  # envelope can carry hundreds, and a per-file ceiling bounds each step while
+  # leaving the invocation unbounded — which is how 200 files ran 4.24 s under a
+  # 3 s budget with no single run anywhere near it.
+  shim_check_budget "after checking $((LINE_NO - 1)) of $PAYLOAD_COUNT file(s) in this patch"
+  LOOP_BUDGET="$(shim_left)"
+  [ "$LOOP_BUDGET" = "-1" ] && LOOP_BUDGET=0
+
   run_hook "$SHIM_TMPDIR/payload.$LINE_NO.json" \
-           "$SHIM_TMPDIR/out.$LINE_NO" "$SHIM_TMPDIR/err.$LINE_NO"
+           "$SHIM_TMPDIR/out.$LINE_NO" "$SHIM_TMPDIR/err.$LINE_NO" "$LOOP_BUDGET"
   hook_rc=$?
 
   hook_err="$(cat "$SHIM_TMPDIR/err.$LINE_NO" 2>/dev/null || true)"
@@ -635,7 +749,7 @@ while IFS= read -r shim_line; do
   fi
 
   if [ "$hook_rc" -ge 128 ]; then
-    shim_block "$HOOK_LABEL was killed by a signal (status $hook_rc) after ${HOOK_TIMEOUT}s. Refusing: a gate that did not finish has not approved anything."
+    shim_block "$HOOK_LABEL was killed by a signal (status $hook_rc) after ${LOOP_BUDGET}s of the ${HOOK_TIMEOUT}s budget remaining at that point. Refusing: a gate that did not finish has not approved anything."
   fi
 
   if [ "$hook_rc" -ne 0 ]; then

@@ -101,10 +101,35 @@ Three things prevent it, and all three are load-bearing:
    the residual for what stays uncovered.
 4. **Nothing exits 2 without writing a reason**, including on behalf of a wrapped
    hook that refused in silence. Refusals go to a descriptor duplicated from the
-   real stderr before any redirection exists to inherit: bash runs a trap inside
-   the redirection context of the command it interrupted, so a refusal written to
-   plain `>&2` while the shim was blocked in a redirected `wait` went to
-   `/dev/null` — the trap ran, only its message was lost.
+   real stderr before any redirection exists to inherit.
+
+**Why 3 and 4 are two defences and not one.** On an *untrapped* fatal signal bash
+runs the EXIT trap and then re-raises, discarding the trap's own `exit 2`. The
+trap runs — but if the shell was blocked in a **builtin** carrying redirections,
+the trap inherits them, because only a builtin's redirection rewires the shell's
+own descriptors. The shim blocks in `wait … >/dev/null 2>&1` for essentially its
+whole life, so a refusal written to plain `>&2` went to `/dev/null`.
+
+The rule is builtin-versus-external, not "redirected" — an earlier draft of this
+paragraph said the latter, which is false for external commands and would mislead
+a reader about which constructs are hazardous:
+
+| EXIT arm only, refusal to `>&2`, killed at 0.6 s | message |
+|---|---|
+| `/bin/sleep 20 >/dev/null 2>&1` — external, redirected | **survives** |
+| `/bin/sleep 20 2>./FILE` — external, redirected | **survives** |
+| `wait "$p" >/dev/null 2>&1` — builtin, redirected | **lost** |
+| `read -r x … 2>/dev/null` — builtin, redirected | **lost** |
+
+| killed during a redirected `wait` | refusal to `>&2` | refusal to `>&9` |
+|---|---|---|
+| **EXIT arm only** | rc 143, 0 bytes | rc 143, message kept |
+| **explicit TERM arm** | rc 2, message kept | rc 2, message kept |
+
+`exec 9>&2` recovers the **message**; the signal arm recovers the **status**, and
+recovers the message too, because a *trapped* signal's handler runs in the shell's
+normal descriptor context. A status that is not 2 is an allow and a refusal nobody
+can read is not a refusal, so both halves are load-bearing.
 
 Every shape below is asserted in `tests/test-codex-shim.sh`, each on **both**
 halves of the criterion — status `2` **and** non-empty stderr — because asserting
@@ -193,8 +218,15 @@ runs, same never-finishing hook, differing only in which ceiling fires first
 
 | Which ceiling stops the hook | `file_change` | the file | model told |
 |---|---|---|---|
-| the shim's own watchdog at 3 s (Codex's is 4 s) | **0** | **ABSENT** | verbatim refusal |
-| Codex's `timeoutSec`, shim watchdog disabled | **1** | **PRESENT** | *nothing* |
+| the shim's own watchdog — shim 3 s, Codex 6 s | **0** | **ABSENT** | verbatim refusal |
+| Codex's `timeoutSec` — shim 60 s, Codex 4 s | **1** | **PRESENT** | *nothing* |
+
+The watchdog is **armed in both arms** and merely set above Codex's ceiling in the
+second, so the shim sits in the same interruptible `wait` either way and the only
+difference is which ceiling fires. (The first version of this experiment disabled
+the watchdog for the second arm, which also changed the shim's blocking construct
+— 1.0 s versus 30.0 s signal response. That confound is removed here and the
+result was unchanged.)
 
 A hook Codex stops waiting for is a **silent allow**. So the one second of margin
 is not tidiness: it is the whole difference between a hung hook refusing and a hung
@@ -208,8 +240,28 @@ ceilings that cannot be ordered are one ceiling and a decoration, and the
 "independent second mechanism" this paragraph used to claim was unreachable in the
 shipped composition. The ordering is now asserted per entry.
 
+**The budget bounds the whole invocation, not each step, and that is what makes
+"the shim always reports first" true.** Bounding only the wrapped hook left two
+phases free to run past Codex's ceiling with every individual step comfortably
+inside its budget:
+
+| phase | measured | budget in force |
+|---|---|---|
+| the jq normalisation (superlinear in added lines) | 8 000 lines 0.34 s, 20 000 2.05 s, **40 000 8.38 s** | `--timeout 3`, returned **0** |
+| the loop, which spawns the hook once per **file** | **200 files 4.24 s** through `block-legacy-input` | emitted Codex ceiling **4 s** |
+
+A signal cannot rescue either, because bash defers a trapped signal until the
+current foreground command finishes — SIGTERM delivered 1.0 s into a 40 000-line
+parse was answered at **8.55 s**. Both phases are now bounded against one
+invocation deadline, and each hook run is given what is *left* rather than the
+whole budget again. An envelope too large to check inside its budget is **refused**,
+naming how many of its files were checked; that is the fail-closed direction, and
+the alternative is Codex timing the hook out, which is a silent allow.
+
 `timeout(1)` is GNU coreutils and absent on a stock macOS host, so the watchdog is
-a background killer, which works on bash 3.2. Its `sleep` is given a closed copy of
+a background killer, which works on bash 3.2. Every child is backgrounded even when
+unbounded, because a foreground child makes the shim unable to answer a signal for
+as long as it runs — measured 30 s versus 1.0 s. Its `sleep` is given a closed copy of
 the refusal descriptor: killing the killer does not kill the `sleep` it is blocked
 in, and while that orphan held the descriptor open it held the *caller's* pipe open
 for the full timeout on every invocation.
