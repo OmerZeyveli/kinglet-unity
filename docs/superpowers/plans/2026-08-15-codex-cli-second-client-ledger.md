@@ -266,11 +266,11 @@ The event stream shape, measured against the real binary:
 | # | Task | Status | Commit range | Notes |
 |---|---|---|---|---|
 | 1 | The probe harness | **DONE** | `a5ec1bd..0b58d05` | general-purpose implementer; 1 fix round; all 8 findings ADDRESSED |
-| 2 | Does Codex import a `.claude/` configuration? | open | — | *(brief pending)* — must be written after Task 1, because it calls the harness Task 1 produces |
-| 3 | Codex's hook mechanism, measured | open | — | *(brief pending)* |
-| 4 | Kinglet's 12 hooks under Codex | open | — | *(brief pending)* |
-| 5 | Kinglet's 16 skills under Codex | open | — | *(brief pending)* |
-| 6 | Rules, `AGENTS.md`, commands and agents | open | — | *(brief pending)* |
+| 2 | Does Codex import a `.claude/` configuration? | **DONE** | `1d8e941..89e7552` | general-purpose implementer; 2 fix rounds; F1 = **confirmed, lossy in silence** |
+| 3 | Codex's hook mechanism, measured | open | — | **RE-PLANNED: collapsed to one probe** — only the block protocol is left |
+| 4 | Kinglet's 12 hooks under Codex | open | — | **RE-PLANNED: did not shrink; now the wave's centre of gravity.** Two risks — rewriting hook bodies against the `apply_patch` envelope, and the block protocol |
+| 5 | Kinglet's 16 skills under Codex | open | — | **RE-PLANNED: shrank most** — discovery settled, only invocation left; plus an unreconciled 18-vs-16 to resolve |
+| 6 | Rules, `AGENTS.md`, commands and agents | open | — | **RE-PLANNED: split.** `AGENTS.md` and agent conversion settled; rules and commands became design work |
 | 7 | Layer B — MCP routes against the live bridge | open | — | *(brief pending)* — needs a free Editor |
 | 8 | Ship the payload the measurement supports | open | — | *(brief pending)* — ship list decided by Tasks 2–7 |
 | 9 | Installer writes and removes the Codex layout | open | — | *(brief pending)* |
@@ -369,6 +369,40 @@ repetition**.
 - `provenance.tsv`'s `fix-round-1:` clause appears on six rows, but **four of those are from an
   earlier, unrelated wave** (`unity-optimizer.md`, `unity-reviewer.md`, `unity-optimize.md`,
   `unity-scene.md`). A future sweep keyed on that marker will over-collect.
+
+---
+
+## Task 2 — close, and the re-plan it forced
+
+Implementer: **general-purpose**. Report `DONE`, then two fix rounds. Review: **Spec ✅**, four
+Important; re-review 1: all nine ADDRESSED, one new Important; re-review 2: **both ADDRESSED,
+nothing new broke, Task 2 can close.** Range **`1d8e941..89e7552`**.
+
+**F1 = confirmed.** All three `externalAgentConfig/*` methods exist and do real work, with a negative
+control enumerating 129 methods. The import writes `.codex/hooks.json`, 13 byte-identical hook
+scripts, 8 agents as `.codex/agents/*.toml`, `.agents/skills/` and `AGENTS.md`, reporting **31
+successes, 0 failures** — and is lossy in silence, in four ways that the success report cannot show.
+
+### Two methodological entries worth more than the verdict
+
+**The criterion refused to classify against a dead control.** When the reviewer's own
+`guard-project-config` control lacked the trigger, the harness printed `CONTROL VACUOUS — cannot
+classify` rather than scoring the hook INERT. That is what stops an inertness table from erring
+toward alarm — the direction nobody double-checks, because it reads as vigilance.
+
+**A byte count that looked like a disagreement was a property of the input.** Implementer and
+reviewer reported 1363 and 1589 bytes for the same hook. Two blocking commands differing by exactly
+39 characters produced 1581 → 1620: output is `constant + len(command)`. Neither figure was a
+property of the hook, and quoting either as one was the actual defect.
+
+### What Task 2 forced into the plan
+
+| Task | Was | Now |
+|---|---|---|
+| 3 | measure config location, schema, events, block protocol, trust | **one probe** — block protocol only |
+| 4 | measure whether hooks fire | **did not shrink**; the wave's centre of gravity — 8 of 9 enforce nothing and the hook bodies need rewriting against `apply_patch` |
+| 5 | measure discovery and invocation | **discovery settled**; invocation only, plus an unreconciled 18-vs-16 skill count |
+| 6 | measure four classes | **split** — two settled mechanically, two became design work |
 
 ---
 

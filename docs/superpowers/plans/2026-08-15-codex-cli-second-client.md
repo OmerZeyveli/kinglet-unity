@@ -640,6 +640,23 @@ learning that after building a port is the expensive order."
 
 ## Task 3: Codex's hook mechanism, measured
 
+> **RE-PLANNED AFTER TASK 2 — this task has collapsed to one probe.**
+>
+> Task 2 measured F2–F5 as a side effect of driving the importer, and its two fix rounds measured
+> more. **Already settled, do not re-measure:** the config file is `.codex/hooks.json` and the import
+> writes it; the schema comes from `codex app-server generate-json-schema`; Codex normalises Claude
+> Code's event names (5/4/2/1 across `PreToolUse`/`PostToolUse`/`SessionStart`/`Stop`); registration
+> passes with `warnings: []` behind a **double trust gate**; `timeoutSec` is **seconds**, bracketed
+> from both sides to `u ∈ (0.667 s, 1.5 s)`; and Codex accepts Claude Code's tool names as **matcher
+> aliases**, so `Edit|Write` and `Bash` need no translation.
+>
+> **What remains is F4 alone: the block protocol.** Does a hook emitting `decision: block` with a
+> non-empty `reason` actually stop the tool call, and does the model learn why? That is one probe.
+>
+> Everything Task 2 settled is in `docs/research/codex-client/codex-facts.md` with the command that
+> produced it. Read it first; re-running a settled measurement is wasted budget, and re-deriving one
+> *differently* is how two numbers start disagreeing.
+
 **Files:**
 - Modify: `docs/research/codex-client/codex-facts.md` (add F2–F5)
 - Modify: `provenance.tsv` (update the note on the `codex-facts.md` row)
@@ -794,6 +811,45 @@ proves it fired, not when its configuration file exists."
 ---
 
 ## Task 4: Kinglet's 12 hooks under Codex
+
+> **RE-PLANNED AFTER TASK 2 — this task did not shrink. It got sharper, and it is now the wave's
+> centre of gravity.**
+>
+> Task 2 already answered the question this task was going to ask first, and the answer is worse than
+> "they do not register". **All 12 hooks register. The matchers fire. Eight of the nine tool-event
+> hooks then do nothing.**
+>
+> The cause is one field. **Codex's file tool is `apply_patch`, and `tool_input` carries exactly one
+> key — `command`, a patch envelope** (`*** Begin Patch…`), for creating a file and for editing one
+> alike. There is no `file_path`, `new_string`, `old_string` or `content`. Measured control, same
+> hook, same edit, same file: `block-scene-edit.sh` exits **2** on a Claude-shaped payload and **0**
+> on the real Codex payload. Only `bash-gate.sh` survives, because it happens to read
+> `.tool_input.command`. **No Kinglet hook reads `tool_name`**, so nothing is wrong at the matcher
+> layer — the break is entirely in what the hook bodies reach for.
+>
+> **Do not re-measure the inertness.** It is measured, with a per-hook paired control and a criterion
+> that refuses to classify against a dead control. Start from it.
+>
+> **This task's two risks, both open:**
+>
+> 1. **Rewriting the hook bodies against the `apply_patch` envelope.** Eight hooks currently enforce
+>    nothing. Whatever you write must keep working under Claude Code — `.claude/hooks/*.sh` is a
+>    shipped surface with 122 assertions in `tests/test-hook-behaviour.sh` behind it — so a payload
+>    shim is likelier to be right than an edit to the twelve.
+> 2. **The block protocol**, if Task 3 has not closed it by the time you start.
+>
+> **A third thing, already measured, that must not be lost:** every one of the 12 entries carries a
+> `timeout` in **milliseconds**, and Codex reads that field as **seconds**. Derived from
+> `.claude/settings.json`:
+>
+> | value | hooks | becomes |
+> |---|---|---|
+> | 3000 | 6 | 50 minutes |
+> | 5000 | 5 | 83 minutes |
+> | 2000 | 1 | 33 minutes |
+>
+> A hung hook that should have been killed in three seconds holds the turn for fifty minutes. This
+> ships in the same file the import writes, so it is this task's to fix or this task's to name.
 
 **Files:**
 - Create: `docs/research/codex-client/findings.md`
@@ -954,6 +1010,28 @@ invoked is the failure this probe is built to catch."
 
 ## Task 5: Kinglet's 16 skills under Codex
 
+> **RE-PLANNED AFTER TASK 2 — this task shrank the most.**
+>
+> **Already settled:** the import writes the skills into `.agents/skills/`, and they load with
+> `enabled: true`. Discovery is not in question. **Only invocation behaviour remains** — is a skill
+> reached for when it is relevant without being named, which is the only mode in which a skill
+> library helps an unprompted session.
+>
+> **A trap that will cost you a wrong number if you skip it.** `skills/list` totals are **not
+> stable**: Task 2's disposable home reported 24, its reviewer's reported **59** — 18 repo, 35 user,
+> 6 system — with the 35 fetched over the network into the home from
+> `plugins/cache/openai-curated-remote/`. Only the **repo-scope count reproduces**. Quote the
+> repo-scope figure, say that it is repo-scope, and never quote a total.
+>
+> **And one thing to resolve rather than inherit:** the repo scope reports **18** while
+> `.claude/skills/` holds **16** (`ls -d .claude/skills/*/ | wc -l` — derive it, do not trust this
+> line). Two extra somethings are being counted as repo skills. Find out what they are before you
+> report a discovery figure, because a count nobody has reconciled is how Task 2's `84` went into
+> three places attached to the wrong noun.
+>
+> **`skills/list` takes `cwds`, an array, not `cwd`.** With `cwd` it returns a well-formed answer
+> about the wrong repository — a result, not an error.
+
 **Files:**
 - Modify: `docs/research/codex-client/findings.md` (add `## Skills`)
 
@@ -1068,6 +1146,37 @@ whether a skill is invoked without being named."
 ---
 
 ## Task 6: Rules, `AGENTS.md`, commands and agents
+
+> **RE-PLANNED AFTER TASK 2 — this task split. Two of its four classes are settled mechanically;
+> the other two stopped being measurements and became design work the measurement created.**
+>
+> **Settled — do not re-measure:**
+>
+> - **`AGENTS.md`** is written by the import. Whether its *content* reaches the model is still worth
+>   one sentinel probe, and that is all this half needs.
+> - **Agents convert**: 8 files become `.codex/agents/*.toml`. But they carry only `name`,
+>   `description` and `developer_instructions`. **`model`, `color` and `tools` are dropped — and
+>   `mcp__UnityMCP` appears exactly 0 times across all 8.** Every Unity capability grant is gone. The
+>   measurement is done; what it means for a Unity toolkit is this task's judgement to write down.
+>
+> **Now design work, not measurement:**
+>
+> - **Rules never cross.** There is no `RULES` item type. Worse, a blind `Claude` → `Codex`
+>   substitution rewrites **29 references** to a `.Codex/rules/` that does not exist, and leaves
+>   **22** `.claude/` references behind — so the imported tree points at two different non-existent
+>   directories. **The number is 29, not 84.** 84 is every `.claude/` → `.Codex/` rewrite across all
+>   classes (skills 23, scripts 9, NOTICE 4, and so on); scoping this work off 84 would be scoping it
+>   off a superset of four unrelated repairs. Source-side reconciliation, already derived:
+>   `85 = 84 + 1`, `30 = 29 + 1`, `22 = 1 + 21` — the 21 live in the rewrite-exempt `.sh` class and
+>   were never inside the 85.
+> - **7 of 9 commands are silently dropped**, because their bodies contain `$ARGUMENTS` — and `$1`
+>   and `$5` in prose trigger it too, so the trigger is broader than the name suggests. They never
+>   appear in `detect`, so there is **no failure entry**: the import reports 31 successes and 0
+>   failures while dropping them.
+>
+> Both remaining halves are decisions about what Kinglet should ship, not questions about what Codex
+> does. Write them as recommendations with the measurement attached, and let Task 8's ship list act
+> on them.
 
 These four surface classes are grouped because they share one question — does a
 document reach the model at all — and because commands and agents are the two
