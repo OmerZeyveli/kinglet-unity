@@ -585,7 +585,16 @@ assert_eq "5" "$(printf '%s\n' "$TSD_PAY_TREE" | grep -c . || true)" \
     "the payload tree holds five directories — the derivation is non-empty, without which every comparison below is vacuously true"
 assert_eq "$TSD_PAY_TREE" "$(cut -d: -f1 <<< "$TSD_PAY_SPECS")" \
     "the doctor checks every directory install.sh actually installs — a sixth added under .claude/ is in that find the moment it exists, so this loop must grow in the same commit"
-assert_not_contains "$TSD_PAY_TREE" "scripts" \
+# SET MEMBERSHIP, NOT SUBSTRING. `TSD_PAY_TREE` is a newline-separated SET of directory names, and
+# the claim is that `scripts` is not one of them. `assert_not_contains` is a `grep -qF` over the
+# whole blob, so it answers a different question: it also fires on any member that merely CONTAINS
+# the word — a future `.claude/scripts-shared/` would red this line while satisfying the claim, and
+# the failure message would say the payload tree contains `scripts` when it does not. `grep -qxF`
+# compares whole lines, which is what a set test is. No verdict changes today (the set is
+# agents/commands/hooks/rules/skills), and that is the point: the assertion was right by accident.
+TSD_PAY_TREE_SCRIPTS="absent"
+grep -qxF -- "scripts" <<< "$TSD_PAY_TREE" && TSD_PAY_TREE_SCRIPTS="present"
+assert_eq "absent" "$TSD_PAY_TREE_SCRIPTS" \
     "…and the pin's scope is the payload tree: .claude/scripts/ is installed by the separate 'for group in scripts' loop, is on no side of it, and is a ledger item rather than a gap this claim hides"
 assert_eq "5" "$(printf '%s\n' "$TSD_PAY_SPECS" | grep -c . || true)" \
     "the doctor's payload list parses to five specs — a derivation that reads nothing must not be compared against another that reads nothing"

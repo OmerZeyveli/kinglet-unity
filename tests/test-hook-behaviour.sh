@@ -166,13 +166,33 @@ assert_eq "$PRESENT_COUNT" "$REGISTERED_COUNT" \
 # WHICH PAYLOADS HAD TO BE INVENTED is itself the measurement, so it is stated under a criterion:
 # a payload counts as PRE-EXISTING when some test file other than this one already RAN that hook on
 # an input that drives it into its acting branch. Being named by a test file is not enough, and the
-# gap is wider than one file: `/usr/bin/grep -rn -F` over tests/, excluding this file, finds the
-# three warn-* hooks SIX times across FOUR files — tests/test-hooks.sh (three, all in comments),
-# tests/test-derived-counts.sh (one comment), tests/test-install-ownership.sh (a path fixture) and
-# tests/test-install-prune.sh (live code, as CUT_HOOK/KEPT_HOOK string literals compared against an
-# install listing). NONE of the six executes a hook, which is what makes "executed by zero tests"
-# true; an earlier draft of this paragraph said "inside a comment block", which is true of
-# tests/test-hooks.sh and false of the tree.
+# gap is wider than one file.
+#
+# THE NEEDLE IS THE HOOK'S BARE NAME, NOT ITS `.sh` FILENAME, AND THE SCOPE IS tests/ LESS THIS FILE.
+# Both halves have to be written down, because without them the recipe below has two defensible
+# readings that return different answers, and two readers took one each: the bare name gives 11 lines
+# across 5 files, the `.sh` filename gives 7 across 3. The bare name is the right one — the claim
+# being supported is that these hooks are NAMED without being RUN, and `warn-serialization` in a
+# comment is a naming. It is also the superset, so it cannot understate the gap.
+#
+#   for n in warn-filename warn-platform-defines warn-serialization; do
+#     /usr/bin/grep -rn -F -- "$n" tests/ | /usr/bin/grep -v '^tests/test-hook-behaviour\.sh:'
+#   done | sort -u
+#
+# Run 2026-08-15, that finds the three warn-* hooks on **11 lines across 5 files** — tests/test-hooks.sh
+# (4, all in comments), tests/test-surface-references.sh (3, `#### warn-*` headings inside a recorded
+# docs/HOOK-REFERENCE.md section-list fixture), tests/test-install-prune.sh (2, CUT_HOOK/KEPT_HOOK
+# string literals compared against an install listing), tests/test-install-ownership.sh (1, a path
+# fixture in the G_EDITED list) and tests/test-derived-counts.sh (1, a comment). NONE of the 11
+# executes a hook, which is what makes "executed by zero tests" true.
+#
+# THIS SENTENCE HAS NOW BEEN WRONG TWICE, both times because it stated an ANSWER a reader could not
+# reproduce. An earlier draft said "inside a comment block", true of tests/test-hooks.sh and false of
+# the tree. Its replacement said "SIX times across FOUR files" and named them — correct when written,
+# then falsified by `72f9916` rewriting tests/test-hooks.sh and `6e489bc` adding the section-list
+# fixture, neither of which had any reason to look at a count recorded in a different test file. A
+# recipe whose criterion is unstated cannot be re-run to check itself; that ambiguity WAS the defect,
+# more than either number.
 #
 #   pre-existing (8) — block-scene-edit, block-meta-edit, guard-project-config, track-edits and
 #                      session-brief in tests/test-hooks.sh (session-brief's block there already
