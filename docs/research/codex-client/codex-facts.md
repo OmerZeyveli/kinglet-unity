@@ -623,13 +623,20 @@ register — all 12 register, `warnings: []`. It does **not** mean matchers are 
 one level below where a matcher test looks. A reader who takes either of the first
 two away from this section has been misled by framing rather than by facts.
 
-### What remains unmeasured, and is handed to Task 4
+### What Task 2 left open, and where it was closed
 
-Whether a hook can actually *veto* a tool call, and by what protocol. The schema
-offers the vocabulary — `HookRunStatus` includes `blocked` and `stopped`, and
-`HookOutputEntryKind` includes `stop`, `feedback`, `context`, `warning`, `error` —
-but nothing here exercised it, so the block protocol is an open question, not a
-finding. `HookEventName`'s full enum, for whoever picks that up: `preToolUse,
+Whether a hook can actually *veto* a tool call, and by what protocol. Task 2
+exercised none of it and recorded it as an open question. **It is now closed: see
+`## F4` below**, which measures two independent block mechanisms and the five
+near-miss shapes that fail open. This paragraph is kept rather than deleted
+because the section above is written as Task 2's hand-off and a reader arriving
+at it should not have to guess whether the hand-off was ever taken up.
+
+The vocabulary Task 2 pointed at, for orientation: `HookRunStatus` includes
+`blocked` and `stopped`, and `HookOutputEntryKind` includes `stop`, `feedback`,
+`context`, `warning`, `error`. **None of those enum values is what a hook emits** —
+they are app-server reporting types, and F4 measures the emission side, which is a
+different vocabulary. `HookEventName`'s full enum, unchanged: `preToolUse,
 permissionRequest, postToolUse, preCompact, postCompact, sessionStart, sessionEnd,
 userPromptSubmit, subagentStart, subagentStop, stop`.
 
@@ -677,3 +684,255 @@ this document for Kinglet shipping its own Codex layout rather than telling user
 import. The wave's remaining tasks stand; what changes is that Tasks 5 and 6 start
 from a measured baseline, and that Task 4's real work is rewriting hook bodies
 against the `apply_patch` envelope, not translating matchers.
+
+## F4 — the block protocol
+
+*Where the other numbers live: the plan assigns F2 (config location), F3 (event
+names) and F5 (hash trust) to this task too, but Task 2 measured all three as a
+side effect of driving the importer, and they are recorded above rather than
+renumbered here — F2 under "What the import actually writes", F3 under "Event
+names are accepted in Claude Code's spelling and normalised", F5 under "The
+registered hooks are individually untrusted". F4 is the one that was still open.*
+
+**Verdict: confirmed, and there are two protocols, not one.** A `preToolUse` hook
+stops a tool call under Codex by **either** of these, independently:
+
+1. **exit `2` with a non-empty message on `stderr`** — what Kinglet ships today
+   through `unity_hook_block()`;
+2. **`{"decision":"block","reason":"<non-empty>"}` on `stdout`** — what the string
+   table suggested.
+
+Both prevent the call outright, and both hand the model the reason **verbatim**.
+**Kinglet's existing refusal path works unchanged.** The feared third failure layer
+— hooks that still would not block even after the `apply_patch` payload problem is
+fixed — **does not exist**.
+
+Against that: **five near-miss shapes fail open, silently**, including two that a
+reasonable implementer would expect to block.
+
+### The rig
+
+The block *protocol* is measured in isolation from the `apply_patch` *payload*
+problem above by using a probe hook that **refuses unconditionally** — it parses
+nothing out of the payload, so nothing it does can depend on a field Codex does
+not supply. Every run is paired against a hook that unconditionally allows, which
+is what separates "the call was prevented" from "the model chose not to make it".
+
+```bash
+T=<disposable git repo>            # NOT this repository: the probe writes into it
+PROBE_HOME=<mode 700 dir outside /tmp, holding a 600 copy of ~/.codex/auth.json>
+printf '[projects."%s"]\ntrust_level = "trusted"\n' "$T" > "$PROBE_HOME/config.toml"
+
+# $T/.codex/hooks.json — see the shape correction below
+# $T/.codex/hooks/<variant>.sh — cats stdin to a log, then emits the variant's shape
+
+CODEX_HOME="$PROBE_HOME" codex exec --json --skip-git-repo-check \
+  --dangerously-bypass-hook-trust --sandbox workspace-write --cd "$T" \
+  -o "$T/last.txt" \
+  'Run exactly this one shell command and nothing else: touch codex-marker.txt
+Then, in one short sentence, tell me whether it succeeded, and quote verbatim any
+error or refusal text you were shown. Do not retry, do not use another method, do
+not create the file any other way.' < /dev/null
+```
+
+**The top-level shape of `.codex/hooks.json` is not the event map.** Writing
+Claude Code's `hooks` block at the top level is rejected, and `hooks/list` says so
+rather than failing silently:
+
+```
+"warnings": ["failed to parse hooks config …/.codex/hooks.json: unknown field
+`PreToolUse`, expected `description` or `hooks` at line 2 column 14"]
+```
+
+The accepted file wraps it — this is what Task 4 must write:
+
+```json
+{
+  "description": "kinglet block-protocol probe",
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "",
+        "hooks": [ { "type": "command", "command": "'/abs/path/hook.sh'", "timeout": 20 } ] }
+    ]
+  }
+}
+```
+
+Registered clean at `warnings: []`, `errors: []`, `enabled: true`,
+`trustStatus: "untrusted"`. Every run below used the **empty matcher**, so the hook
+fires on whichever tool the model reaches for; across all **16** runs it fired
+**exactly once** each — derived, not assumed:
+
+```bash
+for f in <evidence>/block/*.fired.log; do grep -c '^FIRED ' "$f"; done | sort -u   # -> 1
+```
+
+**One run had to be thrown away, and the way it failed is the trap to avoid.** The
+probe script selects its behaviour from its own `basename`, and the first
+`apply_patch` attempt was installed as `v-exit2-stderr-patch.sh` — which matches no
+branch of that `case`, so it fell through to the default and **exited 0**. The run
+completed, the file was created, and it looked exactly like *"the block does not
+work on the file tool"* — a false negative that would have been the single most
+consequential wrong answer available in this section. It was caught because the
+hook logs the variant name it resolved. The measurement was re-run after the
+dispatch was fixed to strip the suffix, and both mechanisms then blocked. The
+discarded run is not in the table; its accidental allow is, however, exactly the
+control the `apply_patch` block needed, and it was re-run deliberately as
+`v-allow-patch` rather than relied on in that form.
+
+### What was measured
+
+`marker` is the filesystem — did `touch codex-marker.txt` actually happen. `cmd
+item` is the count of `command_execution` items in the `--json` event stream: the
+allowed runs carry one with `"exit_code": 0`, and **the blocked runs carry none at
+all**, so the block happens at the router before the tool runs rather than being
+the model declining.
+
+| Variant | hook emits | exit | marker | cmd item | model told |
+|---|---|---|---|---|---|
+| `v-allow` | *nothing* | 0 | **PRESENT** | 1 | — (control) |
+| `v-exit2-stderr` | `BLOCKED: …` on **stderr** | **2** | **ABSENT** | **0** | **verbatim** |
+| `v-json-block` | `{"decision":"block","reason":"…"}` on **stdout** | 0 | **ABSENT** | **0** | **verbatim** |
+| `v-kinglet-lib` | real `unity_hook_block()` | **2** | **ABSENT** | **0** | **verbatim** |
+| `v-json-block-exit2` | both at once | 2 | **ABSENT** | **0** | verbatim, **stderr text wins** |
+| `v-exit2-silent` | *nothing* | **2** | PRESENT | 1 | nothing |
+| `v-exit1-stderr` | `BLOCKED: …` on stderr | **1** | PRESENT | 1 | nothing |
+| `v-exit2-stdout` | `BLOCKED: …` on **stdout**, not JSON | 2 | PRESENT | 1 | nothing |
+| `v-json-malformed` | unterminated JSON on stdout | 0 | PRESENT | 1 | nothing |
+| `v-json-empty-reason` | `{"decision":"block","reason":""}` | 0 | PRESENT | 1 | nothing |
+| `v-json-context` | `{"hookSpecificOutput":{…,"additionalContext":"…"}}` | 0 | PRESENT | 1 | **sentinel delivered** |
+| `v-kinglet-lib-warn` | `UNITY_HOOK_MODE=warn` → stderr warning | 0 | PRESENT | 1 | nothing |
+
+**Observed, verbatim.** Codex's stderr on a block, which confirms the string table's
+`Command blocked by PreToolUse hook:` as real text rather than a guess:
+
+```
+ERROR codex_core::tools::router: error=Command blocked by PreToolUse hook: BLOCKED: kinglet probe refuses this call on purpose (exit2-stderr). Command: touch codex-marker.txt
+```
+
+and the model's own final message for the same run:
+
+```
+It failed: "Command blocked by PreToolUse hook: BLOCKED: kinglet probe refuses this call on purpose (exit2-stderr). Command: touch codex-marker.txt"
+```
+
+For the JSON mechanism the same two lines carry the `reason` field instead, with no
+`BLOCKED:` prefix because nothing put one there:
+
+```
+ERROR codex_core::tools::router: error=Command blocked by PreToolUse hook: kinglet probe: refused via decision-block JSON on purpose. Command: touch codex-marker.txt
+```
+
+### The three questions, answered separately per mechanism
+
+They are reported separately because they can differ, and merging them is the
+failure mode this section was written to avoid. Here they happen to agree.
+
+| | exit 2 + stderr | `decision:block` JSON |
+|---|---|---|
+| **1. Was the call actually prevented?** | **Yes.** No `command_execution` item; `codex-marker.txt` absent. For the file tool, no `file_change` item and `ProbeFile.cs` absent. | **Yes**, identically, on both tools. |
+| **2. Did the model learn why?** | **Yes, verbatim** — the *entire* stderr, including Kinglet's own `BLOCKED: ` prefix, is interpolated into `Command blocked by PreToolUse hook: <stderr>. Command: <cmd>`. | **Yes, verbatim** — the `reason` string, same wrapper. |
+| **3. What must the hook emit?** | Exit status exactly `2`, **and** at least one byte on stderr. Both are load-bearing; see the fail-open table. | Exit `0` (or 2), and a single JSON object on stdout with `decision` = `"block"` and a **non-empty** `reason`. |
+
+**Both mechanisms were confirmed against both tools.** The table above drives the
+shell tool; the file tool was driven separately with *"Create a new file named
+ProbeFile.cs … use the file-editing tool, not the shell"*, whose payload the hook
+logged as `tool_name: apply_patch`, `tool_input` keys `['command']` — the same
+single-key envelope Task 2 measured:
+
+| apply_patch run | `file_change` item | `ProbeFile.cs` |
+|---|---|---|
+| allowing hook (control) | present, `kind: "add"` | **PRESENT** |
+| `exit 2` + stderr | none | **ABSENT** |
+| `decision:block` JSON | none | **ABSENT** |
+
+This matters more than it looks. The `apply_patch` envelope is why 8 of 9 Kinglet
+hooks are inert, and it would have been reasonable to fear the veto was broken on
+that tool too. It is not: **the payload is unreadable, the veto is not.**
+
+### The fail-open class — five shapes that block nothing and say nothing
+
+Every one of these produced a completely silent allow: nothing on Codex's stderr,
+nothing in the event stream, nothing to the model. There is no failure to notice.
+
+- **`exit 2` with no output at all.** The single most likely way to write a
+  blocking hook, and it does nothing. The message is not decoration — it is the
+  block.
+- **`exit 1` with a message on stderr.** The block is keyed on status **2**
+  specifically, not on "non-zero". A hook that dies under `set -e`, or exits 1 on
+  its own error path, **fails open**. (Codes other than 0, 1 and 2 were not tested.)
+- **A plain-text message on stdout with `exit 2`.** stdout is read *as JSON only*.
+- **Malformed JSON on stdout.** Discarded without complaint.
+- **`{"decision":"block","reason":""}`** — a block with an empty reason. The
+  string table's `hook returned decision:block without a non-empty reason` suggested
+  Codex has an opinion here, and **the measured opinion is to ignore the block
+  entirely and say nothing about it**. Re-run under `RUST_LOG=debug`, that string
+  does not appear anywhere in 30 KB of stderr, and neither does any `codex_core`
+  hook module. So the near-miss is not merely unlogged at the default level; it is
+  not logged at all.
+
+**The positive control that makes those negatives mean something.** Without it,
+"malformed JSON was ignored" is indistinguishable from "stdout is never read".
+`v-json-context` emitted well-formed JSON that is not a block —
+`{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"KINGLET-CONTEXT-SENTINEL-9471"}}`
+— and the sentinel reached the model, which quoted it back:
+
+```
+Yes, it succeeded (exit code 0). I received this additional sentinel string alongside the tool call:
+
+`KINGLET-CONTEXT-SENTINEL-9471`
+```
+
+So stdout **is** parsed, Claude Code's `hookSpecificOutput` / `additionalContext`
+container **is** honoured, and the five shapes above are rejected rather than
+unread. This also settles, for free, that Kinglet's three advisory hooks have a
+working delivery route under Codex — though they do not currently use it, since
+they write plain text rather than JSON, and plain text on stdout is discarded.
+
+### Precedence when both mechanisms fire
+
+A hook that emits the JSON block **and** exits 2 with stderr blocks once, and the
+reason the model receives is the **stderr** text. The JSON `reason` does not
+appear. Emitting both is therefore safe but pointless; the stderr wins.
+
+### `UNITY_HOOK_MODE=warn` behaves as an allow
+
+Cheap probe run on the same rig, using Kinglet's real `_lib.sh` rather than a
+re-implementation, so what is measured is the shipped code path. The hook logged
+the variable it saw (`UNITY_HOOK_MODE=[warn]`), confirming Codex passes its own
+environment through to hooks.
+
+| `UNITY_HOOK_MODE` | `unity_hook_block()` does | marker | verdict |
+|---|---|---|---|
+| unset | stderr + `exit 2` | **ABSENT** | blocks, as designed |
+| `warn` | stderr warning + `exit 0` | **PRESENT** | **allows, as required** |
+
+The kill switch is correct under Codex. One asymmetry worth knowing: the
+downgraded `WARNING (downgraded from BLOCKED): …` text is **silently swallowed** —
+it reaches neither the model nor Codex's stderr, because a hook that exits 0 has
+its stderr discarded. Under Claude Code that warning is surfaced. So `warn` mode
+under Codex is not "block downgraded to warning", it is "block downgraded to
+nothing". Converting it to a real warning means emitting `additionalContext` JSON
+on stdout, per the control above.
+
+**What this means for the wave.** Task 4 does **not** need a block-protocol
+translation layer, and the wave is one failure layer shorter than feared. The exact
+requirement for Task 4 to implement against:
+
+> **To refuse a tool call under Codex, a hook must exit with status `2` and write
+> at least one byte to stderr; that stderr is shown to the model verbatim.
+> Equivalently it may exit `0` printing one JSON object on stdout with
+> `"decision":"block"` and a non-empty `"reason"`. Anything else — exit 2 in
+> silence, exit 1 with a message, plain text on stdout, malformed JSON, or a block
+> with an empty reason — allows the call and reports nothing.**
+
+Kinglet's `unity_hook_block()` already satisfies the first form exactly, on both
+the shell tool and the `apply_patch` file tool. What remains broken for Kinglet's
+hooks is only what Task 2 measured: they cannot read the `apply_patch` payload, so
+8 of 9 never reach their refusal. Fix the payload and the refusal lands.
+
+The `exit 1` result is the one to carry into Task 4's design. Kinglet's hooks run
+under `set -euo pipefail`, and any unhandled failure inside one exits non-zero but
+**not** `2` — under Claude Code that is read as an error, under Codex it is an
+unlogged allow. A payload shim that dies on malformed JSON therefore fails open
+silently, which is the worst available direction for a gate.
