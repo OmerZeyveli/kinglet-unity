@@ -21,7 +21,8 @@ had twelve units.** 2b, 2c, 4b, 4c and 13 each came from a measured defect the p
 Both gates on the merged tree at **`7a4acd8`**:
 
 - `bash tests/run-tests.sh` → **rc=0, `Total: 3326  Passed: 3323  Failed: 0  Skipped: 3`**,
-  **38** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **38**.
+  **38** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **38**. **`Skipped: 3` is this
+  checkout, not the suite** — see the closure two paragraphs down for which reader gets which figure.
 - `bash scripts/check-provenance.sh` → **`provenance OK`**.
 - **`main` is 0 ahead, this branch 143 ahead — the merge is a fast-forward.**
 - **Four `provenance.tsv` conflicts across the wave, all note-column appends on different rows**,
@@ -34,6 +35,54 @@ author and skip for everyone else**, because `spikes/platform/clients/probe-host
 untracked gitignored artifact. Pre-existing, and not a defect in itself. **What is a defect is that
 the loop gated sixteen units on a total nobody but this checkout can obtain** — every "N/N" in this
 file is a figure from a privileged tree. Re-derive in a clone before quoting one anywhere else.
+
+### CLOSED 2026-08-15 — which reader each figure is for, and what replaced the total
+
+Task 8 of `docs/superpowers/plans/2026-08-14-unmeasured-surfaces-and-floors.md`. **Both figures were
+reproduced before anything was changed**, at `21d37c0`, same host, sequential runs (never
+concurrent — two suites at once trigger the documented `grep -q` SIGPIPE flake), both rc=0, both
+**41** ANSI-stripped headers == `ls tests/test-*.sh | wc -l` **41**:
+
+| reader | figure | reproducible by |
+|---|---|---|
+| this working checkout — probe binary built, `.research/` present | `Total: 3543  Passed: 3540  Failed: 0  Skipped: 3` | **nobody else.** Both gates are untracked gitignored artifacts |
+| `git clone --no-hardlinks --shared` of the same commit | `Total: 3542  Passed: 3520  Failed: 0  Skipped: 22` | **anyone**, from a clone, with no build step |
+
+So the sixteen units above were gated on the **first** row. **The second row was not made canonical
+either**, and the reason is the rule this file keeps colliding with: writing `22` down here replaces
+a figure that is wrong for a second reader with one that goes stale the next time a test file is
+added — which is what `CLAUDE.md` forbids, and why no total is *asserted* anywhere. Every figure in
+this section is a measurement pinned to a commit. Nothing compares against them.
+
+**What replaced the total: the difference is made loud at the point a reader meets the figure.**
+`tests/run-tests.sh` now prints a `skips by reason` census under the summary — each skip's own reason
+text, counted, harvested from the run and written down nowhere. The fresh clone's report carries
+`16  probe binary not built — skip behavioral hook tests` and this checkout's does not, so a
+difference between two environments is a **labelled line** rather than an unexplained integer, and a
+change in the *set* of reasons is visible to a reader who has pinned no absolute. It prints on every
+run, including runs where nothing skipped, because the asymmetry is the point: the reader whose host
+satisfies every gate is exactly the reader whose `Skipped` figure nobody else can obtain, and a block
+that appeared only when something skipped would say nothing to them.
+
+**And the part no count of skips explains: `Total` itself differed by one.**
+`tests/test-provenance-origins.sh` 7e cross-checks the pinned MIT text against
+`.research/superpowers/LICENSE`, a second gitignored working copy, and its absent branch printed
+`note:` — a line the runner counts as **nothing**. That assertion did not skip; it *vanished*, and
+the suite's own size read differently to a second reader. Converted to `SKIP:`. Re-measured at
+`a43456f`, both rc=0, `provenance OK` and 41 == 41 in both:
+
+| reader | figure |
+|---|---|
+| this working checkout | `Total: 3543  Passed: 3540  Failed: 0  Skipped: 3` |
+| fresh clone of the same commit | `Total: 3543  Passed: 3520  Failed: 0  Skipped: 23` |
+
+**Same `Total` in both environments — and that is the answer to the consequence the task named.** The
+only cross-task check on suite size used to be a human reading consecutive reports, and it was
+reading a number that moved with the reader. A skipped test still counts in `Total`, so **`Total`
+measures the suite and the census measures the host**: a `Total` that moves now means a test file was
+added or removed, which is the change worth noticing, and it says so without anyone writing an
+expected total down. An assertion that neither passes nor skips breaks that invariant in silence —
+**if you add a check whose subject can be absent, make it skip.**
 
 ### The whole-branch review — verdict and disposition
 
