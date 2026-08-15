@@ -397,6 +397,78 @@ Rigidbody.mass           obsolete = False
 So the prose should name `linearDamping`. The separate question Task 4 raised — which key
 `manage_components` expects — is not answered by this and should not be guessed at either.
 
+### F16 — `unity_reflect scope="project"` finds nothing in an asmdef-based project
+
+Measured on 2026-08-15 while exercising `/unity-prototype`. Every first-party type in the measured
+game returns **0** under `scope="project"` and is found under `scope="all"`:
+
+| query | `scope="project"` | `scope="all"` |
+|---|---|---|
+| `BouncingBall` (just written, just compiled) | **0** | 1 |
+| `TimeScaleService` | **0** | 2 |
+| `PlayerMovement` | **0** | 6 |
+| `DNASample` | **0** | 5 |
+
+`BouncingBall` also returns 1 under `scope="packages"`, which is the clue: the classification appears
+to key on `Assembly-CSharp`, and a project that uses assembly definitions — the structure Unity
+recommends and this toolkit's own `assembly-definitions` skill teaches — does not have one. Its code
+lives in named assemblies that the server files elsewhere.
+
+**This is a false absence in the one tool whose job is answering "does this exist".**
+`unity-mcp-patterns` and `unity-fixer` both send agents to `unity_reflect` to verify an API before
+writing C# against it, precisely because training data hallucinates Unity APIs. An agent that asks
+with `scope="project"` on an asmdef project is told the type does not exist — and the honest failure
+mode of a verification tool is to say "not found" when it means "not looked".
+
+The prototyper hit this live and recovered by widening the scope on its next call, which is the same
+pattern as F1 and F2: the model routes around the defect. The fix is documentation — say to use
+`scope="all"`, or to omit scope — not a claim that anything blocked.
+
+### F17 — a background dispatch outlives the session that made it
+
+`/unity-prototype` dispatched `unity-prototyper` with `run_in_background: true`. In a headless
+`claude -p` run the parent returned after **2 turns / 78 s** with "the agent is working in the
+background", and the process exited. The work completed anyway — but it finished **into an editor
+nobody was watching**, and it had entered Play mode as part of its own verification.
+
+The controller found the editor in `playmode_transition` minutes later with `is_playing: true` and no
+session left to stop it. Interactively this is harmless, since the user is present. Headless, or
+after a session ends, it leaves a Unity editor running the game indefinitely.
+
+---
+
+## What `/unity-prototype` actually produced, on the real project
+
+This is the half that had never been measured: a surface that **writes** through MCP.
+
+Dispatched against the live editor, one `unity-prototyper` agent loaded `unity-prototype`, `physics`,
+`input-system` and `verification-before-completion`, activated the `docs` tool group, read the
+project's asmdef/asmref layout to decide where the prototype belonged, and produced:
+
+- `Assets/Prototypes/BouncingBall/BouncingBall.cs` — 196 lines
+- `Assets/Prototypes/EndlessEvolution.Runtime.asmref` — so the prototype compiles into the project's
+  own runtime assembly. **That is the file type this toolkit was blind to until the night before**;
+  `validate-asmdefs.sh` went from 29 references to 30 and stayed at 0 warnings.
+- generated placeholder sprites, a `PhysicsMaterial2D`, and
+  `Assets/Scenes/Prototypes/Prototype_BouncingBall.unity`
+
+**Rule compliance of the generated code, measured rather than assumed:** 0 legacy `Input.*`, 0 `?.`,
+0 `GetComponent` in `Update`, 0 uses of the deprecated `.velocity`, **3 uses of `linearVelocity`** —
+the rename fixed in F10 the night before — and 0 coroutines. It verified `Rigidbody2D.linearVelocity`
+through `unity_reflect` before writing against it.
+
+**And it ran.** The agent entered Play mode and the console shows the mechanic working:
+
+```
+bounce #1  step 1/5  apex 2.00u  launch 6.26u/s  surface floor
+bounce #5  step 5/5  apex 5.00u  launch 9.90u/s  surface floor
+bounce #6  step 1/5  apex 2.00u  launch 6.26u/s  surface floor   ← reset
+```
+
+Apex climbs 2.00 → 5.00 over five bounces and resets on the sixth, exactly as requested; launch
+speeds match `v = √(2gh)` (`9.90 / 6.26 = 1.58 = √2.5`); floor and wall contacts are distinguished;
+**0 runtime errors**. Play mode was stopped afterwards and the editor left idle.
+
 ---
 
 ## The model-behaviour measurement, which is what this repository has never had
