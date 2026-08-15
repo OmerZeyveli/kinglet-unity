@@ -114,18 +114,21 @@ The floor sees the sum. One source can reach zero and the survivors carry the to
 
 **Tightening the number moves the boundary; it does not close the class.** Worked on the real subject
 this shape was found in — `tests/test-bash32-compat.sh`'s bash-4 sweep, whose five sources measure
-**13 + 7 + 40 + 1 + 1 = 62** files (`.claude/hooks`, `scripts`, `tests`, `install.sh`,
-`uninstall.sh`; re-derived in a clean clone at `5881463`). Against a hypothetical floor of `>= 55`:
+**13 + 7 + 42 + 1 + 1 = 64** files (`.claude/hooks`, `scripts`, `tests`, `install.sh`,
+`uninstall.sh`), which is the guard's own printed census on 2026-08-15 — *"SHIPPED:.claude/hooks=13
+SHIPPED:scripts=7 SHIPPED:tests=42 SHIPPED:install.sh=1 SHIPPED:uninstall.sh=1 … (64 shipped, 22 in
+the early-exit-reader scope)"*. It read `40` / `62` here until 2026-08-15, from the derivation at
+`5881463`; `tests/` has gained two `.sh` files since. Against a hypothetical floor of `>= 55`:
 
 | source that dies | total left | verdict |
 |---|---|---|
-| `.claude/hooks` (13) | 49 | **caught** — 49 is below 55 |
-| `scripts` (7) | 55 | **missed** — 55 clears the bar exactly |
-| `install.sh` or `uninstall.sh` (1) | 61 | **missed** |
+| `.claude/hooks` (13) | 51 | **caught** — 51 is below 55 |
+| `scripts` (7) | 57 | **missed** |
+| `install.sh` or `uninstall.sh` (1) | 63 | **missed** |
 
 A floor of `F` over a total of `T` catches exactly the sources **larger than `T - F`**; every source
 inside that slack dies green. Raising `F` shrinks the slack and catches more sources, so tightening
-is not useless — but the only constant that catches all five is `T` itself, 62, and that is not a
+is not useless — but the only constant that catches all five is `T` itself, 64, and that is not a
 threshold sized against a narrowing. It is a hand-written copy of today's tree, red on the next file
 legitimately added or removed, and stale by construction. **For any constant a maintainer would
 actually ship there is a smaller source above it.** That is what the heading means by *however tight
@@ -135,7 +138,7 @@ the number*: no constant short of the identity closes the class, and the identit
 55 out of 60 still passes with the 13 gone"* for four rounds, and it was wrong in every clause.**
 13 + 7 + 40 is 60, and 60 - 13 = **47**, which is *below* 55: the floor fires. It fires on every
 single-source death in that example (47, 53, 20), so the example demonstrated the opposite of its own
-sentence. The subject it was drawn from has **five** sources totalling **62**, not three totalling
+sentence. The subject it was drawn from has **five** sources totalling **64**, not three totalling
 60. And the consequence was not cosmetic — as written it told a maintainer that tightening the union
 floor is futile *and* that no other move exists, when F3 two sections down says to convert the union
 to per-source. **The sole worked justification for this shape inverted the rule it justifies.**
@@ -144,7 +147,7 @@ is not making the point.
 
 **This does not contradict F2's fallback step 3, which sizes a threshold against the cheapest
 plausible narrowing.** A constant *does* catch every narrowing that takes its subject below it — step
-3 is right, and its model (`tests/test-skill-discovery.sh`'s `S2S_CHECKED >= 5` over a subject of 6)
+3 is right, and its model (`tests/test-skill-discovery.sh`'s `S2S_CHECKED >= 7` over a subject of 8)
 is a single-subject **magnitude** floor whose cheapest narrowing is knowable and measurable. What
 Shape 1 rules out is a constant that catches the **smallest source of a union** without being that
 union's own total. Task 3 of this wave reached the same conclusion independently and by execution,
@@ -154,13 +157,16 @@ it — a narrowing to 17 files **does** fire a floor of 30, and raising 30 to 10
 
 Two of the eleven above are green for exactly this reason, and they are the two converted here:
 
-- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **271** files (the guard
-  printed its own answer: `the mobile sweep has roots to read (271 file(s))`). `docs/` alone holds
-  187, so the floor cleared with **zero files under `.claude/`**. Measured in a clone:
+- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **273** tracked files
+  today (`.claude` 62, `docs` 189, `scripts` 8, `examples` 4, `templates` 10; re-derived
+  2026-08-15 — it was **271** with `docs/` at 187 when this bullet was written, and the guard then
+  printed its own answer, `the mobile sweep has roots to read (271 file(s))`). `docs/` alone holds
+  **189**, so the floor cleared with **zero files under `.claude/`**. Measured in a clone:
   **17 passed, 0 failed, rc 0** — identical in verdict to a healthy tree.
 - `tests/test-bash32-compat.sh` — `SS_ALL_N > 0` over five sources and `SS_PIPE_N > 0` over four.
-  `tests/` holds 40 `.sh` files, so both totals cleared with `.claude/hooks/` — the directory the
-  file was originally written for — completely empty. Measured: **8 passed, 0 failed, rc 0**.
+  `tests/` holds **42** `.sh` files (40 when this was written), so both totals cleared with
+  `.claude/hooks/` — the directory the file was originally written for — completely empty. Measured:
+  **8 passed, 0 failed, rc 0**.
 
 **The fix is one shape for both: assert per source, not per union.** Both are converted; the
 mutations are recorded under [Proof](#proof) below.
@@ -331,14 +337,33 @@ not true at 122; what carried over is the identity's own verdict, not the file's
 2. **Bound each source separately** (F3), which converts one loose threshold into k tight presence
    checks.
 3. **Only then** a threshold — and size it against **the cheapest plausible narrowing**, not against
-   zero. `tests/test-skill-discovery.sh`'s `S2S_CHECKED >= 5` is the model, and the arithmetic is
+   zero. `tests/test-skill-discovery.sh`'s `S2S_CHECKED >= 7` is the model, and the arithmetic is
    the point: `S2S_REFS` is `sort -u`'d **before** the loop, so `S2S_CHECKED` is the count of
-   **distinct** reference targets — **six** today, not the eleven raw references the sweep matches.
-   Five is calibrated so that restricting the sweep to a single skill directory, which yields at most
-   four distinct targets, trips it. Measured at `5881463`: removing one of the six leaves 5 and the
-   file stays **16 pass / 0 fail**; removing two leaves 4 and this floor reds at **15 / 1**. That is
-   a bound at **83 %** of its subject — the tightest non-identity floor in the tree — and it is what
-   *"the cheapest plausible narrowing"* buys. *"Far above zero"* is not a calibration.
+   **distinct** reference targets — **eight** today, not the 13 raw references the sweep matches
+   across six citing skills. Seven clears two calibrations at once: restricting the sweep to a single
+   skill directory yields at most **four** distinct targets (`unity-execution`'s; the other five
+   citing skills yield 3, 2, 1, 1, 1), so any such edit trips it, and one step of slack is all it
+   has. Measured 2026-08-15 by removing targets from a copy of the tree, one at a time:
+
+   | distinct targets | `>= 5`, the old floor | `>= 7`, today |
+   |---|---|---|
+   | 8 (today) | 16 pass / 0 fail | 16 pass / 0 fail |
+   | 7 | 16 / 0 | 16 / 0 |
+   | 6 | 16 / 0 | **15 / 1** |
+   | 5 | 16 / 0 | 15 / 1 |
+   | 4 | **15 / 1** | 15 / 1 |
+
+   **This section's own model had been inverted since 2026-08-14 and this paragraph did not notice.**
+   It read `>= 5` over a subject of **six** with *"removing one leaves 5 and stays green, removing
+   two reds it"* — true when written. The live-bridge wave then added two path-form skill→skill
+   references, moving the subject to eight against an unchanged floor, and the left-hand column
+   above is what that bought: **three** targets removable green, in the guard this file offers as
+   proof that a threshold can be sized tightly. The single-directory calibration never broke — four
+   is below both numbers — so nothing anywhere went red while the flagship example demonstrated the
+   opposite of the rule it exists to justify. The floor is now **87 %** of its subject, and the
+   lesson is the one the whole file is about: *a threshold sized against a subject is a claim about
+   that subject, and it rots when the subject grows, silently and in the safe direction.*
+   *"Far above zero"* is not a calibration, and neither is *"it was right once"*.
 
 ### F3 — per source, not per union
 
@@ -358,17 +383,26 @@ Three guards already do it and are worth copying:
 **A PARTITION AND AN OVERLAPPING COVER NEED DIFFERENT RULES, and all three examples above are
 partitions.** The three worked examples have disjoint sources — four regex shapes, four globs, one
 payload group — so "each source contributes" is unambiguous. A git **pathspec** is not a partition:
-in `tests/test-citations-resolve.sh`, `'.claude/*'` and `'*.md'` both match `.claude/**/*.md`, and
-**`'docs/*.md'` is wholly redundant — dropping it changes the scanned set by zero files** (143 →
-143, measured). A naive per-source presence check over the union passes forever, because every
-element's files are also somebody else's.
+in `tests/test-citations-resolve.sh`, `'.claude/*'` and the then-unanchored `'*.md'` both matched
+`.claude/**/*.md`, and **`'docs/*.md'` was wholly redundant — dropping it changed the scanned set by
+zero files** (143 → 143, measured). A naive per-source presence check over the union passes forever,
+because every element's files are also somebody else's.
+
+**That worked example has since expired, and the rule it illustrates has not.** `372b645` anchored
+the root element to `:(glob)*.md`, which no longer crosses `/`, so `'docs/*.md'` stopped being
+redundant the day the overlap it depended on was removed. Re-measured 2026-08-15: with it the sweep
+reads **128** files, without it **121** — it now contributes **7** of its own. The overlap between
+`'.claude/*'` and the root element is gone too. Both sentences above are therefore kept in the past
+tense as the record of a real measurement, and neither is a description of today's pathspec.
 
 **The rule for an overlapping cover: attribute per element IN ISOLATION** — `git ls-files <element>`
 run for that element alone, asserted non-empty — not membership of the union. That catches the
 failure worth catching: an element whose pattern stopped matching anything. **It does not catch
-redundancy**, and should not: on this branch `'docs/*.md'` matches **65** paths in the index (**7**
-after the guard's own two `grep -v` filters) while adding **zero unique files** to the scanned set,
-and that is legitimate belt-and-braces rather than a defect. **An earlier draft put 187 here, which
+redundancy**, and should not: when this was written `'docs/*.md'` matched **65** paths in the index
+(**7** after the guard's own two `grep -v` filters) while adding **zero unique files** to the scanned
+set, and that was legitimate belt-and-braces rather than a defect. Today the same element matches
+**67** and the 7 survivors are all unique, per the paragraph above — the point being made needs a
+redundant element and this one stopped being it, which is exactly the rot this file is about. **An earlier draft put 187 here, which
 is `find docs -type f` — a different guard's subject, and the wrong oracle for a pathspec claim.
 `git ls-files` is what the element is evaluated by, so `git ls-files` is what the number must come
 from.** Say which of the two you are asserting; the difference is
@@ -392,7 +426,7 @@ over a sweep with nothing in its scope, from the block written to stop exactly t
 
 The same shape sat in the converted `tests/test-bash32-compat.sh`: emptying `SHIPPED_SCRIPT_DIRS`
 removes three rows from **both sides** of the census identity at once, so the identity holds, every
-surviving per-source count is ≥ 1, and the bash-4 sweep silently falls from 62 files to two.
+surviving per-source count is ≥ 1, and the bash-4 sweep silently falls from 64 files to two.
 
 Both are closed with an **absolute** floor on the array itself. The rule generalises: when you write
 a floor, ask what the reference is made of, and whether the failure you are guarding against moves
@@ -593,23 +627,43 @@ clean clone of the same commit gives `.claude/state=1`, `.claude=62`. **Any numb
 comes from `find` rather than `git ls-files` must be re-derived in a fresh clone**, because the
 guards read the working tree and the working tree is where a gitignored artefact hides.
 
+**Re-derive the whole column from one suite log, and do it whenever you touch this file.** The
+guards print their own counts, so the comparison is mechanical and takes one command — there is no
+excuse for a hand-checked table here:
+
+```bash
+bash tests/run-tests.sh 2>&1 | sed $'s/\\x1b\\[[0-9;]*m//g' > /tmp/suite.log
+grep -oE '(PASS|FAIL)[: ]+.*\\(floor [0-9]+.*\\)' /tmp/suite.log | sed 's/^ *//' | sort -u
+```
+
+Run on 2026-08-15 against a green suite, that turned up **four** rows whose *Today* column had
+rotted since the pass that wrote them — `citation sweep read` 143 → **128**, `all four citation
+shapes` 31/11/34/2 → **32/14/35/2**, `resolved N live citation(s)` 26 → **30**, `backticked tokens`
+779 → **976** — on top of the nine a whole-branch review had already flagged. That last one then
+moved again, to **1009**, because the same pass edited seven `.claude/` surfaces and the guard counts
+backticked tokens in shipped `.md`: **derive this column last, from the run that gates the commit**,
+or your own diff invalidates it between measurement and write-down. All four are stale in
+the **safe** direction (the subject grew, or the floor's slack widened), which is why no gate moved
+and why nothing but this comparison would have found them. A stale *Today* is not cosmetic: the
+*Ratio* and *Survives* columns are computed from it, and those are the whole argument.
+
 ### Converted or added by this pass
 
 | Guard · assertion anchor | Subject | Bound | Today | Ratio | Survives |
 |---|---|---|---|---|---|
-| `test-no-mobile.sh` · *every mobile-sweep source has files in it* | 11 sources: 5 scan roots + 6 **declared** payload dirs, unioned with whatever `find .claude` adds | ≥ 1 **each**, and each must EXIST (F8) | 62/8/9/13/6/20/1/187/4/8/10 | 100 % per source | **no** |
+| `test-no-mobile.sh` · *every mobile-sweep source has files in it* | 11 sources: 5 scan roots + 6 **declared** payload dirs, unioned with whatever `find .claude` adds | ≥ 1 **each**, and each must EXIST (F8) | 62/8/9/13/6/20/1/189/4/8/10 (total 330) | 100 % per source | **no** |
 | `test-no-mobile.sh` · same assertion, array floor (F4) | `SCAN_DIRS` itself | ≥ 1 | 5 | — | no |
 | `test-no-mobile.sh` · same assertion, array floor (F4) | `PAYLOAD_DIRS` itself — the declared half, without which F8 stops working | ≥ 1 | 6 | — | no |
 | `test-no-mobile.sh` · *the per-source loop read every source the derivation produced* | census rows written vs. sources derived | **identity** | 11 == 11 | 100 % | no |
-| `test-bash32-compat.sh` · *every source of both sweeps resolves to at least one file* | 9 sources across two scopes | ≥ 1 **each** | 13/7/40/1/1 + 13/7/1/1 | 100 % per source | **no** |
+| `test-bash32-compat.sh` · *every source of both sweeps resolves to at least one file* | 9 sources across two scopes | ≥ 1 **each** | 13/7/42/1/1 + 13/7/1/1 | 100 % per source | **no** |
 | `test-bash32-compat.sh` · *the per-source census covered every declared scope entry* | census rows vs. four array lengths | **identity** | 9 == 9 | 100 % | no |
 | `test-bash32-compat.sh` · *all four scope arrays are non-empty* (F4) | the four arrays | ≥ 1 each | 3/2/2/2 | — | no |
 | `test-derived-counts.sh` · *every hook-count claim row matches exactly one site* (F6) | sites per claim row | **== 1** | 20 rows | 100 % | no |
 | `test-derived-counts.sh` · *every surface-count claim row matches exactly one site* | sites per claim row | == 1 | 15 rows | 100 % | no |
 | `test-derived-counts.sh` · *every ECU-footprint claim row matches exactly one site* | sites per claim row | == 1 | 8 rows | 100 % | no |
 
-**What they replaced:** `SCAN_FILES >= 1` over **271** files from 5 roots (**0.4 %**, survived losing 5
-of 6 payload directories) and `SS_ALL_N > 0` / `SS_PIPE_N > 0` over 62 and 22 files from 5 and 4
+**What they replaced:** `SCAN_FILES >= 1` over **273** files from 5 roots (**0.4 %**, survived losing 5
+of 6 payload directories) and `SS_ALL_N > 0` / `SS_PIPE_N > 0` over 64 and 22 files from 5 and 4
 sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 
 ### Identity floors — no ratio, and that is the point
@@ -618,8 +672,8 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 |---|---|---|
 | `test-hook-behaviour.sh` · *settings.json registers every hook file present in .claude/hooks* | `.claude/hooks/*.sh` less `_lib.sh` **vs** distinct commands in `settings.json` | 12 == 12 — **backed by an absolute floor since 2026-08-15**; see the F2 row in the next table |
 | `test-hook-behaviour.sh` · *every registered hook was probed by execution* | distinct commands in `settings.json` **vs** record lines a probe that RAN wrote | 12 == 12 — same absolute floor, same shared side |
-| `run-tests.sh` · *Test discovery is inconsistent* | the `test-*.sh` glob **vs** `find -type f -name 'test-*.sh'` | 40 == 40 |
-| `run-tests.sh` · *ran N test files but M match* | files actually executed **vs** files discovered | 40 == 40 |
+| `run-tests.sh` · *Test discovery is inconsistent* | the `test-*.sh` glob **vs** `find -type f -name 'test-*.sh'` | 41 == 41 |
+| `run-tests.sh` · *ran N test files but M match* | files actually executed **vs** files discovered | 41 == 41 |
 | `test-bash32-compat.sh` · per-source census | census rows **vs** four array lengths | 9 == 9 |
 | `test-no-mobile.sh` · per-source census | census rows written **vs** sources the derivation produced | 11 == 11 |
 
@@ -627,13 +681,13 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 
 | Guard · assertion anchor | Subject | Bound | Today | Ratio | Survives |
 |---|---|---|---|---|---|
-| `test-citations-resolve.sh` · *citation sweep read N live surface file(s)* | files from a 9-element **overlapping** git pathspec | ≥ 30 | **143** | **21 %** | **yes — all three shapes.** Drop `'.claude/*'` → 125, green. Oracle is the index, sweep reads disk. |
-| `test-citations-resolve.sh` · *all four citation shapes matched* | four regex sweeps | ≥ 1 **each** | 31/11/34/2 | per source | no |
-| `test-citations-resolve.sh` · *resolved N live citation(s)* | citations reaching the resolver | ≥ 10 | 26 | 38 % | yes |
+| `test-citations-resolve.sh` · *citation sweep read N live surface file(s)* | files from a 9-element **overlapping** git pathspec | ≥ 30 | **128** | **23 %** | **yes — all three shapes.** Drop `'.claude/*'` → **66**, green (rc 0, measured 2026-08-15; shape C moves 35 → 33 and the resolved count does not move at all). Oracle is the index, sweep reads disk. |
+| `test-citations-resolve.sh` · *all four citation shapes matched* | four regex sweeps | ≥ 1 **each** | 32/14/35/2 | per source | no |
+| `test-citations-resolve.sh` · *resolved N live citation(s)* | citations reaching the resolver | ≥ 10 | 30 | 33 % | yes |
 | `test-shipped-citations.sh` · *guard scanned N shipped .md files* | `.md` under `.claude/` | ≥ 35 | 44 | 80 % | yes |
 | `test-shipped-citations.sh` · *payload derivation produced N entries* | install.sh's payload groups | ≥ 55 | 67 | 82 % | **yes — a whole group can die** |
 | `test-shipped-citations.sh` · *payload carries N .claude/scripts/ entries* | one group of the above | ≥ 1 | 6 | 17 % | no *(the per-source refinement of the row above)* |
-| `test-shipped-citations.sh` · *guard examined N backticked tokens* | tokens in shipped `.md` | ≥ 200 | 779 | **26 %** | yes |
+| `test-shipped-citations.sh` · *guard examined N backticked tokens* | tokens in shipped `.md` | ≥ 200 | 1009 | **20 %** | yes |
 | `test-shipped-citations.sh` · *guard examined N .claude/scripts/ path reference(s)* | script references in surfaces | ≥ 6 | 9 | 67 % | yes |
 | `test-shipped-citations.sh` · *rule 4 derived the project-root installed set* | receipt-row formats in `install.sh` | ≥ 2 | 4 | **50 %** | yes |
 | `test-shipped-citations.sh` · *rule 4 examined N repository path(s)* | paths named in `.claude/UPSTREAM` | ≥ 1 | 5 | **20 %** | yes |
@@ -646,7 +700,7 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 | `test-provenance-origins.sh` · *derived N retired hook/script path(s)* | `rule=absent` rows | ≥ 15 | 19 | 79 % | yes |
 | `test-provenance-origins.sh` · *every glob in the dead-name scan returned a plausible number* | 4 globs | ≥ 60 / ≥ 5 / ≥ 4 / == 1 | 62/8/**7**/1 | **97 % / 63 % / 57 % / 100 %** | per source — no |
 | `test-provenance-origins.sh` · *the manifest yields N Superpowers-adapted surfaces* | two derivation routes | ≥ 3 | 3 | 100 % | no |
-| `test-skill-discovery.sh` · *the skill->skill sweep still reads the chain* | skill->skill references, **deduplicated**: `S2S_REFS` is `sort -u`'d before the loop, so `S2S_CHECKED` counts distinct targets | ≥ 5 | **6** (from 11 raw references) | **83 %** | **no — losing one leaves 5 and stays green, losing two reds it** |
+| `test-skill-discovery.sh` · *the skill->skill sweep still reads the chain* | skill->skill references, **deduplicated**: `S2S_REFS` is `sort -u`'d before the loop, so `S2S_CHECKED` counts distinct targets | ≥ 7 | **8** (from 13 raw references across 6 citing skills) | **87 %** | **no — losing one leaves 7 and stays green, losing two reds it.** Re-sized 2026-08-15: the bound was `≥ 5` against a subject that had grown 6 → 8, so **three** were removable green. See F2 step 3 for the measured before/after |
 | `test-skill-discovery.sh` · *there are skills to check* | skill directories | ≥ 1 | 16 | **6 %** | yes |
 | `test-skills.sh` · *the skill walk found skills to check* | `SKILL.md` files | ≥ 1 | 16 | **6 %** | yes |
 | `test-hook-behaviour.sh` · *settings.json yields a non-empty registered-hook set* | hooks registered in `settings.json` | ≥ 1 | 12 | **8 %** | yes — **and deliberately so.** Added 2026-08-15 as F2's absolute floor under two identities that both read `0 == 0`; detecting a *narrowing* is those identities' job, and they do it at 100 % on both sides |
@@ -664,7 +718,7 @@ sources (**1.6 % / 4.5 %**, survived losing `.claude/hooks/` entirely).
 | `test-install-ownership.sh` · *K: install 1's CLAUDE.md.generated carries the FILL: markers* | `FILL:` markers | > 0 | **9** | 11 % | no |
 | `test-install-ownership.sh` · *L: the run wrote N file(s) under .claude/* | files installed before the stop | > 0 | 67 | **1.5 %** | yes |
 | `test-install-dryrun.sh` · *dirty: the foreign .claude/ holds N user file(s)* | fixture files | ≥ 2 | 2 | 100 % | no |
-| `run-tests.sh` · *No test files found* | discovered test files | ≥ 1 | 40 | **2.5 %** | yes |
+| `run-tests.sh` · *No test files found* | discovered test files | ≥ 1 | 41 | **2.4 %** | yes |
 | `run-tests.sh` · *ran a python suite that discovered 0 tests* | python results | > 0 | 1444 | **0.07 %** | yes |
 | `test-derived-counts.sh` · *the surface counts are derived from a tree that actually has surfaces* | agents / commands / skills | ≥ 1 **each** | 8/9/16 | 13 % / 11 % / 6 % | per source — no |
 | `test-derived-counts.sh` · *the hook and script counts are derived from a tree that actually has hooks and scripts* | hooks / registrations / scripts / skipped | ≥ 1 / ≥ 1 / ≥ 1 / == 1 | 12/12/7/1 | 8 % / 8 % / 14 % / 100 % | per source — no |
@@ -678,7 +732,7 @@ feature is that the first scan's C2 had no clause for them.**
 
 | Guard · assertion anchor | Subject | Mechanism | Today |
 |---|---|---|---|
-| `scripts/check-provenance.sh` · *the tracked-file index is readable* | `git ls-files` against the manifest's own row count | (a) + (f), **relative to the manifest** — the one floor in the whole `scripts/` segment | 544 tracked vs 544 rows, bound `>= rows/2` (**50 %** — half the manifest may vanish) |
+| `scripts/check-provenance.sh` · *the tracked-file index is readable* | `git ls-files` against the manifest's own row count | (a) + (f), **relative to the manifest** — the one floor in the whole `scripts/` segment | 548 tracked vs 548 rows, bound `>= rows/2` (**50 %** — half the manifest may vanish) |
 | `tests/test-provenance-origins.sh` · *the dead-name scan's file list came from a readable git index* | the scan's tracked-file list | (f) | rc == 0 |
 | `tests/test-provenance-origins.sh` · *the dead-name scan read its sentinel* | one assertion per named sentinel | (b), **per source** | 6 live PASS lines |
 | `tests/test-provenance-origins.sh` · *check-provenance.sh reads the ECU pin* | the key the two assertions below describe | (b) | present |

@@ -129,7 +129,13 @@ assert_eq "$(printf '%s' "$BAD_REFS" | grep -c . || true)" "0" "every skill name
 # 2026-08-11, and that is the direction the process chain is built out of:
 # unity-brainstorming names unity-planning, unity-planning names both branches
 # of the fork, unity-execution names its predecessors and the standard it is
-# measured against. Nine references, six distinct targets, all by path.
+# measured against. Six citing skills, 13 references, 8 distinct targets, all by
+# path — derived 2026-08-15. DO NOT TRUST THOSE THREE NUMBERS; they moved once
+# already (they read "nine references, six distinct targets" and were a wave
+# stale), and the floor below is what has to be re-sized when they move again:
+#
+#   grep -rhoE '\.claude/skills/[A-Za-z0-9<[][A-Za-z0-9<>_.-]*/[A-Za-z0-9<[][A-Za-z0-9<>_.-]*\.md' \
+#     .claude/skills | sort -u | grep -vc '[][<>*]'
 #
 # Measured during the 2026-08-10 wave: three surfaces named each other by path
 # BEFORE the targets existed, across three tasks, and nothing in the suite went
@@ -176,13 +182,38 @@ assert_eq "$(printf '%s' "$S2S_DANGLING" | grep -c . || true)" "0" "every skill 
 # Anti-vacuity, two mechanisms, because they fail differently — a floor cannot
 # see a sweep that still returns files but no longer the right ones.
 #
-# The floor is a FLOOR, not a count: six distinct targets exist today and five
-# is below that on purpose. It is calibrated against the cheapest narrowing —
-# restricting the sweep to a single skill directory yields at most four, so any
-# such edit trips it. Dropping legitimately below five means the chain has been
-# rewired, which is a deliberate change and should have to say so here.
+# The floor is a FLOOR, not a count: eight distinct targets exist today and
+# seven is one below that on purpose. Two calibrations, and it has to clear both:
+#
+#   1. THE CHEAPEST NARROWING. Restricting the sweep to a single skill directory
+#      yields at most FOUR distinct targets (unity-execution's, measured
+#      2026-08-15; unity-planning 3, unity-brainstorming 2, the other three 1
+#      each), so any such edit trips a floor anywhere above four.
+#   2. ONE STEP OF SLACK, AND EXACTLY ONE. Losing one target leaves 7 and stays
+#      green; losing two leaves 6 and reds. Dropping legitimately below seven
+#      means the chain has been rewired, which is a deliberate change and should
+#      have to say so here.
+#
+# IT WAS 5 UNTIL 2026-08-15 AND CALIBRATION 2 HAD SILENTLY FAILED. The floor was
+# written against a subject of six; the 2026-08-14 wave added two path-form
+# references (systematic-debugging -> unity-mcp-patterns, urp-pipeline ->
+# systematic-debugging) and moved the subject to eight without touching the
+# number. Measured by removing targets one at a time from a copy of the tree, in
+# order of least load-bearing first:
+#
+#   targets   floor 5 (old)   floor 7 (now)
+#      8        PASS            PASS
+#      7        PASS            PASS
+#      6        PASS            FAIL
+#      5        PASS            FAIL
+#      4        FAIL            FAIL
+#
+# So THREE targets could be removed green, in the guard docs/ANTI-VACUITY.md
+# cites as its worked example of sizing a threshold against the cheapest
+# plausible narrowing. Calibration 1 never broke — four is below both numbers —
+# which is why nothing went red while the flagship example was inverted.
 S2S_FLOOR_STATE="ok"
-[ "$S2S_CHECKED" -ge 5 ] || S2S_FLOOR_STATE="only ${S2S_CHECKED} skill->skill references inspected"
+[ "$S2S_CHECKED" -ge 7 ] || S2S_FLOOR_STATE="only ${S2S_CHECKED} skill->skill references inspected"
 assert_eq "$S2S_FLOOR_STATE" "ok" "the skill->skill sweep still reads the chain, rather than passing on an empty set"
 
 # The sentinels are the chain itself: its entry point, the skill both of its

@@ -91,7 +91,9 @@ SCAN_DIRS=(.claude/ docs/ scripts/ examples/ templates/)
 # PER SOURCE, NOT PER UNION — and that is the whole of what changed here on 2026-08-14.
 #
 # The roots check above USED TO BE `SCAN_FILES=$(find "${SCAN_DIRS[@]}" -type f | wc -l)` followed
-# by `[ "$SCAN_FILES" -ge 1 ]`. One number over five roots. `docs/` alone holds 186 files, so that
+# by `[ "$SCAN_FILES" -ge 1 ]`. One number over five roots. `docs/` alone held 186 files when this
+# was measured and holds 189 tracked today — DERIVE IT, `git ls-files docs | wc -l`; the argument
+# does not depend on the size and the number is here only to make the scale concrete — so that
 # floor cleared with every one of `.claude/agents`, `.claude/commands`, `.claude/hooks`,
 # `.claude/rules` and `.claude/skills` emptied — MEASURED 2026-08-14 in a clone with ZERO files
 # under `.claude/`: **17 passed, 0 failed, rc 0**, byte-identical in verdict to a healthy tree.
