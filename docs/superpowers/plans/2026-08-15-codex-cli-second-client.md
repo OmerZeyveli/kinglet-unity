@@ -517,30 +517,46 @@ Record the exact output. Do not infer a method's existence from the string table
 
 - [ ] **Step 2: Drive the app-server and ask it for its method list**
 
-The app server speaks JSON-RPC over stdio. Establish the handshake and list methods:
+> **CORRECTED AFTER MEASUREMENT (2026-08-15).** The pipeline this step originally gave —
+> `printf '…' | timeout 30 codex app-server` — **cannot answer**. Closing stdin races the server's
+> shutdown, so responses are dropped non-deterministically. Measured over 12 naive runs: six returned
+> nothing at all, six returned only the `initialize` reply, and **in 12 of 12 the result of the
+> method being probed never appeared**. A reader following the original literally would have
+> concluded the method does not work. Hold stdin open until the reply you want has been read.
 
-```bash
-printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"kinglet-probe","version":"1"}}}' \
-  | timeout 30 codex app-server 2>/tmp/appserver.err
-```
+Establish the handshake and get the method list. Do not use a bare `printf |` pipeline; keep stdin
+open for the lifetime of the exchange (a coprocess, a FIFO, or a heredoc that does not close early).
 
-If `codex app-server` is not the right entry point, try `codex debug app-server`
-and record which one works. Record the response verbatim.
+Ask the server to enumerate its own methods rather than guessing: sending a method name that cannot
+exist returns a JSON-RPC error that lists the real ones. That enumeration is also your **negative
+control** — it is what separates "this method exists" from "this server accepts anything".
+
+If `codex app-server` is not the right entry point, try `codex debug app-server`, and record which
+one works.
 
 - [ ] **Step 3: Call the detect method against this repository**
 
-```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"kinglet-probe","version":"1"}}}' \
-  '{"jsonrpc":"2.0","method":"initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"externalAgentConfig/detect","params":{"cwd":"/home/riive/Documents/Github/kinglet-unity"}}' \
-  | timeout 60 codex app-server 2>&1 | tee /tmp/detect.out
-```
+> **CORRECTED AFTER MEASUREMENT (2026-08-15).** This step originally passed `{"cwd": "…"}`. **The
+> real parameter is `cwds`, an array.** The wrong one does not error — it returns `{"items":[]}`,
+> which reads exactly like *"no importer exists"*. Following the original literally records F1 as
+> **refuted** and gets the wave's most consequential answer silently backwards.
+>
+> **The same trap applies to `hooks/list` and `skills/list`, which also take `cwds`** — and there it
+> is worse: with `cwd` they return a well-formed answer *about the wrong repository*, which looks
+> like a result rather than an error. Get every parameter shape from
+> `codex app-server generate-json-schema` rather than from this plan or from a field name.
+
+Call the detect method with the corrected parameter shape, against this repository's path.
 
 Three outcomes, all of them findings:
-- a result describing a detected `.claude/` configuration → F1 = **confirmed**, and record exactly which fields it reports (`agents_md`, `hooks`, `skills_count`, …);
-- a JSON-RPC error `method not found` → F1 = **refuted**;
-- anything else (a schema error, a different parameter name) → iterate on the parameters, and record every attempt including the failures.
+- a result describing a detected `.claude/` configuration → F1 = **confirmed**, and record exactly
+  which item types it reports;
+- a JSON-RPC error `method not found` → F1 = **refuted by method-not-found**;
+- no drivable route to the server at all → F1 = **refuted by absence of a route**, which is a
+  different fact and means something different for a later Codex version.
+
+Record every attempt including the failures. A list of parameter shapes that returned nothing is
+part of this finding's value — an empty result is exactly what a wrong shape produces.
 
 - [ ] **Step 4: If detect works, find out what import would actually do**
 
@@ -599,8 +615,13 @@ placeholder is a failed task, not a partial one.
 - [ ] **Step 6: Add the provenance row**
 
 ```
-docs/research/codex-client/codex-facts.md	original	-	-	-	original	Codex CLI capabilities measured by execution against codex-cli 0.145.0 - resolves the spec's inferred-not-verified list (external agent config import, hook config location and schema, hook events, the block protocol, hash trust) one claim per command
+docs/research/codex-client/codex-facts.md	original	-	-	-	original	Codex CLI capabilities measured by execution against codex-cli 0.145.0 - one claim per command, and each claim states whether it was measured or is explicitly left unmeasured for a later task
 ```
+
+**The note must describe what the file actually contains at the time you write it.** The first
+version of this row was written by the plan and claimed the block protocol was resolved while the
+document said it was not — a note asserting a state the file it describes does not have. If a
+question is still open when you commit, the note says so.
 
 - [ ] **Step 7: Run both gates and commit**
 

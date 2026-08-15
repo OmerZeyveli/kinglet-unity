@@ -122,6 +122,36 @@ whenever stdin is not a terminal, then reads EOF and proceeds. **It is on the st
 and is a warning about nothing.** It is deliberately not filtered, because codex's stderr is the
 evidence. Tasks 3–7 grep `NAME.stderr.txt`; do not treat that line as a fault.
 
+### The app-server has two traps, and both return something that looks like an answer
+
+Measured in Task 2 and independently reproduced by its review. Both bite silently.
+
+**1. The parameter is `cwds`, an array — never `cwd`.** `externalAgentConfig/detect` with `cwd`
+returns `{"items":[]}` with no error, which reads as *"nothing here"*. `hooks/list` and `skills/list`
+are worse: with `cwd` they return a **well-formed answer about the wrong repository**. A reviewer hit
+that and got a clean result for a project it was not asking about. **Get every parameter shape from
+`codex app-server generate-json-schema`** — not from a field name, not from this ledger.
+
+**2. A bare `printf … | codex app-server` pipeline cannot answer.** Closing stdin races the server's
+shutdown and responses are dropped. Measured over 12 naive runs: 6 returned nothing, 6 returned only
+the `initialize` reply, and **in 12 of 12 the probed method's result never appeared**. Keep stdin open
+until you have read the reply you want.
+
+Ask the server to enumerate its own methods (send a name that cannot exist; the error lists the real
+ones — 129 of them). That enumeration doubles as the negative control that separates *"this method
+exists"* from *"this server accepts anything"*.
+
+### A field name is not a measurement — the wave's own rule, applied to itself
+
+Task 2 reported that Kinglet's `timeout: 3000` (ms) lands in Codex's `timeoutSec`, therefore fifty
+minutes. Its review found that **`HookMetadata.timeoutSec` carries no description in Codex's own
+schema**, and that the only documented unit anywhere in the protocol is `timeoutMs`. Nothing had
+measured Codex waiting. The unit claim was an inference from a field name — the exact class of claim
+this wave exists to eliminate, produced by the task built to eliminate it.
+
+Whatever you are about to conclude from a name, measure it instead. A five-second hook registered
+with a one-unit timeout settles this one in a single probe.
+
 ### Codex is pinned at 0.145.0 for this wave
 
 `0.147.0` is available. Do not upgrade. Record `codex --version` in every probe's metadata; a
