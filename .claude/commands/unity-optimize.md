@@ -27,10 +27,28 @@ Use the `unity-optimizer` agent to:
 
 ### Step 1: Profile
 ```
-manage_profiler → start session, capture frame timing
-manage_graphics → get rendering stats (draw calls, batches, triangles)
-manage_profiler → memory snapshot
+manage_profiler action:"profiler_start" → begin profiling
+manage_profiler action:"get_frame_timing" → CPU/GPU frame times
+manage_profiler action:"memory_take_snapshot" → memory breakdown
+manage_graphics action:"stats_get" → draw calls, batches, triangles, set passes
+manage_profiler action:"get_counters" category:"Render" → counters; CATEGORY IS REQUIRED
 ```
+
+**These three lines were dead until 2026-08-15**, in English rather than in call syntax:
+`manage_profiler → start session`, `manage_graphics → get rendering stats` and
+`manage_profiler → memory snapshot`. Underscore-join those and you get `start_session`,
+`get_rendering_stats` and `memory_snapshot` — the exact three names
+`.claude/agents/unity-optimizer.md` was corrected off on 2026-08-14 after executing them against a
+live `mcp-for-unity-server 3.4.5`, where each answers `success:false / Unknown action`. The fix
+landed in the agent and not in the command that dispatches it. `get_counters` resolves as a *name*
+and still fails with an empty message when called with no `category`. See `unity-optimizer` Step 1
+for the full recipe and the failure shape that let all four survive: an unknown action returns
+`isError:false` with `"success": false` in the *body*.
+
+**Written in call syntax on purpose.** The toolkit's own test suite keeps every
+`<tool> action:"<action>"` pair in the payload inside an allow-list recorded from that live server,
+so a citation in the form above is checked offline and a dangling one fails the suite. The
+arrow-and-English form is not checked and structurally cannot be. Write calls, not paraphrases.
 
 ### Step 2: Identify Bottleneck Type
 - **CPU-bound** — GC allocations, expensive Update loops, physics

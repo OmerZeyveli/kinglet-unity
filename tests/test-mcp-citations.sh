@@ -75,6 +75,31 @@
 #     verdicts were reported as one. Closing this means recording each tool's parameter schema, which
 #     is a far larger snapshot to keep true than a list of action names; it is stated rather than
 #     closed. A green run here means "no cited action name is unknown", never "these calls work".
+#   * IT CANNOT SEE A CITATION WRITTEN AS PROSE RATHER THAN AS A CALL, and this shape cost three
+#     lines. `.claude/commands/unity-optimize.md` carried `manage_profiler → start session`,
+#     `manage_graphics → get rendering stats` and `manage_profiler → memory snapshot` — the same
+#     three dead names this guard was written for, in the command that dispatches the agent whose
+#     recipe it fixed — from before this file existed until 2026-08-15. No shape here reaches them:
+#     A/B/C need call syntax and D needs the literal words `with action`. They were rewritten into
+#     shape A rather than taught to the extractor, and THAT WAS A DECISION, not an oversight:
+#
+#       - There is no rule for reading an action name out of English. `start session` happens to
+#         underscore-join into a real-looking `start_session`; `create new scene "Prototype_[X]"`
+#         does not join into anything, and `create` — the real action it describes — is already
+#         correct. A guess is what produced the defect in the first place.
+#       - The form is legitimate almost everywhere it appears. Measured 2026-08-15, `.claude/` holds
+#         **15** `<snapshot tool> → <prose>` lines across **6** files; only unity-optimize.md's three
+#         paraphrased action NAMES. The other 12 (unity-coder, unity-prototyper, unity-scene-builder,
+#         unity-mcp-patterns, block-scene-edit.sh's error text) describe a tool's capability in
+#         ordinary English and are not citations at all.
+#       - A naive shape E over `→` would therefore extract 15 pairs, ~12 of which are prose
+#         fragments no allow-list can carry. Its first run would be a wall of false positives, which
+#         is precisely the outcome the ADJACENCY rule above exists to avoid, and a guard whose
+#         failures are noise gets switched off.
+#
+#     So the hole is named rather than closed: a NEW arrow-and-English tool line in the payload is
+#     green here. What is bounded is the other direction — the recipes that matter are now in shape
+#     A, so their pairs are checked, and the union pair floor rises with them.
 #   * IT CANNOT SEE AN ACTION THAT EXISTS BUT IS WRONG FOR THE JOB. `profiler_stop` where
 #     `profiler_start` was meant passes every check here.
 #   * IT CANNOT SEE A DEAD TOOL, only a dead action on a tool it knows. A cited tool absent from the
