@@ -122,6 +122,15 @@ SNAPSHOT_DATE="2026-08-14"
 # `get_counters` blind spot above). `manage_graphics` is its STATS family only. Every other row is an
 # action that was executed and answered on the day; those tools certainly have more actions than are
 # listed, and adding one means verifying it, not guessing it.
+#
+# THE `manage_editor` ROW IS DATED 2026-08-15, NOT 2026-08-14 — one day later, same server, same
+# editor. It carries the single action `stop`, which was EXECUTED and answered
+# `{"success":true,"message":"Exited play mode."}`. `manage_editor` certainly has more actions than
+# one; the tool's enum was not read, so nothing else about it is recorded here and a citation of any
+# other action on it reds until someone runs that action and writes it down. The row exists because
+# `verification-before-completion` and three agents now cite that call as the obligation of anyone
+# who puts the editor into Play mode — a background dispatch outlived its session on 2026-08-15 and
+# left an editor playing with nobody to stop it.
 ALLOW="manage_profiler	ping
 manage_profiler	profiler_start
 manage_profiler	profiler_stop
@@ -155,6 +164,7 @@ manage_ui	render_ui
 manage_ui	link_stylesheet
 manage_ui	modify_visual_element
 manage_tools	activate
+manage_editor	stop
 manage_scene	create
 manage_scene	validate
 manage_gameobject	create
@@ -166,6 +176,7 @@ SNAPSHOT_TOOLS="manage_profiler
 manage_graphics
 manage_ui
 manage_tools
+manage_editor
 manage_scene
 manage_gameobject
 manage_components"

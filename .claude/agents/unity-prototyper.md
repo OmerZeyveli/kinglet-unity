@@ -169,6 +169,12 @@ If the mechanic depends on a manual Editor step you cannot perform yourself — 
 lightmap bake, an import setting — stop and say so explicitly. Do not write code that assumes the
 asset exists.
 
+**If you enter Play mode to watch the mechanic run, exit it before you report:**
+`manage_editor action:"stop"`. Watching it run is the best verification available to you, so do it —
+and then take the editor back out, whether or not anyone is at the keyboard. A measured prototype
+run left the editor playing: the session that dispatched this agent finished first, and the game was
+still running with nobody left to stop it. See `verification-before-completion`.
+
 ## What NOT To Do
 
 - Don't build production architecture — this is a prototype

@@ -100,7 +100,11 @@ In order of likelihood:
    - `Debug.Log` stripping
 
 ### Step 3: Use MCP for Live Inspection
-- `unity_reflect` — inspect live object state, check component values
+- `unity_reflect` — inspect live object state, check component values. **Ask with `scope:"all"`, or
+  omit `scope`.** On a measured asmdef-based project every first-party type returned 0 under
+  `scope:"project"` and was found under `scope:"all"` — a miss under the narrow scope is
+  indistinguishable from the type not existing, which is the one answer you came here to trust. See
+  `unity-mcp-patterns` Rule 2b.
 - `manage_components` — read current component configurations
 - `read_console` — re-check after applying fix
 

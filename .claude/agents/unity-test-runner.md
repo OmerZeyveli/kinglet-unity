@@ -96,15 +96,59 @@ public IEnumerator Player_OnSpawn_HasFullHealth()
 - Arrange-Act-Assert pattern
 - Clean up GameObjects in `[UnityTearDown]`
 
-### Step 4: Run Tests via MCP
+### Step 4: Run Tests via MCP — `run_tests` starts a job, `get_test_job` holds the results
+
+**`run_tests` is asynchronous.** It returns a handle and nothing else. Measured against
+`mcp-for-unity-server 3.4.5` on Unity 6000.0.68f1, running a real EditMode suite:
+
 ```
-run_tests → execute all tests or specific test fixture
-read_console → check for test output and results
+run_tests mode:"EditMode"
+  → {"success": true, "message": "Test job started.",
+     "data": {"job_id": "abde6087623746a4a7a4edf4032be1a3", "status": "running", "mode": "EditMode"}}
+
+get_test_job job_id:"abde6087623746a4a7a4edf4032be1a3" wait_timeout:120 include_details:true
+  → {"success": true, "data": {"status": "succeeded",
+       "progress": {"completed": 1, "total": 1, "stuck_suspected": false, "blocked_reason": null,
+                    "editor_is_focused": true, "failures_so_far": [], "failures_capped": false},
+       "result": {"summary": {"total": 1, "passed": 1, "failed": 0, "skipped": 0,
+                              "durationSeconds": 0.1486019, "resultState": "Passed"}}}}
 ```
 
+**`run_tests` has no `action` parameter.** Passing one is a hard `unexpected_keyword_argument`
+error — not a `success:false` body you might read past. What it takes is `mode` (`EditMode` or
+`PlayMode`), `test_names`, `group_names`, `category_names`, `assembly_names`,
+`include_failed_tests`, `include_details` and `init_timeout`.
+
+**`get_test_job` is the only source of results.** It needs the `job_id` the run returned;
+`wait_timeout` (seconds) blocks until the job finishes rather than making you poll, and
+`include_details` / `include_failed_tests` fill in the per-test rows Step 5 reports on failures.
+
+**Name a hung run rather than waiting on it.** If `wait_timeout` expires with `status:"running"`,
+read `data.progress.stuck_suspected` and `data.progress.blocked_reason` — that is the job reporting
+that it is not moving, and it is the failure a test-running agent most needs to say out loud. Do not
+re-issue `run_tests`: it starts a *new* job, it does not resume the one you are waiting on.
+
+**A PlayMode run puts the editor into Play mode.** Call `manage_editor action:"stop"` before you
+report — see `verification-before-completion`. A job that ended `stuck_suspected`, or one you gave
+up on, leaves the editor playing with nobody obliged to stop it.
+
+**`read_console` does not carry test results — and the version of this step that shipped until
+2026-08-15 implied it did.** Read immediately after that run it returned a thread-niceness warning,
+an MCP WebSocket error, and `[TestRunnerNoThrottle] Applied No Throttling for test run.`
+Infrastructure noise, no counts. Keep it for what it is genuinely good for: **compile errors**. A
+test assembly that does not compile never produces a job worth reading, and the console is where
+that shows up. Check it after writing tests, before `run_tests`, and again if the job never starts.
+
 ### Step 5: Report Results
-- List passed/failed/skipped counts
-- For failures: show test name, expected vs actual, stack trace
+
+- **Counts come from `data.result.summary`** on the `get_test_job` reply — `total`, `passed`,
+  `failed`, `skipped`, plus `durationSeconds` and `resultState`. Report those numbers; there is no
+  other source for them.
+- For failures: test name, expected vs actual, stack trace — from `data.result.results` with
+  `include_details:true`, or from `progress.failures_so_far` while the job is still running.
+  `failures_capped` tells you whether that list is the whole set.
+- If the job never reached `succeeded`, say so and name `blocked_reason`. A run that hung is a
+  result, and "no failures reported" is not the same claim as "the tests passed".
 - Suggest fixes for failing tests
 
 ## Test Patterns
@@ -165,6 +209,8 @@ public IEnumerator Rigidbody_WithGravity_FallsDown()
 
 - **Status** — all passed, some failed, or blocked (and on what).
 - **What changed** — test files written or modified, with paths.
-- **What was verified, and how** — `run_tests` output: passed/failed/skipped counts. A new test
+- **What was verified, and how** — the `get_test_job` summary: passed/failed/skipped counts, with
+  the `job_id` they came from. `run_tests` on its own reports only that a job started. A new test
   watched fail before the fix, then pass after — not assumed.
-- **What still needs a human** — any coverage gap left, or any test that could not be run.
+- **What still needs a human** — any coverage gap left, any test that could not be run, and any job
+  left `running` with its `blocked_reason`.

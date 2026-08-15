@@ -57,6 +57,10 @@ branches on the tool-call error flag reads a dead call as a successful one and p
 the body, not the flag — `unity-mcp-patterns` Rule 2. If you need an action not listed here, get it
 from `manage_profiler action:"ping"` or the live tool schema rather than from memory.
 
+**Frames come from a running game, and a running editor is yours to stop.** If capturing them means
+entering Play mode, exit it with `manage_editor action:"stop"` before you report — not when someone
+asks. See `verification-before-completion`.
+
 **A name that resolves is not a call that runs.** `get_counters` was on this list as a *correct* name
 for as long as the three dead ones were here, and executed as it was written — no parameters — it
 failed too, with an empty message. Its action name was never the problem; its missing required

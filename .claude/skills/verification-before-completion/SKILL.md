@@ -28,6 +28,13 @@ times, while the tests were read every time.
 - **Manual Editor steps are not done because you described them.** If the change needs a sprite
   atlas, a lightmap bake, or an import setting the agent cannot create, stop and say so explicitly
   rather than writing code that assumes it exists.
+- **Whoever enters Play mode leaves it.** Running the game is a legitimate way to verify one — and
+  the editor stays in Play mode until something takes it out. `manage_editor action:"stop"` is that
+  call; it answered `{"success":true,"message":"Exited play mode."}` on 2026-08-15. Do it before you
+  report, in the same turn, and **do not make the obligation depend on someone watching**:
+  interactively the user can hit stop, but headless — or once the session that dispatched you has
+  ended — nobody can, and a Unity editor left playing keeps running the game and keeps mutating the
+  runtime state the next session will read as the project's real state.
 
 ## The thought that means you are about to skip this
 
@@ -44,6 +51,7 @@ times, while the tests were read every time.
 | "I grepped and found no references, so there are none in the project" | In Unity, source is not the project. Scenes, prefabs and ScriptableObjects hold state no `grep` over `.cs` will find. | "zero `Light2D` references" asserted from grepping `.cs`; `Light2D` was authored in 52 scenes and 26 prefabs, one on the player's root GameObject |
 | "The installer's checksum says this file is untouched" | A guard exercised once has been exercised once. A checksum taken *after* an upgrade that silently reverted a user's edit will match on the next run, because it is recording the reverted state as ground truth. | 2026-08-03 — a user edit survived one upgrade and was overwritten by the next; the installer re-recorded the file as it then stood, so run three is where it dies, not run two |
 | "The MCP call came back success, so the asset changed" | A unity-mcp success flag reports that the call was accepted, not that the value landed. Read the asset, prefab or scene back — from disk, or with a separate query — before reporting the edit as done. | 2026-08-04, a real project: `manage_scriptable_object` **rejected** an array-resize patch outright (`Unsupported SerializedPropertyType: ArraySize`) and then reported **success on all twelve element writes** into that array. The implementer distrusted the flags, read the `.asset` from disk, and only then knew what had actually been written |
+| "I'll leave the editor playing so it can be seen" | Nobody may be there to see it, or to stop it. The session that dispatched the work can end before the work does, and the editor it left running has no one left to close it. | 2026-08-15 — `/unity-prototype` dispatched its agent with `run_in_background`; the parent reported "the agent is working in the background" after 2 turns / 78 s and exited. The work finished into an editor nobody was watching, found minutes later at `is_playing: true` with the session gone |
 | "It only needs to work once, an install is idempotent by nature" | Idempotence is a property you test, not one you assume. | 2026-08-03 — a generated-heading duplication compounded one copy per install, and nothing had asserted that a second install left the document unchanged |
 
 ## When there is nothing left to verify

@@ -82,6 +82,37 @@ Two corollaries worth stating separately, because they are what makes the shape 
   are both plausible and both nonexistent; the real ones are `stats_get` and `memory_take_snapshot`.
   When unsure, ask the live server rather than your memory of it.
 
+## Rule 2b: An empty `unity_reflect` answer is not an absence — widen the scope
+
+Rule 2 is about a failure wearing a success. This is the other one: **a false negative wearing a
+fact.** Measured 2026-08-15 against the same bridge (`mcp-for-unity-server 3.4.5`, Unity
+6000.0.68f1) on a 1417-file game built out of assembly definitions — every first-party type
+searched returned nothing under `scope:"project"` and was found under `scope:"all"`:
+
+| query | `scope:"project"` | `scope:"all"` |
+|---|---|---|
+| `BouncingBall` — written and compiled minutes earlier | **0** | 1 |
+| `TimeScaleService` | **0** | 2 |
+| `PlayerMovement` | **0** | 6 |
+| `DNASample` | **0** | 5 |
+
+`BouncingBall` also returned 1 under `scope:"packages"`, which is the clue: the classification
+appears to key on `Assembly-CSharp`, and a project using assembly definitions — the structure Unity
+recommends and `.claude/skills/assembly-definitions/SKILL.md` teaches — does not have one. Its code
+lives in named assemblies the server files somewhere else.
+
+**So ask with `scope:"all"`, or omit `scope` entirely.** `scope` accepts `unity`, `packages`,
+`project` and `all`; the narrow value is the one that lies to you on the projects this toolkit is
+written for.
+
+Nothing here is blocked and the tool is not broken — the agent that hit this live widened the scope
+on its next call and carried on, which is the same routing-around seen elsewhere. The cost is
+narrower and worse than a blocked call: `unity_reflect` is what this toolkit reaches for to answer
+*does this API actually exist* before writing C# against it, precisely because recalled Unity API
+surface goes stale. **A verification tool that answers "not found" when it means "not looked" is the
+one wrong answer that gets believed**, because it reads as a fact about the project rather than as a
+failed call.
+
 ## Rule 3: project_info Before Assumptions
 
 Before making decisions about the project, read its state:
@@ -160,7 +191,8 @@ Tools marked **(group)** need `manage_tools(action="activate", group=...)` first
 | Profiling | `manage_profiler` **(profiling)** | sessions, timing, memory |
 | Graphics stats | `manage_graphics` | rendering stats, pipeline |
 | Console output | `read_console` | errors, warnings, logs |
-| API inspection | `unity_reflect` **(docs)** | live C# reflection |
+| API inspection | `unity_reflect` **(docs)** | live C# reflection — ask with `scope:"all"`, see Rule 2b |
+| Editor / Play mode state | `manage_editor` | exit Play mode with `stop` |
 | Documentation | `unity_docs` **(docs)** | official Unity docs |
 | C# scripts | `create_script` / `manage_script` / `validate_script` | create, edit, validate |
 | Assets | `manage_asset` | import, move, delete (GUID-safe) |

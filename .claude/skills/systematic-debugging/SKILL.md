@@ -16,6 +16,10 @@ identity problems that reading the code does not reveal.
 2. **Reproduce, and say how.** A bug you cannot trigger is a bug you cannot confirm you fixed.
 3. **Inspect the live API before assuming it.** The unity-mcp `unity_reflect` tool reports what the
    installed Unity and packages actually expose. Recalled API surface goes stale between versions.
+   **Ask with `scope:"all"`, or with no `scope` at all** — on a measured project built out of
+   assembly definitions, `scope:"project"` returned 0 for every first-party type, so the narrow
+   scope reports "not looked" in the words of "not found". See
+   `.claude/skills/unity-mcp-patterns/SKILL.md` Rule 2b.
 4. **Change one thing.** Then re-read the console. Two changes at once means you learn nothing from
    the result.
 

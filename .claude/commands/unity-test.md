@@ -50,14 +50,22 @@ For each untested class/method:
 
 ### Step 3: Run Tests
 
+`run_tests` is **asynchronous** — it starts a job and returns a `job_id`, not results — and it takes
+no `action` parameter. `read_console` does **not** carry test results; it carries compile errors,
+which is what to check it for.
+
 ```
-run_tests → execute all tests (or specific fixture if scoped)
-read_console → get test results
+run_tests mode:"EditMode"                                       → {"job_id":"…","status":"running"}
+get_test_job job_id:"…" wait_timeout:120 include_details:true   → summary + per-test results
 ```
 
 ### Step 4: Report
 
-Present results:
+Present results, taking the counts from `data.result.summary` on the `get_test_job` reply. If the
+job never finished, say so and report `data.progress.stuck_suspected` and
+`data.progress.blocked_reason` rather than reporting nothing — and if the run was PlayMode, take the
+editor back out with `manage_editor action:"stop"`.
+
 - Total: X passed, Y failed, Z skipped
 - For failures: test name, expected vs actual, stack trace, suggested fix
 - New tests created: list with file paths
