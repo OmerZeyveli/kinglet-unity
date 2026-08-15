@@ -170,9 +170,24 @@ unity_track_edit() {
 #   for f in $(grep -oE '^[a-z_]+\(\)' .claude/hooks/_lib.sh | tr -d '()'); do
 #     printf '%-24s %s\n' "$f" \
 #       "$(grep -rn --include='*.sh' --include='*.md' --include='*.tsv' \
-#             --exclude-dir=.superpowers --exclude-dir=superpowers -- "$f" . \
+#             --exclude-dir=.superpowers --exclude-dir='superpowers*' --exclude-dir=.research \
+#             -- "$f" . \
 #          | grep -vc '\.claude/hooks/_lib\.sh:')"
 #   done
+#
+# THE EXCLUSION NAMED TWO DIRECTORIES AND THE TREE HOLDS FOUR. Until 2026-08-15 it read
+# `--exclude-dir=.superpowers --exclude-dir=superpowers`, and `--exclude-dir` matches a directory's
+# BASE NAME -- so `.research/superpowers/` was covered by the second entry while its three siblings
+# `.research/superpowers-6.2.0/`, `.research/superpowers-evals/` and `.research/superpowers-skills/`
+# were not. All four exist. This was LATENT, not live: measured 2026-08-15, those three trees hold
+# **0** hits for all twelve function names, so no count in this file was ever wrong because of it.
+# It is widened anyway, because the failure it invites is the one this whole block is about -- a
+# record tree that discusses a name inflates that name's count and a dead function reads as live,
+# with no error. Proved by planting one sentinel line in each of the four: the old form counted 35
+# for `unity_hook_block` and the new form 32, which is the unplanted answer. Run under BOTH
+# `/usr/bin/grep` and the interactive wrapper (ugrep 7.5.0) and made to agree at 32 before being
+# written here, exactly as the paragraph below requires; the `superpowers*` glob and `--exclude-dir`
+# itself behave identically in both.
 #
 # DO NOT ANCHOR THAT EXCLUSION TO `^\./`. It was written that way until 2026-08-14 and matched
 # NOTHING under a grep front-end that prints paths without the `./` prefix, so the filter passed this
