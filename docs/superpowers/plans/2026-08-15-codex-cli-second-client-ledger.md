@@ -206,9 +206,44 @@ executing the remaining tasks as written.
 
 ---
 
+## Task 1 — review outcome and finding dispositions
+
+Implementer: **general-purpose**, not `unity-coder`. Task 1 is a bash script and a test file; routing
+it to an agent that writes C# and drives the Editor would have measured the dispatch rather than the
+task.
+
+Implementer report: `DONE`. Review verdict: **Spec ✅, Quality: Needs work** — no Critical, three
+Important, six Minor. Implementer commits `a5ec1bd`, `b955320`.
+
+The review did its own job rather than reading the report's: it reproduced six rows of the
+implementer's mutation table independently, and then **found four argv mutations the guard did not
+catch at all**. That is the finding that mattered, and no amount of re-reading the diff would have
+produced it.
+
+| # | Finding | Disposition |
+|---|---|---|
+| Important 1 | Four argv facts (`--sandbox`, `--cd`, `--json`, `--skip-git-repo-check`) asserted by nothing; all four mutants stayed 22/22. `meta.json`'s `"sandbox"` reads from the variable, not argv, so the evidence file can record `read-only` for a run that executed at `danger-full-access` | **fix round 1** |
+| Important 2 | Two of the credential constraint's three clauses guarded by nothing; widening the copy to `cp -R "$HOME/.codex/."` stays green and would leak `~/.codex/skills/` into **Task 5's skill-discovery measurement** | **fix round 1** |
+| Important 3 | A process-group SIGINT (Ctrl-C) skips the EXIT trap and leaves the credential-bearing home; orphans accumulate because the pre-run `rm -rf` only clears the current `$$` | **fix round 1** |
+| Minor 6 | The test file dies under `set -e` before its own verdict line, so a truncated section reads like a complete one; report's "every one of the 22 failed" overstates by three | folded into round 1 |
+| Minor 7 | `codex_args` is a space-joined string and omits the prompt, so it is not "the exact command"; the comment's stated reason for python3 is not what the code achieves | folded into round 1 |
+| Minor 4 | `.gitignore` is the one modified file whose provenance note gained no clause — and it is the change that enforces the credential constraint | folded into round 1 |
+| Minor 5 | Five provenance note clauses run into the previous sentence with no separator | folded into round 1 |
+| Minor 8 | Two concurrent suites share the fixed `defaultout.*` names in the real evidence directory. Reviewer could not reproduce (six concurrent pairs, 22/22) | **folded into round 1 after an initial decision to defer, and the reversal is the entry worth keeping.** `CLAUDE.md` records that running two suites at once is how a previous flake reproduced *every time*, and that **three implementers hit it, called it a flake, and moved on**. The cost of a known name collision is not its failure rate; it is the next person disbelieving it. One line removes it by construction |
+| Minor 9 | A new file entered `docs/ANTI-VACUITY.md`'s `scripts/*.sh` declared scope without the sweep being run | **closed by the review, not deferred.** The reviewer ran C1–C4 over `codex-probe.sh` and found the document's sentence still true — `die()`'s exit 64 is argument validation, not a floor. Nothing to correct |
+
+### ⚠️ Cannot verify — carried, and true for every later task
+
+- **shellcheck is not installed on this host.** CI runs it at warning level over `scripts/**`; neither
+  new file could be linted locally. This applies to every task in the plan that adds a script.
+- **No macOS pass.** `tests/test-bash32-compat.sh` covers the new files statically and they pass, but
+  they have only executed on this Linux host. Consistent with the repository's standing position.
+
+---
+
 ## Deferred and parked findings
 
-*(None yet.)*
+*(None yet — every Task 1 finding was either fixed in round 1 or closed by the review.)*
 
 ---
 
