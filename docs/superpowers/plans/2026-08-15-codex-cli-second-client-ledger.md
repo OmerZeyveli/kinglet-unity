@@ -94,6 +94,34 @@ string adjacency. All of it came from a binary's string table, where symbols sit
 because of how the linker packed them. If a dispatch hands you one of these as a fact, **that
 dispatch is wrong — report `NEEDS_CONTEXT` rather than proceeding.**
 
+### A new file in `scripts/` ships into every user project — discovered by Task 1
+
+`install.sh` copies `scripts/` into each installed project's `.claude/scripts/`. Adding a file there
+without excluding it reddens the suite from two directions at once, and neither guard names
+`install.sh` in its failure message:
+
+- `tests/test-derived-counts.sh` checks `docs/GETTING-STARTED.md`'s repo-scripts and
+  installed-scripts figures against the tree;
+- `tests/test-shipped-citations.sh` fails with *"installed script(s) named by no agent, command or
+  skill"*.
+
+If your task adds anything to `scripts/`, decide **before** you write it whether it ships. If it does
+not, exclude it in `install.sh` in **both** the path enumeration and the write loop — the same shape
+`check-provenance.sh` already uses — and update `docs/GETTING-STARTED.md`'s repo figure. Task 1 did
+this for `codex-probe.sh`; **Task 9 must know the exclusion exists before it touches the installer.**
+
+There is a trap inside the trap: `test-derived-counts.sh` extracts the skipped names by grepping
+`install.sh` for the literal comparison shape, so a *comment* that quotes that shape gets extracted
+as a third skipped script. Describe the shape without spelling it.
+
+### Codex prints `Reading additional input from stdin...` on every probe — discovered by Task 1
+
+The plan states that without stdin redirected `codex exec` prints that line **and blocks**. Measured
+against the real 0.145.0: `< /dev/null` stops the *block*, not the *message*. Codex prints it
+whenever stdin is not a terminal, then reads EOF and proceeds. **It is on the stderr of every probe
+and is a warning about nothing.** It is deliberately not filtered, because codex's stderr is the
+evidence. Tasks 3–7 grep `NAME.stderr.txt`; do not treat that line as a fault.
+
 ### Codex is pinned at 0.145.0 for this wave
 
 `0.147.0` is available. Do not upgrade. Record `codex --version` in every probe's metadata; a
@@ -112,7 +140,48 @@ the copy is mode 600, and it is removed by an EXIT trap. The evidence directory 
 *(Populated as tasks complete. A brief written before a task ran guesses; this section is what
 really happened.)*
 
-Nothing yet — Task 1 is the first dispatch.
+### From Task 1 — `scripts/codex-probe.sh` *(pending review; treat as provisional until Task 1 closes)*
+
+```bash
+bash scripts/codex-probe.sh --name NAME --prompt FILE \
+  [--workdir DIR] [--seed DIR] [--sandbox MODE] [--out DIR] [--model MODEL]
+```
+
+Writes **four** files into the evidence directory (default
+`docs/research/codex-client/evidence`, which is gitignored):
+
+| File | Contents |
+|---|---|
+| `NAME.jsonl` | the raw event stream |
+| `NAME.last.txt` | the final agent message |
+| `NAME.stderr.txt` | codex's stderr — where its warnings land |
+| `NAME.meta.json` | the exact invocation, `codex --version`, exit code, sandbox, model, workdir, UTC timestamp |
+
+Exits with codex's exit code; usage errors exit **64**.
+
+Two behaviours that differ from the plan's text, both decided by Task 1 and both load-bearing for
+later tasks:
+
+- **`NAME.last.txt` is derived from the event stream when codex's `-o` file is absent or empty.**
+  `-o` remains authoritative when present. A run that dies before its first turn completes writes no
+  `-o` file, so a reader that trusted `-o` alone would read nothing and not know why.
+- **`NAME.last.txt` and `NAME.meta.json` are removed before each run.** They are not truncated by a
+  redirection the way `.jsonl` and `.stderr.txt` are, and a stale `last.txt` read as this run's
+  answer is a silently wrong measurement.
+
+**`--seed` and `--model` have no assertion and were never exercised.** `--seed` is
+argument-validated only; its `cp -R` into `CODEX_HOME` is unexercised. **Task 3 is the first
+consumer of `--seed`** — its implementer should expect to be the one that proves the path works, and
+should report a defect there as a harness defect rather than working around it.
+
+The event stream shape, measured against the real binary:
+
+```json
+{"type": "thread.started", "thread_id": "…"}
+{"type": "turn.started"}
+{"type": "item.completed", "item": {"id": "item_0", "type": "agent_message", "text": "…"}}
+{"type": "turn.completed", "usage": {"input_tokens": …, "output_tokens": …}}
+```
 
 ---
 
