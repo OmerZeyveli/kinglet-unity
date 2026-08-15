@@ -53,14 +53,23 @@ artifact does.
 
      This bullet used to prescribe the digit-proximity form
      `grep -rniE '[0-9]+[^0-9]{0,40}NOUN|NOUN[^0-9]{0,40}[0-9]+'`, which does the opposite of the
-     sentence that introduces it. Measured with `NOUN=hooks` over two documents of the toolkit this
-     skill came from, **at commit `b9f2711`**: the digit form returned **11** lines against the plain
-     search's **29** — it discards **18**, and that branch's highest-value bare-numeral defect was
-     among the 18, its count and its noun split by a line wrap. **The pair is pinned to a commit
-     because it moves.** Written first as 10/28, it was stale in the commit that wrote it: the same
-     commit edited one of the two documents it was measured over. The *discarded* count held at 18
-     across the whole range, and that is the figure the argument rests on. **This is the highest-cost shape of the
-     four** — see below.
+     sentence that introduces it. Measured with `NOUN=hooks` **at commit `b9f2711`, over exactly two
+     documents of the toolkit this skill came from — its root README.md and its
+     docs/ARCHITECTURE.md** (that repository's files at that commit, not files in your project): the
+     digit form returned **11** lines against the plain search's **29** — it discards **18**, and that
+     branch's highest-value bare-numeral defect was among the 18, its count and its noun split by a
+     line wrap. **The pair is pinned to a commit because it moves.** Written first as 10/28, it was
+     stale in the commit that wrote it: the same commit edited one of the two documents it was
+     measured over. The *discarded* count held at 18 across the whole range, and that is the figure
+     the argument rests on.
+
+     **The file set is named because a pin to a commit without a pin to a file set is half a pin.**
+     It was missing until 2026-08-15, and a reader could recover it only by trying pairings until one
+     matched — at the same commit, that repository's docs/ARCHITECTURE.md with its
+     docs/HOOK-REFERENCE.md gives 24/58 instead. The pairing that shows why the numbers alone cannot
+     identify the set is CLAUDE.md with docs/ARCHITECTURE.md: **11/30** — the same 11, one apart on
+     the other figure, so a reader checking only the digit form's result would have confirmed the
+     wrong pair. **This is the highest-cost shape of the four** — see below.
    - **Category words.** A list of kinds ("meta, code quality, workflow") that a removal emptied or
      shortened. A list survives the deletion of its last member without one word changing.
    - **Capability sentences.** "X enforces Y", "the tool checks Z" — written about a behaviour rather

@@ -176,9 +176,28 @@ unity_track_edit() {
 #
 # DO NOT ANCHOR THAT EXCLUSION TO `^\./`. It was written that way until 2026-08-14 and matched
 # NOTHING under a grep front-end that prints paths without the `./` prefix, so the filter passed this
-# file's own three hits straight through and every count came out inflated by three. An exclusion
-# that excludes nothing cannot say so -- it reports a larger number, not an error. The form above was
-# run under both GNU grep and the interactive wrapper and made to agree before being written here.
+# file's own hits straight through. An exclusion that excludes nothing cannot say so -- it reports a
+# larger number, not an error. The form above was run under both GNU grep and the interactive wrapper
+# and made to agree before being written here.
+#
+# THE INFLATION IS NOT A CONSTANT, and this sentence ended "and every count came out inflated by
+# three" until 2026-08-15 -- a written answer, two lines below "Run the check; do not write the
+# answer", and wrong for most of the set it described. The rule is what belongs here instead of a
+# digit: an unexcluded self-hit is passed straight through, so each function's count is inflated by
+# ITS OWN hit count in this file -- its definition line, plus every line of the comments above that
+# happens to name it. That is per function, and it moves every time these comments are edited, which
+# is why no number for it is recorded here. Derive it from the same recipe by flipping one flag:
+#
+#   ... | grep -c  '\.claude/hooks/_lib\.sh:'   # the inflation, for that function
+#   ... | grep -vc '\.claude/hooks/_lib\.sh:'   # the count, for that function
+#
+# Re-derived over all twelve on 2026-08-15, and pinned to the trees it was derived from rather than
+# to a date, because the quantity moves: at 6e489bc and again at e17f310, identically both times,
+# "three" was right for five of the twelve and wrong for the other seven -- one of which is
+# unity_state_plan_update, a row the paragraph above is written about, so the clause was false for a
+# case it was written to explain and not only for cases it never mentioned. Checking those two
+# commits out reproduces it; running the recipe here will not, because this paragraph is itself
+# inside the scope being counted and adding it moved several of the twelve.
 #
 # All six are retained because retiring them is a decision about this library's surface rather than
 # a side effect of the hook cut, and nothing forced it. UNITY_READS_FILE below is a separate case:

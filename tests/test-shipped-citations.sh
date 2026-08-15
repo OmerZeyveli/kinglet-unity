@@ -49,7 +49,10 @@ MD_COUNT="$(printf '%s\n' "$SHIPPED_MD" | grep -c . || true)"
 # were derived with headroom from the tree on 2026-08-11, which held 44 shipped .md files and 85
 # payload entries; scripts/detect-pipeline.sh made the second of those 86 and this line went a wave
 # without noticing. Do not read either count off it — both pass lines below print what the tree holds
-# on the run in front of you. Raise a floor when the tree grows; never lower one to make a run pass.
+# on the run in front of you. When a floor is needed, how it is sized, and why it is never lowered to
+# make a run pass are docs/ANTI-VACUITY.md's rules F1 and F7 — cited rather than restated here,
+# because a second copy of a criterion is how the two get to disagree without either one being wrong
+# in isolation. Both floors below are listed in that document's floor set with the ratio they imply.
 #
 # THE PAYLOAD FLOOR MOVED DOWN ON 2026-08-13, from 70 to 55, and that is the one edit the paragraph
 # above forbids — so it needs its reason on the record. The surface criterion was applied to
@@ -396,13 +399,30 @@ fi
 #
 # WHAT THIS DOES NOT COVER, and it is deliberate, not an oversight. It reads ONE file. The payload
 # has 67 entries, 44 Markdown (rules 1-3) and 23 not; this is one of the 23. Applying the same
-# criterion to the other 22 leaves FIFTEEN unmarked repository-only citation sites, twelve of them
-# naming `tests/` files, which never install. Split by directory, and the split is the finding:
+# criterion to the other 22 leaves FIFTEEN unmarked repository-only citation sites, thirteen of them
+# naming `tests/` files and two naming provenance.tsv, none of which install. Split by directory, and
+# the split is the finding:
 #
 #   SIX in `.claude/hooks/`   -- five in bash-gate.sh, one in _lib.sh. Pre-existing.
-#   NINE in `.claude/scripts/` -- detect-missing-refs.sh, detect-pipeline.sh, generate-claude-md.sh
-#                                 x2, studio-doctor.sh x3, validate-asmdefs.sh,
-#                                 validate-serialization.sh.
+#   NINE in `.claude/scripts/` -- detect-missing-refs.sh, generate-claude-md.sh, studio-doctor.sh x5,
+#                                 validate-asmdefs.sh, validate-serialization.sh.
+#
+# WHICH RESOLUTION RULE THE FIFTEEN IS UNDER, because two are in play and the figure differs under
+# each. A token spelled `scripts/studio-doctor.sh` names a real file in THIS repository and is not
+# literally a payload entry -- the payload entry is that name under `.claude/`. Rule 2's own code
+# resolves that form (`case "$t" in scripts/*) p=".claude/$t"`) and so declines to flag it. THE
+# FIFTEEN IS COUNTED UNDER RULE 2'S RESOLUTION: a `scripts/X` token is a resolved payload citation
+# and does not count. Drop that one resolution and the same criterion returns EIGHTEEN over this
+# tree. The figure is meaningless without the rule, which is the whole of ledger 205.
+#
+# AND THE FIGURE WAS RIGHT FOR THE WRONG REASON WHEN IT WAS WRITTEN. Re-derived at f8fab22, the
+# commit that first wrote FIFTEEN: the resolving count there was THIRTEEN and the non-resolving count
+# was fifteen. The split this comment carried until 2026-08-15 -- detect-pipeline.sh, and
+# generate-claude-md.sh twice -- is the non-resolving one, and its two extra rows are exactly two
+# `scripts/X` tokens. So the sentence said "applying the same criterion" while the number came from a
+# criterion missing one of its clauses. It reads fifteen again today only because studio-doctor.sh
+# picked up citations after f8fab22 and detect-pipeline.sh lost its one: the total returned to the
+# written figure while every row under it moved, which is the failure mode a total cannot show you.
 #
 # THIS COMMENT SAID SIX UNTIL 2026-08-14, AND THE SIX IT NAMED ARE EXACTLY THE HOOKS SUBSET -- the
 # nine it missed are exactly the scripts one, for the reason rule 3's own header states three
@@ -423,10 +443,11 @@ fi
 # Re-derive the fifteen rather than trusting this comment -- the criterion is the whole of it:
 #
 #   for every non-Markdown payload file except this rule's own subject, every `*.tsv|md|sh|json`
-#   token naming a real file here -- reading `.claude/scripts/X` as repository `scripts/X` --
-#   that is neither in the payload nor a project-root file install.sh writes, on a line whose
-#   following text does not say `not installed`, excluding install.sh, uninstall.sh, and each
-#   script's own usage string.
+#   token naming a real file here -- reading `.claude/scripts/X` as repository `scripts/X`, AND
+#   reading a bare `scripts/X` as the payload entry `.claude/scripts/X`, which is the clause the
+#   figure was derived with and the criterion was written without -- that is neither in the payload
+#   nor a project-root file install.sh writes, on a line whose following text does not say
+#   `not installed`, excluding install.sh, uninstall.sh, and each script's own usage string.
 UP_FILE="$REPO/.claude/UPSTREAM"
 
 # What an installed reader can open: the payload, plus the project-root files install.sh writes

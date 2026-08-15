@@ -136,6 +136,23 @@ contradicted in the file beside it is a rule nobody is following.
    the controller declining to make a decision. Either park the finding in the ledger with a ruling
    (why it is safe to carry forward, and to whom) or stop the loop entirely if the finding is load-
    bearing — a security gate, a data-loss path, anything the plan cannot be shipped without.
+
+   **A ruling names a task. Refuse one that names a role.** "→ whoever next opens that file", "→ a
+   later pass", "→ the next maintainer" are not owners: nothing is ever dispatched for them, so
+   nothing is scheduled, and the item resurfaces only if a whole-branch review happens to find it
+   again. **A deferral with no owner is not a deferral, it is a deletion with a paper trail.**
+   Measured on this loop: four of six open items in one wave shared that single cause. So a ruling is
+   complete only when it carries all three of:
+
+   - **the finding**, stated so a reader can check it without the round's context;
+   - **why carrying it is safe**, which is the part that makes it a ruling rather than a backlog row;
+   - **an owner that is a task** — an existing numbered task in a plan, or a new one you add to that
+     plan in the same edit. If the owning task lives in a different plan, name the plan and the task,
+     because "a later wave" is a role wearing a date.
+
+   If no task fits and you will not add one, then you are not deferring the finding, you are dropping
+   it — which is a legitimate call, but the ruling has to say **dropped** and say why, so that the
+   next reader is deciding whether to agree rather than waiting for a pass that was never scheduled.
 7. **Complete — two sweeps first, and neither of them is in the diff.** The review that just passed
    read one brief and one diff, so it was not positioned to ask either question below. Both are about
    files the round never opened, which is precisely why they have to be asked here, by you, before the

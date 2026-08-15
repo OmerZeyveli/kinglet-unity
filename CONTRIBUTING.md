@@ -50,10 +50,34 @@ fix `pc-console.md` instead.
 
 ## Good areas to contribute
 
-**The admission test for any new surface** — agent, command, or skill — is the one the 2026-08-03
-cut applied: *does this do something the model cannot do unaided?* A surface that restates what the
-model already knows makes the real ones harder to select. Adding one means answering that question,
-not filling a quota. See `CLAUDE.md`, "What is enforced, not requested".
+**The admission test for any new surface** — agent, command, skill, or hook — is the one the
+2026-08-03 cut applied: *does this do something the model cannot do unaided?* A surface that restates
+what the model already knows makes the real ones harder to select. Adding one means answering that
+question, not filling a quota. See `CLAUDE.md`, "What is enforced, not requested".
+
+**Hooks are held to the same test, and a new hook has to answer it in the PR description.** The
+criterion reached `.claude/hooks/` on 2026-08-13 and removed more than half of what was there.
+Nothing in the suite forces the question to be asked about the *next* hook — `CLAUDE.md` names that
+as the residual risk, and this is the file where it gets closed by convention instead. Rule out the
+three failure modes the cut actually found, because each of them shipped as a hook that read fine:
+
+- **It never runs.** The largest removed group declared a `strict` profile while nothing in the
+  toolkit sets `UNITY_HOOK_PROFILE`, whose default is `standard` — so they were inert in every
+  install from the day they landed, and no test noticed for months. Say which profile yours declares,
+  and show it firing under the default rather than under a profile you exported yourself.
+- **It is structurally broken.** Say what payload you fed it on stdin and what it did. A hook is a
+  shell script reading JSON on stdin under `set -euo pipefail`; "it looks correct" has been wrong
+  here more than once, most recently a warning hook that exited 1 with zero output on an ordinary
+  edit, against its own `# Exit: 0 always` header.
+- **It is net-negative.** A hook that blocks legitimate work costs more than the defect it catches.
+  Say what it blocks, what it deliberately lets through, and why that trade is worth a gate.
+
+A new hook also needs a registration in `.claude/settings.json`, working kill switches
+(`DISABLE_UNITY_HOOKS=1` and its own `DISABLE_HOOK_<NAME>=1`, both handled by `.claude/hooks/_lib.sh`),
+and a behavioural probe in `tests/test-hook-behaviour.sh` — that file derives its hook list from
+`settings.json` rather than hand-maintaining one, and **a registered hook with no probe fails it**, so
+adding the hook and adding its probe are necessarily the same commit. Removing a hook is the mirror
+image: a `provenance-skip.tsv` row with `rule=absent`, which is what stops it drifting back in.
 
 - **Engineering agents and commands** — work that drives the Unity Editor over MCP, or that encodes
   a Unity-specific trap the model gets wrong unaided. (Documentation-only agents that just write to
