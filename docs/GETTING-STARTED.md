@@ -75,14 +75,19 @@ Each cost below was measured against a manual copy, not assumed:
   (6 of the 6 installed scripts are named by some agent, command or skill, so a model can reach
   them; any that were not would be reachable only by a user who went looking for them. That count
   is derived by `tests/test-derived-counts.sh` rather than maintained by hand.) To match Option A,
-  copy them yourself — **all except `check-provenance.sh`**, which Option A deliberately skips in
-  both its announcement and its write loop, because it validates *this repository's* `provenance.tsv`
-  and expects the repo's layout. The repo has 7 scripts; an installed project has 6:
+  copy them yourself — **all except `check-provenance.sh` and `codex-probe.sh`**, which Option A
+  deliberately skips in both its announcement and its write loop. Both measure *this repository*:
+  the first validates its `provenance.tsv` and expects the repo's layout, and the second runs Codex
+  CLI against Kinglet's own surfaces, writing into a `docs/research/` directory that does not ship.
+  The repo has 8 scripts; an installed project has 6:
 
   ```bash
   mkdir -p your-unity-project/.claude/scripts
   for f in kinglet-unity/scripts/*.sh; do
-    [ "$(basename "$f")" = check-provenance.sh ] || cp "$f" your-unity-project/.claude/scripts/
+    case "$(basename "$f")" in
+      check-provenance.sh|codex-probe.sh) continue ;;
+    esac
+    cp "$f" your-unity-project/.claude/scripts/
   done
   chmod +x your-unity-project/.claude/scripts/*.sh
   ```

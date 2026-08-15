@@ -637,11 +637,12 @@ DCK_DROPPED_DOC=$(
   ' "$REPO_DIR/docs/HOOK-REFERENCE.md" 2>/dev/null | sort
 )
 
-# Scripts. install.sh writes `scripts/*.sh` into `.claude/scripts/` and skips exactly one file,
-# check-provenance.sh, because it validates THIS repository. The two numbers therefore always differ
-# by one, and both are quoted in docs/GETTING-STARTED.md, so both are derived here. The skip is read
-# out of install.sh rather than hardcoded: if that line ever names a second file, this derivation
-# follows it instead of silently disagreeing.
+# Scripts. install.sh writes `scripts/*.sh` into `.claude/scripts/` minus a short skip list — files
+# that measure THIS repository and have nothing to do in an installed project. It was
+# check-provenance.sh alone until 2026-08-15, when codex-probe.sh joined it. Both numbers are quoted
+# in docs/GETTING-STARTED.md, so both are derived here. The skip list is read out of install.sh
+# rather than hardcoded, which is what let the second name land without this derivation silently
+# disagreeing — the difference between the two counts is whatever install.sh skips, not a fixed 1.
 #
 # Counted as DISTINCT NAMES, not as matching lines. install.sh carries the same skip twice — once in
 # the NEW_PATHS enumeration and once in the write loop, and its own comment says the two must stay in
@@ -679,7 +680,11 @@ DCK_DERIVATION="ok"
 [ "$DCK_HOOKS"         -ge 1 ] || DCK_DERIVATION="no hooks found under \$REPO_DIR/.claude/hooks"
 [ "$DCK_REGISTERED"    -ge 1 ] || DCK_DERIVATION="no hook registrations found in \$REPO_DIR/.claude/settings.json"
 [ "$DCK_REPO_SCRIPTS"  -ge 1 ] || DCK_DERIVATION="no scripts found under \$REPO_DIR/scripts"
-[ "$DCK_SKIPPED"       -eq 1 ] || DCK_DERIVATION="install.sh no longer skips exactly one script (skips: $(printf '%s' "$DCK_SKIP_NAMES" | tr '\n' ' ')) — the installed-script derivation is guessing"
+# A floor, not an equality. `-eq 1` was right while exactly one script was skipped and was itself
+# the thing that went red when the second one was added correctly — the count of skips is not the
+# invariant, the extraction having found any at all is. Zero means the pattern stopped matching and
+# every number below is then wrong in the direction that reads as green.
+[ "$DCK_SKIPPED"       -ge 1 ] || DCK_DERIVATION="install.sh's script-skip pattern matched nothing — the installed-script derivation is guessing"
 assert_eq "ok" "$DCK_DERIVATION" \
   "the hook and script counts are derived from a tree that actually has hooks and scripts in it"
 
@@ -961,7 +966,7 @@ assert_eq "0" "$(printf '%s' "$DCK_TRACKING_GONE" | grep -c . || true)" \
 # docs/ARCHITECTURE.md   "strict (12 cumulative"                       strict tier
 # docs/GETTING-STARTED.md "hooks/ 12 hooks + _lib.sh"                  total
 # docs/GETTING-STARTED.md "5 of them blocking"                         blocking
-# docs/GETTING-STARTED.md "repo has 7 scripts; an installed project has 6"  repo, installed
+# docs/GETTING-STARTED.md "repo has 8 scripts; an installed project has 6"  repo, installed
 # docs/GETTING-STARTED.md "6 of the 6 installed scripts are named"        named, installed
 # docs/HOOK-REFERENCE.md  "includes 12 hooks"                          total
 # docs/HOOK-REFERENCE.md  "standard profile 12 hooks"                  standard tier

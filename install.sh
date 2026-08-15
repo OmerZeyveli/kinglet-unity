@@ -281,6 +281,7 @@ NEW_PATHS=$(
       [ -f "$f" ] || continue
       b=$(basename "$f")
       [ "$b" = "check-provenance.sh" ] && continue
+      [ "$b" = "codex-probe.sh" ] && continue
       printf '.claude/%s/%s\n' "$group" "$b"
     done
   done
@@ -1274,6 +1275,20 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 # ever report `err provenance.tsv not found` and exit 1 — and a permanently failing check trains
 # people to ignore checks, which costs more than the script is worth.
 #
+# codex-probe.sh joined it on 2026-08-15, by the same reasoning plus one of its own. It measures
+# THIS repository against Codex CLI: its default --out is docs/research/codex-client/evidence, which
+# does not ship, and its prompts are Kinglet's own surfaces. A user project has nothing for it to
+# measure. The reason of its own is that it copies ~/.codex/auth.json into a disposable CODEX_HOME —
+# correct in a harness the toolkit's maintainers run deliberately, and not something to hand every
+# installed project a copy of. Both skips use the identical one-name-per-line comparison form on
+# purpose: tests/test-derived-counts.sh and tests/test-shipped-citations.sh both extract the skipped
+# names from these lines by matching that exact shape, and derive the installed-script set from
+# them — so a skip written any other way (a `case` list, a loop over an array) would make those
+# derivations silently disagree with this loop. This sentence deliberately does not quote the shape
+# it is describing: the extractor is a plain grep over this whole file, and a comment that spells
+# the pattern out is itself extracted, which is how a third "skipped script" named `NAME` appeared
+# in the count on the first attempt at this paragraph.
+#
 # Measured 2026-08-04: that argument was applied to one script and not to the class it describes.
 # Running the shipped suite in a real installed project gives **143 failures out of 229 assertions**,
 # and it always has. Two independent causes:
@@ -1329,6 +1344,7 @@ for group in scripts; do
     [ -f "$f" ] || continue
     b=$(basename "$f")
     [ "$b" = "check-provenance.sh" ] && continue
+    [ "$b" = "codex-probe.sh" ] && continue
     dest="$CLAUDE_DIR/$group/$b"
     if is_modified ".claude/$group/$b"; then
       # Kept, so counted as kept: WRITTEN and KEPT both appear in the summary line, and a kept file

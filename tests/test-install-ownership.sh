@@ -844,8 +844,9 @@ assert_gone "$G_ODD" "$G_UNTOUCHED2" "G (unreadable origin, a well-formed toolki
 #
 # WHAT STATE H CANNOT SEE
 #   * Two of the scripts install.sh ships, in one arrangement. How many it ships is not written
-#     here on purpose — the shipped set is `scripts/*.sh` less `check-provenance.sh`, so derive it
-#     (`ls scripts/*.sh | grep -vc check-provenance`). This line carried the number until
+#     here on purpose — the shipped set is `scripts/*.sh` less the names install.sh skips
+#     (`check-provenance.sh` and, since 2026-08-15, `codex-probe.sh`), so derive it
+#     (`ls scripts/*.sh | grep -cvE 'check-provenance|codex-probe'`). This line carried the number until
 #     2026-08-13: it said "nine" from the day Task 1 wrote it, Task 5's detect-pipeline.sh made that
 #     ten without revisiting the sentence, and nothing in the suite watches a script count, so the
 #     next script to join will do it again. A fix keyed on the two names together, or on "the first

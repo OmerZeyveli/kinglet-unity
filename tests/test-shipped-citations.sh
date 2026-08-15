@@ -19,8 +19,12 @@ pass() { printf 'PASS: %s\n' "$1"; }
 
 # The installed payload, derived the way install.sh derives it — not hardcoded. install.sh's
 # PAYLOAD_FILES assignment takes every file under .claude/ except state/, and its `for group in
-# scripts` copy loop copies scripts/*.sh into .claude/scripts/ with exactly one exclusion,
-# check-provenance.sh. A hardcoded list goes stale the first time the payload changes.
+# scripts` copy loop copies scripts/*.sh into .claude/scripts/ minus a short exclusion list
+# (check-provenance.sh, and codex-probe.sh since 2026-08-15). A hardcoded list goes stale the first
+# time the payload changes — this one held ONE name and went stale the day the second was added, so
+# the names are now read out of install.sh by the same pattern tests/test-derived-counts.sh uses.
+# If that extraction ever matches nothing the payload comes out too LARGE, and this file's rule 3
+# then demands a shipped surface name a script that does not ship: loud, not silent.
 #
 # Cited by anchor, not by line. This comment read `install.sh:175` and `:379-390` and the second half
 # rotted three commits later inside the wave that wrote it: a 29-line insertion higher up in
@@ -29,13 +33,21 @@ pass() { printf 'PASS: %s\n' "$1"; }
 # had listed this exact citation as rot-prone and "measured true today" — a line number cannot be
 # made durable by checking it. An anchor survives an insertion; find them with:
 #   grep -n 'PAYLOAD_FILES=\|for group in scripts' install.sh
+# `|| true` on the ASSIGNMENT, not inside the pipeline: grep exits 1 when it matches nothing, and
+# under pipefail that would kill this file before the fallback below could report anything.
+INSTALL_SKIP_NAMES="$(/usr/bin/grep -oE '\[ "\$b" = "[^"]+" \] && continue' "$REPO/install.sh" \
+                      | sed 's/.*= "//; s/" \].*//' | sort -u)" || true
 payload_paths() {
   ( cd "$REPO/.claude" && find . -type f ! -path './state/*' | sed 's|^\./|.claude/|' )
   for f in "$REPO"/scripts/*.sh; do
     [ -f "$f" ] || continue
     b="$(basename "$f")"
     # `[ x = y ] && continue` as the last command in a loop body exits 1 under set -e. Use if/then.
-    if [ "$b" = "check-provenance.sh" ]; then continue; fi
+    case "
+$INSTALL_SKIP_NAMES
+" in *"
+$b
+"*) continue ;; esac
     printf '.claude/scripts/%s\n' "$b"
   done
 }
