@@ -16,6 +16,10 @@ FAILURES=0
 # indistinguishable from a file that did not run, which is a failure mode this suite has had.
 fail() { printf 'FAIL: %s\n' "$1"; FAILURES=$((FAILURES + 1)); }
 pass() { printf 'PASS: %s\n' "$1"; }
+# SKIP:, for a check whose subject is legitimately absent from a fresh clone. The runner counts a
+# SKIP line and carries its message into the `skips by reason` census; anything else — a `note:`, a
+# silent `continue` — subtracts an assertion from the suite's total for one reader and not another.
+skip() { printf 'SKIP: %s\n' "$1"; }
 
 # 1. The checker must accept origin=superpowers.
 haystack="$(cat "$REPO/scripts/check-provenance.sh")"
@@ -922,6 +926,15 @@ done <<< "$sp_stale_files"
 # fresh one — which is why 7c compares against the pin rather than the file. When the file IS there,
 # say so either way rather than skipping silently: a line that appears only on success is
 # indistinguishable from a check that never ran.
+#
+# The absent branch printed `note:`, which the runner counts as nothing at all, and that is a
+# stronger version of the same defect this block's own comment names. Measured 2026-08-15 at
+# 21d37c0, same host, minutes apart: this working checkout `Total: 3543 … Skipped: 3`, a fresh
+# `git clone --no-hardlinks --shared` of it `Total: 3542 … Skipped: 22`. The 19 are python probe
+# tests that skip and are therefore still counted; the missing ONE is this line, an assertion that
+# neither passed nor skipped and so left the suite's own size looking different to a second reader.
+# SKIP, not note: a skip is counted, carries its reason into the runner's `skips by reason` census,
+# and keeps Total a measure of the suite rather than of whose working copy it ran in.
 sp_upstream_license="$REPO/.research/superpowers/LICENSE"
 if [ -f "$sp_upstream_license" ]; then
   if [ "$(cat "$sp_upstream_license")" = "$sp_license_expected" ]; then
@@ -930,7 +943,7 @@ if [ -f "$sp_upstream_license" ]; then
     fail "the pinned MIT text differs from .research/superpowers/LICENSE — the upstream notice changed, or the pin was mistyped"
   fi
 else
-  printf 'note: %s\n' ".research/superpowers/LICENSE is absent (gitignored working copy), so the pinned MIT text was not cross-checked against upstream this run"
+  skip ".research/superpowers/LICENSE is absent (gitignored working copy), so the pinned MIT text was not cross-checked against upstream this run"
 fi
 
 # ── 8. The shipped notice enumerates every original file, and does it without a count ────────────

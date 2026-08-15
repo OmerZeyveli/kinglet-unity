@@ -55,6 +55,37 @@
 # person who changes this arithmetic: re-run that sweep, and update whatever it finds in the same
 # commit. Do not answer it by writing a number down here — CLAUDE.md forbids exactly that, because a
 # hardcoded expected total is itself a claim that goes stale.
+#
+# WHAT `Skipped` MEANS, AND WHY NO TOTAL HERE IS A GATE (2026-08-15).
+#
+# Two runs of this suite at 21d37c0, minutes apart, on one host, both green, both right:
+#
+#   this working checkout        Total: 3543  Passed: 3540  Failed: 0  Skipped: 3
+#   a fresh clone of it          Total: 3542  Passed: 3520  Failed: 0  Skipped: 22
+#
+# 19 python tests are gated on `spikes/platform/clients/probe-host/dist/`, an untracked gitignored
+# build artifact: they RUN for whoever built the probe and SKIP for everyone else. One shell
+# assertion was gated the same way on `.research/superpowers/LICENSE` and printed a bare `note:`
+# instead of a skip, which is why Total itself moved by one. The previous wave gated sixteen units of
+# work on `Skipped: 3` — a figure no second reader can obtain. A figure a second reader cannot
+# reproduce is not a gate.
+#
+# Those two lines are pinned to that commit as the record of the defect. NOTHING compares against
+# them and nothing may — see the paragraph above; they are a measurement, not an expectation.
+#
+# What a second reader compares instead is the `skips by reason` census printed under the summary.
+# It is derived from the run — each skip's own reason text, counted — so the fresh clone's report
+# carries a line reading `probe binary not built` and this checkout's does not. The difference
+# between two environments becomes a labelled line rather than an unexplained integer, and a change
+# in the SET of reasons is visible to a reader who has pinned no absolute anywhere.
+#
+# THE INVARIANT THIS BUYS, AND THE ONE TO PROTECT. A skipped test still counts in Total — unittest
+# counts skips in `Ran N`, and the shell path counts a SKIP line — so Total measures the size of the
+# suite and the environment lives entirely in the Passed/Skipped split. An assertion that neither
+# passes nor skips is what breaks it, silently, by moving Total instead; that is the `note:` this
+# commit converted to a SKIP in tests/test-provenance-origins.sh. Measured at 21d37c0 after both
+# changes: the two environments above report the SAME Total, differing only in the split. If you add
+# a check that can be absent, make it skip — do not let it vanish.
 # ============================================================================
 
 set -euo pipefail
@@ -88,6 +119,10 @@ SKIP=0
 # were the same number to this runner until 2026-08-14.
 PY_RESULTS=0
 PY_SUITES=0
+# Every skip's reason text, one per line, accumulated across files. A plain variable and not a temp
+# file: the loop below runs in THIS shell (only each test file gets a subshell), so nothing is lost,
+# and there is no artifact to clean up on a killed run.
+SKIP_REASONS=""
 CURRENT_TEST_FILE=""
 
 # --- Assertion Helpers ---
@@ -318,6 +353,39 @@ for test_file in "${test_files[@]}"; do
     file_fail=$(echo "$test_plain" | grep -cE '(^|[[:space:]])FAIL(:|[[:space:]])' || true)
     file_skip=$(echo "$test_plain" | grep -cE '(^|[[:space:]])SKIP(:|[[:space:]])' || true)
 
+    # --- and every skip's REASON, for the census under the summary ------------
+    #
+    # The shell arm uses the SAME regex as file_skip above, character for character, so the census
+    # and the count cannot disagree about what a skip is; the python arm reads unittest's own verbose
+    # `... skipped 'reason'` line. When the two arms harvest fewer reasons than file_skip counted,
+    # the summary says so rather than printing a census that quietly under-reports.
+    #
+    # One awk pass over a here-string: no reader here can exit before its writer is done. The single
+    # quote is built with sprintf rather than written, because this program is itself single-quoted.
+    file_reasons=$(awk '
+        BEGIN { q = sprintf("%c", 39) }
+        {
+            if (match($0, /\.\.\.[[:space:]]+skipped[[:space:]]/)) {
+                reason = substr($0, RSTART + RLENGTH)
+            } else if (match($0, /(^|[[:space:]])SKIP(:|[[:space:]])/)) {
+                reason = substr($0, RSTART + RLENGTH)
+            } else {
+                next
+            }
+            sub(/^[[:space:]]+/, "", reason)
+            sub(/[[:space:]]+$/, "", reason)
+            if (substr(reason, 1, 1) == q || substr(reason, 1, 1) == "\"") { reason = substr(reason, 2) }
+            n = length(reason)
+            if (n > 0 && (substr(reason, n, 1) == q || substr(reason, n, 1) == "\"")) { reason = substr(reason, 1, n - 1) }
+            if (reason == "") { reason = "(skipped, no reason given)" }
+            print reason
+        }
+    ' <<< "$test_plain")
+    if [ -n "$file_reasons" ]; then
+        SKIP_REASONS="${SKIP_REASONS}${file_reasons}
+"
+    fi
+
     # --- unittest's own vocabulary, read in ONE awk pass ---------------------
     #
     # One pass, a here-string, and no reader that can stop early: `grep -q`/`head` on the write end
@@ -404,6 +472,28 @@ echo -e "Total: ${TOTAL}  ${GREEN}Passed: ${PASS}${NC}  ${RED}Failed: ${FAIL}${N
 # only sees Total move cannot tell a python suite that shrank from a shell assertion that was deleted.
 # Derived from the run, never written down: CLAUDE.md forbids a hardcoded expected count here.
 echo -e "  of which ${CYAN}${PY_RESULTS}${NC} result(s) came from ${PY_SUITES} python suite(s)"
+
+# --- Skips, by reason ---
+#
+# Printed on EVERY run, including runs with nothing to show, because the asymmetry is the whole
+# point: the reader whose host happens to satisfy every gate is exactly the reader whose Skipped
+# figure nobody else can reproduce, and a block that appears only when something skipped would say
+# nothing to them. See the header for the two green runs that differed by 19.
+SKIP_ATTRIBUTED=$(printf '%s\n' "$SKIP_REASONS" | awk 'NF { n++ } END { print n + 0 }')
+SKIP_CENSUS=$(printf '%s\n' "$SKIP_REASONS" \
+    | awk 'NF { c[$0]++ } END { for (r in c) printf "      %4d  %s\n", c[r], r }' \
+    | sort -k1,1rn -k2)
+echo -e "  ${YELLOW}skips by reason${NC} — environment-dependent. Another host, or a clone without this"
+echo    "  checkout's untracked artifacts, skips a different set: two readers compare THESE lines,"
+echo    "  not the totals above."
+if [ -n "$SKIP_CENSUS" ]; then
+    printf '%s\n' "$SKIP_CENSUS"
+elif [ "$SKIP" -eq 0 ]; then
+    echo "      (nothing skipped here — a fact about this environment, not about the suite)"
+fi
+if [ "$SKIP_ATTRIBUTED" -ne "$SKIP" ]; then
+    echo -e "      ${RED}census read ${SKIP_ATTRIBUTED} reason(s) against a skipped count of ${SKIP}${NC} — a skip whose message this harvest cannot read is missing from the lines above"
+fi
 echo "========================================"
 
 if [ "$FAIL" -gt 0 ]; then
