@@ -197,7 +197,7 @@ silently answers **for the app-server's own working directory**:
 | `hooks/list` with `cwd` | `/home/riive/…/kinglet-unity` (**wrong repo**) | 0 hooks |
 | `hooks/list` with `cwds` | `<replica>` | 12 hooks |
 | `skills/list` with `cwd` | `/home/riive/…/kinglet-unity` (**wrong repo**) | 6 skills |
-| `skills/list` with `cwds` | `<replica>` | 24 skills |
+| `skills/list` with `cwds` | `<replica>` | 24 skills, **of which 18 repo-scope** |
 
 A well-formed answer for the wrong repository is worse than an error: the `cwd`
 form would let a reader "confirm" every hook finding below against a tree that
@@ -380,9 +380,21 @@ not distinguish a path from a product name:
   the rewritten class is the 30 Markdown/TOML files under `.agents/` and `.codex/`
   plus `AGENTS.md`.
 
-  It reconciles source-side: that class holds **85** `.claude/` references before
-  the import, of which **30** are `.claude/rules/`; 84 were rewritten and exactly 1
-  `.claude/rules/` reference survived un-rewritten.
+  **The ledger.** Each figure is labelled with the side it is counted on —
+  *source* means the `.claude/` files before the import, *output* means the imported
+  tree after it. That labelling is what would have prevented the misattribution
+  above.
+
+  ```
+  source  85 refs in the md/toml class  =  output 84 rewritten to .Codex/  +  output  1 surviving .claude/
+  source  30 of those are rules refs    =  output 29 rewritten             +  output  1 surviving
+                                           output 22 survivors total       =  that 1  +  21 in the .sh copies
+  ```
+
+  `84 + 22 = 106` only *looks* impossible against a source of 85: **21 of the 22
+  survivors live in a different file class** — the 13 copied hook scripts, which the
+  substitution never touches (`.Codex/` occurs in them **0** times). Those 21 were
+  never inside the 85.
 - `everything-claude-unity` → `everything-Codex-unity`, `Claude-Code-Game-Studios`
   → `Codex-Game-Studios` — upstream project names, now wrong.
 - `scripts/generate-claude-md.sh` → `scripts/generate-Codex-md.sh` — a real script
@@ -412,10 +424,13 @@ wrong repository:
 
 Measured with `skills/list` and `hooks/list` against the imported replica:
 
-- **Skills load.** `skills/list` returns 24: Kinglet's 16, the 2 migrated commands,
-  and 6 Codex built-ins (`imagegen`, `openai-docs`, `plugin-creator`,
-  `review-agent`, `skill-creator`, `skill-installer`). Each Kinglet entry is
-  `"scope":"repo","enabled":true`.
+- **Skills load: 18 at `scope:"repo"`** — Kinglet's 16 plus the 2 migrated commands,
+  every one `"enabled":true`. **Quote the 18, not the total.** The total is not
+  stable and must not be relied on: this run saw 24 (18 repo + 6 built-ins named
+  `imagegen`, `openai-docs`, `plugin-creator`, `review-agent`, `skill-creator`,
+  `skill-installer`), while a second measurement on another disposable home saw 59,
+  the extra 35 being `user`-scope skills the app server fetched over the network
+  into a home that started empty. Only the repo-scope 18 is a fact about Kinglet.
 - **Hooks load only after the project is trusted.** Before trust, `hooks/list`
   returns `{"hooks":[],"warnings":[],"errors":[]}` and stderr says: *"Project-local
   config, hooks, and exec policies are disabled in the following folders until the
@@ -505,21 +520,118 @@ stderr showed `hook: PreToolUse` ×4 and `hook: PreToolUse Completed` ×4, and
 `Edit|Write` and the empty matcher, and a shell command, which matched `Bash` and
 the empty matcher.
 
-**Codex presents its tools to hook matchers under Claude Code's tool names.** The
-literal `shell` matcher not firing is the discriminating half — it rules out "the
-matcher is ignored" and "everything matches everything". Kinglet's shipped matchers
-therefore do not need translation. This is a Task 4 result reached early because the
-timeout probe had already built the rig; it is recorded here rather than expanded,
-and it does **not** settle the block protocol.
+**Codex accepts Claude Code's tool names as matcher aliases.** The literal `shell`
+matcher not firing is the discriminating half — it rules out "the matcher is
+ignored" and "everything matches everything". Kinglet ships exactly two tool-name
+matchers, `Edit|Write` and `Bash` (derived from `.claude/settings.json`, covering 9
+of its 12 hook entries), and both are in the fired set, so **matchers need no
+translation**.
 
-**What remains unmeasured, and is handed to Task 4:** whether a hook can actually
-*veto* a tool call, and by what protocol. The schema offers the vocabulary —
-`HookRunStatus` includes `blocked` and `stopped`, and `HookOutputEntryKind` includes
-`stop`, `feedback`, `context`, `warning`, `error` — but nothing here exercised it, so
-the block protocol is an open question, not a finding. `HookEventName`'s full enum,
-for whoever picks that up: `preToolUse, permissionRequest, postToolUse, preCompact,
-postCompact, sessionStart, sessionEnd, userPromptSubmit, subagentStart, subagentStop,
-stop`.
+**That is true of matching and it is not the whole story. Read the next section
+before drawing any conclusion about Kinglet's hooks** — the tool *name* a matcher
+sees and the tool *payload* a hook parses are two different vocabularies, and only
+the first one is Claude Code's.
+
+### Codex's file tool is `apply_patch`, and its `tool_input` is a patch envelope
+
+The matcher aliases hide a different payload underneath. An empty-matcher
+`preToolUse` hook that dumps its stdin was registered, and the model was driven
+through three kinds of turn.
+
+```bash
+# .codex/hooks.json: one PreToolUse entry, matcher "", command -> dump.sh
+# dump.sh:  cat > "dumps/payload-$(date +%s%N).json"
+CODEX_HOME="$PROBE_HOME" codex exec --dangerously-bypass-hook-trust \
+  --sandbox workspace-write -C "$T" \
+  "Edit the existing file Assets/Scenes/Main.unity: change the m_Name value to Controlled." < /dev/null
+```
+
+Captured, for **editing an existing file**:
+
+```json
+{ "hook_event_name": "PreToolUse",
+  "tool_name": "apply_patch",
+  "tool_input": { "command": "*** Begin Patch\n*** Update File: Assets/Scenes/Main.unity\n@@\n-  m_Name: Main\n+  m_Name: Controlled\n*** End Patch" },
+  "cwd": "…", "session_id": "…", "tool_use_id": "…", "turn_id": "…",
+  "model": "…", "permission_mode": "…", "transcript_path": "…" }
+```
+
+and for **creating a new file**, the same single-key shape with a different verb:
+
+```
+"command": "*** Begin Patch\n*** Add File: Assets/Scenes/Second.unity\n+m_Name: Second\n*** End Patch"
+```
+
+For a **shell** turn the payload is Claude Code's shape exactly —
+`"tool_name": "Bash"`, `"tool_input": {"command": "…"}`.
+
+So `tool_input` for the file tool carries **one key, `command`**, holding a patch
+envelope. There is **no `file_path`, no `new_string`, no `old_string`, no
+`content`.** (Incidentally the path form is not even consistent between the two
+verbs: `Update File:` carried an absolute path in one capture and a relative one in
+another, while `Add File:` was relative.)
+
+**The control that makes the negative mean something.** The same hook, the same
+edit to the same file, run twice with only the payload *shape* changed:
+
+```bash
+bash .claude/hooks/block-scene-edit.sh < claude-shape-payload.json
+bash .claude/hooks/block-scene-edit.sh < real-codex-payload.json   # captured above
+```
+
+| stdin | exit | bytes |
+|---|---|---|
+| Claude Code shape (`tool_input.file_path = Assets/Scenes/Main.unity`) | **2** | **412** — blocks, as designed |
+| real Codex `apply_patch` payload, same edit, same file | **0** | **0** — does nothing |
+
+The hook is not broken; the payload is different.
+
+**Criterion for the class below.** A tool-event hook is *inert under Codex* iff,
+given a real `apply_patch` payload for an edit that makes its Claude-shaped control
+act, it takes no action — where "action" is non-zero exit, any output, or any state
+written. Applied to every tool-event entry in `.claude/settings.json`, each hook
+paired against its own control:
+
+| Hook | Claude-shape control | real Codex payload | |
+|---|---|---|---|
+| `block-scene-edit` | exit 2, 412 B | exit 0, 0 B | INERT |
+| `block-meta-edit` | exit 2, 360 B | exit 0, 0 B | INERT |
+| `block-legacy-input` | exit 2, 769 B | exit 0, 0 B | INERT |
+| `guard-project-config` | exit 2, 267 B | exit 0, 0 B | INERT |
+| `warn-serialization` | exit 0, 392 B | exit 0, 0 B | INERT |
+| `warn-filename` | exit 0, 309 B | exit 0, 0 B | INERT |
+| `warn-platform-defines` | exit 0, 430 B | exit 0, 0 B | INERT |
+| `track-edits` | writes `session-edits.txt`, 1 line | **file not created** | INERT |
+| `bash-gate` | — reads `.tool_input.command` — | exit 2, 1363 B | **survives** |
+
+**8 of the 9 tool-event hooks match, run, and do nothing.** `track-edits` needed its
+state file measured rather than its stdout, since it writes no output either way.
+`bash-gate` survives because `command` is the one field Codex supplies, and it is
+live rather than vacuously passing: fed a real captured Codex `Bash` envelope it
+exits 0 on a benign read command and exits 2 with 1363 bytes when the command is one
+it targets.
+
+The remaining 3 of Kinglet's 12 hooks (`session-restore`, `session-brief`,
+`session-save`) are not tool events and are untouched by this.
+
+The break is entirely in `tool_input`: **no Kinglet hook reads `tool_name` at all**
+— it appears once in the whole hook directory, in a comment in `block-scene-edit.sh`.
+
+**What this does and does not mean.** It does **not** mean the hooks fail to
+register — all 12 register, `warnings: []`. It does **not** mean matchers are broken
+— they match, measured above. It means the payload schema is where the port breaks,
+one level below where a matcher test looks. A reader who takes either of the first
+two away from this section has been misled by framing rather than by facts.
+
+### What remains unmeasured, and is handed to Task 4
+
+Whether a hook can actually *veto* a tool call, and by what protocol. The schema
+offers the vocabulary — `HookRunStatus` includes `blocked` and `stopped`, and
+`HookOutputEntryKind` includes `stop`, `feedback`, `context`, `warning`, `error` —
+but nothing here exercised it, so the block protocol is an open question, not a
+finding. `HookEventName`'s full enum, for whoever picks that up: `preToolUse,
+permissionRequest, postToolUse, preCompact, postCompact, sessionStart, sessionEnd,
+userPromptSubmit, subagentStart, subagentStop, stop`.
 
 Note also that every hook above ran only because `--dangerously-bypass-hook-trust`
 was passed; hooks registered as `trustStatus: "untrusted"` and nothing in this
@@ -548,12 +660,20 @@ Whether a Codex subagent can be granted MCP tools at all is unmeasured here.
 but it cannot be the port. It carries skills and agents across usefully, it
 produces the `.codex/hooks.json` that Task 3 was to discover, it proves the target
 layout (`.agents/skills/`, `.codex/agents/*.toml`, `.codex/hooks.json`,
-`AGENTS.md`), and — measured above — the hooks it writes really do fire with
-Kinglet's own matchers. Against that, it silently drops 7 of 9 commands, never
-migrates the rules layer at all, rewrites 84 `.claude/` path references to a
-non-existent `.Codex/` (29 of them `.Codex/rules/`), and strips every agent's tool
-grants — all while reporting 31 successes and zero failures. A Kinglet user who runs
-the importer gets a configuration that looks complete and is not. The wave's
-remaining tasks stand; what changes is that Tasks 5 and 6 now start from a measured
-baseline instead of an open question, and that Kinglet has a positive reason to ship
-its own Codex layout rather than tell users to import.
+`AGENTS.md`), and — measured above — the hooks it writes register and fire with
+Kinglet's own matchers untranslated.
+
+Against that: it silently drops 7 of 9 commands, never migrates the rules layer at
+all, rewrites 84 `.claude/` path references to a non-existent `.Codex/` (29 of them
+`.Codex/rules/`), strips every agent's tool grants, and — the one that survives all
+the way to runtime — hands the hooks a `tool_input` none of them can read, so 8 of 9
+tool-event hooks fire and do nothing. All of it while reporting 31 successes and
+zero failures.
+
+A Kinglet user who runs the importer gets a configuration that looks complete, and
+whose hooks look live in `hooks/list`, and which does not enforce a single one of
+the file-level rules those hooks exist to enforce. That is the strongest argument in
+this document for Kinglet shipping its own Codex layout rather than telling users to
+import. The wave's remaining tasks stand; what changes is that Tasks 5 and 6 start
+from a measured baseline, and that Task 4's real work is rewriting hook bodies
+against the `apply_patch` envelope, not translating matchers.
