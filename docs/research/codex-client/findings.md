@@ -90,10 +90,21 @@ Three things prevent it, and all three are load-bearing:
 1. **`set -e` is deliberately not set** in the shim. Errexit there converts a bug
    into a silent allow.
 2. **An EXIT trap converts every status that is neither 0 nor 2 into a 2 with a
-   message on stderr** — unbound variable, missing `jq`, a signal, a `return`
-   nobody checked.
-3. **Nothing exits 2 without writing stderr**, including on behalf of a wrapped
-   hook that refused in silence.
+   message** — unbound variable, missing `jq`, a `return` nobody checked.
+3. **Explicit arms for `TERM`, `INT`, `HUP` and `PIPE`.** This list said "a
+   signal" under item 2 and that was **false when written**: the EXIT arm alone
+   left a signalled shim at 143/130/129/141 with an *empty* stderr, which is the
+   measured silent-allow class. It is reachable by what Kinglet itself emits —
+   Codex enforces `timeoutSec` by killing the hook from outside — and by any
+   Ctrl-C (`SIGINT`) or closed terminal (`SIGHUP`). Fixed and asserted; see
+   "The timeout unit" below for the ordering that keeps it from arising, and
+   the residual for what stays uncovered.
+4. **Nothing exits 2 without writing a reason**, including on behalf of a wrapped
+   hook that refused in silence. Refusals go to a descriptor duplicated from the
+   real stderr before any redirection exists to inherit: bash runs a trap inside
+   the redirection context of the command it interrupted, so a refusal written to
+   plain `>&2` while the shim was blocked in a redirected `wait` went to
+   `/dev/null` — the trap ran, only its message was lost.
 
 Every shape below is asserted in `tests/test-codex-shim.sh`, each on **both**
 halves of the criterion — status `2` **and** non-empty stderr — because asserting
@@ -101,8 +112,13 @@ the status alone would pass a silent refusal, which is an allow. Count them from
 the file rather than from a number here:
 
 ```bash
-/usr/bin/grep -c '^refuses ' tests/test-codex-shim.sh
+/usr/bin/grep -cE '^(refuses |  fail "SIG|  pass "SIG|  pass "refused)' tests/test-codex-shim.sh
 ```
+
+(The jq-missing and signal rows are hand-rolled rather than `refuses` calls,
+because each needs a bespoke environment; counting only `refuses` undercounts the
+table it heads, which is how three documents came to quote three different
+totals.)
 
 | Fed to the shim | Result |
 |---|---|
@@ -116,6 +132,10 @@ the file rather than from a number here:
 | `jq` absent from `PATH` | refused |
 | a wrapped hook blocking via `decision:block` JSON on stdout | refused — Codex's other legal protocol, forwarded rather than collected as advice |
 | a `decision:block` with an **empty** `reason` | refused — Codex ignores that shape and says nothing, so forwarding it would be a silent allow |
+| the shim itself killed by `SIGTERM` / `SIGINT` / `SIGHUP` / `SIGPIPE` | refused — was 143/130/129/141 with 0 bytes, a silent allow |
+| a path walking out of an exempted directory (`Assets/Extensions/../Scripts/X.cs`) | refused — was rc 0, 0 bytes |
+| a header the parser does not recognise, hiding behind a valid file | refused — was rc 0 |
+| a header padded with a trailing space or tab | refused — was rc 0; `*.unity ` is not `*.unity` |
 
 ### The timeout unit — fixed, not merely named
 
@@ -154,11 +174,45 @@ events: {'preToolUse': 5, 'postToolUse': 4, 'sessionStart': 2, 'stop': 1}
 timeoutSec values: [2, 3, 5]
 ```
 
-**Fixed a second time, independently, because the shim does not own that file.**
-The shim carries its own per-invocation watchdog (default 15 s,
-`KINGLET_CODEX_HOOK_TIMEOUT`), and expiry **refuses** — a gate that did not finish
-has approved nothing. `timeout(1)` is GNU coreutils and absent on a stock macOS
-host, so the watchdog is a background killer, which works on bash 3.2.
+**And the two ceilings are ORDERED, which the first version got wrong.** The shim
+carries its own per-invocation watchdog whose expiry **refuses** — a gate that did
+not finish has approved nothing — and `--emit-config` now passes it explicitly:
+
+| | value | why |
+|---|---|---|
+| shim `--timeout` | `ceil(ms/1000)` | exactly the budget `settings.json` declares |
+| Codex `timeout` | `ceil(ms/1000) + 1` | one second of margin, so the shim always reports first |
+
+The margin is added to Codex's number rather than subtracted from the shim's, so a
+hook never silently loses budget it was declared with; subtracting would turn
+`timeout: 2000` into a one-second hook.
+
+**The ordering is load-bearing, and that is measured rather than argued.** Two live
+runs, same never-finishing hook, differing only in which ceiling fires first
+(`codex-facts.md`, "A hook Codex times out is a silent ALLOW"):
+
+| Which ceiling stops the hook | `file_change` | the file | model told |
+|---|---|---|---|
+| the shim's own watchdog at 3 s (Codex's is 4 s) | **0** | **ABSENT** | verbatim refusal |
+| Codex's `timeoutSec`, shim watchdog disabled | **1** | **PRESENT** | *nothing* |
+
+A hook Codex stops waiting for is a **silent allow**. So the one second of margin
+is not tidiness: it is the whole difference between a hung hook refusing and a hung
+hook waving an unchecked edit through.
+
+**The first version emitted the bare conversion and passed no `--timeout` at all**,
+leaving the shim on its 15 s default underneath a 2–5 s Codex ceiling. The shim's
+watchdog could therefore *never* fire: every hook that outran the budget was killed
+from outside by Codex — a signal, which at that point was a silent allow. Two
+ceilings that cannot be ordered are one ceiling and a decoration, and the
+"independent second mechanism" this paragraph used to claim was unreachable in the
+shipped composition. The ordering is now asserted per entry.
+
+`timeout(1)` is GNU coreutils and absent on a stock macOS host, so the watchdog is
+a background killer, which works on bash 3.2. Its `sleep` is given a closed copy of
+the refusal descriptor: killing the killer does not kill the `sleep` it is blocked
+in, and while that orphan held the descriptor open it held the *caller's* pipe open
+for the full timeout on every invocation.
 
 ### Per-hook verdict
 
@@ -285,8 +339,8 @@ whole file. Three hooks reason over content and can therefore see less than they
 would under Claude Code:
 
 - **`block-legacy-input`** exempts legacy input that is properly guarded, by looking
-  for `#if ENABLE_LEGACY_INPUT_MANAGER` **and** `ENABLE_INPUT_SYSTEM` in the same
-  content. A hunk that edits one line inside an already-guarded block shows neither,
+  for `#if ENABLE_LEGACY_INPUT_MANAGER` **or** `#if UNITY_EDITOR` — both spellings
+  are accepted by its regex — **and** `ENABLE_INPUT_SYSTEM` in the same content. A hunk that edits one line inside an already-guarded block shows neither,
   so the edit is refused. The user retries with more context, or switches the hook
   off for that call.
 - **`warn-platform-defines`** counts `#if` against `#else` in the content. A hunk
@@ -319,6 +373,14 @@ registered hooks, matching matchers, and not a single file-level rule enforced.
 
 `--dangerously-bypass-hook-trust` is a measurement instrument and must never appear
 in anything Kinglet tells a user to run. Nothing in this section needed it.
+
+**Two named limitations of the generator, before an installer builds on it.**
+`--emit-config` single-quotes paths without escaping, so a project path containing
+a `'` produces a broken `hooks.json` entry; Codex's own importer has the same shape,
+so this is parity rather than regression, but it should be validated or refused
+rather than emitted. And a shim killed with `SIGKILL` exits 137 with nothing, which
+Codex reads as an allow — nothing in a shell script can defend against that, and it
+is named here rather than left implied.
 
 **The honest residual:** step 3 writes the user's home directory, which Kinglet has
 never done. That needs consent, a backup, and a receipt entry — it is named here

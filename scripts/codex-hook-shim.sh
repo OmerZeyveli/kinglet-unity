@@ -46,14 +46,21 @@
 # an unlogged allow. A shim that dies on a malformed patch envelope therefore
 # fails OPEN, silently, forever.
 #
-# Three things defend against that, and all three are load-bearing:
+# Four things defend against that, and all four are load-bearing:
 #
 #   1. **`set -e` is deliberately NOT set.** Every fallible step is checked
 #      explicitly. Errexit here would convert a bug into a silent allow.
 #   2. **An EXIT trap converts every exit status that is neither 0 nor 2 into a
-#      2 with a message on stderr.** Unbound variable, missing interpreter,
-#      SIGPIPE, a `return` nobody checked — all of them land on a refusal.
-#   3. **Nothing exits 2 without writing stderr first.** `shim_block` is the
+#      2 with a message.** Unbound variable, missing interpreter, a `return`
+#      nobody checked — all of them land on a refusal.
+#   3. **Explicit arms for TERM, INT, HUP and PIPE**, because the EXIT arm does
+#      NOT cover them on its own. This list read "…SIGPIPE… all of them land on a
+#      refusal" while SIGPIPE measured exit 141 with an EMPTY stderr — a comment
+#      asserting a property its own subject did not have, on the one sentence a
+#      reader would rely on to conclude the timeout path was safe. The
+#      measurement, and why the signal path is reachable at all, are at the trap
+#      block below. SIGKILL stays uncovered and is named there.
+#   4. **Nothing exits 2 without writing a reason first.** `shim_block` is the
 #      only refusal path and it always writes. A hook that exits 2 in silence
 #      has a message supplied on its behalf, because its silence would be an
 #      allow.
@@ -91,11 +98,52 @@ SHIM_TMPDIR=""
 HOOK_LABEL="(unresolved)"
 
 # ---------------------------------------------------------------------------
+# A PRIVATE COPY OF THE REAL STDERR, AND IT IS NOT BELT-AND-BRACES.
+#
+# Measured: when a fatal signal arrives while bash is blocked in a REDIRECTED
+# command, the EXIT trap runs — but it runs inside that command's redirection
+# context, so a refusal written to `>&2` goes wherever that command's stderr
+# went. This script blocks in `wait "$rh_pid" >/dev/null 2>&1` for essentially
+# its whole life, so the refusal landed in /dev/null:
+#
+#   trap writes to >&2, killed during a redirected wait -> rc 143, 0 bytes
+#   the same trap writing to a FILE                      -> file written
+#
+# The trap was running the whole time; only its message was lost. Under Codex a
+# refusal nobody can read is not a refusal — exit 2 with an empty stderr is in
+# the measured silent-allow class. So the real stderr is duplicated ONCE, here,
+# before any redirection exists to inherit, and every refusal is written to that
+# descriptor instead. A fixed number rather than `{fd}>&2`, which is bash 4.1+
+# and this repository still targets bash 3.2 for the macOS pass.
+# ---------------------------------------------------------------------------
+exec 9>&2 || exec 9>/dev/null
+
+# ---------------------------------------------------------------------------
 # The fail-closed guard. Installed before ANY other work, including argument
 # parsing: a shim that dies while reading its own arguments must still refuse.
 #
 # Bash does not re-enter an EXIT trap from inside itself, so the `exit 2` below
 # is final.
+#
+# THE SIGNAL ARMS ARE LOAD-BEARING AND ARE NOT THE SAME AS THE EXIT ARM.
+# On a fatal signal with no handler installed, bash runs the EXIT trap and then
+# RE-RAISES the signal to die by it, so the trap's own `exit 2` is discarded and
+# the wait status stays 128+signo. Measured, killed at 1 s during a 30 s hook:
+#
+#   EXIT arm only            SIGTERM 143 / SIGINT 130 / SIGHUP 129 / SIGPIPE 141, 0 bytes each
+#   with these signal arms   exit 2 with a reason, every one
+#   control, same hook, its own --timeout 1   exit 2 with a reason
+#
+# The control is what makes those negatives mean something: the refusal path
+# worked all along; it was the signal path that was silent. And it is reachable
+# by what this script itself emits — Codex enforces `timeoutSec` from the config
+# `--emit-config` writes, so a hook that outruns it is killed from OUTSIDE, which
+# is precisely the row above. A user's Ctrl-C is SIGINT and a closed terminal is
+# SIGHUP; both land here too.
+#
+# SIGKILL cannot be trapped and is the named residual: a shim killed with -9
+# exits 137 with nothing, which Codex reads as an allow. Nothing in a shell
+# script can defend against that.
 # ---------------------------------------------------------------------------
 shim_cleanup() {
   if [ -n "$SHIM_TMPDIR" ] && [ -d "$SHIM_TMPDIR" ]; then
@@ -113,18 +161,34 @@ shim_guard() {
   # non-2 status is an unlogged allow, so it is converted here rather than
   # reported.
   printf 'BLOCKED: %s failed internally (exit %s) while normalising a tool payload for hook %s.\n' \
-    "$SHIM_NAME" "$shim_rc" "$HOOK_LABEL" >&2
-  printf '  The tool call is refused because the gate could not read it. A gate that cannot\n' >&2
-  printf '  read the payload cannot vouch for it, and under Codex an unreadable failure is\n' >&2
-  printf '  otherwise a silent allow.\n' >&2
+    "$SHIM_NAME" "$shim_rc" "$HOOK_LABEL" >&9
+  printf '  The tool call is refused because the gate could not read it. A gate that cannot\n' >&9
+  printf '  read the payload cannot vouch for it, and under Codex an unreadable failure is\n' >&9
+  printf '  otherwise a silent allow.\n' >&9
+  exit 2
+}
+
+shim_signal() {
+  shim_cleanup
+  printf 'BLOCKED: %s was terminated by SIG%s while checking a tool call for hook %s.\n' \
+    "$SHIM_NAME" "$1" "$HOOK_LABEL" >&9
+  printf '  Refusing: a gate that was stopped before it finished has approved nothing, and\n' >&9
+  printf '  under Codex a status other than 2 permits the call and reports nothing.\n' >&9
+  # `trap - EXIT` first: without it the EXIT arm runs after this one and sees
+  # $? = 2, which is harmless but makes the exit path harder to reason about.
+  trap - EXIT
   exit 2
 }
 trap shim_guard EXIT
+trap 'shim_signal TERM' TERM
+trap 'shim_signal INT'  INT
+trap 'shim_signal HUP'  HUP
+trap 'shim_signal PIPE' PIPE
 
-# The one refusal path. Always writes stderr, because `exit 2` in silence is an
-# allow under Codex.
+# The one refusal path. Always writes to the saved descriptor, because `exit 2`
+# in silence is an allow under Codex.
 shim_block() {
-  printf 'BLOCKED: %s\n' "$1" >&2
+  printf 'BLOCKED: %s\n' "$1" >&9
   exit 2
 }
 
@@ -212,6 +276,25 @@ SHIM_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SHIM_DIR=""
 # writes the Codex layout cannot get it wrong by omission. Ceiling division: a
 # sub-second timeout must not round down to 0, which Codex's schema accepts
 # (`minimum: 0`) and which would kill every hook instantly.
+#
+# THE TWO CEILINGS ARE ORDERED, NOT MERELY BOTH PRESENT. The hook gets exactly
+# its declared budget and the shim refuses at that point; Codex's ceiling is one
+# second later, purely as a backstop:
+#
+#   shim  --timeout N     where N = ceil(ms/1000), the budget settings.json declares
+#   Codex  timeout  N+1   so the shim always reports first
+#
+# The first draft emitted the bare conversion and passed no `--timeout` at all,
+# which left the shim on its 15 s default underneath a 2–5 s Codex ceiling — so
+# the shim's watchdog could never fire, and every hook that outran the ceiling
+# was killed from outside instead. That is the signal path the header above
+# measures, and it was reachable by ~110 files in one patch (the hook is spawned
+# once per file) or by a large enough envelope. Two mechanisms that cannot be
+# ordered are one mechanism and a decoration.
+#
+# The margin is added to CODEX's number rather than subtracted from the shim's,
+# so a hook never silently loses budget it was declared with: subtracting would
+# turn `timeout: 2000` into a one-second hook.
 # ===========================================================================
 if [ "$MODE" = "emit-config" ]; then
   # Config generation is not a gate. Refusing to emit is a build failure, not a
@@ -267,11 +350,14 @@ if [ "$MODE" = "emit-config" ]; then
                       hooks: [ .hooks[]
                         | (.command | sub("^\\./"; "")) as $rel
                         | ($root + "/" + $rel) as $abs
+                        | ceil_sec(.timeout // 0) as $budget
+                        | ($event == "PreToolUse" or $event == "PostToolUse") as $wrapped
                         | { type: "command",
-                            command: ( if ($event == "PreToolUse" or $event == "PostToolUse")
+                            command: ( if $wrapped
                                        then quoted($shim) + " --hook " + quoted($abs)
+                                            + " --timeout " + ($budget | tostring)
                                        else quoted($abs) end ),
-                            timeout: ceil_sec(.timeout // 0) } ] } ] ) ) }
+                            timeout: (if $wrapped then $budget + 1 else $budget end) } ] } ] ) ) }
   ' || { printf '%s: failed to derive hooks.json from %s\n' "$SHIM_NAME" "$SETTINGS" >&2; exit 1; }
   exit 0
 fi
@@ -375,12 +461,39 @@ if [ "$ROUTE" = "patch" ]; then
   PAYLOADS_FILE="$SHIM_TMPDIR/payloads.jsonl"
   printf '%s' "$PAYLOAD" | jq -c '
     def flush: if .cur == null then . else (.files += [.cur] | .cur = null) end;
-    def hdrval($p): ltrimstr($p) | rtrimstr("\r");
+
+    # Trailing whitespace, not just CR. A single trailing space defeated every
+    # suffix glob the hooks match on: `*.unity ` is not `*.unity`, so a scene
+    # edit went through unremarked. Every normalisation difference between this
+    # parser and Codex'"'"'s is a bypass, and this is the cheapest of the three.
+    def hdrval($p): ltrimstr($p) | sub("[ \t\r]+$"; "");
+
+    # RESOLVE `.` AND `..` TEXTUALLY. Joining without normalising let a path walk
+    # out of an exempted directory and back into a gated one while still MATCHING
+    # the exemption: `Assets/Extensions/../Scripts/Player.cs` carries the literal
+    # `/Assets/Extensions/` that block-legacy-input.sh skips as vendored, and
+    # lands on a first-party file. Measured before the fix: rc 0, 0 bytes, where
+    # the same content at `Assets/Scripts/Player.cs` refused with 884 bytes.
+    #
+    # Textual, not `realpath`: nothing here touches the filesystem, so there is
+    # no TOCTOU window between the check and the write, and no dependency on a
+    # GNU realpath that a macOS host does not ship. A leading `..` that would
+    # escape the root is kept rather than dropped — refusing to invent a parent
+    # is the fail-closed direction.
+    def normpath:
+      (split("/")) as $parts
+      | ($parts[0] == "") as $absolute
+      | reduce $parts[] as $seg ([];
+            if   $seg == "" or $seg == "." then .
+            elif $seg == ".." then (if (length > 0 and .[-1] != "..") then .[0:-1] else . + [$seg] end)
+            else . + [$seg] end)
+      | join("/")
+      | if $absolute then "/" + . else . end;
 
     . as $orig
     | ($orig.cwd // "") as $cwd
     | ((.tool_input // {}).command // "") as $cmd
-    | (reduce ($cmd | split("\n"))[] as $l ({files: [], cur: null};
+    | (reduce ($cmd | split("\n"))[] as $l ({files: [], cur: null, unknown: []};
           if   ($l | startswith("*** Begin Patch"))   then .
           elif ($l | startswith("*** End Patch"))     then flush
           elif ($l | startswith("*** Add File: "))    then flush | .cur = {op:"add",    path: ($l | hdrval("*** Add File: ")),    add: [], del: [], move: ""}
@@ -388,12 +501,23 @@ if [ "$ROUTE" = "patch" ]; then
           elif ($l | startswith("*** Delete File: ")) then flush | .cur = {op:"delete", path: ($l | hdrval("*** Delete File: ")), add: [], del: [], move: ""}
           elif ($l | startswith("*** Move to: "))     then (if .cur == null then . else .cur.move = ($l | hdrval("*** Move to: ")) end)
           elif ($l | startswith("*** End of File"))   then .
+          # ANY OTHER `*** ` DIRECTIVE IS RECORDED, NOT DROPPED. Silently
+          # ignoring one made the refusal key on "zero files understood" rather
+          # than "every line understood": a malformed scene header sitting behind
+          # one valid file parsed to a single innocent payload and returned 0,
+          # while the same malformed header alone was refused. The allowed file is
+          # then the one nobody looked at.
+          elif ($l | startswith("*** "))              then .unknown += [$l]
           elif ($l | startswith("@@"))                then .
           elif (.cur == null)                         then .
           elif ($l | startswith("+"))                 then .cur.add += [$l[1:]]
           elif ($l | startswith("-"))                 then .cur.del += [$l[1:]]
           else . end)
-       | flush | .files) as $files
+       | flush) as $parsed
+    | if (($parsed.unknown | length) > 0)
+      then error("unrecognised patch directive: " + ($parsed.unknown[0]))
+      else . end
+    | $parsed.files as $files
     | [ $files[]
         | . as $f
         | ([$f.path] + (if ($f.move // "") == "" then [] else [$f.move] end))[]
@@ -401,7 +525,7 @@ if [ "$ROUTE" = "patch" ]; then
         | ($p | sub("^\\./"; "")) as $clean
         | (if ($clean | startswith("/")) then $clean
            elif ($cwd == "") then $clean
-           else ($cwd + "/" + $clean) end) as $abs
+           else ($cwd + "/" + $clean) end | normpath) as $abs
         | $orig
           + { tool_name: (if $f.op == "add" then "Write" else "Edit" end),
               tool_input: ( if $f.op == "add"
@@ -415,7 +539,10 @@ if [ "$ROUTE" = "patch" ]; then
   ' > "$PAYLOADS_FILE" 2>"$SHIM_TMPDIR/jq.err"
   jq_rc=$?
   if [ "$jq_rc" -ne 0 ]; then
-    shim_block "$SHIM_NAME: could not parse the apply_patch envelope handed to $HOOK_LABEL (jq exit $jq_rc). Refusing the call rather than allowing an unchecked edit."
+    # jq's own message names the offending directive on the unknown-directive
+    # path, so it is forwarded rather than reduced to an exit code.
+    jq_why="$(cat "$SHIM_TMPDIR/jq.err" 2>/dev/null | tr '\n' ' ' || true)"
+    shim_block "$SHIM_NAME: could not parse the apply_patch envelope handed to $HOOK_LABEL (jq exit $jq_rc). Refusing the call rather than allowing an unchecked edit. ${jq_why:-<no detail>}"
   fi
 
   # An envelope that yields no files is not an empty edit — it is an envelope
@@ -447,13 +574,30 @@ run_hook() {
   rh_payload_file="$1"
   rh_out="$2"
   rh_err="$3"
+  # 9>&- closes the saved-stderr descriptor for the wrapped hook: it is this
+  # script's private refusal channel and no hook has business writing to it.
   if [ "$HOOK_TIMEOUT" -eq 0 ]; then
-    bash "$HOOK_PATH" < "$rh_payload_file" > "$rh_out" 2> "$rh_err"
+    bash "$HOOK_PATH" < "$rh_payload_file" > "$rh_out" 2> "$rh_err" 9>&-
     return $?
   fi
-  bash "$HOOK_PATH" < "$rh_payload_file" > "$rh_out" 2> "$rh_err" &
+  bash "$HOOK_PATH" < "$rh_payload_file" > "$rh_out" 2> "$rh_err" 9>&- &
   rh_pid=$!
-  ( sleep "$HOOK_TIMEOUT"; kill -TERM "$rh_pid" ) >/dev/null 2>&1 &
+  # `trap -` FIRST, and it is not tidiness. A subshell inherits this script's
+  # traps, and the line below kills this one deliberately on the happy path — so
+  # without the reset the killer would run shim_signal, write a refusal to the
+  # inherited descriptor 9, and put a spurious BLOCKED line on the real stderr
+  # of a call the hook had just ALLOWED. The `>/dev/null 2>&1` on this subshell
+  # would not hide it, because descriptor 9 is not stderr.
+  #
+  # `9>&-` CLOSES THE SAVED STDERR FOR THE KILLER TOO, and that is a correctness
+  # fix rather than hygiene. Descriptor 9 is a dup of the caller's stderr, so
+  # anything holding it open holds the caller's pipe open. Killing this subshell
+  # does NOT kill the `sleep` it is blocked in — that orphan survives, and while
+  # it held descriptor 9 a caller reading the shim's output through a pipe (which
+  # is how a test captures it, and how Codex reads it) blocked for the FULL
+  # timeout on every single invocation, allow or refuse. Measured before this
+  # fix: the suite's own shim test went from 4 s to over 150 s and was killed.
+  ( trap - EXIT TERM INT HUP PIPE; sleep "$HOOK_TIMEOUT"; kill -TERM "$rh_pid" ) 9>&- >/dev/null 2>&1 &
   rh_killer=$!
   wait "$rh_pid" >/dev/null 2>&1
   rh_rc=$?
@@ -482,7 +626,7 @@ while IFS= read -r shim_line; do
     # entire stderr into `Command blocked by PreToolUse hook: <stderr>`, so
     # Kinglet's own `BLOCKED:` prefix reaches the model unchanged.
     if [ -n "$hook_err" ]; then
-      printf '%s\n' "$hook_err" >&2
+      printf '%s\n' "$hook_err" >&9
       exit 2
     fi
     # A silent exit 2 is an ALLOW under Codex. Supply the message the hook

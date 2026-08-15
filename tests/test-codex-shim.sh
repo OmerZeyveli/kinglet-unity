@@ -84,6 +84,28 @@ echo "--- codex shim: it exists and is executable ---"
 assert_eq "yes" "$([ -f "$SHIM" ] && echo yes || echo no)" "scripts/codex-hook-shim.sh exists"
 assert_eq "yes" "$([ -x "$SHIM" ] && echo yes || echo no)" "scripts/codex-hook-shim.sh is executable"
 
+# --- FIRST, BECAUSE EVERY LATER ASSERTION DEPENDS ON IT BEING TRUE -----------
+#
+# Descriptor 9 is a dup of the caller's stderr, and killing the watchdog subshell
+# does NOT kill the `sleep` it is blocked in. If that orphan inherits descriptor
+# 9 it holds the CALLER'S pipe open, so a caller reading the shim through a pipe
+# — which is how Codex reads it, and how almost every assertion below captures it
+# — waits the full watchdog period on EVERY invocation, allow or refuse.
+#
+# This sits at the top because the failure is not localised: it makes the whole
+# file take minutes and be killed by a harness timeout, which reports "timed out"
+# rather than naming the defect. One second here says what is wrong.
+SPEED_HOOK="$WORK/speed-hook.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SPEED_HOOK"; chmod +x "$SPEED_HOOK"
+SPEED_PAYLOAD='{"tool_name":"apply_patch","cwd":"/proj","tool_input":{"command":"*** Begin Patch\n*** Add File: Assets/X.cs\n+class X {}\n*** End Patch"}}'
+SPEED_START=$(date +%s)
+SPEED_OUT="$(printf '%s' "$SPEED_PAYLOAD" | bash "$SHIM" --hook "$SPEED_HOOK" --timeout 12 2>&1)" || true
+SPEED_END=$(date +%s)
+SPEED_ELAPSED=$((SPEED_END - SPEED_START))
+assert_eq "yes" "$([ "$SPEED_ELAPSED" -lt 6 ] && echo yes || echo no)" \
+  "the shim releases the caller's pipe when the hook exits (${SPEED_ELAPSED}s under a 12s watchdog), rather than when its own killer expires"
+assert_eq "" "$SPEED_OUT" "an allowed call writes nothing at all"
+
 # ============================================================================
 # 1. FAIL-CLOSED
 #
@@ -459,6 +481,64 @@ write_payload "{\"tool_name\":\"apply_patch\",\"cwd\":\"$VEND\",\"hook_event_nam
 FIRST_RC=0; bash "$SHIM" --hook block-legacy-input < "$PAYLOAD_FILE" >/dev/null 2>&1 || FIRST_RC=$?
 assert_eq "2" "$FIRST_RC" "a first-party Assets/Scripts/ file with the same violation IS blocked"
 
+# --- THE ADVERSARIAL DIRECTION, which the two rows above do not cover --------
+#
+# Joining a path without NORMALISING it let a patch walk out of an exempted
+# directory and back into a gated one while still matching the exemption:
+# `Assets/Extensions/../Scripts/Player.cs` carries the literal
+# `/Assets/Extensions/` that block-legacy-input.sh skips as vendored, and lands
+# on a first-party file. Measured before the fix: rc 0, 0 bytes, against a
+# baseline of rc 2. A model can produce that form without trying.
+#
+# The vendored row above is the control that stops this being "normalise until
+# everything blocks": it must still be skipped.
+for dotdot in \
+  "Assets/Extensions/../Scripts/Player.cs" \
+  "Assets/Editor/../Scripts/Player.cs" \
+  "Assets/Tests/../Scripts/Player.cs" \
+  "Library/PackageCache/../../Assets/Scripts/Player.cs" \
+  "./Assets/Scripts/./Player.cs" ; do
+  write_payload "{\"tool_name\":\"apply_patch\",\"cwd\":\"$VEND\",\"hook_event_name\":\"PreToolUse\",\"tool_input\":{\"command\":\"*** Begin Patch\n*** Add File: $dotdot\n+using UnityEngine;\n+public class P { void U() { if (Input.GetKey(KeyCode.W)) {} } }\n*** End Patch\"}}"
+  DD_RC=0; bash "$SHIM" --hook block-legacy-input < "$PAYLOAD_FILE" >/dev/null 2>&1 || DD_RC=$?
+  assert_eq "2" "$DD_RC" "a path walking through an exempted directory is still gated: $dotdot"
+done
+
+# --- A DIRECTIVE THE PARSER DOES NOT KNOW IS REFUSED, NOT DROPPED -----------
+#
+# The refusal used to key on "zero files understood" rather than "every line
+# understood", so a malformed header BEHIND one valid file parsed to a single
+# innocent payload and returned 0 — while the same malformed header alone was
+# refused. The allowed file is then the one nobody looked at, which is the exact
+# hazard §4 was written against for the multi-file case.
+echo "--- codex shim: an unrecognised patch directive is refused ---"
+
+refuses "a malformed header hiding behind a valid file" \
+  "{\"tool_name\":\"apply_patch\",\"cwd\":\"$CWD\",\"hook_event_name\":\"PreToolUse\",\"tool_input\":{\"command\":\"*** Begin Patch\n*** Add File: Assets/Scripts/Fine.cs\n+class Fine {}\n*** Update File:Assets/Scenes/Main.unity\n@@\n-a\n+b\n*** End Patch\"}}" \
+  --hook block-scene-edit
+refuses "an entirely unknown *** directive alongside a valid file" \
+  "{\"tool_name\":\"apply_patch\",\"cwd\":\"$CWD\",\"hook_event_name\":\"PreToolUse\",\"tool_input\":{\"command\":\"*** Begin Patch\n*** Add File: Assets/Scripts/Fine.cs\n+class Fine {}\n*** Rename File: Assets/Scenes/Main.unity\n*** End Patch\"}}" \
+  --hook block-scene-edit
+
+# The control: the same envelope WITHOUT the unknown directive must be allowed,
+# or this pair proves only that the shim refuses everything.
+write_payload "{\"tool_name\":\"apply_patch\",\"cwd\":\"$CWD\",\"hook_event_name\":\"PreToolUse\",\"tool_input\":{\"command\":\"*** Begin Patch\n*** Add File: Assets/Scripts/Fine.cs\n+class Fine {}\n*** End Patch\"}}"
+KNOWN_RC=0; bash "$SHIM" --hook block-scene-edit < "$PAYLOAD_FILE" >/dev/null 2>&1 || KNOWN_RC=$?
+assert_eq "0" "$KNOWN_RC" "the same envelope with only known directives is allowed — the refusals above are about the unknown one"
+
+# --- TRAILING WHITESPACE ON A HEADER ----------------------------------------
+#
+# The hooks match on suffix globs, and `*.unity ` is not `*.unity`. One trailing
+# space took a scene edit from rc 2 to rc 0. Whether Codex's own parser trims it
+# is unmeasured; the shim closes the divergence either way, because every
+# normalisation difference between the two parsers is a bypass.
+echo "--- codex shim: trailing whitespace on a header does not defeat the suffix globs ---"
+
+for pad in " " "  " "\t"; do
+  write_payload "{\"tool_name\":\"apply_patch\",\"cwd\":\"$CWD\",\"hook_event_name\":\"PreToolUse\",\"tool_input\":{\"command\":\"*** Begin Patch\n*** Update File: Assets/Scenes/Main.unity$pad\n@@\n-a\n+b\n*** End Patch\"}}"
+  PAD_RC=0; bash "$SHIM" --hook block-scene-edit < "$PAYLOAD_FILE" >/dev/null 2>&1 || PAD_RC=$?
+  assert_eq "2" "$PAD_RC" "a scene header padded with [$pad] is still blocked"
+done
+
 # ============================================================================
 # 6. THE KILL SWITCHES STILL REACH THE HOOK THROUGH THE SHIM
 #
@@ -513,10 +593,45 @@ if [ "$CFG_RC" -eq 0 ]; then
   assert_eq "yes" "$(jq -e 'has("hooks")' "$CFG" >/dev/null 2>&1 && echo yes || echo no)" \
     "the emitted config has the top-level \"hooks\" wrapper Codex requires (a bare event map is rejected)"
 
-  # Ceiling division, derived from the settings file rather than asserted from a table.
-  WANT_SECS="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | ((.timeout + 999) / 1000 | floor)] | sort | join(",")' "$ROOT/.claude/settings.json")"
-  GOT_SECS="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | .timeout] | sort | join(",")' "$CFG")"
-  assert_eq "$WANT_SECS" "$GOT_SECS" "every emitted timeout is its settings.json value converted ms -> s"
+  # --- The budget, derived from the settings file rather than asserted from a table. ---
+  #
+  # The shim's OWN ceiling is the budget settings.json declares; Codex's is that
+  # plus one, so the shim always reports first. Both sides derived.
+  WANT_BUDGET="$(jq -r '[.hooks | to_entries[] | select(.key == "PreToolUse" or .key == "PostToolUse") | .value[] | .hooks[] | ((.timeout + 999) / 1000 | floor)] | sort | join(",")' "$ROOT/.claude/settings.json")"
+  GOT_SHIM_T="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | select(.command | test("codex-hook-shim\\.sh")) | (.command | capture("--timeout (?<t>[0-9]+)") | .t | tonumber)] | sort | join(",")' "$CFG")"
+  assert_eq "$WANT_BUDGET" "$GOT_SHIM_T" \
+    "the shim's own ceiling is exactly the budget settings.json declares, converted ms -> s"
+
+  WANT_CODEX_T="$(jq -r '[.hooks | to_entries[] | select(.key == "PreToolUse" or .key == "PostToolUse") | .value[] | .hooks[] | (((.timeout + 999) / 1000 | floor) + 1)] | sort | join(",")' "$ROOT/.claude/settings.json")"
+  GOT_CODEX_T="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | select(.command | test("codex-hook-shim\\.sh")) | .timeout] | sort | join(",")' "$CFG")"
+  assert_eq "$WANT_CODEX_T" "$GOT_CODEX_T" \
+    "Codex's ceiling for a wrapped hook is the budget plus one second of margin"
+
+  # Session hooks are unwrapped, so their timeout is the bare conversion.
+  WANT_SESSION_T="$(jq -r '[.hooks | to_entries[] | select(.key != "PreToolUse" and .key != "PostToolUse") | .value[] | .hooks[] | ((.timeout + 999) / 1000 | floor)] | sort | join(",")' "$ROOT/.claude/settings.json")"
+  GOT_SESSION_T="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | select(.command | test("codex-hook-shim\\.sh") | not) | .timeout] | sort | join(",")' "$CFG")"
+  assert_eq "$WANT_SESSION_T" "$GOT_SESSION_T" \
+    "an unwrapped session hook carries the bare ms -> s conversion, with no margin"
+
+  # --- THE ORDERING INVARIANT, which is the whole point of having two ceilings. ---
+  #
+  # The first version of this generator emitted the bare conversion and passed no
+  # --timeout at all, leaving the shim on its 15 s default under a 2-5 s Codex
+  # ceiling: the shim's watchdog could never fire, so every hook that outran the
+  # budget was killed from OUTSIDE by Codex — the signal path, which was a silent
+  # allow. Two ceilings that are not ordered are one ceiling and a decoration.
+  ORDER_BAD="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[]
+                       | select(.command | test("codex-hook-shim\\.sh"))
+                       | select((.command | capture("--timeout (?<t>[0-9]+)") | .t | tonumber) >= .timeout)] | length' "$CFG")"
+  assert_eq "0" "$ORDER_BAD" \
+    "every wrapped hook's own ceiling is strictly below Codex's, so the shim refuses before Codex gives up"
+
+  WRAPPED_WITH_T="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | select(.command | test("codex-hook-shim\\.sh")) | select(.command | test("--timeout [0-9]+"))] | length' "$CFG")"
+  WRAPPED_N="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | select(.command | test("codex-hook-shim\\.sh"))] | length' "$CFG")"
+  assert_eq "$WRAPPED_N" "$WRAPPED_WITH_T" \
+    "every wrapped entry passes an explicit --timeout ($WRAPPED_WITH_T of $WRAPPED_N) — without it the shim runs on its default and can never fire first"
+  assert_eq "yes" "$([ "$WRAPPED_N" -ge 1 ] && echo yes || echo no)" \
+    "there were wrapped entries to check ($WRAPPED_N) — zero would pass the ordering assertion vacuously"
 
   # The floor that makes the comparison mean something: an empty settings file
   # would make both sides the empty string and the assertion above green.
@@ -532,7 +647,7 @@ if [ "$CFG_RC" -eq 0 ]; then
   # Registration identity: every hook in settings.json appears in the emitted
   # config, and nothing else does.
   WANT_HOOKS="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | .command | sub(".*/"; "")] | sort | unique | join(",")' "$ROOT/.claude/settings.json")"
-  GOT_HOOKS="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | .command | sub("^.*/"; "") | sub("'\''$"; "")] | sort | unique | join(",")' "$CFG")"
+  GOT_HOOKS="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | .command | sub(" --timeout [0-9]+$"; "") | sub("^.*/"; "") | sub("'\''$"; "")] | sort | unique | join(",")' "$CFG")"
   assert_eq "$WANT_HOOKS" "$GOT_HOOKS" "the emitted config registers exactly the hooks settings.json registers"
 
   # Tool events go through the shim; session events do not — a Stop hook has no
@@ -546,6 +661,160 @@ if [ "$CFG_RC" -eq 0 ]; then
   SESSION_SHIMMED="$(jq -r '[.hooks | to_entries[] | select(.key != "PreToolUse" and .key != "PostToolUse") | .value[] | .hooks[] | select(.command | contains("codex-hook-shim.sh"))] | length' "$CFG")"
   assert_eq "0" "$SESSION_SHIMMED" "no session-lifecycle hook is wrapped — it has no tool payload to normalise"
 fi
+
+# --- CEILING DIVISION, AGAINST A TREE THAT CAN TELL CEIL FROM FLOOR ----------
+#
+# Every timeout Kinglet ships is a multiple of 1000, so ceil and floor AGREE at
+# 3/5/2 and the assertions above cannot distinguish them — a mutation from
+# `(ms + 999) / 1000` to `ms / 1000` survived the whole suite. The divergence
+# exists only sub-second, and `findings.md` names ceiling division as a
+# deliberate safety property: Codex's schema accepts `minimum: 0`, and a timeout
+# of 0 kills every hook instantly. So the property is exercised here against a
+# SYNTHETIC settings file carrying values no shipped tree has.
+echo "--- codex shim: ceiling division, where ceil and floor actually differ ---"
+
+CEILDIR="$WORK/ceil"
+mkdir -p "$CEILDIR/.claude/hooks"
+cp "$HOOKS/block-meta-edit.sh" "$HOOKS/_lib.sh" "$CEILDIR/.claude/hooks/"
+cat > "$CEILDIR/.claude/settings.json" <<'CEILEOF'
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": ".claude/hooks/block-meta-edit.sh", "timeout": 500 },
+          { "type": "command", "command": ".claude/hooks/block-meta-edit.sh", "timeout": 1500 },
+          { "type": "command", "command": ".claude/hooks/block-meta-edit.sh", "timeout": 1 }
+        ] }
+    ]
+  }
+}
+CEILEOF
+
+CEILCFG="$WORK/ceil.json"
+bash "$SHIM" --emit-config --project-dir "$CEILDIR" > "$CEILCFG" 2>/dev/null && CEIL_RC=0 || CEIL_RC=$?
+assert_eq "0" "$CEIL_RC" "--emit-config succeeds against a settings file with sub-second timeouts"
+
+if [ "$CEIL_RC" -eq 0 ]; then
+  # 500ms -> 1 (floor would give 0), 1500ms -> 2 (floor would give 1), 1ms -> 1 (floor: 0).
+  CEIL_GOT="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | (.command | capture("--timeout (?<t>[0-9]+)") | .t | tonumber)] | sort | join(",")' "$CEILCFG")"
+  assert_eq "1,1,2" "$CEIL_GOT" \
+    "sub-second budgets round UP (500ms->1s, 1500ms->2s, 1ms->1s); floor division would emit 0,0,1"
+
+  CEIL_ZERO="$(jq -r '[.hooks | to_entries[] | .value[] | .hooks[] | select((.command | capture("--timeout (?<t>[0-9]+)") | .t | tonumber) == 0)] | length' "$CEILCFG")"
+  assert_eq "0" "$CEIL_ZERO" \
+    "no budget rounds to a 0-second ceiling — Codex accepts 0 and it would kill every hook instantly"
+fi
+
+# ============================================================================
+# 7b. THE FAIL-CLOSED GUARD ITSELF
+#
+# Every `refuses` shape above routes through `shim_block`, which exits 2
+# deliberately. NONE of them constructs an UNEXPECTED internal death, so the EXIT
+# trap — the file's own "defence 2", the thing that converts a stray non-zero
+# status into a refusal — had no assertion behind it, and deleting it left the
+# suite green. With it gone and a death injected, the shim exits 1 with no
+# BLOCKED line: Codex's measured "exit 1 with a message" silent-allow class.
+#
+# So the guard is exercised the only way it can be: against a COPY of the shim
+# with a real fault injected, which is what a future edit to the trap would have
+# to survive.
+# ============================================================================
+echo "--- codex shim: the EXIT guard converts an unexpected internal death ---"
+
+INJDIR="$WORK/inject"; mkdir -p "$INJDIR"
+INJ="$INJDIR/codex-hook-shim.sh"
+# The fault is placed after the traps are installed and before the payload is
+# read, so it is exactly an "unexpected death mid-run" and nothing else.
+awk '
+  { print }
+  /^PAYLOAD="\$\(cat\)"/ && !done { print "printf %s \"$KINGLET_DELIBERATELY_UNBOUND_FAULT\""; done = 1 }
+' "$SHIM" > "$INJ"
+chmod +x "$INJ"
+
+INJ_APPLIED="$(/usr/bin/grep -c 'KINGLET_DELIBERATELY_UNBOUND_FAULT' "$INJ" || true)"
+assert_eq "1" "$INJ_APPLIED" \
+  "the injected-fault copy really carries the fault (0 would make the assertion below vacuous)"
+
+inj_err="$(printf '%s' "$PATCH_OK" | bash "$INJ" --hook "$HOOKS/block-meta-edit.sh" 2>&1 >/dev/null)" && inj_rc=0 || inj_rc=$?
+if [ "$inj_rc" -eq 2 ] && [ -n "$inj_err" ]; then
+  pass "an unexpected internal death is converted to a refusal (exit 2 + ${#inj_err} bytes) rather than an exit-1 silent allow"
+else
+  fail "an unexpected internal death did NOT become a refusal (exit $inj_rc, ${#inj_err} bytes) — the EXIT guard is not doing its job"
+fi
+
+# ============================================================================
+# 7c. SIGNALS
+#
+# Measured on the first version of this shim: killed by SIGTERM/INT/HUP/PIPE it
+# exited 143/130/129/141 with ZERO bytes on stderr, which `codex-facts.md`
+# records as an unlogged allow. The EXIT trap was running the whole time — the
+# mechanism is that bash runs it inside the redirection context of the command
+# it interrupted, and then RE-RAISES the signal, so both the message and the
+# `exit 2` were discarded.
+#
+# It is reachable by what the generator itself emits: Codex enforces `timeoutSec`
+# and kills the shim from outside. A user's Ctrl-C is SIGINT; a closed terminal
+# is SIGHUP.
+#
+# The control below is what makes the signal rows mean something: the same shim
+# and the same never-finishing hook, stopped by its OWN watchdog, must also
+# refuse. If the control failed, the signal rows would be measuring a shim that
+# cannot refuse at all.
+# ============================================================================
+echo "--- codex shim: a signal lands on a refusal, not a silent allow ---"
+
+SIGHOOK="$WORK/sig-hook.sh"
+printf '#!/usr/bin/env bash\nsleep 45\n' > "$SIGHOOK"; chmod +x "$SIGHOOK"
+
+# `set -m` IS LOAD-BEARING AND THE SIGINT ROW IS WHY. POSIX requires a
+# non-interactive shell to start an ASYNC job with SIGINT and SIGQUIT set to
+# SIG_IGN, and bash cannot trap a signal that was ignored on entry — so without
+# job control the shim never sees a SIGINT at all and this row measured the
+# harness rather than the shim. Read out of /proc/self/status for a child of an
+# async job on this host: SigIgn=0x6 (INT+QUIT) without `set -m`, SigIgn=0x0
+# with it. Codex spawns hooks as ordinary children with default dispositions,
+# which is the `set -m` column. Job-control chatter goes to the subshell's own
+# stderr, not the shim's capture file.
+for sig in TERM INT HUP PIPE; do
+  sig_err="$WORK/sig.$sig.err"
+  : > "$sig_err"
+  (
+    set -m
+    printf '%s' "$PATCH_OK" | bash "$SHIM" --hook "$SIGHOOK" --timeout 60 >/dev/null 2>"$sig_err" &
+    sig_pid=$!
+    sleep 1
+    kill -"$sig" "$sig_pid" 2>/dev/null || true
+    wait "$sig_pid"
+  ) >/dev/null 2>/dev/null && sig_rc=0 || sig_rc=$?
+  if [ "$sig_rc" -eq 2 ] && [ -s "$sig_err" ]; then
+    pass "SIG$sig lands on a refusal (exit 2 + $(wc -c < "$sig_err") bytes)"
+  else
+    fail "SIG$sig did NOT refuse (exit $sig_rc, $(wc -c < "$sig_err") bytes) — under Codex that permits the call and reports nothing"
+  fi
+done
+
+# The control. Same shim, same never-finishing hook, stopped by its own watchdog.
+refuses "the control for the signal rows: the same hook stopped by the watchdog" \
+  "$PATCH_OK" --hook "$SIGHOOK" --timeout 1
+
+# A signal must not be able to turn an ALLOW into a refusal either: the killer
+# subshell inherits this script's traps, and the happy path kills it on purpose.
+# Without a `trap -` reset inside it, that kill ran the signal handler in the
+# subshell and put a spurious BLOCKED line on the real stderr of a call the hook
+# had just allowed — descriptor 9 is not stderr, so the subshell's own
+# `2>/dev/null` would not have hidden it.
+FASTHOOK="$WORK/fast-hook.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$FASTHOOK"; chmod +x "$FASTHOOK"
+fast_err="$(printf '%s' "$PATCH_OK" | bash "$SHIM" --hook "$FASTHOOK" --timeout 5 2>&1 >/dev/null)" && fast_rc=0 || fast_rc=$?
+assert_eq "0" "$fast_rc" "an allowed call still exits 0 with the watchdog armed"
+assert_eq "" "$fast_err" "an allowed call writes nothing to stderr — the watchdog's killer emits no spurious refusal"
+
+# The pipe-release property is asserted at the top of this file, where it can
+# name itself before a regression makes everything else slow. See the note there
+# for why the capture must go through a pipe: written as `>/dev/null 2>&1` it
+# gives the orphaned `sleep` nothing to hold open, and the mutation that removes
+# `9>&-` survives it at 0 s either way.
 
 # ============================================================================
 # 8. CLAUDE CODE IS UNTOUCHED
@@ -566,6 +835,55 @@ fi
 # the suite counts it as a 13th hook that settings.json does not register.
 assert_eq "no" "$([ -f "$HOOKS/codex-hook-shim.sh" ] && echo yes || echo no)" \
   "the shim is not inside .claude/hooks/ (it would be read as an unregistered hook)"
+
+# ============================================================================
+# 9. THE SHIM DOES NOT SHIP INTO A CLAUDE CODE PROJECT, AND BOTH HALVES OF THE
+#    SKIP ARE HELD
+#
+# install.sh names each skipped script TWICE — once in the NEW_PATHS enumeration
+# and once in the write loop — and its own comment says the two must stay in
+# step. Nothing held them together: tests/test-derived-counts.sh extracts the
+# names with `sort -u`, deliberately counting DISTINCT NAMES rather than matching
+# lines, so ONE of the two lines is enough to keep every count green. Measured:
+# removing the write-loop half alone left that file green and landed
+# `.claude/scripts/codex-hook-shim.sh` in a real fixture install; removing the
+# enumeration half alone was equally green.
+#
+# This is a structural gap that predates this wave, but this wave added a third
+# name to it, and "skipped in both" was established by reading rather than by a
+# guard. Asserted here per name, in both directions.
+echo "--- codex shim: install.sh skips it in BOTH the enumeration and the write loop ---"
+
+SC_INSTALL="$ROOT/install.sh"
+assert_eq "yes" "$([ -f "$SC_INSTALL" ] && echo yes || echo no)" "install.sh is readable"
+
+# Derived from install.sh, not hardcoded: whatever it skips, it must skip twice.
+SC_SKIP_NAMES="$(/usr/bin/grep -oE '\[ "\$b" = "[^"]+" \] && continue' "$SC_INSTALL" \
+                 | sed 's/.*= "//; s/" \].*//' | sort -u)"
+SC_SKIP_N="$(printf '%s\n' "$SC_SKIP_NAMES" | /usr/bin/grep -c . || true)"
+assert_eq "yes" "$([ "$SC_SKIP_N" -ge 1 ] && echo yes || echo no)" \
+  "install.sh's script-skip pattern matched something ($SC_SKIP_N names) — zero would make the loop below vacuous"
+
+SC_HALF=""
+while IFS= read -r sc_name; do
+  [ -n "$sc_name" ] || continue
+  sc_count="$(/usr/bin/grep -cF -- "[ \"\$b\" = \"$sc_name\" ] && continue" "$SC_INSTALL" || true)"
+  [ "$sc_count" -ge 2 ] || SC_HALF="${SC_HALF}${sc_name} (appears ${sc_count}x, needs 2)"$'\n'
+done <<< "$SC_SKIP_NAMES"
+
+if [ -n "$SC_HALF" ]; then
+  printf '%s' "$SC_HALF" | sed 's|^|     skipped in only one of install.sh'"'"'s two loops: |'
+fi
+assert_eq "0" "$(printf '%s' "$SC_HALF" | /usr/bin/grep -c . || true)" \
+  "every skipped script is skipped in BOTH install.sh loops — one half alone still installs the file"
+
+# And the behavioural half: the shim must not appear in what a dry run announces.
+SC_DRY="$(bash "$SC_INSTALL" --project-dir "$PROJ" --dry-run 2>&1 || true)"
+if grep -qF -- "codex-hook-shim" <<< "$SC_DRY"; then
+  fail "install.sh --dry-run names codex-hook-shim.sh — it is a Codex-layer artifact and does not belong in a Claude Code project"
+else
+  pass "install.sh --dry-run does not name codex-hook-shim.sh"
+fi
 
 echo ""
 printf 'test-codex-shim: %s assertions, %s failed\n' "$TESTS_RUN" "$TESTS_FAILED"

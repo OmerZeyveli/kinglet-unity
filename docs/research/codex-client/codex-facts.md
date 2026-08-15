@@ -948,6 +948,30 @@ unread. This also settles, for free, that Kinglet's three advisory hooks have a
 working delivery route under Codex — though they do not currently use it, since
 they write plain text rather than JSON, and plain text on stdout is discarded.
 
+### A hook Codex times out is a silent ALLOW — measured 2026-08-16
+
+Left open by this section's first round, and reasoned about rather than measured
+("given the measured contract, a hook Codex stopped waiting for cannot have
+produced exit 2 + stderr"). The reasoning was right and it is now a measurement.
+
+Two live runs, same rig, same never-finishing `PreToolUse` hook (`sleep 600`),
+differing only in which ceiling is allowed to fire first:
+
+| Which ceiling stops the hook | `file_change` items | the file | model told |
+|---|---|---|---|
+| the wrapper's own watchdog, at 3 s (Codex's is 4 s) | **0** | **ABSENT** | verbatim: `BLOCKED: … was killed by a signal (status 143) after 3s.` |
+| **Codex's `timeoutSec`**, with the wrapper's watchdog disabled | **1** | **PRESENT** | *nothing* |
+
+So `timeoutSec` expiry is not a refusal and is not reported: the tool call
+proceeds and the model is told nothing at all, which puts it in the same
+silent-allow class as the five near-miss shapes above. Nothing appeared on
+Codex's stderr for the timed-out run.
+
+**The consequence for anything wrapping a hook:** the wrapper's own ceiling must
+be strictly below Codex's, or the wrapper cannot be the thing that refuses. A
+wrapper whose ceiling is above `timeoutSec` never fires at all — it is killed
+from outside, and being killed from outside is an allow.
+
 ### Precedence when both mechanisms fire
 
 A hook that emits the JSON block **and** exits 2 with stderr blocks once, and the
