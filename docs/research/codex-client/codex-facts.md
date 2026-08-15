@@ -445,6 +445,26 @@ Measured with `skills/list` and `hooks/list` against the imported replica:
 - **Event names are accepted in Claude Code's spelling and normalised.**
   `PreToolUse` in the file is reported as `eventName: "preToolUse"`. Registered:
   5 `preToolUse`, 4 `postToolUse`, 2 `sessionStart`, 1 `stop`.
+
+  **These are registration counts, not firing counts, and the distinction is the
+  whole of F3.** Registering is what `hooks/list` reports; firing is what a marker
+  file proves. Measured firing, per event, as of this round:
+
+  | Event | Registered | Observed firing | Where |
+  |---|---|---|---|
+  | `preToolUse` | 5 | **yes** | F4's whole rig |
+  | `sessionStart` | 2 | **yes** | the `timeoutSec` probe |
+  | `postToolUse` | 4 | **yes** | F5, `v-allow` on `PostToolUse` — fired once, `marker PRESENT` |
+  | `stop` | 1 | **not measured** | no probe has driven it |
+
+  `postToolUse` was unmeasured until this round and is now measured: it fires, and
+  its payload carries `hook_event_name: "PostToolUse"`, `tool_name: "Bash"`, the
+  same single-key `tool_input`, **plus a `tool_response`** (a string for the shell
+  tool) that `preToolUse` does not have. That matters because 4 of Kinglet's 12
+  hooks are `PostToolUse` (`warn-serialization`, `warn-filename`,
+  `warn-platform-defines`, `track-edits` — derived from `.claude/settings.json`).
+  `stop` remains **registered but never observed firing**, and that is stated in
+  those words rather than assumed from its siblings.
 - **Matchers are carried across verbatim** — `Edit|Write`, `Bash`,
   `startup|clear|compact` — i.e. Claude Code's tool names, untranslated. Whether
   they nevertheless *match* is measured below, and the answer is yes.
@@ -710,6 +730,17 @@ fixed — **does not exist**.
 Against that: **five near-miss shapes fail open, silently**, including two that a
 reasonable implementer would expect to block.
 
+> **Every run in this section passed `--dangerously-bypass-hook-trust`, which is
+> explicitly not a shipping answer.** That flag is a measurement instrument, and
+> F5 below measures what it was standing in for. **The two headline results were
+> re-verified without it**, under trust granted the way a non-interactive installer
+> would grant it — see F5's "F4 re-verified under legitimate trust". Neither result
+> changed. The rest of this section's rows were not re-run un-bypassed, because
+> hook trust gates *whether the hook runs at all* and not *what its output means*:
+> once a hook runs, the protocol is the protocol. That reasoning is stated so a
+> reader can reject it; the two rows that carry the wave were measured both ways
+> rather than argued.
+
 ### The rig
 
 The block *protocol* is measured in isolation from the `apply_patch` *payload*
@@ -744,11 +775,10 @@ rather than failing silently:
 `PreToolUse`, expected `description` or `hooks` at line 2 column 14"]
 ```
 
-The accepted file wraps it — this is what Task 4 must write:
+The accepted top level is `{"hooks": {…}}` — this is what Task 4 must write:
 
 ```json
 {
-  "description": "kinglet block-protocol probe",
   "hooks": {
     "PreToolUse": [
       { "matcher": "",
@@ -758,14 +788,27 @@ The accepted file wraps it — this is what Task 4 must write:
 }
 ```
 
+**`description` is optional**, measured: a `{"hooks": {…}}` file with no
+`description` key at all registers clean at `warnings: [], errors: []`, and the
+importer itself writes the no-`description` form. An earlier draft of this section
+showed the config *with* `description` under "what Task 4 must write", which reads
+as though both keys are required; they are not.
+
 Registered clean at `warnings: []`, `errors: []`, `enabled: true`,
 `trustStatus: "untrusted"`. Every run below used the **empty matcher**, so the hook
-fires on whichever tool the model reaches for; across all **16** runs it fired
+fires on whichever tool the model reaches for; across all **17** runs it fired
 **exactly once** each — derived, not assumed:
 
 ```bash
+ls <evidence>/block/*.fired.log | wc -l                                           # -> 17
 for f in <evidence>/block/*.fired.log; do grep -c '^FIRED ' "$f"; done | sort -u   # -> 1
 ```
+
+The table below lists 12 of those 17. The other five are the same variants driven
+against the file tool (`v-allow-patch`, `v-exit2-stderr-patch`, `v-json-block-patch`
+— see the `apply_patch` table), the `RUST_LOG=debug` re-run
+(`v-json-empty-reason-v`), and `v-kinglet-lib-default`, which is the `unset` arm of
+the `UNITY_HOOK_MODE` table below.
 
 **One run had to be thrown away, and the way it failed is the trap to avoid.** The
 probe script selects its behaviour from its own `basename`, and the first
@@ -875,7 +918,23 @@ nothing in the event stream, nothing to the model. There is no failure to notice
 "malformed JSON was ignored" is indistinguishable from "stdout is never read".
 `v-json-context` emitted well-formed JSON that is not a block —
 `{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"KINGLET-CONTEXT-SENTINEL-9471"}}`
-— and the sentinel reached the model, which quoted it back:
+— and the sentinel reached the model, which quoted it back.
+
+**This control needs its own prompt, and the rig's prompt will not surface it.**
+The rig above asks the model to quote *"any error or refusal text"*; `additionalContext`
+is neither, so the model answers the question it was asked and never mentions the
+sentinel — on that evidence the control looks like it failed, and a re-runner
+following the rig block literally will conclude exactly that. It is the one row in
+this section that is not driven by the standard prompt. Use:
+
+```
+Run exactly this one shell command and nothing else: touch codex-marker.txt
+Then tell me: did it succeed, and did you receive any additional context, note, or
+sentinel string alongside that tool call? If you saw any string of the form
+KINGLET-CONTEXT-SENTINEL-NNNN, quote it exactly.
+```
+
+With that prompt the final message is:
 
 ```
 Yes, it succeeded (exit code 0). I received this additional sentinel string alongside the tool call:
@@ -936,3 +995,210 @@ under `set -euo pipefail`, and any unhandled failure inside one exits non-zero b
 **not** `2` — under Claude Code that is read as an error, under Codex it is an
 unlogged allow. A payload shim that dies on malformed JSON therefore fails open
 silently, which is the worst available direction for a gate.
+
+## F5 — hook trust
+
+**Verdict: a trust step is required, and a non-interactive installer can satisfy it —
+but only by writing the user's `$CODEX_HOME/config.toml`, never by shipping a file in
+the repository.** Trust is per-hook-entry, keyed by a string that embeds the absolute
+path of `hooks.json`, and it is granted by copying a hash that Codex computes and
+`hooks/list` reports. `--dangerously-bypass-hook-trust` is not needed and is not
+recommended.
+
+### The baseline: registered, `enabled: true`, and silently not run
+
+With the project already trusted (`trust_level = "trusted"`) but **no** hook trust and
+**no** bypass flag:
+
+```
+hook fired:  0
+marker:      PRESENT        (the call went through)
+Codex stderr: no prompt, no warning, nothing
+model said:  "The command succeeded."
+```
+
+while `hooks/list` for that same directory, at that same moment, reported
+`registered 1, warnings [], errors [], enabled=True, trustStatus=untrusted,
+statusMessage=None`.
+
+**`enabled: true` does not mean it will run**, and `statusMessage` — the one field
+whose name suggests it would explain this — is `null`. This is a **fourth**
+silent-failure layer, on top of the payload problem, the exit-code problem and the
+matcher question, and it gates all of them: a user who installs Kinglet's hooks
+correctly gets nothing, with no diagnostic, until trust is granted.
+
+### The trust store: `hooks.state` in the home's `config.toml`
+
+There is **no `hooks/trust` app-server method** — the 123-method enumeration returned
+by an unknown-method error contains exactly two hook methods, `hooks/list` and the
+bogus one used to trigger the list. Trust is written as *config*: the binary carries
+`config/batchWrite failed while updating hook trust in TUI` and a
+`hooks.state."` config-path prefix, alongside a `HookStateToml { enabled, trusted_hash }`.
+
+**The recipe, measured end to end.** Two steps, both scriptable:
+
+```bash
+# 1. read the key and the hash Codex computed — cwds, an array, per the trap above
+{ printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"kinglet","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"initialized"}' \
+  "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"hooks/list\",\"params\":{\"cwds\":[\"$T\"]}}"; sleep 8; } \
+  | CODEX_HOME="$CODEX_HOME" codex app-server
+# -> each hook: {"key": "<abs>/.codex/hooks.json:pre_tool_use:0:0",
+#                "currentHash": "sha256:ab9c…", "trustStatus": "untrusted"}
+
+# 2. write it back, verbatim, into the HOME's config.toml (one table per hook entry)
+cat >> "$CODEX_HOME/config.toml" <<EOF
+[hooks.state."<key>"]
+enabled = true
+trusted_hash = "<currentHash>"
+EOF
+```
+
+`hooks/list` then reports `trustStatus: "trusted"`, and — the assertion that matters —
+running **without** `--dangerously-bypass-hook-trust`:
+
+```
+=== v-exit2-stderr, NO bypass flag: fires=1 marker=ABSENT ===
+model: It failed: "BLOCKED: kinglet probe refuses this call on purpose (exit2-stderr). Command: touch codex-marker.txt"
+```
+
+The hook fired, blocked the call, and the model was told why — with no dangerous flag
+anywhere. **A non-interactive installer can do this.**
+
+### F4 re-verified under legitimate trust
+
+Both block mechanisms were re-run with trust granted as above and the bypass flag
+removed. Neither result changed:
+
+| Mechanism | fires | marker | model told |
+|---|---|---|---|
+| exit 2 + stderr | 1 | **ABSENT** | verbatim |
+| `decision:block` JSON | 1 | **ABSENT** | verbatim |
+
+So F4's contract for Task 4 stands as written; trust decides *whether* a hook runs,
+not *what its output means*.
+
+### Near-miss trust shapes, and what they report
+
+`hooks/list`'s `trustStatus` is a free oracle — no model call — so these were
+separated cheaply:
+
+| `hooks.state."<key>"` contains | `trustStatus` |
+|---|---|
+| `enabled = true` + `trusted_hash` exactly matching `currentHash` | **`trusted`** |
+| `enabled = true` + the hash with the `sha256:` prefix stripped | **`modified`** |
+| `enabled = true` only, no `trusted_hash` | `untrusted` |
+| nothing (no table at all) | `untrusted` |
+
+The `sha256:` prefix is part of the stored value. A wrong hash reads as **`modified`**
+— "modified since last trusted" — not as untrusted, which is a useful distinction for
+an installer diagnosing its own output.
+
+**Trust cannot ship in the repository.** Putting `trusted_hash` inside the matcher
+group in `.codex/hooks.json` — the shape the string table's
+`MatcherGroup { matcher, hooks, trusted_hash }` suggests — is **silently ignored**:
+accepted with `warnings: []`, `trustStatus` still `untrusted`, and `currentHash`
+unchanged. The app-server's own `ConfiguredHookMatcherGroup` schema has exactly two
+properties, `matcher` and `hooks`, and no `trusted_hash`. So trust is **per user
+home**, and a project cannot vouch for itself — which is the entire point of the gate,
+and also the reason Kinglet cannot solve this by committing a file.
+
+### What the hash actually covers — the config entry, not the script
+
+This is the finding with the sharpest consequences, and it is the opposite of what
+"trusting a hook" sounds like. Measured by mutating one thing at a time and re-reading
+`currentHash`:
+
+| Step | `currentHash` | sha256 of the script file |
+|---|---|---|
+| A. baseline | `sha256:da8eea…` | `sha256:fb99ea…` |
+| B. **script body edited** | `sha256:da8eea…` — **unchanged** | `sha256:fccf5e…` — changed |
+| C. config `timeout` 20 → 25 | `sha256:b64731…` — **changed** | — |
+| D. `timeout` restored to 20 | `sha256:da8eea…` — back to baseline | — |
+
+**Rewriting the hook script does not disturb its trust.** The hash is over the hook's
+*declaration* — command string, timeout, matcher, event — not its *contents*, and it
+is not the sha256 of the script by any reading (A's two columns differ). Adding an
+unknown key to the matcher group left it unchanged too, so it covers specific fields
+rather than the raw file bytes.
+
+Two consequences, pulling in opposite directions:
+
+- **Operationally good for Kinglet.** Updating a hook's body — which is what a toolkit
+  upgrade does — does not invalidate trust and does not send the user back through a
+  review prompt. Only changing the *registration* does.
+- **A real security caveat, and it should be stated to users rather than buried.**
+  Once a hook entry is trusted, anything that can write the script file can change
+  what runs, with no re-review and no notification. Trust here means "I vouch for this
+  command line", not "I vouch for this code".
+
+Step D also establishes the hash is **deterministic**, not a nonce: restoring the
+config restores the exact hash. It is **home-independent** — the same config read from
+two different disposable `CODEX_HOME`s produced the identical hash — and
+**path-dependent by construction**, since the hashed command string embeds the
+absolute hook path. So it **cannot be precomputed and shipped**; it must be read from
+`hooks/list` on the target machine at install time, which is why the recipe above is
+two steps rather than one.
+
+### The interactive path, for `docs/` to describe
+
+Codex's TUI carries a startup hook review (`tui/src/startup_hooks_review.rs`). Its
+strings, read from the binary rather than guessed:
+
+```
+Hooks need review
+1 hook is new or changed.
+Hooks can run outside the sandbox after you trust them.
+Trusting hooks...
+[Trust all and continue]  [Continue without trusting (hooks won't run)]
+```
+
+and per-hook status text: `New hook - review required`, `Trusted`,
+`Modified since last trusted - review required`, plus `Managed hooks are always on`.
+
+So a human running interactive `codex` in a Kinglet project is prompted once, sees the
+hooks, and chooses. **This was read from the binary's strings, not exercised** — no
+interactive TUI session was driven in this wave, and the exact keybindings and screen
+layout are therefore unmeasured.
+
+### `allow_managed_hooks_only` — the enterprise switch, unmeasured
+
+`ConfigRequirements.allowManagedHooksOnly` (boolean, nullable) exists in the
+app-server schema, beside `ManagedHooksRequirements` with its `managedDir` /
+`windowsManagedDir` and a full event map. In the binary the key sits in the
+managed-config cluster next to `allowed_sandbox_modes`, `allow_remote_control`,
+`guardian_policy_config` and `enforce_residency` — i.e. the MDM surface, not the user
+one. The TUI string `Managed hooks are always on` is consistent with managed hooks
+bypassing the review entirely.
+
+**This is unmeasured, in those words.** Nothing here set the switch or supplied a
+managed config. What it would take: a managed-config source Codex reads (the
+`legacyManagedConfigFile` / `legacyManagedConfigMdm` values in `HookSource` name two
+routes), `allow_managed_hooks_only = true`, and a hook placed in `managedDir` — then
+re-run the F5 baseline and see whether a project hook still registers and whether the
+managed one runs untrusted. The reason it matters to Kinglet: if an organisation sets
+it, Kinglet's project-scoped hooks may not run **at all**, and no amount of
+`hooks.state` trust would change that.
+
+### What this means for the wave
+
+**F5's answer is the good one: a trust step exists, and a non-interactive installer
+can satisfy it** — Task 9's installer reads `hooks/list` and appends one
+`[hooks.state."<key>"]` table per hook to `$CODEX_HOME/config.toml`. That is a real
+obligation and it has three properties Task 8/9 must design around:
+
+1. **It writes the user's Codex home**, not the project. Kinglet has so far only ever
+   written inside the project. An installer that edits `~/.codex/config.toml` needs
+   consent, a backup, and an uninstall path — and `uninstall.sh` is receipt-driven, so
+   the receipt must record the exact tables added.
+2. **It needs Codex running to compute the hashes**, because they cannot be
+   precomputed. Install-time ordering therefore is: write `hooks.json`, then query
+   `hooks/list`, then write trust.
+3. **Re-registration invalidates it.** Changing a hook's timeout or command path
+   changes the hash and drops it back to `modified`; changing the script body does not.
+
+And the honest framing for the ship: until this is implemented, everything F4 proves is
+proved behind a flag Kinglet must not tell users to pass. With it implemented, Kinglet's
+hooks run legitimately — and are then still inert against the `apply_patch` payload
+until Task 4 fixes that. The four layers are independent, and all four have to be right.
