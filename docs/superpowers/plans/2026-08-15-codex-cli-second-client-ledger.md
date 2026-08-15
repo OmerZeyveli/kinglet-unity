@@ -157,6 +157,12 @@ Writes **four** files into the evidence directory (default
 | `NAME.stderr.txt` | codex's stderr — where its warnings land |
 | `NAME.meta.json` | the exact invocation, `codex --version`, exit code, sandbox, model, workdir, UTC timestamp |
 
+**READ `codex_argv`, NOT `codex_args`.** Fix round 1 replaced the space-joined `codex_args` string
+with **`codex_argv`, a JSON array that includes the prompt**. The old key is gone. A space-joined
+string could not represent a path containing a space unambiguously, and it omitted the prompt
+entirely — so it was not "the exact command" the brief asked it to record, which in a wave whose
+deliverable is a recorded verdict is a defect in the evidence rather than in the formatting.
+
 Exits with codex's exit code; usage errors exit **64**.
 
 Two behaviours that differ from the plan's text, both decided by Task 1 and both load-bearing for
@@ -169,10 +175,10 @@ later tasks:
   redirection the way `.jsonl` and `.stderr.txt` are, and a stale `last.txt` read as this run's
   answer is a silently wrong measurement.
 
-**`--seed` and `--model` have no assertion and were never exercised.** `--seed` is
-argument-validated only; its `cp -R` into `CODEX_HOME` is unexercised. **Task 3 is the first
-consumer of `--seed`** — its implementer should expect to be the one that proves the path works, and
-should report a defect there as a harness defect rather than working around it.
+**`--seed` was exercised by the Task 1 reviewer** and works: it copies dotfiles, nested directories
+and the executable bit, and a seed carrying its own `auth.json` is correctly overwritten by the real
+credential and re-chmodded to 600 — the exact arrangement Task 3 will build. **Task 3 is still the
+first real consumer**; report anything wrong there as a harness defect rather than working around it.
 
 The event stream shape, measured against the real binary:
 
