@@ -222,6 +222,14 @@ Expected: FAIL — `scripts/codex-probe.sh` does not exist, so every run_probe c
 
 - [ ] **Step 3: Write the harness**
 
+> **SUPERSEDED IN PART — read this before copying the listing below.** Task 1 shipped and its fix
+> round changed two things in this file. `meta.json`'s `codex_args` (a space-joined string) is now
+> **`codex_argv`, a JSON array that includes the prompt** — the old key does not exist, and Tasks 2–7
+> read the new one. The harness also gained signal arms and a sweep that reclaims disposable homes
+> whose pid is dead, because `SIGKILL` leaks by construction and nothing reclaimed the orphan. The
+> listing below is kept as the brief that was given, not as a description of what shipped; read
+> `scripts/codex-probe.sh` for that.
+
 Create `scripts/codex-probe.sh`:
 
 ```bash
@@ -1685,6 +1693,37 @@ ls .claude/commands/*.md | wc -l
 ls -d .claude/skills/*/ | wc -l
 ```
 
+- [ ] **Step 5a: Re-derive `docs/ANTI-VACUITY.md`'s bash-4 census, and put it under a guard**
+
+Added during the run, by the Task 1 completion sweep. That document carries the five-source census
+of `tests/test-bash32-compat.sh`'s bash-4 sweep as a live figure with a date stamp — search for
+`SHIPPED:scripts` — and states the sum in prose. Task 1 added one file to `scripts/` and one to
+`tests/`, and Tasks 8 and 9 add at least one more test file each, so the figure recorded before this
+step is wrong by construction. Derive and correct it:
+
+```bash
+printf '%s + %s + %s + 1 + 1 = %s\n' \
+  "$(ls .claude/hooks/*.sh | wc -l)" "$(ls scripts/*.sh | wc -l)" "$(ls tests/*.sh | wc -l)" \
+  "$(( $(ls .claude/hooks/*.sh | wc -l) + $(ls scripts/*.sh | wc -l) + $(ls tests/*.sh | wc -l) + 2 ))"
+```
+
+Note that `tests/*.sh` is **not** `tests/test-*.sh` — it includes `run-tests.sh`, which is why the
+tests figure is one higher than the suite's file count. Reading the wrong one is how this number was
+mis-stated before.
+
+**Correcting the number is not the deliverable — the guard is.** This figure has now gone stale
+three recorded times, twice inside a document whose entire subject is numbers that rot. Extend
+`tests/test-derived-counts.sh` to derive this census from the tree and fail when
+`docs/ANTI-VACUITY.md` disagrees, the same shape its existing surface-pool block already uses for
+`README.md` and `docs/ARCHITECTURE.md`. Prove the guard by mutation: change the document's figure by
+one, confirm red, restore, confirm green.
+
+Leave the pinned historical measurements alone. The `39 test files` figure under
+**## The measured class** is a past measurement whose own table sums to 39 (11 green + 1 collapsed +
+27 red), and the `15 hooks and 4 scripts were cut` line is a record of a past wave. Both are correct
+as history. If you touch them at all, it is only to say in the text that they are pinned — a live
+figure and a historical one that look identical is the ambiguity that produced this step.
+
 - [ ] **Step 5: Re-derive every number in both research documents**
 
 Numbers written during a measurement go stale as later tasks change the tree.
@@ -1725,6 +1764,76 @@ git commit -m "docs(codex): the architecture decision, the exclusions, and the d
 The decision names the measurement that chose it, every dead surface class is
 named with what killed it, and the machinery the decision strands is recorded
 as debt rather than quietly ignored."
+```
+
+---
+
+## Task 11: Close the probe harness's residual guard gaps
+
+Added during the run. The Task 1 fix-round re-review measured three places where
+`scripts/codex-probe.sh` behaves correctly and **nothing would notice if it stopped**. None was worth
+extending that fix loop; all three are worth an assertion before the wave ends, because each is a
+silent regression waiting for an unrelated edit.
+
+**Files:**
+- Modify: `tests/test-codex-probe.sh`
+
+**Interfaces:**
+- Consumes: `scripts/codex-probe.sh` as Task 1 shipped it. Changes no behaviour — assertions only.
+- Produces: nothing later tasks call.
+
+Run this **after Task 9**, so the harness has stopped changing.
+
+- [ ] **Step 1: Guard the sweep's liveness check**
+
+Measured: deleting `if kill -0 "$stale_pid" …; then continue; fi` from the reclamation loop leaves the
+guard at 35/35 green, and the consequence is real rather than theoretical — a concurrent probe's
+`CODEX_HOME` and its copied credential are deleted out from under it while it is still running,
+reproduced deterministically 2/2 each way. The suite itself runs a probe into the default `--out`,
+which is the same directory a live Task 3–7 probe uses.
+
+Write an assertion that fails when the liveness check is gone: start a long-running probe, run a
+second probe into the same `--out`, and assert the first probe's home and credential survive. Prove
+it by mutation — delete the `kill -0` line, confirm red, restore, confirm green.
+
+- [ ] **Step 2: Make deleting the signal arms detectable**
+
+Measured: removing all three of `trap 'on_signal …' HUP`, `INT`, `TERM` leaves the guard at 35/35
+green. The arms are correct — isolated (EXIT trap removed, arms kept) they clean up on all three
+signals and exit with the right `128+signo` — but on bash 5.2.21 the EXIT trap alone already covers
+those signals, so a *behavioural* assertion would be green with or without them. That is why Task 1
+deliberately left them unasserted, and that reasoning was right.
+
+The gap is that they now read as covered while being deletable. Add a **structural** assertion that
+the three arms exist and route to `cleanup`, and **label it in the file as a presence check standing
+in for a behaviour this host cannot observe** — the label is the point, because an unlabelled
+presence check is how a structural assertion gets mistaken for a behavioural one. Prove it by
+deleting one arm and confirming red.
+
+- [ ] **Step 3: Widen the disposable-home entry check past the top level**
+
+Measured: `HOME_ENTRIES` is a top-level `ls -A`, so a leak nested inside a directory the seed already
+creates is invisible — a seed carrying `skills/` plus the owner's skills leaked into it produces the
+expected entry list and the guard stays green. Contrived compared to the wholesale `cp -R` widening
+the guard does catch, but **Task 5 measures skill discovery**, and a leaked `~/.codex/skills/` is
+precisely the contamination that would corrupt it with a green suite.
+
+Compare the home's full recursive contents against the seed's, not just the top level. Prove it by
+leaking one nested file and confirming red.
+
+- [ ] **Step 4: Run both gates and commit**
+
+```bash
+bash tests/test-codex-probe.sh
+bash tests/run-tests.sh 2>&1 | tail -6
+bash scripts/check-provenance.sh | tail -1
+git add tests/test-codex-probe.sh
+git commit -m "test(codex): assert the three harness behaviours nothing would have missed
+
+Each was measured green after deleting the thing it protects. The signal-arm
+assertion is structural and says so in the file: on this host the EXIT trap
+already covers HUP/INT/TERM, so a behavioural assertion would pass with the
+arms removed."
 ```
 
 ---

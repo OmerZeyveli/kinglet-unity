@@ -195,7 +195,7 @@ The event stream shape, measured against the real binary:
 
 | # | Task | Status | Commit range | Notes |
 |---|---|---|---|---|
-| 1 | The probe harness | **open** | — | brief = plan §Task 1 |
+| 1 | The probe harness | **DONE** | `a5ec1bd..0b58d05` | general-purpose implementer; 1 fix round; all 8 findings ADDRESSED |
 | 2 | Does Codex import a `.claude/` configuration? | open | — | *(brief pending)* — must be written after Task 1, because it calls the harness Task 1 produces |
 | 3 | Codex's hook mechanism, measured | open | — | *(brief pending)* |
 | 4 | Kinglet's 12 hooks under Codex | open | — | *(brief pending)* |
@@ -204,7 +204,8 @@ The event stream shape, measured against the real binary:
 | 7 | Layer B — MCP routes against the live bridge | open | — | *(brief pending)* — needs a free Editor |
 | 8 | Ship the payload the measurement supports | open | — | *(brief pending)* — ship list decided by Tasks 2–7 |
 | 9 | Installer writes and removes the Codex layout | open | — | *(brief pending)* |
-| 10 | Findings synthesis, decision, debt | open | — | *(brief pending)* |
+| 10 | Findings synthesis, decision, debt | open | — | *(brief pending)* — gained **Step 5a** during the run: re-derive `docs/ANTI-VACUITY.md`'s bash-4 census and put it under a guard |
+| 11 | Close the probe harness's residual guard gaps | open | — | **added during the run** by Task 1's completion sweep and re-review. Runs after Task 9, when the harness has stopped changing |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
 configuration natively, Tasks 3–6 shrink and Task 8's ship list changes. Re-plan rather than
@@ -247,9 +248,63 @@ produced it.
 
 ---
 
+## Task 1 — fix round 1 and close
+
+Fix round 1: implementer commit `0b58d05`, status `DONE_WITH_CONCERNS`, 15 mutations. Guard 22 → 35
+assertions, nothing weakened. Re-review verdict: **all eight findings ADDRESSED**, 20 mutations,
+zero `MUTANT DID NOT APPLY`, no new breakage. Recommendation: accept. **Task 1 closed at
+`a5ec1bd..0b58d05`.**
+
+### The entry worth keeping: a reviewer withdrew its own finding, with the confound named
+
+Important 3 (SIGINT leaves the credential-bearing home) was reported as **deterministic 3/3**. The
+implementer could not reproduce it and pushed back with numbers — SIGINT 0/70. The re-review settled
+it against the reviewer, and the mechanism is the house defect in its purest form:
+
+```bash
+setsid bash -c '… exec bash …/codex-probe.sh …' >/dev/null 2>&1 &
+PGID=$(ps -o pgid= -p $! | tr -d ' ')
+kill -INT -"$PGID" 2>/dev/null
+```
+
+`setsid` forked, so `$!` was the wrapper, which had already exited. `ps -o pgid= -p $!` returned
+**empty**. `kill -INT -""` therefore sent no signal at all — `rc=1`, and `2>/dev/null` hid the error.
+The "orphaned home" was a **live probe's working directory**, which is correct behaviour. The 3/3
+determinism was three repetitions of the same non-experiment.
+
+Re-run correctly (`set -m`, pgid verified non-empty, delivery counted): 0 leaks in 46 runs across
+INT/TERM/HUP on both harnesses. **SIGKILL leaks 6/6 on both** — no trap can cover it — which is the
+half that was right and the half the fix shipped against.
+
+Two things this costs nothing to remember: an error stream silenced by `2>/dev/null` is how a
+non-experiment passes for a measurement, and **a repetition count is not evidence of anything except
+repetition**.
+
+### Deferred findings, each with an owner that is a task
+
+| Finding | Ruling | Owner |
+|---|---|---|
+| The sweep's liveness check is unguarded — deleting `kill -0` is 35/35 green, and a live probe's home and credential are then deleted mid-run (2/2 deterministic) | Safe to carry: the check is present and correct today, and the failure needs someone to delete it. It is a silent-regression gap, not a live defect | **Task 11 Step 1** (added to the plan in this edit) |
+| Deleting all three signal arms is 35/35 green. The arms are correct in isolation (right cleanup, right `128+signo`), but on bash 5.2.21 the EXIT trap already covers those signals, so a behavioural assertion would pass either way | Safe: correct code, and Task 1's decision to leave it unasserted rather than assert it green was right. What is missing is a *structural* check, labelled as standing in for an unobservable behaviour | **Task 11 Step 2** |
+| `HOME_ENTRIES` is a top-level `ls -A`, so a leak nested inside a directory the seed already creates is invisible | Safe for now — the realistic wholesale widening is caught. But **Task 5 measures skill discovery**, and a leaked `~/.codex/skills/` is exactly what would corrupt it with a green suite | **Task 11 Step 3** |
+| `docs/ANTI-VACUITY.md`'s bash-4 census reads `13 + 7 + 42 + 1 + 1 = 64`; the tree now derives **13 + 8 + 43 + 1 + 1 = 66**. Found by the controller's completion sweep, not by any review — it is in no diff | **Deliberately not corrected now.** Tasks 8, 9 and 11 each add a test file, so any figure written today is wrong by construction before the wave ends. Correcting it now would be the fourth recorded rot of this number, twice inside the document whose subject is numbers that rot. `tests/*.sh` is not `tests/test-*.sh` — it counts `run-tests.sh` — which is how it was mis-stated before | **Task 10 Step 5a** (added to the plan in this edit), which both corrects it **and puts it under a guard**, because the number is not the deliverable |
+| `docs/research/codex-client/evidence/livesmoke.meta.json` was written under the old `codex_args` schema | **Dropped, not deferred.** It is untracked, gitignored, and regenerable by re-running one probe; Task 2 produces fresh evidence under the new schema inside this same wave. Recording it as dropped so the next reader is deciding whether to agree rather than waiting for a pass nobody scheduled | — |
+| The plan's Task 1 code listing still wrote `"codex_args"` | Closed by the controller in this edit: the listing carries a **SUPERSEDED IN PART** header naming both changes. The listing is kept as the brief that was given, not as a description of what shipped | — |
+
+### Corrections to the record
+
+- Task 1's first report claimed the red-first state was "every one of the 22 failed". It was 19, with
+  the last three assertions never reached and **no verdict line at all**. Now fixed: the guard reports
+  a clean `0/35` with its verdict line present when the harness is absent.
+- `provenance.tsv`'s `fix-round-1:` clause appears on six rows, but **four of those are from an
+  earlier, unrelated wave** (`unity-optimizer.md`, `unity-reviewer.md`, `unity-optimize.md`,
+  `unity-scene.md`). A future sweep keyed on that marker will over-collect.
+
+---
+
 ## Deferred and parked findings
 
-*(None yet — every Task 1 finding was either fixed in round 1 or closed by the review.)*
+See the Task 1 table above. Nothing is parked at a fix-loop cap; the loop closed at round 1.
 
 ---
 
