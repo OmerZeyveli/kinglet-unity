@@ -376,7 +376,7 @@ The event stream shape, measured against the real binary:
 | 5 | Kinglet's 16 skills under Codex | **DONE** | `1bb6135..f4f19c4` | general-purpose implementer; 1 fix round; skills **are** invoked unnamed, and the spec's payload-location proposal was refuted |
 | 6 | Rules, `AGENTS.md`, commands and agents | **DONE** | `4898876..56183ef` | general-purpose implementer; 2 fix rounds, one Critical; the pointer verdict was prompt-conditional and became a **positive** ship recommendation |
 | 7 | Layer B — MCP routes against the live bridge | **DEFERRED TO LAST** | — | **The owner is using the Editor.** See the ruling below |
-| 8 | Ship the payload the measurement supports | open | — | *(brief pending)* — ship list decided by Tasks 2–7 |
+| 8 | Ship the payload the measurement supports | **DONE** | `b713f09..993dee2` | general-purpose implementer; 2 fix rounds; the payload ships and its guard is 86 assertions |
 | 9 | Installer writes and removes the Codex layout | open | — | *(brief pending)* |
 | 10 | Findings synthesis, decision, debt | open | — | *(brief pending)* — gained **Step 5a** during the run: re-derive `docs/ANTI-VACUITY.md`'s bash-4 census and put it under a guard |
 | 11 | Close the probe harness's residual guard gaps | open | — | **added during the run** by Task 1's completion sweep and re-review. Runs after Task 9, when the harness has stopped changing |
@@ -730,6 +730,63 @@ schema-enumeration rule above), so the honest statement is that **Kinglet's meas
 |---|---|---|
 | The round that fixed categoricals **introduced a new one**: *"`AGENTS.md` is the only document that reaches the model unasked"*, contradicted one section up by `## Skills`, where names and descriptions are injected with no tool call | Safe: it does not change Task 8's action either way, since the skills injection is frontmatter-only and Task 5 covers it. The repair is one word — *"the only project document whose **body** reaches the model unasked"* | **Task 10 Step 5**, which re-derives both research documents |
 | The `### Reproducing` sweep has now found something **three times out of three** — and the third instance was introduced by the round doing the sweeping | Recorded as method, not as an incident: **after any round that rewrites categoricals, sweep for categoricals the rewrite introduced** | Standing method; applied by every remaining task |
+
+---
+
+## Task 8 — close: the payload ships
+
+Implementer: **general-purpose**. `DONE`, two fix rounds. Review: **Spec ✅** (eight steps discharged,
+two exceeded), **Quality Needs work — six Important, nothing shipped broken**; the reviewer ran every
+shipped entry point end to end on a real `install.sh --yes` fixture. Re-review 2: **approved**. Range
+**`b713f09..993dee2`**. Suite 3727 → **3817**; `tests/test-codex-surface.sh` at **86** assertions.
+
+**Ships:** the hook shim, `scripts/codex-command-to-skill.sh`, `generate-claude-md.sh --client codex`,
+the skills bridge, `AGENTS.md`, and an MCP configuration row with client behaviour **marked open**.
+Rules ship unchanged with the declarative pointer kept. **`.claude/hooks/` and `.claude/settings.json`
+remain byte-unchanged since the base commit** — verified by the controller over the whole range.
+
+**Excluded in writing, each with its measurement:** agents in both shapes, `.codex/` as tracked
+content (recorded `rule=absent`, and the reviewer proved the red gate fires by planting both paths),
+the importer's entry document, and two refuted skill-root routes.
+
+### The finding that unblocked Task 4's leftover
+
+The shim had been withheld because shipping it reddened a guard. The real reason surfaced here:
+`--emit-config` writes an **absolute** path, so **a shim outside the project is nine registered hooks
+enforcing nothing.** Shipping it fixes that rather than moving it — and the guard's mutation now trips
+**three** assertions at once, because excluding the shim from the payload *is* what makes the emitted
+config point outside the project. Two defects found separately were one defect.
+
+### The guard could not see the fix its own task shipped
+
+The sharpest review finding of the wave. `tests/test-codex-surface.sh` generated **against this
+repository, which has no `.claude/scripts/`**, so the in-project preference branch was never executed
+and the assertion checked a substring **both** branches satisfy. Forcing an out-of-project shim path
+left it green at 72/72. It now builds a real fixture install and generates twice — the second time in
+Task 9's shape — asserting every quoted path resolves under the project root.
+
+Two more mutants survived that green guard: hook coverage collapsing **12 → 5**, and the converter's
+default `--out` root. The 12 → 5 case is the instructive one — the same file already enforced the
+right identity for commands one section away, so the guard was inconsistent **with itself**.
+
+### The one argument with no measurement under it was wrong
+
+The ship list claimed the spine non-negotiables missing from the generated digest are the ones a hook
+enforces. **They are not.** The only `UNITY_EDITOR` in the hooks is an *exemption*, not a check, and
+of six `NON-NEGOTIABLE` sections **one is in the digest, one is half hook-covered, and four are in
+neither**. The old residual read *"if row 1 is not installed"* when for those four it held **even when
+installed**. The four were then inlined, Codex arm only; the Claude document stayed byte-identical at
+4870 bytes.
+
+This is why that argument was flagged to the reviewer before it read the diff: it was the single piece
+of reasoning in the ship list with nothing measured beneath it.
+
+### Deferred, with an owner
+
+| Finding | Ruling | Owner |
+|---|---|---|
+| The conjunction branch in `tests/test-codex-surface.sh` § 8 matches `and` **anywhere** on the gate line and runs regardless of `gate_or`, so a **correct** disjunction whose sentence happens to contain an ordinary "and" is failed and told it is "worse than the original defect" | Safe: it **cannot let a real conjunction through**, and it fails loudly rather than silently. But wrong advice on correct work is the shape that costs an afternoon here — `CLAUDE.md` records three implementers dismissing a real defect as a flake. The fix is a three-line branch reorder, already dry-run against four shapes without re-opening the mutation it exists for | **Task 11**, which is already the guard-gaps task and will be editing these files |
+| The `HookEventName` enum check stays undone. The decline is right; its stated dichotomy was false and is now corrected — the suite **already skips with a stated reason**, so deriving the enum only when `codex` is on `PATH` would add no dependency and hardcode nothing | Recorded rather than closed, with the reason restated as *"the residual is one reviewed edit wide"* rather than *"it is unavailable"* | **Task 11**, same file, same visit |
 
 ---
 
