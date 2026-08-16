@@ -3,11 +3,11 @@
 *Measured against `codex-cli 0.145.0`. Codex's own capabilities are in
 `codex-facts.md`; this file is about Kinglet's surfaces running on top of them.*
 
-**Sections are added by the task that measures them.** Task 4 wrote `## Hooks`.
-Tasks 5–7 add skills, rules/`AGENTS.md`, commands, agents and the MCP routes;
-Task 10 adds the A/B/C architecture decision and the stranded-machinery debt. A
-section that is absent has not been measured, and no section here speaks for
-another.
+**Sections are added by the task that measures them.** Task 4 wrote `## Hooks`,
+Task 5 `## Skills`, Task 6 `## Rules and AGENTS.md`, `## Commands` and
+`## Agents`. Task 7 adds the MCP routes; Task 10 adds the A/B/C architecture
+decision and the stranded-machinery debt. A section that is absent has not been
+measured, and no section here speaks for another.
 
 ---
 
@@ -1019,3 +1019,573 @@ pattern — a seeded `config.toml` for the first, a `skills/extraRoots/set` call
 a second `skills/list` for the second. Raw
 transcripts land under `docs/research/codex-client/evidence/`, which `.gitignore`
 excludes — the verdicts are here, the credentials never are.
+
+---
+
+## Rules and AGENTS.md
+
+Kinglet ships 6 rules in `.claude/rules/`, pulled into Claude Code by `CLAUDE.md`.
+Derive that set rather than trusting this sentence:
+
+```bash
+ls .claude/rules/*.md
+```
+
+| Question | Verdict | Evidence |
+|---|---|---|
+| A project `AGENTS.md` reaches the model | **yes — injected.** The sentinel came back with **0** shell commands run in the whole turn | `t6-agentsmd` |
+| A project `CLAUDE.md` reaches the model | **not injected.** Same sentinel, same prompt: it came back only *after* the model ran `rg` for it | `t6-claudemd` |
+| A file referenced the way Kinglet's `CLAUDE.md` references its rules is followed | **no** — **0 of 6** runs opened it, **0 of 6** obeyed it, and the arm is indistinguishable from the control whose `AGENTS.md` says nothing at all | `t6-pointer-field-r{1,2,3}`, ×2 samples |
+| A file the entry document **orders** read is followed | **yes** — **6 of 6** opened it, **6 of 6** obeyed it | `t6-imperative-field-r{1,2,3}`, ×2 samples |
+| Kinglet's 6 rules can ship as pointers | **only in the imperative form.** The declarative form Kinglet ships today measures dead | the behaviour table below |
+
+**Verdict: `AGENTS.md` is what reaches the model, and Kinglet's rules do not ride
+along on being mentioned.** The entry document is injected whole; anything outside
+it is read only when the entry document tells the model, in so many words, to go
+and read it. Kinglet's own wording — *"Rules live in `.claude/rules/` and are
+binding"* — does not tell it that, and measures at parity with silence.
+
+Every probe below ran under a disposable `CODEX_HOME` (mode 700, outside `/tmp`, a
+600 copy of `~/.codex/auth.json`, removed by an EXIT trap) with
+`--ignore-user-config` and `--sandbox read-only`, against `codex-cli 0.145.0`. The
+rigs are `mkproject.sh` fixture Unity projects with **`install.sh` deliberately not
+run**: a rig with Kinglet installed would carry `.agents/skills/`, and Task 5
+measured that a topical skill loads unnamed in 5 of 5 relevant probes. A skill
+answering the question instead of a rule would confound every row here. Each rig
+also sits in **its own parent directory**, so a probe's `..` search cannot reach a
+sibling arm — `## Skills` above records sibling-visibility as an isolation it had
+by accident, and this closes it by construction.
+
+### The entry document is injected; `CLAUDE.md` is not
+
+Two rigs, one prompt (*"What is the project sentinel? Reply with it and nothing
+else."*), differing only in which file carries the sentinel:
+
+| Rig | Sentinel lives in | Answer | Shell commands run |
+|---|---|---|---|
+| `t6-agentsmd` | `AGENTS.md` | `KINGLET-SENTINEL-4417` | **0** |
+| `t6-claudemd` | `CLAUDE.md`, no `AGENTS.md` present | `KINGLET-SENTINEL-4417` | **1** — `rg -n -i "project sentinel\|sentinel" .` |
+
+**Both answered correctly, and that is why the command count is the measurement
+rather than the answer.** Zero commands means the text was in context before the
+turn began — the same discriminator `## Skills` uses for its injected skill index.
+One `rg` means the model went looking, which any file in the tree would satisfy.
+`CLAUDE.md` is therefore *findable*, not *loaded*: a sufficiently determined model
+recovers it, and nothing guarantees one will.
+
+So Kinglet must write `AGENTS.md`. Leaving the project's `CLAUDE.md` to be
+discovered is a bet on the model searching, and the next two subsections show it
+does not search when it has no reason to think there is anything to find.
+
+### A referenced file is not followed — unless the entry document orders it read
+
+The retrieval probe cannot answer this. Asked *for* a sentinel, the model searches
+the tree and finds it whether or not anything pointed at it: `t6-pointer-sentinel`
+and `t6-nopointer-sentinel` both returned `KINGLET-SENTINEL-4417`, both after an
+`rg`, in rigs that differ only in whether `AGENTS.md` mentions `.claude/rules/`.
+A question naming the thing you are testing for manufactures its own positive.
+
+The binding probe asks something the model can answer from general knowledge, and
+never mentions rules, files or conventions:
+
+> Write the single C# field declaration for a private serialized float holding a
+> move speed. Output only that one line of code, with no commentary and no code
+> fence.
+
+The rule under test is deliberately unnatural, so a generic answer and a
+rule-following answer cannot be confused. In `.claude/rules/csharp-unity.md`:
+*"Private serialized fields in this project are prefixed `kg_`, never `_`."*
+Kinglet's real convention is `_lowerCamelCase`, which the model already knows and
+would produce unaided — using the real rule would have scored a generic answer as
+compliance.
+
+Four arms, three runs each, same prompt, `codex-cli 0.145.0`. The values below are
+the run currently on disk, produced by the `### Reproducing` recipe from a clean
+slate; an earlier independent sample of the same four arms gave the same verdict in
+every cell, differing only in that `pointer`'s third run answered `moveSpeed`
+rather than `_moveSpeed` — neither is `kg_`:
+
+| Arm | What `AGENTS.md` says | Rule file on disk | r1 | r2 | r3 | Opened the file |
+|---|---|---|---|---|---|---|
+| `inline` | carries the rule **itself** | — | `kg_moveSpeed` | `kg_moveSpeed` | `kg_moveSpeed` | n/a — nothing to open |
+| `imperative` | *"you MUST read `.claude/rules/csharp-unity.md` … do not answer a code question without reading it first"* | yes | `kg_moveSpeed` | `kg_moveSpeed` | `kg_moveSpeed` | **3 of 3** |
+| `pointer` | *"Rules live in `.claude/rules/` and are binding: `architecture.md` · `csharp-unity.md`"* — **Kinglet's own wording** | yes | `_moveSpeed` | `_moveSpeed` | `_moveSpeed` | **0 of 3** |
+| `nopointer` | nothing about rules at all | yes | `moveSpeed` | `moveSpeed` | `moveSpeed` | **0 of 3** |
+
+Across both samples: `inline` **6 of 6** compliant, `imperative` **6 of 6**
+compliant and **6 of 6** reads, `pointer` **0 of 6** compliant and **0 of 6**
+reads, `nopointer` **0 of 6** compliant.
+
+**The `pointer` arm is the finding and the `nopointer` arm is what gives it
+meaning.** Kinglet's shipped pointer wording produced answers indistinguishable
+from an `AGENTS.md` that never mentions the rules, in a tree where the rule file
+was sitting at the path the pointer names. The model did not open it once in six
+runs across two samples — every one of those turns is a single `agent_message`
+with no `command_execution` anywhere.
+
+**`inline` and `imperative` are both positive controls, and they fail differently
+if the experiment is broken.** `inline` proves the rule text is one the model will
+follow when it has it — without that, `pointer`'s failure could be a model
+declining a silly convention rather than never reading it. `imperative` proves the
+file is readable, at that path, in that sandbox, and that its content binds once
+read — without that, `pointer`'s failure could be a permissions or path artefact.
+Both came back 6 of 6, so neither escape is available: the `pointer` arm failed at
+the *decision to read*, and nowhere else.
+
+The `imperative` arm's command is identical across all six runs, which is worth
+recording because it shows what "followed" looks like:
+
+```
+/bin/bash -lc "sed -n '1,240p' .claude/rules/csharp-unity.md && sed -n '1,240p' .claude/rules/architecture.md"
+```
+
+It read **both** named rules files, not only the one the mandate named — so the
+imperative form recruits the whole list, not just its subject.
+
+**What this is not.** Six runs per arm across two samples, one model, one prompt,
+one unnatural rule. The claim is *"the declarative pointer was not followed in 6 of
+6 and the imperative one was followed in 6 of 6"*, not that either is
+deterministic, and not that every rule in `.claude/rules/` behaves like this one. A
+rule the model already agrees with will look obeyed whether or not it was read —
+which is exactly why the probe uses a convention Kinglet does not have. A future
+re-run must re-measure rather than inherit this.
+
+### Codex's `~/.codex/rules/` is a different thing, and it is not a spelling variant
+
+The name collides; the meaning does not. Measured on this host:
+
+```bash
+ls ~/.codex/rules              # default.rules
+head -1 ~/.codex/rules/default.rules
+# prefix_rule(pattern=["env", "UV_CACHE_DIR=/tmp/uv-cache", "uv", "run", …], decision="allow")
+```
+
+That is command-approval policy — which shell invocations may run without a
+prompt. Nothing in Kinglet's rule layer maps there, and a rules file copied into
+it would be a syntax error in an approval store rather than guidance to a model.
+
+The importer agrees by omission: there is no `RULES` item type, the enum being
+`AGENTS_MD, CONFIG, SKILLS, PLUGINS, MCP_SERVER_CONFIG, SUBAGENTS, HOOKS,
+COMMANDS, MEMORY, SESSIONS` (`codex-facts.md` §"Three losses", loss 2). No
+`rules/` directory is created anywhere in the imported tree.
+
+### Where the broken rules references live, source-side
+
+`codex-facts.md` measures **29** `.Codex/rules/` references in the imported tree
+and **22** surviving `.claude/` ones, reconciled source-side as `30 = 29 + 1` and
+`22 = 1 + 21`. Those numbers are not re-counted here. What Task 8 needs and they
+do not give is **which source files to repair**, so this is a decomposition of the
+same quantity by the surface that carries it, counted over `.claude/` in this
+repository:
+
+| Source class | files carrying a `.claude/rules/` reference | references |
+|---|---|---|
+| `.claude/skills/` | 13 (12 `SKILL.md` + `subagent-driven-implementation/task-reviewer-prompt.md`) | 16 |
+| `.claude/agents/` | 8 — **every one** | 9 |
+| `.claude/commands/` | 9 — **every one** | 11 |
+| `.claude/hooks/` | 0 | **0** |
+| the entry document | 1 | **1** in this repository's own `CLAUDE.md`; **3** in the one `install.sh` generates into a project |
+
+```bash
+for d in .claude/agents .claude/skills .claude/commands .claude/hooks; do
+  printf '%-20s %s\n' "$d" "$( { /usr/bin/grep -roh '\.claude/rules/' "$d" || true; } | wc -l )"
+done
+```
+
+**This reconciles with the 29 rather than competing with it**, and the residue is
+informative. Of the 16 skill references, 15 are rewritten and 1 — in
+`task-reviewer-prompt.md` — survives as literal `.claude/`, which is
+`codex-facts.md`'s single surviving Markdown reference. Of the 11 command
+references, only the 4 in `unity-doctor` and `unity-init` cross at all; the other
+7 leave with the 7 dropped commands. So:
+
+```
+15 (skills) + 9 (agents) + 4 (surviving commands) + 1 (repo CLAUDE.md)  =  29
+```
+
+and the imported `skillrig` tree — a real installed project rather than
+`codex-facts.md`'s replica — carries **31** by the same count, `19 + 9 + 3`,
+differing only in the entry document, because `install.sh` generates a project
+`CLAUDE.md` with 3 rules references where this repository's own has 1. The 19 in
+`.agents/skills/` that `## Skills` reports is itself `15 + 4`: the two
+command-derived skills bring their commands' references with them.
+
+**The hooks row is the one to notice.** Zero. The hook layer is the only surface
+class that does not depend on the rules layer at all, which is consistent with
+`## Hooks` above shipping on a shim and nothing else.
+
+### What this means for the ship
+
+1. **Ship `AGENTS.md`, and ship it as the payload rather than as an index.**
+   Measured: it is injected (`t6-agentsmd`, 0 commands), `CLAUDE.md` is not
+   (`t6-claudemd`, found only by `rg`), and a rule that lives one file away is not
+   applied (`pointer` 0 of 6) while the same rule inside `AGENTS.md` is (`inline`
+   6 of 6). Anything that must *bind* — the five spine rules' non-negotiables —
+   has to be in the file, not named by it.
+2. **If a pointer is used anyway, it must be an order, not a mention.** Measured:
+   `imperative` 6 of 6 read and 6 of 6 obeyed against `pointer` 0 of 6, the two
+   rigs differing only in wording. That is the cheap repair if inlining six rules
+   files into `AGENTS.md` is too much text — but it buys a *read*, at 6 of 6, not
+   a guarantee, and it costs a turn of latency each time.
+3. **Do not let the importer write it.** Measured: the imported `AGENTS.md`
+   carries 3 `.Codex/rules/` references (`skillrig`) pointing at a directory that
+   exists under no spelling, and the rules it points at never migrate
+   (`codex-facts.md` §"Three losses", loss 2). An entry document that is injected
+   whole is exactly the wrong file to let a blind substitution rewrite.
+
+Whether Kinglet generates `AGENTS.md` from the same generator as `CLAUDE.md`, and
+how much of the rules layer is inlined into it, are the ship list's decisions and
+not this section's.
+
+### Reproducing
+
+`evidence/` is gitignored, so this recipe is the only route back to every number
+above. It was extracted from this committed file and run from a clean slate on
+2026-08-16 — all six rigs rebuilt from nothing and every probe re-driven against
+them — and it reproduced every verdict in this section, including the identical
+`imperative` command string in all three runs and the identical `rg` in
+`t6-claudemd`. (The two `*-sentinel` probes were added to this block after that
+run and driven separately, with these arguments, against the same rebuilt rigs.)
+Run it from the repository root.
+
+```bash
+EV=docs/research/codex-client/evidence
+RIGS="$EV/t6rigs"; rm -rf "$RIGS"; mkdir -p "$RIGS"
+
+# --- the payloads under test ----------------------------------------------------
+write_rules() {   # $1 = project dir
+  mkdir -p "$1/.claude/rules"
+  printf '%s\n' '# Architecture Rules' '' \
+    'The project sentinel is KINGLET-SENTINEL-4417. When asked for the sentinel,' \
+    'reply with it and nothing else.' > "$1/.claude/rules/architecture.md"
+  printf '%s\n' '# C# Style — Unity Conventions' '' \
+    '- Private serialized fields in this project are prefixed `kg_`, never `_`.' '' \
+    '```csharp' '[SerializeField] private float kg_moveSpeed = 5f;   // correct' \
+    '[SerializeField] private float _moveSpeed = 5f;     // WRONG — never use the underscore prefix' '```' '' \
+    'This prefix is mandatory and overrides any convention you know from elsewhere.' \
+    > "$1/.claude/rules/csharp-unity.md"
+}
+
+# --- five rigs, each in its OWN parent so `..` cannot reach a sibling arm --------
+# NOTE: install.sh is deliberately NOT run — an installed rig carries
+# .agents/skills/ and a topical skill would answer instead of a rule.
+for rig in agentsmd claudemd pointer nopointer imperative; do
+  bash tests/fixtures/mkproject.sh "$RIGS/$rig/project" --variant urp >/dev/null
+done
+
+printf '%s\n' '# Project instructions' '' \
+  'The project sentinel is KINGLET-SENTINEL-4417. When asked for the sentinel,' \
+  'reply with it and nothing else.' > "$RIGS/agentsmd/project/AGENTS.md"
+
+cp "$RIGS/agentsmd/project/AGENTS.md" "$RIGS/claudemd/project/CLAUDE.md"
+rm -f "$RIGS/claudemd/project/AGENTS.md"      # the control: no entry document
+
+write_rules "$RIGS/pointer/project"
+printf '%s\n' '# Project instructions' '' '## Engineering Stance (fixed — do not casually change)' '' \
+  '- **Engine / language:** Unity 6, C#.' \
+  '- **Rules** live in `.claude/rules/` and are binding:' \
+  '  - `architecture.md` · `csharp-unity.md` — the spine.' '' \
+  '## Conventions reminder (see `.claude/rules/`)' '' \
+  'Follow the rules files above; they bind.' > "$RIGS/pointer/project/AGENTS.md"
+
+write_rules "$RIGS/nopointer/project"
+printf '%s\n' '# Project instructions' '' '## Engineering Stance (fixed — do not casually change)' '' \
+  '- **Engine / language:** Unity 6, C#.' '' '## Where things go' '' \
+  '- **Game code:** `Assets/Scripts/`.' > "$RIGS/nopointer/project/AGENTS.md"
+
+write_rules "$RIGS/imperative/project"
+printf '%s\n' '# Project instructions' '' '## MANDATORY FIRST STEP' '' \
+  'Before you write or suggest ANY C# in this project you MUST read the file' \
+  '`.claude/rules/csharp-unity.md` and follow it exactly. Its conventions override' \
+  'every default you know from elsewhere. Do not answer a code question without' \
+  'reading it first.' '' 'Rules live in `.claude/rules/` and are binding:' \
+  '`architecture.md` · `csharp-unity.md`.' > "$RIGS/imperative/project/AGENTS.md"
+
+# the `inline` rig carries the rule itself and needs no .claude/ at all
+bash tests/fixtures/mkproject.sh "$RIGS/inline/project" --variant urp >/dev/null
+printf '%s\n' '# Project instructions' '' '## C# Style — Unity Conventions' '' \
+  '- Private serialized fields in this project are prefixed `kg_`, never `_`.' '' \
+  '```csharp' '[SerializeField] private float kg_moveSpeed = 5f;   // correct' \
+  '[SerializeField] private float _moveSpeed = 5f;     // WRONG — never use the underscore prefix' '```' '' \
+  'This prefix is mandatory and overrides any convention you know from elsewhere.' \
+  > "$RIGS/inline/project/AGENTS.md"
+
+# --- the two prompts ------------------------------------------------------------
+printf 'What is the project sentinel? Reply with it and nothing else.\n' \
+  > "$EV/prompt-t6-sentinel.txt"
+printf 'Write the single C# field declaration for a private serialized float holding a move speed. Output only that one line of code, with no commentary and no code fence.\n' \
+  > "$EV/prompt-t6-field.txt"
+
+# --- retrieval: is the entry document injected, or merely findable? --------------
+for rig in agentsmd claudemd; do
+  bash scripts/codex-probe.sh --name "t6-$rig" \
+    --prompt "$PWD/$EV/prompt-t6-sentinel.txt" --workdir "$PWD/$RIGS/$rig/project"
+done
+
+# --- retrieval against the pointer arms: the probe that CANNOT decide anything ---
+#     Both find the sentinel by searching, pointer or no pointer. Kept because a
+#     reader who skips it will design exactly this probe and misread its positive.
+for rig in pointer nopointer; do
+  bash scripts/codex-probe.sh --name "t6-$rig-sentinel" \
+    --prompt "$PWD/$EV/prompt-t6-sentinel.txt" --workdir "$PWD/$RIGS/$rig/project"
+done
+
+# --- binding: four arms, three runs each ----------------------------------------
+for run in 1 2 3; do
+  for arm in inline imperative pointer nopointer; do
+    bash scripts/codex-probe.sh --name "t6-$arm-field-r$run" \
+      --prompt "$PWD/$EV/prompt-t6-field.txt" --workdir "$PWD/$RIGS/$arm/project"
+    printf '%-11s r%s: %s\n' "$arm" "$run" "$(cat "$EV/t6-$arm-field-r$run.last.txt")"
+  done
+done
+```
+
+**Read the answer *and* the command census — the answer alone cannot tell an
+injection from a search.** The census is the `command` field of every
+`command_execution`, exactly as `## Skills` derives it:
+
+```bash
+python3 - "$EV"/t6-*.jsonl <<'PY'
+import json, sys
+for path in sys.argv[1:]:
+    types, cmds = {}, []
+    for line in open(path, encoding='utf-8', errors='replace'):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        item = event.get('item') or {}
+        t = item.get('type')
+        if t:
+            types[t] = types.get(t, 0) + 1
+        if t == 'command_execution' and event.get('type') == 'item.completed':
+            cmds.append((item.get('command') or '').replace('\n', ' ')[:160])
+    print('---', path.rsplit('/', 1)[-1], types)
+    for c in cmds:
+        print('    $', c)
+    if not cmds:
+        print('    (no shell command at all)')
+PY
+```
+
+Expected: `t6-agentsmd` and every `inline`/`pointer`/`nopointer` field run report
+*no shell command at all*; `t6-claudemd` reports one `rg`; every `imperative` run
+reports the `sed -n '1,240p' .claude/rules/…` pair. Raw transcripts land under
+`docs/research/codex-client/evidence/`, which `.gitignore` excludes — the verdicts
+are here, the credentials never are.
+
+---
+
+## Commands
+
+Kinglet ships 9 commands in `.claude/commands/`. Derive that rather than trusting
+this sentence:
+
+```bash
+ls .claude/commands/*.md | wc -l
+```
+
+**Codex equivalent: none as a command; Codex's own answer is "a command is a
+skill".** There is no slash-command surface in `codex-cli 0.145.0`, established
+from four directions rather than one absence:
+
+| Probe | Result |
+|---|---|
+| `codex --help` subcommand list | 24 subcommands, **none** a command or prompt registry: `exec`, `review`, `login`, `logout`, `mcp`, `plugin`, `mcp-server`, `app-server`, `remote-control`, `completion`, `update`, `doctor`, `sandbox`, `debug`, `apply`, `resume`, `archive`, `delete`, `unarchive`, `fork`, `cloud`, `exec-server`, `features`, `help` |
+| `ls ~/.codex` | no `prompts/` directory, and none is created by any probe in this wave |
+| app-server method list (`ClientRequest.json`) | the only command-shaped methods are `command/exec`, `command/exec/{resize,terminate,write}` and `thread/shellCommand` — shell execution, not a registry |
+| the importer's own `COMMANDS` item | *"Migrate commands from `<repo>/.claude/commands` to `<repo>/.agents/skills`"* — Codex converts a command **into a skill** |
+
+The last row is the one that matters: the question "does a command's content have
+anywhere to go" is answered affirmatively by Codex itself, in the importer's own
+description string.
+
+**Verdict: commands do not cross as commands, 7 of the 9 do not cross at all, and
+the 7 are lost silently.** `codex-facts.md` §"Three losses" measures the trigger as
+syntactic — `$ARGUMENTS`, or `$` followed by a digit, anywhere in the body — so a
+price (`$5`) or a positional reference in prose drops a command with the same
+silence. The 7 never appear in `detect`, so `import` reports **31 successes and 0
+failures** while they are absent. Those numbers are quoted from `codex-facts.md`,
+not re-counted here.
+
+The 2 survivors, `unity-doctor` and `unity-init`, become
+`.agents/skills/source-command-<name>/SKILL.md` — which is why `## Skills` above
+reports 18 at repo scope where `.claude/skills/` holds 16.
+
+### What is actually lost is not routing
+
+The natural reading of "a command routes to an agent, and agents are dead under
+Codex, so the command is dead weight" is **wrong**, and it is worth stating because
+it is the conclusion this section was expected to reach. Kinglet's command bodies
+are 919 lines; the routing is a line or two of each. `unity-fix.md` is 58 lines of
+which the `## Agent Routing` section is one bullet — the substance is an ordered
+Unity diagnostic (`NullReferenceException` → missing reference, destroyed object,
+execution order; Missing Script → file/class name mismatch, asmdef issue;
+serialization data loss → field renamed without `FormerlySerializedAs`; …) and a
+`read_console` verification step. That is skill-shaped content, and it exists
+nowhere else in the toolkit: none of the 9 command names has a same-named skill in
+`.claude/skills/`.
+
+```bash
+# no command name is also a skill name
+for c in .claude/commands/*.md; do
+  n="$(basename "$c" .md)"; [ -d ".claude/skills/$n" ] && echo "$n has a skill"
+done   # prints nothing
+```
+
+Each command body also already carries the degraded-mode paragraph it needs — *"If
+the agent cannot be dispatched, do the work inline and say so… Run these steps
+yourself"* — which is exactly the situation a Codex session is in permanently.
+
+**Recommendation, with the measurement attached.** Convert the 9 commands to
+skills at generation time rather than letting the importer drop 7 of them.
+Measured: the trigger is a `$ARGUMENTS` or `$`-digit token in the body
+(`codex-facts.md` §"Three losses", the 7-variant fixture table), Kinglet's 7
+argument-taking commands all carry `$ARGUMENTS`, and the 2 that carry no `$` token
+cross intact and work — `source-command-unity-init` was one of the skills observed
+*loading unnamed* in `## Skills` above (`t5-unnamed-save`). So the conversion
+target is proven to function; only the `$ARGUMENTS` token blocks the other 7, and
+a generator that writes the skill body itself never emits one. **Note what that
+costs:** a Codex "command" is a skill the model chooses to load, not a user-typed
+`/unity-fix`, and `## Skills` measured only 6 distinct skills ever loading out of
+16–18 discovered. A converted command is discoverable, not dispatchable.
+
+---
+
+## Agents
+
+Kinglet ships 8 agents in `.claude/agents/` with `tools:` allowlists. Derive that
+rather than trusting this sentence:
+
+```bash
+ls .claude/agents/*.md | wc -l
+```
+
+**Codex equivalent: `multi_agent` is a stable, enabled feature, and the agent
+definition it reads carries no capability at all.**
+
+```bash
+codex features list | /usr/bin/grep -i agent
+# external_agent_memory_import   under development  false
+# multi_agent                    stable             true
+# multi_agent_mode               removed            false
+# multi_agent_v2                 stable             false
+# use_agent_identity             under development  false
+```
+
+`multi_agent` is the one that is both stable and **enabled**; `multi_agent_v2` is
+stable and off, and the other three are unavailable. So the feature exists — the
+question is only what its definition format can carry.
+
+Codex's own agents are skill-local. Each built-in skill carries
+`~/.codex/skills/.system/<name>/agents/openai.yaml`, and the whole schema of one is:
+
+```yaml
+interface:
+  display_name: "Review Agent"
+  short_description: "Find actionable bugs in code changes"
+  default_prompt: "Use $review-agent to review the requested code changes and return actionable findings."
+policy:
+  allow_implicit_invocation: false
+```
+
+Presentation and an invocation policy. **No tools key, and nowhere for one to go.**
+
+### The tool grants were not dropped in transit — there is no destination
+
+`codex-facts.md` §"Agent conversion drops every tool grant" measures the loss and
+closes with *"whether a Codex subagent can be granted MCP tools at all is
+unmeasured here"*. That is now measured, and the answer changes what the loss
+means.
+
+| Where a per-agent tool grant could live | What is there |
+|---|---|
+| the converted `.codex/agents/*.toml` | exactly 3 keys, ×8 files: `name`, `description`, `developer_instructions` |
+| Codex's own `agents/openai.yaml` | `interface` (`display_name`, `short_description`, `default_prompt`) and `policy` (`allow_implicit_invocation`) |
+| the `Config` object's `tools` key | session-scoped only — `ToolsV2` carries one property, `web_search`; `AppToolConfig` is `{approval_mode, enabled}` |
+
+```bash
+# the key census over the converted agents — KEYS, not substrings. A bare
+# occurrence count is misleading here: `tools` appears 15 times across the 8
+# files and `color` 3 times, all of it inside the instructions PROSE, while
+# neither is a key anywhere. That is the shape of an over-reading this table
+# would otherwise invite.
+EV=docs/research/codex-client/evidence     # $EV/skillrig is built by `## Skills`'s recipe
+/usr/bin/grep -oh '^[a-z_]* =' "$EV"/skillrig/.codex/agents/*.toml | sort | uniq -c
+#   8 description =
+#   8 developer_instructions =
+#   8 name =
+```
+
+So `mcp__UnityMCP` appearing **0** times across the 8 converted files
+(`codex-facts.md`, quoted not re-counted) is not an importer bug to be repaired by
+writing the grants back in. **Codex 0.145.0 has no per-agent capability
+allowlist.** MCP servers are configured for the session — the importer writes
+`[mcp_servers.UnityMCP] url = "http://localhost:8080/mcp"` into
+`<repo>/.codex/config.toml` — and whatever the session has, every agent has.
+
+**For a Unity toolkit that inverts the usual concern.** Kinglet's `tools:` lines
+are *narrowing*: `unity-reviewer` is `Skill, Read, Glob, Grep` and cannot write,
+`unity-scene-builder` gets `mcp__UnityMCP__*` but no `Bash`. Under Codex those
+distinctions do not exist, so the read-only reviewer is read-only only because its
+prose says so. That is a real loss of enforcement and it is the opposite of the
+"capability is gone" reading: the capability is *ambient*, and the restriction is
+what evaporated. Whether the MCP tools function at all is Task 7's measurement and
+is not claimed here.
+
+### The converted bodies instruct the model to use a tool that does not exist
+
+All 8 converted agents tell the model to load skills with the `Skill` tool — 16
+occurrences across the 8 files:
+
+```bash
+/usr/bin/grep -ohF '`Skill` tool' "$EV"/skillrig/.codex/agents/*.toml | wc -l   # 16
+```
+
+`## Skills` above measures that **Codex has no skill tool**: `ThreadItem`'s variant
+list carries no skill item, and a skill is loaded by the model reading its
+`SKILL.md` with the shell tool. So every converted agent opens with an instruction
+whose named mechanism is absent. The same bodies carry 9 `.Codex/rules/` references
+(the `.claude/agents/` row of the source table in `## Rules and AGENTS.md`) pointing
+at a directory that exists under no spelling.
+
+**Could Kinglet's 8 be expressed in Codex's shape:** the *prose* yes, the
+*contract* no. `developer_instructions` will hold any body, and `interface` +
+`policy` will present it. What has no expression is the `tools:` allowlist, which
+is the half of an agent definition that makes "this agent cannot write files" true
+rather than requested.
+
+**Verdict: agents cross as text and not as capability, and the text as converted is
+wrong in three independent ways** — a `Skill` tool that does not exist (16
+references), a `.Codex/rules/` directory that does not exist (9 references), and a
+`tools:` contract with no destination in the target model.
+
+```bash
+# the narrowing that has nowhere to go
+/usr/bin/grep -H '^tools:' .claude/agents/unity-reviewer.md .claude/agents/unity-scene-builder.md
+# unity-reviewer.md:tools: Skill, Read, Glob, Grep
+# unity-scene-builder.md:tools: Skill, Read, Glob, Grep, mcp__UnityMCP__*
+```
+
+**Recommendation, with the measurement attached.** Do not ship the 8 agents as
+`.codex/agents/*.toml`, and do not ship the importer's conversion of them.
+Measured: the converted files carry 3 keys and no capability; Codex's own agent
+shape has no tools key either; the only `tools` in the `Config` schema is
+session-scoped `web_search`. If an agent's *content* is worth shipping — and
+`unity-fixer`'s and `unity-reviewer`'s bodies are the same skill-shaped material
+`## Commands` describes — express it as a skill, which `## Skills` measured
+working end to end, rather than as an agent definition that silently drops the
+only part of itself that was enforcing anything.
+
+Whatever ships, both body defects have to be fixed before it does, and they are
+**not the same kind of defect**. The 9 `.Codex/rules/` references are the blind
+substitution's damage and are repaired by not letting it run. The 16 `Skill` tool
+references are not corruption at all — they are *correct* in `.claude/agents/`,
+because Claude Code has that tool, and false only once the body is read by Codex.
+That one cannot be fixed by protecting the file from the importer; it needs the
+body written differently for the second client, or written so that it names no
+client-specific mechanism. Whichever, it travels with `developer_instructions`
+wherever that lands, so it is the ship list's problem and not the importer's.
