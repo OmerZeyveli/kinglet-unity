@@ -113,33 +113,50 @@ A reader who fixes one of these still ships the others. They are different.
 The floor sees the sum. One source can reach zero and the survivors carry the total over the bar.
 
 **Tightening the number moves the boundary; it does not close the class.** Worked on the real subject
-this shape was found in — `tests/test-bash32-compat.sh`'s bash-4 sweep, whose five sources measure
-**13 + 7 + 42 + 1 + 1 = 64** files (`.claude/hooks`, `scripts`, `tests`, `install.sh`,
-`uninstall.sh`), which is the guard's own printed census on 2026-08-15 — *"SHIPPED:.claude/hooks=13
-SHIPPED:scripts=7 SHIPPED:tests=42 SHIPPED:install.sh=1 SHIPPED:uninstall.sh=1 … (64 shipped, 22 in
-the early-exit-reader scope)"*. It read `40` / `62` here until 2026-08-15, from the derivation at
-`5881463`; `tests/` has gained two `.sh` files since. Against a hypothetical floor of `>= 55`:
+this shape was found in — `tests/test-bash32-compat.sh`'s bash-4 sweep, whose five sources
+(`.claude/hooks`, `scripts`, `tests`, `install.sh`, `uninstall.sh`) measure
+**13 + 10 + 45 + 1 + 1 = 70** files. That is the guard's own printed census rather than a count taken
+by hand — *"SHIPPED:.claude/hooks=13 SHIPPED:scripts=10 SHIPPED:tests=45 SHIPPED:install.sh=1
+SHIPPED:uninstall.sh=1 … (70 shipped, 25 in the early-exit-reader scope)"*.
 
-| source that dies | total left | verdict |
+**That figure is live, it has rotted three times, and it is the one number in this document under a
+guard.** It read `40` / `62` until 2026-08-15 (the derivation at `5881463`), and then **64** —
+`13`, `7` and `42` across the first three sources — until 2026-08-16; both times a sweep found it
+rather than a failing test, in the file whose whole subject is numbers that rot. (Those two prior
+readings are deliberately *not* written in the live figure's own `a + b + c + 1 + 1 = d` form: a
+pinned figure that looks byte-identical to a live one is the ambiguity this whole step exists to
+remove, and the guard below would otherwise be checking a union of the two.) `tests/test-derived-counts.sh` now
+derives all five sources from the tree and reds when this section disagrees, so the next `.sh` file
+added to any of them fails here instead of quietly widening the gap. Two traps that produced the
+earlier mis-statements: `tests/*.sh` is **not** `tests/test-*.sh` — it counts `run-tests.sh`, which
+is why the tests figure sits one above the suite's file count — and everything else numeric in this
+document is a **past measurement, pinned**, so a reader must not update one of those to match a tree
+it was never about.
+
+No single constant catches every source. The table says which floor each one would need:
+
+| source that dies | total left | the smallest floor that would catch it |
 |---|---|---|
-| `.claude/hooks` (13) | 51 | **caught** — 51 is below 55 |
-| `scripts` (7) | 57 | **missed** |
-| `install.sh` or `uninstall.sh` (1) | 63 | **missed** |
+| `tests` (45) | 25 | 26 |
+| `.claude/hooks` (13) | 57 | 58 |
+| `scripts` (10) | 60 | 61 |
+| `install.sh` or `uninstall.sh` (1) | 69 | 70 |
 
 A floor of `F` over a total of `T` catches exactly the sources **larger than `T - F`**; every source
 inside that slack dies green. Raising `F` shrinks the slack and catches more sources, so tightening
-is not useless — but the only constant that catches all five is `T` itself, 64, and that is not a
-threshold sized against a narrowing. It is a hand-written copy of today's tree, red on the next file
-legitimately added or removed, and stale by construction. **For any constant a maintainer would
-actually ship there is a smaller source above it.** That is what the heading means by *however tight
-the number*: no constant short of the identity closes the class, and the identity is not a constant.
+is not useless — but the last row is the whole argument: catching the smallest source requires `F` to
+be `T` itself, and that is not a threshold sized against a narrowing. It is a hand-written copy of
+today's tree, red on the next file legitimately added or removed, and stale by construction. **For
+any constant a maintainer would actually ship there is a smaller source above it.** That is what the
+heading means by *however tight the number*: no constant short of the identity closes the class, and
+the identity is not a constant.
 
 **This paragraph read *"Tightening the number does not help: with sources of 13, 7 and 40, a floor of
 55 out of 60 still passes with the 13 gone"* for four rounds, and it was wrong in every clause.**
 13 + 7 + 40 is 60, and 60 - 13 = **47**, which is *below* 55: the floor fires. It fires on every
 single-source death in that example (47, 53, 20), so the example demonstrated the opposite of its own
-sentence. The subject it was drawn from has **five** sources totalling **64**, not three totalling
-60. And the consequence was not cosmetic — as written it told a maintainer that tightening the union
+sentence. The subject it was drawn from has **five** sources, not the three totalling
+60 the sentence assumed. And the consequence was not cosmetic — as written it told a maintainer that tightening the union
 floor is futile *and* that no other move exists, when F3 two sections down says to convert the union
 to per-source. **The sole worked justification for this shape inverted the rule it justifies.**
 Recorded rather than quietly replaced: a file about unchecked numbers that silently repairs its own
@@ -426,7 +443,9 @@ over a sweep with nothing in its scope, from the block written to stop exactly t
 
 The same shape sat in the converted `tests/test-bash32-compat.sh`: emptying `SHIPPED_SCRIPT_DIRS`
 removes three rows from **both sides** of the census identity at once, so the identity holds, every
-surviving per-source count is ≥ 1, and the bash-4 sweep silently falls from 64 files to two.
+surviving per-source count is ≥ 1, and the bash-4 sweep silently falls to `install.sh` and
+`uninstall.sh` alone. (No count is written here on purpose: the live one lives in Shape 1, where a
+guard checks it.)
 
 Both are closed with an **absolute** floor on the array itself. The rule generalises: when you write
 a floor, ask what the reference is made of, and whether the failure you are guarding against moves

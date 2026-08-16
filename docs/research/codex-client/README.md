@@ -46,4 +46,24 @@ re-runs rather than trusts.
   that established it. This file is what turns the spec's "inferred, NOT
   verified" list into measured or refuted.
 - `findings.md` — Kinglet's surfaces under Codex: one verdict per surface
-  class, the architecture decision, and everything excluded.
+  class, the architecture decision, everything excluded, the machinery the
+  decision strands, and the six silent-failure layers in one table.
+
+## Two reading conventions, so a sweep over these files is not misread
+
+**Angle brackets here are metavariables, not unfilled placeholders.** `<repo>`,
+`<key>`, `<name>`, `<abs>`, `<dir>`, `<replica>` and their kin stand in for a path
+or a hash the reader supplies; several are quoted verbatim out of Codex's own
+response strings, where the brackets are Codex's. A sweep for `<…>` therefore
+returns dozens of hits on a complete document. It was run to completion on
+2026-08-16 and every hit triaged: the one genuine unfilled slot, a `'<prompt>'` in
+`## Hooks`'s reproduction recipe, is filled.
+
+**A number here is a dated measurement unless it is derived in place.** These are
+records of what was true against `codex-cli 0.145.0` on 2026-08-15/16, and a guard
+that silently updated them would destroy the record rather than protect it — which
+is why nothing in `tests/` reads these two files. Where a figure comes from
+Kinglet's own tree rather than from a probe, the surrounding text gives the command
+to re-derive it and tells you to. Two such figures had already moved by the time the
+wave closed, both inside it: the command bodies' line count, and the bash-4 census
+in `docs/ANTI-VACUITY.md` — that one is guarded, in `tests/test-derived-counts.sh`.

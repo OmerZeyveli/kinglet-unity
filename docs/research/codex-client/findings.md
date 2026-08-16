@@ -485,11 +485,23 @@ printf '[projects."%s"]\ntrust_level = "trusted"\n' "$T" > "$PROBE_HOME/config.t
   "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"hooks/list\",\"params\":{\"cwds\":[\"$T\"]}}"; sleep 10; } \
   | CODEX_HOME="$PROBE_HOME" codex app-server
 
-# 4. append one table per entry, then run WITHOUT any bypass flag
-#    [hooks.state."<key>"]  enabled = true  trusted_hash = "<currentHash>"
+# 4. append one table per entry (key and currentHash exactly as step 3 reported them),
+#    then run WITHOUT any bypass flag
 CODEX_HOME="$PROBE_HOME" codex exec --json --skip-git-repo-check \
-  --sandbox workspace-write --cd "$T" -o last.txt '<prompt>' < /dev/null
+  --sandbox workspace-write --cd "$T" -o last.txt \
+  'Create Assets/Scripts/ProbeInput.cs — a MonoBehaviour that reads the horizontal axis with Input.GetAxis("Horizontal") in Update and logs it.' \
+  < /dev/null
 ```
+
+**The prompt is the experiment, and each row of the table above needs its own.** The
+one written out drives `block-legacy-input`; `block-scene-edit` needs an edit to an
+existing `.unity` file, `warn-filename` a C# file whose class name does not match it,
+and the allow control a file that violates nothing — that control is what makes an
+absent file mean *blocked* rather than *the model chose not to write it*. Read the
+`file_change` item count in the `.jsonl`, not the model's summary: **0** items is the
+veto landing at the router, and a model that declines produces a sentence rather than
+a zero. The exact bytes of each live probe's prompt live in the gitignored evidence
+directory; what a reproduction needs is the shape.
 
 Raw transcripts land under `docs/research/codex-client/evidence/`, which
 `.gitignore` excludes — the verdicts are here, the credentials never are.
@@ -663,6 +675,17 @@ enumeration of everything Codex offers. `skills/extraRoots/set` was found by rea
 one schema file to the end, after the first three routes had already been written up
 as complete.
 
+**The enumeration has since been run to closure, and it is stated so the negative
+carries its search.** `codex app-server generate-json-schema` was re-run offline
+2026-08-16 under a disposable `CODEX_HOME`, and `ClientRequest.json` carries exactly
+**three** `skills/*` request variants: `skills/list`, `skills/extraRoots/set`, and
+`skills/config/write`. The third is new to this document and it is **not** a fourth
+root route — `SkillsConfigWriteParams` is `{enabled, name?, path?}`, an enable/disable
+toggle for a skill Codex has already found, which is what the `skill_approval`
+configuration key is about. So it neither adds a root nor refutes the two refutations
+above; it is recorded because a negative about a tool this size is a claim about a
+search, and this is the search.
+
 ### The detector, and both directions it can be wrong in
 
 Codex has no skill *tool*. `ThreadItem`'s variant list — derived from
@@ -764,6 +787,17 @@ what give that second entry meaning:
 
 Without these, "the relevant skill loaded" and "a skill always loads" would be the
 same observation.
+
+**The `none` cells are per-run facts, not invariants, and one of them has already
+drifted.** A clean-slate re-run of `t5-control` loaded `using-kinglet` where the
+committed transcript loads nothing. Across every control run now in existence —
+five — **four loaded nothing**, and `t5-control-api` loaded nothing with **no shell
+command at all** on two independent runs. So the column means *"this run loaded
+nothing"*, not *"this prompt cannot load anything"*, and the load-bearing claim is
+unaffected: what the controls establish is that loading is **task-driven rather than
+unconditional**, and a control that occasionally loads the session-entry skill is
+still not a control that loads the *topical* one. `t5-control-addressables` declining
+`addressables` is the row that carries that, and it has not drifted.
 
 **The `noguide` rows are what rule out the second confound.** The imported `AGENTS.md`
 carries a *"Skills matching this project"* block naming `input-system` and
@@ -1045,9 +1079,17 @@ ls .claude/rules/*.md
 | A file the entry document **orders** read is followed | **yes** — **12 of 12** opened, **12 of 12** obeyed, under the request shape that leaves the declarative pointer at 1 of 12 | `t6-imperative-field-r{1,2,3}`, ×4 samples |
 | Kinglet's 6 rules can ship as pointers | **conditionally, and the condition is a rate rather than a switch.** A declarative pointer is a **map, not an order**: it makes the rules reachable and does not make them read. The request shape sets how often they are | the 2 × 3 table below |
 
-**Verdict: `AGENTS.md` is the only document that reaches the model unasked, and a
-pointer inside it decides *where* the model looks while the request mostly decides
-*how often*.** The entry document is injected whole. A file outside it was never
+**Verdict: `AGENTS.md` is the only project document whose *body* reaches the model
+unasked, and a pointer inside it decides *where* the model looks while the request
+mostly decides *how often*.** The word *body* is load-bearing and was missing here
+for a round: `## Skills` above measures that every skill's **name and description**
+are injected too, with no tool call — `t5-selfreport` lists them off 16 580 input
+tokens having run nothing. So the categorical as first written was contradicted one
+section up, by this same document. What is unique to `AGENTS.md` is that the whole
+file arrives, not merely an index entry for it. (The round that wrote that sentence
+was the round correcting two *other* categoricals, which is why the standing method
+is now: after rewriting a categorical, sweep for the categorical the rewrite
+introduced.) The entry document is injected whole. A file outside it was never
 once opened without a pointer — 0 in 24 runs — and *with* a pointer it was opened
 between one time in twelve and six times in six, depending on nothing but how the
 request was phrased. Where the request does send the model looking, the pointer is
@@ -1659,7 +1701,10 @@ reports 18 at repo scope where `.claude/skills/` holds 16.
 The natural reading of "a command routes to an agent, and agents are dead under
 Codex, so the command is dead weight" is **wrong**, and it is worth stating because
 it is the conclusion this section was expected to reach. Kinglet's command bodies
-are 919 lines; the routing is a line or two of each. `unity-fix.md` is 58 lines of
+are **982** lines (`cat .claude/commands/*.md | wc -l`, re-derived 2026-08-16 — it read
+919 until Task 8 added 63 lines to `unity-doctor.md` inside this same wave, which is
+what a count written mid-wave does); the routing is a line or two of each.
+`unity-fix.md` is 58 lines of
 which the `## Agent Routing` section is one bullet — the substance is an ordered
 Unity diagnostic (`NullReferenceException` → missing reference, destroyed object,
 execution order; Missing Script → file/class name mismatch, asmdef issue;
@@ -1952,7 +1997,7 @@ Kinglet's guarantees onto a tree Kinglet never touched.
 |---|---|---|---|
 | 1 | **Hooks** | `scripts/codex-hook-shim.sh`, now in `install.sh`'s payload → `.claude/scripts/codex-hook-shim.sh`; `.codex/hooks.json` **generated** by `--emit-config` at install time, **after `scripts/` is already in place** — see the ordering note below the table, which is a contract on the installer and not a preference; hook trust granted at install time | `## Hooks`: all nine tool-event hooks enforce through the shim; without it eight of the nine fire and do nothing. The config's top level must be a `hooks` wrapper — a bare event map is rejected with a parse warning. `timeout` is milliseconds in `.claude/settings.json` and **seconds** in Codex, so the generator converts by ceiling division and orders the two ceilings: shim `--timeout ceil(ms/1000)`, Codex `timeout ceil(ms/1000)+1` |
 | 2 | **Skills** | `<project>/.agents/skills/` — a real directory holding one symlink per skill, `<name>` → `../../.claude/skills/<name>` | `## Skills`: `.claude/skills/` unaided gives **0**; the `skills` config key gives 0 under two spellings; a symlink root gives 16, enabled, with invocation observed. The root is per-entry rather than the single directory symlink because row 3 needs generated entries beside the symlinked ones — measured 2026-08-16 under this task, see **The mixed root** below |
-| 3 | **Commands** | `scripts/codex-command-to-skill.sh`, in the payload → `.claude/scripts/codex-command-to-skill.sh`; it writes `<project>/.agents/skills/<command-name>/SKILL.md`, one per `.claude/commands/*.md` | `## Commands`: 7 of the 9 are dropped silently by the importer on an argument token, the loss is **content and not routing** (919 lines of Unity diagnostics that exist nowhere else in the toolkit), no command name collides with a skill name, and a converted command was observed loading unnamed. Under the Kinglet path with row 2 alone, 9 of 9 would be lost — worse than the importer |
+| 3 | **Commands** | `scripts/codex-command-to-skill.sh`, in the payload → `.claude/scripts/codex-command-to-skill.sh`; it writes `<project>/.agents/skills/<command-name>/SKILL.md`, one per `.claude/commands/*.md` | `## Commands`: 7 of the 9 are dropped silently by the importer on an argument token, the loss is **content and not routing** (982 lines of Unity diagnostics that exist nowhere else in the toolkit), no command name collides with a skill name, and a converted command was observed loading unnamed. Under the Kinglet path with row 2 alone, 9 of 9 would be lost — worse than the importer |
 | 4 | **The entry document** | `scripts/generate-claude-md.sh --client codex` emits it; Task 9 writes it to `<project>/AGENTS.md`. This repository gets its own tracked `AGENTS.md` | `## Rules and AGENTS.md`: `AGENTS.md` is **injected** (sentinel returned with 0 shell commands); `CLAUDE.md` is *findable*, not loaded (same sentinel, recovered only after an `rg`). This half is unconditional — the injection happens before the turn |
 | 5 | **Rules** | `.claude/rules/` ships as it already does; the Codex entry document keeps the **declarative pointer** and the existing digest **and adds the four `NON-NEGOTIABLE` sections that are in neither the digest nor a hook**, plus the editor-guard rule. The Claude Code document is byte-identical to base | `## Rules and AGENTS.md`: without the pointer `.claude/rules/` was opened **0 times in 24 runs**, and the failure mode is not "no conventions" but **confidently wrong** ones. The pointer is not sufficient (1 of 12 under a conventions-blind request) while the same rule inlined binds 12 of 12. The membership is derived, not asserted — see **What is and is not inlined** below, which corrects a false claim this row carried for one round |
 | 6 | **MCP** | the `mcp_servers.UnityMCP` row for `<project>/.codex/config.toml`, written by Task 9. The entry document names the file and **marks the client-behaviour question open** | `codex-facts.md`: the importer writes exactly that row pointing at the bridge's `localhost:8080/mcp` URL, so the **configuration shape** is measured. **Whether the routes behave is not** — Task 7 has not run. See **Open, not answered** below |
@@ -2117,3 +2162,220 @@ not advisory** — provided row 1 and its trust step are installed. The entry
 document states that conditional in those terms rather than claiming enforcement
 unconditionally, because a user who bridged only the skills has an advisory install
 and no way to tell from the inside.
+
+---
+
+## Architecture decision
+
+*Written by Task 10 on 2026-08-16, after Tasks 1–6 and 8–9 shipped. Not a
+measurement — a decision, read off what the measurements let ship. Task 7 has not
+run; where that limits the decision it is said so in place rather than at the end.*
+
+The spec put three shapes on the table and **expected A**:
+
+- **A — the Superpowers shape.** One shared content tree, a thin per-client
+  manifest, `AGENTS.md` as an entry document (a symlink, in the upstream it is drawn
+  from), a per-client hook manifest. Its evidence was that it ships to seven clients
+  today.
+- **B — the 2026-07-23 platform design.** Fill `src/catalog/`, write renderers in
+  `tools/kinglet_build/`, generate a product per client.
+- **C — installer-only.** Leave the repository shape alone; `install.sh` translates.
+
+### The decision: none of the three, and here is what it actually is
+
+**What shipped is a single shared content tree plus a runtime adapter, with every
+client-specific artefact generated on the target machine at install time and none of
+it tracked.** Read off the branch rather than off the ship list:
+
+| What shipped | Where |
+|---|---|
+| the payload, unforked | `.claude/` — `.claude/hooks/` and `.claude/settings.json` are **byte-unchanged since the base commit** |
+| the runtime adapter | `scripts/codex-hook-shim.sh`, installed into the project as `.claude/scripts/codex-hook-shim.sh` and executed on **every hook invocation** |
+| a generator for the one class with no Codex surface | `scripts/codex-command-to-skill.sh` |
+| a second arm on the existing entry-document generator | `scripts/generate-claude-md.sh --client codex` |
+| sequencing, consent, receipt, and the home write | `install.sh --client codex [--codex-trust]`, `uninstall.sh` |
+| the repository's own entry document | `AGENTS.md`, tracked, 42 lines |
+| nothing at all | `src/catalog/`, `tools/kinglet_build/`, `adapters/` — **0 lines changed across the whole branch** |
+
+Against A: **two of A's four members are not merely unused, they are measured
+unshippable.** There is no tracked per-client manifest and there cannot be one —
+`.codex/hooks.json`'s command strings carry absolute paths to the shim and to each
+hook, so a committed copy would carry one machine's filesystem, and hook trust keys
+on a hash that embeds that same absolute path (`codex-facts.md` §F5). A project
+cannot vouch for itself: `trusted_hash` written inside the matcher group is not
+rejected, it is **silently ignored**, same `currentHash`, `warnings: []`, still
+untrusted. `.codex/hooks.json`, `.codex/agents` and `.agents` are all recorded in
+`provenance-skip.tsv` as `rule=absent`, so a tracked manifest fails the provenance
+gate rather than drifting back in quietly. And `AGENTS.md` is not a symlink to `CLAUDE.md`: it is
+a *different document*, because `## Rules and AGENTS.md` measured that a declarative
+pointer is read 1 time in 12 under a conventions-blind request while an imperative one
+is read 12 of 12 — so the Codex arm carries an imperative instruction and an inlined
+block that the Claude Code arm does not.
+
+Against C: the translation is **not** inside `install.sh`, which was the spec's own
+stated objection to C. It is in two standalone scripts with their own test surfaces
+(`tests/test-codex-shim.sh`, `tests/test-codex-surface.sh`), and the installer calls
+them. What `install.sh` owns is sequence, consent, the receipt, and the write to the
+user's home — none of which is translation. The repository shape did change, by three
+scripts and one root document.
+
+**And the member none of the three names is the one that decided the wave: a runtime
+adapter.** A, B and C are all *layout* answers — where do files live, what renders
+them, who copies them. The defect that had to be solved is not a layout defect.
+
+### The measurement that chose it
+
+**Codex's file tool is `apply_patch`, and its `tool_input` carries exactly one key:
+`command`, a patch envelope.** No `file_path`, no `content`, no `new_string`, no
+`old_string`. Measured by dumping a hook's stdin, and every row of `## Hooks`'s
+per-hook table carries the control that makes it mean something: `block-scene-edit`
+given a Claude-shaped payload exits 2 with 443 bytes and blocks; given the real Codex
+payload for the same edit to the same file it exits 0 with 0 bytes. Eight of the nine
+tool-event hooks are inert that way; `bash-gate` survives only because `command` is
+the one field Codex does supply. (Byte counts of a refusal are `constant +
+len(command)`, so two readers measuring the same hook on different inputs get
+different numbers and neither is a property of the hook — quote the row, not a figure
+lifted from another rig.)
+
+**No arrangement of files fixes that.** A shared tree does not, a per-client manifest
+does not, a renderer does not, and an installer that copies bytes does not — every one
+of them would have shipped twelve registered hooks, matching matchers, `warnings: []`,
+`errors: []`, and not one file-level rule enforced. The mismatch is in the payload
+vocabulary at the moment the hook runs, so the fix has to be at that moment too. That
+is what `scripts/codex-hook-shim.sh` is, and it is why the shape that shipped is not
+one of the three: **the wave's load-bearing artefact is a process that runs in the
+user's project on every tool call, not a file that is placed there.**
+
+Three further measurements each closed off a specific member of A or B, and they are
+named separately because any one of them alone would leave the decision arguable:
+
+1. **Hook trust forces generation over tracking.** The hash cannot be precomputed and
+   the project cannot vouch for itself, so the ordering is fixed — write
+   `hooks.json` → query `hooks/list` → write the user's `$CODEX_HOME/config.toml`.
+   That is an install-time sequence, and a tracked manifest has no place in it.
+2. **The single shared tree survives, but needs a root the repository cannot hold.**
+   `.claude/skills/` unaided gives **0** repo-scope skills; the `skills` configuration
+   key gives 0 under two spellings, each against a control in the same file that
+   demonstrably took effect. What works is a per-project `.agents/skills/` root of
+   symlinks — a thing the installer makes, not a thing the repository ships. So A's
+   best idea (one tree, no second copy) is kept, and A's mechanism for exposing it is
+   not available.
+3. **B builds renderers for the layer that measured least load-bearing.** What crossed
+   in this wave is executable — a shim, a converter, a generator arm. What did not
+   cross is declarative: the `tools:` allowlist has no destination in Codex's agent
+   shape, and commands have no surface at all. `python3 -m tools.kinglet_build
+   validate` still reports `Validated 0 canonical units, 0 routes, 2 adapters` against
+   `src/catalog/routing.json` = `{"routes": []}`; re-derived 2026-08-16. Filling that
+   machine would have produced generated prose for exactly the classes that measured
+   dead, and none of the runtime translation that measured decisive.
+
+### What this decision does not rest on
+
+**Task 7 has not run**, so nothing here is informed by how Codex's MCP client behaves
+against a live Unity bridge. That does not change the decision — the shim, the skill
+root and the entry document are all measured without Unity — but it does bound it: if
+Codex's MCP client turns out to need per-route translation, that translation has no
+home yet, and the shape above says where it would go (a runtime adapter, not a
+renderer) without saying that it is needed.
+
+---
+
+## Excluded, by surface class
+
+Task 8's ship list carries a row-level exclusion table with the measurement behind
+each. This section is the **class-level** view, because a class dropped without an
+entry is indistinguishable from a class forgotten, and two of these are whole classes
+rather than rows.
+
+| Class | Status on Codex | The measurement | Revivable by work, or structurally absent? |
+|---|---|---|---|
+| **Hooks** | **ships, with a named translation** | 9 of 9 tool-event hooks enforce through the shim; without it 8 of the 9 fire and do nothing | — |
+| **Skills** | **ships, no translation at all** | 16 discovered through a symlink root, invocation observed unnamed in 5 of 5 relevant probes | — |
+| **Rules** | **ships as pointer + digest + an inlined non-negotiables block** | without the pointer `.claude/rules/` was opened **0 times in 24 runs**; the failure mode is confidently wrong conventions, not absent ones | — |
+| **Commands, as a command surface** | **structurally absent** | `codex-cli 0.145.0` has 24 subcommands and none is a prompt registry; no `~/.codex/prompts/`; the only command-shaped app-server methods are shell execution; and Codex's own importer describes migrating commands **into skills** | **Structurally absent.** No work on Kinglet's side creates a `/unity-fix`. The *content* crosses — `scripts/codex-command-to-skill.sh` writes all 9 as skills — and what is lost is dispatch, not substance |
+| **Agents, as `.codex/agents/*.toml`** | **excluded wholly** | converted files carry exactly 3 keys (`name`, `description`, `developer_instructions`); none of Codex's 6 built-in agent definitions has a tools key; the only `tools` in the `Config` schema is session-scoped `web_search` (23 keys, re-derived 2026-08-16) | **Structurally absent** for the contract. The prose would carry; the capability contract has nowhere to go |
+| **The `tools:` capability narrowing** | **excluded, and this is the loss that matters** | **5 of 8** agents carry a substantive narrowing; `unity-reviewer` is deliberately read-only and under Codex would run with `Write`, `Edit`, `Bash` **and** MCP | **Partly revivable, and unmeasured.** `ThreadStartParams.sandbox`, `TurnStartParams.sandboxPolicy` and `permissionProfile/list` all exist, so *a client* could start a narrowed thread. Whether `multi_agent` dispatch propagates it is unmeasured, and `codex exec` — the shape this wave measured — takes one `--sandbox` for the whole run |
+| **Agents re-expressed as skills** | **excluded in this wave** | a skill has no tools contract either, so the skill route drops the narrowing exactly as completely; and `## Skills` observed **6 distinct skills ever loading** out of 16–18 discovered | Revivable — it is a content decision, not a mechanism one. Deferred because it doubles the surface with no measurement that anyone reaches it |
+| **MCP client behaviour** | **not excluded — unmeasured** | the configuration row is measured (the importer writes exactly it); nothing establishes that the routes behave | **Unmeasured, and it is Task 7's.** Recorded here so it is not read as an exclusion |
+| **The importer path** | **not repaired, deliberately** | the importer drops 7 of 9 commands silently, migrates no rules, rewrites 84 `.claude/` references to a `.Codex/` that exists under no spelling, strips every tool grant, copies `timeout: 3000` into `timeoutSec` unconverted — and reports 31 successes, 0 failures | Not Kinglet's to repair: it rewrites files Kinglet never writes. Kinglet's answer is to write its own layout instead |
+
+**Two classes are dead as classes, and the difference between them is worth keeping.**
+Commands are dead because Codex has no such surface — a structural absence, and the
+content survives the crossing by changing shape. Agents are dead because Codex has no
+*contract* for the half of an agent definition that makes "this agent cannot write
+files" true rather than requested — the prose would cross perfectly and the guarantee
+would not, which is the worse of the two failures and the reason the whole class is
+excluded rather than half-shipped.
+
+---
+
+## The debt this decision strands
+
+The 2026-07-23 platform program built a machine and never put content through it. The
+decision above does not use it, does not extend it, and **this wave deliberately does
+not retire it.** Naming it is the whole obligation here, because the failure shape
+this repository has hunted across four waves is a thing that stops being true while no
+document changes.
+
+Counts re-derived 2026-08-16, not copied from the plan:
+
+```bash
+ls src/catalog | wc -l                       # 3
+find tools/kinglet_build -name '*.py' | wc -l # 10
+ls adapters/*/profile.json | wc -l            # 2
+```
+
+| Stranded | Size | The measurement that stranded it |
+|---|---|---|
+| `src/catalog/` | **3** files — `capabilities.json`, `routing.json`, `support-policy.json` | `routing.json` is `{"schema_version": 1, "routes": []}`. The Codex client shipped without one route ever being written |
+| `tools/kinglet_build/` | **10** Python modules, one of which is the renderers package's `__init__.py` | `python3 -m tools.kinglet_build validate` reports `Validated 0 canonical units, 0 routes, 2 adapters`. It has a working CLI, 135 passing tests under `tests/kinglet/`, and no content |
+| `adapters/claude/profile.json`, `adapters/codex/profile.json` | **2** files | **This is the sharpest one, because the profile is not merely unused — it is contradicted.** `adapters/codex/profile.json` declares `output_roots` of `plugins/kinglet-unity` and `packages/codex-project`; the layout that measured correct is `AGENTS.md`, `.agents/skills/`, `.codex/hooks.json` and `.codex/config.toml`, and neither declared root appears anywhere in Codex. It also maps a `delegate` capability to `agent-delegation` **per adapter**, while `## Agents` measures that Codex 0.145.0 has no per-agent capability surface at all |
+
+**`migration/baseline-inventory.json` is NOT stranded, and the spec said it was.**
+That is corrected here rather than repeated: it is live and maintained. This wave
+updated it — `source_commit` moved to `b3ecfb2` and `.claude/commands/unity-doctor.md`'s
+recorded sha256 changed with Task 8's edit — and `tests/kinglet/test_baseline_inventory.py`
+verifies it inside the suite through `tests/test-kinglet-build.sh`. It tracks the
+`.claude/` payload, not the unbuilt platform, which is why it behaved differently from
+its three neighbours in the spec's list.
+
+**Why it is not retired now.** Retiring it means deleting 15 tracked files and most of
+the 135 tests that `tests/test-kinglet-build.sh` runs — not all of them, since the
+baseline-inventory tests below belong to the live half — and this wave's own evidence
+is one client wide: the decision above was chosen
+by measurements taken against `codex-cli 0.145.0` on one Linux host, with Task 7 unrun
+and no Windows or macOS pass. B's premise — that clients diverge enough to need
+generated products — was not *refuted*; it was **not needed for this client**, which
+is a weaker result and does not license a deletion. What is now recorded, and was not
+before, is that the second client came and went without touching it. A third client is
+the evidence that decides whether it is dead or merely early, and `provenance-skip.tsv`
+already holds the shape a retirement would take.
+
+---
+
+## The six silent-failure layers, in one place
+
+Each layer reports success in its own terms while the layer under it does nothing.
+They are collected here because they were measured one per task and no single section
+holds them all — and because the last one is the likeliest a real user meets.
+
+| # | Layer | What it reports | What actually happens | Where |
+|---|---|---|---|---|
+| 1 | Codex's own importer | **31 successes, 0 failures** | 7 of 9 commands dropped, rules never migrate, 84 path references rewritten to a directory that does not exist, every tool grant stripped, `timeout` copied ms-into-seconds | `codex-facts.md` §F1 |
+| 2 | Hook registration | `registered 12, warnings: [], errors: []`, `enabled: true` | nothing yet — but every signal a reader would check is now green | `codex-facts.md` §F1 |
+| 3 | Per-hook trust | `enabled: true`, `trustStatus: untrusted`, `statusMessage: null` | the hook fires **0** times. No prompt, no warning, nothing logged | `codex-facts.md` §F5 |
+| 4 | The hook body | the matcher fires, the process runs | 8 of 9 read fields `apply_patch` does not have, and exit 0 with 0 bytes | `codex-facts.md`, `## Hooks` |
+| 5 | The hook's own ceiling | Codex's `timeoutSec` expires | a `PreToolUse` hook Codex times out is a **silent allow** — the edit lands, the model is told nothing, and Codex's stderr carries **0** `hook:` lines | `## Hooks`, "the two ceilings are ORDERED" |
+| 6 | **Project trust** | `hooks: [], warnings: [], errors: []` | against a project Codex has not been told to trust, the hooks are **not reported as untrusted — they are not registered at all**, and nothing says so | Task 9, `install.sh` |
+
+**Layer 6 is the one to state to users.** The other five are reached by installing
+something; layer 6 is reached by installing *correctly* and then opening the project.
+A reader who checks the one diagnostic that exists — `hooks/list` — is handed three
+empty arrays and no error, which is indistinguishable from a project with no hooks in
+it. `install.sh` names this case with the commands that fix it, and `README.md` says
+it in plain words, because a user who installs expecting guardrails and gets none has
+been misled by an omission.
+
+Layers 4 and 5 are closed by the shim, layer 3 by `--codex-trust`, and layer 6 by
+granting project trust once. Layer 1 is closed only by not using the importer. Layer 2
+was never a defect — it is in the list because it is the signal a reader would trust.

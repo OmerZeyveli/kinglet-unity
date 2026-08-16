@@ -65,8 +65,8 @@ does, via a `{ printf …; sleep 8; }` brace group. A probe that reports "no
 response" without holding stdin open has measured nothing.
 
 **A method's existence is decided by calling it.** An unknown method returns
-JSON-RPC `-32600` and the error text enumerates **129** methods — every one this
-build accepts — which is the negative control the rest of this file relies on:
+JSON-RPC `-32600` and the error text enumerates every method this build accepts,
+which is the negative control the rest of this file relies on:
 
 ```bash
 … '{"jsonrpc":"2.0","id":3,"method":"externalAgentConfig/thisMethodDoesNotExist","params":{}}'
@@ -76,6 +76,16 @@ build accepts — which is the negative control the rest of this file relies on:
 `externalAgentConfig/thisMethodDoesNotExist`, expected one of `initialize`,
 `thread/start`, … `externalAgentConfig/detect`, `externalAgentConfig/import`,
 `externalAgentConfig/import/readHistories`, …"},"id":3}`
+
+**Do not quote a method count as a constant, and this file used to.** Three readings
+of the same pinned build disagree: the error text was counted at **129** by one agent
+and **123** by another, and `ClientRequest.json` from
+`codex app-server generate-json-schema` carries **89** request variants (re-derived
+2026-08-16, `codex-cli 0.145.0`). The three are not obviously the same population —
+the error enumerates what the deserialiser will accept, the schema enumerates what the
+protocol documents — and nothing here established which. **Use the enumeration as a
+membership test, never as a total**, and prefer the schema bundle when the question is
+"does a route for X exist", because it is offline, exhaustive and re-derivable.
 
 ## F1 — external agent configuration import
 
@@ -196,8 +206,14 @@ silently answers **for the app-server's own working directory**:
 |---|---|---|
 | `hooks/list` with `cwd` | `/home/riive/…/kinglet-unity` (**wrong repo**) | 0 hooks |
 | `hooks/list` with `cwds` | `<replica>` | 12 hooks |
-| `skills/list` with `cwd` | `/home/riive/…/kinglet-unity` (**wrong repo**) | 6 skills |
+| `skills/list` with `cwd` | `/home/riive/…/kinglet-unity` (**wrong repo**) | 6 skills, **0 of them repo-scope** |
 | `skills/list` with `cwds` | `<replica>` | 24 skills, **of which 18 repo-scope** |
+
+**Read the repo-scope halves of that last column and ignore the totals.** 24 and 6 are
+scope-mixed and neither reproduces across homes — see *"Quote the 18, not the total"*
+below, where a second disposable home reported 59. The load-bearing contrast here is
+**18 versus 0**: the `cwd` form found none of the replica's skills while reporting a
+number that looks like an answer.
 
 A well-formed answer for the wrong repository is worse than an error: the `cwd`
 form would let a reader "confirm" every hook finding below against a tree that
@@ -448,23 +464,26 @@ Measured with `skills/list` and `hooks/list` against the imported replica:
 
   **These are registration counts, not firing counts, and the distinction is the
   whole of F3.** Registering is what `hooks/list` reports; firing is what a marker
-  file proves. Measured firing, per event, as of this round:
+  file proves. Measured firing, per event:
 
   | Event | Registered | Observed firing | Where |
   |---|---|---|---|
   | `preToolUse` | 5 | **yes** | F4's whole rig |
   | `sessionStart` | 2 | **yes** | the `timeoutSec` probe |
   | `postToolUse` | 4 | **yes** | F5, `v-allow` on `PostToolUse` — fired once, `marker PRESENT` |
-  | `stop` | 1 | **not measured** | no probe has driven it |
+  | `stop` | 1 | **yes** | Task 3's re-review, `fires=1`; and end to end in `findings.md` `## Hooks`, where `session-save.sh` wrote `session.json` |
 
-  `postToolUse` was unmeasured until this round and is now measured: it fires, and
-  its payload carries `hook_event_name: "PostToolUse"`, `tool_name: "Bash"`, the
+  **All four of the events Kinglet registers are now observed firing.** `stop` was
+  the last one, and it read *"not measured — no probe has driven it"* here until
+  2026-08-16. It fires, and its payload is the distinct one: `last_assistant_message`
+  and `stop_hook_active`, and **no tool fields at all** — no `tool_name`, no
+  `tool_input`, no `tool_response`. That is the shape `session-save.sh` is handed.
+
+  `postToolUse` fires with `hook_event_name: "PostToolUse"`, `tool_name: "Bash"`, the
   same single-key `tool_input`, **plus a `tool_response`** (a string for the shell
   tool) that `preToolUse` does not have. That matters because 4 of Kinglet's 12
   hooks are `PostToolUse` (`warn-serialization`, `warn-filename`,
   `warn-platform-defines`, `track-edits` — derived from `.claude/settings.json`).
-  `stop` remains **registered but never observed firing**, and that is stated in
-  those words rather than assumed from its siblings.
 - **Matchers are carried across verbatim** — `Edit|Write`, `Bash`,
   `startup|clear|compact` — i.e. Claude Code's tool names, untranslated. Whether
   they nevertheless *match* is measured below, and the answer is yes.
@@ -662,7 +681,12 @@ userPromptSubmit, subagentStart, subagentStop, stop`.
 
 Note also that every hook above ran only because `--dangerously-bypass-hook-trust`
 was passed; hooks registered as `trustStatus: "untrusted"` and nothing in this
-session granted persisted hook trust. How trust is granted normally is unmeasured.
+session granted persisted hook trust. **How trust is granted normally was unmeasured
+when this paragraph was written and is measured now — `## F5` below.** It is config,
+not a method: one `[hooks.state."<key>"]` table per entry in the *user home's*
+`config.toml`, carrying the `currentHash` that `hooks/list` reports. Both block
+mechanisms were then re-run under legitimate trust with no bypass flag in argv, and
+neither result changed.
 
 ### Where the MCP server row came from
 
@@ -1067,16 +1091,22 @@ while `hooks/list` for that same directory, at that same moment, reported
 statusMessage=None`.
 
 **`enabled: true` does not mean it will run**, and `statusMessage` — the one field
-whose name suggests it would explain this — is `null`. This is a **fourth**
+whose name suggests it would explain this — is `null`. This is another
 silent-failure layer, on top of the payload problem, the exit-code problem and the
 matcher question, and it gates all of them: a user who installs Kinglet's hooks
-correctly gets nothing, with no diagnostic, until trust is granted.
+correctly gets nothing, with no diagnostic, until trust is granted. (This paragraph
+called it *"a fourth"*, which was true when it was written and is not a total: the
+wave ended with **six**, and they are enumerated in one table in `findings.md`,
+*"The six silent-failure layers, in one place"*. An ordinal written mid-measurement
+is the same class of stale figure as a count.)
 
 ### The trust store: `hooks.state` in the home's `config.toml`
 
-There is **no `hooks/trust` app-server method** — the 123-method enumeration returned
-by an unknown-method error contains exactly two hook methods, `hooks/list` and the
-bogus one used to trigger the list. Trust is written as *config*: the binary carries
+There is **no `hooks/trust` app-server method** — the enumeration returned by an
+unknown-method error contains exactly two hook methods, `hooks/list` and the bogus one
+used to trigger the list, and `ClientRequest.json` agrees: `hooks/list` is the only
+`hooks/*` variant in the schema bundle. (The enumeration's *length* is not quoted
+here; see "Do not quote a method count as a constant" above.) Trust is written as *config*: the binary carries
 `config/batchWrite failed while updating hook trust in TUI` and a
 `hooks.state."` config-path prefix, alongside a `HookStateToml { enabled, trusted_hash }`.
 
@@ -1246,4 +1276,8 @@ obligation and it has three properties Task 8/9 must design around:
 And the honest framing for the ship: until this is implemented, everything F4 proves is
 proved behind a flag Kinglet must not tell users to pass. With it implemented, Kinglet's
 hooks run legitimately — and are then still inert against the `apply_patch` payload
-until Task 4 fixes that. The four layers are independent, and all four have to be right.
+until Task 4 fixes that. **The layers are independent, and every one of them has to be
+right** — Task 4 shipped the shim and the ordered timeout ceilings, Task 9 shipped the
+trust grant and found a sixth layer beneath all of them (an untrusted *project*
+registers no hooks at all and says nothing). The full set is enumerated once, in
+`findings.md`, rather than counted again here.

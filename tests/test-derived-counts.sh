@@ -1139,3 +1139,127 @@ done
 if [ -n "$DCE_MISSING" ]; then printf '%s' "$DCE_MISSING"; fi
 assert_eq "0" "$(printf '%s' "$DCE_MISSING" | grep -c . || true)" \
   "every hook variable and state path docs/ARCHITECTURE.md names in prose is still in the tree"
+
+# ============================================================================
+# docs/ANTI-VACUITY.md's bash-4 census — the one LIVE figure in a document otherwise made of pinned
+# past measurements, and the number this repository has now watched rot three times.
+#
+#   `40` / `62`                 until 2026-08-15
+#   `13 + 7 + 42 + 1 + 1 = 64`  until 2026-08-16
+#
+# Both were found by a completion sweep, in no diff, by nobody's review — which is the whole reason
+# a guard replaces the warning. Shape 1 of that document is worked on `tests/test-bash32-compat.sh`'s
+# five sources, so the census is a property of the tree and moves whenever a `.sh` file is added to
+# `.claude/hooks/`, `scripts/` or `tests/`. Three tasks of the 2026-08-15 Codex wave each added one,
+# which is why the figure written at the start of that wave was wrong by construction before it ended.
+#
+# TWO TRAPS, both of which produced an earlier mis-statement and both of which this block encodes
+# rather than restates:
+#
+#   * `tests/*.sh` is NOT `tests/test-*.sh`. It counts `run-tests.sh`, so the tests figure is one
+#     ABOVE the suite's file count. Reading the wrong glob is how the number went wrong before.
+#   * The early-exit-reader scope is a DIFFERENT union — `.claude/hooks`, `scripts`, `install.sh`,
+#     `uninstall.sh`, without `tests` — and the document quotes both totals in one sentence.
+#
+# The derivation below is the same one `tests/test-bash32-compat.sh` performs on itself; this block
+# is deliberately NOT a comparison against that file's output, because sourcing it here would make
+# both sides move together — F4 in the document being guarded. Two independent derivations of one
+# quantity is the shape, and the second derivation is the sentence a human wrote.
+echo "--- derived counts: the bash-4 census in docs/ANTI-VACUITY.md ---"
+
+DCV_DOC="docs/ANTI-VACUITY.md"
+DCV_HOOKS=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | grep -c . || true)
+DCV_SCRIPTS=$(ls -1 "$REPO_DIR"/scripts/*.sh 2>/dev/null | grep -c . || true)
+DCV_TESTS=$(ls -1 "$REPO_DIR"/tests/*.sh 2>/dev/null | grep -c . || true)
+DCV_TOTAL=$((DCV_HOOKS + DCV_SCRIPTS + DCV_TESTS + 2))
+DCV_PIPE=$((DCV_HOOKS + DCV_SCRIPTS + 2))
+
+# The derivation has to be able to fail, for the same reason the surface-pool block above says so:
+# run against a tree whose payload has moved and every count is 0, and 0 compared with 0 is a green
+# suite that inspected nothing. Asserted before anything is compared against it.
+DCV_DERIVATION="ok"
+[ "$DCV_HOOKS"   -ge 1 ] || DCV_DERIVATION="no .sh files under \$REPO_DIR/.claude/hooks"
+[ "$DCV_SCRIPTS" -ge 1 ] || DCV_DERIVATION="no .sh files under \$REPO_DIR/scripts"
+[ "$DCV_TESTS"   -ge 1 ] || DCV_DERIVATION="no .sh files under \$REPO_DIR/tests"
+[ -f "$REPO_DIR/install.sh" ]   || DCV_DERIVATION="install.sh is not at the repository root, so the census's fourth source is not 1"
+[ -f "$REPO_DIR/uninstall.sh" ] || DCV_DERIVATION="uninstall.sh is not at the repository root, so the census's fifth source is not 1"
+assert_eq "ok" "$DCV_DERIVATION" \
+  "the bash-4 census is derived from a tree that actually has shell scripts in it"
+
+# Every site in the document that carries a number from that census, each with its own pattern, and
+# each pattern matching exactly one site. Fields: relative path, extended-regex pattern, then the
+# expected 1st, 2nd and 3rd number in the match (`-` where the match carries fewer).
+#
+# MATCHED AGAINST THE FILE FLATTENED — the sum sentence wraps mid-expression and the quoted census
+# wraps between `SHIPPED:scripts=` and the rest, so a line-oriented reader sees neither. That is the
+# same wrap that hid these numbers from three readers.
+DCV_CLAIMS="$DCV_DOC	[0-9]+ [+] [0-9]+ [+] [0-9]+ [+] 1 [+] 1 = [0-9]+	$DCV_HOOKS	$DCV_SCRIPTS	$DCV_TESTS
+$DCV_DOC	SHIPPED:[.]claude/hooks=[0-9]+ SHIPPED:scripts=[0-9]+ SHIPPED:tests=[0-9]+	$DCV_HOOKS	$DCV_SCRIPTS	$DCV_TESTS
+$DCV_DOC	\([0-9]+ shipped, [0-9]+ in the early-exit-reader scope\)	$DCV_TOTAL	$DCV_PIPE	-
+$DCV_DOC	.tests. \([0-9]+\) [|] [0-9]+ [|] [0-9]+	$DCV_TESTS	$((DCV_TOTAL - DCV_TESTS))	$((DCV_TOTAL - DCV_TESTS + 1))
+$DCV_DOC	.[.]claude/hooks. \([0-9]+\) [|] [0-9]+ [|] [0-9]+	$DCV_HOOKS	$((DCV_TOTAL - DCV_HOOKS))	$((DCV_TOTAL - DCV_HOOKS + 1))
+$DCV_DOC	.scripts. \([0-9]+\) [|] [0-9]+ [|] [0-9]+	$DCV_SCRIPTS	$((DCV_TOTAL - DCV_SCRIPTS))	$((DCV_TOTAL - DCV_SCRIPTS + 1))
+$DCV_DOC	uninstall[.]sh. \([0-9]+\) [|] [0-9]+ [|] [0-9]+	1	$((DCV_TOTAL - 1))	$DCV_TOTAL"
+
+# The sum sentence states the total too. It is checked separately rather than as a fourth field,
+# because the pattern above already spends its three fields on the three moving sources and a reader
+# fixing a red needs to be told which half disagrees.
+DCV_SUM_WANT="$DCV_HOOKS + $DCV_SCRIPTS + $DCV_TESTS + 1 + 1 = $DCV_TOTAL"
+
+DCV_BAD=""
+DCV_VACUOUS=""
+DCV_MULTISITE=""
+while IFS=$'\t' read -r dcv_rel dcv_pat dcv_w1 dcv_w2 dcv_w3; do
+  [ -n "$dcv_rel" ] || continue
+  if [ ! -f "$REPO_DIR/$dcv_rel" ]; then
+    DCV_VACUOUS="${DCV_VACUOUS}${dcv_rel} is not present, so its '${dcv_pat}' claim was never checked"$'\n'
+    continue
+  fi
+  # tr drains its input; neither reader here can exit early.
+  dcv_flat="$(tr '\n' ' ' < "$REPO_DIR/$dcv_rel" | tr -s ' ')"
+  dcv_hits=0
+  while IFS= read -r dcv_claim; do
+    [ -n "$dcv_claim" ] || continue
+    dcv_hits=$((dcv_hits + 1))
+    dcv_g1=$(printf '%s' "$dcv_claim" | grep -oE '[0-9]+' | sed -n 1p)
+    dcv_g2=$(printf '%s' "$dcv_claim" | grep -oE '[0-9]+' | sed -n 2p)
+    dcv_g3=$(printf '%s' "$dcv_claim" | grep -oE '[0-9]+' | sed -n 3p)
+    if [ "$dcv_g1" != "$dcv_w1" ] \
+      || { [ "$dcv_w2" != "-" ] && [ "$dcv_g2" != "$dcv_w2" ]; } \
+      || { [ "$dcv_w3" != "-" ] && [ "$dcv_g3" != "$dcv_w3" ]; }; then
+      DCV_BAD="${DCV_BAD}${dcv_rel} states '${dcv_claim}' — the tree derives ${dcv_w1}/${dcv_w2}/${dcv_w3}"$'\n'
+    fi
+  done <<< "$(grep -oE "$dcv_pat" <<< "$dcv_flat" || true)"
+
+  if [ "$dcv_hits" -lt 1 ]; then
+    DCV_VACUOUS="${DCV_VACUOUS}${dcv_rel} no longer states its '${dcv_pat}' claim in a form this guard can read"$'\n'
+  elif [ "$dcv_hits" -gt 1 ]; then
+    DCV_MULTISITE="${DCV_MULTISITE}${dcv_rel}'s '${dcv_pat}' row matches ${dcv_hits} sites — its vacuity check is a union over them. Split it into one row per site, with lexically disjoint patterns."$'\n'
+  fi
+done <<< "$DCV_CLAIMS"
+
+if [ -n "$DCV_MULTISITE" ]; then
+  printf '%s' "$DCV_MULTISITE"
+fi
+assert_eq "0" "$(printf '%s' "$DCV_MULTISITE" | grep -c . || true)" \
+  "every bash-4 census claim row matches exactly one site in $DCV_DOC"
+
+if [ -n "$DCV_BAD" ]; then
+  printf '%s' "$DCV_BAD"
+  printf '     %s\n' "Re-derive with: printf '%s + %s + %s + 1 + 1 = %s\\n' \"\$(ls .claude/hooks/*.sh | wc -l)\" \"\$(ls scripts/*.sh | wc -l)\" \"\$(ls tests/*.sh | wc -l)\" \"\$(( \$(ls .claude/hooks/*.sh | wc -l) + \$(ls scripts/*.sh | wc -l) + \$(ls tests/*.sh | wc -l) + 2 ))\""
+  printf '     %s\n' "tests/*.sh is NOT tests/test-*.sh — it counts run-tests.sh. Do not 'fix' this by editing a pinned historical figure elsewhere in that document."
+fi
+assert_eq "0" "$(printf '%s' "$DCV_BAD" | grep -c . || true)" \
+  "every bash-4 census number in $DCV_DOC matches the tree ($DCV_SUM_WANT, $DCV_PIPE in the early-exit-reader scope)"
+
+if [ -n "$DCV_VACUOUS" ]; then
+  printf '%s' "$DCV_VACUOUS"
+fi
+assert_eq "0" "$(printf '%s' "$DCV_VACUOUS" | grep -c . || true)" \
+  "every bash-4 census phrasing this guard covers is still present in $DCV_DOC"
+
+# The sum sentence, as one string rather than as three separate numbers. A document that kept the
+# five sources right and mis-added them would satisfy every row above.
+DCV_SUM_SEEN=$(tr '\n' ' ' < "$REPO_DIR/$DCV_DOC" | tr -s ' ' | grep -oE '[0-9]+ [+] [0-9]+ [+] [0-9]+ [+] 1 [+] 1 = [0-9]+' | sed -n 1p || true)
+assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
+  "$DCV_DOC's bash-4 census sums its own five sources correctly"

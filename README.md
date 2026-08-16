@@ -1,10 +1,13 @@
 # Kinglet Pioneer
 
-**A standalone, PC/console-focused Claude Code toolkit for Unity 6.** One repo, one installer.
+**A standalone, PC/console-focused Unity 6 toolkit for Claude Code, with a measured second client
+in Codex CLI.** One repo, one installer.
 
 It gives Claude Code an **engineering** layer for your Unity project: agents that drive the Unity
 Editor over MCP (coder, reviewer, optimizer, scene-builder, …), `/unity-*` commands, safety hooks,
-and architecture rules. A **design & production** layer adapted from Claude-Code-Game-Studios shipped
+and architecture rules. `./install.sh --client codex` also writes a Codex CLI layer — see
+[Kinglet on Codex CLI](#kinglet-on-codex-cli), which states what crosses, what does not, and the
+one failure mode that is silent on both sides. A **design & production** layer adapted from Claude-Code-Game-Studios shipped
 earlier and was removed 2026-08-03 — a field note measured its `docs/design`, `docs/production`, and
 `docs/adr` output used 0 of 3 on a real project. See `provenance-skip.tsv` and `MERGE-NOTES.md` Part 1
 for the record of what was cut and why.
@@ -26,9 +29,9 @@ worth reading before you adopt it.** Every claim below is checkable with the com
 
 | | State |
 |---|---|
-| **Client** | **Claude Code only.** `adapters/codex/profile.json` exists, but `src/catalog/routing.json` is empty and `python3 -m tools.kinglet_build validate` reports *0 canonical units, 0 routes, 2 adapters*. Nothing renders for Codex yet. |
-| **Host** | **linux-x64 only** (`.claude/UPSTREAM`). The shell avoids bash-4 and GNU-only constructs so a macOS pass stays possible, but that pass has not happened. Windows: nothing. |
-| **The build system** | **Scaffolded, not in use.** `src/templates/` does not exist. `.claude/` is still the hand-authored surface, pinned by a human-owned manifest in `migration/`. Adding one file there means updating five separate records — see `migration/baseline-inventory.json`'s description. |
+| **Client** | **Claude Code, fully. Codex CLI, partially and measurably** — `codex-cli 0.145.0`, measured on this host 2026-08-15/16, not inferred. Hooks, skills, rules and the entry document cross; **commands and agents do not cross as surfaces**. `./install.sh --client codex` writes that layer. The per-class verdicts, with the command that produced each, are in `docs/research/codex-client/findings.md`. |
+| **Host** | **linux-x64 only** (`.claude/UPSTREAM`). The shell avoids bash-4 and GNU-only constructs so a macOS pass stays possible, but that pass has not happened. Windows: nothing — and the Codex skill root is a directory of **symlinks**, which nothing has tested on Windows. |
+| **The build system** | **Scaffolded, and now measurably unused.** `src/catalog/routing.json` is still `{"routes": []}` and `python3 -m tools.kinglet_build validate` still reports *0 canonical units, 0 routes, 2 adapters* — the second client shipped without one route being written, and without `src/`, `tools/` or `adapters/` changing by a line. `.claude/` is still the hand-authored surface, pinned by a human-owned manifest in `migration/`. |
 | **Unity MCP** | **Session-bound.** Tool schemas register when the client process starts, so Unity must be open and the bridge listening *before* you start the session, and must stay up. A session that begins without it can never acquire it — registering mid-session succeeds and changes nothing. |
 | **Verification in your project** | **None ships.** The hooks below are prompt-time guards: they refuse a tool call. The toolkit installs no tests, no gates, no CI, and no pre-push chain for your game. Build-time verification is yours to write. |
 
@@ -101,6 +104,86 @@ keeps the original adaptation reasoning for history. None of those agents or com
 
 ---
 
+## Kinglet on Codex CLI
+
+**Measured against `codex-cli 0.145.0` on Linux, 2026-08-15/16. Every row below has a command behind
+it in [`docs/research/codex-client/findings.md`](docs/research/codex-client/findings.md); nothing
+here is inferred from Codex's documentation or from parity with Claude Code.**
+
+```bash
+./install.sh --project-dir /path/to/your/UnityProject --client codex
+./install.sh --project-dir /path/to/your/UnityProject --client codex --codex-trust
+```
+
+The first writes the project. The second **also writes `~/.codex/config.toml`** — see *Hook trust*
+below; it is opt-in for that reason, and it is the only thing in this toolkit that touches a file
+outside your Unity project.
+
+### What crosses
+
+| | On Codex |
+|---|---|
+| **Hooks** | **They enforce** — but only through a translation, and only after two trust steps. Codex's file tool is `apply_patch` and its payload carries a patch envelope where Claude Code sends a file path and content, so eight of the nine tool-event hooks fire and do **nothing** unaided. `.claude/scripts/codex-hook-shim.sh` normalises the envelope; the hooks themselves are unchanged. `.codex/hooks.json` is generated at install time, never committed — it carries absolute paths, and the timeout unit differs (milliseconds here, **seconds** there, which is a 33-to-83-minute hook if anything copies the numbers across unconverted) |
+| **Skills** | **They load, and they are reached without being named** — a topical skill loaded in 5 of 5 relevant probes. Codex does not read `.claude/skills/`: the installer creates `.agents/skills/` as a directory of symlinks into it, so there is no second copy to keep in sync |
+| **Rules** | The generated `AGENTS.md` keeps the pointer at `.claude/rules/` and inlines the highest-value conventions. Measured: without a pointer, `.claude/rules/` was opened **0 times in 24 runs**, and the failure mode is not "no conventions" but *confidently wrong* ones |
+| **The entry document** | `AGENTS.md` is **injected whole** by Codex; `CLAUDE.md` is not. Both are written, and `--client codex` never removes anything Claude Code reads |
+| **MCP** | Only the **configuration row** for `.codex/config.toml`. See *What is not measured* |
+
+### What does not cross
+
+- **Commands.** `codex-cli 0.145.0` has no slash-command surface at all — 24 subcommands, none of
+  them a prompt registry. The *content* of all nine crosses: the installer converts each into a
+  skill. What you lose is typing `/unity-fix` and getting it; a converted command is something the
+  model may choose to load, not something you dispatch.
+- **Agents, and this is the loss to weigh.** Codex has no per-agent capability contract — its own
+  agent definitions carry no tools key, and neither does the format its importer converts Kinglet's
+  into. Five of the eight agents narrow their own tools; `unity-reviewer` is deliberately read-only
+  and under Codex would run with write, edit, shell **and** MCP access. Rather than ship a reviewer
+  that can silently repair what it reviews, the agents are excluded from the Codex layer entirely.
+- **Codex's own `externalAgentConfig/import`.** If you migrate that way instead, you get a tree
+  Kinglet did not write and does not repair: it drops seven of the nine commands, migrates no rules,
+  rewrites 84 path references to a directory that exists under no spelling, strips every tool grant,
+  and copies the hook timeouts across unconverted — while reporting **31 successes and 0 failures**.
+
+### Hook trust, and the failure that says nothing at all
+
+Codex will not run a project's hooks until it is told to trust them, and **every way that can go
+wrong is silent**:
+
+1. **The project is not trusted.** `hooks/list` returns `hooks: [], warnings: [], errors: []`. The
+   hooks are not reported as untrusted — they are **not registered at all**, and there is no
+   diagnostic for you or for `studio-doctor.sh` to notice. This is the one you are most likely to
+   meet: it is what a correct install looks like from the inside before you have ever run `codex` in
+   the project. Fix it by running `codex` once there and accepting its trust prompt.
+2. **The hooks are registered but individually untrusted.** They report `enabled: true` and fire
+   **zero** times, with no prompt and nothing logged. `--codex-trust` grants this by appending one
+   table per hook to `$CODEX_HOME/config.toml`; the installer backs the file up, keeps its mode, and
+   records the exact tables in the receipt so `uninstall.sh` removes them.
+3. **A hook that Codex times out is an ALLOW**, and a silent one — the edit lands and the model is
+   told nothing. The generated config is what keeps the shim's own deadline one second under
+   Codex's, so a hung hook refuses instead of waving the edit through. This is why `.codex/hooks.json`
+   is generated rather than hand-written.
+
+**Kinglet will never tell you to pass `--dangerously-bypass-hook-trust`.** Every hook result in the
+research above was measured under legitimate trust.
+
+**So: with the Codex layer installed and trust granted, Kinglet on Codex is enforcing. With only the
+skills bridged, it is advisory — and there is no way to tell from inside the session.** That
+sentence is why this section exists.
+
+### What is not measured
+
+- **MCP behaviour under Codex.** The configuration row is measured; nothing establishes that the
+  Unity bridge's actions resolve under Codex's MCP client, that reads and writes split the same way,
+  or that a failure is surfaced rather than swallowed. **Do not read Claude Code's MCP behaviour onto
+  Codex** — assuming that parity is what produced four of the six silent failures listed above.
+- **Windows.** The skill root is symlinks; nothing has tested that, or whether Unity's asset pipeline
+  objects to a symlinked directory outside `Assets/`.
+- **Managed/enterprise Codex configurations**, where an `allow_managed_hooks_only` policy may stop
+  project hooks running regardless of trust.
+
+---
+
 ## Installation
 
 ```bash
@@ -110,6 +193,9 @@ cd kinglet-unity
 
 # optionally add the CoplayDev MCP package to Packages/manifest.json at the same time
 ./install.sh --project-dir /path/to/your/UnityProject --with-mcp
+
+# also write the Codex CLI layer (adds to the install; removes nothing Claude Code reads)
+./install.sh --project-dir /path/to/your/UnityProject --client codex
 ```
 
 That's the whole thing. There is no prerequisite toolkit to install first.
@@ -118,6 +204,11 @@ The installer scans your project (Unity version, render pipeline, packages, asmd
 the payload into `.claude/`, and generates a `CLAUDE.md` with a vision section for you to fill in and
 an auto-detected facts section. Use `--dry-run` to see what it would do, `--yes` for
 non-interactive.
+
+`--client codex` adds `AGENTS.md`, the `.agents/skills/` root, a generated `.codex/hooks.json` and a
+`.codex/config.toml` row on top of that, and `--codex-trust` additionally writes your Codex home —
+read [Kinglet on Codex CLI](#kinglet-on-codex-cli) before using either. Under `--yes` the home is
+never written unless you ask for it.
 
 **Re-installing is safe.** `.claude/state/install-receipt.tsv` records every file the toolkit owns,
 with its checksum — what is ours to remove again, rather than a log of what any one run wrote. A

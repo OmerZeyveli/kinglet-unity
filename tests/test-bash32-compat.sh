@@ -206,8 +206,10 @@ assert_eq \
 # ...AND EACH ARRAY IS NON-EMPTY, which the identity above cannot see. A FLOOR WHOSE REFERENCE THE
 # MUTATION ALSO MOVES IS NOT A FLOOR: emptying `SHIPPED_SCRIPT_DIRS` drops three rows from BOTH
 # sides at once, so the identity still holds, every surviving per-source count is >= 1, and the
-# bash-4 sweep quietly falls from 62 files to install.sh and uninstall.sh — green over a scope that
-# lost three directories. The same mutation on tests/test-no-mobile.sh's SCAN_DIRS was measured at
+# bash-4 sweep quietly falls to install.sh and uninstall.sh alone — green over a scope that
+# lost three directories. (No file count is written here: this comment carried a stale one for two
+# waves. The live census is docs/ANTI-VACUITY.md's Shape 1, and tests/test-derived-counts.sh guards
+# that one against this file's own derivation.) The same mutation on tests/test-no-mobile.sh's SCAN_DIRS was measured at
 # 17 pass / 0 fail before its own absolute floor was added. Four arrays, four floors, no relative
 # reference. docs/ANTI-VACUITY.md records this as rule F4.
 SS_ARRAYS="ok"

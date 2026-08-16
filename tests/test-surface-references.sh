@@ -1541,6 +1541,10 @@ docs_sections_expected() {
 ### Hook Summary
 ### Hook Input
 ## How Rules Work
+## The Second Client — Codex CLI
+### The shape, and why it is not a second payload
+### What the classes do on Codex
+### The failure mode to know
 ## The MCP Integration
 ### The batch_execute Pattern
 ## Agent Interaction Pattern
