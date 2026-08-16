@@ -30,7 +30,27 @@ ls tests/test-*.sh | wc -l
 The runner colours its headers, so an anchored `grep -c` on raw output returns **0** on a completely
 healthy suite — indistinguishable from the catastrophe the count exists to detect.
 
-### THE SUITE TAKES 405–434 SECONDS — a range, because a single figure was wrong
+### GIVE THE SUITE 600000 MS. Wall-clock is host- and load-dependent, not a health signal
+
+**Observed 405–459 s across 2026-08-15/16 at load average 2.0–3.6, against 3876–3893 assertions.
+A slower green run is not a regression.**
+
+**Quote the load average and the assertion count beside any figure**, or the range widens for reasons
+no later reader can attribute. `405–434` (load unrecorded) and `430–459` (load 2.8–3.6) are not two
+measurements of one quantity.
+
+This entry has been wrong twice, in both available directions, and the corrections are the point:
+
+- It first read **"THE SUITE TAKES 434 SECONDS"** with *"sixteen seconds of headroom"* computed from
+  it. 434 was the **maximum of four** runs the same day on the same host — 405, 423, 425, 434 — and the
+  other three existed nowhere tracked.
+- The replacement range was then **falsified as a ceiling**: 459 s was observed on the **untouched
+  baseline at HEAD**. A recorded band that a healthy run exceeds is a false-alarm generator, and this
+  ledger's own flake entry explains what that costs — it is how a team learns to skim red.
+
+**What actually grew across this wave is the assertion count** (3543 → 3893). The seconds followed the
+host. Size the timeout by the maximum and never less; do not use wall-clock for commit-to-commit
+comparison unless both were measured back-to-back under the same load.
 
 **Use a timeout of at least 600000 ms.** A truncated run reads as red, and a red that is really a
 truncation is the most expensive false signal this repository produces.
@@ -47,65 +67,58 @@ that really took 191–255 s and dispatched four implementers under a number tha
 
 **Re-measure before quoting, and quote what you measured, including the spread.**
 
-### A flaky assertion exists in `tests/test-codex-shim.sh` — do not call it a flake and move on
+### THE FLAKE IS DIAGNOSED — `tests/test-codex-shim.sh`, and the cause is a bash fork race
 
-Found during Task 9 and **correctly diagnosed by checking the instrument before the subject**: the
-implementer's full-suite run went red on one assertion, and it **reproduces at `b6bc214` with that
-task's changes stashed, 3 of 4 runs.** So it is pre-existing, not Task 9's.
+**This entry said "THE CAUSE IS UNKNOWN" until 2026-08-16 and told the next reader to bisect the tree
+state. Both were wrong, and both are corrected here rather than deleted, because this is the document
+a red suite log is read against.**
 
-It is **fail-closed** — the shim still refuses — but it refuses on a failed staging write rather than
-on the budget, so the count is lost.
+**The cause.** `shim_watch`'s killer subshell **inherits the parent's `EXIT` trap** — signal traps are
+reset at fork, `EXIT` is not — and `trap -` is **not atomic with the fork**. With a fast hook, `wait`
+returns in milliseconds and the parent's `kill -TERM "$sw_killer"` lands *before the subshell runs its
+first builtin*, so the subshell runs `shim_guard` → `shim_cleanup` → `rm -rf` of the **parent's** temp
+directory mid-loop — silently, because fd 9 is closed and output goes to `/dev/null`.
 
-**THE CAUSE IS UNKNOWN, and an earlier version of this entry said otherwise.** It read that the
-shim's own header *"documents a race of exactly this shape and calls it 'currently unreachable… not a
-property worth depending on', which the reproduction refutes."* That is wrong on the load-bearing
-half. The comment near `shim_watch` describes what would happen **without** the `trap - EXIT TERM INT
-HUP PIPE` reset in the killer subshell — and the reset **is there**, kept deliberately, *"verified
-equivalent over 70 paired runs"*. So the specific race it names is already defended against and the
-reproduction **does not refute that sentence**. Attributing the failure to it would send the next
-implementer to a line that is already correct.
+**Confirmed three independent ways**, by the implementer and then by a reviewer who re-derived every
+number from the comment alone:
 
-That argues **for** routing rather than guessing, so the disposition is unchanged and only the
-confidence is: this is an unexplained failure in a fail-closed surface, not a diagnosed one.
+- **The bash semantics in isolation:** a parent's EXIT trap **runs** in a signalled subshell
+  (`bashpid` ≠ `$$`) while the TERM trap does not — the asymmetry the finding rests on.
+- **The window is wide:** the parent's TERM beats the subshell's `trap -` roughly **one fork in six**
+  when the kill is immediate.
+- **In the shim:** an instrumented `shim_cleanup` logs
+  `funcs=[shim_cleanup shim_guard shim_watch run_hook main]` with `bashpid` ≠ `$$` — **one line per
+  miss, none per pass**, each sitting immediately before the parent cleanup carrying the *same*
+  `tmp=` path. Counter-experiment: return early when `$BASHPID != $$` → **0/12 against 3/12**.
 
-**3 of 4 is not a flake rate, it is the majority outcome.** Recording it makes the next red readable;
-it does not stop the suite's most likely failure being a known-good surface, which is how a team
-learns to skim red. **It needs an owner, and it has one: Task 11.** The expensive half — the
-reproduction — is done:
+**It fires more often than it misses.** Under the counter-experiment the log still recorded **9**
+subshell entries across 12 green runs, so 3/12 is the ceiling of what is *observable* — the first fire
+deletes the directory and ends the run.
 
-```bash
-# From a clean tree at the commit under test:
-git stash push install.sh uninstall.sh tests/test-codex-surface.sh   # if Task 9's changes are present
-for i in 1 2 3 4; do
-  bash tests/test-codex-shim.sh 2>&1 | /usr/bin/grep -cE '^\s*FAIL'
-done
-# Observed at b6bc214: 1 0 1 1  (3 of 4 red).  Observed on Task 9's tree: 0 1 1  (2 of 3 red).
-```
+**My bisect instruction was dead and was killed by measurement.** It reproduces at HEAD on an
+untouched tree — the reviewer's own run failed on payload **127**. The defect is **load-dependent, not
+tree-dependent**. Also eliminated: the `shim_watch` comment's own race (0 hits in 500 iterations — the
+warning not to chase that line was right), a glob delete in the suite, PID reuse, and anything
+proportional to loop length.
 
-The failing assertion is *"the refusal names how many of the envelope's files were checked"* in the
-400-file budget case. The symptom is `<tmpdir>/payload.<N>.json: No such file or directory` on stderr
-followed by `BLOCKED: codex-hook-shim: could not stage payload <N>` — i.e. the shim's temp directory
-has gone while the staging loop is still running, so it refuses on the staging failure and the
-`of 400 file(s)` count never appears. **What removes that directory mid-loop is the open question**, and Task 9's review narrowed it:
-the recorded symptom is payload **151** in the 400-file case, but the reviewer's own reproduction is
-payload **5** for `noop-hook.sh`, **immediately after the preceding budget case**. So the directory
-can vanish within the first few payloads — which points away from anything proportional to loop
-length and toward **the teardown of the preceding case**. That is a constraint, not a diagnosis.
+**Exposure, as a number rather than a mood:** `tests/test-codex-shim.sh` alone fails roughly **25 %**
+of runs; the full suite hit it in **2 of 3**. It is **fail-closed** — the invocation still refuses, it
+loses the *count* — so **expect the red, do not be surprised by it**, and do not read it as a new
+break.
 
-Reproduction rates across three independent attempts: **3/4, 2/3, 1/4** — consistent with a race, and
-every reader so far has stood by routing rather than guessing.
+**The fix is NOT one line, which is why it was correctly left unpatched.** The obvious spelling —
+`shim_cleanup` returning early when `$BASHPID != $$` — is **bash-4 only**. `BASHPID` arrived in bash
+4.0, this repository keeps bash 3.2 viable for the planned macOS pass, and **`tests/test-bash32-compat.sh`
+guards five bash-4 constructs and `BASHPID` is not among them** — so that spelling would pass the gate
+that exists to stop exactly this. Where `BASHPID` is absent it expands empty, the test is false
+forever, and the guard inverts from *"skip cleanup in a subshell"* to *"skip cleanup always"*:
+measured as **one leaked temp directory per invocation**, on the hook that runs on every tool call.
 
-**And the rates are tree-state dependent, which is the sharpest clue anyone has.** Those three were
-measured at `b6bc214` with Task 9's changes stashed. **At HEAD it did not hit in four consecutive
-full-suite runs during Task 10, nor in the controller's own run.** That is *four runs deep*, **not**
-evidence the race is gone — but a defect that reproduces at one commit and not at a later one is a
-defect with a handle on it. **Task 11 should bisect the tree state before chasing the code**, because
-the cheapest available experiment is already half-run.
+**The portable alternative, measured:** send the killer **`SIGKILL`**, which cannot run a trap.
+Paired probe, 50 forks each — `kill -TERM` **10/50** subshell EXIT-trap hits, `kill -KILL` **0/50**.
 
-The controller re-ran the whole suite independently on 2026-08-16 and got **3865 / 0 failed, 434 s** —
-**it did not hit.** That is what a race looks like, and it is precisely the shape `CLAUDE.md` warns
-about: a real defect that three implementers dismissed as a flake because it did not reproduce for
-them. **It is written down here so the next red run is read as this, not as a new break.**
+**Owner: a dedicated task with its own review gate.** Not folded into anything, because on this
+surface a wrong change converts refusals into allows.
 
 ### Provenance
 
