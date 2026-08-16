@@ -1211,10 +1211,51 @@ Two consequences, pulling in opposite directions:
 Step D also establishes the hash is **deterministic**, not a nonce: restoring the
 config restores the exact hash. It is **home-independent** — the same config read from
 two different disposable `CODEX_HOME`s produced the identical hash — and
-**path-dependent by construction**, since the hashed command string embeds the
-absolute hook path. So it **cannot be precomputed and shipped**; it must be read from
-`hooks/list` on the target machine at install time, which is why the recipe above is
-two steps rather than one.
+**path-dependent by construction**, because the trust *key* is
+`<abs>/.codex/hooks.json:<event>:<group>:<index>`, which embeds the absolute path of
+the config file itself. So it **cannot be precomputed and shipped**; it must be read
+from `hooks/list` on the target machine at install time, which is why the recipe above
+is two steps rather than one.
+
+**The key's absoluteness is Codex's; the command string's is not — measured
+2026-08-16.** Those two were welded together in an earlier reading of this section, and
+they come apart: the key is absolute no matter what the command says, while a
+**relative `command` resolves and runs.** One rig, one session, three `PreToolUse`
+entries differing *only* in the command's path form, under legitimate hook trust with
+no bypass flag anywhere:
+
+| `command` in `.codex/hooks.json` | registered | fired | `$0` the hook saw |
+|---|---|---|---|
+| `'<abs>/hookabs.sh'` — the control | yes | **yes** | the absolute path |
+| `'./hookrel.sh'` | yes | **yes** | `./hookrel.sh` |
+| `'.codex/hooks/hookdir.sh'` | yes | **yes** | `.codex/hooks/hookdir.sh` |
+
+`registered: 3, warnings: [], errors: []`, three distinct `currentHash` values, three
+`hooks.state` tables written, and all three markers present after one `codex exec`.
+**All three hooks in this probe ran with `pwd` equal to the project root**, which is
+why both relative forms resolved — each hook logged its own `pwd` and `$0` rather than
+either being inferred from the outcome. The
+allow control is in the same run: the tool call proceeded and `probe.txt` was written,
+so the three arms are three hooks that ran and exited 0, not three that never ran.
+
+Two things this settles and one it does not. It settles that **absolute command strings
+are a property of what a generator chooses to emit, not a requirement of Codex** —
+`codex-hook-shim.sh --emit-config` builds `$root + "/" + $rel` by construction, so the
+absoluteness downstream is Kinglet's. It settles that a *tracked* `hooks.json` is not
+impossible on path grounds, which is the form the argument against it had taken. It does
+**not** touch the trust half: the key is absolute regardless, so trust still cannot ship
+in a repository and still needs a per-machine step. What it does not measure is a hook
+run from any other working directory — every hook in this probe saw the project root,
+and a relative command is only as good as that invariant.
+
+```bash
+# .codex/hooks.json: one PreToolUse group, three command entries differing only in path form
+# each hook: `printf '%s cwd=%s argv0=%s\n' NAME "$(pwd)" "$0" >> hooklog.txt; : > MARKER_NAME; exit 0`
+printf '[projects."%s"]\ntrust_level = "trusted"\n' "$RIG" > "$PROBE_HOME/config.toml"
+# hooks/list -> key + currentHash per entry, appended as [hooks.state."<key>"] tables, then:
+CODEX_HOME="$PROBE_HOME" codex exec --json --skip-git-repo-check --sandbox workspace-write \
+  --cd "$RIG" -o last.txt 'Create a file named probe.txt containing the word hello. Then stop.' < /dev/null
+```
 
 ### The interactive path, for `docs/` to describe
 

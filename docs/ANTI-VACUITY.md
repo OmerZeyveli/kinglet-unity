@@ -127,11 +127,20 @@ readings are deliberately *not* written in the live figure's own `a + b + c + 1 
 pinned figure that looks byte-identical to a live one is the ambiguity this whole step exists to
 remove, and the guard below would otherwise be checking a union of the two.) `tests/test-derived-counts.sh` now
 derives all five sources from the tree and reds when this section disagrees, so the next `.sh` file
-added to any of them fails here instead of quietly widening the gap. Two traps that produced the
-earlier mis-statements: `tests/*.sh` is **not** `tests/test-*.sh` — it counts `run-tests.sh`, which
-is why the tests figure sits one above the suite's file count — and everything else numeric in this
-document is a **past measurement, pinned**, so a reader must not update one of those to match a tree
-it was never about.
+added to any of them fails here instead of quietly widening the gap. One trap that produced an
+earlier mis-statement: `tests/*.sh` is **not** `tests/test-*.sh` — it counts `run-tests.sh`, which is
+why the tests figure sits one above the suite's file count.
+
+**The guard covers this section and nothing else in this document, and the difference is not that
+everything else is pinned.** Some other figures are pinned — `## The measured class` records a past
+sweep whose own table sums to 39, and `15 hooks and 4 scripts were cut` records a past wave — but
+`## The floor set`'s `Today` columns are **dated snapshots that are known to be stale**, including
+this same census in per-source form, and that section says so at the point of use with the specific
+cells named. Neither class may be edited to match today's tree: a pinned figure is *about* another
+tree, and a stale snapshot needs the whole column re-derived from one gating run rather than one cell
+patched. The distinction was written here as a blanket *"everything else is pinned"* for one round,
+which asserted that a column headed `Today` was intentionally historical — the exact ambiguity this
+file exists to remove, restated one level up.
 
 No single constant catches every source. The table says which floor each one would need:
 
@@ -665,6 +674,19 @@ or your own diff invalidates it between measurement and write-down. All four are
 the **safe** direction (the subject grew, or the floor's slack widened), which is why no gate moved
 and why nothing but this comparison would have found them. A stale *Today* is not cosmetic: the
 *Ratio* and *Survives* columns are computed from it, and those are the whole argument.
+
+**The whole column is undated since 2026-08-14 and has NOT been re-derived in this wave, so no cell
+in it should be trusted without re-running the command above.** How many are stale is unknown —
+that is what re-deriving would establish — but **at least four** are, found by inspection rather than
+by the sweep: the `test-bash32-compat.sh` per-source row reads `13/7/42/1/1 + 13/7/1/1` where the tree
+derives `13/10/45/1/1 + 13/10/1/1`; the *What they replaced* paragraph below reads *"over 64 and 22
+files"* where those are now 70 and 25; and **both** `run-tests.sh` identity rows read `41 == 41`
+against a suite of 44 files. **That is stale, not pinned** — the distinction Shape 1 draws — and it is
+deliberately not repaired here: this column must be re-derived **whole, from one gating suite log**,
+and patching the cells a reader happened to notice produces a column that is part fresh and part
+2026-08-14 with nothing saying which. Shape 1's rendering of the bash-4 census is now guarded; the two
+renderings of that same census below are not, and neither is anything else in this column. Recorded as
+a residual owned by a re-derivation pass, rather than left as an accident.
 
 ### Converted or added by this pass
 

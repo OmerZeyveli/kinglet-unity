@@ -423,16 +423,21 @@ Shipping `.codex/hooks.json` alone reproduces the measured failure exactly:
 registered hooks, matching matchers, and not a single file-level rule enforced.
 
 1. **`scripts/codex-hook-shim.sh` must be installed wherever `.codex/hooks.json`
-   points.** The config's command strings carry absolute paths to both the shim and
-   the hook.
+   points.** The config `--emit-config` writes carries absolute paths to both the shim
+   and the hook — **that is the generator's choice, not Codex's requirement**: a
+   relative `command` resolves against the project root and fires (`codex-facts.md`
+   §F5, measured 2026-08-16). What the absoluteness buys is independence from whatever
+   directory a hook happens to be invoked from; what it costs is that the file cannot
+   be shared between machines, which is why it is generated per project.
 2. **`.codex/hooks.json` must be generated, not hand-written** — `--emit-config` is
    the ms→s conversion's only home, and a hand-written file reintroduces the
    fifty-minute timeout silently.
 3. **Hook trust must be granted at install time**, by appending one
    `[hooks.state."<key>"]` table per entry to the user's `$CODEX_HOME/config.toml`.
-   It cannot be precomputed (the hash embeds the absolute path of `hooks.json`) and
-   it cannot ship in the repository (a project cannot vouch for itself). Ordering is
-   fixed: write `hooks.json` → query `hooks/list` → write trust.
+   It cannot be precomputed (the trust key embeds the absolute path of `hooks.json`
+   itself, whatever the command says) and it cannot ship in the repository (a project
+   cannot vouch for itself). Ordering is fixed: write `hooks.json` → query
+   `hooks/list` → write trust.
 
 `--dangerously-bypass-hook-trust` is a measurement instrument and must never appear
 in anything Kinglet tells a user to run. Nothing in this section needed it.
@@ -2024,7 +2029,7 @@ ordering.
 |---|---|---|
 | **Agents, as `.codex/agents/` TOML** | wholly | `## Agents`: the converted files carry exactly 3 keys — `name`, `description`, `developer_instructions` — and no capability. Codex's own agent shape has no tools key in any of the 6 built-ins. The only `tools` in the `Config` schema is session-scoped `web_search`. **5 of 8** Kinglet agents carry a narrowing that has no destination, and `unity-reviewer` — deliberately read-only — would gain `Write`, `Edit`, `Bash` **and** MCP |
 | **Agents, re-expressed as skills** | wholly, in this wave | `## Agents`: a skill has no tools contract either, so the skill route drops the narrowing exactly as completely. Re-expressing the *content* is possible and is not done here: the two agent bodies worth crossing (`unity-fixer`, `unity-reviewer`) are the same skill-shaped material row 3 carries for commands, and shipping them would double the surface without a measurement that anyone reaches them — `## Skills` observed **6 distinct skills ever loading out of 16–18 discovered** |
-| **`.codex/hooks.json` as a tracked file** | wholly | `## Hooks`: the config's command strings carry **absolute paths** to both the shim and the hook, so a tracked copy would carry one machine's paths. A hand-written one also reintroduces the fifty-minute timeout silently, because `--emit-config` is the ms-to-s conversion's only home. Recorded in `provenance-skip.tsv` as `rule=absent` so it cannot drift back in |
+| **`.codex/hooks.json` as a tracked file** | wholly | `## Hooks`: it is **derived**, not merely placed — its twelve entries, their matchers, events and **converted** timeouts all come from `.claude/settings.json`, `--emit-config` is the ms-to-s conversion's only home, and the shim's own ceiling has to be ordered one second under Codex's per entry. A tracked copy is a second registration of the same twelve hooks with no guard tying it to the first, and it reintroduces the 33-to-83-minute timeouts the moment either drifts. It also carries the absolute shim path this generator emits — **though that is the generator's choice and not Codex's**: a relative `command` was measured registering and firing (`codex-facts.md` §F5, 2026-08-16), so this row rests on the derivation, not on an impossibility. Recorded in `provenance-skip.tsv` as `rule=absent` so it cannot drift back in |
 | **`.codex/agents/` in this repository** | wholly | as above; `rule=absent` |
 | **The importer's `AGENTS.md`** | wholly | `## Rules and AGENTS.md`: the imported file carries 3 `.Codex/rules/` references pointing at a directory that exists under no spelling, and the rules it points at never migrate. A document that is injected whole is the worst file in the tree to let a blind substitution rewrite |
 | **`skills/extraRoots/set`** | as a ship route | `## Skills`: it works, and it lands at `scope:"user"` — every other project the session touches would get Kinglet's 16 skills — and it does not persist. After the call the home holds no file naming the root |
@@ -2142,6 +2147,12 @@ remains, and is not closed by anything:
   `.claude/UPSTREAM` claims one shipped host, `linux-x64`.
 - **`session-brief`'s firing** (`## Hooks`) — registered, matcher untested against
   Codex's `sessionStart` source string.
+- **Whether Codex ever runs a hook from a directory other than the project root.**
+  Opened 2026-08-16 by the probe that closed the relative-command question: three
+  hooks, one session, all three with `pwd` at the project root. Nothing rests on the
+  answer today, because `--emit-config` emits absolute paths and is therefore immune
+  to it — but it is the invariant a *tracked* config with relative commands would
+  depend on, so it is recorded rather than left implied by a single session.
 
 ### The three imported-tree defects, and who owns each
 
@@ -2198,15 +2209,37 @@ it tracked.** Read off the branch rather than off the ship list:
 | nothing at all | `src/catalog/`, `tools/kinglet_build/`, `adapters/` — **0 lines changed across the whole branch** |
 
 Against A: **two of A's four members are not merely unused, they are measured
-unshippable.** There is no tracked per-client manifest and there cannot be one —
-`.codex/hooks.json`'s command strings carry absolute paths to the shim and to each
-hook, so a committed copy would carry one machine's filesystem, and hook trust keys
-on a hash that embeds that same absolute path (`codex-facts.md` §F5). A project
-cannot vouch for itself: `trusted_hash` written inside the matcher group is not
-rejected, it is **silently ignored**, same `currentHash`, `warnings: []`, still
-untrusted. `.codex/hooks.json`, `.codex/agents` and `.agents` are all recorded in
-`provenance-skip.tsv` as `rule=absent`, so a tracked manifest fails the provenance
-gate rather than drifting back in quietly. And `AGENTS.md` is not a symlink to `CLAUDE.md`: it is
+unshippable.** Kinglet ships no per-client manifest, and the reason is trust rather
+than paths — a distinction this paragraph got wrong for a round, and one worth
+separating because only one half is measured shut:
+
+- **Trust cannot ship in a repository. Measured, and it is the airtight half.** The
+  trust key is `<abs>/.codex/hooks.json:<event>:<group>:<index>`, so it embeds the
+  absolute path of the config file and cannot be precomputed. A project cannot vouch
+  for itself either: `trusted_hash` written inside the matcher group is not rejected,
+  it is **silently ignored** — same `currentHash`, `warnings: []`, still untrusted
+  (`codex-facts.md` §F5). So an install-time step on the target machine exists no
+  matter what else is tracked, and A's manifest would not remove it.
+- **A tracked config file is not impossible on path grounds, and the earlier version
+  of this paragraph said it was.** That claim rested on *"the command strings carry
+  absolute paths"*, which describes what `--emit-config` chooses to build
+  (`$root + "/" + $rel`) rather than anything Codex requires. Measured 2026-08-16,
+  three `PreToolUse` entries differing only in path form: `'./hookrel.sh'` and
+  `'.codex/hooks/hookdir.sh'` both **registered and fired**, alongside the absolute
+  control, under legitimate trust with no bypass flag — all three running with `pwd`
+  at the project root, which each logged itself. The negative is withdrawn and
+  replaced by the measurement; what stays open is a hook invoked from any *other*
+  directory, which this probe did not produce and a relative command depends on.
+
+**What actually keeps the config generated is derivation, not impossibility**, and
+saying so is the honest form: the twelve entries, their matchers, their events and
+their **converted** timeouts all come from `.claude/settings.json`, `--emit-config` is
+the only home of the millisecond-to-second conversion, and the two ceilings have to be
+ordered per entry (shim `ceil(ms/1000)`, Codex `+1`). A tracked copy would be a second
+registration of the same twelve hooks, needing its own identity guard against the
+first — a real design argument, and a weaker one than "cannot", which is why it is
+written as what it is. `.codex/hooks.json`, `.codex/agents` and `.agents` stay
+`rule=absent` in `provenance-skip.tsv` on that ground. And `AGENTS.md` is not a symlink to `CLAUDE.md`: it is
 a *different document*, because `## Rules and AGENTS.md` measured that a declarative
 pointer is read 1 time in 12 under a conventions-blind request while an imperative one
 is read 12 of 12 — so the Codex arm carries an imperative instruction and an inlined

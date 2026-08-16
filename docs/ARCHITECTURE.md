@@ -297,12 +297,18 @@ from it on the target machine:
 $CODEX_HOME/config.toml           one [hooks.state."<key>"] table per hook — only with --codex-trust
 ```
 
-Three of those cannot be committed, and each for a measured reason rather than a stylistic one:
-`.codex/hooks.json`'s command strings carry **absolute** paths; Codex's hook-trust hash is computed
-over those same absolute paths, so it cannot be precomputed; and a `trusted_hash` written inside the
-project's own config is not rejected but **silently ignored** — a project cannot vouch for itself.
-`provenance-skip.tsv` carries `.codex/hooks.json`, `.codex/agents` and `.agents` as `rule=absent`, so
-a committed copy fails the provenance gate rather than shipping quietly.
+Three of those are not committed, and the grounds differ by artefact rather than being one reason
+applied three times. **Trust cannot ship, and that half is shut:** the trust key embeds the absolute
+path of `hooks.json` itself, so the hash cannot be precomputed, and a `trusted_hash` written inside
+the project's own config is not rejected but **silently ignored** — a project cannot vouch for
+itself. **`.codex/hooks.json` is not committed because it is *derived*:** its entries, matchers,
+events and millisecond-to-second-converted timeouts all come from `.claude/settings.json`, and a
+tracked copy would be a second registration of the same hooks with nothing tying it to the first.
+That it also carries absolute command paths is the generator's choice and **not** Codex's
+requirement — a relative `command` was measured registering and firing — so the ground here is
+derivation, not impossibility. `provenance-skip.tsv` carries `.codex/hooks.json`, `.codex/agents`
+and `.agents` as `rule=absent`, so a committed copy fails the provenance gate rather than shipping
+quietly.
 
 **The load-bearing piece is a runtime adapter, not a layout.** Codex's file tool is `apply_patch`,
 and its `tool_input` carries exactly one key — a patch envelope. Kinglet's hooks read `file_path`,
