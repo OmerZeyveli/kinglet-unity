@@ -2497,7 +2497,29 @@ CODEXCFG
   # Trust cannot ship in this repository. Putting `trusted_hash` inside the matcher group in
   # hooks.json is silently ignored — same hash, `warnings: []`, still untrusted — because the
   # app-server's own schema has no such field. A project cannot vouch for itself, which is the point
-  # of the gate. So it is the user's `$CODEX_HOME/config.toml` or nowhere.
+  # of the gate. So the LOCATION is the user's `$CODEX_HOME/config.toml` or nowhere.
+  #
+  # THE LOCATION IS SETTLED; THE MECHANISM IS A CHOICE, AND IT WAS NOT ENUMERATED BEFORE IT WAS MADE.
+  # `config/value/write` and `config/batchWrite` are live app-server methods whose params carry
+  # `filePath` (defaulting to the user's `config.toml`), `keyPath`, `value`, `mergeStrategy` and an
+  # `expectedVersion` for optimistic concurrency. A structured write through Codex's own writer would
+  # not have had a file mode to lose, which is the defect the `cat >` note below repairs by hand.
+  #
+  # IT IS STILL HAND-ROLLED, DELIBERATELY, AND HERE IS THE TRADE. Nothing in this wave has measured
+  # how `keyPath` addresses a key that is itself a quoted absolute path containing `:`, `/` and `.`
+  # — which is exactly the shape of every key here — nor what `mergeStrategy` does to a table that
+  # already exists, nor whether a failed `expectedVersion` leaves the file partly written. Adopting
+  # an unmeasured write path into a user's HOME on the strength of a schema read is the substitution
+  # this wave exists to avoid; the hand-rolled path is measured end to end, backed up, reversible and
+  # byte-idempotent. Measuring those three questions is the work that would justify the swap, and it
+  # is recorded as the better mechanism once someone does it.
+  #
+  # THE SHAPES THE LINE-ORIENTED PASS WAS TESTED AGAINST are in tests/test-codex-surface.sh: an
+  # indented table, CRLF line endings, a table immediately followed by another table, a comment
+  # between tables, a foreign `hooks.state` table that must survive, a file with no trailing newline,
+  # and an empty file. Its known limit is a multi-line basic string containing a line that begins
+  # with `[` — a line-oriented pass reads that as a table header. No Codex config carries one, the
+  # backup covers it, and it is named here rather than left to be discovered.
   #
   # AND IT CANNOT BE PRECOMPUTED. The hash covers the hook's DECLARATION — command string, timeout,
   # matcher, event — and the command string embeds absolute paths, so it is path-dependent by
@@ -2543,7 +2565,13 @@ CODEXCFG
 
   if [ "$CODEX_TRUST_GRANT" -eq 1 ]; then
     TRUST_SKIP_WHY=""
-    command -v codex >/dev/null 2>&1 || TRUST_SKIP_WHY="the codex CLI is not on PATH, and the hashes can only be read from it"
+    TRUST_CFG="$CODEX_HOME_DIR/config.toml"
+    # "the only route measured", not "the only route there is". `hooks/list` is where this wave read
+    # the hashes; the hash is deterministic and home-independent, so a reimplementation is
+    # conceivable and simply has not been measured. The distinction matters because writing a
+    # superlative over the routes that were TRIED as a superlative over the routes that EXIST is the
+    # error this wave has now made four times.
+    command -v codex >/dev/null 2>&1 || TRUST_SKIP_WHY="the codex CLI is not on PATH, and hooks/list is the only route measured for reading the hashes"
     if [ -z "$TRUST_SKIP_WHY" ] && ! command -v jq >/dev/null 2>&1; then
       TRUST_SKIP_WHY="jq is not on PATH"
     fi
@@ -2552,6 +2580,14 @@ CODEXCFG
     fi
     if [ -z "$TRUST_SKIP_WHY" ] && [ ! -w "$CODEX_HOME_DIR" ]; then
       TRUST_SKIP_WHY="$CODEX_HOME_DIR is not writable"
+    fi
+    # THE DIRECTORY BEING WRITABLE SAYS NOTHING ABOUT THE FILE, and the test above is about the
+    # directory. A `config.toml` at mode 444 sits perfectly happily inside a writable home, so it
+    # passed every precondition and was then replaced — measured: 444 in, 600 out, trust granted, no
+    # warning. Someone who made their Codex config read-only did that on purpose, and the answer to
+    # a deliberate read-only file is to decline rather than to route around it.
+    if [ -z "$TRUST_SKIP_WHY" ] && [ -e "$TRUST_CFG" ] && [ ! -w "$TRUST_CFG" ]; then
+      TRUST_SKIP_WHY="$TRUST_CFG is not writable — it looks deliberately read-only, and this installer will not route around that"
     fi
 
     if [ -z "$TRUST_SKIP_WHY" ]; then
@@ -2566,21 +2602,57 @@ CODEXCFG
       # `grep -q` on a FILE ARGUMENT, never on a pipe: grep exits at the first match without
       # draining, and on a pipe that is the SIGPIPE-plus-pipefail death this repository's shell
       # conventions are mostly about. A file argument has no writer to signal.
+      #
+      # TWO QUESTIONS IN THE ONE SESSION, AND THE ORDER OF THE IDS IS DELIBERATE.
+      #
+      # `configRequirements/read` goes FIRST and `hooks/list` LAST, because the poll below waits for
+      # the LAST id. An unknown method is answered with an error rather than a hang — that is how
+      # this server's method list gets enumerated at all — so if a future Codex drops the
+      # requirements route, id 2 errors, id 3 still answers, and the trust step is unaffected. The
+      # other order would make an optional diagnostic able to stall the load-bearing request.
       {
         printf '%s\n' \
           '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"kinglet-install","version":"1"}}}' \
           '{"jsonrpc":"2.0","method":"initialized"}' \
-          "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"hooks/list\",\"params\":{\"cwds\":[\"$PROJECT_DIR\"]}}"
+          '{"jsonrpc":"2.0","id":2,"method":"configRequirements/read","params":{}}' \
+          "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"hooks/list\",\"params\":{\"cwds\":[\"$PROJECT_DIR\"]}}"
         TRUST_WAIT=0
         while [ "$TRUST_WAIT" -lt 300 ]; do
-          grep -q '"id":2' "$TRUST_OUT" 2>/dev/null && break
+          grep -q '"id":3' "$TRUST_OUT" 2>/dev/null && break
           sleep 0.1
           TRUST_WAIT=$((TRUST_WAIT + 1))
         done
       } | CODEX_HOME="$CODEX_HOME_DIR" codex app-server > "$TRUST_OUT" 2>/dev/null || true
 
+      # ── The managed-hooks switch, asked rather than assumed ─────────────
+      #
+      # WHAT IS MEASURED AND WHAT IS NOT, stated here because the branch below is half-exercised.
+      # `configRequirements/read` is a LIVE route in 0.145.0 and answers `{"requirements": null}` —
+      # verified twice, independently. Its response type carries `allowManagedHooksOnly`, and the
+      # schema's own description names the source: "Null if no requirements are configured (e.g. no
+      # requirements.toml/MDM entries)."
+      #
+      # NOBODY HAS MADE THE PAYLOAD NON-NULL. Two people tried; a `requirements.toml` in the home
+      # under both spellings and under a `managed/` subdirectory all returned null. So the `true`
+      # arm below has never been reached by a real policy — it is exercised by a stubbed response in
+      # tests/test-codex-surface.sh instead, which is the difference between a branch that is tested
+      # and a branch that is proven to fire in the field.
+      #
+      # The wording therefore claims detection of what Codex REPORTS, not of what an organisation
+      # has SET. If those differ, this says nothing and the hooks quietly do not run — which is why
+      # the sentence printed names its own uncertainty rather than reassuring.
+      TRUST_MANAGED="$(jq -r 'select(.id==2)|.result.requirements.allowManagedHooksOnly // empty' \
+        "$TRUST_OUT" 2>/dev/null | tr -d '[:space:]' || true)"
+      if [ "$TRUST_MANAGED" = "true" ]; then
+        warn "Codex reports allowManagedHooksOnly for this machine."
+        warn "If that is in force, project-scoped hooks may not run AT ALL, and no amount of trust"
+        warn "changes it — it is an organisation policy, not a Kinglet setting. Kinglet has never"
+        warn "observed this switch set, so what follows may be granted into a layer that is inert."
+        note_not_done "Codex reports allowManagedHooksOnly, which is an organisation policy Kinglet cannot change and has never observed set. If it is in force, .codex/hooks.json may not run at all whatever its trust says. Confirm with whoever manages your Codex configuration before relying on the hook layer."
+      fi
+
       TRUST_PAIRS=$(mktemp)
-      jq -r 'select(.id==2)|.result.data[]?|.hooks[]?|"\(.key)\t\(.currentHash)"' \
+      jq -r 'select(.id==3)|.result.data[]?|.hooks[]?|"\(.key)\t\(.currentHash)"' \
         "$TRUST_OUT" 2>/dev/null | sort -u > "$TRUST_PAIRS" || true
       TRUST_N=$(grep -c . "$TRUST_PAIRS" || true)
 
@@ -2596,7 +2668,6 @@ CODEXCFG
         warn "    ./install.sh --project-dir \"$PROJECT_DIR\" --client codex --codex-trust"
         note_not_done "Codex hook trust was NOT granted: 'hooks/list' returned no hooks for this project, which is what Codex reports for a project it has not been told to trust. The hooks are on disk and will not run. Run 'codex' once in the project, accept its trust prompt, then re-run install.sh with --client codex --codex-trust."
       else
-        TRUST_CFG="$CODEX_HOME_DIR/config.toml"
         TRUST_BACKUP="-"
         TRUST_WROTE=1
         # A BACKUP BEFORE THE FIRST BYTE. This is the user's file and it is outside the project, so
@@ -2608,6 +2679,26 @@ CODEXCFG
         else
           : > "$TRUST_CFG" || TRUST_WROTE=0
         fi
+
+        # BOUNDED, BECAUSE NOTHING ELSE REAPS THEM. Every grant left another `.kinglet-backup.<ts>`
+        # in the user's home and nothing — not a later install, not uninstall — ever removed one, so
+        # a project re-installed weekly accumulated a copy a week, forever, in the one directory
+        # this toolkit otherwise works hardest to keep its footprint out of. The newest three are
+        # kept: enough that a bad run is recoverable past the run that followed it, bounded so the
+        # set cannot grow without limit. Only OUR pattern is matched, and only for THIS config.
+        #
+        # The names are UTC `%Y%m%d%H%M%S`, so lexical order is chronological and `sort -r` is a
+        # date sort without parsing a date.
+        TRUST_REAP=$(mktemp)
+        for tb in "$TRUST_CFG".kinglet-backup.*; do
+          if [ -f "$tb" ]; then printf '%s\n' "$tb" >> "$TRUST_REAP"; fi
+        done
+        TRUST_REAPED=0
+        while IFS= read -r tb; do
+          [ -n "$tb" ] || continue
+          rm -f "$tb" && TRUST_REAPED=$((TRUST_REAPED + 1))
+        done <<< "$(sort -r "$TRUST_REAP" 2>/dev/null | awk 'NR > 3' || true)"
+        rm -f "$TRUST_REAP"
 
         if [ "$TRUST_WROTE" -eq 0 ]; then
           warn "Could not back up $TRUST_CFG — hook trust not granted, and nothing was written."
@@ -2621,6 +2712,30 @@ CODEXCFG
           #
           # Only OUR tables are removed: those whose key `hooks/list` just reported for THIS
           # project, plus the marker line. A hook-trust table for another project is not ours.
+          # DID THE USER'S FILE END IN A NEWLINE BEFORE KINGLET EVER TOUCHED IT?
+          #
+          # The append cannot avoid adding one — our marker would otherwise land on the end of their
+          # last line — so the byte is not optional on install. What it costs is the exactness of the
+          # REVERSAL: without this flag, `uninstall.sh` hands back a file one byte longer than the one
+          # it was given, which is the same class of unannounced change as the file mode, and this
+          # task's own guard measured it on a config whose last line carried no newline.
+          #
+          # STICKY, AND THAT IS THE WHOLE SUBTLETY. Asking the question on every grant answers it
+          # about the file AS THIS TOOLKIT LAST LEFT IT: after grant 1 the last line is our own
+          # appended table, which certainly ends in a newline, so grant 2 recorded `yes` and undid
+          # grant 1's correct `no`. The reversal then reintroduced the byte, and the failure appeared
+          # only on the second install — the shape this installer has already paid for twice with
+          # `user-modified`. The previous record is the only witness to the original state, so it
+          # wins; the question is asked exactly once, on the grant that finds no record.
+          TRUST_HAD_NL=""
+          if [ -f "$PROJECT_DIR/$CODEX_TRUST_REL" ]; then
+            TRUST_HAD_NL=$(awk '/^# original-trailing-newline: /{sub(/^# original-trailing-newline: /, ""); print; exit}' \
+              "$PROJECT_DIR/$CODEX_TRUST_REL")
+          fi
+          if [ -z "$TRUST_HAD_NL" ]; then
+            TRUST_HAD_NL=yes
+            if [ -s "$TRUST_CFG" ] && [ -n "$(tail -c1 "$TRUST_CFG")" ]; then TRUST_HAD_NL=no; fi
+          fi
           TRUST_KEYS=$(mktemp)
           cut -f1 "$TRUST_PAIRS" > "$TRUST_KEYS"
           TRUST_MARK="# kinglet:codex-trust — hook trust for $PROJECT_DIR (remove with uninstall.sh)"
@@ -2641,8 +2756,21 @@ CODEXCFG
               if (inblock) { next }
               print
             }
-          ' "$TRUST_CFG" > "$TRUST_NEW" && mv "$TRUST_NEW" "$TRUST_CFG" || TRUST_CLEANED=0
+          ' "$TRUST_CFG" > "$TRUST_NEW" && cat "$TRUST_NEW" > "$TRUST_CFG" || TRUST_CLEANED=0
           rm -f "$TRUST_NEW"
+          # `cat >` RATHER THAN `mv`, AND THE REASON IS THE FILE'S MODE. `mv` from `mktemp` replaces
+          # the inode and carries 0600 with it, so a home config at 644 came out 600 and one at 444
+          # came out 600 — a silent change to a property of a file this toolkit did not create, in
+          # the one place it is least entitled to make one. Measured, three ways, in both directions
+          # of the round trip. The same trap is documented twice elsewhere in this file for project
+          # files, with `chmod 644` as the fix; here there is no correct constant to chmod TO, because
+          # the right mode is whatever the user already chose.
+          #
+          # Rewriting the existing inode keeps mode, ownership and any ACL by construction, on every
+          # platform, with no `stat` and therefore no GNU/BSD split. What it gives up is atomicity: a
+          # crash between truncate and write leaves a short file. The backup taken a few lines above
+          # is the mitigation, it is taken unconditionally, and its path is printed and recorded —
+          # and the alternative trades a rare, loud, recoverable failure for a silent certain one.
 
           # THE APPEND IS GATED ON THE CLEAN HAVING HAPPENED, and that is not defensive
           # decoration. Appending to a file the removal pass failed on writes a SECOND
@@ -2676,6 +2804,7 @@ CODEXCFG
             printf '# backup: %s\n' "$TRUST_BACKUP"
             printf '# granted-at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             printf '# marker: %s\n' "$TRUST_MARK"
+            printf '# original-trailing-newline: %s\n' "$TRUST_HAD_NL"
             printf 'key\thash\n'
             cat "$TRUST_PAIRS"
           } > "$PROJECT_DIR/$CODEX_TRUST_REL"
@@ -2685,6 +2814,7 @@ CODEXCFG
 
           ok "Granted Codex hook trust for $TRUST_N hook(s) in $TRUST_CFG"
           [ "$TRUST_BACKUP" = "-" ] || ok "Backup: $TRUST_BACKUP"
+          [ "$TRUST_REAPED" -eq 0 ] || info "Reaped $TRUST_REAPED older Kinglet backup(s); the newest 3 are kept."
           warn "Hook trust vouches for a COMMAND LINE, not for code: anything that can write"
           warn "$CLAUDE_DIR/hooks/*.sh from now on changes what runs, with no re-review."
           fi
@@ -2702,10 +2832,22 @@ CODEXCFG
     note_not_done "Codex hook trust was not granted, so the $([ -f "$CODEX_HOOKS_JSON" ] && grep -c '"type": "command"' "$CODEX_HOOKS_JSON" 2>/dev/null || echo 0) registered hook(s) in .codex/hooks.json will NOT run: Codex ignores an untrusted hook silently. Grant it by running 'codex' once in this project and accepting its hook review, or re-run install.sh with --client codex --codex-trust."
   fi
 
-  # `allowManagedHooksOnly` exists in Codex's managed-configuration surface and is UNMEASURED in
-  # those words. If an organisation sets it, project-scoped hooks may not run at all regardless of
-  # trust, and no amount of `hooks.state` would change that. Stated here rather than left implied,
-  # because it is the one failure this installer cannot detect or repair.
+  # `allowManagedHooksOnly` is an organisation policy: if it is in force, project-scoped hooks may
+  # not run at all regardless of trust, and no amount of `hooks.state` would change that.
+  #
+  # THIS COMMENT READ "the one failure this installer cannot detect or repair" AND THE FIRST HALF WAS
+  # WRONG. `configRequirements/read` is a live route in 0.145.0 that answers, and its response type
+  # carries the field — so the installer had simply never asked, in a session it was already holding
+  # open. It asks now, above. That was the fourth time in this wave a superlative over the routes
+  # somebody tried got written as a superlative over the routes that exist, and the method that
+  # refutes it every time is the same one: enumerate the schema bundle for the capability noun
+  # before accepting a "there is no…" sentence.
+  #
+  # WHAT IS STILL TRUE, NARROWED TO WHAT IS PROVEN. Kinglet cannot REPAIR it — it is not Kinglet's
+  # policy to change. And detection is proven only on the null side: two people have failed to make
+  # `requirements` non-null, so nothing here demonstrates that a policy an organisation has actually
+  # SET surfaces through that field. The correct sentence is "cannot repair, and does not yet detect
+  # a set policy" — not "cannot detect", and not "detects".
 fi
 
 # ── Step 9: Write the receipt ────────────────────────────────────────────────

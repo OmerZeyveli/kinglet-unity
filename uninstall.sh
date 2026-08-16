@@ -195,6 +195,10 @@ TRUST_CFG=""; TRUST_MARK=""; TRUST_KEY_COUNT=0
 if [ -f "$TRUST_REC" ]; then
   TRUST_CFG=$(awk -F': ' '/^# config: /{sub(/^# config: /, ""); print; exit}' "$TRUST_REC")
   TRUST_MARK=$(awk '/^# marker: /{sub(/^# marker: /, ""); print; exit}' "$TRUST_REC")
+  # Absent in a record written before this field existed, and `yes` is the right reading of an
+  # absent value: it means "do not strip", which leaves the file as the removal pass produced it.
+  TRUST_HAD_NL=$(awk '/^# original-trailing-newline: /{sub(/^# original-trailing-newline: /, ""); print; exit}' "$TRUST_REC")
+  [ -n "$TRUST_HAD_NL" ] || TRUST_HAD_NL=yes
   TRUST_KEY_COUNT=$(awk -F'\t' 'NR>1 && !/^#/ && NF>=1 && $1 != "key" && $1 != "" {n++} END {print n+0}' "$TRUST_REC")
 fi
 
@@ -248,11 +252,23 @@ fi
 #
 # The user's file is copied first, for the same reason install.sh copied it: it is outside the
 # project, so `git checkout` is not a route back for them.
-if [ -n "$TRUST_CFG" ] && [ "$TRUST_KEY_COUNT" -gt 0 ] && [ -f "$TRUST_CFG" ]; then
+if [ -n "$TRUST_CFG" ] && [ "$TRUST_KEY_COUNT" -gt 0 ] && [ -f "$TRUST_CFG" ] && [ ! -w "$TRUST_CFG" ]; then
+  # THE SAME REFUSAL install.sh MAKES, IN THE OTHER DIRECTION. A config the user has made read-only
+  # is a decision, and the right response to it is to say what is left behind rather than to find a
+  # way around it. Reported rather than merely skipped: the tables become inert the moment the
+  # hooks.json they name is removed below, and the user is owed the sentence that says so.
+  err "$TRUST_CFG is not writable — its $TRUST_KEY_COUNT hook-trust table(s) were NOT removed."
+  err "They name this project's .codex/hooks.json, which this run removes, so they are inert;"
+  err "make that file writable and delete the [hooks.state.\"...\"] tables naming $PROJECT_DIR."
+elif [ -n "$TRUST_CFG" ] && [ "$TRUST_KEY_COUNT" -gt 0 ] && [ -f "$TRUST_CFG" ]; then
   TRUST_KEYS=$(mktemp)
   awk -F'\t' 'NR>1 && !/^#/ && $1 != "key" && $1 != "" {print $1}' "$TRUST_REC" > "$TRUST_KEYS"
   TRUST_TMP=$(mktemp)
   TRUST_BAK="$TRUST_CFG.kinglet-uninstall.$(date +%Y%m%d%H%M%S)"
+  # `cat >` RATHER THAN `mv`, FOR THE REASON install.sh's TWIN CARRIES IN FULL: `mv` from `mktemp`
+  # replaces the inode and takes 0600 with it, so an uninstall silently re-moded a 644 home config
+  # to 600 — measured. Rewriting the existing inode preserves mode and ownership by construction,
+  # and the backup one line up is what covers the atomicity it gives up.
   if cp "$TRUST_CFG" "$TRUST_BAK" 2>/dev/null \
      && awk -v keyfile="$TRUST_KEYS" -v mark="$TRUST_MARK" '
           BEGIN { while ((getline k < keyfile) > 0) { drop["[hooks.state.\"" k "\"]"] = 1 } }
@@ -267,9 +283,36 @@ if [ -n "$TRUST_CFG" ] && [ "$TRUST_KEY_COUNT" -gt 0 ] && [ -f "$TRUST_CFG" ]; t
             print
           }
         ' "$TRUST_CFG" > "$TRUST_TMP" \
-     && mv "$TRUST_TMP" "$TRUST_CFG"; then
+     && cat "$TRUST_TMP" > "$TRUST_CFG"; then
+    # THE LAST BYTE, GIVEN BACK. The install had to add a newline before appending its block, or the
+    # marker would have landed on the end of the user's last line — so a config that arrived without
+    # a trailing newline left with one. The removal pass alone therefore returns a file one byte
+    # longer than the one that was given, which is exactly as much of an unannounced change as the
+    # file mode was. `head -c` on a FILE ARGUMENT, so nothing pipes into an early-exit reader; the
+    # inode is rewritten rather than replaced, for the mode reason above.
+    if [ "$TRUST_HAD_NL" = "no" ] && [ -s "$TRUST_CFG" ] && [ -z "$(tail -c1 "$TRUST_CFG")" ]; then
+      TRUST_SZ=$(wc -c < "$TRUST_CFG" | tr -d ' ')
+      if head -c "$((TRUST_SZ - 1))" "$TRUST_CFG" > "$TRUST_TMP"; then
+        cat "$TRUST_TMP" > "$TRUST_CFG"
+      fi
+    fi
     ok "Removed $TRUST_KEY_COUNT hook-trust table(s) from $TRUST_CFG"
     ok "Its backup: $TRUST_BAK"
+    # Bounded, on the same rule and for the same reason as install.sh's: nothing else reaps these,
+    # and an uninstall-reinstall cycle would otherwise leave one copy per cycle in the user's home
+    # forever. Newest three of OUR uninstall pattern; install's backups are left alone, because they
+    # are the copy that predates everything this run just undid.
+    TRUST_REAP=$(mktemp)
+    for tb in "$TRUST_CFG".kinglet-uninstall.*; do
+      if [ -f "$tb" ]; then printf '%s\n' "$tb" >> "$TRUST_REAP"; fi
+    done
+    TRUST_REAPED=0
+    while IFS= read -r tb; do
+      [ -n "$tb" ] || continue
+      rm -f "$tb" && TRUST_REAPED=$((TRUST_REAPED + 1))
+    done <<< "$(sort -r "$TRUST_REAP" 2>/dev/null | awk 'NR > 3' || true)"
+    rm -f "$TRUST_REAP"
+    [ "$TRUST_REAPED" -eq 0 ] || info "Reaped $TRUST_REAPED older uninstall backup(s); the newest 3 are kept."
   else
     err "Could not edit $TRUST_CFG — its hook-trust tables are still there."
     err "They name this project's .codex/hooks.json, which is about to be removed, so they are inert;"

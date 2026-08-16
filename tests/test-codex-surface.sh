@@ -1107,6 +1107,25 @@ if bash tests/fixtures/mkproject.sh "$UPFIX" --variant urp >/dev/null 2>&1 \
   # "yours", which is exactly how the measured regression arrived.
   printf '\n' >> "$UPFIX/.claude/settings.json"
   UP_SETTINGS_SHA="$(sha256sum "$UPFIX/.claude/settings.json" | cut -d' ' -f1)"
+
+  # AND A CODEX-LAYER FILE, because the edit above is a Claude-arm file and the
+  # preservation mechanism unique to this task is the one guarding CONVERTED
+  # COMMAND SKILLS. The converter overwrites its whole output directory, so those
+  # files are written through `is_modified` — the same test both Step 5 loops use
+  # — and nothing in this guard exercised that branch. It works; without an
+  # assertion nothing would notice if it stopped, and an upgrade that destroys an
+  # edit is the defect this whole fixture exists for.
+  UP_CMDSKILL=""
+  for c in .claude/commands/*.md; do
+    [ -f "$c" ] || continue
+    UP_CMDSKILL="$UPFIX/.agents/skills/$(basename "$c" .md)/SKILL.md"
+    break
+  done
+  UP_CMDSKILL_SHA=""
+  if [ -n "$UP_CMDSKILL" ] && [ -f "$UP_CMDSKILL" ]; then
+    printf '\n<!-- a line the user added -->\n' >> "$UP_CMDSKILL"
+    UP_CMDSKILL_SHA="$(sha256sum "$UP_CMDSKILL" | cut -d' ' -f1)"
+  fi
   if CODEX_HOME="$CODEX_HOME_T" bash install.sh --project-dir "$UPFIX" --client codex --yes \
        >"$WORK/upgrade.out" 2>&1; then
     ok "a second --client codex install over the first succeeds"
@@ -1119,10 +1138,31 @@ else
 fi
 
 if [ "$UPFIX_OK" -eq 1 ]; then
+  UPRCPT="$UPFIX/.claude/state/install-receipt.tsv"
   if [ "$(sha256sum "$UPFIX/.claude/settings.json" | cut -d' ' -f1)" = "$UP_SETTINGS_SHA" ]; then
     ok "upgrade: the edit to the file the installer documents as preserved survived"
   else
     bad "upgrade: .claude/settings.json was overwritten — that is the file the installer reports as kept"
+  fi
+
+  if [ -n "$UP_CMDSKILL_SHA" ]; then
+    if [ "$(sha256sum "$UP_CMDSKILL" | cut -d' ' -f1)" = "$UP_CMDSKILL_SHA" ]; then
+      ok "upgrade: an edited converted command skill survived the upgrade byte-for-byte"
+    else
+      bad "upgrade: $UP_CMDSKILL was overwritten — the converter rewrites its whole output directory, so these files are only safe if the installer routes them through is_modified"
+    fi
+    # And the row records it AS EDITED, which is what makes the NEXT upgrade
+    # recognise it. A kept file written back as `toolkit` survives exactly one
+    # upgrade and is destroyed by the one after — the measured shape of this
+    # defect elsewhere in the installer.
+    UP_CMD_REL="${UP_CMDSKILL#"$UPFIX"/}"
+    if /usr/bin/grep -q "^$(printf '%s' "$UP_CMD_REL" | sed 's/[.[\*^$/]/\\&/g')	.*	user-modified\$" "$UPRCPT" 2>/dev/null; then
+      ok "upgrade: the kept command skill is recorded user-modified, so the next upgrade still knows"
+    else
+      bad "upgrade: $UP_CMD_REL was kept but not recorded user-modified — the edit survives one upgrade and the next one destroys it"
+    fi
+  else
+    bad "upgrade: no converted command skill was found to edit — the is_modified branch is untested"
   fi
 
   # Internal consistency 1: the config still points at the project's own shim and
@@ -1155,7 +1195,6 @@ if [ "$UPFIX_OK" -eq 1 ]; then
   # Internal consistency 3: the receipt and the tree agree in BOTH directions
   # over the Codex layer. A row with no file is a claim about nothing; a file
   # with no row is permanent debris.
-  UPRCPT="$UPFIX/.claude/state/install-receipt.tsv"
   UP_ROW_DEAD=""
   while IFS=$'\t' read -r rel _sha _mode _origin; do
     case "$rel" in ''|\#*|path) continue ;; esac
@@ -1216,6 +1255,327 @@ PY
     ok "upgrade: the installer named the offending registration rather than failing quietly"
   else
     bad "upgrade: the installer did not name the unrunnable registration — a config it declines to write in silence is indistinguishable from one it wrote"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 12. THE HOME WRITE, UNDER A STUB `codex`
+#
+# WHY A STUB AND NOT THE REAL BINARY. The trust step is the only thing this
+# toolkit does outside a project, and until this section it had NO guard at all:
+# every install above declines consent, so the writer, the idempotence pass and
+# the reversal were exercised only by hand. The real `codex` cannot be the
+# instrument — it is not on every machine that runs this suite, it costs seconds
+# per call, and `hooks/list` against a project Codex has not been told to trust
+# returns nothing, so a real run here would test the refusal and never the write.
+#
+# A canned app-server response tests exactly the part that is Kinglet's: parse
+# the reply, back the file up, remove our previous tables, append the new ones,
+# record the reversal, and give the file back unchanged in every respect the user
+# chose. The part that is Codex's — that those hashes make `trustStatus` go
+# `trusted` — is measured against the real binary and recorded in the task
+# report; a stub cannot and should not speak to it.
+#
+# THE MODE IS THE ASSERTION THIS SECTION EXISTS FOR. `mv` from `mktemp` replaces
+# the inode and carries 0600, so the round trip silently re-moded a home config
+# 644 -> 600, and a deliberately read-only 444 was rewritten without a word.
+# Three modes are checked because the read-only one is what revealed it.
+# ---------------------------------------------------------------------------
+echo "--- codex surface: the home write, stubbed ---"
+
+STUBBIN="$WORK/stubbin"
+mkdir -p "$STUBBIN"
+cat > "$STUBBIN/codex" <<'STUB'
+#!/usr/bin/env bash
+# A canned `codex app-server`. Emits the response the test wrote, then holds
+# briefly so the caller's poll sees the last id before the pipe closes.
+[ "${1:-}" = "app-server" ] || exit 1
+cat "$KINGLET_STUB_RESPONSE"
+sleep 0.4
+STUB
+chmod +x "$STUBBIN/codex"
+export KINGLET_STUB_RESPONSE="$WORK/stub-response.jsonl"
+
+# One canned reply per rig, because every key embeds that rig's absolute path —
+# which is the whole reason the hash cannot be precomputed and shipped.
+stub_response() {   # $1 = project dir, $2 = managed (true|null)
+  {
+    if [ "$2" = "true" ]; then
+      printf '{"id":2,"result":{"requirements":{"allowManagedHooksOnly":true}}}\n'
+    else
+      printf '{"id":2,"result":{"requirements":null}}\n'
+    fi
+    printf '{"id":3,"result":{"data":[{"cwd":"%s","hooks":[' "$1"
+    sr_n=0
+    while [ "$sr_n" -lt 3 ]; do
+      [ "$sr_n" -eq 0 ] || printf ','
+      printf '{"key":"%s/.codex/hooks.json:pre_tool_use:0:%s","currentHash":"sha256:stub%s","trustStatus":"untrusted"}' \
+        "$1" "$sr_n" "$sr_n"
+      sr_n=$((sr_n + 1))
+    done
+    printf ']}]}}\n'
+  } > "$KINGLET_STUB_RESPONSE"
+}
+
+# The composite config body. SIX SHAPES IN ONE FILE, so one install exercises
+# all of them: a foreign hooks.state table that must survive with its hash, an
+# INDENTED table, an EMPTY table immediately followed by another table header, a
+# COMMENT between tables, and no trailing newline. Every one is a shape the
+# line-oriented removal pass could get wrong, and a claim about what it handles
+# is worth exactly what it is tested against — which is why the adjacency case is
+# here rather than only in the sentence that says it was covered.
+write_home_cfg() {   # $1 = path
+  {
+    printf '[projects."/somewhere/else"]\n'
+    printf 'trust_level = "trusted"\n'
+    printf '# a comment the user wrote between two tables\n'
+    printf '[hooks.state."/another/project/.codex/hooks.json:pre_tool_use:0:0"]\n'
+    printf 'enabled = true\n'
+    printf 'trusted_hash = "sha256:someoneelse"\n'
+    # An EMPTY hooks.state table whose very next line is another header. The
+    # removal pass clears its in-block flag on a line beginning `[`, so this is
+    # the input that tells whether the reset fires before the next table's keys
+    # are swallowed with it.
+    printf '[hooks.state."/third/project/.codex/hooks.json:stop:0:0"]\n'
+    printf '[telemetry]\n'
+    printf 'enabled = false\n'
+    printf '  [tools.web_search]\n'
+    printf '  enabled = false\n'
+    printf '[model]\n'
+    printf 'name = "gpt-5.6-sol"'
+  } > "$1"
+}
+
+home_trust_rig() {   # $1 = label, $2 = mode, $3 = managed(true|null); echoes the rig dir
+  htr_dir="$WORK/htr-$1"
+  bash tests/fixtures/mkproject.sh "$htr_dir" --variant urp >/dev/null 2>&1 || return 1
+  mkdir -p "$WORK/home-$1"
+  chmod 700 "$WORK/home-$1"
+  write_home_cfg "$WORK/home-$1/config.toml"
+  chmod "$2" "$WORK/home-$1/config.toml"
+  stub_response "$htr_dir" "$3"
+  printf '%s\n' "$htr_dir"
+}
+
+mode_of() { stat -c '%a' "$1" 2>/dev/null || echo unknown; }
+
+# ── Rig A: mode 644, the ordinary case ──────────────────────────────────────
+RIG_A="$(home_trust_rig a 644 null || true)"
+HOME_A="$WORK/home-a"
+CFG_A="$HOME_A/config.toml"
+CFG_A_ORIG="$WORK/cfg-a-orig.toml"
+if [ -n "$RIG_A" ] && [ -d "$RIG_A" ]; then
+  cp "$CFG_A" "$CFG_A_ORIG"
+  if PATH="$STUBBIN:$PATH" CODEX_HOME="$HOME_A" bash install.sh \
+       --project-dir "$RIG_A" --client codex --codex-trust --yes >"$WORK/htr-a.out" 2>&1; then
+    ok "the stubbed trust grant completes"
+  else
+    bad "the stubbed trust grant failed: $(tail -3 "$WORK/htr-a.out" | tr '\n' ' ')"
+  fi
+
+  if [ "$(mode_of "$CFG_A")" = "644" ]; then
+    ok "MODE: a 644 home config is still 644 after the trust write"
+  else
+    bad "MODE: the home config went 644 -> $(mode_of "$CFG_A"). mv from mktemp replaces the inode and carries 0600 with it — a silent change to a property of a file the toolkit did not create"
+  fi
+
+  A_OURS="$(/usr/bin/grep -c "^\[hooks\.state\.\"$RIG_A" "$CFG_A" || true)"
+  A_MARK="$(/usr/bin/grep -c 'kinglet:codex-trust' "$CFG_A" || true)"
+  if [ "$A_OURS" -eq 3 ] && [ "$A_MARK" -eq 1 ]; then
+    ok "the trust write added one table per hook (3) and exactly one marker"
+  else
+    bad "the trust write produced $A_OURS table(s) and $A_MARK marker(s); expected 3 and 1"
+  fi
+
+  # THE FOREIGN TABLE IS THE POINT. Every key we remove embeds this project's own
+  # hooks.json path, so another repository's trust cannot match one — but that is
+  # an argument, and this is the test of it.
+  A_FOREIGN_BAD=""
+  /usr/bin/grep -qF -- 'sha256:someoneelse' "$CFG_A" || A_FOREIGN_BAD="$A_FOREIGN_BAD hash-gone"
+  /usr/bin/grep -qF -- '[hooks.state."/third/project' "$CFG_A" || A_FOREIGN_BAD="$A_FOREIGN_BAD empty-table-gone"
+  # The adjacency case's real casualty is the table AFTER the empty one: an
+  # in-block flag that does not reset on a `[` line swallows it silently.
+  /usr/bin/grep -qF -- '[telemetry]' "$CFG_A" || A_FOREIGN_BAD="$A_FOREIGN_BAD telemetry-swallowed"
+  if [ -z "$A_FOREIGN_BAD" ]; then
+    ok "foreign hooks.state tables survive, including an empty one adjacent to another table"
+  else
+    bad "the trust write damaged the user's own tables:$A_FOREIGN_BAD — those keys name other projects and are not ours to touch"
+  fi
+
+  if [ -f "$RIG_A/.claude/state/codex-trust.tsv" ] \
+     && /usr/bin/grep -q '^\.claude/state/codex-trust\.tsv	' "$RIG_A/.claude/state/install-receipt.tsv"; then
+    ok "the reversal record exists and carries its own receipt row"
+  else
+    bad "the trust reversal record is missing or unreceipted — uninstall.sh reads it to undo the home write, and a receipt row is what removes the record itself"
+  fi
+
+  BK_N="$(find "$HOME_A" -maxdepth 1 -name 'config.toml.kinglet-backup.*' 2>/dev/null | /usr/bin/grep -c . || true)"
+  if [ "$BK_N" -ge 1 ]; then
+    ok "the home config was backed up before it was edited"
+  else
+    bad "no backup was taken before editing a file outside the project"
+  fi
+
+  # ── Idempotence, byte for byte ────────────────────────────────────────────
+  CFG_A_AFTER1="$WORK/cfg-a-after1.toml"
+  cp "$CFG_A" "$CFG_A_AFTER1"
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$HOME_A" bash install.sh \
+    --project-dir "$RIG_A" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+  if cmp -s "$CFG_A" "$CFG_A_AFTER1"; then
+    ok "a second grant leaves the home config byte-identical"
+  else
+    bad "a second grant changed the home config — a re-emitted config keeps its keys and changes its hashes, so an append-if-absent writer would leave a duplicate TOML table here"
+  fi
+  if [ "$(mode_of "$CFG_A")" = "644" ]; then
+    ok "MODE: still 644 after a second grant"
+  else
+    bad "MODE: the second grant moved the mode to $(mode_of "$CFG_A")"
+  fi
+
+  # ── The reversal ──────────────────────────────────────────────────────────
+  if bash uninstall.sh --project-dir "$RIG_A" --yes --no-backup >"$WORK/htr-a-un.out" 2>&1; then
+    if cmp -s "$CFG_A" "$CFG_A_ORIG"; then
+      ok "uninstall gives the home config back byte-identical to the user's original"
+    else
+      bad "uninstall did not restore the home config: $(diff "$CFG_A_ORIG" "$CFG_A" 2>&1 | head -4 | tr '\n' ' ')"
+    fi
+    if [ "$(mode_of "$CFG_A")" = "644" ]; then
+      ok "MODE: 644 survives the reversal too"
+    else
+      bad "MODE: uninstall moved the home config to $(mode_of "$CFG_A") — the same inode-replacing shape, in the other direction"
+    fi
+  else
+    bad "uninstall failed after a stubbed trust grant"
+  fi
+fi
+
+# ── Rig B: mode 600, to prove the mode is PRESERVED and not pinned to 644 ───
+RIG_B="$(home_trust_rig b 600 null || true)"
+if [ -n "$RIG_B" ] && [ -d "$RIG_B" ]; then
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-b" bash install.sh \
+    --project-dir "$RIG_B" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+  if [ "$(mode_of "$WORK/home-b/config.toml")" = "600" ]; then
+    ok "MODE: a 600 home config is still 600 — the mode is preserved, not normalised"
+  else
+    bad "MODE: a 600 home config became $(mode_of "$WORK/home-b/config.toml"); a fix that hardcodes 644 is the same defect with a different constant"
+  fi
+fi
+
+# ── Rig C: mode 444, the read-only file that revealed all of this ───────────
+RIG_C="$(home_trust_rig c 444 null || true)"
+if [ -n "$RIG_C" ] && [ -d "$RIG_C" ]; then
+  CFG_C="$WORK/home-c/config.toml"
+  CFG_C_ORIG="$WORK/cfg-c-orig.toml"
+  cp "$CFG_C" "$CFG_C_ORIG"
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-c" bash install.sh \
+    --project-dir "$RIG_C" --client codex --codex-trust --yes >"$WORK/htr-c.out" 2>&1 || true
+  if cmp -s "$CFG_C" "$CFG_C_ORIG" && [ "$(mode_of "$CFG_C")" = "444" ]; then
+    ok "READ-ONLY: a 444 home config is left byte- and mode-identical"
+  else
+    bad "READ-ONLY: a deliberately read-only home config was rewritten (mode now $(mode_of "$CFG_C")). The writability precondition tests the DIRECTORY, and a read-only file inside a writable directory passes it"
+  fi
+  if [ -f "$RIG_C/.claude/state/codex-trust.tsv" ]; then
+    bad "READ-ONLY: a reversal record was written for a grant that did not happen — uninstall would then edit a file this run never touched"
+  else
+    ok "READ-ONLY: no reversal record, because no grant happened"
+  fi
+  if /usr/bin/grep -qiF -- 'not writable' "$WORK/htr-c.out"; then
+    ok "READ-ONLY: the refusal is named rather than silent"
+  else
+    bad "READ-ONLY: nothing in the run says the home config was not writable"
+  fi
+  # The half that must still land: skills need no trust at all.
+  if [ -d "$RIG_C/.agents/skills" ] && [ -f "$RIG_C/.codex/hooks.json" ]; then
+    ok "READ-ONLY: the project layer still landed in full"
+  else
+    bad "READ-ONLY: a home-side refusal took the project layer down with it"
+  fi
+fi
+
+# ── Rig D: CRLF, and Rig E: an empty config ────────────────────────────────
+RIG_D="$(home_trust_rig d 644 null || true)"
+if [ -n "$RIG_D" ] && [ -d "$RIG_D" ]; then
+  CFG_D="$WORK/home-d/config.toml"
+  awk '{ printf "%s\r\n", $0 }' "$CFG_D" > "$CFG_D.crlf" && mv "$CFG_D.crlf" "$CFG_D"
+  chmod 644 "$CFG_D"
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-d" bash install.sh \
+    --project-dir "$RIG_D" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+  D_OURS="$(/usr/bin/grep -c "^\[hooks\.state\.\"$RIG_D" "$CFG_D" || true)"
+  if [ "$D_OURS" -eq 3 ] && /usr/bin/grep -qF -- 'sha256:someoneelse' "$CFG_D"; then
+    ok "CRLF: the tables are written and the user's CRLF content survives"
+  else
+    bad "CRLF: $D_OURS table(s) written, foreign table present: $(/usr/bin/grep -c 'someoneelse' "$CFG_D" || true). A trailing \\r puts the carriage return inside the compared token"
+  fi
+fi
+
+RIG_E="$(home_trust_rig e 644 null || true)"
+if [ -n "$RIG_E" ] && [ -d "$RIG_E" ]; then
+  CFG_E="$WORK/home-e/config.toml"
+  : > "$CFG_E"
+  chmod 644 "$CFG_E"
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-e" bash install.sh \
+    --project-dir "$RIG_E" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+  E_OURS="$(/usr/bin/grep -c "^\[hooks\.state\.\"$RIG_E" "$CFG_E" || true)"
+  if [ "$E_OURS" -eq 3 ] && [ "$(mode_of "$CFG_E")" = "644" ]; then
+    ok "EMPTY: an empty home config gains the tables and keeps its mode"
+  else
+    bad "EMPTY: $E_OURS table(s), mode $(mode_of "$CFG_E")"
+  fi
+
+  # ── The backups are bounded ───────────────────────────────────────────────
+  # Seeded rather than accumulated, because proving a bound by running the
+  # installer five times tests patience rather than the reaper.
+  for ts in 20200101000000 20200102000000 20200103000000 20200104000000 20200105000000; do
+    : > "$CFG_E.kinglet-backup.$ts"
+  done
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-e" bash install.sh \
+    --project-dir "$RIG_E" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+  E_BK="$(find "$WORK/home-e" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | /usr/bin/grep -c . || true)"
+  if [ "$E_BK" -le 3 ]; then
+    ok "BACKUPS: bounded at 3 — older ones are reaped rather than accumulating in the home ($E_BK present)"
+  else
+    bad "BACKUPS: $E_BK backups in the home and nothing reaps them; every grant adds one, forever, in the directory this toolkit works hardest to stay out of"
+  fi
+  # WHICH THREE SURVIVE, not merely how many. A reaper with its sort inverted keeps three files and
+  # deletes the recent ones — the count assertion above is green either way, and the copy a user
+  # actually needs is the newest. Six exist at this point (five seeded plus the one this run made),
+  # so the oldest seeded must be gone and the newest seeded must remain.
+  E_BK_LIST="$(find "$WORK/home-e" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | sort || true)"
+  E_BK_BAD=""
+  /usr/bin/grep -qF -- 'kinglet-backup.20200101000000' <<< "$E_BK_LIST" && E_BK_BAD="$E_BK_BAD oldest-kept"
+  /usr/bin/grep -qF -- 'kinglet-backup.20200105000000' <<< "$E_BK_LIST" || E_BK_BAD="$E_BK_BAD newest-seeded-deleted"
+  if [ -z "$E_BK_BAD" ]; then
+    ok "BACKUPS: the reaper dropped the oldest and kept the newest"
+  else
+    bad "BACKUPS:$E_BK_BAD — the names are UTC timestamps, so a reverse lexical sort is a date sort, and getting it backwards deletes exactly the copies a recovery would want"
+  fi
+fi
+
+# ── The managed-hooks switch: the branch no real policy has ever reached ────
+#
+# `configRequirements/read` is live and answers `{"requirements": null}` — that
+# much is measured against the real binary, twice. Nobody has produced a non-null
+# payload, so the `true` arm is reachable here and nowhere else. Testing it with a
+# stub is the difference between a warning that is written and a warning that has
+# been seen to fire; what it does NOT establish is that a policy an organisation
+# actually set surfaces through that field, and the installer's own comment says
+# so rather than implying detection works.
+RIG_M="$(home_trust_rig m 644 true || true)"
+if [ -n "$RIG_M" ] && [ -d "$RIG_M" ]; then
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-m" bash install.sh \
+    --project-dir "$RIG_M" --client codex --codex-trust --yes >"$WORK/htr-m.out" 2>&1 || true
+  if /usr/bin/grep -qF -- 'allowManagedHooksOnly' "$WORK/htr-m.out"; then
+    ok "MANAGED: a reported allowManagedHooksOnly is surfaced to the user"
+  else
+    bad "MANAGED: the installer read configRequirements/read and said nothing about a reported allowManagedHooksOnly — if that policy is in force the hooks may not run at all, whatever their trust says"
+  fi
+  # And the control, in the same shape as every other differential here: the
+  # ordinary rigs must NOT carry the warning, or the assertion above is satisfied
+  # by a line the installer prints unconditionally.
+  if /usr/bin/grep -qF -- 'allowManagedHooksOnly' "$WORK/htr-a.out" 2>/dev/null; then
+    bad "MANAGED: the warning also appears on a rig whose requirements are null — it is unconditional, so the assertion above proves nothing"
+  else
+    ok "MANAGED: control — the warning is absent when requirements are null"
   fi
 fi
 
