@@ -477,30 +477,64 @@ fi
 #
 # WHAT THIS DOES NOT COVER, and it is deliberate, not an oversight. It reads ONE file. The payload
 # has 69 entries, 44 Markdown (rules 1-3) and 25 not; this is one of the 25. Applying the same
-# criterion to the other 24 leaves FIFTEEN unmarked repository-only citation sites, thirteen of them
-# naming `tests/` files and two naming provenance.tsv, none of which install. Split by directory, and
+# criterion to the other 24 leaves TWENTY-FIVE unmarked repository-only citation sites -- DERIVED
+# 2026-08-17, and read it as a dated derivation rather than a live figure, because nothing computes
+# it at run time. The two payload totals in the sentence before it ARE live and ARE guarded, in
+# tests/test-derived-counts.sh's tree-size block; these three are not, and the difference is the
+# reason the whole class of them went four rounds without being re-derived. Split by directory, and
 # the split is the finding:
 #
-#   SIX in `.claude/hooks/`   -- five in bash-gate.sh, one in _lib.sh. Pre-existing.
-#   NINE in `.claude/scripts/` -- detect-missing-refs.sh, generate-claude-md.sh, studio-doctor.sh x5,
-#                                 validate-asmdefs.sh, validate-serialization.sh.
+#   SIX in `.claude/hooks/`     -- five in bash-gate.sh, one in _lib.sh. Pre-existing, and unmoved
+#                                  since 2026-08-15.
+#   NINETEEN in `.claude/scripts/` -- codex-hook-shim.sh x8, studio-doctor.sh x6,
+#                                  codex-command-to-skill.sh, detect-missing-refs.sh,
+#                                  generate-claude-md.sh, validate-asmdefs.sh,
+#                                  validate-serialization.sh.
 #
-# WHICH RESOLUTION RULE THE FIFTEEN IS UNDER, because two are in play and the figure differs under
-# each. A token spelled `scripts/studio-doctor.sh` names a real file in THIS repository and is not
-# literally a payload entry -- the payload entry is that name under `.claude/`. Rule 2's own code
-# resolves that form (`case "$t" in scripts/*) p=".claude/$t"`) and so declines to flag it. THE
-# FIFTEEN IS COUNTED UNDER RULE 2'S RESOLUTION: a `scripts/X` token is a resolved payload citation
-# and does not count. Drop that one resolution and the same criterion returns EIGHTEEN over this
-# tree. The figure is meaningless without the rule, which is the whole of ledger 205.
+# By what they name: 21 name `tests/` files, 2 name provenance.tsv, 1 names
+# docs/research/codex-client/codex-facts.md and 1 names scripts/codex-probe.sh -- the one repository
+# script that is deliberately excluded from the payload, so it is the only member whose target is a
+# `scripts/` file at all.
+#
+# THE SCRIPTS HALF WENT FROM SEVEN TO NINETEEN AND THIS COMMENT SAID NINE THROUGH ALL OF IT. Two
+# causes, and both are the reason the figure is re-derived here rather than adjusted: the branch
+# added two scripts to the payload (codex-hook-shim.sh, codex-command-to-skill.sh) carrying nine
+# sites between them, and studio-doctor.sh gained three more while being repaired. The hooks half
+# did not move at all, which is exactly why a TOTAL cannot be read as evidence about either half.
+#
+# WHICH RESOLUTION RULE THE FIGURE IS UNDER, because two are in play and it differs under each. A
+# token spelled `scripts/studio-doctor.sh` names a real file in THIS repository and is not literally
+# a payload entry -- the payload entry is that name under `.claude/`. Rule 2's own code resolves that
+# form (`case "$t" in scripts/*) p=".claude/$t"`) and so declines to flag it. THE TWENTY-FIVE IS
+# COUNTED UNDER RULE 2'S RESOLUTION: a `scripts/X` token is a resolved payload citation and does not
+# count. The figure is meaningless without the rule, which is the whole of ledger 205.
+#
+# THERE IS A SECOND CLAUSE, IT WAS NEVER WRITTEN DOWN, AND IT IS WORTH MORE THAN THE NUMBER:
+# **A TOKEN RESOLVES ONLY IF `$REPO/<token>` EXISTS. A BARE BASENAME IS NOT SEARCHED FOR.** Rule 4's
+# own code, four hundred lines below, DOES search for one (`git ls-files | grep -E "(^|/)$t$"`,
+# accepted on a unique match) -- so "the same criterion" was never the same, and applying rule 4's
+# spelling to this sweep returns a different, larger set. Reconstructed and confirmed against both
+# anchors this comment carries: at f8fab22, verbatim-path resolution gives 13 and rule 4's spelling
+# gives 18; the comment's own THIRTEEN and its SIX-in-hooks split (five bash-gate, one _lib.sh) both
+# reproduce exactly under the first and neither reproduces under the second.
+#
+# What the missing clause was hiding, by name, so nobody re-derives them as new findings: a bare
+# `HOOK-REFERENCE.md` (3 sites), a bare `smoke-pass.md` (1), and a bare `manifest.json` (2). The
+# last of those is the reason to keep the clause rather than adopt rule 4's: in studio-doctor.sh
+# `manifest.json` is the USER'S Unity project manifest, and it resolves to this repository's
+# `spikes/.../fixture/Packages/manifest.json` only because that happens to be the unique match here.
+# Rule 4 can afford the looser rule because `.claude/UPSTREAM` is a list of paths; a sweep over
+# prose cannot.
 #
 # AND THE FIGURE WAS RIGHT FOR THE WRONG REASON WHEN IT WAS WRITTEN. Re-derived at f8fab22, the
 # commit that first wrote FIFTEEN: the resolving count there was THIRTEEN and the non-resolving count
 # was fifteen. The split this comment carried until 2026-08-15 -- detect-pipeline.sh, and
 # generate-claude-md.sh twice -- is the non-resolving one, and its two extra rows are exactly two
 # `scripts/X` tokens. So the sentence said "applying the same criterion" while the number came from a
-# criterion missing one of its clauses. It reads fifteen again today only because studio-doctor.sh
-# picked up citations after f8fab22 and detect-pipeline.sh lost its one: the total returned to the
-# written figure while every row under it moved, which is the failure mode a total cannot show you.
+# criterion missing one of its clauses. It read fifteen again on 2026-08-15 only because
+# studio-doctor.sh picked up citations after f8fab22 and detect-pipeline.sh lost its one: the total
+# returned to the written figure while every row under it moved, which is the failure mode a total
+# cannot show you.
 #
 # THIS COMMENT SAID SIX UNTIL 2026-08-14, AND THE SIX IT NAMED ARE EXACTLY THE HOOKS SUBSET -- the
 # nine it missed are exactly the scripts one, for the reason rule 3's own header states three
@@ -515,17 +549,20 @@ fi
 # WIDENING IS A SEPARATE CHANGE, and the criterion it needs is EXEMPT BY ROLE, NOT BY MARKER:
 # `install.sh` and `uninstall.sh` are not in the payload, yet a shipped file naming them is naming
 # the command the user ran, not a dangling pointer. The same holds for a script's own
-# `./scripts/<self>.sh` usage string. Both are excluded from the fifteen above. That ruling lived
+# `./scripts/<self>.sh` usage string. Both are excluded from the count above. That ruling lived
 # only in the wave ledger until 2026-08-14, where a widening pass would never have opened it.
 #
-# Re-derive the fifteen rather than trusting this comment -- the criterion is the whole of it:
+# Re-derive rather than trusting this comment -- the criterion is the whole of it:
 #
 #   for every non-Markdown payload file except this rule's own subject, every `*.tsv|md|sh|json`
-#   token naming a real file here -- reading `.claude/scripts/X` as repository `scripts/X`, AND
-#   reading a bare `scripts/X` as the payload entry `.claude/scripts/X`, which is the clause the
-#   figure was derived with and the criterion was written without -- that is neither in the payload
-#   nor a project-root file install.sh writes, on a line whose following text does not say
-#   `not installed`, excluding install.sh, uninstall.sh, and each script's own usage string.
+#   token THAT EXISTS VERBATIM AT `$REPO/<token>` -- no bare-basename search, see the clause above --
+#   reading `.claude/scripts/X` as repository `scripts/X`, AND reading a bare `scripts/X` as the
+#   payload entry `.claude/scripts/X`, that is neither in the payload nor a project-root file
+#   install.sh writes, on a line whose following text does not say `not installed`, excluding
+#   install.sh, uninstall.sh, and each script's own usage string.
+#
+#   Count SITES, not paths: five citations of one test file are five. That is the unit the split
+#   above uses and the one a per-file figure silently changes.
 UP_FILE="$REPO/.claude/UPSTREAM"
 
 # What an installed reader can open: the payload, plus the project-root files install.sh writes

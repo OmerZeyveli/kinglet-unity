@@ -449,5 +449,75 @@ tiuc_eq "yes" "$TIUC_CRIT_OK" \
 tiuc_eq "$TIUC_CRIT_A" "$TIUC_CRIT_B" \
   "install.sh and scripts/studio-doctor.sh carry the SAME codex_layer_path, character for character — the shipped script cannot source the installer, so this comparison is what stops the two spellings drifting apart again"
 
+# ─────────────────────────────────────────────────────────────────────────────
+# THE PREDICATE ITSELF, IN BOTH DIRECTIONS. Every arm above asserts that a Codex
+# path is INCLUDED. None asserted that a non-Codex path is EXCLUDED, and the gap
+# was measured rather than argued: a shadow `codex_layer_path() { return 0; }`
+# left this file at 24/24 green. A guard that only exercises one direction of a
+# predicate is half a guard — and the untested half is the dangerous one, because
+# a criterion that is too WIDE tells a Claude-only user to install a Codex layer
+# they never asked for, which is the exact defect round 2 of Task 12 shipped and
+# had to withdraw.
+#
+# It runs the EXTRACTED REGION, not a re-spelling of it: `eval` inside a subshell
+# so the definition cannot leak into this file's own scope, and so a change to
+# install.sh's real function is what this arm reads. A table with a hardcoded
+# copy of the criterion would agree with itself forever.
+#
+# WHAT THIS ARM CANNOT SEE, measured 2026-08-17 rather than reasoned about. It
+# reads the REGION, so a shadow appended AFTER the end marker — the shape that
+# started this whole thread — is invisible to it. Both halves were run:
+#
+#   shadow in scripts/studio-doctor.sh -> 24/26 here, the two behavioural arms red
+#   shadow in install.sh               -> 26/26 GREEN here; 38 red across the full
+#                                         suite, in test-install-prune.sh and
+#                                         test-studio-doctor.sh
+#
+# Nothing ships silently either way, and the three guards have three different
+# blind spots: the byte comparison catches a textual edit and no shadow, the
+# behavioural arms catch the doctor's runtime and not the installer's, and this
+# arm catches what the criterion ANSWERS and no shadow at all. Stated here so the
+# next reader does not read one green as three.
+TIUC_PRED_BAD=""
+TIUC_PRED_IN=0
+TIUC_PRED_OUT=0
+tiuc_pred() {   # $1 = project-relative path, $2 = expected rc (0 = Codex-layer)
+  local rc=0
+  ( eval "$TIUC_CRIT_A"; codex_layer_path "$1" ) || rc=$?
+  if [ "$2" = "0" ]; then TIUC_PRED_IN=$((TIUC_PRED_IN + 1)); else TIUC_PRED_OUT=$((TIUC_PRED_OUT + 1)); fi
+  [ "$rc" = "$2" ] || TIUC_PRED_BAD="${TIUC_PRED_BAD}${1} -> rc ${rc}, expected ${2}"$'\n'
+}
+# Codex-layer: every shape the installer's Codex arm writes.
+tiuc_pred 'AGENTS.md'                             0
+tiuc_pred '.agents/skills/addressables'           0
+tiuc_pred '.agents/skills/unity-doctor/SKILL.md'  0
+tiuc_pred '.codex/hooks.json'                     0
+tiuc_pred '.codex/config.toml'                    0
+tiuc_pred '.claude/state/codex-trust.tsv'         0
+# NOT Codex-layer: a plain install writes every one of these, and a criterion
+# that claims any of them sends a Claude-only user to `--client codex`.
+tiuc_pred '.claude/settings.json'                 1
+tiuc_pred '.claude/skills/addressables/SKILL.md'  1
+tiuc_pred '.claude/state/install-receipt.tsv'     1
+tiuc_pred 'CLAUDE.md'                             1
+tiuc_pred '.mcp.json'                             1
+tiuc_pred 'MCP-SETUP.md'                          1
+# `.agents/` is not the criterion; `.agents/skills/*` is. A prefix rule gets this
+# one wrong, and it is the row that tells the two spellings apart.
+tiuc_pred '.agents/notes.md'                      1
+
+# THE FLOOR, AND IT IS TWO-SIDED ON PURPOSE. An empty table makes `TIUC_PRED_BAD`
+# empty and the assertion below green; a table that kept only its positive half
+# would restore exactly the gap this arm exists to close, and a single total
+# cannot see that happen.
+if [ "$TIUC_PRED_IN" -ge 3 ] && [ "$TIUC_PRED_OUT" -ge 3 ]; then TIUC_PRED_FLOOR=ok
+else TIUC_PRED_FLOOR="probed $TIUC_PRED_IN included and $TIUC_PRED_OUT excluded path(s); both halves need at least 3"; fi
+tiuc_eq "ok" "$TIUC_PRED_FLOOR" \
+  "the predicate table carries members on BOTH sides ($TIUC_PRED_IN in, $TIUC_PRED_OUT out) — a table that lost its excluded half would pass this arm having tested one direction again"
+
+if [ -n "$TIUC_PRED_BAD" ]; then printf '%s' "$TIUC_PRED_BAD" | sed 's|^|       |'; fi
+tiuc_eq "" "$TIUC_PRED_BAD" \
+  "install.sh's codex_layer_path answers correctly in BOTH directions — every Codex-layer shape included AND every plain-install path excluded"
+
 printf '  %s passed, %s failed\n' "$TIUC_PASS" "$TIUC_FAIL"
 [ "$TIUC_FAIL" -eq 0 ]

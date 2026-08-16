@@ -1989,8 +1989,12 @@ The two are not variants of one layout. The importer drops 7 of 9 commands
 silently, migrates no rules at all, rewrites 84 `.claude/` references to a
 `.Codex/` that exists under no spelling, strips every agent's tool grants, and —
 measured — copies `timeout: 3000` into `timeoutSec` **unconverted**, so a user who
-arrives that way has hook timeouts of 33 to 83 minutes. It reports 31 successes and
-0 failures while doing all of it.
+arrives that way has hook timeouts of 33 to 83 minutes. It reports **32** successes
+and 0 failures while doing all of it — 32 because this sentence's subject is a user
+importing their own installed project; 31 is the same import over `codex-facts.md`'s
+replica, which has no `.mcp.json`. It read 31 until 2026-08-17, which is the right
+number attached to the wrong subject and the same correction already made in
+`README.md`. The failure count is **0** for both, and that is the point.
 
 **Kinglet does not write the importer's tree and does not repair it.** The ship
 list therefore makes no claim about a project that arrived by import, and the
@@ -2138,7 +2142,12 @@ remains, and is not closed by anything:
   beside a `success` false payload) appears, or that an inactive tool group is
   diagnosed. Row 6 ships the *configuration*, which is measured, and says the rest
   is unknown. Assuming parity with Claude Code is the move that produced four of
-  this wave's five silent-failure layers.
+  this wave's **six** silent-failure layers — the six enumerated in one table below.
+  This sentence read *five* until 2026-08-17, in the same document whose later
+  heading is *"The six silent-failure layers, in one place"*: an ordinal or a total
+  written mid-measurement is the same class of stale figure as any other count, and
+  the class was already annotated in `codex-facts.md` while two of its three stale
+  sites went unswept.
 - **Whether `multi_agent` dispatch propagates a per-thread sandbox** to a sub-agent
   is unmeasured (`## Agents`). It is the difference between *a client could enforce
   a read-only reviewer* and *Codex will*. Nothing in this wave dispatched an agent,
@@ -2346,7 +2355,7 @@ rather than rows.
 | **The `tools:` capability narrowing** | **excluded, and this is the loss that matters** | **5 of 8** agents carry a substantive narrowing; `unity-reviewer` is deliberately read-only and under Codex would run with `Write`, `Edit`, `Bash` **and** MCP | **Partly revivable, and unmeasured.** `ThreadStartParams.sandbox`, `TurnStartParams.sandboxPolicy` and `permissionProfile/list` all exist, so *a client* could start a narrowed thread. Whether `multi_agent` dispatch propagates it is unmeasured, and `codex exec` — the shape this wave measured — takes one `--sandbox` for the whole run |
 | **Agents re-expressed as skills** | **excluded in this wave** | a skill has no tools contract either, so the skill route drops the narrowing exactly as completely; and `## Skills` observed **6 distinct skills ever loading** out of 16–18 discovered | Revivable — it is a content decision, not a mechanism one. Deferred because it doubles the surface with no measurement that anyone reaches it |
 | **MCP client behaviour** | **not excluded — unmeasured** | the configuration row is measured (the importer writes exactly it); nothing establishes that the routes behave | **Unmeasured, and it is Task 7's.** Recorded here so it is not read as an exclusion |
-| **The importer path** | **not repaired, deliberately** | the importer drops 7 of 9 commands silently, migrates no rules, rewrites 84 `.claude/` references to a `.Codex/` that exists under no spelling, strips every tool grant, copies `timeout: 3000` into `timeoutSec` unconverted — and reports 31 successes, 0 failures | Not Kinglet's to repair: it rewrites files Kinglet never writes. Kinglet's answer is to write its own layout instead |
+| **The importer path** | **not repaired, deliberately** | the importer drops 7 of 9 commands silently, migrates no rules, rewrites 84 `.claude/` references to a `.Codex/` that exists under no spelling, strips every tool grant, copies `timeout: 3000` into `timeoutSec` unconverted — and reports **32** successes, 0 failures over a real installed project (31 over the `.mcp.json`-less replica) | Not Kinglet's to repair: it rewrites files Kinglet never writes. Kinglet's answer is to write its own layout instead |
 
 **Two classes are dead as classes, and the difference between them is worth keeping.**
 Commands are dead because Codex has no such surface — a structural absence, and the
@@ -2410,7 +2419,7 @@ holds them all — and because the last one is the likeliest a real user meets.
 
 | # | Layer | What it reports | What actually happens | Where |
 |---|---|---|---|---|
-| 1 | Codex's own importer | **31 successes, 0 failures** | 7 of 9 commands dropped, rules never migrate, 84 path references rewritten to a directory that does not exist, every tool grant stripped, `timeout` copied ms-into-seconds | `codex-facts.md` §F1 |
+| 1 | Codex's own importer | **32 successes, 0 failures** over a real installed project; **31** over the replica with no `.mcp.json` | 7 of 9 commands dropped, rules never migrate, 84 path references rewritten to a directory that does not exist, every tool grant stripped, `timeout` copied ms-into-seconds | `codex-facts.md` §F1 |
 | 2 | Hook registration | `registered 12, warnings: [], errors: []`, `enabled: true` | nothing yet — but every signal a reader would check is now green | `codex-facts.md` §F1 |
 | 3 | Per-hook trust | `enabled: true`, `trustStatus: untrusted`, `statusMessage: null` | the hook fires **0** times. No prompt, no warning, nothing logged | `codex-facts.md` §F5 |
 | 4 | The hook body | the matcher fires, the process runs | 8 of 9 read fields `apply_patch` does not have, and exit 0 with 0 bytes | `codex-facts.md`, `## Hooks` |

@@ -581,10 +581,20 @@ unstated gets read as a guarantee:**
 
 ## The floor set
 
-The tables below carry **83 rows**, one per BOUND. **Three of those rows restate a bound another row
-already carries**, so: **at least 80 distinct bounds** meet the criterion in the current tree. **This
-is a lower bound and is written as one deliberately** — the count has now been wrong three times, and
-a fourth confident total would be the artifact repeating its own subject's defect.
+**The row total is no longer written here. Derive it:**
+
+```bash
+awk '/^## The floor set/{f=1;next} /^## Proof/{f=0} f && /^\| `/{n++} END{print n}' docs/ANTI-VACUITY.md
+```
+
+**It read "83 rows" until 2026-08-17, and the derivation answered 85 the first time anyone ran it —
+before that day's sweep added anything.** That is the fourth time this total has been wrong, in the
+section that says a fourth confident total would be the artifact repeating its own subject's defect;
+the defect was not the number chosen but the decision to write one down at all, in a file whose whole
+argument is that a figure nothing compares is a rumour. Three rows restate a bound another row
+already carries, so **distinct bounds = the derived row count minus three, as a lower bound** —
+a lower bound deliberately, because the sweep has never been exhaustive and the 2026-08-17 pass
+found thirty-four rows nobody had looked for.
 
 The three restatements, each identified by reading the assertion rather than the wording:
 `test-bash32-compat.sh`'s and `test-no-mobile.sh`'s per-source census identities, each listed under
@@ -616,6 +626,13 @@ done.
   says which — for one round it meant neither, and a reader could not tell the two apart.
 - The ~28 was low for a different reason: a window scan with no written criterion, which had already
   lost 14 members to an `awk` `getline` window and looked complete.
+- **And the whole set was 2026-08-14's tree.** The Codex wave added four test files and two floors
+  inside modified ones, and **not one row here named any of them** while this file was itself edited
+  twice in that wave for its census figures. Swept and tabled 2026-08-17 under the criterion below;
+  the new rows are the last table in this section. Zero rows from a *file* means the same thing zero
+  rows from a *segment* means, and until that sweep ran, `tests/*.sh` had rows, so nothing
+  distinguished *"swept"* from *"four new files never swept"* — the rule this document states about
+  segments does not extend to files, which is the hole the wave fell through.
 
 **Re-derive rather than trusting the number.** Enumerate C2's clauses (a)–(g) over every file in the
 scope; **build the window from an array, never with `getline`**; and key C3 by **propagating the
@@ -841,6 +858,72 @@ first derivation missed*, set by the one `[ ! -s "$SWEEP_LIST" ]` in the file. T
 because it carries the mechanism clause and the sentinel name, and because that guard's other two
 arms live beside it — splitting one arm of a three-arm block into a different table is what made two
 rows look like two bounds for three rounds, and is why the third arm's absence went unnoticed.
+
+### Added by the 2026-08-15 Codex wave, swept 2026-08-17
+
+**The criterion for this table, written before the count:** C1–C4 above, at this document's own unit
+(*one floor = one assertion site that can red on its own*), applied to every file in the declared
+scope that the branch `9a2ebec..HEAD` **added or introduced a floor into**, minus anything an
+existing row already carries. The candidate sweep was checked against eight known members already
+tabled elsewhere in this file before it was trusted; two of the eight first read as misses and both
+were errors in the *verification string*, not the sweep — **the bound and its failure message sit on
+different lines**, so a line-keyed candidate list cannot be checked by grepping the message.
+
+**Thirty-four rows, thirty-four sites, thirty-five bounds, in six files.** One row carries two bounds
+(the skills/commands pair), exactly as `test-no-mobile.sh`'s per-source row does; two rows are a
+single site each over 19 and 3 sources. Four of the six files are new (`test-codex-surface.sh`,
+`test-codex-shim.sh`, `test-codex-probe.sh`, `test-install-upgrade-client.sh`) and two gained floors
+while being modified. The review that raised this said *"at least six"*; that was a lower bound from
+a hand-count of **three** files, and the fourth new file — `test-install-upgrade-client.sh`, which
+carries five — was not in it, because a review that enumerates by reading cannot see a file it did
+not open.
+
+| Guard · assertion anchor | Subject | Mechanism | Bound |
+|---|---|---|---|
+| `test-codex-surface.sh` · *the ship list section is present and substantive* | `## Ship list` in `findings.md`, extracted by `awk` | (a) | ≥ 20 lines |
+| `test-codex-surface.sh` · *the tracked Codex payload is non-empty* | `git ls-files AGENTS.md .codex/* .agents/*` | (a) | ≥ 1 |
+| `test-codex-surface.sh` · *install.sh's script-skip list was extracted* | the skip names read out of `install.sh` | (a) + (f) | ≥ 1 |
+| `test-codex-surface.sh` · *the install payload carries N Codex script(s)* | payload scripts matching the ship list | (a) | ≥ 2 — **dual-purpose**: also the substantive claim that both Codex scripts ship |
+| `test-codex-surface.sh` · *the ship list names N repository script/test path(s)* | backticked `scripts/`+`tests/` paths in the ship list | (a) | ≥ 3 |
+| `test-codex-surface.sh` · *settings.json registers N hook entr(ies)* | hook entries in `.claude/settings.json` | (a) | ≥ 1 |
+| `test-codex-surface.sh` · *the emitted Codex hook config names N hook(s)* | hooks in the emitted `hooks.json` | (a) | ≥ 1 |
+| `test-codex-surface.sh` · *the default root is `.agents/skills/`* | converted commands seen | (a), **fused with the claim** — `DEF_SEEN ≥ 1` **and** `-z DEF_MISSING` in one site | ≥ 1 |
+| `test-codex-surface.sh` · *the converter emitted N skill(s)* | skill directories the converter wrote | (a) + (g) | ≥ 1 |
+| `test-codex-surface.sh` · *control: N source command(s) do carry an argument placeholder* | `.claude/commands/*.md` matching the placeholder | (a) | ≥ 1 — a **positive control** under an assertion that 0 in the output is a strip rather than an empty input |
+| `test-codex-surface.sh` · *the Codex entry document inlines all N non-negotiables* | tokens swept for | (a), fused as above | ≥ 5 |
+| `test-codex-surface.sh` · *control: the default entry document still names the Skill tool* | the generated Claude-arm document | (b)/(c) | present |
+| `test-codex-surface.sh` · *derived N skill(s) and M command(s)* | two derivations, **two bounds, one site** | (a) | ≥ 1 each |
+| `test-codex-shim.sh` · *there were wrapped entries to check* | wrapped entries in the emitted config | (a) | ≥ 1 |
+| `test-codex-shim.sh` · *the emitted config actually carries hook entries* | entries in the emitted config | (a) | ≥ 1 |
+| `test-codex-shim.sh` · *there were tool-event hooks to route* | tool-event hooks | (a) | ≥ 1 |
+| `test-codex-shim.sh` · *the injected-fault copy really carries the fault* | the marker in the mutated shim copy | (a) + (g) | == 1 |
+| `test-codex-shim.sh` · *the shim's kill of the watchdog killer was located* | the signal extracted **from the shim** | (b) + (f) | non-empty |
+| `test-codex-shim.sh` · *install.sh's script-skip pattern matched something* | the skip names | (a) + (f) | ≥ 1 |
+| `test-codex-probe.sh` · *the seed carries a nested path* | seed paths at all depths **vs** top-level entries | (a), **relative** — like `check-provenance.sh`'s | `ALL > TOP` |
+| `test-codex-probe.sh` · *a killed run leaves its disposable home behind* | the orphan the reclamation arm needs | **(g)** | present |
+| `test-codex-probe.sh` · *a running probe holds a disposable home with a credential* | the live probe the survival arm needs | **(g)** | present |
+| `test-install-upgrade-client.sh` · *the Codex install produced a layer to be consistent ABOUT* | Codex-layer paths after `--client codex` | (a) | ≥ 25 |
+| `test-install-upgrade-client.sh` · *…over a layer that actually exists* | the same, second install path | (a) | ≥ 25 |
+| `test-install-upgrade-client.sh` · *the receipt carries non-symlink Codex-layer rows to edit* | non-symlink rows | (a) | ≥ 3 |
+| `test-install-upgrade-client.sh` · *…and they span more than one top-level prefix* | distinct first path segments of those rows | (a) | ≥ 2 |
+| `test-install-upgrade-client.sh` · *the criterion markers still delimit a real function* | lines between the named markers | (a) + (b) | ≥ 4 **and** the function name present |
+| `test-studio-doctor.sh` · *the codex fixture's receipt actually carries symlink rows* | symlink rows in a `--client codex` receipt | (a) | > 0 |
+| `test-derived-counts.sh` · *the tree-size figures are derived from a tree that has files in it* | **19 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each |
+| `test-derived-counts.sh` · *the region above this block was actually read* | path literals before the block | (a) + (f) | ≥ 10 |
+| `test-derived-counts.sh` · *…reaches N path(s) this file does not mention above* | the scanned set minus the mentioned set | (a) | ≥ 1 |
+| `test-derived-counts.sh` · *every tree-size claim row matches exactly one site* (F6) | sites per claim row | == 1 | 20 rows |
+| `test-derived-counts.sh` · *the vacuity-census figures are derived from a tree with files in it* | 3 sources, one sentinel, one site | (a) + (f) | ≥ 1 each |
+| `test-derived-counts.sh` · *every vacuity-census claim row matches exactly one site* (F6) | sites per claim row | == 1 | 2 rows |
+
+**Row count versus site count, since this section's own rules demand the distinction:** the two
+`derived N skill(s) and M command(s)` bounds are **one** site; the two `test-derived-counts.sh`
+sentinel rows are **one site each over 19 and 3 sources**; everything else is one row per site.
+
+**What this sweep deliberately did not admit**, each rejected by a named clause rather than by
+judgement: `test-codex-surface.sh`'s *".codex/ is not tracked"* (`== 0` — **C4**, the claim is
+emptiness); its *"the home config was backed up"* (the arm's claim, not a floor under a later
+sweep); every elapsed-time bound in `test-codex-shim.sh` (`-lt 6`, `-le 5`, `-le 8` — **C1**, a
+duration is not a tree read, and **C2**, an upper bound).
 
 ---
 

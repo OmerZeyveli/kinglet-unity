@@ -142,8 +142,12 @@ CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
 # remedy a missing receipted file is given. Derive the call sites rather than trusting a numeral
 # here: grep each file for the function's name followed by a quoted argument. **Do not write that
 # pattern out in a comment** — the first attempt at this sentence did, and the comment then matched
-# its own instruction and inflated the answer from 2 to 3, which is the trap `CLAUDE.md` already
-# records for `install.sh`'s script-skip shape. This sentence also read "THREE READERS IN THIS FILE,
+# its own instruction and inflated the answer from 2 to 3, which is the same trap this file records
+# at its script-skip loop and `provenance.tsv` records in this file's row. **The address was wrong
+# until 2026-08-17**: it read *"the trap `CLAUDE.md` already records"*, and a flattened probe over
+# `CLAUDE.md` returns zero hits for every phrasing of it. The lesson is right and it is filed — just
+# not there, and a citation that names the wrong document is how a reader concludes the lesson is
+# unrecorded. This sentence also read "THREE READERS IN THIS FILE,
 # AND A FOURTH IN A DIFFERENT FILE" for one commit, contradicting the enumeration on the line above
 # it, in the comment whose entire job is to establish that there is one criterion.
 #
@@ -171,8 +175,33 @@ CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
 # assertions (2, 2 and 5 red). So: the comparison catches a textual edit to one copy (a whitespace-
 # only change reds it), its floor catches the vacuous case where both markers are renamed and the
 # comparison would pass over two empty strings, and *which predicate actually runs, in which scope,
-# with which argument* is guarded by those arms and by nothing here. The pair is adequate; either
-# half alone is not, and the half in this file is the weaker one.
+# with which argument* is guarded by those arms and by nothing here.
+#
+# **"THE PAIR IS ADEQUATE" WAS FALSE IN THE UNTESTED DIRECTION UNTIL 2026-08-17, AND IT WAS FALSE
+# BECAUSE OF WHAT THE ARMS ASSERT RATHER THAN WHETHER THEY RUN.** Arms 1-4 all assert that Codex
+# paths are *included*; not one asserted that a non-Codex path is *excluded*. Measured: a shadow
+# `codex_layer_path() { return 0; }` left `tests/test-install-upgrade-client.sh` at **24/24 green**.
+# The full suite did red on it elsewhere, so nothing shipped silently — but a guard that only ever
+# exercises one direction of a predicate is half a guard, and the half it skips is the one where a
+# too-wide criterion tells a Claude-only user to install a Codex layer they never asked for. That
+# file now runs the extracted region itself against a table with members on **both** sides, with a
+# floor requiring the table to keep them.
+#
+# AND THAT ARM READS THE REGION, NOT THE RUNNING FUNCTION, which is a real limit and is measured
+# rather than asserted. Re-run 2026-08-17 against the shape that motivated all of this — a shadow
+# appended AFTER the end marker, so both regions stay byte-identical:
+#
+#   shadow in `scripts/studio-doctor.sh`  -> test-install-upgrade-client.sh **24/26, 2 red** (the
+#                                            behavioural arms, which drive the doctor)
+#   shadow in `install.sh`                -> test-install-upgrade-client.sh **26/26 GREEN**; the
+#                                            full suite **38 red**, in test-install-prune.sh and
+#                                            test-studio-doctor.sh
+#
+# So no shape ships silently, and the file that owns the criterion is still not the file that
+# catches every abuse of it. Three guards, three different blind spots: the byte comparison sees a
+# textual edit and no shadow; the behavioural arms see the doctor's runtime and not the installer's;
+# the table arm sees the criterion's own answers and no shadow at all. Adequate is a property of the
+# set, and the set's weakest member is still the comparison in this file.
 #
 # THE TRUST RECEIPT IS SPELLED OUT rather than written `$CODEX_TRUST_REL`, because the other copy
 # has no such variable and a textual comparison is the whole mechanism.
@@ -2591,7 +2620,11 @@ CODEXCFG
   # A registered hook does not run. Measured: with the project trusted and no hook trust, the hook
   # fired 0 times, the call went through, Codex printed no prompt and no warning, and `hooks/list`
   # at that same moment reported `enabled: true, trustStatus: untrusted, statusMessage: null`. That
-  # is a fifth silent-failure layer sitting above the other four.
+  # is layer 3 of the six silent-failure layers this wave measured, and it sits above the hook body
+  # (layer 4), which is why an untrusted hook never reaches the code that would have refused. This
+  # comment read "a fifth silent-failure layer sitting above the other four" until 2026-08-17: the
+  # ordinal was written mid-measurement, four layers were known then and six are known now, and the
+  # canonical numbering is `findings.md` § *The six silent-failure layers, in one place*.
   #
   # Trust cannot ship in this repository. Putting `trusted_hash` inside the matcher group in
   # hooks.json is silently ignored — same hash, `warnings: []`, still untrusted — because the

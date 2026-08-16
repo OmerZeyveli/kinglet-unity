@@ -475,10 +475,16 @@ else
   #                                             AND NOT A SECOND BUG — but the reason is stated below
   #                                             at its real size, because the first version of this
   #                                             row gave half of it.
+  #   this file                               — was the one that reached a user with it.
+  #
+  # The fourth row sat alone below a paragraph until 2026-08-17: a round inserted the explanation of
+  # the third row BETWEEN the third and the fourth, and a table whose last row is stranded past a
+  # paragraph reads as a footnote rather than as a member. The explanation now follows the whole
+  # table, which is where an explanation of one row belongs when the table is the point.
   #
   # WHAT THAT SCAN ACTUALLY FEEDS, enumerated rather than characterised. `is_modified` reads
-  # `MODIFIED_FILES` and is called from FOUR sites: the orphan sweep, the `.claude/**` payload loop,
-  # the `scripts/` copy loop, the `settings.json` write — AND the converted-command-skill loop, which
+  # `MODIFIED_FILES` and is called from FIVE sites: the orphan sweep, the `.claude/**` payload loop,
+  # the `scripts/` copy loop, the `settings.json` write, and the converted-command-skill loop, which
   # calls it with `.agents/skills/<name>/SKILL.md`. This row read *"that scan feeds the `.claude/**`
   # payload loops, the symlink rows are `.agents/`"*, which is one clause too narrow: the scan does
   # reach `.agents/`. The conclusion is unchanged and now rests on the right fact — those converted
@@ -486,11 +492,15 @@ else
   # DIRECTORY symlinks, and the loop that writes those (the skill-root loop) is the one call site that
   # never consults `is_modified` at all, doing its own `-L` plus `readlink` check instead.
   #
+  # THE COUNT SAID FOUR AND THEN NAMED FIVE, in the paragraph whose stated point is enumerating
+  # rather than characterising, until 2026-08-17. Derive it — `grep -n 'is_modified' install.sh`
+  # less the one definition line — rather than reading it off this comment, and note that the
+  # enumeration was the half that was right: the number was written first and the list grew past it.
+  #
   # It is the same shape as the defect this file just fixed, one edit away from mattering, which is
   # why it is named here rather than left for someone to rediscover — and a safety argument that
   # describes half its own subject is exactly what this wave keeps finding, so the enumeration above
   # is the point of the correction rather than the verdict, which did not change.
-  #   this file                               — was the one that reached a user with it.
   #
   # The third column stopped being `_mode` in the same change. A symlink to a directory has no
   # sha256 — `sha256sum` fails and the substitution is empty — so fixing existence alone moves all

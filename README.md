@@ -223,7 +223,12 @@ session.
 - **MCP behaviour under Codex.** The configuration row is measured; nothing establishes that the
   Unity bridge's actions resolve under Codex's MCP client, that reads and writes split the same way,
   or that a failure is surfaced rather than swallowed. **Do not read Claude Code's MCP behaviour onto
-  Codex** — assuming that parity is what produced four of the six silent failures listed above.
+  Codex** — assuming that parity is what produced four of the six silent-failure layers this wave
+  measured. **Six is the total; this document describes five of them** — the importer, the hook
+  body, per-hook trust, the hook ceiling and project trust. The sixth, hook *registration* reporting
+  `registered N, warnings: [], errors: []` over hooks that then do nothing, appears nowhere here.
+  All six are in one table in `docs/research/codex-client/findings.md`. The phrase was *"listed
+  above"* until 2026-08-17, which was a scope claim rather than a count, and the count was right.
 - **Windows.** The skill root is symlinks; nothing has tested that, or whether Unity's asset pipeline
   objects to a symlinked directory outside `Assets/`.
 - **Managed/enterprise Codex configurations**, where an `allow_managed_hooks_only` policy may stop

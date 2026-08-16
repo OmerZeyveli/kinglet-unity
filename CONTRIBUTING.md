@@ -116,7 +116,7 @@ directory — that separation is gone; `provenance.tsv` tracks origin now, not t
   key, because it gets believed. `description` is the entire selection mechanism: write it as the
   trigger condition, not as a title.
 - **Agents** (`.claude/agents/<name>.md`): frontmatter `name`, `description`, `model`, `color`,
-  `tools`. All eight shipping agents are `unity-*` implementers with `mcp__UnityMCP__*` tools. An
+  `tools`. All 8 shipping agents are `unity-*` implementers with `mcp__UnityMCP__*` tools. An
   agent that should use a skill needs `Skill` in `tools:` **and** a **Skills to load** block naming
   it — neither alone works, and nothing loads a skill implicitly.
 - **Commands** (`.claude/commands/<name>.md`): frontmatter `name`, `description`, `user-invocable`,

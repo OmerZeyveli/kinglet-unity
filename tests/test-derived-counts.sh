@@ -382,10 +382,24 @@ fi
 # already answers at :16 — a warning is not a guard — reproduced four sections lower. Both the
 # parenthetical and the numbers are fixed; this block is why the fix stays fixed.
 #
-# CLAUDE.md is deliberately NOT in the table below. Its ruling is that the repo guide states the
-# criterion and never the count ("Derive it, never quote it"), so there is nothing here to check —
-# a file that quotes no number cannot quote a stale one. Adding it would mean adding a number to it
-# first, which is the opposite of the fix.
+# CLAUDE.md IS IN THE TABLE BELOW SINCE 2026-08-17, AND THE GROUND IT WAS EXCLUDED ON WAS FALSE
+# ABOUT THE FILE IT EXCLUDED. The exclusion read: *"its ruling is that the repo guide states the
+# criterion and never the count ('Derive it, never quote it'), so there is nothing here to check —
+# a file that quotes no number cannot quote a stale one."* The premise is right and the conclusion
+# does not follow from it, because `CLAUDE.md` does not obey its own ruling: it quotes the agent
+# count **twice, in the present tense** — *"The N agents shipped today"* and *"All N current
+# agents"*. Both are correct today. That is what makes this a guard gap rather than a stale figure,
+# and it is why the GROUND mattered more than the sites: an exclusion justified by a property the
+# excluded file does not have is worse than a disclosed gap, because it tells the next reader not
+# to look.
+#
+# A THIRD NUMERAL IN THAT FILE IS PINNED AND MUST STAY PINNED, and it is why both patterns below are
+# narrow rather than one loose `[0-9]+ agents`. `CLAUDE.md`'s history paragraph reads *"(8 agents,
+# 9 commands, 5 templates)"* of the Donchitos design/production layer that was CUT on 2026-08-03.
+# Its 8 is a dead figure that happens to equal the live one today; re-deriving it would rewrite a
+# record of what was removed. The two patterns below match the present-tense sentences and not that
+# one — and the block's own multisite check is what will red if a rewording makes either of them
+# ambiguous, rather than a comment promising they are not.
 echo "--- derived counts: the surface pool ---"
 
 # One `ls` per surface class, `grep -c .` to count — it drains its input, so no early-exit reader is
@@ -451,7 +465,24 @@ docs/GETTING-STARTED.md	commands/ [0-9]+ slash commands	$DCS_COMMANDS	-
 docs/GETTING-STARTED.md	skills/ [0-9]+ knowledge modules	$DCS_SKILLS	-
 docs/GETTING-STARTED.md	rules/ [0-9]+ always-loaded coding standards	$DCS_RULES	-
 README.md	\*\*Rules\*\* [|] [0-9]+	$DCS_RULES	-
-README.md	\*\*Templates\*\* [|] [0-9]+	$DCS_TEMPLATES	-"
+README.md	\*\*Templates\*\* [|] [0-9]+	$DCS_TEMPLATES	-
+CLAUDE.md	The [0-9]+ agents shipped today	$DCS_AGENTS	-
+CLAUDE.md	All [0-9]+ current agents	$DCS_AGENTS	-
+docs/AGENT-GUIDE.md	All [0-9]+ Agents at a Glance	$DCS_AGENTS	-
+CONTRIBUTING.md	All [0-9]+ shipping agents	$DCS_AGENTS	-"
+
+# EVERY PATTERN IN EVERY CLAIMS TABLE IN THIS FILE IS DIGIT-ONLY, AND A WORD NUMERAL IS THEREFORE
+# INVISIBLE TO ALL OF THEM. That is a property of the guard, not of the tree, and it is stated here
+# because three consecutive review rounds swept this class with digit-only expressions and each one
+# read its own zero as coverage. `CONTRIBUTING.md`'s agent count read *"All eight shipping agents"*
+# until 2026-08-17 — live, correct, and unreachable by any row above; it was converted to a digit in
+# the same commit as the row that now guards it, which is the only repair that works, because a
+# pattern arm for every spelled-out number would still miss the next spelling.
+#
+# So: **a live figure written as a word is a figure this file cannot guard.** When you find one,
+# convert it and add a row. When it is genuinely pinned — a quoted run output, a measured mutation
+# narrative — leave the word alone, because the word is part of what marks it as prose about a
+# reading rather than a claim about today.
 
 DCS_BAD=""
 DCS_VACUOUS=""
@@ -954,22 +985,27 @@ assert_eq "0" "$(printf '%s' "$DCK_TRACKING_GONE" | grep -c . || true)" \
 #   awk -F'\t' 'NF >= 3 { print $1 "\t" $2 }' tests/test-derived-counts.sh   # then count the
 #   matches of each pattern in the flattened file it names; every row must match exactly one site.
 #
-# docs/ARCHITECTURE.md   "hooks/ 12 registered shell scripts"          total
-# docs/ARCHITECTURE.md   "Of the 12 registered hooks, 11 source"       total, _lib.sh sourcers
-# README.md              "**Hooks** | 12 registered"                   total
-# README.md              "(5 blocking"                                 blocking
-# README.md              "13 files on disk"                            files incl. _lib.sh
-# docs/HOOK-REFERENCE.md "11 of the 12 hooks source a shared library"  sourcers, total (two phrasings)
-# docs/ARCHITECTURE.md   "11 of the 12 get them by sourcing"           sourcers, total
-# docs/ARCHITECTURE.md   "minimal (4 cumulative"                       minimal tier
-# docs/ARCHITECTURE.md   "standard (12 cumulative)"                    standard tier
-# docs/ARCHITECTURE.md   "strict (12 cumulative"                       strict tier
-# docs/GETTING-STARTED.md "hooks/ 12 hooks + _lib.sh"                  total
-# docs/GETTING-STARTED.md "5 of them blocking"                         blocking
-# docs/GETTING-STARTED.md "repo has 8 scripts; an installed project has 6"  repo, installed
-# docs/GETTING-STARTED.md "6 of the 6 installed scripts are named"        named, installed
-# docs/HOOK-REFERENCE.md  "includes 12 hooks"                          total
-# docs/HOOK-REFERENCE.md  "standard profile 12 hooks"                  standard tier
+# NO VALUES IN THIS KEY. It is a reading aid for the table below, and a reading aid that
+# transcribes the numbers the table DERIVES is a second, unguarded copy of every one of them --
+# which is exactly what it became: two lines read `8`/`6` against a tree of 10/8/8, edited on
+# one line and left on the next, correct assertions under a wrong key. `N` and `M` stand for
+# the first and second captured numbers; the derivation is in the row.
+# docs/ARCHITECTURE.md   "hooks/ N registered shell scripts"          total
+# docs/ARCHITECTURE.md   "Of the N registered hooks, N source"       total, _lib.sh sourcers
+# README.md              "**Hooks** | N registered"                   total
+# README.md              "(N blocking"                                 blocking
+# README.md              "N files on disk"                            files incl. _lib.sh
+# docs/HOOK-REFERENCE.md "N of the N hooks source a shared library"  sourcers, total (two phrasings)
+# docs/ARCHITECTURE.md   "N of the N get them by sourcing"           sourcers, total
+# docs/ARCHITECTURE.md   "minimal (N cumulative"                       minimal tier
+# docs/ARCHITECTURE.md   "standard (N cumulative)"                    standard tier
+# docs/ARCHITECTURE.md   "strict (N cumulative"                       strict tier
+# docs/GETTING-STARTED.md "hooks/ N hooks + _lib.sh"                  total
+# docs/GETTING-STARTED.md "N of them blocking"                         blocking
+# docs/GETTING-STARTED.md "repo has N scripts; an installed project has N" repo, installed
+# docs/GETTING-STARTED.md "N of the N installed scripts are named"        named, installed
+# docs/HOOK-REFERENCE.md  "includes N hooks"                          total
+# docs/HOOK-REFERENCE.md  "standard profile N hooks"                  standard tier
 DCK_CLAIMS="docs/ARCHITECTURE.md	hooks/ [0-9]+ registered shell scripts	$DCK_HOOKS	-
 docs/ARCHITECTURE.md	Of the [0-9]+ registered hooks, [0-9]+ source	$DCK_HOOKS	$DCK_LIB_SOURCERS
 docs/ARCHITECTURE.md	.minimal. \([0-9]+ cumulative	$DCK_MINIMAL	-
@@ -1274,6 +1310,10 @@ assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
 # sentence: `CLAUDE.md` is excluded by this file's own line 385 (*"CLAUDE.md is deliberately NOT in
 # the table below"*), `.claude/NOTICE.md` appears in no claim row at all, the enumeration sums to
 # eleven while the sentence says twelve, and `DCE_QUOTING_FILES` — 940 lines above — already checks a
+# (That first clause has since inverted: `CLAUDE.md` was brought INTO the surface-pool table on
+# 2026-08-17, because the ground it was excluded on turned out to be false about it. The re-review's
+# point stands unchanged — the census was wrong four ways — and this parenthesis is here so a reader
+# checking the clause against today's tree does not read the correction as a fifth error.)
 # numeral in `provenance.tsv` and in **this very file**, neither of them `.md`. A hand-written census
 # of a scanned set, written by the same commit as the widening it describes, inside the block whose
 # entire subject is figures that go stale unwatched. It is replaced by `DCT_ABOVE`, which reads the
@@ -1319,14 +1359,25 @@ assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
 # adverb is not a scope
 # statement. So:
 #
-#   * The live figures in `findings.md` that this block DOES now cover are listed in DCT_CLAIMS by
-#     name, like every other row.
+#   * THE RULE IS NOW WRITTEN, 2026-08-17, and it lives with its subject:
+#     `docs/research/codex-client/README.md` § *Live and pinned*. Three clauses — **L1** the figure
+#     is computable from this repository's tracked files alone, **L2** the sentence asserts it of the
+#     present tree (a probe name, a `<replica>`, `codex-cli 0.145.0` or *"measured <date>"* pins it;
+#     *"re-derived <date>"* does not), **L3** writing a re-derived value in would leave the
+#     surrounding sentence true. It selected **eleven distinct figures across fourteen rows**: six
+#     in `findings.md`'s `Kinglet ships N …` family, its three stranded-machinery counts stated
+#     twice each (code block and table, so six rows for three figures), and the hook total plus its
+#     two partitions in `codex-facts.md`, which states the total at two sites. Every one of them is
+#     a sentence that already tells the reader to derive rather than trust it. All are rows below.
 #   * What remains uncovered there is the per-run measurement class — figures counted against probe
 #     transcripts that are gitignored, which cannot be re-derived from this tree at all and must not
-#     be edited to match it. That is a genuine criterion problem: separating them from the live ones
-#     needs a rule written first, and writing that rule is the work. It is not a hedge, it is a named
-#     piece of missing infrastructure, and it is the same rule `docs/ANTI-VACUITY.md` needs for its
-#     `## The floor set` Today column.
+#     be edited to match it. That is now an EXCLUSION UNDER A WRITTEN CRITERION rather than a hedge,
+#     and the criterion's own worked traps (a run measurement whose value coincides with a tree
+#     count; a `0 == 0` row that would need a floor of its own) are listed beside it.
+#   * `docs/ANTI-VACUITY.md`'s `## The floor set` Today column needs the same rule and **still has
+#     no owner** — that document rules it must be re-derived whole from one gating suite log, and
+#     nothing has scheduled that pass. Named here as well as there, because a residual recorded only
+#     in the document it afflicts is recorded where the reader already trusts the document.
 #   * It does not cover every numeral in the shell files it reads — only the rows named below.
 #
 # The four figures it covers in `docs/ANTI-VACUITY.md` are in that file's `### Shape 1`
@@ -1399,8 +1450,31 @@ DCT_PAY_NONMD=$((DCT_PAY_TOTAL - DCT_PAY_MD))
 # `tests/test-bash32-compat.sh` QUOTES ITS OWN RUNTIME CENSUS in prose, and those two numbers are
 # live. They are the same two `docs/ANTI-VACUITY.md` quotes and the DCV block above guards — but
 # that block's rows are keyed to `docs/ANTI-VACUITY.md`, so the second copy is covered by nothing.
-DCT_HOOKS_SH=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | grep -c . || true)
+#
+# `DCT_HOOKS_SH` SAT HERE UNTIL 2026-08-17 AND WAS READ BY NO ROW. It was derived, floor-checked,
+# and never compared against anything: a floor whose subject nothing consumes bounds a set no
+# assertion depends on, which is a third kind of vacuity and the one hardest to see, because the
+# floor itself is green and correct. The hooks half of that census is guarded — by `DCV_HOOKS`, in
+# the block above, keyed to `docs/ANTI-VACUITY.md`, which is the file that quotes it. Deleted rather
+# than given a row, because the row would have duplicated a live guard instead of closing a gap.
 DCT_SCRIPTS_SH=$(ls -1 "$REPO_DIR"/scripts/*.sh 2>/dev/null | grep -c . || true)
+
+# THE STRANDED-MACHINERY FIGURES IN `findings.md`, selected by that directory's live-vs-pinned
+# criterion (`docs/research/codex-client/README.md` § *Live and pinned*). Each is stated twice
+# there — once as a shell command with its answer in a trailing comment, once in the table beside
+# it — and each states it of THIS tree, in the present tense, with the command that re-derives it.
+#
+# `codex-facts.md` states the hook total twice, and each time it partitions it — 4 `PostToolUse`,
+# and the remaining 3 that are not tool events. All three numerals are live, so all three are
+# derived here rather than only the total: guarding the total and leaving the partition unguarded
+# is how a row comes to be internally inconsistent and green, which this file has recorded twice.
+# `DCK_REG_TRIPLES` is `hook<TAB>event<TAB>matcher`, derived from `settings.json` in the DCK block
+# above; `sort -u` on the hook name so a doubly-registered hook counts once.
+DCT_CF_POST=$(printf '%s\n' "$DCK_REG_TRIPLES" | awk -F'\t' '$2 == "PostToolUse" { print $1 }' | sort -u | grep -c . || true)
+DCT_CF_NONTOOL=$(printf '%s\n' "$DCK_REG_TRIPLES" | awk -F'\t' '$2 != "PreToolUse" && $2 != "PostToolUse" && $1 != "" { print $1 }' | sort -u | grep -c . || true)
+DCT_CATALOG=$(git -C "$REPO_DIR" ls-files 'src/catalog/*' 2>/dev/null | grep -c . || true)
+DCT_KBUILD_PY=$(git -C "$REPO_DIR" ls-files 'tools/kinglet_build/*.py' 2>/dev/null | grep -c . || true)
+DCT_ADAPTERS=$(git -C "$REPO_DIR" ls-files 'adapters/*/profile.json' 2>/dev/null | grep -c . || true)
 
 # THE DERIVATION HAS TO BE ABLE TO FAIL. Run outside a git checkout, every `git ls-files` is empty,
 # five zeros sum to zero, and zero compared with zero is a green suite that inspected nothing —
@@ -1420,8 +1494,12 @@ DCT_DERIVATION="ok"
 [ "$DCT_PAY_CLAUDE" -ge 1 ] || DCT_DERIVATION="the payload derivation found nothing under .claude/"
 [ "$DCT_PAY_SCRIPTS" -ge 1 ] || DCT_DERIVATION="the payload derivation ships no scripts/*.sh — the skip list read out of install.sh may match everything"
 [ "$DCT_PAY_MD"     -ge 1 ] || DCT_DERIVATION="the payload derivation found no .md under .claude/"
-[ "$DCT_HOOKS_SH"   -ge 1 ] || DCT_DERIVATION="no .sh files under \$REPO_DIR/.claude/hooks"
 [ "$DCT_SCRIPTS_SH" -ge 1 ] || DCT_DERIVATION="no .sh files under \$REPO_DIR/scripts"
+[ "$DCT_CF_POST"    -ge 1 ] || DCT_DERIVATION="no PostToolUse registrations found in .claude/settings.json"
+[ "$DCT_CF_NONTOOL" -ge 1 ] || DCT_DERIVATION="no non-tool-event registrations found in .claude/settings.json"
+[ "$DCT_CATALOG"    -ge 1 ] || DCT_DERIVATION="git ls-files 'src/catalog/*' is empty"
+[ "$DCT_KBUILD_PY"  -ge 1 ] || DCT_DERIVATION="git ls-files 'tools/kinglet_build/*.py' is empty"
+[ "$DCT_ADAPTERS"   -ge 1 ] || DCT_DERIVATION="git ls-files 'adapters/*/profile.json' is empty"
 # The skip list is read, not written, so an install.sh whose spelling moved must fail loudly here
 # rather than silently shipping a payload figure derived from an empty skip list.
 DCT_SKIP_N=$(printf '%s' "$DCT_SKIPPED_NAMES" | grep -c . || true)
@@ -1447,7 +1525,21 @@ docs/research/codex-client/findings.md	while .[.]claude/skills/. holds [*][*][0-
 docs/research/codex-client/findings.md	where .[.]claude/skills/. holds [0-9]+	$DCT_SKILL_DIRS
 tests/test-shipped-citations.sh	The payload has [0-9]+ entries, [0-9]+ Markdown	$DCT_PAY_TOTAL,$DCT_PAY_MD
 tests/test-shipped-citations.sh	and [0-9]+ not; this is one of the [0-9]+[.] Applying the same criterion to the other [0-9]+	$DCT_PAY_NONMD,$DCT_PAY_NONMD,$((DCT_PAY_NONMD - 1))
-tests/test-bash32-compat.sh	SHIPPED:tests=[0-9]+ SHIPPED:scripts=[0-9]+	$DCT_TESTS_SH,$DCT_SCRIPTS_SH"
+tests/test-bash32-compat.sh	SHIPPED:tests=[0-9]+ SHIPPED:scripts=[0-9]+	$DCT_TESTS_SH,$DCT_SCRIPTS_SH
+docs/research/codex-client/findings.md	Kinglet ships [0-9]+ hooks	$DCK_HOOKS
+docs/research/codex-client/findings.md	all [0-9]+ registered in .[.]claude/settings.json.	$DCK_REGISTERED
+docs/research/codex-client/findings.md	Kinglet ships [0-9]+ skills	$DCS_SKILLS
+docs/research/codex-client/findings.md	Kinglet ships [0-9]+ rules	$DCS_RULES
+docs/research/codex-client/findings.md	Kinglet ships [0-9]+ commands	$DCS_COMMANDS
+docs/research/codex-client/findings.md	Kinglet ships [0-9]+ agents	$DCS_AGENTS
+docs/research/codex-client/findings.md	ls src/catalog [|] wc -l # [0-9]+	$DCT_CATALOG
+docs/research/codex-client/findings.md	kinglet_build -name .[*][.]py. [|] wc -l # [0-9]+	$DCT_KBUILD_PY
+docs/research/codex-client/findings.md	ls adapters/[*]/profile.json [|] wc -l # [0-9]+	$DCT_ADAPTERS
+docs/research/codex-client/findings.md	.src/catalog/. [|] [*][*][0-9]+[*][*] files	$DCT_CATALOG
+docs/research/codex-client/findings.md	[*][*][0-9]+[*][*] Python modules	$DCT_KBUILD_PY
+docs/research/codex-client/findings.md	profile.json. [|] [*][*][0-9]+[*][*] files	$DCT_ADAPTERS
+docs/research/codex-client/codex-facts.md	[0-9]+ of Kinglet.s [0-9]+ hooks are .PostToolUse.	$DCT_CF_POST,$DCK_HOOKS
+docs/research/codex-client/codex-facts.md	remaining [0-9]+ of Kinglet.s [0-9]+ hooks	$DCT_CF_NONTOOL,$DCK_HOOKS"
 
 # THE WIDENING IS ASSERTED AGAINST A DERIVED BOUNDARY, NOT AGAINST A WRITTEN ONE.
 #
@@ -1478,10 +1570,22 @@ DCT_BLOCK_LINE=$(awk '/^# TREE-SIZE FIGURES, AND THE EDGE/ && !seen { print NR; 
 # one: a source line reading `"$REPO_DIR/install.sh"` is extracted as `REPO_DIR/install.sh`. The
 # previous spelling stripped a prefix that could not occur, so it was DEAD CODE — evidenced, not
 # inferred: `DCT_ABOVE` held `REPO_DIR/uninstall.sh`, `REPO_DIR/provenance.tsv` and seven more with
-# the prefix intact. It was harmless only by luck, because each of those paths also appears in bare
-# form somewhere above; a path mentioned ONLY as `"$REPO_DIR/…"` would fail to match its bare form,
-# be counted NEW, and INFLATE the widening claim — the unsafe direction for an assertion whose only
+# the prefix intact. A path mentioned ONLY as `"$REPO_DIR/…"` would fail to match its bare form, be
+# counted NEW, and INFLATE the widening claim — the unsafe direction for an assertion whose only
 # virtue is being conservative.
+#
+# THE REASON IT WAS HARMLESS IS NOT THE ONE THIS COMMENT GAVE. It said *"each of those paths also
+# appears in bare form somewhere above"*, and that is false for **2 of the 9** — measured by
+# counting occurrences rather than lines, because a prefixed occurrence sits on a line that also
+# contains the bare substring and a line-keyed count reads every one of the nine as bare:
+#
+#   .claude/hooks/_lib.sh              1 occurrence,  1 prefixed,  0 bare
+#   .claude/hooks/session-restore.sh   2 occurrences, 2 prefixed,  0 bare
+#
+# The other seven do appear bare. What actually made it harmless is that neither of those two is in
+# `DCT_SCANNED`, so neither could be counted NEW whatever `DCT_ABOVE` held — a property of the
+# scanned set, not of the spellings above. The corrected spelling makes the question moot in both
+# directions, which is why it stays.
 DCT_ABOVE=$(awk -v stop="${DCT_BLOCK_LINE:-0}" 'NR < stop' "$REPO_DIR/tests/test-derived-counts.sh" \
             | grep -oE '[A-Za-z0-9_./-]+\.(md|tsv|sh)' \
             | sed 's|^REPO_DIR/||' | sort -u)
@@ -1520,10 +1624,23 @@ assert_eq "1" "$DCT_WIDE" \
 #
 # THE SOURCE SET IS DECLARED **AND** DERIVED, which is `tests/test-no-mobile.sh`'s own grammar and is
 # here for the same reason: the declared half is what closes DELETION. `DCT_DECLARED` names every
-# file this block is expected to cover; `DCT_SCANNED` is derived from the claims table. They must
-# match IN BOTH DIRECTIONS. Removing a row now drops its file out of the derived set while the
-# declaration still names it, and reds; adding a row for a new file reds until the declaration grows
-# too, which is the deliberate two-line act it should be.
+# file this block is expected to cover **and how many rows it is expected to carry**; the same pair
+# is derived from the claims table. They must match IN BOTH DIRECTIONS.
+#
+# THE COUNT IS THERE BECAUSE THE FILE-LEVEL VERSION WAS HALF A GUARD, AND IT WAS HALF A GUARD IN THE
+# COMMIT THAT WROTE THIS PARAGRAPH CLAIMING OTHERWISE. `DCT_SCANNED` was `cut -f1 | sort -u`, so a
+# file with more than one row stayed in the derived set after one of its rows was deleted, and the
+# comparison could not see the deletion at all. Measured on the tree at the time: `findings.md` had
+# four rows, `docs/ANTI-VACUITY.md` three, `tests/test-shipped-citations.sh` two — **nine rows whose
+# individual deletion left the suite fully green, including the row the same commit had just added
+# to close deletion.** The honest limit statement that version replaced was true for exactly those
+# nine. Keying on `path<TAB>count` closes it: deleting one row of sixteen moves the derived count to
+# fifteen against a declaration of sixteen and reds by name.
+#
+# A DECLARED COUNT IS NOT A QUOTED COUNT. Every warning in this repository about writing a number
+# down applies to numbers nothing compares; this one is compared, mechanically, in both directions,
+# on every run, and its only job is to disagree. Adding or removing a row is the deliberate two-line
+# act it should be.
 #
 # A DECLARED LIST IS A HAND-MAINTAINED LIST, AND THE DISTINCTION FROM THE CENSUS THIS BLOCK'S HEADER
 # THREW OUT IS NOT COSMETIC. That census DESCRIBED something derivable, was never compared against
@@ -1533,8 +1650,8 @@ assert_eq "1" "$DCT_WIDE" \
 #
 # ── AN OPEN RESIDUAL, NAMED HERE SO IT IS INHERITED RATHER THAN REDISCOVERED ──
 #
-# **THIS FILE IS NOT IN THE LIST, AND THIS FILE QUOTES FIGURES.** `DCT_DECLARED` names ten paths and
-# `tests/test-derived-counts.sh` is not one of them, so the guard whose entire subject is stale
+# **THIS FILE IS NOT IN THE LIST, AND THIS FILE QUOTES FIGURES.** `DCT_DECLARED` names every path
+# this block covers and `tests/test-derived-counts.sh` is not one of them, so the guard whose subject is stale
 # numerals does not scan its own prose. That is not hypothetical: two comment blocks in this file
 # carried `982` as the value of `cat .claude/commands/*.md | wc -l`, in the present tense and
 # undated, while `DCT_CLAIMS`'s `install.sh` row was correctly guarding `1023`. (Cited by construct,
@@ -1547,34 +1664,54 @@ assert_eq "1" "$DCT_WIDE" \
 # Repaired 2026-08-16 by DELETING the numerals rather than re-transcribing them — the surviving
 # sentences make the same point without a value, which is the only repair that cannot go stale again.
 #
-# **Whether this file should scan itself is a real design question and it is Task 13's**, not a
-# one-line addition here. Adding `tests/test-derived-counts.sh` to `DCT_DECLARED` requires a claim
-# row, and a claim row over this file's own comments is a guard reading the file it lives in — the
-# `DCT_ABOVE` extraction already shows how sharp that edge is (it must stop at a line number derived
-# from an anchor in this same file). Decide it there; do not bolt it on.
-DCT_DECLARED="docs/ANTI-VACUITY.md
-docs/research/codex-client/findings.md
-install.sh
-tests/test-bash32-compat.sh
-tests/test-mcp-doc-instructions.sh
-tests/test-mcp-naming.sh
-tests/test-no-mobile.sh
-tests/test-pipeline-detector.sh
-tests/test-provenance-origins.sh
-tests/test-shipped-citations.sh"
+# **DECIDED 2026-08-17, by Task 13, which this paragraph named as the owner: this file does NOT
+# scan itself, and the residual is closed by removing its subject rather than by adding a row.**
+#
+# The reasoning, so the decision is reviewable rather than merely recorded. A claim row over this
+# file would have to match a numeral in this file's own prose — and every reader of `DCT_CLAIMS` is
+# also a line of this file, so the row's pattern is itself a candidate match for the row's pattern.
+# `DCT_ABOVE` already shows how sharp that edge is: it must stop at a line number derived from an
+# anchor in this same file, and the comment above it records what happened when a second line
+# matched that anchor. A guard that has to reason about its own text to avoid matching itself is
+# strictly harder to keep correct than the defect it would catch.
+#
+# What actually made the residual dangerous was not the absence of a row — it was that this file
+# carried live figures in prose AT ALL. The 2026-08-16 repair deleted those numerals instead of
+# re-transcribing them, and the standing rule that replaces the row is: **no live figure is written
+# into this file's prose.** Where one is genuinely needed, it goes in a `printf` beside the
+# assertion that derives it, where it is regenerated every run and cannot go stale. The one class
+# this rule does not cover is a DECLARED count like `DCT_DECLARED`'s own right-hand column, which is
+# compared in both directions on every run and is therefore not a quoted figure at all.
+#
+# A reader who disagrees should reopen it as its own task with a mutation battery, not add a row.
+DCT_DECLARED="docs/ANTI-VACUITY.md	3
+docs/research/codex-client/codex-facts.md	2
+docs/research/codex-client/findings.md	16
+install.sh	1
+tests/test-bash32-compat.sh	1
+tests/test-mcp-doc-instructions.sh	1
+tests/test-mcp-naming.sh	1
+tests/test-no-mobile.sh	1
+tests/test-pipeline-detector.sh	1
+tests/test-provenance-origins.sh	1
+tests/test-shipped-citations.sh	2"
 
-DCT_UNDECLARED=$(comm -23 <(printf '%s\n' "$DCT_SCANNED") <(printf '%s\n' "$DCT_DECLARED" | sort -u))
-DCT_UNSCANNED=$(comm -13 <(printf '%s\n' "$DCT_SCANNED") <(printf '%s\n' "$DCT_DECLARED" | sort -u))
+# `sort` and `uniq` both drain; nothing on either side of these pipes can exit early.
+DCT_SCANNED_COUNTS=$(cut -f1 <<< "$DCT_CLAIMS" | sort | uniq -c | awk '{ printf "%s\t%s\n", $2, $1 }' | sort)
+DCT_DECLARED_COUNTS=$(printf '%s\n' "$DCT_DECLARED" | grep -v '^$' | sort)
+
+DCT_UNDECLARED=$(comm -23 <(printf '%s\n' "$DCT_SCANNED_COUNTS") <(printf '%s\n' "$DCT_DECLARED_COUNTS"))
+DCT_UNSCANNED=$(comm -13 <(printf '%s\n' "$DCT_SCANNED_COUNTS") <(printf '%s\n' "$DCT_DECLARED_COUNTS"))
 if [ -n "$DCT_UNDECLARED" ]; then
-  printf '%s\n' "$DCT_UNDECLARED" | sed 's|^|     scanned but not declared (add it to DCT_DECLARED in this commit): |'
+  printf '%s\n' "$DCT_UNDECLARED" | sed 's|^|     scanned rows not matching the declaration (path<TAB>rows — update DCT_DECLARED in this commit): |'
 fi
 if [ -n "$DCT_UNSCANNED" ]; then
-  printf '%s\n' "$DCT_UNSCANNED" | sed 's|^|     declared but NO LONGER SCANNED — a claim row was deleted and took its own guard with it: |'
+  printf '%s\n' "$DCT_UNSCANNED" | sed 's|^|     declared but NO LONGER SCANNED at that row count — a claim row was deleted and took its own guard with it: |'
 fi
 assert_eq "" "$DCT_UNDECLARED" \
-  "every file this block scans is declared — a row added without declaring it is a guard nobody agreed to maintain"
+  "every file this block scans is declared, at the row count it actually carries — a row added without declaring it is a guard nobody agreed to maintain"
 assert_eq "" "$DCT_UNSCANNED" \
-  "every declared file is still scanned — this is the assertion that makes DELETING a claim row loud, which it was not until a mutation removed the three rows that close this block's own headline finding and left the file green"
+  "every declared file is still scanned at its declared row count — this is the assertion that makes DELETING a claim row loud, and it is keyed on rows rather than files because the file-level version could not see one row of four leave"
 
 DCT_BAD=""
 DCT_VACUOUS=""

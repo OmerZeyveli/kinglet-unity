@@ -117,7 +117,23 @@ installer. `.claude/VERSION` is **2.0.0** — ours, and a major bump because the
 
 ## What shipped
 
-Counts verified against disk, not against anyone's README:
+**This table is a record of what the standalone merge produced on its date. It is not a running
+total, and every figure in it is stale by construction** — the 2026-08-03 surface cut removed the
+whole design/production layer and 15 of 27 hooks, and today's tree derives roughly a quarter of
+these numbers. Do not read a row here as a statement about the current toolkit; derive that instead:
+
+```bash
+ls .claude/agents/*.md | wc -l ; ls .claude/commands/*.md | wc -l ; ls -d .claude/skills/*/ | wc -l
+```
+
+The disclaimer is repeated **here**, at the head of the table, rather than only in the
+*"records of what a wave produced on a date, not running totals"* sentence far below — that sentence
+is scoped *"in this section"* and its section is a different one, so the exclusion was defensible and
+undocumented at exactly the point a reader needs it. That is why these rows are outside
+`tests/test-derived-counts.sh`'s reach and must stay outside it: bringing them under the guard would
+re-derive them and destroy the record. Stated 2026-08-17.
+
+Counts verified against disk on the merge date, not against anyone's README:
 
 | | Count | Notes |
 |---|---|---|

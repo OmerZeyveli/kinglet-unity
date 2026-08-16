@@ -50,7 +50,16 @@ TESTS_FAILED=0
 # suite red when it exits non-zero — the runner adds a failure for any file that
 # "exited N without reporting a failure" — but its assertions never reach the
 # `Total:` line, and Total is the number a reader compares between runs. Written
-# in ticks first, this file's 100 assertions moved that total by zero.
+# in ticks first, every assertion in this file moved that total by zero.
+#
+# NO COUNT IS WRITTEN IN THAT SENTENCE, AND THAT IS THE REPAIR. It read "this
+# file's 100 assertions" until 2026-08-17, in the present possessive, against a
+# file that emits half again as many now — a pinned reading of a live quantity,
+# wearing the grammar of a live one. The argument needs the fact that the total
+# did not move, not the size of what failed to move it. Deleting the numeral is
+# the only fix that cannot go stale a second time; where a figure here is
+# genuinely pinned, date it and put the verb in the past, as the census
+# paragraph in tests/test-bash32-compat.sh does.
 pass() { TESTS_RUN=$((TESTS_RUN + 1)); printf '  PASS: %s\n' "$1"; }
 fail() {
   TESTS_RUN=$((TESTS_RUN + 1)); TESTS_FAILED=$((TESTS_FAILED + 1))
