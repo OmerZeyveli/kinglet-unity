@@ -3,6 +3,12 @@
 One dispatch, one `unity-reviewer` invocation via the `Agent` tool, after every implementer report
 that is not `BLOCKED`. This is the shape — fill it in per task.
 
+**Under Codex CLI there is no `Agent` tool and no `unity-reviewer`** — see the degraded path in
+`.claude/skills/subagent-driven-implementation/SKILL.md`, just above *"Per task, in plan order"*.
+The review still happens, as its own turn; what it cannot be is *started narrowed*, so say in the
+ledger that the read-only separation was an instruction you kept rather than a capability you were
+held to. Everything below applies unchanged.
+
 ## The three inputs, by path
 
 Give the reviewer three file paths. **The diff arrives as a file, never pasted into the dispatch

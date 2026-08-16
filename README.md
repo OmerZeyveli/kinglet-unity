@@ -192,21 +192,29 @@ research above was measured under legitimate trust.
 skills bridged, it is advisory.** That distinction is why this section exists.
 
 **How much of it a session can tell about itself, exactly.** This paragraph used to end *"— and
-there is no way to tell from inside the session"*. That is true of failure 1 and **false of failures
-2 and 3**, and the difference decides whether a diagnostic can ever be written. `hooks/list` takes
-`cwds` — the project — and reads no home, and `trustStatus` is a **required** field of every entry
-it returns, drawn from `["managed", "untrusted", "trusted", "modified"]`:
+there is no way to tell from inside the session"*. That is too wide, and the boundary is worth being
+precise about, because it decides whether a diagnostic can ever be written. **The one route that
+answers without touching your home is `hooks/list`:** it takes `cwds` — the project — and
+`trustStatus` is a **required** field of every entry it returns, drawn from
+`["managed", "untrusted", "trusted", "modified"]`. So, keyed on **trust state** rather than on the
+numbered failures above, because the two do not line up one-to-one:
 
-- **Failure 1 is genuinely invisible.** An untrusted project's response carries **zero** entries,
-  and an entry that is not there has no `trustStatus`. It is indistinguishable from a project with
-  no hook config at all.
-- **Failures 2 and 3 are visible.** A registered-but-untrusted hook reports
-  `trustStatus: "untrusted"` next to its `enabled: true`; a `.codex/hooks.json` regenerated since it
-  was trusted reports the enumerated value `"modified"`.
+- **A project that is not trusted (failure 1) is genuinely invisible.** The response carries **zero**
+  entries, and an entry that is not there has no `trustStatus` to read. It is indistinguishable from
+  a project with no hook config at all.
+- **A registered-but-untrusted hook (failure 2) reports itself.** `trustStatus: "untrusted"`, next to
+  the `enabled: true` that misled you.
+- **A `.codex/hooks.json` edited since it was trusted reports `"modified"`**, which Codex treats as
+  untrusted and does not run. That case is not in the numbered list above at all — it is the one
+  `docs/HOOK-REFERENCE.md`'s *"do not hand-edit `.codex/hooks.json`"* paragraph owns.
+- **A hook that times out (failure 3) is still invisible, and the deleted sentence still holds
+  there.** A timing-out hook is `enabled: true` and `trustStatus: "trusted"`; trust state says
+  nothing whatever about a deadline, so its allow is exactly as silent as before. The generated
+  config's one-second margin is the mitigation, and it is the only one.
 
-What remains true is that **nothing in the shipped toolkit asks after install time.** `install.sh`
-calls `hooks/list` while granting trust and nothing calls it again, so a session still has no
-running diagnostic — the route exists and no shipped surface takes it. Verified against the
+What remains true across all four is that **nothing in the shipped toolkit asks after install time.**
+`install.sh` calls `hooks/list` while granting trust and nothing calls it again, so a session still
+has no running diagnostic — the route exists and no shipped surface takes it. Verified against the
 committed schema bundle in `docs/research/codex-client/evidence/f1-schema/`, not against a live
 session.
 

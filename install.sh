@@ -129,6 +129,10 @@ INPUT_SYSTEM_PKG_NAME="com.unity.inputsystem"
 INPUT_SYSTEM_PKG_VERSION="1.18.0"
 
 RECEIPT_REL=".claude/state/install-receipt.tsv"
+# Read by the Codex trust step, by Step 8e's carry-forward, and by the dry run's
+# Codex-layer announcement — all three outside the `--client codex` block, so it is
+# declared here rather than beside its writer. See the note above that writer.
+CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
 
 # ── Args ─────────────────────────────────────────────────────────────────────
 PROJECT_DIR="$(pwd)"
@@ -1210,6 +1214,45 @@ if [ "$DRY_RUN" -eq 1 ]; then
       printf '  %s/config.toml — not touched: hook trust is opt-in (--codex-trust), so the hooks would register and not run\n' \
         "$CODEX_HOME_DIR"
     fi
+  else
+    # THE OTHER HALF OF THE SAME QUESTION, AND THE ONE A USER ACTUALLY DRY-RUNS FOR. `claude` is the
+    # DEFAULT client, so `install.sh --project-dir X --dry-run` against a project that already has a
+    # Codex layer is a user asking "will this delete the layer I asked for?" — and until this arm
+    # existed the block said nothing at all, while the real run printed two `info` lines and possibly
+    # a `warn` block about it. That is exactly the announcement-vs-write divergence Step 3b's header
+    # forbids, in the newest write.
+    #
+    # THE CONDITION IS STEP 8e's, SPELLED THE SAME WAY, and the counts are derived from the same
+    # receipt it reads — not from a second walk of the disk. `$RECEIPT` still holds the previous
+    # run's receipt here, which is what makes the announcement able to answer at all.
+    DRY_CX_KEEP=0; DRY_CX_GONE=0
+    if [ "$MODE" = ours ] && [ -f "$RECEIPT" ]; then
+      while IFS=$'\t' read -r dcx_rel _dcx_sha _dcx_mode _dcx_origin; do
+        case "$dcx_rel" in
+          ''|\#*|path) continue ;;
+          AGENTS.md|.agents/skills/*|.codex/*) ;;
+          "$CODEX_TRUST_REL") ;;
+          *) continue ;;
+        esac
+        if [ -e "$PROJECT_DIR/$dcx_rel" ] || [ -L "$PROJECT_DIR/$dcx_rel" ]; then
+          DRY_CX_KEEP=$((DRY_CX_KEEP + 1))
+        else
+          DRY_CX_GONE=$((DRY_CX_GONE + 1))
+        fi
+      done < "$RECEIPT"
+    fi
+    # NO PATH IN THE FIRST FIELD ON THE KEEP LINE, deliberately: tests/test-install-dryrun.sh's
+    # parser reads the first field and would classify a leading `.agents/…` as a PROMISE about a
+    # path this run does not write. `Codex layer` has neither a dot nor a slash, so it reads as
+    # prose — the same device the `keep N file(s) you modified` lines above use.
+    if [ "$DRY_CX_KEEP" -gt 0 ]; then
+      printf '  Codex layer — %s receipted path(s) would be kept and re-recorded; this client writes none of them and removes none\n' \
+        "$DRY_CX_KEEP"
+    fi
+    if [ "$DRY_CX_GONE" -gt 0 ]; then
+      printf '  Codex layer — %s receipted path(s) are already gone from disk; their rows would be dropped (re-run with --client codex to restore)\n' \
+        "$DRY_CX_GONE"
+    fi
   fi
 
   printf '\nDry run complete — nothing written.\n'
@@ -2213,8 +2256,12 @@ fi
 # in the project, and refuses to INSTALL a config any of whose paths cannot run.
 #
 # THE CLAUDE CODE ARM DOES NOT ENTER THIS BLOCK AT ALL. Everything below is inside one `if`, so a
-# default invocation executes not one line of it.
-CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
+# default invocation executes not one line of it — except CODEX_TRUST_REL, which is declared beside
+# RECEIPT_REL at the top of this file because THREE readers outside this block need it: Step 8e's
+# carry-forward, the dry run's Codex-layer announcement, and this block. It lived here until
+# 2026-08-16, and moving the announcement above it produced `CODEX_TRUST_REL: unbound variable` and
+# rc 1 on every `--dry-run` against a project with an existing receipt — a `set -u` death in the one
+# command whose entire job is to write nothing and tell you what would happen.
 
 # Every path a Codex hook command names, checked for the two ways it can be unrunnable. Printed one
 # defect per line; empty output means the config is safe to install.
@@ -2387,11 +2434,11 @@ if [ "$CLIENT" = codex ]; then
       ok "Converted $CMDSKILL_W command(s) into .agents/skills/$([ "$CMDSKILL_K" -gt 0 ] && printf ', kept %s of yours' "$CMDSKILL_K")"
     else
       warn "codex-command-to-skill.sh failed — the commands did not cross to Codex."
-      # 1010 IS DERIVED — `cat .claude/commands/*.md | wc -l` — AND IT IS GUARDED. It read 919 until
+      # 1023 IS DERIVED — `cat .claude/commands/*.md | wc -l` — AND IT IS GUARDED. It read 919 until
       # 2026-08-16, which was correct until Task 8 added 63 lines to unity-doctor.md inside the same
       # wave; that task corrected the research document and left this string, which is the half a
       # user reads. tests/test-derived-counts.sh's tree-size block now reds when the two disagree.
-      note_not_done "The nine commands were NOT converted into .agents/skills/, so 1010 lines of Unity diagnostics that exist nowhere else in the toolkit are unreachable under Codex. Run .claude/scripts/codex-command-to-skill.sh by hand to see why it failed."
+      note_not_done "The nine commands were NOT converted into .agents/skills/, so 1023 lines of Unity diagnostics that exist nowhere else in the toolkit are unreachable under Codex. Run .claude/scripts/codex-command-to-skill.sh by hand to see why it failed."
     fi
     rm -rf "$CONV_TMP"
   fi
@@ -2976,14 +3023,31 @@ else
   # THE ROWS ARE CARRIED VERBATIM, AND ONLY WHEN THE PATH STILL EXISTS. Verbatim, because a row means
   # "the toolkit wrote this file with this checksum": re-deriving the sha would newly claim ownership
   # of a file the user edited after the Codex install, and `uninstall.sh` would then delete it as
-  # unchanged — the exact data loss its two-test classifier exists to prevent. A row whose path is
-  # gone is dropped, because there is nothing left to own; `-e || -L` and not `-f`, since the skill
-  # rows are symlinks to directories and `-f` is false for every one of them (that spelling is what
-  # made `studio-doctor.sh` fail every correct Codex install).
+  # unchanged — the exact data loss its two-test classifier exists to prevent. That is measured, not
+  # argued: with the two carried rows' shas re-derived by hand, `uninstall.sh` reports
+  # `remove 99 file(s) — unchanged since install` and DELETES both edited files.
+  # `-e || -L` and not `-f`, since the skill rows are symlinks to directories and `-f` is false for
+  # every one of them (that spelling is what made `studio-doctor.sh` fail every correct Codex
+  # install).
+  #
+  # A ROW WHOSE PATH IS GONE IS DROPPED — AND THE DROP IS SAID OUT LOUD, WHICH IS THE HALF THAT WAS
+  # MISSING. Dropping is right: a row for a path that is not there is a ghost, and keeping it would
+  # give a user who deliberately removed the Codex layer a permanently failing doctor with no way to
+  # clear it — a false-alarm generator, which this repository's own ledger rates as the most
+  # expensive kind of red. But SILENT dropping is worse than either. Measured 2026-08-16:
+  # `studio-doctor.sh` correctly reports `FAIL 2 receipted file(s) missing — re-run install.sh`
+  # (rc 1); following that remedy literally, with the DEFAULT client, dropped both rows and the next
+  # doctor run read `8 passed · 1 warning(s) · 0 failure(s)` with both files still gone. The branch's
+  # original Critical was a remedy that REPRODUCED the bad state; that one at least kept complaining.
+  # So: count the drops, name them, and route a `note_not_done` — which prints immediately above
+  # `Next steps:`, at the moment the user is reading. `studio-doctor.sh`'s remedy line now names
+  # `--client codex` for these paths, so the two halves agree.
   #
   # `$RECEIPT` still holds the PREVIOUS run's receipt at this point — Step 9 is what replaces it —
   # which is the same fact four `owned_by_installer` call sites depend on.
   CODEX_CARRIED=0
+  CODEX_DROPPED=0
+  CODEX_DROPPED_LIST=""
   if [ "$MODE" = ours ] && [ -f "$RECEIPT" ]; then
     while IFS=$'\t' read -r cx_rel cx_sha cx_mode cx_origin; do
       case "$cx_rel" in
@@ -2992,7 +3056,11 @@ else
         "$CODEX_TRUST_REL") ;;
         *) continue ;;
       esac
-      [ -e "$PROJECT_DIR/$cx_rel" ] || [ -L "$PROJECT_DIR/$cx_rel" ] || continue
+      if [ ! -e "$PROJECT_DIR/$cx_rel" ] && [ ! -L "$PROJECT_DIR/$cx_rel" ]; then
+        CODEX_DROPPED=$((CODEX_DROPPED + 1))
+        CODEX_DROPPED_LIST="${CODEX_DROPPED_LIST}${cx_rel}"$'\n'
+        continue
+      fi
       printf '%s\t%s\t%s\t%s\n' "$cx_rel" "$cx_sha" "$cx_mode" "$cx_origin" >> "$RECEIPT_TMP"
       CODEX_CARRIED=$((CODEX_CARRIED + 1))
     done < "$RECEIPT"
@@ -3000,6 +3068,15 @@ else
   if [ "$CODEX_CARRIED" -gt 0 ]; then
     info "Codex layer: $CODEX_CARRIED receipted path(s) kept — this run installed Claude Code only."
     info "Nothing Codex reads was removed. Re-run with --client codex to regenerate that layer."
+  fi
+  if [ "$CODEX_DROPPED" -gt 0 ]; then
+    warn "$CODEX_DROPPED Codex-layer path(s) in the previous receipt are GONE from disk:"
+    while IFS= read -r cx_d; do
+      if [ -n "$cx_d" ]; then printf '       %s\n' "$cx_d"; fi
+    done <<< "$CODEX_DROPPED_LIST"
+    warn "Their receipt rows were dropped — this run installed Claude Code only and did not"
+    warn "restore them. Re-run with --client codex to get that layer back."
+    note_not_done "$CODEX_DROPPED Codex-layer path(s) listed above were missing from disk and their receipt rows were dropped, so nothing owns or reports them any more. This run was --client claude and does not write that layer. If .codex/hooks.json is among them this project is advisory rather than enforcing under Codex. Re-run: ./install.sh --project-dir \"$PROJECT_DIR\" --client codex"
   fi
 fi
 

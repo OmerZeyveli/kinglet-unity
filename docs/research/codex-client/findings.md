@@ -1706,9 +1706,10 @@ reports 18 at repo scope where `.claude/skills/` holds 16.
 The natural reading of "a command routes to an agent, and agents are dead under
 Codex, so the command is dead weight" is **wrong**, and it is worth stating because
 it is the conclusion this section was expected to reach. Kinglet's command bodies
-are **1010** lines (`cat .claude/commands/*.md | wc -l`, re-derived 2026-08-16 — it read
-919 until Task 8 added 63 lines to `unity-doctor.md` inside this same wave, then 982 until
-Task 12 added 28 more to the same file, which is what a count written mid-wave does); the routing is a line or two of each.
+are **1023** lines (`cat .claude/commands/*.md | wc -l`, re-derived 2026-08-16 — it read
+919 until Task 8 added 63 lines to `unity-doctor.md` inside this same wave, then 982, then
+1010, then this, as Task 12 and its fix round kept editing that same file: a count written
+mid-wave is stale by the next commit, which is why this one is guarded rather than trusted); the routing is a line or two of each.
 `unity-fix.md` is 58 lines of
 which the `## Agent Routing` section is one bullet — the substance is an ordered
 Unity diagnostic (`NullReferenceException` → missing reference, destroyed object,
@@ -2002,7 +2003,7 @@ Kinglet's guarantees onto a tree Kinglet never touched.
 |---|---|---|---|
 | 1 | **Hooks** | `scripts/codex-hook-shim.sh`, now in `install.sh`'s payload → `.claude/scripts/codex-hook-shim.sh`; `.codex/hooks.json` **generated** by `--emit-config` at install time, **after `scripts/` is already in place** — see the ordering note below the table, which is a contract on the installer and not a preference; hook trust granted at install time | `## Hooks`: all nine tool-event hooks enforce through the shim; without it eight of the nine fire and do nothing. The config's top level must be a `hooks` wrapper — a bare event map is rejected with a parse warning. `timeout` is milliseconds in `.claude/settings.json` and **seconds** in Codex, so the generator converts by ceiling division and orders the two ceilings: shim `--timeout ceil(ms/1000)`, Codex `timeout ceil(ms/1000)+1` |
 | 2 | **Skills** | `<project>/.agents/skills/` — a real directory holding one symlink per skill, `<name>` → `../../.claude/skills/<name>` | `## Skills`: `.claude/skills/` unaided gives **0**; the `skills` config key gives 0 under two spellings; a symlink root gives 16, enabled, with invocation observed. The root is per-entry rather than the single directory symlink because row 3 needs generated entries beside the symlinked ones — measured 2026-08-16 under this task, see **The mixed root** below |
-| 3 | **Commands** | `scripts/codex-command-to-skill.sh`, in the payload → `.claude/scripts/codex-command-to-skill.sh`; it writes `<project>/.agents/skills/<command-name>/SKILL.md`, one per `.claude/commands/*.md` | `## Commands`: 7 of the 9 are dropped silently by the importer on an argument token, the loss is **content and not routing** (1010 lines of Unity diagnostics that exist nowhere else in the toolkit), no command name collides with a skill name, and a converted command was observed loading unnamed. Under the Kinglet path with row 2 alone, 9 of 9 would be lost — worse than the importer |
+| 3 | **Commands** | `scripts/codex-command-to-skill.sh`, in the payload → `.claude/scripts/codex-command-to-skill.sh`; it writes `<project>/.agents/skills/<command-name>/SKILL.md`, one per `.claude/commands/*.md` | `## Commands`: 7 of the 9 are dropped silently by the importer on an argument token, the loss is **content and not routing** (1023 lines of Unity diagnostics that exist nowhere else in the toolkit), no command name collides with a skill name, and a converted command was observed loading unnamed. Under the Kinglet path with row 2 alone, 9 of 9 would be lost — worse than the importer |
 | 4 | **The entry document** | `scripts/generate-claude-md.sh --client codex` emits it; Task 9 writes it to `<project>/AGENTS.md`. This repository gets its own tracked `AGENTS.md` | `## Rules and AGENTS.md`: `AGENTS.md` is **injected** (sentinel returned with 0 shell commands); `CLAUDE.md` is *findable*, not loaded (same sentinel, recovered only after an `rg`). This half is unconditional — the injection happens before the turn |
 | 5 | **Rules** | `.claude/rules/` ships as it already does; the Codex entry document keeps the **declarative pointer** and the existing digest **and adds the four `NON-NEGOTIABLE` sections that are in neither the digest nor a hook**, plus the editor-guard rule. The Claude Code document is byte-identical to base | `## Rules and AGENTS.md`: without the pointer `.claude/rules/` was opened **0 times in 24 runs**, and the failure mode is not "no conventions" but **confidently wrong** ones. The pointer is not sufficient (1 of 12 under a conventions-blind request) while the same rule inlined binds 12 of 12. The membership is derived, not asserted — see **What is and is not inlined** below, which corrects a false claim this row carried for one round |
 | 6 | **MCP** | the `mcp_servers.UnityMCP` row for `<project>/.codex/config.toml`, written by Task 9. The entry document names the file and **marks the client-behaviour question open** | `codex-facts.md`: the importer writes exactly that row pointing at the bridge's `localhost:8080/mcp` URL, so the **configuration shape** is measured. **Whether the routes behave is not** — Task 7 has not run. See **Open, not answered** below |
@@ -2173,6 +2174,21 @@ not advisory** — provided row 1 and its trust step are installed. The entry
 document states that conditional in those terms rather than claiming enforcement
 unconditionally, because a user who bridged only the skills has an advisory install
 and no way to tell from the inside.
+
+**Scoped 2026-08-16, and this correction is here because `install.sh` names this
+section by heading as the thing it scopes.** "No way to tell from the inside" is
+true of the case this sentence is about — with only the skills bridged there is no
+`.codex/hooks.json`, so `hooks/list` returns no Kinglet entries and there is no
+`trustStatus` to read — and it is **not** true as a general claim about hook trust,
+which is how it came to be quoted. Two things now say where the line falls, and both
+came out of this measurement rather than around it. `trustStatus` is a required field
+of every entry `hooks/list` returns, so a *registered*-but-untrusted hook reports
+itself and a config edited since it was trusted reports `"modified"`; what stays
+invisible is an untrusted **project** (empty list, no entry) and a hook Codex **times
+out** (`trusted`, and the allow is silent). And the toolkit now ships a route for the
+case in this sentence: `studio-doctor.sh` reports a missing `.codex/hooks.json` by
+path. `README.md` § *Hook trust* carries the full boundary; do not re-quote this
+sentence without it.
 
 ---
 

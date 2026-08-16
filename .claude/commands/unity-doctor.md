@@ -100,12 +100,23 @@ five until 2026-08-14: the payload-directory item is gone because the script iss
 itself now, and that is the direction to take every time one of these becomes something the script
 reports — delete the item, do not keep both.
 
-**"And only these" used to close the sentence, and the branch below falsified it six lines later.**
-`scripts/studio-doctor.sh` contains zero occurrences of `codex`, `AGENTS.md` or `.agents`, so the
-whole second-client surface is outside what it reports too — and it is covered by **Check 3b**,
-behind its own skip gate, not by this list. Four here plus 3b's five is the real membership. If you
-add an item, decide which of the two checks owns it and say so; a closed-world claim in one of them
-is what went wrong the first time.
+**"And only these" used to close the sentence, and it was wrong twice over.** The second client is
+also outside this list, and it is covered by **Check 3b**, behind its own skip gate — so the
+membership is these four plus 3b's five, not four. If you add an item, decide which of the two checks
+owns it and say so; a closed-world claim in one of them is what went wrong the first time.
+
+**The ground that was reached for is itself false, and it is recorded here rather than quietly
+dropped, because this paragraph's whole subject is exactly that.** A version of this text shipped on
+2026-08-16 reading *"`scripts/studio-doctor.sh` contains zero occurrences of `codex`, `AGENTS.md` or
+`.agents`, so the whole second-client surface is outside what it reports too."* Both halves are
+wrong. Derived with that sentence's own pattern, `/usr/bin/grep -cE 'codex|AGENTS\.md|\.agents'
+scripts/studio-doctor.sh` answers a non-zero number today and already did on the day the sentence was
+written. And the script **does** report on the second client: it verifies **every** receipt row, and
+a Codex install has rows outside `.claude/` — delete `.codex/hooks.json` and it prints
+`FAIL … receipted file(s) missing`, names the path, and now names `--client codex` as the remedy.
+What Check 3b still owns is what the receipt cannot see: the shim paths resolving, the timeout unit,
+the skill root, and trust. **Do not restate that as a count or a closed set** — derive it, or say
+what the script does and does not read.
 
 1. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
    other direction: for every `.sh` in `.claude/hooks/` except `_lib.sh`, confirm it appears in
@@ -195,10 +206,12 @@ checking by hand because it is **silent**: hooks that are registered, listed, an
    This step used to end *"do not report its state"*, full stop, and that was too wide. The route
    that answers without touching the home is `hooks/list`: it takes `cwds` — the project — and
    `trustStatus` is a **required** field of every entry it returns, from
-   `["managed", "untrusted", "trusted", "modified"]`. So one of the three states is invisible and
-   two are not: an **untrusted project** returns an empty list, and an entry that is not there has
-   no `trustStatus` to read; a **registered-but-untrusted hook** reports `trustStatus: "untrusted"`,
-   and a config regenerated since it was trusted reports `"modified"`.
+   `["managed", "untrusted", "trusted", "modified"]`. Enumerated rather than counted, because the
+   boundary is what matters: an **untrusted project** returns an empty list, so there is no entry to
+   carry a status and that state is genuinely invisible; a **registered-but-untrusted hook** reports
+   `trustStatus: "untrusted"`; a **config edited since it was trusted** reports `"modified"`, which
+   Codex treats as untrusted. **Trust state answers nothing outside itself** — a hook Codex times out
+   is `enabled: true` and `"trusted"`, and its allow is as silent as it ever was.
 
    **Do not run that call as part of this check.** Reaching it means driving `codex app-server`
    over JSON-RPC, and that protocol has two measured traps that each return something shaped like an

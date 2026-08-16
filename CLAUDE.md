@@ -157,14 +157,24 @@ session pays to read, and it is a worse outcome than none. It was this criterion
 **A shipped surface gets a Codex qualification when, and only when, a reader who can reach it under
 Codex would act on a sentence in it that is false or unreachable there.** Both halves are required.
 
-1. **Can a Codex reader reach it at all?** `.claude/agents/` is **not installed** under Codex — the
-   agents are excluded deliberately — so their `Skill`-tool and sub-agent sentences have no Codex
-   reader and need no edit. `.claude/commands/` reaches a Codex reader only through
-   `scripts/codex-command-to-skill.sh`, which prepends a caveat banner, so a command-body claim is
-   qualified **once, in the banner**, not once per command file. `docs/` does not ship into a
-   project at all; it is qualified for the human evaluating the toolkit, which is a different reader
-   and a different bar. What a Codex session really reads is `AGENTS.md`, `.agents/skills/*`,
-   `.claude/rules/*` (only when something points at them), and `MCP-SETUP.md`.
+1. **Can a Codex reader reach it at all? Reachability is about being BRIDGED, not about being
+   installed** — and getting that wrong once carried the largest exclusion in this section on a
+   false premise. `.claude/agents/` **is** installed under `--client codex`: the files are copied and
+   the receipt carries a row for each. What it is not is **bridged** — `.agents/skills/` contains no
+   agent entry, so nothing surfaces an agent to a Codex session, which is why their `Skill`-tool and
+   sub-agent sentences have no Codex reader and need no edit. (`README.md` has the durable wording:
+   *"the agents are excluded from the Codex layer entirely."*) `.claude/commands/` reaches a Codex
+   reader only through `scripts/codex-command-to-skill.sh`, which prepends a caveat banner, so a
+   command-body claim is qualified **once, in the banner**, not once per command file. `docs/` does
+   not ship into a project at all; it is qualified for the human evaluating the toolkit, which is a
+   different reader and a different bar.
+
+   **Bridged means the whole directory, not the `SKILL.md`.** `.agents/skills/<name>` is a symlink to
+   the skill *directory*, so every sibling file inside it is reachable verbatim and none of them gets
+   the converter's banner. That is how `subagent-driven-implementation/implementer-prompt.md` and
+   `task-reviewer-prompt.md` — whose opening sentences both name the `Agent` tool — are members while
+   nothing else under `.claude/skills/` is. Run the predicate over **every file** in a skill
+   directory, never over `SKILL.md` alone.
 2. **Does it assert a Claude Code mechanism as automatic, or route somewhere Codex has not got?**
    *"loads automatically"*, *"always loaded"*, *"blocked by a hook"*, *"the `Skill` tool"*, an
    `Agent`-tool dispatch. A surface carrying only Unity/C# knowledge — `physics`, `object-pooling`,
@@ -181,17 +191,43 @@ surface that makes it. `/name` is the case: Codex has no slash-command surface, 
 `.claude/commands/` is installed there as a skill of the same name, so a `/unity-review` in a skill body is
 a *spelling* difference and not a dead reference. The generated `AGENTS.md` carries the translation
 rule and Codex injects it whole, so `unity-brainstorming` and `verification-before-completion` — both
-of which name slash commands as live routes — are correctly left alone. `using-kinglet` gets one
-clause pointing at that rule and nothing more: it was in scope for test 2 anyway (it claimed the
-rules load automatically), and a whole section restating the translation was written, measured
-against `tests/test-surface-references.sh`'s five-section budget, and **deleted** — a second copy of
-a rule the reader has already been handed, in the one file whose length is its failure mode.
+of which name slash commands as live routes — are correctly left alone. `using-kinglet` states the
+rule inline in its intro block, which had to change anyway; a whole *section* restating it was
+written, measured against `tests/test-surface-references.sh`'s five-section budget, and **deleted** —
+a second copy in the one file whose length is its failure mode.
 
-The membership that criterion selected: `.claude/skills/using-kinglet/`,
-`.claude/skills/input-system/`, `.claude/skills/subagent-driven-implementation/`,
-`.claude/rules/unity-specifics.md`, `.claude/rules/pc-console.md`, `.claude/commands/unity-doctor.md`
-and `MCP-SETUP.md`. **Re-run the criterion, do not copy the list** — it is the answer for one tree on
-one date.
+**The exclusion has a known load path, and it is not single-copy — check that before you lean on it
+again.** It rests on the rule being somewhere a Codex session cannot fail to meet. Today that is two
+places: the generated `AGENTS.md` (injected whole, unconditionally) **and** `using-kinglet`'s intro
+block (a symlinked skill, which no install branch can freeze). The second exists *because* the first
+can be lost: `AGENTS.md` has **no marked-region merge** — unlike `CLAUDE.md`, which the installer
+refreshes between its markers — so once a user edits it, every later `--client codex` run prints
+*"AGENTS.md exists and is not ours — keeping yours, untouched"* and the translation stops being
+updatable. This task's own Next step 2 tells the user to edit that file, which is the awkward part.
+**Giving `AGENTS.md` the merge is the real fix and it is a task, not a paragraph** — it means a new
+write path into a user-owned file, reversing a decision Task 9 argued deliberately, and its own
+state-by-state guards. Until then: if you add a surface whose only correction lives in `AGENTS.md`,
+you are relying on a file the user can freeze. Put it in a symlinked skill too, or qualify the
+surface.
+
+The membership that criterion selected, 2026-08-16 — **every member, including the ones handled
+elsewhere**, because a member that appears in the rule and vanishes from the result is the one thing
+this section must not do:
+
+| Member | Selected by | Where it was handled |
+|---|---|---|
+| `.claude/skills/using-kinglet/SKILL.md` | test 2 — *"load automatically"* | here |
+| `.claude/skills/input-system/SKILL.md` | test 2 — *"blocked by a hook"* | here |
+| `.claude/skills/subagent-driven-implementation/SKILL.md` | test 2 — `Agent`-tool dispatch | here |
+| …`/implementer-prompt.md`, …`/task-reviewer-prompt.md` | test 2, and reachable because the **directory** is symlinked | here |
+| `.claude/rules/unity-specifics.md` (×2), `pc-console.md` | test 2 — *"blocked by a hook"* | here |
+| `.claude/commands/unity-doctor.md` | test 2, and it is Check 3b's own home | here |
+| `MCP-SETUP.md` | the exception — installer's Next step | here |
+| `scripts/studio-doctor.sh` | the exception — installer's Next step | **the previous round**: the `-f`→`-e` symlink fix and Check 3b; this round added the `--client codex` remedy for a missing Codex-layer path |
+
+**Re-run the criterion, do not copy this table** — it is the answer for one tree on one date. What is
+worth copying is the negative half, because it is what would have shown a carpet-bomb: the other
+skills, the other rules and the other commands were run through test 2 and selected **nothing**.
 
 ## Shell conventions
 

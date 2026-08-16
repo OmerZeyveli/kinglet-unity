@@ -89,7 +89,7 @@ contradicted in the file beside it is a rule nobody is following.
 are excluded from the Codex layer entirely — `.claude/agents/` is not installed there — so
 `unity-coder` and `unity-reviewer` are names with nothing behind them, and there is no `Agent` tool
 to call them with. What Codex does have is a session-level sandbox (`codex --sandbox read-only`, and
-`sandbox` / `sandboxPolicy` on its thread and turn parameters) and `subagentStart` / `subagentStop`
+`sandbox` on its thread-start parameters, `sandboxPolicy` on its turn-start ones) and `subagentStart` / `subagentStop`
 hook events; what it does **not** have is a per-agent tool allowlist, which is the one thing the
 reviewer's read-only guarantee rests on. So the degraded path is: run the implementer turn and the
 review turn **separately**, hand the reviewer the brief, the report and the diff as three paths, and

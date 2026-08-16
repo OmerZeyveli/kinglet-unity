@@ -556,8 +556,33 @@ else
   if [ "$MISSING" -eq 0 ]; then
     pass "Install intact: $VERIFIED file(s) verified against the receipt"
   else
-    fail "$MISSING receipted file(s) missing — re-run install.sh"
-    print_first_5 "$MISSING_LIST"
+    # THE REMEDY HAS TO NAME THE CLIENT, BECAUSE `install.sh` WITHOUT `--client codex` DOES NOT
+    # RESTORE A CODEX-LAYER PATH — IT DROPS THE ROW. Measured 2026-08-16: delete
+    # `.codex/hooks.json` and one `.agents/skills/*` entry from a clean Codex install, run this
+    # script (correctly `FAIL 2 receipted file(s) missing`, rc 1), then follow the bare remedy
+    # `install.sh --project-dir X --yes`. Step 8e carries forward only rows whose path still exists,
+    # so the two rows are dropped and this script then reports `8 passed · 0 failure(s)` with both
+    # files still gone. A remedy that turns a loud failure into a silent one is worse than the
+    # original defect on this branch, which at least kept complaining.
+    #
+    # The Codex-layer paths are exactly the receipted rows that are NOT under `.claude/` — the
+    # criterion `install.sh` Step 8e uses, spelled the same way. Nothing here parses the receipt a
+    # second time; MISSING_LIST is already the answer.
+    # ONE `fail` FOR ONE PROBLEM. The explanation goes out through `printf`, not through `fail` —
+    # `fail` increments FAIL_C, and the summary line is what `.claude/commands/unity-doctor.md`
+    # tells the model to read first, so three lines about one missing pair would report
+    # `3 failure(s)` for one fault. The count is the finding, not the sentence count.
+    dr_codex="$(printf '%s' "$MISSING_LIST" | grep -vE '^\.claude/' | grep -c . || true)"
+    if [ "$dr_codex" -gt 0 ]; then
+      fail "$MISSING receipted file(s) missing — re-run install.sh --client codex"
+      print_first_5 "$MISSING_LIST"
+      printf '       %s\n' "$dr_codex of these are Codex-layer paths (AGENTS.md, .agents/, .codex/)."
+      printf '       %s\n' "A plain install.sh will NOT restore them — it drops their rows instead,"
+      printf '       %s\n' "and this check then passes with the files still missing."
+    else
+      fail "$MISSING receipted file(s) missing — re-run install.sh"
+      print_first_5 "$MISSING_LIST"
+    fi
   fi
   if [ "$MODIFIED" -gt 0 ]; then
     # Not a failure. Editing the toolkit in place is legitimate; you just want to know you did,
