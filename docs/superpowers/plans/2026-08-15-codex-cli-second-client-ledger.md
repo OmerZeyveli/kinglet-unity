@@ -82,7 +82,14 @@ The failing assertion is *"the refusal names how many of the envelope's files we
 400-file budget case. The symptom is `<tmpdir>/payload.<N>.json: No such file or directory` on stderr
 followed by `BLOCKED: codex-hook-shim: could not stage payload <N>` — i.e. the shim's temp directory
 has gone while the staging loop is still running, so it refuses on the staging failure and the
-`of 400 file(s)` count never appears. **What removes that directory mid-loop is the open question.**
+`of 400 file(s)` count never appears. **What removes that directory mid-loop is the open question**, and Task 9's review narrowed it:
+the recorded symptom is payload **151** in the 400-file case, but the reviewer's own reproduction is
+payload **5** for `noop-hook.sh`, **immediately after the preceding budget case**. So the directory
+can vanish within the first few payloads — which points away from anything proportional to loop
+length and toward **the teardown of the preceding case**. That is a constraint, not a diagnosis.
+
+Reproduction rates across three independent attempts: **3/4, 2/3, 1/4** — consistent with a race, and
+every reader so far has stood by routing rather than guessing.
 
 The controller re-ran the whole suite independently on 2026-08-16 and got **3865 / 0 failed, 434 s** —
 **it did not hit.** That is what a race looks like, and it is precisely the shape `CLAUDE.md` warns
@@ -429,7 +436,7 @@ The event stream shape, measured against the real binary:
 | 6 | Rules, `AGENTS.md`, commands and agents | **DONE** | `4898876..56183ef` | general-purpose implementer; 2 fix rounds, one Critical; the pointer verdict was prompt-conditional and became a **positive** ship recommendation |
 | 7 | Layer B — MCP routes against the live bridge | **DEFERRED TO LAST** | — | **The owner is using the Editor.** See the ruling below |
 | 8 | Ship the payload the measurement supports | **DONE** | `b713f09..993dee2` | general-purpose implementer; 2 fix rounds; the payload ships and its guard is 86 assertions |
-| 9 | Installer writes and removes the Codex layout | open | — | *(brief pending)* |
+| 9 | Installer writes and removes the Codex layout | **DONE** | `b3ecfb2..ce09521` | general-purpose implementer; 2 fix rounds; writes the user's **home** for the first time in this toolkit's history |
 | 10 | Findings synthesis, decision, debt | open | — | *(brief pending)* — gained **Step 5a** during the run: re-derive `docs/ANTI-VACUITY.md`'s bash-4 census and put it under a guard |
 | 11 | Close the probe harness's residual guard gaps | open | — | **added during the run** by Task 1's completion sweep and re-review. Runs after Task 9, when the harness has stopped changing |
 
@@ -839,6 +846,66 @@ of reasoning in the ship list with nothing measured beneath it.
 |---|---|---|
 | The conjunction branch in `tests/test-codex-surface.sh` § 8 matches `and` **anywhere** on the gate line and runs regardless of `gate_or`, so a **correct** disjunction whose sentence happens to contain an ordinary "and" is failed and told it is "worse than the original defect" | Safe: it **cannot let a real conjunction through**, and it fails loudly rather than silently. But wrong advice on correct work is the shape that costs an afternoon here — `CLAUDE.md` records three implementers dismissing a real defect as a flake. The fix is a three-line branch reorder, already dry-run against four shapes without re-opening the mutation it exists for | **Task 11**, which is already the guard-gaps task and will be editing these files |
 | The `HookEventName` enum check stays undone. The decline is right; its stated dichotomy was false and is now corrected — the suite **already skips with a stated reason**, so deriving the enum only when `codex` is on `PATH` would add no dependency and hardcode nothing | Recorded rather than closed, with the reason restated as *"the residual is one reviewed edit wide"* rather than *"it is unavailable"* | **Task 11**, same file, same visit |
+
+---
+
+## Task 9 — close: the installer, and Kinglet's first write to a user's home
+
+Implementer: **general-purpose**. `DONE`, two fix rounds. Review: **Spec ✅** — six steps discharged,
+two substantially exceeded, including **the upgrade fixture the brief required and no earlier round in
+this wave had built**. Re-review 2: **all closed**. Range **`b3ecfb2..ce09521`**. Suite → **3869**;
+`tests/test-codex-surface.sh` at **138** assertions.
+
+`--client claude` differs from today by **one line across the entire tree** — the receipt's
+`installed-at`. The owner's `~/.codex` is **byte-identical across all 6751 files** before and after,
+`config.toml` at `c32cf5be…` mode 664, with zero Kinglet artefacts and zero `hooks.state` rows.
+
+### The sixth silent-failure shape, and it is the likeliest one a user meets
+
+Against a project Codex has **not** been told to trust, `hooks/list` returns
+**`hooks: [], warnings: [], errors: []`**. The hooks are not reported as untrusted — **they are not
+registered at all, and nothing says so.** There is no diagnostic for a user or a doctor check to
+notice. The installer now names this case with the exact commands that fix it.
+
+### Writing a user's home is a different act, and it took two rounds to get right
+
+Three defects, none of which lose content, all of which are the shape that only appears when the file
+belongs to someone else:
+
+1. **The mode was silently normalised** — 644 → 600, and **444 → 600 on a deliberately read-only
+   config, rewritten without a word.** The precondition tested the *directory* for writability, and
+   `mv` from `mktemp` carries 0600. **`install.sh` documents this exact trap twice, with `chmod 644`
+   as the fix**, and it was missed in the one file Kinglet does not own. Fixed **by construction** —
+   `cat tmp > file` preserves mode, ownership and ACL without reading them, and there is no correct
+   constant to `chmod` to, because the right mode is whatever the user chose.
+2. **A config with no trailing newline came back one byte longer** — found by the implementer's *own*
+   new guard, not by review. And the flag had to be made **sticky**, because asking per-grant answers
+   about the file *as the toolkit last left it*, so grant 2 silently undid grant 1's correct answer.
+   **That surfaced only on the second install.**
+3. **No surviving backup held the original.** Backup 1 is the user's true original; 2..N are
+   byte-identical copies of the post-grant state, so a newest-three bound discarded the only
+   irreplaceable one. Now the result is assembled and compared **before** the user's file is touched —
+   an identical re-grant writes nothing, not even an mtime — and when it does differ the bound keeps
+   **oldest plus newest two**. Measured on a five-grant rig: one backup survives and it is the
+   pre-Kinglet original, byte for byte.
+
+**The asymmetry is deliberate and stated where the rules differ:** uninstall keeps the **newest**
+three of its own pattern, because an uninstall backup is the state just before that uninstall — every
+member is reconstructible and recency is what recovery wants — while an install backup's oldest member
+is the only thing that cannot be rebuilt.
+
+**And the two fixes are load-bearing for each other:** the newline flag now consults the record, then
+the **oldest surviving backup**, then the config itself — and witness 2 is only worth consulting
+because the backup rule guarantees the oldest is never evicted. Tested as a pair, the sequence that
+failed before (`grant → delete the record → grant → uninstall`) now returns **129 bytes byte-identical**
+against 132-versus-131 previously.
+
+### Deferred, with owners
+
+| Finding | Ruling | Owner |
+|---|---|---|
+| Inverting the reap to `sort -r` stays **green 138/138**. The oldest survives either way, so both assertions hold while the documented *"the newest are what a recent mistake needs"* half degrades from two recent copies to one | Safe — no data loss in either ordering, and two controls confirm the guard is not generally insensitive there. One assertion closes it | **Task 11** |
+| Mutant **M9** is caught by the *count* rather than by a semantic assertion. The reviewer agrees that is the right discrimination — unbounded churn is a count defect — but notes the count **conflates** "no backup on a no-op" with "the bound": tighten the bound to 1 while still backing up on no-ops and M9 slips through. **The direct witness is the mtime, verified by hand, and nothing asserts it** | Safe today; the gap is a guard gap, not a behaviour one | **Task 11**, same block of code |
 
 ---
 
