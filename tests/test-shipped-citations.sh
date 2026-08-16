@@ -409,9 +409,47 @@ fi
 # basename resolves when exactly one tracked file carries it, which is the same rule
 # tests/test-citations-resolve.sh uses.
 #
+# THOSE TWO FIGURES READ 67 AND 23 UNTIL 2026-08-16, AND THE STORY OF HOW THEY SURVIVED THREE SWEEPS
+# IS WORTH MORE THAN THE CORRECTION. They are `payload_paths()`'s own output: 61 files under
+# `.claude/` less `state/`, plus `scripts/*.sh` less install.sh's skip list, which is 8 — 69 today,
+# 44 of them Markdown. At the branch base `9a2ebec` the skip list held ONE name and `scripts/` held
+# seven `.sh`, so the payload was 61 + 6 = 67 and the sentence was CORRECT. This branch added
+# `codex-command-to-skill.sh` and `codex-hook-shim.sh` to the shipped set (`codex-probe.sh` joined
+# the skip list), i.e. **+2**, and the figure was off by exactly that.
+#
+# It is therefore inside the crudest possible criterion — "off by exactly what this branch added" —
+# which is the sweep that found the first eight members of this class, and it is ALSO inside the
+# written criterion that replaced it. And this file's own runtime output contradicts it on every
+# single run — the `payload derivation produced N entries` line below prints the live figure. That is
+# character for character the ground cited for correcting `tests/test-provenance-origins.sh` and for
+# ruling on `tests/test-bash32-compat.sh`.
+#
+# NEITHER THE OLD READING NOR THE NEW ONE IS RESTATED IN THIS PARAGRAPH, and that is deliberate:
+# the guard cannot tell a stale claim from a correct record of an older one, so a historical quote in
+# the matchable form would either red on the day the live figure legitimately changes or, worse,
+# satisfy the pattern twice and turn the row's vacuity check into a union over two sites. The DCV
+# block in tests/test-derived-counts.sh carries that rule in those words; this is the second file to
+# need it. The figures live in ONE sentence, below.
+#
+# WHY THE CRITERION-BASED SWEEP MISSED IT ANYWAY, stated precisely because a vague answer here is
+# worth nothing. The criterion was fine and this site satisfies it. THE RAW SWEEP FOUND IT — the
+# sentence below was in its 465 hits, verbatim, at its old value. What discarded it was the step
+# between those 465 and the ~19 that were classified by hand: criterion (b), "asserted about the tree
+# as it now stands", was applied through a KEYWORD PROXY — `grep -E 'holds|today|tracked|now'` — and
+# the sentence below is phrased "the payload HAS N entries". None of those four words. Measured after
+# the fact: 8 hits from this file entered the narrowing, 0 survived it.
+#
+# So the defect was not the criterion but an unmeasured NARROWING STEP standing in for it — a filter
+# with no floor, no positive control, and no check that the 446 hits it dropped contained no
+# members. That is the same shape this whole wave has been finding, committed by the sweep built to
+# find it. The rule it earns: when a criterion is applied through a cheaper proxy, the proxy's
+# RECALL is the thing to measure, and the way to measure it is to run the criterion by hand over a
+# sample of what the proxy discarded. Both figures are now derived and guarded in
+# tests/test-derived-counts.sh's tree-size block, against this file's own `payload_paths()`.
+#
 # WHAT THIS DOES NOT COVER, and it is deliberate, not an oversight. It reads ONE file. The payload
-# has 67 entries, 44 Markdown (rules 1-3) and 23 not; this is one of the 23. Applying the same
-# criterion to the other 22 leaves FIFTEEN unmarked repository-only citation sites, thirteen of them
+# has 69 entries, 44 Markdown (rules 1-3) and 25 not; this is one of the 25. Applying the same
+# criterion to the other 24 leaves FIFTEEN unmarked repository-only citation sites, thirteen of them
 # naming `tests/` files and two naming provenance.tsv, none of which install. Split by directory, and
 # the split is the finding:
 #

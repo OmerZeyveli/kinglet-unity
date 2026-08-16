@@ -451,12 +451,24 @@ else
   #                                             there first, and the shape copied from here.
   #   install.sh, the MODIFIED_FILES scan     — carries `[ -f "$PROJECT_DIR/$rel" ] || continue` and
   #                                             therefore skips every symlink row. HARMLESS TODAY
-  #                                             AND NOT A SECOND BUG: that scan feeds the `.claude/**`
-  #                                             payload loops, the symlink rows are `.agents/`, and
-  #                                             the loop that writes them never calls `is_modified`.
-  #                                             It is the same shape, one edit away from mattering,
-  #                                             which is why it is named here rather than left for
-  #                                             someone to rediscover.
+  #                                             AND NOT A SECOND BUG — but the reason is stated below
+  #                                             at its real size, because the first version of this
+  #                                             row gave half of it.
+  #
+  # WHAT THAT SCAN ACTUALLY FEEDS, enumerated rather than characterised. `is_modified` reads
+  # `MODIFIED_FILES` and is called from FOUR sites: the orphan sweep, the `.claude/**` payload loop,
+  # the `scripts/` copy loop, the `settings.json` write — AND the converted-command-skill loop, which
+  # calls it with `.agents/skills/<name>/SKILL.md`. This row read *"that scan feeds the `.claude/**`
+  # payload loops, the symlink rows are `.agents/`"*, which is one clause too narrow: the scan does
+  # reach `.agents/`. The conclusion is unchanged and now rests on the right fact — those converted
+  # skills are REGULAR FILES, so `[ -f ]` passes them; the only `.agents/` rows `[ -f ]` drops are the
+  # DIRECTORY symlinks, and the loop that writes those (the skill-root loop) is the one call site that
+  # never consults `is_modified` at all, doing its own `-L` plus `readlink` check instead.
+  #
+  # It is the same shape as the defect this file just fixed, one edit away from mattering, which is
+  # why it is named here rather than left for someone to rediscover — and a safety argument that
+  # describes half its own subject is exactly what this wave keeps finding, so the enumeration above
+  # is the point of the correction rather than the verdict, which did not change.
   #   this file                               — was the one that reached a user with it.
   #
   # The third column stopped being `_mode` in the same change. A symlink to a directory has no

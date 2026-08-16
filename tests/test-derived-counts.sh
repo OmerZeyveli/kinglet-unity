@@ -1329,11 +1329,18 @@ assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
 #   * It does not cover every numeral in the shell files it reads — only the rows named below.
 #
 # The four figures it covers in `docs/ANTI-VACUITY.md` are in that file's `### Shape 1`
-# worked-example bullets, NOT `### Shape 2`. Both this comment and the document's own new paragraph
-# said Shape 2 for one commit; derived, Shape 1 spans lines 111-219 and the figures are at 193-207,
-# while Shape 2 begins at 220. `tests/test-citations-resolve.sh` guards path citations and not
-# section citations, so nothing mechanical catches a wrong section name — which is the reason to
-# derive it once and write it down rather than repeat it from memory a second time.
+# worked-example bullets — the two beginning "`tests/test-no-mobile.sh` — `SCAN_FILES >= 1`" and
+# "`tests/test-bash32-compat.sh` — `SS_ALL_N > 0`" — and NOT in `### Shape 2`. Both this comment and
+# the document's own paragraph said Shape 2 for one commit.
+#
+# CITED BY CONSTRUCT, NOT BY LINE, AND THE FIRST VERSION OF THIS SENTENCE PROVED WHY IN ONE COMMIT.
+# It read "Shape 1 spans lines 111-219 and the figures are at 193-207, while Shape 2 begins at 220".
+# All three were true when written and all three were falsified by the SAME COMMIT, which added seven
+# lines to that document above them — so the sentence immediately before "which is the reason to
+# derive it once and write it down" was itself a transcription that its own change invalidated.
+# `docs/ARCHITECTURE.md` already carries the rule as *"cite by anchor, not by distance"*, and nothing
+# mechanical catches this: `tests/test-citations-resolve.sh` reads `path:line` citations and these
+# carried no path prefix. Anchors do not move when a paragraph above them grows.
 echo "--- derived counts: tree-size figures outside the .md documents ---"
 
 DCT_CLAIM_ROOT=$(git -C "$REPO_DIR" ls-files .claude 2>/dev/null | grep -c . || true)
@@ -1353,14 +1360,46 @@ DCT_CMD_LINES=$(cat "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | wc -l | tr -
 [ -n "$DCT_CMD_LINES" ] || DCT_CMD_LINES=0
 DCT_SKILL_DIRS=$(find "$REPO_DIR/.claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -c . || true)
 DCT_PIPE_SWEEP=$(git -C "$REPO_DIR" ls-files -- .claude/ scripts/ install.sh uninstall.sh 2>/dev/null | grep -c . || true)
-# The pathspec `tests/test-mcp-naming.sh` actually sweeps, character for character, so this guard
-# and that file cannot drift into deriving two different sets. Its `docs/*` element excludes
-# research/ and superpowers/, which is why a bare `git ls-files docs` is the wrong number here.
+# A TRANSCRIBED COPY OF THE PATHSPEC `tests/test-mcp-naming.sh` SWEEPS — and transcribed is the
+# operative word. This comment claimed the two "cannot drift into deriving two different sets"
+# because the pathspec is reproduced character for character; a mutation refuted it in one edit.
+# Deleting `'docs/*'` from that file's real `git ls-files` call leaves BOTH files fully green while
+# it sweeps 79 paths and no `docs/` at all: the guard holds its own copy, so the copies drift
+# independently and the numeral check goes on comparing this copy's answer with the prose beside the
+# other. What is actually guarded is the NUMBER IN THE COMMENT, which is what the class of defects
+# this block exists for is made of; the pathspec's own correctness is guarded by that file's floor
+# and by nothing here. Keeping the copy is still right — deriving it by parsing the other file's
+# source would couple two things that must be able to disagree — but the reason has to be stated at
+# the size it actually has. Its `docs/*` element excludes research/ and superpowers/, which is why a
+# bare `git ls-files docs` is the wrong number here.
 DCT_MCPN_CLAUDE=$(git -C "$REPO_DIR" ls-files '.claude/*' 2>/dev/null | grep -c . || true)
 DCT_MCPN_DOCS=$(git -C "$REPO_DIR" ls-files 'docs/*' ':!docs/research/*' ':!docs/superpowers/*' 2>/dev/null | grep -c . || true)
 DCT_MCPN_TOTAL=$(git -C "$REPO_DIR" ls-files '.claude/*' 'scripts/*' 'docs/*' install.sh uninstall.sh \
                    CLAUDE.md CONTRIBUTING.md README.md MCP-SETUP.md \
                    ':!docs/research/*' ':!docs/superpowers/*' 2>/dev/null | grep -c . || true)
+# `tests/test-shipped-citations.sh`'s payload, by its own `payload_paths()` rule: everything tracked
+# under `.claude/` except `state/`, plus `scripts/*.sh` less the names install.sh skips. The skip
+# list is READ OUT OF install.sh rather than written here, for the same reason the hooks block above
+# reads it — it changed twice on this branch, and a transcribed copy of it is what made the figure
+# this guards go stale in the first place.
+DCT_SKIPPED_NAMES=$(grep -oE '\[ "\$b" = "[^"]+" \] && continue' "$REPO_DIR/install.sh" 2>/dev/null \
+                    | sed 's/.*= "//; s/" \].*//' | sort -u)
+DCT_PAY_CLAUDE=$(git -C "$REPO_DIR" ls-files '.claude/*' 2>/dev/null | grep -cv '^\.claude/state/' || true)
+DCT_PAY_SCRIPTS=0
+for dct_s in "$REPO_DIR"/scripts/*.sh; do
+  [ -f "$dct_s" ] || continue
+  dct_b=$(basename "$dct_s")
+  if grep -qxF -- "$dct_b" <<< "$DCT_SKIPPED_NAMES"; then continue; fi
+  DCT_PAY_SCRIPTS=$((DCT_PAY_SCRIPTS + 1))
+done
+DCT_PAY_TOTAL=$((DCT_PAY_CLAUDE + DCT_PAY_SCRIPTS))
+DCT_PAY_MD=$(git -C "$REPO_DIR" ls-files '.claude/*' 2>/dev/null | grep -v '^\.claude/state/' | grep -c '\.md$' || true)
+DCT_PAY_NONMD=$((DCT_PAY_TOTAL - DCT_PAY_MD))
+# `tests/test-bash32-compat.sh` QUOTES ITS OWN RUNTIME CENSUS in prose, and those two numbers are
+# live. They are the same two `docs/ANTI-VACUITY.md` quotes and the DCV block above guards — but
+# that block's rows are keyed to `docs/ANTI-VACUITY.md`, so the second copy is covered by nothing.
+DCT_HOOKS_SH=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | grep -c . || true)
+DCT_SCRIPTS_SH=$(ls -1 "$REPO_DIR"/scripts/*.sh 2>/dev/null | grep -c . || true)
 
 # THE DERIVATION HAS TO BE ABLE TO FAIL. Run outside a git checkout, every `git ls-files` is empty,
 # five zeros sum to zero, and zero compared with zero is a green suite that inspected nothing —
@@ -1377,6 +1416,15 @@ DCT_DERIVATION="ok"
 [ "$DCT_PIPE_SWEEP" -ge 1 ] || DCT_DERIVATION="the pipeline-detector sweep pathspec matches nothing"
 [ "$DCT_MCPN_TOTAL" -ge 1 ] || DCT_DERIVATION="the mcp-naming pathspec matches nothing"
 [ "$DCT_MCPN_DOCS"  -ge 1 ] || DCT_DERIVATION="the mcp-naming docs/* element (less research and superpowers) matches nothing"
+[ "$DCT_PAY_CLAUDE" -ge 1 ] || DCT_DERIVATION="the payload derivation found nothing under .claude/"
+[ "$DCT_PAY_SCRIPTS" -ge 1 ] || DCT_DERIVATION="the payload derivation ships no scripts/*.sh — the skip list read out of install.sh may match everything"
+[ "$DCT_PAY_MD"     -ge 1 ] || DCT_DERIVATION="the payload derivation found no .md under .claude/"
+[ "$DCT_HOOKS_SH"   -ge 1 ] || DCT_DERIVATION="no .sh files under \$REPO_DIR/.claude/hooks"
+[ "$DCT_SCRIPTS_SH" -ge 1 ] || DCT_DERIVATION="no .sh files under \$REPO_DIR/scripts"
+# The skip list is read, not written, so an install.sh whose spelling moved must fail loudly here
+# rather than silently shipping a payload figure derived from an empty skip list.
+DCT_SKIP_N=$(printf '%s' "$DCT_SKIPPED_NAMES" | grep -c . || true)
+[ "$DCT_SKIP_N"     -ge 1 ] || DCT_DERIVATION="install.sh's script-skip pattern matched nothing, so the payload total is derived from a skip list of zero names"
 assert_eq "ok" "$DCT_DERIVATION" \
   "the tree-size figures are derived from a tree that actually has files in it"
 
@@ -1395,7 +1443,10 @@ tests/test-mcp-doc-instructions.sh	against [0-9]+ tracked paths under .[.]claude
 docs/research/codex-client/findings.md	[(][0-9]+ lines of Unity diagnostics	$DCT_CMD_LINES
 docs/research/codex-client/findings.md	command bodies are [*][*][0-9]+[*][*] lines	$DCT_CMD_LINES
 docs/research/codex-client/findings.md	while .[.]claude/skills/. holds [*][*][0-9]+[*][*]	$DCT_SKILL_DIRS
-docs/research/codex-client/findings.md	where .[.]claude/skills/. holds [0-9]+	$DCT_SKILL_DIRS"
+docs/research/codex-client/findings.md	where .[.]claude/skills/. holds [0-9]+	$DCT_SKILL_DIRS
+tests/test-shipped-citations.sh	The payload has [0-9]+ entries, [0-9]+ Markdown	$DCT_PAY_TOTAL,$DCT_PAY_MD
+tests/test-shipped-citations.sh	and [0-9]+ not; this is one of the [0-9]+[.] Applying the same criterion to the other [0-9]+	$DCT_PAY_NONMD,$DCT_PAY_NONMD,$((DCT_PAY_NONMD - 1))
+tests/test-bash32-compat.sh	SHIPPED:tests=[0-9]+ SHIPPED:scripts=[0-9]+	$DCT_TESTS_SH,$DCT_SCRIPTS_SH"
 
 # THE WIDENING IS ASSERTED AGAINST A DERIVED BOUNDARY, NOT AGAINST A WRITTEN ONE.
 #
@@ -1409,10 +1460,30 @@ docs/research/codex-client/findings.md	where .[.]claude/skills/. holds [0-9]+	$D
 # This replaces a hand-written census that was wrong four ways on the day it shipped. The lesson is
 # in the header; the mechanism is here. `sed` and `sort` both drain their input.
 DCT_SCANNED=$(cut -f1 <<< "$DCT_CLAIMS" | sort -u)
-DCT_BLOCK_LINE=$(grep -n '^# TREE-SIZE FIGURES, AND THE EDGE' "$REPO_DIR/tests/test-derived-counts.sh" | cut -d: -f1)
+# ONE ANCHOR MATCH, TAKEN INSIDE awk, AND NOT WITH `head`. `grep -n … | cut -d: -f1` returns one line
+# per match, and a second line matching this header — a maintainer cross-referencing the block by its
+# name is enough — makes `stop` a multi-line string. `awk -v stop=` then compares `NR` against a
+# non-numeric strnum AS STRINGS, and the region silently extends past the block: measured, the
+# extraction swallows the claims table itself and every scanned path stops looking new. It reddens
+# today by the arithmetic of the line numbers rather than by design, which is not a property to keep.
+# `| head -1` is the obvious repair and it is REFUSED: under `set -euo pipefail` a reader that exits
+# on line 1 SIGPIPEs its writer, `pipefail` turns 141 into a failure, and it hides on small inputs
+# and fires on large ones — this repository has been bitten by that twice, once through `grep -q`.
+# awk takes the first match and keeps reading, so nothing can exit early on anyone.
+DCT_BLOCK_LINE=$(awk '/^# TREE-SIZE FIGURES, AND THE EDGE/ && !seen { print NR; seen = 1 }' \
+                 "$REPO_DIR/tests/test-derived-counts.sh")
+# `^REPO_DIR/`, NOT `^\$REPO_DIR/`, AND THE DIFFERENCE IS THE WHOLE POINT OF THE NORMALISATION.
+# The `grep -oE` above has no `$` in its character class, so nothing it emits can ever begin with
+# one: a source line reading `"$REPO_DIR/install.sh"` is extracted as `REPO_DIR/install.sh`. The
+# previous spelling stripped a prefix that could not occur, so it was DEAD CODE — evidenced, not
+# inferred: `DCT_ABOVE` held `REPO_DIR/uninstall.sh`, `REPO_DIR/provenance.tsv` and seven more with
+# the prefix intact. It was harmless only by luck, because each of those paths also appears in bare
+# form somewhere above; a path mentioned ONLY as `"$REPO_DIR/…"` would fail to match its bare form,
+# be counted NEW, and INFLATE the widening claim — the unsafe direction for an assertion whose only
+# virtue is being conservative.
 DCT_ABOVE=$(awk -v stop="${DCT_BLOCK_LINE:-0}" 'NR < stop' "$REPO_DIR/tests/test-derived-counts.sh" \
             | grep -oE '[A-Za-z0-9_./-]+\.(md|tsv|sh)' \
-            | sed 's|^\$REPO_DIR/||' | sort -u)
+            | sed 's|^REPO_DIR/||' | sort -u)
 DCT_NEW=$(comm -23 <(printf '%s\n' "$DCT_SCANNED") <(printf '%s\n' "$DCT_ABOVE"))
 DCT_NEW_N=$(printf '%s' "$DCT_NEW" | grep -c . || true)
 
@@ -1435,27 +1506,52 @@ fi
 assert_eq "1" "$DCT_WIDE" \
   "…and it reaches $DCT_NEW_N path(s) this file does not mention anywhere above this block, so the widening is real rather than a restatement of what was already covered"
 
-# BY REGION, NOT ONLY BY COUNT — and this is here because a mutation showed the count alone is not
-# enough. Deleting the four `docs/research/codex-client/` rows and the two other new `tests/*.sh`
-# rows in one edit left the assertion above GREEN: `tests/test-no-mobile.sh` is still in the table
-# and still unmentioned above, so the difference stayed non-empty while the coverage this block was
-# built for was gone. A count cannot express "still reaches both places the widening was for". The
-# two regions are named because they are the two the review identified as outside every scanned set,
-# and a region is a stable thing to assert where a number is not.
-DCT_HAS_TESTS="no"; DCT_HAS_RESEARCH="no"
-grep -qE '^tests/' <<< "$DCT_SCANNED" && DCT_HAS_TESTS="yes"
-grep -qE '^docs/research/' <<< "$DCT_SCANNED" && DCT_HAS_RESEARCH="yes"
-assert_eq "yes" "$DCT_HAS_TESTS" \
-  "…and it still reaches tests/ — the comment blocks in this suite's own files, where two figures went stale in a paragraph instructing the reader to derive them"
-assert_eq "yes" "$DCT_HAS_RESEARCH" \
-  "…and docs/research/, where a second unguarded copy of install.sh's own command-body line count was hiding behind the word 'overwhelmingly' in this block's first residual statement"
+# ROW DELETION USED TO BE SILENT. IT IS NOT ANY MORE, AND THAT IS THIS BLOCK'S REAL GUARD.
+#
+# The previous version asserted only that the scanned set still REACHED `tests/` and
+# `docs/research/`. That was already a repair of a plain count — but it was half-hollow, and a
+# mutation found the other half: `DCT_HAS_TESTS` was satisfied by `tests/test-provenance-origins.sh`
+# and `tests/test-no-mobile.sh`, both of which were rows before the widening. So deleting ALL THREE
+# newly added `tests/*.sh` rows — including `tests/test-mcp-doc-instructions.sh`, the row that closes
+# the coverage hole this block was written for — left the file 49/49 GREEN. Exactly the defect fixed
+# for `docs/research/` one round earlier, surviving in the region next to it, because a region test
+# that any one member satisfies cannot see the other members leave.
+#
+# THE SOURCE SET IS DECLARED **AND** DERIVED, which is `tests/test-no-mobile.sh`'s own grammar and is
+# here for the same reason: the declared half is what closes DELETION. `DCT_DECLARED` names every
+# file this block is expected to cover; `DCT_SCANNED` is derived from the claims table. They must
+# match IN BOTH DIRECTIONS. Removing a row now drops its file out of the derived set while the
+# declaration still names it, and reds; adding a row for a new file reds until the declaration grows
+# too, which is the deliberate two-line act it should be.
+#
+# A DECLARED LIST IS A HAND-MAINTAINED LIST, AND THE DISTINCTION FROM THE CENSUS THIS BLOCK'S HEADER
+# THREW OUT IS NOT COSMETIC. That census DESCRIBED something derivable, was never compared against
+# it, and was wrong four ways on the day it shipped. This list is compared, mechanically, every run,
+# in both directions — its only job is to disagree. A hand-written list that is checked is a
+# declaration; one that is not is a rumour.
+DCT_DECLARED="docs/ANTI-VACUITY.md
+docs/research/codex-client/findings.md
+install.sh
+tests/test-bash32-compat.sh
+tests/test-mcp-doc-instructions.sh
+tests/test-mcp-naming.sh
+tests/test-no-mobile.sh
+tests/test-pipeline-detector.sh
+tests/test-provenance-origins.sh
+tests/test-shipped-citations.sh"
 
-# ROW DELETION IS SILENT, AND SAYING SO IS THE HONEST END OF THIS SECTION. Nothing above notices a
-# single claim row being removed: the vacuity check only fires for a row whose FILE still exists and
-# whose phrasing has gone, so deleting the row deletes its own guard with it. That is a property of
-# every claims table in this file, not of this one, and it is why the region assertions above are
-# worth more than the count — they are the part that survives an edit made in good faith by someone
-# tidying a table they do not know the history of.
+DCT_UNDECLARED=$(comm -23 <(printf '%s\n' "$DCT_SCANNED") <(printf '%s\n' "$DCT_DECLARED" | sort -u))
+DCT_UNSCANNED=$(comm -13 <(printf '%s\n' "$DCT_SCANNED") <(printf '%s\n' "$DCT_DECLARED" | sort -u))
+if [ -n "$DCT_UNDECLARED" ]; then
+  printf '%s\n' "$DCT_UNDECLARED" | sed 's|^|     scanned but not declared (add it to DCT_DECLARED in this commit): |'
+fi
+if [ -n "$DCT_UNSCANNED" ]; then
+  printf '%s\n' "$DCT_UNSCANNED" | sed 's|^|     declared but NO LONGER SCANNED — a claim row was deleted and took its own guard with it: |'
+fi
+assert_eq "" "$DCT_UNDECLARED" \
+  "every file this block scans is declared — a row added without declaring it is a guard nobody agreed to maintain"
+assert_eq "" "$DCT_UNSCANNED" \
+  "every declared file is still scanned — this is the assertion that makes DELETING a claim row loud, which it was not until a mutation removed the three rows that close this block's own headline finding and left the file green"
 
 DCT_BAD=""
 DCT_VACUOUS=""
