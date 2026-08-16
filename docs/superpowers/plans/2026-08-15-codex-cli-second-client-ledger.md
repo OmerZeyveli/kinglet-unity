@@ -354,7 +354,7 @@ The event stream shape, measured against the real binary:
 | 1 | The probe harness | **DONE** | `a5ec1bd..0b58d05` | general-purpose implementer; 1 fix round; all 8 findings ADDRESSED |
 | 2 | Does Codex import a `.claude/` configuration? | **DONE** | `1d8e941..89e7552` | general-purpose implementer; 2 fix rounds; F1 = **confirmed, lossy in silence** |
 | 3 | Codex's hook mechanism, measured | **DONE** | `1993b1b..952cd7a` | general-purpose implementer; 1 fix round; F4 **and** F5 delivered — my RE-PLANNED header had wrongly dropped F5 |
-| 4 | Kinglet's 12 hooks under Codex | open | — | **RE-PLANNED: did not shrink; now the wave's centre of gravity.** Two risks — rewriting hook bodies against the `apply_patch` envelope, and the block protocol |
+| 4 | Kinglet's 12 hooks under Codex | **DONE** | `23e2444..53daafb` | general-purpose implementer; **3 fix rounds**, one Critical; the shim ships and all 9 tool-event hooks enforce |
 | 5 | Kinglet's 16 skills under Codex | open | — | **RE-PLANNED: shrank most** — discovery settled, only invocation left; plus an unreconciled 18-vs-16 to resolve |
 | 6 | Rules, `AGENTS.md`, commands and agents | open | — | **RE-PLANNED: split.** `AGENTS.md` and agent conversion settled; rules and commands became design work |
 | 7 | Layer B — MCP routes against the live bridge | open | — | *(brief pending)* — needs a free Editor |
@@ -522,6 +522,75 @@ what it actually did, not what it was asked to do.
 |---|---|---|
 | `codex-facts.md` records `stop` as not measured. It **fires** — the re-review observed `Stop fires=1` with a distinct payload (`last_assistant_message`, `stop_hook_active`, no tool fields) | Safe: the document understates rather than overstates, which is the harmless direction. Folding it in completes F3 — all four Kinglet hook events now observed firing | **Task 10 Step 5**, which already re-derives both research documents |
 | The enterprise switch `allowManagedHooksOnly` is missing from `codex-facts.md`'s "three properties Task 8/9 must design around" — and it is the one condition that makes the whole hook feature inert regardless of trust. Its "what it would take" also names two managed routes where the enum carries five | **Not safe to leave only in a document Task 8 might not re-read.** Carried into this ledger's Standing facts as property 4, which every Task 8/9 dispatch copies verbatim | **Task 8 and Task 9** via Standing facts, plus **Task 10 Step 5** for the document |
+
+---
+
+## Task 4 — close, and the five silent-failure layers
+
+Implementer: **general-purpose**. `DONE`, then **three fix rounds** — the longest loop of the wave and
+the only one that opened with a **Critical**. Range **`23e2444..53daafb`**. Suite 3578 → **3727**;
+`tests/test-codex-shim.sh` 100 → **149** assertions.
+
+**What shipped:** `scripts/codex-hook-shim.sh`, a payload shim that normalises Codex's `apply_patch`
+envelope into the shape Kinglet's hooks already read. **`.claude/hooks/` and `.claude/settings.json`
+are byte-unchanged since the base commit `9a2ebec`** — verified independently by the controller, not
+taken from the report. All nine tool-event hooks now enforce under Codex.
+
+### The fifth layer, and the one-second margin that is the whole design
+
+| Ceiling that fires | `file_change` | file | Codex's stderr |
+|---|---|---|---|
+| the shim's watchdog | **0** | **ABSENT** | 1 `hook:` line — verbatim refusal |
+| Codex's `timeoutSec` | **1** | **PRESENT** | **0 mentions of `hook`, `block` or `timeout`** |
+
+**A `PreToolUse` hook that Codex times out is a silent allow.** Measured twice — the first table was
+confounded (disabling the watchdog also changed how the shim blocks), and the re-run keeps the
+watchdog armed in both arms so only the firing ceiling differs. That is why `--emit-config` emits the
+shim's budget one second **under** Codex's ceiling: it is the difference between a hung hook refusing
+and one waving an unchecked edit through.
+
+### Three lessons this loop paid for
+
+**A trap that runs is not a trap that speaks.** Bash *does* run an EXIT trap on a fatal signal, then
+re-raises and discards `exit 2`. What is lost is the **message**: the trap executes with the
+descriptors of the command it interrupted, and the discriminator is **builtin versus external** —
+only a builtin's redirection rewires the shell's own descriptors, so `wait >/dev/null 2>&1` loses the
+refusal while `sleep 30 >/dev/null 2>&1` keeps it. `scripts/codex-probe.sh` never lost anything
+because its handler only does `rm -rf`: it has nothing to say. Two defences, and the 2×2 separates
+them — `exec 9>&2` recovers the **message**, the signal arm recovers the **status**.
+
+**Bash defers a trapped signal until the current foreground command finishes.** 1.0 s inside an async
+`wait`, **20.0 s** inside a foreground external. Which is why the fix is one **invocation deadline**
+checked before every step, with every child backgrounded even when unbounded — a foreground child
+cannot be interrupted.
+
+**An overloaded sentinel needs two mutations to expose.** `0` meant *expired* to one function and
+*unbounded* to another. Neither `S2` (delete the check) nor `T1` (initialise to `-1`) is observable
+alone — both give 4.08 s, identical to baseline. **Together they give 12.1 s**, which is the defect.
+The one-line fix both the controller and the reviewer proposed was half a fix, and only the
+combination showed it.
+
+### Three parties were wrong once each, and each was corrected by measurement
+
+- **The controller and the reviewer** both proposed the same one-line sentinel fix. It was insufficient.
+- **The implementer** wrote a guard that sampled the verdict; the whole-second mutation survived it.
+  It found this itself, and its diagnosis corrected its own assumption — the truncation bites in a few
+  percent of runs, not the ~50 % it expected. The reviewer's independent figure (39/40 surviving)
+  agrees. **It would otherwise have shipped exactly the intermittent assertion `CLAUDE.md` warns about.**
+- **The controller relayed a wrong correction.** I passed on the reviewer's claim that a "6 s" figure
+  transcribed the `postToolUse` ceiling. The implementer refuted it: no surviving capture is
+  identifiable as that arm's, the file having been overwritten. The reviewer then withdrew its own
+  finding and named the flaw precisely — its inference rested on an unstated assumption, and the error
+  was **stating it as a defect in a specification document**. The implementer adopted the underlying
+  point anyway and re-ran with the confound removed.
+
+### Deferred, with owners
+
+| Finding | Ruling | Owner |
+|---|---|---|
+| `shim_ms_to_sleep` emits `3.000` rather than `3`. On a `%N`-less BSD host **every** value takes that form, so if any BSD `sleep` rejects a fractional argument the killer never fires | Safe on this host — GNU `sleep` accepts it and the suite is green. Unverifiable without a macOS box, and the mitigation is one character | **The planned macOS host pass.** Named here because it is the first Codex-side item that pass inherits |
+| `T5` is classified as a floor, but the reviewer judges the label **generous**: it is unobservable alone *and* combined, 0/60 in a race probe. The sentinel split converted its defect into a no-op | Safe: it is "equivalent given the fix", not an independent layer, and saying so is more honest than leaving it counted as a guard | **Task 11**, which is already the harness-and-guard-gaps task |
+| A reviewer cleaned up with `rm -rf /tmp/kinglet-codex-shim.*` — a glob delete in shared `/tmp`. Nothing was damaged; the controller verified the repository, the scratchpad and other agents' directories | Dropped as an incident, kept as a rule: **remove named directories you created, or work under one `mktemp -d` root and remove that single path.** Both agents adopted it for the remaining rounds | — |
 
 ---
 
