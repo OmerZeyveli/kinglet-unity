@@ -160,6 +160,17 @@ checking by hand because it is **silent**: hooks that are registered, listed, an
 
    Report it as **ERROR** rather than **WARNING** even though nothing is broken today, because the
    symptom only appears when a hook hangs — which is exactly when the timeout mattered.
+
+   **Say this whenever you tell the user to regenerate.** The trust hash covers a hook's
+   *declaration* — its command string, timeout, matcher and event — not its script, so regenerating
+   `.codex/hooks.json` changes every entry's hash and drops each one to *"modified since last
+   trusted"*, which Codex treats as untrusted and does not run. Measured. Regenerating by hand
+   therefore fixes the timeout and silently removes the enforcement. The command that does both is
+   the installer, run from the kinglet-unity checkout:
+
+   ```bash
+   ./install.sh --project-dir <this project> --client codex --codex-trust
+   ```
 4. **The skill root resolves.** `.agents/skills/` should hold one entry per directory in
    `.claude/skills/`, and each entry should resolve to a file. A dangling entry → **WARNING**: Codex
    lists what it can resolve and says nothing about the rest. If commands were converted, each also

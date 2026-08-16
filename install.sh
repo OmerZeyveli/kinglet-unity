@@ -6,11 +6,20 @@
 # settings, and a generated CLAUDE.md. One repo, one script, no prerequisites beyond Unity itself.
 #
 # Usage:
-#   ./install.sh [--project-dir <path>] [--with-mcp] [--with-input-system] [--yes] [--dry-run]
+#   ./install.sh [--project-dir <path>] [--client claude|codex] [--with-mcp]
+#                [--with-input-system] [--codex-trust] [--yes] [--dry-run]
 #
 #   --project-dir <path>  Target Unity project root (default: current directory)
+#   --client <name>       claude (default) or codex. `codex` ALSO writes the Codex CLI layer:
+#                         AGENTS.md, the .agents/skills root, .codex/hooks.json and the
+#                         .codex/config.toml MCP row. It never removes anything Claude Code reads.
 #   --with-mcp            Also add the CoplayDev Unity MCP package to Packages/manifest.json
 #   --with-input-system   Also add Unity's New Input System package to Packages/manifest.json
+#   --codex-trust         With --client codex, also grant Codex hook trust by writing one
+#                         [hooks.state."<key>"] table per hook into $CODEX_HOME/config.toml
+#                         (default ~/.codex). This writes your HOME, not the project, so it is
+#                         opt-in: without it the hooks are registered and will not run.
+#   --no-codex-trust      Never ask, never write the home. The default under --yes.
 #   --yes                 Non-interactive; take the safe default at every prompt
 #   --dry-run             Report what would happen; write nothing
 #   -h, --help            Show this help
@@ -33,7 +42,7 @@ warn() { printf '%s\n' "${YELLOW}warn${NC} $*"; }
 err()  { printf '%s\n' "${RED}err ${NC} $*" >&2; }
 die()  { err "$*"; exit 1; }
 
-usage() { sed -n '3,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '3,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 # ── Work this run was asked for and did not do ───────────────────────────────
 # ONE ACCUMULATOR, ONE EMITTER, AND THE REASON IS THAT MANY BRANCHES CAN ABANDON WORK AND EXACTLY
@@ -125,6 +134,20 @@ RECEIPT_REL=".claude/state/install-receipt.tsv"
 PROJECT_DIR="$(pwd)"
 WITH_MCP=0; WITH_INPUT_SYSTEM=0; ASSUME_YES=0; DRY_RUN=0
 PROVIDER_CHOICE=""
+# THE DEFAULT IS `claude`, AND THAT IS THE WHOLE COMPATIBILITY CONTRACT. Every invocation that
+# worked before this flag existed must still write byte-identical bytes, so the Codex layer is
+# reached only by naming it. tests/test-codex-surface.sh proves the equivalence rather than
+# asserting it: the default arm and the explicit `--client claude` arm are diffed tree against tree,
+# and both are checked to carry no Codex artifact at all.
+CLIENT="claude"
+# Tri-state on purpose: `''` means nobody has decided, which is the only state in which the run is
+# allowed to ASK. Writing the user's home is the first thing this toolkit has ever done outside a
+# project, so a silent default in either direction would be wrong — `--yes` takes "no", an
+# interactive run is asked, and both flags below are an answer given in advance.
+CODEX_TRUST=""
+# Codex's own variable, honoured because Codex honours it. This is not a test hook: a user who runs
+# Codex with a non-default home must have trust written to THAT home or it is written nowhere useful.
+CODEX_HOME_DIR="${CODEX_HOME:-$HOME/.codex}"
 # Overridable so the test suite can point at a fixture instead of the real home
 # directory. install.sh reads nothing else from $HOME; this read is the first,
 # it is read-only, and its absence is benign.
@@ -134,14 +157,31 @@ while [ $# -gt 0 ]; do
     # Validate before shift 2: under `set -u`, `shift 2` on a trailing flag kills the script
     # before any error message can print.
     --project-dir)      [ $# -ge 2 ] || die "--project-dir requires a path"; PROJECT_DIR="$2"; shift 2 ;;
+    # The VALUE is validated here too, not only its presence. `--client codxe` reaching the payload
+    # section as an unrecognised string would install the Claude Code arm and say nothing about the
+    # typo, which is the silent-half-install shape this whole wave exists to stop.
+    --client)           [ $# -ge 2 ] || die "--client requires a value (claude or codex)"
+                        case "$2" in
+                          claude|codex) CLIENT="$2" ;;
+                          *) die "--client must be claude or codex, not: $2" ;;
+                        esac
+                        shift 2 ;;
     --with-mcp)          WITH_MCP=1; shift ;;
     --with-input-system) WITH_INPUT_SYSTEM=1; shift ;;
+    --codex-trust)       CODEX_TRUST=yes; shift ;;
+    --no-codex-trust)    CODEX_TRUST=no; shift ;;
     --yes|-y)            ASSUME_YES=1; shift ;;
     --dry-run)           DRY_RUN=1; shift ;;
     -h|--help)           usage ;;
     *)                   die "Unknown argument: $1 (use --help)" ;;
   esac
 done
+
+# A flag that cannot do anything is a flag whose user believes it did. `--codex-trust` without
+# `--client codex` has no hook config to vouch for, so it is an error rather than a no-op.
+if [ "$CODEX_TRUST" = yes ] && [ "$CLIENT" != codex ]; then
+  die "--codex-trust needs --client codex: trust is granted for the hook config that arm writes, and there is none without it."
+fi
 
 PROJECT_DIR="$(cd "$PROJECT_DIR" 2>/dev/null && pwd)" || die "Project directory not found"
 CLAUDE_DIR="$PROJECT_DIR/.claude"
@@ -1138,6 +1178,40 @@ if [ "$DRY_RUN" -eq 1 ]; then
       printf '  MCP-SETUP.md already exists — its contents are NOT touched\n'
     fi
   fi
+  # ── The Codex CLI layer ────────────────────────────────────────────────────
+  # ANNOUNCED, BECAUSE THIS ARM IS THE ONE THAT WRITES OUTSIDE .claude/ THE MOST. Three of its five
+  # project paths are at the root or in directories no Claude Code install creates, and one optional
+  # step leaves the project entirely. A dry run silent about those is worse than no dry run — that
+  # is this block's own ruling, already paid for twice above, applied to the newest writes.
+  #
+  # The counts are DERIVED from the same trees the real run walks, so the announcement cannot promise
+  # a number the write does not produce.
+  if [ "$CLIENT" = codex ]; then
+    printf '  AGENTS.md — the Codex entry document (generated; Codex injects it whole)\n'
+    DRY_SKILL_N=$(ls -d "$SCRIPT_DIR/.claude/skills"/*/ 2>/dev/null | grep -c . || true)
+    DRY_CMD_N=$(ls -1 "$SCRIPT_DIR/.claude/commands"/*.md 2>/dev/null | grep -c . || true)
+    printf '  .agents/skills/ — %s symlink(s) into .claude/skills/ and %s converted command skill(s)\n' \
+      "$DRY_SKILL_N" "$DRY_CMD_N"
+    printf '  .codex/hooks.json — generated from .claude/settings.json AFTER scripts/ is in place\n'
+    if [ ! -f "$PROJECT_DIR/.codex/config.toml" ]; then
+      printf '  .codex/config.toml (new — mcp_servers.UnityMCP -> http://localhost:8080/mcp)\n'
+    elif grep -qF -- 'mcp_servers.UnityMCP' "$PROJECT_DIR/.codex/config.toml" 2>/dev/null; then
+      printf '  .codex/config.toml already has a UnityMCP server — would leave alone\n'
+    else
+      printf '  .codex/config.toml exists without UnityMCP — would print the block, not rewrite\n'
+    fi
+    # THE HOME IS NAMED WHETHER OR NOT IT WILL BE WRITTEN, and the two states are different
+    # sentences. A user reading a dry run before letting an installer near their home directory is
+    # owed the answer to "does this touch anything outside my project", and "no" is an answer.
+    if [ "$CODEX_TRUST" = yes ]; then
+      printf '  %s/config.toml — OUTSIDE THIS PROJECT: would back it up and append one hook-trust table per hook\n' \
+        "$CODEX_HOME_DIR"
+    else
+      printf '  %s/config.toml — not touched: hook trust is opt-in (--codex-trust), so the hooks would register and not run\n' \
+        "$CODEX_HOME_DIR"
+    fi
+  fi
+
   printf '\nDry run complete — nothing written.\n'
   exit 0
 fi
@@ -1155,6 +1229,11 @@ RECEIPT_TMP=$(mktemp)
 # compare — is a second definition that drifts, which is the failure this whole change is about.
 # Created here, beside RECEIPT_TMP, so both are set before the trap that removes them.
 MCP_JSON_REF=$(mktemp)
+# The same device for the Codex arm's .codex/config.toml: one canonical copy, written once and read
+# twice — by the create branch and by owned_by_installer. Created here, unconditionally and beside
+# the other two, so it is set before the trap that removes it: a `mktemp` inside the `if [ "$CLIENT"
+# = codex ]` block below would be an unbound variable in the trap on every Claude Code run.
+CODEX_CFG_REF=$(mktemp)
 
 # ── The receipt, and why it is committed by a trap and not only at the end ────
 #
@@ -1232,7 +1311,7 @@ receipt_rescue() {
       err "Remove .claude/ by hand if you want the project back as it was."
     fi
   fi
-  rm -f "$RECEIPT_TMP" "$MCP_JSON_REF"
+  rm -f "$RECEIPT_TMP" "$MCP_JSON_REF" "$CODEX_CFG_REF"
 }
 trap receipt_rescue EXIT
 
@@ -2111,6 +2190,522 @@ fi
 # end of the run, not what this run happened to write.
 if owned_by_installer 'MCP-SETUP.md' "$SCRIPT_DIR/MCP-SETUP.md"; then
   printf 'MCP-SETUP.md\t%s\t644\ttoolkit\n' "$(sha_of "$MCP_SETUP_MD")" >> "$RECEIPT_TMP"
+fi
+
+# ── Step 8d: the Codex CLI layer ─────────────────────────────────────────────
+#
+# WHY IT IS HERE AND NOT ANYWHERE EARLIER, AND THIS IS A CONTRACT RATHER THAN A PREFERENCE.
+#
+# `--emit-config` writes the shim's ABSOLUTE path into all twelve command strings, choosing it by
+# preferring `<project>/.claude/scripts/codex-hook-shim.sh` and falling back to the toolkit clone it
+# was invoked from. The scripts loop that puts the shim in the project is Step 5. Emit before it and
+# every entry points into this checkout — a directory the user is under no obligation to keep — and
+# per findings.md `## Hooks` a hook command Codex cannot run is a silent ALLOW, not an error. The
+# result is nine registered hooks enforcing nothing: the exact defect the shim exists to close,
+# reintroduced by sequence alone.
+#
+# NOTHING IN THE SUITE COULD CATCH THAT FROM THE OUTSIDE. tests/test-codex-surface.sh's section 4
+# installs and THEN emits, so it exercises the generator's preference logic, not an installer's
+# order. Section 9 of that file now makes the assertion that can only be made from here — on a FRESH
+# install, the one shape where the ordering is observable, because on a re-install the project's own
+# copy is already there from run 1 and the wrong order picks it up anyway. Two defences, because one
+# of them is a test that can be deleted: the block below REFUSES TO EMIT unless the shim is already
+# in the project, and refuses to INSTALL a config any of whose paths cannot run.
+#
+# THE CLAUDE CODE ARM DOES NOT ENTER THIS BLOCK AT ALL. Everything below is inside one `if`, so a
+# default invocation executes not one line of it.
+CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
+
+# Every path a Codex hook command names, checked for the two ways it can be unrunnable. Printed one
+# defect per line; empty output means the config is safe to install.
+#
+# `grep -o` over the file rather than jq: the paths are single-quoted inside the command strings —
+# that quoting is the generator's own, and it is what Codex's shell sees — so the quotes are the
+# delimiter to read. It also keeps the Claude Code arm free of a jq dependency it never had.
+codex_config_defects() {   # $1 = config file
+  local f="$1" p seen=0
+  [ -f "$f" ] || { printf 'not a file: %s\n' "$f"; return 0; }
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    seen=$((seen + 1))
+    if [ ! -f "$p" ]; then printf 'names a file that does not exist: %s\n' "$p"; continue; fi
+    case "$p" in
+      "$PROJECT_DIR"/*) ;;
+      *) printf 'names a path outside the project: %s\n' "$p" ;;
+    esac
+  done <<< "$(grep -o "'[^']*'" "$f" 2>/dev/null | tr -d "'" | sort -u || true)"
+  # A config with no command path at all registers nothing and reads as healthy. Named rather than
+  # passed: the whole failure class here is "looks installed, enforces nothing".
+  [ "$seen" -gt 0 ] || printf 'carries no command path at all\n'
+}
+
+if [ "$CLIENT" = codex ]; then
+  info "Codex CLI layer (second client)"
+  CODEX_DIR="$PROJECT_DIR/.codex"
+  CODEX_SKILL_ROOT="$PROJECT_DIR/.agents/skills"
+  CODEX_HOOKS_JSON="$CODEX_DIR/hooks.json"
+  CODEX_CFG="$CODEX_DIR/config.toml"
+
+  # ── 8d.1 AGENTS.md, the entry document ──────────────────────────────────
+  # Codex INJECTS this file whole, before the turn — measured, sentinel returned with 0 shell
+  # commands — where CLAUDE.md is merely findable. That is what makes overwriting a user's own
+  # AGENTS.md the most expensive mistake available on this arm, and why the decline comes first.
+  #
+  # No marker-pair merge, unlike CLAUDE.md. The generated Codex document has no `separate` sibling
+  # and no in-place refresh arm, because there is no established convention of hand-written prose in
+  # an AGENTS.md this installer wrote. Ownership decides instead: ours is replaced, yours is kept.
+  AGENTS_MD="$PROJECT_DIR/AGENTS.md"
+  AGENTS_BRANCH=skipped
+  if [ ! -f "$GEN" ]; then
+    warn "$GEN not found — AGENTS.md was not generated."
+    note_not_done "AGENTS.md — the generator is missing, so this project has no Codex entry document. Codex injects that file whole, so without it none of the toolkit's conventions reach a Codex session."
+  elif [ -e "$AGENTS_MD" ] && ! owned_by_installer 'AGENTS.md' ''; then
+    warn "AGENTS.md exists and is not ours — keeping yours, untouched."
+    warn "No Codex entry document was generated this run. Rename or delete AGENTS.md and re-run"
+    warn "to get one."
+    AGENTS_BRANCH=kept-yours
+    note_not_done "AGENTS.md — yours was kept, so this run generated no Codex entry document. Rename or delete it and re-run with --client codex to get one."
+  else
+    TMP_AG=$(mktemp)
+    if bash "$GEN" --client codex ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_AG" 2>/dev/null; then
+      mv "$TMP_AG" "$AGENTS_MD"
+      # `mv` from mktemp carries 0600 across; the receipt row reads the mode off the file, so this
+      # keeps the file readable AND keeps the row honest rather than hardcoding a mode.
+      chmod 644 "$AGENTS_MD"
+      ok "Generated AGENTS.md (the Codex entry document)"
+      AGENTS_BRANCH=written
+    else
+      rm -f "$TMP_AG"
+      warn "AGENTS.md generation failed — skipped."
+      note_not_done "AGENTS.md — generation failed, so this project has no Codex entry document and none of the toolkit's conventions reach a Codex session."
+    fi
+  fi
+  # Outside the branch, for the reason every root-file row in this installer is: on a re-install
+  # where the file is ours and unchanged the writing branch still runs, but on a run where it was
+  # kept the row must not appear, and `owned_by_installer` is the only thing that can tell them
+  # apart. There is no reference copy — the document is generated per project — so the ref is ''.
+  if [ "$AGENTS_BRANCH" = written ] || owned_by_installer 'AGENTS.md' ''; then
+    printf 'AGENTS.md\t%s\t%s\ttoolkit\n' \
+      "$(sha_of "$AGENTS_MD")" \
+      "$(stat -c '%a' "$AGENTS_MD" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+  fi
+
+  # ── 8d.2 the skill root ─────────────────────────────────────────────────
+  # Measured: `.claude/skills/` unaided gives Codex ZERO skills, and so does the `skills` config key
+  # under both spellings. A root at `.agents/skills/` holding one symlink per skill gives all of
+  # them, enabled, with invocation observed — and every symlinked entry reports the REAL
+  # `.claude/skills/<name>/SKILL.md` as its path, so the link is a discovery device and not a second
+  # copy. That is why this is `ln -s` and not `cp`: a copy discovers the same set and then goes
+  # stale the moment a skill is edited.
+  #
+  # PER-ENTRY, NOT ONE DIRECTORY SYMLINK, because row 3 below writes generated command skills into
+  # this same root and a directory symlink has nowhere to put them. The mixed root was measured
+  # rather than assumed: 17 repo-scope skills, all enabled, errors [].
+  SKILLS_LINKED=0; SKILLS_KEPT=0
+  mkdir -p "$CODEX_SKILL_ROOT"
+  for sd in "$CLAUDE_DIR"/skills/*/; do
+    [ -d "$sd" ] || continue
+    sname=$(basename "$sd")
+    slink="$CODEX_SKILL_ROOT/$sname"
+    # RELATIVE, so the root survives the project being moved or renamed. The hook config cannot be
+    # relative — Codex runs those commands from elsewhere — but a skill root is read in place.
+    swant="../../.claude/skills/$sname"
+    if [ -L "$slink" ]; then
+      if [ "$(readlink "$slink")" != "$swant" ]; then
+        # Someone else's link at our path. Same rule as every other file: not ours, not touched,
+        # and no row, so uninstall.sh will never take it either.
+        SKILLS_KEPT=$((SKILLS_KEPT + 1))
+        continue
+      fi
+    elif [ -e "$slink" ]; then
+      SKILLS_KEPT=$((SKILLS_KEPT + 1))
+      continue
+    else
+      ln -s "$swant" "$slink"
+    fi
+    SKILLS_LINKED=$((SKILLS_LINKED + 1))
+    # MODE `symlink`, AND THE CHECKSUM COLUMN CARRIES THE TARGET. A symlink to a directory has no
+    # sha256 — `sha_of` returns the empty string for it, and an empty checksum is a row uninstall.sh
+    # silently declines to act on, which reads as coverage and is not. The target is what the row
+    # actually has to vouch for: uninstall removes the link only while it still points where we
+    # pointed it.
+    printf '.agents/skills/%s\t%s\tsymlink\ttoolkit\n' "$sname" "$swant" >> "$RECEIPT_TMP"
+  done
+  # A skill this payload no longer ships leaves a dangling entry behind, and Codex lists what it can
+  # resolve and says nothing about the rest — so a dangling entry is invisible rather than noisy.
+  # Only OUR links are pruned, identified by the target prefix we write, and only when the target is
+  # gone: anything else in this directory belongs to someone else.
+  SKILLS_PRUNED=0
+  for slink in "$CODEX_SKILL_ROOT"/*; do
+    [ -L "$slink" ] || continue
+    starget="$(readlink "$slink")"
+    case "$starget" in
+      ../../.claude/skills/*)
+        if [ ! -d "$CLAUDE_DIR/skills/${starget#../../.claude/skills/}" ]; then
+          rm -f "$slink"; SKILLS_PRUNED=$((SKILLS_PRUNED + 1))
+        fi ;;
+    esac
+  done
+  ok "Skill root: $SKILLS_LINKED link(s) in .agents/skills/$([ "$SKILLS_PRUNED" -gt 0 ] && printf ', %s pruned' "$SKILLS_PRUNED")"
+  if [ "$SKILLS_KEPT" -gt 0 ]; then
+    warn "$SKILLS_KEPT entr(ies) in .agents/skills/ are not ours — left alone, so those skills may not reach Codex."
+    note_not_done "$SKILLS_KEPT entr(ies) in .agents/skills/ were already there and are not ours, so this run did not link those skills. Remove them and re-run if you want Kinglet's copies."
+  fi
+
+  # ── 8d.3 the commands, converted ────────────────────────────────────────
+  # Codex has no command surface at all — 24 subcommands, none a prompt registry — so Kinglet's nine
+  # commands reach a Codex reader only as skills. Its own importer converts two of the nine and
+  # drops the other seven silently on an `$ARGUMENTS` token, reporting zero failures; with no
+  # converter, nine of nine are lost.
+  #
+  # WRITTEN THROUGH A TEMP DIRECTORY AND THEN THE PAYLOAD LOOP'S OWN GUARD, rather than letting the
+  # converter write into the project directly. The converter overwrites; `is_modified` is what makes
+  # "the user edited this" survive an upgrade, and it is the same test, spelled the same way, that
+  # both write loops in Step 5 use. Skipping it here would make these the only files in the tree an
+  # upgrade destroys.
+  CMDSKILL_W=0; CMDSKILL_K=0
+  CONV="$CLAUDE_DIR/scripts/codex-command-to-skill.sh"
+  if [ -f "$CONV" ]; then
+    CONV_TMP=$(mktemp -d)
+    if bash "$CONV" --project-dir "$PROJECT_DIR" --out "$CONV_TMP" >/dev/null 2>&1; then
+      while IFS= read -r cf; do
+        [ -n "$cf" ] || continue
+        crel=".agents/skills/${cf#"$CONV_TMP"/}"
+        cdest="$PROJECT_DIR/$crel"
+        if is_modified "$crel"; then
+          CMDSKILL_K=$((CMDSKILL_K + 1))
+          printf '%s\t%s\t%s\tuser-modified\n' "$crel" "$(sha_of "$cdest")" \
+            "$(stat -c '%a' "$cdest" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+          continue
+        fi
+        mkdir -p "$(dirname "$cdest")"
+        cp "$cf" "$cdest"
+        CMDSKILL_W=$((CMDSKILL_W + 1))
+        printf '%s\t%s\t%s\ttoolkit\n' "$crel" "$(sha_of "$cdest")" \
+          "$(stat -c '%a' "$cdest" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+      done <<< "$(find "$CONV_TMP" -type f 2>/dev/null | sort)"
+      ok "Converted $CMDSKILL_W command(s) into .agents/skills/$([ "$CMDSKILL_K" -gt 0 ] && printf ', kept %s of yours' "$CMDSKILL_K")"
+    else
+      warn "codex-command-to-skill.sh failed — the commands did not cross to Codex."
+      note_not_done "The nine commands were NOT converted into .agents/skills/, so 919 lines of Unity diagnostics that exist nowhere else in the toolkit are unreachable under Codex. Run .claude/scripts/codex-command-to-skill.sh by hand to see why it failed."
+    fi
+    rm -rf "$CONV_TMP"
+  fi
+
+  # ── 8d.4 .codex/hooks.json ──────────────────────────────────────────────
+  # THREE REFUSALS BEFORE A BYTE IS WRITTEN, and each closes a measured way to end up with a config
+  # that registers and enforces nothing.
+  mkdir -p "$CODEX_DIR"
+  CODEX_SHIM="$CLAUDE_DIR/scripts/codex-hook-shim.sh"
+  HOOKS_JSON_OK=0
+  HOOKS_SKIP_WHY=""
+  case "$PROJECT_DIR" in
+    # `--emit-config` single-quotes paths without escaping, so one apostrophe in the project path
+    # produces a config Codex parses wrongly. Codex's own importer has the same shape, so this is
+    # parity rather than regression — and a broken config is still a silent allow, so it is refused
+    # rather than emitted.
+    *\'*) HOOKS_SKIP_WHY="the project path contains a single quote, which --emit-config cannot escape" ;;
+  esac
+  if [ -z "$HOOKS_SKIP_WHY" ] && [ ! -f "$CODEX_SHIM" ]; then
+    # THE ORDERING SELF-CHECK. Unreachable while Step 5 runs first, which is the point: it makes the
+    # ordering an invariant this file enforces rather than one a reviewer has to notice.
+    HOOKS_SKIP_WHY="the shim is not in the project at $CODEX_SHIM — the hook config's command strings are absolute, so emitting one now would point every hook at this toolkit checkout"
+  fi
+  if [ -z "$HOOKS_SKIP_WHY" ] && ! command -v jq >/dev/null 2>&1; then
+    HOOKS_SKIP_WHY="jq is not on PATH, and every Kinglet hook needs it"
+  fi
+  if [ -n "$HOOKS_SKIP_WHY" ]; then
+    warn "Codex hook config not written: $HOOKS_SKIP_WHY."
+    note_not_done "The Codex hook config was NOT written — $HOOKS_SKIP_WHY. Under Codex a project with the skills bridge and no .codex/hooks.json is advisory rather than enforcing, and nothing inside the session says so."
+  elif [ -e "$CODEX_HOOKS_JSON" ] && ! owned_by_installer '.codex/hooks.json' ''; then
+    warn ".codex/hooks.json exists and is not ours — keeping yours, untouched."
+    warn "It was not regenerated, so it may not match .claude/settings.json."
+    note_not_done ".codex/hooks.json — yours was kept, so the hook config was not regenerated from this version's .claude/settings.json. Delete it and re-run to get a generated one."
+  else
+    HCFG_TMP=$(mktemp)
+    if bash "$CODEX_SHIM" --emit-config --project-dir "$PROJECT_DIR" > "$HCFG_TMP" 2>/dev/null; then
+      HCFG_DEFECTS="$(codex_config_defects "$HCFG_TMP")"
+      if [ -z "$HCFG_DEFECTS" ]; then
+        cat "$HCFG_TMP" > "$CODEX_HOOKS_JSON"
+        HOOKS_JSON_OK=1
+        ok "Wrote .codex/hooks.json (every command routed through the project's own shim)"
+        printf '.codex/hooks.json\t%s\t%s\ttoolkit\n' "$(sha_of "$CODEX_HOOKS_JSON")" \
+          "$(stat -c '%a' "$CODEX_HOOKS_JSON" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+      else
+        # NOT INSTALLED, AND SAID ALOUD WITH THE OFFENDING PATHS IN IT. The usual cause is a kept
+        # .claude/settings.json registering a hook this version no longer ships: under Claude Code
+        # that is a dead registration the block above already reports, and under Codex the same row
+        # becomes a command that cannot run, which is an ALLOW. A config nobody can read as broken
+        # is worse than no config, because /unity-doctor Check 3b can see a missing file.
+        warn "Codex hook config NOT written — it would register command(s) that cannot run:"
+        while IFS= read -r hd; do
+          if [ -n "$hd" ]; then printf '       %s\n' "$hd"; fi
+        done <<< "$HCFG_DEFECTS"
+        warn "Under Codex a hook command that cannot run is a silent ALLOW, not an error."
+        note_not_done ".codex/hooks.json was NOT written: the config derived from .claude/settings.json $(printf '%s' "$HCFG_DEFECTS" | tr '\n' ';' ). Fix those registrations in .claude/settings.json and re-run with --client codex."
+        # And do not leave OUR own stale one behind if it is equally unrunnable. A config that
+        # matches nothing on disk is the state this whole branch exists to refuse.
+        if [ -f "$CODEX_HOOKS_JSON" ] && owned_by_installer '.codex/hooks.json' '' \
+           && [ -n "$(codex_config_defects "$CODEX_HOOKS_JSON")" ]; then
+          rm -f "$CODEX_HOOKS_JSON"
+          warn "Removed the previous .codex/hooks.json — its commands could not run either."
+        fi
+      fi
+    else
+      warn "codex-hook-shim.sh --emit-config failed — .codex/hooks.json was not written."
+      note_not_done ".codex/hooks.json — --emit-config failed, so this project has no Codex hook layer and is advisory rather than enforcing under Codex."
+    fi
+    rm -f "$HCFG_TMP"
+  fi
+
+  # ── 8d.5 .codex/config.toml — the MCP server row ────────────────────────
+  # The CONFIGURATION shape is measured — Codex's own importer writes exactly this row pointing at
+  # the bridge — and whether the routes BEHAVE under Codex is not: Task 7 has not run. The entry
+  # document marks that question open; this writes the configuration and claims nothing more.
+  #
+  # Same shape as .mcp.json above, including the refusal to rewrite a config.toml that is the
+  # user's: a project .codex/config.toml can carry model settings, approval policy and sandbox
+  # rules, none of which are ours to reformat.
+  cat > "$CODEX_CFG_REF" <<'CODEXCFG'
+[mcp_servers.UnityMCP]
+url = "http://localhost:8080/mcp"
+CODEXCFG
+  if [ ! -f "$CODEX_CFG" ]; then
+    cat "$CODEX_CFG_REF" > "$CODEX_CFG"
+    ok "Wrote .codex/config.toml (UnityMCP → http://localhost:8080/mcp)"
+  elif grep -qF -- 'mcp_servers.UnityMCP' "$CODEX_CFG" 2>/dev/null; then
+    ok ".codex/config.toml already has a UnityMCP server — left alone."
+  else
+    warn ".codex/config.toml exists without a UnityMCP server — not rewriting it. Add:"
+    warn ''
+    warn '    [mcp_servers.UnityMCP]'
+    warn '    url = "http://localhost:8080/mcp"'
+    note_not_done ".codex/config.toml — yours has no UnityMCP server and was not rewritten, so a Codex session in this project reaches no Unity bridge. Add the [mcp_servers.UnityMCP] block printed above."
+  fi
+  if owned_by_installer '.codex/config.toml' "$CODEX_CFG_REF"; then
+    printf '.codex/config.toml\t%s\t%s\ttoolkit\n' "$(sha_of "$CODEX_CFG")" \
+      "$(stat -c '%a' "$CODEX_CFG" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+  fi
+
+  # ── 8d.6 hook trust — the one write that leaves the project ─────────────
+  #
+  # A registered hook does not run. Measured: with the project trusted and no hook trust, the hook
+  # fired 0 times, the call went through, Codex printed no prompt and no warning, and `hooks/list`
+  # at that same moment reported `enabled: true, trustStatus: untrusted, statusMessage: null`. That
+  # is a fifth silent-failure layer sitting above the other four.
+  #
+  # Trust cannot ship in this repository. Putting `trusted_hash` inside the matcher group in
+  # hooks.json is silently ignored — same hash, `warnings: []`, still untrusted — because the
+  # app-server's own schema has no such field. A project cannot vouch for itself, which is the point
+  # of the gate. So it is the user's `$CODEX_HOME/config.toml` or nowhere.
+  #
+  # AND IT CANNOT BE PRECOMPUTED. The hash covers the hook's DECLARATION — command string, timeout,
+  # matcher, event — and the command string embeds absolute paths, so it is path-dependent by
+  # construction. Deterministic and home-independent, but only knowable on the target machine. The
+  # order is therefore fixed and not negotiable: write hooks.json, ask `hooks/list`, write trust.
+  #
+  # WHAT TRUST MEANS, SAID TO THE USER RATHER THAN BURIED. Measured by mutating one thing at a time:
+  # editing the hook SCRIPT does not change the hash; changing the config's `timeout` does. So this
+  # vouches for a command line, not for code. Anything that can later write the script file changes
+  # what runs, with no re-review and no notification. That sentence is printed at the prompt.
+  #
+  # `--dangerously-bypass-hook-trust` appears nowhere here and must not: a toolkit that tells users
+  # to switch hook trust off is worse than one that ships no hooks. Nothing in the measurement
+  # needed it.
+  CODEX_TRUST_GRANT=0
+  if [ "$HOOKS_JSON_OK" -eq 1 ]; then
+    if [ "$CODEX_TRUST" = yes ]; then
+      CODEX_TRUST_GRANT=1
+    elif [ "$CODEX_TRUST" = no ]; then
+      info "--no-codex-trust — hook trust not granted; the hooks will register and not run."
+    elif [ "$ASSUME_YES" -eq 1 ] || [ ! -t 0 ]; then
+      # THE SAFE DEFAULT FOR A WRITE OUTSIDE THE PROJECT IS NOT TO MAKE IT. `--yes` means "take the
+      # safe default at every prompt", and consent to modify a user's home directory is not
+      # something a flag about prompts can supply.
+      info "Non-interactive — hook trust NOT granted (it writes your home directory; pass --codex-trust to grant it)."
+    else
+      printf '\n  Codex will not run a hook until you trust it, and trust lives in your home\n'
+      printf '  directory: %s/config.toml.\n' "$CODEX_HOME_DIR"
+      printf '  Kinglet can back that file up and append one table per hook.\n'
+      printf '  What you would be vouching for is the COMMAND LINE, not the code: editing a hook\n'
+      printf '  script later does not re-open this question.\n'
+      # SAID BEFORE THE ANSWER, NOT DISCOVERED AFTER IT. The hashes can only be read from a running
+      # app server, and starting one makes Codex populate that home with its OWN state — caches,
+      # sqlite stores, its built-in skills. None of it is Kinglet's and none of it is reversed by
+      # uninstall.sh, so a user consenting to "one table per hook" would otherwise find a directory
+      # they did not expect and no account of where it came from.
+      printf '  Reading the hashes starts codex app-server briefly, and Codex writes its own\n'
+      printf '  state into that directory when it starts. Kinglet reverses only its own tables.\n'
+      read -rp "  Grant Codex hook trust for this project? [y/N]: " REPLY_TRUST
+      case "$REPLY_TRUST" in [yY]*) CODEX_TRUST_GRANT=1 ;; esac
+    fi
+  fi
+
+  if [ "$CODEX_TRUST_GRANT" -eq 1 ]; then
+    TRUST_SKIP_WHY=""
+    command -v codex >/dev/null 2>&1 || TRUST_SKIP_WHY="the codex CLI is not on PATH, and the hashes can only be read from it"
+    if [ -z "$TRUST_SKIP_WHY" ] && ! command -v jq >/dev/null 2>&1; then
+      TRUST_SKIP_WHY="jq is not on PATH"
+    fi
+    if [ -z "$TRUST_SKIP_WHY" ] && ! mkdir -p "$CODEX_HOME_DIR" 2>/dev/null; then
+      TRUST_SKIP_WHY="$CODEX_HOME_DIR could not be created"
+    fi
+    if [ -z "$TRUST_SKIP_WHY" ] && [ ! -w "$CODEX_HOME_DIR" ]; then
+      TRUST_SKIP_WHY="$CODEX_HOME_DIR is not writable"
+    fi
+
+    if [ -z "$TRUST_SKIP_WHY" ]; then
+      info "Reading the hook hashes Codex computed (this starts codex app-server briefly)…"
+      TRUST_OUT=$(mktemp)
+      # STDIN IS HELD OPEN UNTIL THE REPLY LANDS, and that is not a stylistic choice: the app server
+      # exits when its input closes, so a request written and immediately followed by EOF is a
+      # request whose answer cannot arrive. Polling rather than a fixed sleep, so an ordinary run
+      # costs a second or two instead of the ten a safe fixed sleep would need — with a ceiling, so
+      # a Codex that never answers cannot hang an install.
+      #
+      # `grep -q` on a FILE ARGUMENT, never on a pipe: grep exits at the first match without
+      # draining, and on a pipe that is the SIGPIPE-plus-pipefail death this repository's shell
+      # conventions are mostly about. A file argument has no writer to signal.
+      {
+        printf '%s\n' \
+          '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"kinglet-install","version":"1"}}}' \
+          '{"jsonrpc":"2.0","method":"initialized"}' \
+          "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"hooks/list\",\"params\":{\"cwds\":[\"$PROJECT_DIR\"]}}"
+        TRUST_WAIT=0
+        while [ "$TRUST_WAIT" -lt 300 ]; do
+          grep -q '"id":2' "$TRUST_OUT" 2>/dev/null && break
+          sleep 0.1
+          TRUST_WAIT=$((TRUST_WAIT + 1))
+        done
+      } | CODEX_HOME="$CODEX_HOME_DIR" codex app-server > "$TRUST_OUT" 2>/dev/null || true
+
+      TRUST_PAIRS=$(mktemp)
+      jq -r 'select(.id==2)|.result.data[]?|.hooks[]?|"\(.key)\t\(.currentHash)"' \
+        "$TRUST_OUT" 2>/dev/null | sort -u > "$TRUST_PAIRS" || true
+      TRUST_N=$(grep -c . "$TRUST_PAIRS" || true)
+
+      if [ "$TRUST_N" -eq 0 ]; then
+        # MEASURED, AND IT IS THE ANSWER A USER NEEDS RATHER THAN A GENERIC FAILURE. Against a
+        # project Codex does not yet trust, `hooks/list` returns `hooks: [], warnings: [], errors:
+        # []` — zero hooks and no diagnostic of any kind. So the hooks are not merely untrusted at
+        # that point, they are not registered at all, and neither Codex nor this installer can tell
+        # the user why unless it says so here.
+        warn "Codex listed no hooks for this project, so there is nothing to grant trust to."
+        warn "Measured: an untrusted project reports an EMPTY hook list with no warning and no error."
+        warn "Run 'codex' once in this project and accept its trust prompt, then re-run:"
+        warn "    ./install.sh --project-dir \"$PROJECT_DIR\" --client codex --codex-trust"
+        note_not_done "Codex hook trust was NOT granted: 'hooks/list' returned no hooks for this project, which is what Codex reports for a project it has not been told to trust. The hooks are on disk and will not run. Run 'codex' once in the project, accept its trust prompt, then re-run install.sh with --client codex --codex-trust."
+      else
+        TRUST_CFG="$CODEX_HOME_DIR/config.toml"
+        TRUST_BACKUP="-"
+        TRUST_WROTE=1
+        # A BACKUP BEFORE THE FIRST BYTE. This is the user's file and it is outside the project, so
+        # `git checkout` is not available to them the way it is for everything else this installer
+        # touches.
+        if [ -f "$TRUST_CFG" ]; then
+          TRUST_BACKUP="$TRUST_CFG.kinglet-backup.$(date -u +%Y%m%d%H%M%S)"
+          cp "$TRUST_CFG" "$TRUST_BACKUP" || TRUST_WROTE=0
+        else
+          : > "$TRUST_CFG" || TRUST_WROTE=0
+        fi
+
+        if [ "$TRUST_WROTE" -eq 0 ]; then
+          warn "Could not back up $TRUST_CFG — hook trust not granted, and nothing was written."
+          note_not_done "Codex hook trust was NOT granted: $TRUST_CFG could not be backed up, and this installer does not edit a home file it cannot first copy."
+        else
+          # IDEMPOTENT BY DELETE-THEN-APPEND, not by append-if-absent. A re-install whose hook
+          # config changed keeps the same KEYS and gets new HASHES, so appending would write a
+          # second `[hooks.state."<key>"]` table with the same name — a duplicate table, which is a
+          # TOML parse error, in the user's home config. Removing our previous block first makes two
+          # identical runs produce a byte-identical file, which is what idempotent has to mean here.
+          #
+          # Only OUR tables are removed: those whose key `hooks/list` just reported for THIS
+          # project, plus the marker line. A hook-trust table for another project is not ours.
+          TRUST_KEYS=$(mktemp)
+          cut -f1 "$TRUST_PAIRS" > "$TRUST_KEYS"
+          TRUST_MARK="# kinglet:codex-trust — hook trust for $PROJECT_DIR (remove with uninstall.sh)"
+          TRUST_NEW=$(mktemp)
+          TRUST_CLEANED=1
+          awk -v keyfile="$TRUST_KEYS" -v mark="$TRUST_MARK" '
+            BEGIN {
+              while ((getline k < keyfile) > 0) { drop["[hooks.state.\"" k "\"]"] = 1 }
+              inblock = 0
+            }
+            {
+              line = $0
+              sub(/^[[:space:]]+/, "", line)
+              sub(/[[:space:]]+$/, "", line)
+              if (line == mark) { next }
+              if (line in drop) { inblock = 1; next }
+              if (inblock && line ~ /^\[/) { inblock = 0 }
+              if (inblock) { next }
+              print
+            }
+          ' "$TRUST_CFG" > "$TRUST_NEW" && mv "$TRUST_NEW" "$TRUST_CFG" || TRUST_CLEANED=0
+          rm -f "$TRUST_NEW"
+
+          # THE APPEND IS GATED ON THE CLEAN HAVING HAPPENED, and that is not defensive
+          # decoration. Appending to a file the removal pass failed on writes a SECOND
+          # `[hooks.state."<key>"]` table with a name already in the file — a duplicate table, which
+          # is a TOML parse error in the user's home config, produced by the step meant to repair it.
+          if [ "$TRUST_CLEANED" -eq 0 ]; then
+            warn "Could not rewrite $TRUST_CFG — hook trust NOT granted, and the file is as it was."
+            [ "$TRUST_BACKUP" = "-" ] || warn "Its backup is at $TRUST_BACKUP."
+            note_not_done "Codex hook trust was NOT granted: $TRUST_CFG could not be rewritten, so nothing was appended to it. The hooks are registered and will not run."
+          else
+
+          {
+            printf '%s\n' "$TRUST_MARK"
+            while IFS=$'\t' read -r tk th; do
+              [ -n "$tk" ] || continue
+              printf '[hooks.state."%s"]\nenabled = true\ntrusted_hash = "%s"\n' "$tk" "$th"
+            done < "$TRUST_PAIRS"
+          } >> "$TRUST_CFG"
+
+          # THE RECEIPT FOR A FILE THAT IS NOT OURS TO DELETE. Every other row in the receipt says
+          # "this path is ours to remove"; this one cannot, because the file is the user's and only
+          # the tables are ours. So the reversal is recorded as data — the config path, the backup,
+          # and the exact keys — in a file that IS ours, carries its own ordinary receipt row, and
+          # is what uninstall.sh reads to undo precisely this and nothing else.
+          mkdir -p "$CLAUDE_DIR/state"
+          {
+            printf '# kinglet codex hook-trust record\n'
+            printf '# Written by install.sh --client codex --codex-trust. uninstall.sh removes exactly\n'
+            printf '# the [hooks.state."<key>"] tables listed below from the config named here.\n'
+            printf '# config: %s\n' "$TRUST_CFG"
+            printf '# backup: %s\n' "$TRUST_BACKUP"
+            printf '# granted-at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            printf '# marker: %s\n' "$TRUST_MARK"
+            printf 'key\thash\n'
+            cat "$TRUST_PAIRS"
+          } > "$PROJECT_DIR/$CODEX_TRUST_REL"
+          printf '%s\t%s\t%s\ttoolkit\n' "$CODEX_TRUST_REL" \
+            "$(sha_of "$PROJECT_DIR/$CODEX_TRUST_REL")" \
+            "$(stat -c '%a' "$PROJECT_DIR/$CODEX_TRUST_REL" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+
+          ok "Granted Codex hook trust for $TRUST_N hook(s) in $TRUST_CFG"
+          [ "$TRUST_BACKUP" = "-" ] || ok "Backup: $TRUST_BACKUP"
+          warn "Hook trust vouches for a COMMAND LINE, not for code: anything that can write"
+          warn "$CLAUDE_DIR/hooks/*.sh from now on changes what runs, with no re-review."
+          fi
+          rm -f "$TRUST_KEYS"
+        fi
+      fi
+      rm -f "$TRUST_OUT" "$TRUST_PAIRS"
+    else
+      warn "Codex hook trust not granted: $TRUST_SKIP_WHY."
+      note_not_done "Codex hook trust was NOT granted — $TRUST_SKIP_WHY. The hooks are registered in .codex/hooks.json and will NOT run until trust is granted. Fix that and re-run with --client codex --codex-trust."
+    fi
+  elif [ "$HOOKS_JSON_OK" -eq 1 ]; then
+    # THE HONEST HALF-STATE, NAMED. A hook layer on disk that nothing has vouched for enforces
+    # nothing, and `## Success criterion 1` says a user cannot tell from inside the session.
+    note_not_done "Codex hook trust was not granted, so the $([ -f "$CODEX_HOOKS_JSON" ] && grep -c '"type": "command"' "$CODEX_HOOKS_JSON" 2>/dev/null || echo 0) registered hook(s) in .codex/hooks.json will NOT run: Codex ignores an untrusted hook silently. Grant it by running 'codex' once in this project and accepting its hook review, or re-run install.sh with --client codex --codex-trust."
+  fi
+
+  # `allowManagedHooksOnly` exists in Codex's managed-configuration surface and is UNMEASURED in
+  # those words. If an organisation sets it, project-scoped hooks may not run at all regardless of
+  # trust, and no amount of `hooks.state` would change that. Stated here rather than left implied,
+  # because it is the one failure this installer cannot detect or repair.
 fi
 
 # ── Step 9: Write the receipt ────────────────────────────────────────────────

@@ -829,5 +829,395 @@ if [ -f "$DOCTOR" ]; then
   fi
 fi
 
+# ---------------------------------------------------------------------------
+# 9. The installer places the Codex layout, and the receipt disowns it
+#
+# EVERY INSTALL BELOW RUNS UNDER A DISPOSABLE `CODEX_HOME`. install.sh's trust
+# step is the first thing this toolkit has ever written outside a project, and a
+# test that pointed it at the real `~/.codex` would be a test that can damage the
+# machine running it. The disposable home is also an ASSERTION: no consent was
+# given on any of these runs, so it must still be empty afterwards.
+# ---------------------------------------------------------------------------
+echo "--- codex surface: the installer writes the layout ---"
+
+CODEX_HOME_T="$WORK/codexhome"
+mkdir -p "$CODEX_HOME_T"
+chmod 700 "$CODEX_HOME_T"
+
+# Derived from the tree, never listed: the skill set and the command set are what
+# rows 2 and 3 of the ship list promise, one entry each.
+SKILL_NAMES="$(for d in .claude/skills/*/; do [ -d "$d" ] && basename "$d"; done)"
+CMD_NAMES="$(for c in .claude/commands/*.md; do [ -f "$c" ] && basename "$c" .md; done)"
+SKILL_NAMES_N="$(printf '%s\n' "$SKILL_NAMES" | /usr/bin/grep -c . || true)"
+CMD_NAMES_N="$(printf '%s\n' "$CMD_NAMES" | /usr/bin/grep -c . || true)"
+
+if [ "$SKILL_NAMES_N" -ge 1 ] && [ "$CMD_NAMES_N" -ge 1 ]; then
+  ok "derived $SKILL_NAMES_N skill(s) and $CMD_NAMES_N command(s) for the layout checks to be an identity over"
+else
+  bad "derived $SKILL_NAMES_N skill(s) and $CMD_NAMES_N command(s) — the layout checks below would pass over an empty set"
+fi
+
+CXFIX="$WORK/cxfix"
+CXFIX_OK=0
+if bash tests/fixtures/mkproject.sh "$CXFIX" --variant urp >/dev/null 2>&1 \
+   && CODEX_HOME="$CODEX_HOME_T" bash install.sh --project-dir "$CXFIX" --client codex --yes \
+        >"$WORK/cxinstall.out" 2>&1; then
+  ok "install.sh --client codex succeeds against a fixture project"
+  CXFIX_OK=1
+else
+  bad "install.sh --client codex failed against a fixture project: $(tail -3 "$WORK/cxinstall.out" 2>/dev/null | tr '\n' ' ')"
+fi
+
+# The set of project-relative paths the Codex layer owns, derived from the tree
+# rather than written down, so a payload that grows or shrinks moves this with it.
+codex_layout_paths() {   # $1 = project root
+  printf 'AGENTS.md\n.codex/hooks.json\n.codex/config.toml\n'
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    printf '.agents/skills/%s\n' "$n"
+  done <<< "$SKILL_NAMES"
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    printf '.agents/skills/%s/SKILL.md\n' "$n"
+  done <<< "$CMD_NAMES"
+}
+
+if [ "$CXFIX_OK" -eq 1 ]; then
+  LAYOUT_MISSING=""
+  while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    # `-e` OR `-L`: rows 2's entries are symlinks to directories, and `-f` is
+    # false for those. A check that used `-f` would report the whole skill bridge
+    # absent while it was sitting right there.
+    if [ -e "$CXFIX/$rel" ] || [ -L "$CXFIX/$rel" ]; then :; else
+      LAYOUT_MISSING="$LAYOUT_MISSING $rel"
+    fi
+  done <<< "$(codex_layout_paths "$CXFIX")"
+  if [ -z "$LAYOUT_MISSING" ]; then
+    ok "the installer placed every path the ship list's rows 1-4 and 6 name"
+  else
+    bad "the installer did not place:$LAYOUT_MISSING"
+  fi
+
+  # Row 2 is a symlink root, not a copy. A directory of copies discovers the same
+  # 16 and then goes stale the moment a skill is edited, which is the whole reason
+  # the ship list prefers the symlink to the importer's copy.
+  LINK_BAD=""
+  while IFS= read -r n; do
+    [ -n "$n" ] || continue
+    l="$CXFIX/.agents/skills/$n"
+    [ -L "$l" ] || { LINK_BAD="$LINK_BAD $n(not-a-symlink)"; continue; }
+    [ -f "$l/SKILL.md" ] || LINK_BAD="$LINK_BAD $n(dangling)"
+  done <<< "$SKILL_NAMES"
+  if [ -z "$LINK_BAD" ]; then
+    ok "every skill entry is a symlink that resolves to a SKILL.md"
+  else
+    bad "skill-root defects:$LINK_BAD — Codex lists what it can resolve and says nothing about the rest"
+  fi
+
+  # Row 6: the MCP server row, in the shape the importer was measured to write.
+  if /usr/bin/grep -qF -- 'mcp_servers.UnityMCP' "$CXFIX/.codex/config.toml" 2>/dev/null; then
+    ok "the project's .codex/config.toml carries the UnityMCP server row"
+  else
+    bad "the project's .codex/config.toml has no mcp_servers.UnityMCP row"
+  fi
+
+  # ── THE ORDERING PROOF ───────────────────────────────────────────────────
+  #
+  # This is the assertion section 4 explicitly cannot make. There the config is
+  # emitted BY THE TEST against an already-installed project, so the generator's
+  # preference is exercised and the installer's SEQUENCE is not. Here the
+  # installer emitted it, on a FRESH install — the only shape where the ordering
+  # is observable at all. On a re-install `<project>/.claude/scripts/` is already
+  # there from run 1, so an installer that emits before copying still picks up the
+  # project's copy and this assertion passes over the defect. Fresh, or nothing.
+  #
+  # What an emit-before-copy produces is not a broken config: it is a config whose
+  # every command string points into the toolkit clone, which per `## Hooks` is a
+  # silent ALLOW once that directory moves. Nine registered hooks enforcing
+  # nothing, which is the exact defect the shim exists to close.
+  INST_SHIM_PATHS="$(/usr/bin/grep -o "'[^']*codex-hook-shim\.sh'" "$CXFIX/.codex/hooks.json" 2>/dev/null \
+    | tr -d "'" | sort -u || true)"
+  if [ "$INST_SHIM_PATHS" = "$CXFIX/.claude/scripts/codex-hook-shim.sh" ]; then
+    ok "ORDERING: the installer copied scripts/ before emitting, so the config names the project's own shim"
+  else
+    bad "ORDERING: the emitted config names [$INST_SHIM_PATHS], not $CXFIX/.claude/scripts/codex-hook-shim.sh. install.sh emitted .codex/hooks.json BEFORE copying scripts/ into the project, so the generator fell back to the toolkit clone — a directory the user is under no obligation to keep, and per findings.md a hook command Codex cannot run is a silent allow, not an error"
+  fi
+
+  # And the general form of it: every path in every command string exists and
+  # lies inside the project.
+  CFG_BAD=""
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    if [ ! -f "$p" ]; then CFG_BAD="$CFG_BAD $p(absent)"; continue; fi
+    case "$p" in "$CXFIX"/*) ;; *) CFG_BAD="$CFG_BAD $p(outside)" ;; esac
+  done <<< "$(/usr/bin/grep -o "'[^']*'" "$CXFIX/.codex/hooks.json" 2>/dev/null | tr -d "'" | sort -u || true)"
+  if [ -z "$CFG_BAD" ]; then
+    ok "every path the installed hook config names exists and lies inside the project"
+  else
+    bad "installed hook config names unrunnable path(s):$CFG_BAD"
+  fi
+
+  # ── The receipt ──────────────────────────────────────────────────────────
+  # A file written without a receipt row is one uninstall.sh refuses to touch
+  # forever. That defect shipped once already.
+  CXRECEIPT="$CXFIX/.claude/state/install-receipt.tsv"
+  if [ -f "$CXRECEIPT" ]; then
+    ok "the codex install wrote a receipt"
+    RCPT_MISSING=""
+    while IFS= read -r rel; do
+      [ -n "$rel" ] || continue
+      /usr/bin/grep -q "^$(printf '%s' "$rel" | sed 's/[.[\*^$/]/\\&/g')	" "$CXRECEIPT" \
+        || RCPT_MISSING="$RCPT_MISSING $rel"
+    done <<< "$(codex_layout_paths "$CXFIX")"
+    if [ -z "$RCPT_MISSING" ]; then
+      ok "the receipt covers every Codex path the installer wrote"
+    else
+      bad "the receipt does not cover:$RCPT_MISSING — uninstall.sh removes only what the receipt lists, so those are permanent debris"
+    fi
+  else
+    bad "no receipt after a codex install"
+  fi
+
+  # ── No consent, no home write ────────────────────────────────────────────
+  # `--yes` takes the safe default at every prompt, and for the one write that
+  # leaves the project the safe default is not to make it.
+  HOME_N="$(find "$CODEX_HOME_T" -mindepth 1 2>/dev/null | /usr/bin/grep -c . || true)"
+  if [ "$HOME_N" -eq 0 ]; then
+    ok "no consent was given, so the disposable CODEX_HOME is untouched"
+  else
+    bad "install.sh wrote $HOME_N path(s) into CODEX_HOME without consent — writing a user's home is not something --yes may take as a default"
+  fi
+
+  # ── The inverse ──────────────────────────────────────────────────────────
+  if bash uninstall.sh --project-dir "$CXFIX" --yes --no-backup >"$WORK/cxuninstall.out" 2>&1; then
+    LEFT=""
+    while IFS= read -r rel; do
+      [ -n "$rel" ] || continue
+      if [ -e "$CXFIX/$rel" ] || [ -L "$CXFIX/$rel" ]; then LEFT="$LEFT $rel"; fi
+    done <<< "$(codex_layout_paths "$CXFIX")"
+    if [ -z "$LEFT" ]; then
+      ok "uninstall.sh removed the whole Codex layout, symlinks included"
+    else
+      bad "uninstall.sh left behind:$LEFT"
+    fi
+    # The directories too. An empty `.agents/skills/` still reads as a skill root.
+    DIRS_LEFT=""
+    for d in .agents .codex; do
+      [ -d "$CXFIX/$d" ] && DIRS_LEFT="$DIRS_LEFT $d"
+    done
+    if [ -z "$DIRS_LEFT" ]; then
+      ok "uninstall.sh pruned the Codex directories it emptied"
+    else
+      bad "uninstall.sh left empty director(ies):$DIRS_LEFT"
+    fi
+  else
+    bad "uninstall.sh failed after a codex install: $(tail -3 "$WORK/cxuninstall.out" 2>/dev/null | tr '\n' ' ')"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 10. `--client claude` is what runs today
+#
+# The resolution this task was given is that every existing invocation must be
+# unchanged, and that it be PROVEN rather than asserted. The proof a test can
+# make is the equivalence: the flag's default and the flag spelled out produce
+# byte-identical trees, and neither carries a Codex artifact. (The other half —
+# that this equals the installer BEFORE the flag existed — is a comparison
+# against a commit, which lives in the task's report, not here.)
+# ---------------------------------------------------------------------------
+echo "--- codex surface: the default client is untouched ---"
+
+DEFFIX="$WORK/deffix"
+EXPFIX="$WORK/expfix"
+if bash tests/fixtures/mkproject.sh "$DEFFIX" --variant urp >/dev/null 2>&1 \
+   && bash tests/fixtures/mkproject.sh "$EXPFIX" --variant urp >/dev/null 2>&1 \
+   && CODEX_HOME="$CODEX_HOME_T" bash install.sh --project-dir "$DEFFIX" --yes >/dev/null 2>&1 \
+   && CODEX_HOME="$CODEX_HOME_T" bash install.sh --project-dir "$EXPFIX" --client claude --yes >/dev/null 2>&1; then
+  ok "both the default and --client claude install cleanly"
+
+  # The receipt records an install timestamp and the fixtures differ in path, so
+  # the comparison is over the payload, not the state directory.
+  DIFF_OUT="$(diff -r --exclude=state "$DEFFIX/.claude" "$EXPFIX/.claude" 2>&1 || true)"
+  if [ -z "$DIFF_OUT" ]; then
+    ok "--client claude writes the same .claude/ tree the default does"
+  else
+    bad "--client claude diverges from the default install: $(printf '%s' "$DIFF_OUT" | head -5 | tr '\n' ' ')"
+  fi
+
+  CLAUDE_ARM_EXTRA=""
+  for p in AGENTS.md .codex .agents; do
+    if [ -e "$DEFFIX/$p" ] || [ -e "$EXPFIX/$p" ]; then CLAUDE_ARM_EXTRA="$CLAUDE_ARM_EXTRA $p"; fi
+  done
+  if [ -z "$CLAUDE_ARM_EXTRA" ]; then
+    ok "neither Claude Code install produced a Codex artifact"
+  else
+    bad "a Claude Code install produced Codex artifact(s):$CLAUDE_ARM_EXTRA — the second client must be opt-in"
+  fi
+else
+  bad "could not install the two Claude Code arms — the equivalence below cannot run"
+fi
+
+# A dry run writes nothing, on the codex arm too. Verified, not assumed.
+DRYFIX="$WORK/dryfix"
+if bash tests/fixtures/mkproject.sh "$DRYFIX" --variant urp >/dev/null 2>&1; then
+  DRY_BEFORE="$(find "$DRYFIX" | sort)"
+  CODEX_HOME="$CODEX_HOME_T" bash install.sh --project-dir "$DRYFIX" --client codex --dry-run >"$WORK/dry.out" 2>&1 || true
+  DRY_AFTER="$(find "$DRYFIX" | sort)"
+  if [ "$DRY_BEFORE" = "$DRY_AFTER" ]; then
+    ok "--client codex --dry-run wrote nothing"
+  else
+    bad "--client codex --dry-run changed the tree: $(diff <(printf '%s\n' "$DRY_BEFORE") <(printf '%s\n' "$DRY_AFTER") | tr '\n' ' ')"
+  fi
+  # And it announced the layer rather than staying silent about it, which is the
+  # dry run's whole job on the one arm that writes outside .claude/.
+  if /usr/bin/grep -qF -- 'AGENTS.md' "$WORK/dry.out" && /usr/bin/grep -qF -- '.codex/hooks.json' "$WORK/dry.out"; then
+    ok "the codex dry run announces the layer it would write"
+  else
+    bad "the codex dry run does not name AGENTS.md and .codex/hooks.json — a dry run silent about a write outside .claude/ is worse than none"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# 11. THE UPGRADE FIXTURE
+#
+# Every other guard in this repository runs against a tree this repository just
+# built. The tree that actually breaks is the one a user already has, produced by
+# the previous version and then updated — measured on this toolkit, where a wave
+# removed 15 hook files and every guard stayed green while an upgraded project
+# kept 15 registrations pointing at nothing.
+#
+# So: install, modify the one file the update is documented to preserve
+# (`.claude/settings.json` — the most-edited file in the payload, and the only
+# place a hook is registered), install again, and assert the RESULTING TREE IS
+# INTERNALLY CONSISTENT rather than merely that files were written.
+#
+# The second arm is the one that matters here. A kept settings.json is the input
+# `--emit-config` reads, so a registration naming a file that is not there
+# produces a Codex hook entry that cannot run — and under Codex that is an ALLOW,
+# not an error. The installer must refuse to write such a config.
+# ---------------------------------------------------------------------------
+echo "--- codex surface: the upgrade fixture ---"
+
+UPFIX="$WORK/upfix"
+UPFIX_OK=0
+if bash tests/fixtures/mkproject.sh "$UPFIX" --variant urp >/dev/null 2>&1 \
+   && CODEX_HOME="$CODEX_HOME_T" bash install.sh --project-dir "$UPFIX" --client codex --yes >/dev/null 2>&1; then
+  # The documented preservation: one appended newline is enough to make the file
+  # "yours", which is exactly how the measured regression arrived.
+  printf '\n' >> "$UPFIX/.claude/settings.json"
+  UP_SETTINGS_SHA="$(sha256sum "$UPFIX/.claude/settings.json" | cut -d' ' -f1)"
+  if CODEX_HOME="$CODEX_HOME_T" bash install.sh --project-dir "$UPFIX" --client codex --yes \
+       >"$WORK/upgrade.out" 2>&1; then
+    ok "a second --client codex install over the first succeeds"
+    UPFIX_OK=1
+  else
+    bad "the upgrade install failed: $(tail -3 "$WORK/upgrade.out" 2>/dev/null | tr '\n' ' ')"
+  fi
+else
+  bad "could not build the upgrade fixture"
+fi
+
+if [ "$UPFIX_OK" -eq 1 ]; then
+  if [ "$(sha256sum "$UPFIX/.claude/settings.json" | cut -d' ' -f1)" = "$UP_SETTINGS_SHA" ]; then
+    ok "upgrade: the edit to the file the installer documents as preserved survived"
+  else
+    bad "upgrade: .claude/settings.json was overwritten — that is the file the installer reports as kept"
+  fi
+
+  # Internal consistency 1: the config still points at the project's own shim and
+  # every path in it runs.
+  UP_CFG_BAD=""
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    if [ ! -f "$p" ]; then UP_CFG_BAD="$UP_CFG_BAD $p(absent)"; continue; fi
+    case "$p" in "$UPFIX"/*) ;; *) UP_CFG_BAD="$UP_CFG_BAD $p(outside)" ;; esac
+  done <<< "$(/usr/bin/grep -o "'[^']*'" "$UPFIX/.codex/hooks.json" 2>/dev/null | tr -d "'" | sort -u || true)"
+  if [ -z "$UP_CFG_BAD" ]; then
+    ok "upgrade: every path the hook config names still exists inside the project"
+  else
+    bad "upgrade: the hook config names unrunnable path(s):$UP_CFG_BAD"
+  fi
+
+  # Internal consistency 2: the skill root still resolves, entry by entry.
+  UP_LINK_BAD=""
+  for l in "$UPFIX"/.agents/skills/*; do
+    [ -e "$l" ] || [ -L "$l" ] || continue
+    n="$(basename "$l")"
+    [ -f "$l/SKILL.md" ] || UP_LINK_BAD="$UP_LINK_BAD $n"
+  done
+  if [ -z "$UP_LINK_BAD" ]; then
+    ok "upgrade: every entry in the skill root still resolves to a SKILL.md"
+  else
+    bad "upgrade: dangling skill-root entr(ies):$UP_LINK_BAD"
+  fi
+
+  # Internal consistency 3: the receipt and the tree agree in BOTH directions
+  # over the Codex layer. A row with no file is a claim about nothing; a file
+  # with no row is permanent debris.
+  UPRCPT="$UPFIX/.claude/state/install-receipt.tsv"
+  UP_ROW_DEAD=""
+  while IFS=$'\t' read -r rel _sha _mode _origin; do
+    case "$rel" in ''|\#*|path) continue ;; esac
+    case "$rel" in AGENTS.md|.codex/*|.agents/*) ;; *) continue ;; esac
+    if [ -e "$UPFIX/$rel" ] || [ -L "$UPFIX/$rel" ]; then :; else
+      UP_ROW_DEAD="$UP_ROW_DEAD $rel"
+    fi
+  done < "$UPRCPT"
+  if [ -z "$UP_ROW_DEAD" ]; then
+    ok "upgrade: every Codex receipt row names a path that is there"
+  else
+    bad "upgrade: receipt row(s) name paths that do not exist:$UP_ROW_DEAD"
+  fi
+
+  UP_FILE_UNCLAIMED=""
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    rel="${f#"$UPFIX"/}"
+    /usr/bin/grep -q "^$(printf '%s' "$rel" | sed 's/[.[\*^$/]/\\&/g')	" "$UPRCPT" \
+      || UP_FILE_UNCLAIMED="$UP_FILE_UNCLAIMED $rel"
+  done <<< "$(find "$UPFIX/.codex" "$UPFIX/.agents" -mindepth 1 \( -type f -o -type l \) 2>/dev/null | sort)"
+  [ -f "$UPFIX/AGENTS.md" ] && { /usr/bin/grep -q '^AGENTS\.md	' "$UPRCPT" || UP_FILE_UNCLAIMED="$UP_FILE_UNCLAIMED AGENTS.md"; }
+  if [ -z "$UP_FILE_UNCLAIMED" ]; then
+    ok "upgrade: every file in the Codex layout carries a receipt row"
+  else
+    bad "upgrade: Codex file(s) with no receipt row:$UP_FILE_UNCLAIMED — uninstall.sh will refuse to touch them forever"
+  fi
+
+  # ── The measured upgrade defect, in the Codex layer ──────────────────────
+  # A kept settings.json that registers a hook whose file is not there. Under
+  # Claude Code that is a dead registration the installer already reports; under
+  # Codex the SAME row becomes a command Codex cannot run, and a hook command
+  # Codex cannot run is a silent allow. So the installer must not emit it.
+  python3 - "$UPFIX/.claude/settings.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+cfg = json.load(open(p))
+cfg.setdefault("hooks", {}).setdefault("PreToolUse", []).append(
+    {"matcher": "Edit|Write",
+     "hooks": [{"type": "command",
+                "command": ".claude/hooks/this-hook-does-not-exist.sh",
+                "timeout": 3000}]})
+json.dump(cfg, open(p, "w"), indent=2)
+PY
+  CODEX_HOME="$CODEX_HOME_T" bash install.sh --project-dir "$UPFIX" --client codex --yes \
+    >"$WORK/upgrade2.out" 2>&1 || true
+  DEAD_IN_CFG=""
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    [ -f "$p" ] || DEAD_IN_CFG="$DEAD_IN_CFG $p"
+  done <<< "$(/usr/bin/grep -o "'[^']*'" "$UPFIX/.codex/hooks.json" 2>/dev/null | tr -d "'" | sort -u || true)"
+  if [ -z "$DEAD_IN_CFG" ]; then
+    ok "upgrade: a settings.json registration naming a missing file never reaches .codex/hooks.json"
+  else
+    bad "upgrade: .codex/hooks.json carries command(s) that cannot run:$DEAD_IN_CFG — under Codex that is an allow, not an error, so the gate is simply absent and nothing reports it"
+  fi
+  if /usr/bin/grep -qiF -- 'this-hook-does-not-exist' "$WORK/upgrade2.out"; then
+    ok "upgrade: the installer named the offending registration rather than failing quietly"
+  else
+    bad "upgrade: the installer did not name the unrunnable registration — a config it declines to write in silence is indistinguishable from one it wrote"
+  fi
+fi
+
 printf '\n=== Codex Surface: %d/%d passed, %d failed ===\n' "$PASS" "$((PASS + FAIL))" "$FAIL"
 [ "$FAIL" -eq 0 ]

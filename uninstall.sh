@@ -20,6 +20,12 @@
 # provenance check, so it would happily delete a file it had never installed — and then print
 # "ECU is untouched", which was an assertion rather than something it enforced.
 #
+# ONE THING IS REVERSED OUTSIDE THE PROJECT, and only if the install put it there. `install.sh
+# --client codex --codex-trust` appends Codex hook-trust tables to your $CODEX_HOME/config.toml.
+# This removes exactly those tables — identified by the keys recorded at install time, each of
+# which names this project's own hooks.json — after copying that file. Nothing else in your home
+# is read or written, and the Plan below names the file before you confirm.
+#
 set -euo pipefail
 
 if [ -t 1 ]; then
@@ -33,7 +39,7 @@ warn() { printf '%s\n' "${YELLOW}warn${NC} $*"; }
 err()  { printf '%s\n' "${RED}err ${NC} $*" >&2; }
 die()  { err "$*"; exit 1; }
 
-usage() { sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '3,28p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 PROJECT_DIR="$(pwd)"
 ASSUME_YES=0; PURGE=0; KEEP_LOCAL=0; NO_BACKUP=0
@@ -112,17 +118,43 @@ sha_of() {
 # values. The catch-all defends against a hand-edited or transport-mangled receipt, and its cost is
 # a file left on disk and reported, which the user can delete, instead of a file deleted, which they
 # cannot undelete.
+#
+# THE EXISTENCE TEST IS `-e` OR `-L`, NOT `-f`, AND THE ROWS THAT NEEDED THAT ARE THE CODEX SKILL
+# ROOT'S. `.agents/skills/<name>` is a symlink to a DIRECTORY, and `-f` follows the link and then
+# asks "is the target a regular file", which is false. Under the old test every one of those rows
+# counted as `already gone`, so the whole skill bridge survived every uninstall while the run
+# reported success — a file left behind by a check that could not see it. `-L` is the second
+# disjunct rather than a replacement because `-e` is false through a DANGLING link, and a dangling
+# link of ours is exactly what we most want to remove.
+#
+# A row whose path is now a directory falls through to the classifier and is KEPT: `sha_of` returns
+# the empty string for it, no recorded checksum equals that, so it lands in MODIFIED. Fail-closed,
+# by the same mechanism as everything else here.
 TO_REMOVE=""; MODIFIED=""; ALREADY_GONE=0
-while IFS=$'\t' read -r rel recorded _mode origin; do
+while IFS=$'\t' read -r rel recorded mode origin; do
   case "$rel" in ''|\#*|path) continue ;; esac
   abs="$PROJECT_DIR/$rel"
-  if [ ! -f "$abs" ]; then ALREADY_GONE=$((ALREADY_GONE + 1)); continue; fi
+  if [ ! -e "$abs" ] && [ ! -L "$abs" ]; then ALREADY_GONE=$((ALREADY_GONE + 1)); continue; fi
   case "$origin" in
     user-modified)
       MODIFIED="${MODIFIED}${rel}"$'\n'
       ;;
     toolkit)
-      if [ "$(sha_of "$abs")" = "$recorded" ]; then
+      # TWO PROOFS OF OWNERSHIP FOR TWO KINDS OF FILE, chosen by the mode column, which until this
+      # row existed was written by three writers and read by none.
+      #
+      # A symlink has no sha256 — `sha_of` returns the empty string for one pointing at a directory
+      # — so the checksum test can only ever answer "modified" for it, and the file would be kept
+      # forever. What install.sh actually recorded for these rows is the LINK TARGET, and that is
+      # the right thing to check: the link is ours while it still points where we pointed it, and
+      # the moment someone repoints it, it is theirs.
+      if [ "$mode" = symlink ]; then
+        if [ -L "$abs" ] && [ "$(readlink "$abs")" = "$recorded" ]; then
+          TO_REMOVE="${TO_REMOVE}${rel}"$'\n'
+        else
+          MODIFIED="${MODIFIED}${rel}"$'\n'
+        fi
+      elif [ "$(sha_of "$abs")" = "$recorded" ]; then
         TO_REMOVE="${TO_REMOVE}${rel}"$'\n'
       else
         MODIFIED="${MODIFIED}${rel}"$'\n'
@@ -147,8 +179,36 @@ while IFS= read -r f; do
   grep -qxF "$rel" "$RECEIPTED" || FOREIGN_COUNT=$((FOREIGN_COUNT + 1))
 done < <(find "$CLAUDE_DIR" -type f)
 
+# ── The one thing this uninstaller reverses that is not a file of ours ───────
+#
+# `install.sh --client codex --codex-trust` appends one `[hooks.state."<key>"]` table per hook to
+# the user's `$CODEX_HOME/config.toml`. That file is OUTSIDE the project and it is the user's own —
+# it carries their model settings, their approval policy, their trust decisions about every other
+# repository — so it can never be a receipt row, because every receipt row means "this path is ours
+# to delete". What is ours is the TABLES, and they are recorded as data in a file that is ours:
+# .claude/state/codex-trust.tsv, which carries its own ordinary row and is removed with the rest.
+#
+# READ BEFORE ANYTHING IS DELETED, and announced in the Plan below, because a user about to approve
+# an uninstall is owed the fact that something outside their project will be edited.
+TRUST_REC="$CLAUDE_DIR/state/codex-trust.tsv"
+TRUST_CFG=""; TRUST_MARK=""; TRUST_KEY_COUNT=0
+if [ -f "$TRUST_REC" ]; then
+  TRUST_CFG=$(awk -F': ' '/^# config: /{sub(/^# config: /, ""); print; exit}' "$TRUST_REC")
+  TRUST_MARK=$(awk '/^# marker: /{sub(/^# marker: /, ""); print; exit}' "$TRUST_REC")
+  TRUST_KEY_COUNT=$(awk -F'\t' 'NR>1 && !/^#/ && NF>=1 && $1 != "key" && $1 != "" {n++} END {print n+0}' "$TRUST_REC")
+fi
+
 printf '\n%s\n' "${BOLD}Plan${NC}"
 printf '  remove   %s file(s) — unchanged since install\n' "$REMOVE_COUNT"
+if [ -n "$TRUST_CFG" ] && [ "$TRUST_KEY_COUNT" -gt 0 ]; then
+  if [ -f "$TRUST_CFG" ]; then
+    printf '  %sedit     %s — OUTSIDE THIS PROJECT: remove %s Codex hook-trust table(s)%s\n' \
+      "$YELLOW" "$TRUST_CFG" "$TRUST_KEY_COUNT" "$NC"
+  else
+    printf '  skip     %s is gone — %s Codex hook-trust table(s) already unreachable\n' \
+      "$TRUST_CFG" "$TRUST_KEY_COUNT"
+  fi
+fi
 if [ "$MOD_COUNT" -gt 0 ]; then
   if [ "$PURGE" -eq 1 ]; then
     printf '  %sremove   %s file(s) you modified (--purge)%s\n' "$YELLOW" "$MOD_COUNT" "$NC"
@@ -179,6 +239,45 @@ if [ "$KEEP_LOCAL" -eq 1 ] && [ -f "$CLAUDE_DIR/settings.local.json" ]; then
   cp "$CLAUDE_DIR/settings.local.json" "$SAVED_LOCAL"
 fi
 
+# ── Reverse the home write, before the record that describes it is deleted ───
+#
+# EXACTLY THE TABLES THIS PROJECT'S INSTALL ADDED, identified by the keys recorded at install time —
+# and every one of those keys embeds the absolute path of THIS project's .codex/hooks.json, so a
+# hook-trust table belonging to another repository cannot match one of them. The marker comment goes
+# with them.
+#
+# The user's file is copied first, for the same reason install.sh copied it: it is outside the
+# project, so `git checkout` is not a route back for them.
+if [ -n "$TRUST_CFG" ] && [ "$TRUST_KEY_COUNT" -gt 0 ] && [ -f "$TRUST_CFG" ]; then
+  TRUST_KEYS=$(mktemp)
+  awk -F'\t' 'NR>1 && !/^#/ && $1 != "key" && $1 != "" {print $1}' "$TRUST_REC" > "$TRUST_KEYS"
+  TRUST_TMP=$(mktemp)
+  TRUST_BAK="$TRUST_CFG.kinglet-uninstall.$(date +%Y%m%d%H%M%S)"
+  if cp "$TRUST_CFG" "$TRUST_BAK" 2>/dev/null \
+     && awk -v keyfile="$TRUST_KEYS" -v mark="$TRUST_MARK" '
+          BEGIN { while ((getline k < keyfile) > 0) { drop["[hooks.state.\"" k "\"]"] = 1 } }
+          {
+            line = $0
+            sub(/^[[:space:]]+/, "", line)
+            sub(/[[:space:]]+$/, "", line)
+            if (mark != "" && line == mark) { next }
+            if (line in drop) { inblock = 1; next }
+            if (inblock && line ~ /^\[/) { inblock = 0 }
+            if (inblock) { next }
+            print
+          }
+        ' "$TRUST_CFG" > "$TRUST_TMP" \
+     && mv "$TRUST_TMP" "$TRUST_CFG"; then
+    ok "Removed $TRUST_KEY_COUNT hook-trust table(s) from $TRUST_CFG"
+    ok "Its backup: $TRUST_BAK"
+  else
+    err "Could not edit $TRUST_CFG — its hook-trust tables are still there."
+    err "They name this project's .codex/hooks.json, which is about to be removed, so they are inert;"
+    err "delete the [hooks.state.\"...\"] tables naming $PROJECT_DIR by hand if you want them gone."
+  fi
+  rm -f "$TRUST_KEYS" "$TRUST_TMP"
+fi
+
 # ── Remove ───────────────────────────────────────────────────────────────────
 REMOVED=0
 while IFS= read -r rel; do
@@ -199,6 +298,32 @@ rm -f "$RECEIPT"
 # Prune directories that went empty, deepest first. A directory still holding a user's file
 # survives on its own — rmdir refuses a non-empty dir, so no special-casing is needed.
 find "$CLAUDE_DIR" -depth -type d -empty -exec rmdir {} + 2>/dev/null || true
+# THE CODEX LAYOUT'S TWO DIRECTORIES, ON THE SAME RULE AND FOR A SHARPER REASON. `.agents/skills/`
+# emptied of its entries is still a skill ROOT: Codex reads it, finds nothing, and reports nothing —
+# so an empty one is indistinguishable from a working one from inside a session. `.codex/` emptied
+# is milder but is equally not something the user asked to keep. Both are pruned only when empty,
+# so a `.codex/config.toml` the user wrote themselves — which gets no receipt row and is never
+# removed above — keeps its directory.
+#
+# ONE `find` PASS IS NOT ENOUGH, AND THAT IS A PROPERTY OF `-exec … +` RATHER THAN OF THE LAYOUT.
+# The batching form defers every `rmdir` to the end of the walk, so `-empty` is evaluated against
+# the tree as it stood BEFORE any removal: `.agents/` still holds `skills/` at that moment and is
+# therefore not empty, and one pass leaves it standing. Measured — `.agents/` survived a complete
+# uninstall, which is worse than it sounds, because an empty `.agents/skills/` is still a skill root
+# Codex reads and finds nothing in, and reports nothing about. The layout is three levels deep at
+# `.agents/skills/<command>/`, so it takes three passes; the loop runs until a pass changes nothing
+# rather than counting them, and is bounded so a pathological tree cannot spin.
+for cdx in "$PROJECT_DIR/.agents" "$PROJECT_DIR/.codex"; do
+  cdx_pass=0
+  while [ -d "$cdx" ] && [ "$cdx_pass" -lt 8 ]; do
+    cdx_before=$(find "$cdx" -type d 2>/dev/null | wc -l | tr -d ' ')
+    find "$cdx" -depth -type d -empty -exec rmdir {} + 2>/dev/null || true
+    [ -d "$cdx" ] || break
+    cdx_after=$(find "$cdx" -type d 2>/dev/null | wc -l | tr -d ' ')
+    if [ "$cdx_before" = "$cdx_after" ]; then break; fi
+    cdx_pass=$((cdx_pass + 1))
+  done
+done
 
 if [ -d "$CLAUDE_DIR" ]; then
   LEFT=$(find "$CLAUDE_DIR" -type f 2>/dev/null | wc -l | tr -d ' ')
