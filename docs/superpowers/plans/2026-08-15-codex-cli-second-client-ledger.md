@@ -30,12 +30,33 @@ ls tests/test-*.sh | wc -l
 The runner colours its headers, so an anchored `grep -c` on raw output returns **0** on a completely
 healthy suite — indistinguishable from the catastrophe the count exists to detect.
 
-### THE SUITE TAKES 364 SECONDS — measured 2026-08-15 on this host
+### THE SUITE TAKES 434 SECONDS — re-measured 2026-08-16, and it is still growing
 
-Any timeout below ~450 s truncates the run, and a truncated run reads as red. **Do not set a timeout
-under 450000 ms.** A previous wave wrote 150000 ms into its own constraints against a suite that
-really took 191–255 s, and dispatched four implementers under a constraint that manufactured
-failures. The suite has grown since; 364 s is today's measurement, not a ceiling.
+**Use a timeout of at least 600000 ms.** A truncated run reads as red, and a red that is really a
+truncation is the most expensive false signal this repository produces.
+
+**This figure has moved twice inside one wave** — 364 s at setup on 2026-08-15, **434 s** today — as
+the suite went 3543 → 3865 assertions. The guidance that stood until now was "at least 450000 ms",
+which against a 434 s run leaves **sixteen seconds** of headroom. That is not a margin, and a previous
+wave already paid for exactly this: it wrote 150000 ms into its constraints against a suite that
+really took 191–255 s and dispatched four implementers under a number that manufactured failures.
+
+**Re-measure before quoting.** The number is a moving property of the tree, not a constant.
+
+### A flaky assertion exists in `tests/test-codex-shim.sh` — do not call it a flake and move on
+
+Found during Task 9 and **correctly diagnosed by checking the instrument before the subject**: the
+implementer's full-suite run went red on one assertion, and it **reproduces at `b6bc214` with that
+task's changes stashed, 3 of 4 runs.** So it is pre-existing, not Task 9's.
+
+It is **fail-closed** — the shim still refuses — but it refuses on a failed staging write rather than
+on the budget, so the count is lost. The shim's own header documents a race of exactly this shape and
+calls it *"currently unreachable… not a property worth depending on"*, which the reproduction refutes.
+
+The controller re-ran the whole suite independently on 2026-08-16 and got **3865 / 0 failed, 434 s** —
+**it did not hit.** That is what a race looks like, and it is precisely the shape `CLAUDE.md` warns
+about: a real defect that three implementers dismissed as a flake because it did not reproduce for
+them. **It is written down here so the next red run is read as this, not as a new break.**
 
 ### Provenance
 
