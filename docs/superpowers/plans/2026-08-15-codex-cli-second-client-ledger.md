@@ -375,7 +375,7 @@ The event stream shape, measured against the real binary:
 | 4 | Kinglet's 12 hooks under Codex | **DONE** | `23e2444..53daafb` | general-purpose implementer; **3 fix rounds**, one Critical; the shim ships and all 9 tool-event hooks enforce |
 | 5 | Kinglet's 16 skills under Codex | **DONE** | `1bb6135..f4f19c4` | general-purpose implementer; 1 fix round; skills **are** invoked unnamed, and the spec's payload-location proposal was refuted |
 | 6 | Rules, `AGENTS.md`, commands and agents | **DONE** | `4898876..56183ef` | general-purpose implementer; 2 fix rounds, one Critical; the pointer verdict was prompt-conditional and became a **positive** ship recommendation |
-| 7 | Layer B — MCP routes against the live bridge | open | — | *(brief pending)* — needs a free Editor |
+| 7 | Layer B — MCP routes against the live bridge | **DEFERRED TO LAST** | — | **The owner is using the Editor.** See the ruling below |
 | 8 | Ship the payload the measurement supports | open | — | *(brief pending)* — ship list decided by Tasks 2–7 |
 | 9 | Installer writes and removes the Codex layout | open | — | *(brief pending)* |
 | 10 | Findings synthesis, decision, debt | open | — | *(brief pending)* — gained **Step 5a** during the run: re-derive `docs/ANTI-VACUITY.md`'s bash-4 census and put it under a guard |
@@ -753,9 +753,36 @@ retries costs every implementer the same, silently, forever.
 
 ---
 
-## Editor / scene state
+## Editor / scene state, and why Task 7 moved to last
 
-Task 7 is the only task that touches Unity. Record here whether it left any scene dirty, saved, or
-untouched.
+Task 7 is the only task that touches Unity. **It was deferred to the end of the plan on 2026-08-16,
+before being dispatched**, because the preflight found the owner working in the Editor.
 
-*(Not yet reached.)*
+Measured, not assumed:
+
+```
+ps            -projectPath /home/riive/Documents/GitHub/Endless-Evolution
+              Unity/Hub/Editor/6000.0.68f1/Editor/Unity
+ss -tlnp      127.0.0.1:8080  LISTEN  users:(("python",pid=2050426))
+initialize    serverInfo: mcp-for-unity-server 3.4.5
+EE branch     feat/skin-system, clean tree
+```
+
+The bridge is live and it is **the owner's Editor, holding the owner's project**, on a branch that
+moved since this wave started. **The one-implementer rule is absolute and it is not about files:**
+the Editor is a single process holding a single asset database, and two agents driving it over MCP
+concurrently corrupt that state as a broken `.unity` file, not as a merge conflict — with no diff to
+review and no record of which call did it.
+
+**Ruling: reorder, do not wait and do not proceed.** Tasks 8 through 11 touch no Unity and no MCP, so
+the wave loses nothing by running them first. Task 7 runs when the Editor is free.
+
+**What Task 8 must therefore assume:** the MCP client questions are **unmeasured** — whether Codex
+hits the same tool-versus-resource split, whether `manage_*` action names resolve under its client,
+whether the `isError: false` + `"success": false` silent-failure shape appears, and whether it
+diagnoses an inactive tool group. Task 8 may ship an MCP configuration translation if the rest of the
+evidence supports it, but **must mark the client-behaviour question as open rather than assuming
+parity with Claude Code.** Assuming parity is exactly the move that produced four of this wave's five
+silent-failure layers.
+
+*(No scene has been touched. Nothing to record yet.)*
