@@ -125,20 +125,30 @@ do not keep both.
 
 ## Check 3b: The second client, and only if the project asked for one
 
-**Skip this whole check unless a `.codex/` directory exists in the project root.** A project
-installed for Claude Code alone has no Codex layer, and reporting its absence would fail every
-healthy install.
+**Skip this whole check unless the project root has a `.codex/` directory *or* an `.agents/skills/`
+directory.** A project installed for Claude Code alone has neither, and reporting their absence
+would fail every healthy install.
 
-If it exists, the project has a Codex CLI layer, and that layer has one failure mode worth checking
-by hand because it is **silent**: hooks that are registered, listed, and never run.
+**The gate is a disjunction and that is the whole point of it.** The first version read
+*"unless `.codex/` exists"*, which made step 1 below unreachable in the exact case it was written
+for: a project with the skills bridge and **no** `.codex/` at all is the advisory-not-enforcing
+install, and gating on `.codex/` skips the check precisely when the answer is "the hook layer is
+missing". Either directory means someone installed a Codex layer; only running the check tells you
+whether they installed all of it.
+
+If either exists, the project has a Codex CLI layer, and that layer has one failure mode worth
+checking by hand because it is **silent**: hooks that are registered, listed, and never run.
 
 1. **`.codex/hooks.json` exists.** Absent while `.agents/skills/` is present → **WARNING**: the
    skills bridge was installed and the hook layer was not, so this project is advisory rather than
    enforcing under Codex. Say that in those words.
-2. **The shim it points at is present and executable:** `.claude/scripts/codex-hook-shim.sh`. The
-   config carries an **absolute** path to it, so a moved or renamed project directory breaks every
-   entry at once. Missing → **ERROR**: under Codex a hook whose command cannot run is not an error
-   the user sees, it is an allow.
+2. **The shim each entry points at resolves.** Read the paths out of `.codex/hooks.json` itself and
+   test *those*, not the relative `.claude/scripts/codex-hook-shim.sh` — the config carries
+   **absolute** paths, so a moved or renamed project directory breaks every entry at once while the
+   relative path is still perfectly present. Checking the relative one passes in exactly the
+   scenario this step exists to catch. Any absolute path in the config that is not an existing file,
+   or that points outside the project directory → **ERROR**: under Codex a hook whose command cannot
+   run is not an error the user sees, it is an allow. The fix for both is to regenerate, per step 3.
 3. **The timeouts are seconds, not milliseconds.** Read `.codex/hooks.json` and check every
    `timeout`. `.claude/settings.json` declares milliseconds; Codex reads seconds. A value in the
    thousands → **ERROR**: that is an unconverted millisecond figure, and a hook that should die in

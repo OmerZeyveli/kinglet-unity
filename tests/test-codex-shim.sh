@@ -1038,8 +1038,17 @@ assert_eq "no" "$([ -f "$HOOKS/codex-hook-shim.sh" ] && echo yes || echo no)" \
   "the shim is not inside .claude/hooks/ (it would be read as an unregistered hook)"
 
 # ============================================================================
-# 9. THE SHIM DOES NOT SHIP INTO A CLAUDE CODE PROJECT, AND BOTH HALVES OF THE
-#    SKIP ARE HELD
+# 9. WHATEVER install.sh SKIPS, IT SKIPS IN BOTH HALVES
+#
+# This header read "THE SHIM DOES NOT SHIP INTO A CLAUDE CODE PROJECT, AND BOTH
+# HALVES OF THE SKIP ARE HELD" until 2026-08-16. The first clause is now false —
+# the Codex ship list put codex-hook-shim.sh into the payload, because the
+# .codex/hooks.json it generates carries an absolute path to it and a shim outside
+# the project is a hook command Codex silently allows. The assertions below never
+# named the shim: they derive the skip list from install.sh and hold whatever is
+# in it, so they were correct through that change and only the header stated the
+# opposite of the world. Kept as a header about the invariant rather than about
+# one file's membership, which is the property that made it rot.
 #
 # install.sh names each skipped script TWICE — once in the NEW_PATHS enumeration
 # and once in the write loop — and its own comment says the two must stay in

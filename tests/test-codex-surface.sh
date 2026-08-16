@@ -206,16 +206,164 @@ done <<< "$SHIP_PATHS"
 
 # ---------------------------------------------------------------------------
 # 4. The generated Codex hook config
+#
+# GENERATED TWICE, AGAINST TWO PROJECT LAYOUTS, AND THE SECOND IS THE ONE THAT
+# MATTERS. `--emit-config` picks the shim path it writes into every command
+# string by preferring `<project>/.claude/scripts/codex-hook-shim.sh` and falling
+# back to the toolkit clone it was invoked from. Generated against THIS
+# repository only the fallback branch is ever taken, because this repository has
+# no `.claude/scripts/` — so the branch that carries this task's whole reason for
+# shipping the shim would never be exercised. It was not, in the first version of
+# this file: a mutation deleting the in-project preference emitted a path outside
+# the project and this guard stayed green at 72/72.
+#
+# A path outside the project is not a broken config that errors. Per `## Hooks`
+# in findings.md, a hook command Codex cannot run is a silent ALLOW. So the
+# assertion is not "the string mentions the shim" — both branches satisfy that —
+# it is "the path exists AND lies under the project root it was generated for".
 # ---------------------------------------------------------------------------
 echo "--- codex surface: the generated hook config ---"
 
-# --emit-config writes to STDOUT and reads only .claude/settings.json, so running
-# it against this repository creates nothing here.
+# A real install, because the installed layout is the layout users run. 0.7 s.
+INSTFIX="$WORK/instfix"
+INSTFIX_OK=0
+if bash tests/fixtures/mkproject.sh "$INSTFIX" --variant urp >/dev/null 2>&1 \
+   && bash install.sh --project-dir "$INSTFIX" --yes >/dev/null 2>&1; then
+  ok "built a real fixture install to exercise the installed layout"
+  INSTFIX_OK=1
+else
+  bad "could not build a fixture install — the installed-layout assertions below cannot run"
+fi
+
+# --emit-config writes to STDOUT and reads only .claude/settings.json, so neither
+# run creates anything in this repository.
 HCFG="$WORK/hooks.json"
 if bash scripts/codex-hook-shim.sh --emit-config --project-dir "$REPO_DIR" > "$HCFG" 2>"$WORK/emit.err"; then
   ok "codex-hook-shim.sh --emit-config succeeds against this repository"
 else
   bad "codex-hook-shim.sh --emit-config failed: $(cat "$WORK/emit.err" 2>/dev/null | tr '\n' ' ')"
+fi
+
+# The installed-layout arm, driven from the REPO copy of the shim with the
+# fixture as --project-dir. That is the shape Task 9's installer has and the one
+# in which the in-project preference is the only thing keeping the emitted path
+# inside the project.
+HCFG_INST="$WORK/hooks-installed.json"
+HCFG_INST_OK=0
+if [ "$INSTFIX_OK" -eq 1 ] \
+   && bash scripts/codex-hook-shim.sh --emit-config --project-dir "$INSTFIX" > "$HCFG_INST" 2>"$WORK/emit-inst.err"; then
+  ok "--emit-config succeeds against an installed project"
+  HCFG_INST_OK=1
+elif [ "$INSTFIX_OK" -eq 1 ]; then
+  bad "--emit-config failed against an installed project: $(cat "$WORK/emit-inst.err" 2>/dev/null | tr '\n' ' ')"
+fi
+
+# Every path a command string carries — the shim and the hook alike — must exist
+# and sit under the project the config was generated for. Checked on BOTH arms:
+# the repo arm pins the fallback branch, the installed arm pins the preference.
+check_paths_inside() {   # $1 = config, $2 = project root, $3 = label
+  [ -f "$1" ] || return 0
+  cpi_bad="$(PROJ="$2" python3 - "$1" <<'PY'
+import json, os, re, sys
+root = os.path.realpath(os.environ["PROJ"])
+cfg = json.load(open(sys.argv[1])).get("hooks", {})
+problems, seen = [], 0
+for event, groups in cfg.items():
+    for group in groups:
+        for hook in group.get("hooks", []):
+            for path in re.findall(r"'([^']+)'", hook.get("command", "")):
+                seen += 1
+                if not os.path.isfile(path):
+                    problems.append("%s: does not exist: %s" % (event, path))
+                    continue
+                real = os.path.realpath(path)
+                if real != root and not real.startswith(root + os.sep):
+                    problems.append("%s: outside the project: %s" % (event, path))
+if not seen:
+    problems.append("no quoted path found in any command string")
+print("\n".join(problems))
+PY
+)"
+  if [ -z "$cpi_bad" ]; then
+    ok "every path the emitted config names exists and lies under the project root ($3)"
+  else
+    bad "emitted config names path(s) outside the project or absent ($3) — under Codex a hook command that cannot run is a silent allow, not an error: $cpi_bad"
+  fi
+}
+check_paths_inside "$HCFG" "$REPO_DIR" "repo layout"
+[ "$HCFG_INST_OK" -eq 1 ] && check_paths_inside "$HCFG_INST" "$INSTFIX" "installed layout"
+
+# The installed arm additionally pins WHICH copy was chosen. "Inside the project"
+# is the invariant; "the project's own .claude/scripts/ copy" is the decision,
+# and it is the one that makes copying scripts/ before generating the config a
+# hard ordering constraint rather than a preference.
+if [ "$HCFG_INST_OK" -eq 1 ]; then
+  INST_SHIMS="$(python3 - "$HCFG_INST" <<'PY'
+import json, re, sys
+cfg = json.load(open(sys.argv[1])).get("hooks", {})
+found = set()
+for groups in cfg.values():
+    for group in groups:
+        for hook in group.get("hooks", []):
+            for path in re.findall(r"'([^']+)'", hook.get("command", "")):
+                if path.endswith("codex-hook-shim.sh"):
+                    found.add(path)
+print("\n".join(sorted(found)))
+PY
+)"
+  if [ "$INST_SHIMS" = "$INSTFIX/.claude/scripts/codex-hook-shim.sh" ]; then
+    ok "the installed layout's config points at the project's own shim copy"
+  else
+    bad "the installed layout's config points at [$INST_SHIMS], not $INSTFIX/.claude/scripts/codex-hook-shim.sh — the toolkit clone is a directory the user is under no obligation to keep"
+  fi
+fi
+
+# --- the hook set is an IDENTITY against settings.json, not a floor -----------
+# A floor of >= 1 let a mutation that emitted only PreToolUse drop 12 entries to
+# 5 and stay green at 65/65: seven hooks silently unregistered, and the whole
+# assertion total quietly seven smaller. The command section one screen down
+# already asserts exactly this identity (`EMITTED_N -eq CMD_N`); the asymmetry
+# was the defect. Compared as SETS and per-event COUNTS, not as one total, so a
+# hook swapped for another cannot net out.
+SETTINGS_HOOKS="$(python3 - "$REPO_DIR/.claude/settings.json" <<'PY'
+import json, os, sys
+cfg = json.load(open(sys.argv[1])).get("hooks", {})
+rows = []
+for event, groups in cfg.items():
+    for group in groups:
+        for hook in group.get("hooks", []):
+            rows.append("%s\t%s" % (event, os.path.basename(hook.get("command", ""))))
+print("\n".join(sorted(rows)))
+PY
+)"
+EMITTED_HOOKS="$(python3 - "$HCFG" <<'PY'
+import json, os, re, sys
+cfg = json.load(open(sys.argv[1])).get("hooks", {})
+rows = []
+for event, groups in cfg.items():
+    for group in groups:
+        for hook in group.get("hooks", []):
+            cmd = hook.get("command", "")
+            paths = re.findall(r"'([^']+)'", cmd)
+            # The wrapped form is '<shim>' --hook '<hook>'; the unwrapped form is
+            # just '<hook>'. The hook is the last quoted path either way.
+            rows.append("%s\t%s" % (event, os.path.basename(paths[-1]) if paths else "?"))
+print("\n".join(sorted(rows)))
+PY
+)"
+SETTINGS_N="$(printf '%s\n' "$SETTINGS_HOOKS" | /usr/bin/grep -c . || true)"
+EMITTED_N_HOOKS="$(printf '%s\n' "$EMITTED_HOOKS" | /usr/bin/grep -c . || true)"
+
+if [ "$SETTINGS_N" -ge 1 ]; then
+  ok ".claude/settings.json registers $SETTINGS_N hook entr(ies) for the identity below to be an identity over"
+else
+  bad ".claude/settings.json registers no hook entries — the identity below would hold vacuously"
+fi
+
+if [ "$EMITTED_HOOKS" = "$SETTINGS_HOOKS" ]; then
+  ok "the emitted config is the whole of .claude/settings.json's hook set, event for event ($EMITTED_N_HOOKS entries)"
+else
+  bad "the emitted config is not settings.json's hook set: $EMITTED_N_HOOKS emitted against $SETTINGS_N registered. A hook that Claude Code enforces and Codex never registers is not an error a user sees — it is a gate that is simply absent. Missing: $(comm -23 <(printf '%s\n' "$SETTINGS_HOOKS") <(printf '%s\n' "$EMITTED_HOOKS") | tr '\n' ' ')"
 fi
 
 if [ -s "$HCFG" ] && python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$HCFG" 2>/dev/null; then
@@ -323,6 +471,40 @@ else
     ok "codex-command-to-skill.sh succeeds against this repository's commands"
   else
     bad "codex-command-to-skill.sh failed: $(tail -3 "$WORK/conv.out" | tr '\n' ' ')"
+  fi
+
+  # --- THE DEFAULT ROOT, run exactly as the shipped documentation prescribes ---
+  # Every assertion in this section passes --out explicitly, so the default root
+  # was the one invocation form the guard never exercised — while being the only
+  # form anything shipped actually prescribes: `.claude/commands/unity-doctor.md`
+  # Check 3b step 4 tells the user to run the script with no arguments at all,
+  # and Task 9's installer will do the same. A mutation changing the default from
+  # `.agents/skills` to a root Codex was measured NOT to read left this guard
+  # green at 72/72.
+  #
+  # Run from inside the installed fixture with NO arguments, so this also pins
+  # the installed-layout project-dir resolution (<project>/.claude/scripts/ ->
+  # <project>) rather than only the default's spelling.
+  if [ "$INSTFIX_OK" -eq 1 ]; then
+    if ( cd "$INSTFIX" && bash .claude/scripts/codex-command-to-skill.sh ) >"$WORK/conv-default.out" 2>&1; then
+      ok "the converter runs with no arguments from inside an installed project, as Check 3b prescribes"
+    else
+      bad "the converter failed with no arguments from an installed project: $(tail -3 "$WORK/conv-default.out" | tr '\n' ' ')"
+    fi
+
+    DEF_MISSING=""
+    DEF_SEEN=0
+    for c in .claude/commands/*.md; do
+      [ -f "$c" ] || continue
+      n="$(basename "$c" .md)"
+      DEF_SEEN=$((DEF_SEEN + 1))
+      [ -f "$INSTFIX/.agents/skills/$n/SKILL.md" ] || DEF_MISSING="$DEF_MISSING $n"
+    done
+    if [ "$DEF_SEEN" -ge 1 ] && [ -z "$DEF_MISSING" ]; then
+      ok "the default root is .agents/skills/ — all $DEF_SEEN converted command(s) landed where Codex reads"
+    else
+      bad "the converter's DEFAULT root is not <project>/.agents/skills/ (missing:$DEF_MISSING). Measured: .claude/skills/ unaided discovers 0 skills, and any other root is discovered the same way — the files exist and Codex never sees them"
+    fi
   fi
 
   EMITTED_N="$(ls -1d "$SKILLDIR"/*/ 2>/dev/null | /usr/bin/grep -c . || true)"
@@ -469,6 +651,35 @@ if [ "$GEN_OK" -eq 1 ] && [ -s "$DOC_CODEX" ] && [ -s "$DOC_CLAUDE" ]; then
     bad "the Codex entry document dropped digest content:$DIGEST_MISSING"
   fi
 
+  # The non-negotiables that no hook covers. Derived membership, not a list
+  # someone remembered: the five rules' NON-NEGOTIABLE/CRITICAL sections less the
+  # one the digest carries (FormerlySerializedAs) and the one a hook enforces
+  # (legacy Input), plus the editor-guard rule that is neither. An earlier version
+  # of findings.md claimed all of these were hook-enforced; the only UNITY_EDITOR
+  # occurrence in .claude/hooks/ is an EXEMPTION in block-legacy-input.sh, not a
+  # check, so nothing was covering four of them.
+  NN_MISSING=""
+  NN_SEEN=0
+  for token in 'ServiceLocator' 'Minimum visibility' 'PlayerControls' 'MaterialPropertyBlock' 'UNITY_EDITOR'; do
+    NN_SEEN=$((NN_SEEN + 1))
+    /usr/bin/grep -qF -- "$token" "$DOC_CODEX" || NN_MISSING="$NN_MISSING $token"
+  done
+  if [ "$NN_SEEN" -ge 5 ] && [ -z "$NN_MISSING" ]; then
+    ok "the Codex entry document inlines all $NN_SEEN non-negotiables that no hook covers"
+  else
+    bad "the Codex entry document is missing inlined non-negotiable(s):$NN_MISSING — measured: a pointed-at rule is followed 1 time in 12 under a conventions-blind request while the same rule inlined binds 12 of 12, and no hook checks any of these"
+  fi
+
+  # And they are inlined for Codex ONLY. Nothing in this wave measured Claude
+  # Code's rule reachability, so the shipping client's document is left alone;
+  # this pins that as a decision rather than an oversight, and it fails loudly if
+  # someone later inlines into both without measuring the other client.
+  if /usr/bin/grep -qF -- 'Non-negotiables not covered by a gate' "$DOC_CLAUDE"; then
+    bad "the Claude Code entry document has grown the Codex-only inlined block — every pointer rate behind it was measured under Codex, so adding it here is the substitution this wave exists to avoid. Measure Claude Code's rule reachability first"
+  else
+    ok "the inlined non-negotiables are Codex-only; the Claude Code document is untouched by them"
+  fi
+
   # The skill root. Codex reads `.agents/skills/`; `.claude/skills/` unaided
   # gives it zero skills.
   if /usr/bin/grep -qF -- '.agents/skills' "$DOC_CODEX"; then
@@ -520,13 +731,43 @@ fi
 # ---------------------------------------------------------------------------
 echo "--- codex surface: recorded exclusions ---"
 
-for p in '.codex/hooks.json' '.codex/agents'; do
+for p in '.codex/hooks.json' '.codex/agents' '.agents'; do
   if /usr/bin/grep -qE "^$(printf '%s' "$p" | sed 's/[.]/\\./g')	.*	absent	" provenance-skip.tsv; then
     ok "excluded path is recorded rule=absent in provenance-skip.tsv: $p"
   else
     bad "excluded path is not recorded rule=absent in provenance-skip.tsv: $p — without the row it can drift back in silently"
   fi
 done
+
+# ---------------------------------------------------------------------------
+# 8. The shipped Codex diagnosis is not gated out of its own case
+#
+# `/unity-doctor` Check 3b exists to find one thing: a project that took the
+# skills bridge and not the hook layer, which the ship list names as its residual
+# and which `## Success criterion 1` says a user cannot detect from the inside.
+# Its first version skipped the whole check unless `.codex/` existed — so in the
+# headline case, where `.codex/` is exactly what is missing, the check never ran.
+# The gate has to be a disjunction, and prose that reads fine is how it stopped
+# being one.
+# ---------------------------------------------------------------------------
+echo "--- codex surface: the shipped diagnosis ---"
+
+DOCTOR=".claude/commands/unity-doctor.md"
+if [ -f "$DOCTOR" ]; then
+  GATE_LINE="$(awk '/Skip this whole check/{print; exit}' "$DOCTOR")"
+  if [ -z "$GATE_LINE" ]; then
+    bad "$DOCTOR has no Codex-layer skip gate — Check 3b either vanished or was reworded past this guard"
+  else
+    gate_bad=""
+    /usr/bin/grep -qF -- '.codex/' <<< "$GATE_LINE" || gate_bad="$gate_bad .codex/"
+    /usr/bin/grep -qF -- '.agents/skills' <<< "$GATE_LINE" || gate_bad="$gate_bad .agents/skills"
+    if [ -z "$gate_bad" ]; then
+      ok "the Codex check's skip gate names both layers, so the skills-bridge-without-hooks case reaches it"
+    else
+      bad "the Codex check's skip gate does not name:$gate_bad — gating on one layer skips the check in exactly the case it was written to detect (skills bridge installed, hook layer absent)"
+    fi
+  fi
+fi
 
 printf '\n=== Codex Surface: %d/%d passed, %d failed ===\n' "$PASS" "$((PASS + FAIL))" "$FAIL"
 [ "$FAIL" -eq 0 ]

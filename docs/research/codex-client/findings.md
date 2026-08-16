@@ -1954,7 +1954,7 @@ Kinglet's guarantees onto a tree Kinglet never touched.
 | 2 | **Skills** | `<project>/.agents/skills/` — a real directory holding one symlink per skill, `<name>` → `../../.claude/skills/<name>` | `## Skills`: `.claude/skills/` unaided gives **0**; the `skills` config key gives 0 under two spellings; a symlink root gives 16, enabled, with invocation observed. The root is per-entry rather than the single directory symlink because row 3 needs generated entries beside the symlinked ones — measured 2026-08-16 under this task, see **The mixed root** below |
 | 3 | **Commands** | `scripts/codex-command-to-skill.sh`, in the payload → `.claude/scripts/codex-command-to-skill.sh`; it writes `<project>/.agents/skills/<command-name>/SKILL.md`, one per `.claude/commands/*.md` | `## Commands`: 7 of the 9 are dropped silently by the importer on an argument token, the loss is **content and not routing** (919 lines of Unity diagnostics that exist nowhere else in the toolkit), no command name collides with a skill name, and a converted command was observed loading unnamed. Under the Kinglet path with row 2 alone, 9 of 9 would be lost — worse than the importer |
 | 4 | **The entry document** | `scripts/generate-claude-md.sh --client codex` emits it; Task 9 writes it to `<project>/AGENTS.md`. This repository gets its own tracked `AGENTS.md` | `## Rules and AGENTS.md`: `AGENTS.md` is **injected** (sentinel returned with 0 shell commands); `CLAUDE.md` is *findable*, not loaded (same sentinel, recovered only after an `rg`). This half is unconditional — the injection happens before the turn |
-| 5 | **Rules** | unchanged: `.claude/rules/` ships as it already does, and the Codex entry document keeps the **declarative pointer** and the existing inlined digest. Nothing new is inlined | `## Rules and AGENTS.md`: without the pointer `.claude/rules/` was opened **0 times in 24 runs**, and the failure mode is not "no conventions" but **confidently wrong** ones. The pointer is not sufficient (1 of 12 under a conventions-blind request) and the request sets the rate. The digest already inlines the shortlist — see **What is not inlined, and why** below |
+| 5 | **Rules** | `.claude/rules/` ships as it already does; the Codex entry document keeps the **declarative pointer** and the existing digest **and adds the four `NON-NEGOTIABLE` sections that are in neither the digest nor a hook**, plus the editor-guard rule. The Claude Code document is byte-identical to base | `## Rules and AGENTS.md`: without the pointer `.claude/rules/` was opened **0 times in 24 runs**, and the failure mode is not "no conventions" but **confidently wrong** ones. The pointer is not sufficient (1 of 12 under a conventions-blind request) while the same rule inlined binds 12 of 12. The membership is derived, not asserted — see **What is and is not inlined** below, which corrects a false claim this row carried for one round |
 | 6 | **MCP** | the `mcp_servers.UnityMCP` row for `<project>/.codex/config.toml`, written by Task 9. The entry document names the file and **marks the client-behaviour question open** | `codex-facts.md`: the importer writes exactly that row pointing at the bridge's `localhost:8080/mcp` URL, so the **configuration shape** is measured. **Whether the routes behave is not** — Task 7 has not run. See **Open, not answered** below |
 | 7 | **The guard** | `tests/test-codex-surface.sh` | Task 8's own deliverable. Derives both sides from the tree, fails in both directions, carries an anti-vacuity floor |
 
@@ -1997,27 +1997,72 @@ anything, because `skills/list` is an app-server call and no model ran. A genera
 command-skill is **discoverable**; whether it is reached is the same open question
 `## Commands` and `## Agents` both attach to their recommendations.
 
-### What is not inlined, and why
+### What is and is not inlined, and the membership derived rather than asserted
 
-Row 5 adds nothing to the digest, and that is a decision against the obvious
-alternative. The generated document's `## Conventions reminder` already inlines
-`[SerializeField] private`, `_lowerCamelCase`, `== null` (never `?.` / `is null`),
-`[FormerlySerializedAs]`, zero-allocation `Update`/`FixedUpdate`/`LateUpdate` and
-the `GetComponent` / `Camera.main` caching rule — which is the `inline` mechanism,
-measured at 12 of 12, applied to exactly the conventions a conventions-blind request
-would otherwise miss.
+**This section asserted something false for one round and it is worth saying how.**
+It read: *"The spine non-negotiables that are not in the digest — no legacy
+`Input.*`, no hand-edited `.meta` or scene files, no unguarded `UnityEditor`
+reference in runtime code — are the ones a hook enforces."* The third member is
+enforced by **nothing**. The only `UNITY_EDITOR` occurrence anywhere in
+`.claude/hooks/` is at `block-legacy-input.sh:141`, where it is an **exemption** —
+legacy input inside an `#if UNITY_EDITOR` block is excused — not a check. And the
+list was not exhaustive. It was the one argument in this document with no
+measurement under it, and it was wrong in both directions at once. Derive the
+membership rather than trusting the table below:
 
-The spine non-negotiables that are *not* in the digest — no legacy `Input.*`, no
-hand-edited `.meta` or scene files, no unguarded `UnityEditor` reference in runtime
-code — are the ones a **hook** enforces, and row 1 makes those hooks enforce under
-Codex. They bind by mechanism rather than by prose, so inlining them buys a second
-copy of a rule that is already refused at the router. Prose that duplicates an
-enforced gate is the cheapest thing to add and the first thing to go stale.
+```bash
+/usr/bin/grep -rnE '^#+ .*(NON-NEGOTIABLE|CRITICAL)' .claude/rules/
+/usr/bin/grep -rn 'UNITY_EDITOR' .claude/hooks/
+```
 
-**The residual is named rather than hidden:** if row 1 is not installed — a user who
-took the skills bridge and not the hook layer — those rules are neither inlined nor
-enforced, and the entry document says so in that case rather than implying the
-toolkit is enforcing.
+The five spine rules carry **six** `NON-NEGOTIABLE`/`CRITICAL` sections:
+
+| Section | In the digest? | Hook-enforced? |
+|---|---|---|
+| `serialization.md` — CRITICAL: `FormerlySerializedAs` | **yes** | yes — `warn-serialization` |
+| `unity-specifics.md` — Input System | no | **the legacy-API half only** — `block-legacy-input` |
+| `architecture.md` — Input System Architecture | no | **no** (the *pattern* — `InputView` owns `PlayerControls`, Systems input-agnostic — is not what the hook checks) |
+| `architecture.md` — NO GameContext / Service Locator | no | **no** |
+| `csharp-unity.md` — Encapsulation / minimum visibility | no | **no** |
+| `performance.md` — Rendering & Draw Calls | no | **no** |
+
+Plus one that is not headed `NON-NEGOTIABLE` and belongs in the same class:
+`unity-specifics.md` § *Editor vs Runtime*, whose own stated failure mode is
+*"compiles in Editor, **fails on build** with no warning"*. Neither inlined nor
+enforced. That is the member the false sentence named.
+
+**What the digest already carries** — `[SerializeField] private`, `_lowerCamelCase`,
+`== null` (never `?.` / `is null`), `[FormerlySerializedAs]`, zero-allocation
+`Update`/`FixedUpdate`/`LateUpdate`, and the `GetComponent` / `Camera.main` caching
+rule. That is the `inline` mechanism, measured at 12 of 12, applied to the
+conventions a conventions-blind request would otherwise miss.
+
+**What row 5 now inlines, for the Codex client only.** The four sections in neither
+column, plus the editor-guard rule, are inlined into the Codex entry document as a
+`## Non-negotiables not covered by a gate` block. The brief's instruction was
+*"inline what the digest lacks"*, scoped to what is not already there; this is that
+set, derived rather than guessed.
+
+**Why the Claude Code arm is left byte-identical to base.** Nothing in this wave
+measured Claude Code's rule reachability — every pointer rate in `## Rules and
+AGENTS.md` was measured under Codex. Changing the shipping client's document on the
+strength of a measurement taken against the other one is the substitution this wave
+exists to avoid. The asymmetry is therefore recorded as a gap, not as a finding: it
+is unknown whether Claude Code needs the same block, and the way to find out is to
+run the P1/P2/P3 experiment against it.
+
+**The residual, restated correctly.** The earlier version said the residual was
+*"if row 1 is not installed, those rules are neither inlined nor enforced"*. For the
+four sections above the residual held **even when row 1 is installed**, because no
+hook ever covered them — that is what the inlining now closes for Codex. What
+remains, and is not closed by anything:
+
+- **Under Claude Code** those four are pointer-only, as they have always been.
+- **Under Codex without row 1**, the two hook-enforced members — legacy `Input.*`
+  and hand-edited `.meta`/scene files — are neither inlined nor enforced. The entry
+  document states that conditional where it states the enforcement.
+- Inlining is prose. It was measured at 12 of 12 against one unnatural rule in one
+  probe shape; it is not a gate, and no hook exists for these four.
 
 ### Open, not answered
 

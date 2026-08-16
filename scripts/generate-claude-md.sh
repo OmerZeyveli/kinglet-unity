@@ -715,6 +715,34 @@ document that speaks.
   all, rewrites paths to a directory that exists under no spelling, and copies hook timeouts without
   converting milliseconds to seconds — which turns a three-second gate into a fifty-minute one.
 
+## Non-negotiables not covered by a gate
+
+The conventions reminder below is inlined because a rule that is only *pointed at* is read about one
+time in twelve when the request gives no reason to look for it, while the same rule inlined is
+followed every time. These five are inlined for the same reason and are listed separately because
+nothing else catches them: **no hook checks any of them**, so under Codex they bind only if you
+apply them.
+
+- **No `GameContext`, `ServiceLocator` or any god-container.** Every class requests its own
+  dependencies — constructor injection for Systems, `[Inject] Construct` for Views. Bundling them
+  into one injectable object is a Service Locator: it hides real dependencies, defeats least
+  privilege, and makes the class untestable in isolation.
+- **Minimum visibility.** `private` unless you can name a concrete caller in this codebase. "Might
+  be useful later" is not a caller. Do not add `[SerializeField]` speculatively — only when a
+  designer actually configures that value in the Inspector. Runtime state and cached references are
+  plain `private`.
+- **Input is a View concern.** The `InputView` is the only class that constructs or holds
+  `PlayerControls`; it enables action maps in `OnEnable`, disables and unsubscribes in `OnDisable`,
+  reads continuous input in `Update` and applies it in `FixedUpdate`. Systems receive
+  `SetMoveInput(Vector2)` / `Jump()` and never learn the device.
+- **Draw calls are budgeted, not discovered.** Sprite atlases for 2D, shared materials with
+  `MaterialPropertyBlock` for per-instance colour (never `renderer.material`, which clones and
+  breaks batching), Canvases split by update frequency. Plan this before writing the renderer, not
+  after profiling it.
+- **`UnityEditor` in runtime code must be `#if UNITY_EDITOR`-guarded.** Unguarded, it compiles in
+  the Editor and **fails the build** with no warning until build time. Code under `Editor/` is
+  exempt — it is excluded from builds automatically.
+
 ## Conventions reminder (see `.claude/rules/`)
 MDEOF
 else

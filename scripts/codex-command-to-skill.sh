@@ -133,17 +133,21 @@ for src in "$CMD_DIR"/*.md; do
   target_dir="$OUT_DIR/$name"
   target="$target_dir/SKILL.md"
 
+  # VALIDATED BEFORE THE --list BRANCH, NOT AFTER IT. `description` is the entire
+  # selection mechanism — a skill with an empty one is discovered and never
+  # chosen — so a missing one is refused rather than emitted as a dead surface.
+  # This check used to sit below the `continue`, which meant `--list` happily
+  # promised a SKILL.md the write path would then die on: an installer building a
+  # receipt from --list would record a file that was never written.
+  desc="$(fm_value "$src" description)"
+  if [ -z "$desc" ]; then
+    die "$src has no description: in its frontmatter; a skill with no description is discovered and never selected"
+  fi
+
   if [ "$LIST_ONLY" -eq 1 ]; then
     printf '%s\n' "$target"
     WROTE=$((WROTE + 1))
     continue
-  fi
-
-  desc="$(fm_value "$src" description)"
-  if [ -z "$desc" ]; then
-    # `description` is the entire selection mechanism — a skill with an empty one
-    # is discovered and never chosen. Refuse rather than emit a dead surface.
-    die "$src has no description: in its frontmatter; a skill with no description is discovered and never selected"
   fi
 
   end="$(fm_end_line "$src")"

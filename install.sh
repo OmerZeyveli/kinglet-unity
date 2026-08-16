@@ -1289,10 +1289,12 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 # `--emit-config` writes carries an ABSOLUTE path to this script, so it has to be in the project
 # it points into. A shim excluded from the payload is a `.codex/hooks.json` pointing at a file that
 # is not there, which under Codex is not an error — it is nine registered hooks that enforce
-# nothing. It now ships, and `.claude/skills/using-kinglet/SKILL.md` and
-# `.claude/commands/unity-doctor.md` name it, so the reachability rule is satisfied rather than
-# waived. codex-command-to-skill.sh ships for the same reason and was never skipped: Codex has no
-# command surface, so Kinglet's commands only reach a Codex reader as generated skills.
+# nothing. It now ships, and `.claude/commands/unity-doctor.md` names it — one surface, not two;
+# this comment claimed `.claude/skills/using-kinglet/SKILL.md` named it as well, which was true of a
+# draft that was reverted whole and never true of the tree. The reachability rule is satisfied by
+# that one citation rather than waived. codex-command-to-skill.sh ships for the same reason and was
+# never skipped: Codex has no command surface, so Kinglet's commands only reach a Codex reader as
+# generated skills, and the doctor command names it too.
 #
 # Both remaining skips use the identical one-name-per-line comparison form on
 # purpose: tests/test-derived-counts.sh and tests/test-shipped-citations.sh both extract the skipped
