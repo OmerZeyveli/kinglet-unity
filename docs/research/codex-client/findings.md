@@ -1035,15 +1035,26 @@ ls .claude/rules/*.md
 |---|---|---|
 | A project `AGENTS.md` reaches the model | **yes — injected.** The sentinel came back with **0** shell commands run in the whole turn | `t6-agentsmd` |
 | A project `CLAUDE.md` reaches the model | **not injected.** Same sentinel, same prompt: it came back only *after* the model ran `rg` for it | `t6-claudemd` |
-| A file referenced the way Kinglet's `CLAUDE.md` references its rules is followed | **no** — **0 of 6** runs opened it, **0 of 6** obeyed it, and the arm is indistinguishable from the control whose `AGENTS.md` says nothing at all | `t6-pointer-field-r{1,2,3}`, ×2 samples |
-| A file the entry document **orders** read is followed | **yes** — **6 of 6** opened it, **6 of 6** obeyed it | `t6-imperative-field-r{1,2,3}`, ×2 samples |
-| Kinglet's 6 rules can ship as pointers | **only in the imperative form.** The declarative form Kinglet ships today measures dead | the behaviour table below |
+| A file referenced the way Kinglet's `CLAUDE.md` references its rules is followed | **it depends on the request, and that dependence is the finding.** **0 of 9** under a request that gives the model no reason to look for project conventions; **3 of 3** under one that asks for them, against a control at **0 of 3** | `t6-pointer-field-*` vs `t6-pointer-conv-*`, `t6-nopointer-conv-*` |
+| A file the entry document **orders** read is followed | **yes** — **9 of 9** opened, **9 of 9** obeyed, under the very request shape that leaves the declarative pointer at 0 | `t6-imperative-field-r{1,2,3}`, ×3 samples |
+| Kinglet's 6 rules can ship as pointers | **conditionally, and the condition is legible.** A declarative pointer is a **map, not an order**: it supplies a destination, never a motive. Inert when the request supplies no motive; load-bearing when it does | the 2 × 3 table below |
 
-**Verdict: `AGENTS.md` is what reaches the model, and Kinglet's rules do not ride
-along on being mentioned.** The entry document is injected whole; anything outside
-it is read only when the entry document tells the model, in so many words, to go
-and read it. Kinglet's own wording — *"Rules live in `.claude/rules/` and are
-binding"* — does not tell it that, and measures at parity with silence.
+**Verdict: `AGENTS.md` is the only document that reaches the model unasked, and a
+pointer inside it decides *where* the model looks, not *whether* it looks.** The
+entry document is injected whole. Everything outside it is reached only when the
+request gives the model a reason to go looking — and *then* the pointer is decisive,
+because the control without one goes looking in the wrong place and reports the
+wrong conventions with full confidence.
+
+**This section stated the first half of that as the whole of it until 2026-08-16,
+and the correction came from a counter-experiment in review, not from here.** The
+original ran one prompt shape — terse, one line, "no commentary" — measured the
+pointer at 0 of 6, and generalised to *"the declarative form Kinglet ships today
+measures dead."* One prompt is not a measurement of a mechanism, and the ship
+recommendation built on it (inline the whole rules layer into `AGENTS.md`) was a
+large generator change justified by a result that does not hold for the request
+shape Kinglet users actually issue. The 2 × 3 table below is that experiment
+completed; every arm of it was re-run here.
 
 Every probe below ran under a disposable `CODEX_HOME` (mode 700, outside `/tmp`, a
 600 copy of `~/.codex/auth.json`, removed by an EXIT trap) with
@@ -1055,6 +1066,38 @@ answering the question instead of a rule would confound every row here. Each rig
 also sits in **its own parent directory**, so a probe's `..` search cannot reach a
 sibling arm — `## Skills` above records sibling-visibility as an isolation it had
 by accident, and this closes it by construction.
+
+**Two things about the rigs that bound what these results are about.**
+
+*The `pointer` rig carries a pointer Kinglet does not actually ship.* Its
+`AGENTS.md` ends with a "Conventions reminder" heading followed by *"Follow the
+rules files above; they bind."* The **real** generated document has the same
+heading followed by an **inlined digest of actual rule content** — verify it rather
+than trusting this sentence:
+
+```bash
+bash tests/fixtures/mkproject.sh /tmp/genfix --variant urp >/dev/null
+bash scripts/generate-claude-md.sh /tmp/genfix | awk '/^## Conventions reminder/{p=1} p&&/^## Custom Notes/{exit} p'
+# - `[SerializeField] private` for inspector fields; `_lowerCamelCase` privates; `== null` (never `?.`
+#   / `is null`) on Unity objects; `[FormerlySerializedAs]` on every renamed serialized field; zero GC
+#   allocations in `Update`/`FixedUpdate`/`LateUpdate`; cache `GetComponent` / `Camera.main`.
+```
+
+Stripping that is *correct* for isolating the mechanism — leave it in and the
+`pointer` arm becomes the `inline` arm. But it means these rigs measure
+**pointer-minus-digest**, while Kinglet ships **pointer-plus-digest**, and the
+digest already carries the highest-value conventions by the mechanism that scores
+best below. Every ship claim here is scoped to the rule content that lives *only*
+behind the pointer, never to the rules layer as a whole.
+
+*`nopointer` differs from `pointer` by a substitution, not a deletion.* Where
+`pointer` has the rules bullet and the conventions reminder, `nopointer` has
+*"## Where things go — **Game code:** `Assets/Scripts/`"*: topic-neutral and
+length-matched, so it cannot plausibly manufacture the effect. It is **not** inert,
+though, and the counter-experiment below is what showed it — under a
+conventions-inviting request the control went straight to `Assets/Scripts/`. So the
+contrast is not *pointer versus nothing* but **one destination hint versus
+another**, which if anything is the harder test.
 
 ### The entry document is injected; `CLAUDE.md` is not
 
@@ -1074,16 +1117,24 @@ One `rg` means the model went looking, which any file in the tree would satisfy.
 recovers it, and nothing guarantees one will.
 
 So Kinglet must write `AGENTS.md`. Leaving the project's `CLAUDE.md` to be
-discovered is a bet on the model searching, and the next two subsections show it
-does not search when it has no reason to think there is anything to find.
+discovered is a bet on the model searching — and the sections below measure exactly
+when it searches and when it does not, which is the one thing that bet depends on.
+This row is the only unconditional result in the section.
 
-### A referenced file is not followed — unless the entry document orders it read
+### Whether a referenced file is followed depends on the request
 
-The retrieval probe cannot answer this. Asked *for* a sentinel, the model searches
-the tree and finds it whether or not anything pointed at it: `t6-pointer-sentinel`
-and `t6-nopointer-sentinel` both returned `KINGLET-SENTINEL-4417`, both after an
-`rg`, in rigs that differ only in whether `AGENTS.md` mentions `.claude/rules/`.
-A question naming the thing you are testing for manufactures its own positive.
+The retrieval probe cannot decide this on its **answer**. Asked *for* a sentinel,
+the model searches the tree and finds it whether or not anything pointed at it:
+`t6-pointer-sentinel` and `t6-nopointer-sentinel` both returned
+`KINGLET-SENTINEL-4417`, both after an `rg`. A question naming the thing you are
+testing for manufactures its own positive.
+
+**Their *commands* are a different matter, and the first version of this section
+threw that away.** `t6-pointer-sentinel` grepped and then ran
+`sed -n '1,80p' .claude/rules/architecture.md` — it went to the rules file.
+`t6-nopointer-sentinel` ran three commands and touched `.claude/rules/` in none of
+them. That asymmetry points the same way as everything below, and calling the pair
+"decided nothing" was reading only the column that could not decide.
 
 The binding probe asks something the model can answer from general knowledge, and
 never mentions rules, files or conventions:
@@ -1099,56 +1150,113 @@ Kinglet's real convention is `_lowerCamelCase`, which the model already knows an
 would produce unaided — using the real rule would have scored a generic answer as
 compliance.
 
-Four arms, three runs each, same prompt, `codex-cli 0.145.0`. The values below are
-the run currently on disk, produced by the `### Reproducing` recipe from a clean
-slate; an earlier independent sample of the same four arms gave the same verdict in
-every cell, differing only in that `pointer`'s third run answered `moveSpeed`
-rather than `_moveSpeed` — neither is `kg_`:
+**Prompt P1 — the terse one, and the only one the first version ran.** Four
+`AGENTS.md` arms, three runs each. These values are the run on disk; the same four
+arms were run twice more — once before it and once by an independent clean-slate
+reproduction of the `### Reproducing` block — and agreed in every cell, so each
+figure below is **3 of 3 on disk and 9 of 9 across three samples**.
 
-| Arm | What `AGENTS.md` says | Rule file on disk | r1 | r2 | r3 | Opened the file |
-|---|---|---|---|---|---|---|
-| `inline` | carries the rule **itself** | — | `kg_moveSpeed` | `kg_moveSpeed` | `kg_moveSpeed` | n/a — nothing to open |
-| `imperative` | *"you MUST read `.claude/rules/csharp-unity.md` … do not answer a code question without reading it first"* | yes | `kg_moveSpeed` | `kg_moveSpeed` | `kg_moveSpeed` | **3 of 3** |
-| `pointer` | *"Rules live in `.claude/rules/` and are binding: `architecture.md` · `csharp-unity.md`"* — **Kinglet's own wording** | yes | `_moveSpeed` | `_moveSpeed` | `_moveSpeed` | **0 of 3** |
-| `nopointer` | nothing about rules at all | yes | `moveSpeed` | `moveSpeed` | `moveSpeed` | **0 of 3** |
+**Only the last sample is on disk, and that is a defect in the evidence trail
+rather than in the result.** The three samples reuse the `-r{1,2,3}` filenames, so
+each overwrote its predecessor; what survives here is one complete 4-arm × 3-run
+pass. The 9 of 9 rests on two runs whose transcripts no longer exist — one of them
+another reader's — so a sceptic should re-derive it with the recipe rather than
+accept it. The recipe reproduces the on-disk sample exactly, which is the part that
+can be checked.
 
-Across both samples: `inline` **6 of 6** compliant, `imperative` **6 of 6**
-compliant and **6 of 6** reads, `pointer` **0 of 6** compliant and **0 of 6**
-reads, `nopointer` **0 of 6** compliant.
+| Arm | What `AGENTS.md` says | r1 | r2 | r3 | Opened the rules file |
+|---|---|---|---|---|---|
+| `inline` | carries the rule **itself** | `kg_moveSpeed` | `kg_moveSpeed` | `kg_moveSpeed` | n/a — nothing to open |
+| `imperative` | *"you MUST read `.claude/rules/csharp-unity.md` … do not answer a code question without reading it first"* | `kg_moveSpeed` | `kg_moveSpeed` | `kg_moveSpeed` | **3 of 3** |
+| `pointer` | *"Rules live in `.claude/rules/` and are binding: `architecture.md` · `csharp-unity.md`"* — **Kinglet's own wording** | `_moveSpeed` | `_moveSpeed` | `_moveSpeed` | **0 of 3** |
+| `nopointer` | nothing about rules at all | `moveSpeed` | `moveSpeed` | `moveSpeed` | **0 of 3** |
 
-**The `pointer` arm is the finding and the `nopointer` arm is what gives it
-meaning.** Kinglet's shipped pointer wording produced answers indistinguishable
-from an `AGENTS.md` that never mentions the rules, in a tree where the rule file
-was sitting at the path the pointer names. The model did not open it once in six
-runs across two samples — every one of those turns is a single `agent_message`
-with no `command_execution` anywhere.
-
-**`inline` and `imperative` are both positive controls, and they fail differently
-if the experiment is broken.** `inline` proves the rule text is one the model will
-follow when it has it — without that, `pointer`'s failure could be a model
-declining a silly convention rather than never reading it. `imperative` proves the
-file is readable, at that path, in that sandbox, and that its content binds once
-read — without that, `pointer`'s failure could be a permissions or path artefact.
-Both came back 6 of 6, so neither escape is available: the `pointer` arm failed at
-the *decision to read*, and nowhere else.
-
-The `imperative` arm's command is identical across all six runs, which is worth
-recording because it shows what "followed" looks like:
+**`inline` and `imperative` are positive controls that fail differently if the
+experiment is broken.** `inline` proves the rule is one the model will follow when
+it has it — without that, `pointer`'s failure could be a model declining a silly
+convention. `imperative` proves the file is readable, at that path, in that
+sandbox, and binds once read — without that, `pointer`'s failure could be a
+permissions or path artefact. Both are 9 of 9, so under P1 the `pointer` arm failed
+at the *decision to read* and nowhere else. The `imperative` command is
+byte-identical in all nine runs and reads **both** named files, not only the one the
+mandate names:
 
 ```
 /bin/bash -lc "sed -n '1,240p' .claude/rules/csharp-unity.md && sed -n '1,240p' .claude/rules/architecture.md"
 ```
 
-It read **both** named rules files, not only the one the mandate named — so the
-imperative form recruits the whole list, not just its subject.
+**`pointer` and `nopointer` are identical on both measured variables and *not*
+identical in their answers**, and the first version of this section called them
+"indistinguishable", which the transcripts it cited contradict. `pointer` answered
+`_moveSpeed` 9 of 9; `nopointer` answered `moveSpeed` 9 of 9. Neither is `kg_`, so
+both are non-compliant and both opened nothing — but the split is perfectly
+consistent and it runs *toward* Kinglet's real `_lowerCamelCase` convention. The
+pointer text was in context and was doing something: naming `csharp-unity.md` and a
+"conventions reminder" moved the answer toward conventional C# without causing a
+single read. That is the first hint of the mechanism the next table measures.
 
-**What this is not.** Six runs per arm across two samples, one model, one prompt,
-one unnatural rule. The claim is *"the declarative pointer was not followed in 6 of
-6 and the imperative one was followed in 6 of 6"*, not that either is
-deterministic, and not that every rule in `.claude/rules/` behaves like this one. A
-rule the model already agrees with will look obeyed whether or not it was read —
-which is exactly why the probe uses a convention Kinglet does not have. A future
-re-run must re-measure rather than inherit this.
+### The same rig, the same rule file, a different request
+
+Nothing changes below but the prompt. Same two rigs, byte-identical, same
+`.claude/rules/csharp-unity.md`, same model, same sandbox:
+
+- **P1** — *"Write the single C# field declaration for a private serialized float
+  holding a move speed. Output only that one line of code, with no commentary and
+  no code fence."*
+- **P2** — P1 **plus four words**: *"…, following this project's conventions."*
+- **P3** — *"Show me the code for a new MonoBehaviour called PlayerMover for this
+  project. It needs a serialized move speed field and should move the transform
+  each frame. Follow this project's conventions."*
+
+| Prompt | `pointer` opened rules | `pointer` compliant | `nopointer` opened rules | `nopointer` compliant |
+|---|---|---|---|---|
+| **P1** — no reason to look | **0 of 9** | 0 of 9 | 0 of 9 | 0 of 9 |
+| **P2** — four words appended | **2 of 3** | 2 of 3 | **0 of 3** | 0 of 3 |
+| **P3** — asks for conventions | **3 of 3** | **3 of 3** | **0 of 3** | 0 of 3 |
+
+**P3 is the decisive row and its control is what makes it decisive.** All three
+`pointer` runs issued exactly one command and it went straight to the rules:
+
+```
+/bin/bash -lc "sed -n '1,240p' .claude/rules/architecture.md && sed -n '1,280p' .claude/rules/csharp-unity.md"
+```
+
+Under the **same** prompt the `nopointer` control never touched `.claude/rules/`. It
+went to the code instead — `rg --files Assets/Scripts`, then
+`sed … Assets/Scripts/GameLifetimeScope.cs && sed … Gameplay.asmdef` — answered
+`moveSpeed` 3 of 3, and **asserted in every one of the three that it had followed
+the project's conventions**:
+
+> This follows the project's current convention of sealed component classes without an explicit namespace.
+> This follows the project's existing convention of sealed classes, Allman braces, and no explicit namespace.
+> This matches the project's current global-namespace and sealed-class conventions.
+
+So the failure mode without a pointer is not *no conventions applied*. It is **the
+wrong conventions applied, from the wrong file, and reported as the project's own.**
+The pointer is the only difference between those two outcomes.
+
+**P2 is the single-variable version and it carries a control the review's did not.**
+Four appended words move the `pointer` rig from 0 of 9 to **2 of 3**; the same four
+words move the `nopointer` rig to **0 of 3**, and in that arm the model ran **no
+command at all** in any of the three runs. So the four words alone do not cause a
+search, and the pointer alone does not either. **The prompt supplies the motive and
+the pointer supplies the destination, and a read needs both.** That interaction is
+the mechanism, and it is why "the declarative pointer measures dead" was the wrong
+generalisation of a true measurement.
+
+(`pointer` P2 r2 is the one arm that read nothing and answered `_moveSpeed` — the
+same non-compliant answer P1 produces. The row is 2 of 3, not 3 of 3, and it is
+recorded rather than rounded because P2's whole value is being a minimal
+perturbation.)
+
+**What this is not.** Three runs per cell against a stochastic model, one model, one
+unnatural rule, three prompts. It establishes that the P1 zero is
+*prompt-conditional* and that the pointer is *decisive under P3*; it does not
+establish where the boundary between those regimes lies, and P2 sitting between them
+at 2 of 3 is the visible edge of a gradient nobody has mapped. A rule the model
+already agrees with will look obeyed whether or not it was read, which is why the
+probe uses a convention Kinglet does not have. A future re-run must re-measure
+rather than inherit this.
 
 ### Codex's `~/.codex/rules/` is a different thing, and it is not a spelling variant
 
@@ -1216,39 +1324,82 @@ class that does not depend on the rules layer at all, which is consistent with
 
 ### What this means for the ship
 
-1. **Ship `AGENTS.md`, and ship it as the payload rather than as an index.**
-   Measured: it is injected (`t6-agentsmd`, 0 commands), `CLAUDE.md` is not
-   (`t6-claudemd`, found only by `rg`), and a rule that lives one file away is not
-   applied (`pointer` 0 of 6) while the same rule inside `AGENTS.md` is (`inline`
-   6 of 6). Anything that must *bind* — the five spine rules' non-negotiables —
-   has to be in the file, not named by it.
-2. **If a pointer is used anyway, it must be an order, not a mention.** Measured:
-   `imperative` 6 of 6 read and 6 of 6 obeyed against `pointer` 0 of 6, the two
-   rigs differing only in wording. That is the cheap repair if inlining six rules
-   files into `AGENTS.md` is too much text — but it buys a *read*, at 6 of 6, not
-   a guarantee, and it costs a turn of latency each time.
-3. **Do not let the importer write it.** Measured: the imported `AGENTS.md`
+1. **Kinglet must write `AGENTS.md`; it cannot leave `CLAUDE.md` to be found.**
+   Measured, and this half is unconditional: `AGENTS.md` is injected
+   (`t6-agentsmd`, **0** commands) and `CLAUDE.md` is not (`t6-claudemd`, recovered
+   only by an `rg`). Nothing here depends on the prompt — the injection happens
+   before the turn.
+2. **Keep the declarative pointer. It is doing real work, and the work it does is
+   not the work the first version of this section denied.** Measured: under a
+   request that asks for the project's conventions, the pointer rig read the rules
+   **3 of 3** while the identical rig without a pointer read `Assets/Scripts/` and
+   claimed the project's conventions **3 of 3** while getting them wrong. Removing
+   the pointer does not degrade to "no conventions"; it degrades to **confidently
+   wrong conventions**, which is worse and harder to notice.
+3. **Inline what must bind regardless of how the user phrases the request — and
+   that is a shortlist, not the rules layer.** Measured: under a request that gives
+   no reason to look, the pointer is not followed (**0 of 9**) while the same rule
+   inlined binds (`inline` **9 of 9**). So a rule that must hold even when the user
+   asks a narrow, conventions-blind question has to be *in* `AGENTS.md`. **Kinglet
+   already does this** — the generated document's `## Conventions reminder` inlines
+   `_lowerCamelCase`, `== null`, `[FormerlySerializedAs]`, zero-alloc `Update` and
+   the caching rule, which is the `inline` mechanism applied to exactly the
+   highest-value conventions. The open question for Task 8 is therefore **narrow**:
+   which spine non-negotiables are *not* in that digest and should be. It is not
+   "inline the rules layer into `AGENTS.md`", which is what this list said before
+   the counter-experiment and would have been a large generator change bought with
+   a one-prompt result.
+4. **An imperative pointer is available, and its cost is now legible.** Measured:
+   `imperative` **9 of 9** read and **9 of 9** obeyed under the very prompt that
+   leaves the declarative form at 0 — and it reads *every* file it names, not only
+   its subject. It is the strongest of the three routes under P1 and the only one
+   that survives a conventions-blind request without inlining. What it costs is a
+   turn of latency on every task, whether or not the rules are relevant; and it is
+   9 of 9, not a guarantee.
+5. **Do not let the importer write `AGENTS.md`.** Measured: the imported file
    carries 3 `.Codex/rules/` references (`skillrig`) pointing at a directory that
    exists under no spelling, and the rules it points at never migrate
-   (`codex-facts.md` §"Three losses", loss 2). An entry document that is injected
-   whole is exactly the wrong file to let a blind substitution rewrite.
+   (`codex-facts.md` §"Three losses", loss 2). A document that is injected whole is
+   the worst file in the tree to let a blind substitution rewrite — and by item 2
+   the pointer inside it is load-bearing, so corrupting it is not cosmetic.
 
-Whether Kinglet generates `AGENTS.md` from the same generator as `CLAUDE.md`, and
-how much of the rules layer is inlined into it, are the ship list's decisions and
-not this section's.
+Whether Kinglet generates `AGENTS.md` from the same generator as `CLAUDE.md`, which
+non-negotiables join the inlined digest, and whether the pointer is upgraded to the
+imperative form, are the ship list's decisions and not this section's.
 
 ### Reproducing
 
 `evidence/` is gitignored, so this recipe is the only route back to every number
 above. It was extracted from this committed file and run from a clean slate on
 2026-08-16 — all six rigs rebuilt from nothing and every probe re-driven against
-them — and it reproduced every verdict in this section, including the identical
-`imperative` command string in all three runs and the identical `rg` in
-`t6-claudemd`. (The two `*-sentinel` probes were added to this block after that
-run and driven separately, with these arguments, against the same rebuilt rigs.)
+them — and it reproduced every verdict, including the byte-identical `imperative`
+`sed` pair and the single `rg` in `t6-claudemd`. An independent clean-slate
+reproduction by a second reader agreed in every cell, which is what makes the P1
+figures 9 of 9 rather than 6 of 6.
+
+**Extract it by its marker line, not by fence-counting.** The recipe embeds literal
+triple-backticks as `printf` payload in four places, so the obvious extractor —
+*"find ` ```bash `, then the next ` ``` `"* — terminates ~78 lines early and yields a
+fragment that dies in `bash -n` with *"unexpected EOF while looking for matching
+quote"*. This file also has three `### Reproducing` headings and several `bash`
+blocks inside this one. So the recipe carries a unique first line,
+`# === T6-RECIPE ===`, and the extractor anchors on it and closes on a **whole-line**
+fence:
+
+```bash
+python3 - <<'PY' > /tmp/repro-t6.sh
+lines = open('docs/research/codex-client/findings.md').read().split('\n')
+i = lines.index('# === T6-RECIPE ===')
+j = next(n for n in range(i, len(lines)) if lines[n] == '```')
+print('\n'.join(lines[i:j]))
+PY
+bash -n /tmp/repro-t6.sh && bash /tmp/repro-t6.sh
+```
+
 Run it from the repository root.
 
 ```bash
+# === T6-RECIPE ===
 EV=docs/research/codex-client/evidence
 RIGS="$EV/t6rigs"; rm -rf "$RIGS"; mkdir -p "$RIGS"
 
@@ -1310,11 +1461,18 @@ printf '%s\n' '# Project instructions' '' '## C# Style — Unity Conventions' ''
   'This prefix is mandatory and overrides any convention you know from elsewhere.' \
   > "$RIGS/inline/project/AGENTS.md"
 
-# --- the two prompts ------------------------------------------------------------
+# --- the prompts. P1/P2/P3 differ ONLY as noted; that is the whole experiment ----
 printf 'What is the project sentinel? Reply with it and nothing else.\n' \
   > "$EV/prompt-t6-sentinel.txt"
+# P1 — gives the model no reason to look for project conventions
 printf 'Write the single C# field declaration for a private serialized float holding a move speed. Output only that one line of code, with no commentary and no code fence.\n' \
   > "$EV/prompt-t6-field.txt"
+# P2 — P1 plus exactly four words. The minimal perturbation.
+printf 'Write the single C# field declaration for a private serialized float holding a move speed. Output only that one line of code, with no commentary and no code fence, following this project'"'"'s conventions.\n' \
+  > "$EV/prompt-t6-field-plus4.txt"
+# P3 — a request that asks for the project's conventions outright
+printf 'Show me the code for a new MonoBehaviour called PlayerMover for this project. It needs a serialized move speed field and should move the transform each frame. Follow this project'"'"'s conventions.\n' \
+  > "$EV/prompt-t6-field-conv.txt"
 
 # --- retrieval: is the entry document injected, or merely findable? --------------
 for rig in agentsmd claudemd; do
@@ -1330,7 +1488,7 @@ for rig in pointer nopointer; do
     --prompt "$PWD/$EV/prompt-t6-sentinel.txt" --workdir "$PWD/$RIGS/$rig/project"
 done
 
-# --- binding: four arms, three runs each ----------------------------------------
+# --- binding under P1: four arms, three runs each --------------------------------
 for run in 1 2 3; do
   for arm in inline imperative pointer nopointer; do
     bash scripts/codex-probe.sh --name "t6-$arm-field-r$run" \
@@ -1338,6 +1496,23 @@ for run in 1 2 3; do
     printf '%-11s r%s: %s\n' "$arm" "$run" "$(cat "$EV/t6-$arm-field-r$run.last.txt")"
   done
 done
+
+# --- the counter-experiment: SAME rigs, P2 and P3, each with its control ---------
+#     This is the half the first version of this section did not run, and it is
+#     what turns "the pointer measures dead" into "the pointer is a map".
+for run in 1 2 3; do
+  for arm in pointer nopointer; do
+    for p in conv plus4; do
+      bash scripts/codex-probe.sh --name "t6-$arm-$p-r$run" \
+        --prompt "$PWD/$EV/prompt-t6-field-$p.txt" --workdir "$PWD/$RIGS/$arm/project"
+    done
+  done
+done
+# Compliance is `kg_` in the answer; the READ is the `.claude/rules/` path in the
+# command census below. Both columns are needed — P2 r2 on `pointer` answered
+# non-compliantly having read nothing, which is the row that keeps P2 at 2 of 3.
+/usr/bin/grep -c 'kg_' "$EV"/t6-pointer-conv-r?.last.txt "$EV"/t6-nopointer-conv-r?.last.txt \
+                      "$EV"/t6-pointer-plus4-r?.last.txt "$EV"/t6-nopointer-plus4-r?.last.txt
 ```
 
 **Read the answer *and* the command census — the answer alone cannot tell an
@@ -1371,9 +1546,13 @@ for path in sys.argv[1:]:
 PY
 ```
 
-Expected: `t6-agentsmd` and every `inline`/`pointer`/`nopointer` field run report
-*no shell command at all*; `t6-claudemd` reports one `rg`; every `imperative` run
-reports the `sed -n '1,240p' .claude/rules/…` pair. Raw transcripts land under
+Expected: `t6-agentsmd` and every P1 `inline`/`pointer`/`nopointer` run report *no
+shell command at all*; `t6-claudemd` reports one `rg`; every `imperative` run
+reports the `sed -n '1,240p' .claude/rules/…` pair; every `t6-pointer-conv-*` run
+reports a single `sed … .claude/rules/architecture.md && sed …
+.claude/rules/csharp-unity.md`; and every `t6-nopointer-conv-*` run reports
+`rg --files Assets/Scripts` followed by a read of `GameLifetimeScope.cs` —
+the wrong file, confidently. Raw transcripts land under
 `docs/research/codex-client/evidence/`, which `.gitignore` excludes — the verdicts
 are here, the credentials never are.
 
@@ -1408,8 +1587,10 @@ the 7 are lost silently.** `codex-facts.md` §"Three losses" measures the trigge
 syntactic — `$ARGUMENTS`, or `$` followed by a digit, anywhere in the body — so a
 price (`$5`) or a positional reference in prose drops a command with the same
 silence. The 7 never appear in `detect`, so `import` reports **31 successes and 0
-failures** while they are absent. Those numbers are quoted from `codex-facts.md`,
-not re-counted here.
+failures** while they are absent — 31 over `codex-facts.md`'s replica, which has no
+`.mcp.json`; the same import over a real installed project reports **32**, per the
+reconciliation in `## Skills`. Either way the failure count is **0**. Those numbers
+are quoted from `codex-facts.md`, not re-counted here.
 
 The 2 survivors, `unity-doctor` and `unity-init`, become
 `.agents/skills/source-command-<name>/SKILL.md` — which is why `## Skills` above
@@ -1504,8 +1685,9 @@ means.
 | Where a per-agent tool grant could live | What is there |
 |---|---|
 | the converted `.codex/agents/*.toml` | exactly 3 keys, ×8 files: `name`, `description`, `developer_instructions` |
-| Codex's own `agents/openai.yaml` | `interface` (`display_name`, `short_description`, `default_prompt`) and `policy` (`allow_implicit_invocation`) |
+| Codex's own `agents/openai.yaml` | `interface` (`display_name`, `short_description`, `default_prompt`) and `policy` (`allow_implicit_invocation`) — and this holds for **all six** built-ins, not only the one quoted above: `/usr/bin/grep -rl tools ~/.codex/skills/.system/*/agents/` returns nothing |
 | the `Config` object's `tools` key | session-scoped only — `ToolsV2` carries one property, `web_search`; `AppToolConfig` is `{approval_mode, enabled}` |
+| **`--sandbox`** | **a real, enforced restriction — and the only one Codex has.** `read-only`, `workspace-write`, `danger-full-access`. Every probe in this wave ran under `read-only`. It is *session*-scoped like `mcp_servers`, so it cannot vary per agent within a session |
 
 ```bash
 # the key census over the converted agents — KEYS, not substrings. A bare
@@ -1527,14 +1709,43 @@ allowlist.** MCP servers are configured for the session — the importer writes
 `[mcp_servers.UnityMCP] url = "http://localhost:8080/mcp"` into
 `<repo>/.codex/config.toml` — and whatever the session has, every agent has.
 
-**For a Unity toolkit that inverts the usual concern.** Kinglet's `tools:` lines
-are *narrowing*: `unity-reviewer` is `Skill, Read, Glob, Grep` and cannot write,
-`unity-scene-builder` gets `mcp__UnityMCP__*` but no `Bash`. Under Codex those
-distinctions do not exist, so the read-only reviewer is read-only only because its
-prose says so. That is a real loss of enforcement and it is the opposite of the
-"capability is gone" reading: the capability is *ambient*, and the restriction is
-what evaporated. Whether the MCP tools function at all is Task 7's measurement and
-is not claimed here.
+**For a Unity toolkit that inverts the usual concern.** Kinglet's `tools:` lines are
+*narrowing*, and the narrowing is what has no expression. Derived over all 8 rather
+than argued from an example:
+
+```bash
+for f in .claude/agents/*.md; do
+  printf '%-22s %s\n' "$(basename "$f" .md)" "$(/usr/bin/grep -m1 '^tools:' "$f")"
+done
+```
+
+| Agent | Narrowing that evaporates under Codex |
+|---|---|
+| `unity-reviewer` | **no `Write`, no `Edit`, no `Bash`, no MCP** — the only fully read-only agent |
+| `unity-scene-builder` | no `Write`, no `Edit`, no `Bash` |
+| `unity-optimizer` | no `Bash` |
+| `unity-test-runner` | no `Bash` |
+| `unity-ui-builder` | no `Bash` |
+| `unity-fixer` | no `Agent` |
+| `unity-coder`, `unity-prototyper` | none — full set |
+
+**5 of 8 carry a substantive capability narrowing** (6 of 8 if the absent `Agent`
+grant counts). Under Codex none of it survives, so a read-only agent is read-only
+only because its prose says so.
+
+**`unity-reviewer` is the row that matters most, and it is worse than a lost
+attribute.** Its own description says it reports issues and *"does not fix them"*;
+under Codex it would run with `Write`, `Edit`, `Bash` **and** MCP. A reviewer that
+can repair what it reviews is not a degraded reviewer — it is a different thing, and
+this repository's own `subagent-driven-implementation` loop depends on the review
+gate being unable to quietly fix what it was meant to report.
+
+That is a real loss of enforcement and it is the opposite of the "capability is
+gone" reading: the capability is *ambient*, and the **restriction** is what
+evaporated. The one exception is `--sandbox`, in the table above — a genuine
+enforced restriction, but session-scoped, so it can make a whole Codex session
+read-only and cannot make one agent read-only inside it. Whether the MCP tools
+function at all is Task 7's measurement and is not claimed here.
 
 ### The converted bodies instruct the model to use a tool that does not exist
 
@@ -1573,12 +1784,29 @@ references), a `.Codex/rules/` directory that does not exist (9 references), and
 **Recommendation, with the measurement attached.** Do not ship the 8 agents as
 `.codex/agents/*.toml`, and do not ship the importer's conversion of them.
 Measured: the converted files carry 3 keys and no capability; Codex's own agent
-shape has no tools key either; the only `tools` in the `Config` schema is
-session-scoped `web_search`. If an agent's *content* is worth shipping — and
-`unity-fixer`'s and `unity-reviewer`'s bodies are the same skill-shaped material
-`## Commands` describes — express it as a skill, which `## Skills` measured
-working end to end, rather than as an agent definition that silently drops the
-only part of itself that was enforcing anything.
+shape has no tools key in any of the 6 built-ins; the only `tools` in the `Config`
+schema is session-scoped `web_search`.
+
+**The restriction cannot be preserved by any route measured in this wave, and
+re-expressing an agent as a skill does not restore it.** A skill has no `tools`
+contract either — by this section's own evidence there is no per-agent capability
+surface anywhere in Codex 0.145.0, so the skill route drops the narrowing exactly
+as completely as the TOML route does. Anyone reading item 2 below as the remedy for
+the enforcement loss has read it wrong: it is the remedy for the *broken file*, and
+the enforcement loss has no remedy here. What Kinglet has to decide is what a
+reviewer that can write is worth, and `--sandbox read-only` for a whole session is
+the only lever measured that changes the answer.
+
+So, two separable decisions:
+
+1. **Do not ship the TOML.** Airtight on the measurement above, and independent of
+   anything else.
+2. **If an agent's *content* is worth shipping** — `unity-fixer`'s and
+   `unity-reviewer`'s bodies are the same skill-shaped material `## Commands`
+   describes — a skill is the shape that exists. But state its reach honestly, the
+   way `## Commands` does: `## Skills` measured **6 distinct skills ever loading out
+   of 16–18 discovered**, so a converted agent is discoverable, not dispatchable,
+   and this recommendation must not be read as "the model will find it".
 
 Whatever ships, both body defects have to be fixed before it does, and they are
 **not the same kind of defect**. The 9 `.Codex/rules/` references are the blind
