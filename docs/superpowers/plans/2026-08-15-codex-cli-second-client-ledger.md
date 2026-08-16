@@ -355,7 +355,7 @@ The event stream shape, measured against the real binary:
 | 2 | Does Codex import a `.claude/` configuration? | **DONE** | `1d8e941..89e7552` | general-purpose implementer; 2 fix rounds; F1 = **confirmed, lossy in silence** |
 | 3 | Codex's hook mechanism, measured | **DONE** | `1993b1b..952cd7a` | general-purpose implementer; 1 fix round; F4 **and** F5 delivered — my RE-PLANNED header had wrongly dropped F5 |
 | 4 | Kinglet's 12 hooks under Codex | **DONE** | `23e2444..53daafb` | general-purpose implementer; **3 fix rounds**, one Critical; the shim ships and all 9 tool-event hooks enforce |
-| 5 | Kinglet's 16 skills under Codex | open | — | **RE-PLANNED: shrank most** — discovery settled, only invocation left; plus an unreconciled 18-vs-16 to resolve |
+| 5 | Kinglet's 16 skills under Codex | **DONE** | `1bb6135..f4f19c4` | general-purpose implementer; 1 fix round; skills **are** invoked unnamed, and the spec's payload-location proposal was refuted |
 | 6 | Rules, `AGENTS.md`, commands and agents | open | — | **RE-PLANNED: split.** `AGENTS.md` and agent conversion settled; rules and commands became design work |
 | 7 | Layer B — MCP routes against the live bridge | open | — | *(brief pending)* — needs a free Editor |
 | 8 | Ship the payload the measurement supports | open | — | *(brief pending)* — ship list decided by Tasks 2–7 |
@@ -591,6 +591,70 @@ combination showed it.
 | `shim_ms_to_sleep` emits `3.000` rather than `3`. On a `%N`-less BSD host **every** value takes that form, so if any BSD `sleep` rejects a fractional argument the killer never fires | Safe on this host — GNU `sleep` accepts it and the suite is green. Unverifiable without a macOS box, and the mitigation is one character | **The planned macOS host pass.** Named here because it is the first Codex-side item that pass inherits |
 | `T5` is classified as a floor, but the reviewer judges the label **generous**: it is unobservable alone *and* combined, 0/60 in a race probe. The sentinel split converted its defect into a no-op | Safe: it is "equivalent given the fix", not an independent layer, and saying so is more honest than leaving it counted as a guard | **Task 11**, which is already the harness-and-guard-gaps task |
 | A reviewer cleaned up with `rm -rf /tmp/kinglet-codex-shim.*` — a glob delete in shared `/tmp`. Nothing was damaged; the controller verified the repository, the scratchpad and other agents' directories | Dropped as an incident, kept as a rule: **remove named directories you created, or work under one `mktemp -d` root and remove that single path.** Both agents adopted it for the remaining rounds | — |
+
+---
+
+## Task 5 — close, and the spec proposal that measurement refuted
+
+Implementer: **general-purpose**. `DONE`, one fix round. Review: **Spec ✅ with one deviation, Quality
+Needs work** — no Critical, four Important, **all four in the framing rather than the facts**; all four
+load-bearing claims reproduced exactly under independent re-derivation. Re-review: **clean**. Range
+**`1bb6135..f4f19c4`**.
+
+### Skills are invoked without being named — with a control, and then four
+
+Five of five relevant unnamed probes loaded a skill. Kinglet-shaped guidance *without* a load was
+never observed. Controls went from one to five across the loop; **four of five loaded nothing**,
+including a Unity-domain question about `Time.fixedDeltaTime`, and one collision case loaded
+`using-kinglet` while **declining** `addressables`.
+
+**Routing comes from Codex's injected index, not from any project document.** In a rig with
+`AGENTS.md`, `CLAUDE.md`, `.claude/` and `.codex/` deleted, the model *tried* `sed AGENTS.md`
+(exit 2) and `rg` (exit 1, empty), then went **straight to the exact skill path with no prior
+discovery**.
+
+**But the reach is narrower than the listing.** Across all rigs only **6 distinct skills were ever
+observed loading** — 5 of 18, 3 of 18, 2 of 16 by rig, denominators taken from the rigs themselves.
+The other twelve are **discoverable, not reachable**, and no measurement says otherwise.
+
+### The spec's payload-location proposal is refuted; its first fallback wins
+
+The spec proposed *"no second copy: Codex reads `.claude/skills/` directly"*, with a symlink and then
+an install-time copy as ordered fallbacks. Measured: `.claude/skills/` alone gives **0** repo skills.
+**The proposal is dead and the first fallback is selected** — which is the structure working, not a
+defect in it.
+
+| route | result |
+|---|---|
+| `.claude/skills/` alone | **0** skills |
+| `skills` config key, two spellings | **0** — and controlled: the same `config.toml` carried a trust entry and `hooks/list` went **0 → 12**, so the file was read while the key did nothing |
+| directory symlink `.agents/skills → ../.claude/skills` | **16**, enabled, invocation observed |
+| the importer's copy | works, but carries **50** `.Codex/` rewrites over 17 of 18 skills, including **13 skill→skill references over 8 targets, 0 resolving** while all 8 exist one directory away |
+| `skills/extraRoots/set` | **16**, enabled, no symlink and no copy — but `scope:"user"` and **non-persisting** |
+
+**A correction Task 8 must build on: the symlink is a discovery device, not a load path.**
+`skills/list` hands the model the real `.claude/skills/…` path, and every `command_execution` reads
+that path. **Nothing traverses `.agents/skills` at load time.** A ship design assuming loads flow
+through `.agents/` would be designing for a path nothing uses.
+
+### Two methodological entries
+
+**An instrument that reads its own output.** A skill load appears as a `command_execution` reading
+the `SKILL.md`, so the detector must read **only the `command` field** — a loaded skill body echoes
+its own `.Codex/skills/…` citations into the *output*, and a naive grep scored **4 loads where 2
+happened** (worse elsewhere: 5 versus 2).
+
+**A silent negative needs proof the mechanism was live.** "The `skills` key did nothing" and "the
+file was never read" are the same observation until something else in the same file demonstrably
+works. The trust entry going 0 → 12 is what makes the refutation mean anything.
+
+### Deferred, with owners
+
+| Finding | Ruling | Owner |
+|---|---|---|
+| **The importer writes `timeoutSec: 3000` un-converted.** Task 4 fixed the units at the source via `--emit-config`, but a user who reaches Codex through `externalAgentConfig/import` rather than through Kinglet's installer still gets the millisecond value read as seconds | **Not safe to leave implicit.** It is the gap between what Kinglet installs and what Codex's own importer produces, and a reader who used the import would have 33-to-83-minute hook timeouts with nothing saying so | **Task 8** (ship list must state which path a user is on) and **Task 9** (the installer must not assume the import ran) |
+| A control drifted on a clean-slate re-run: a fresh `t5-control` loaded `using-kinglet` where the committed one loaded nothing | Safe: of five control runs now in existence four loaded nothing, and `t5-control-api` loaded nothing with **no shell command at all** on two independent runs. The section already discloses `n = 1` | **Task 10 Step 5**, to record that the `none` cells are per-run facts rather than invariants |
+| The `### Reproducing` recipe leaves three gitignored `repro-*.out` files behind | Dropped: they are evidence, the directory is gitignored, and removing them would remove the only artefacts a re-runner produces | — |
 
 ---
 
