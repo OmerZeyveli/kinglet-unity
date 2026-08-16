@@ -1177,6 +1177,16 @@ find Assets -name '*.meta' -exec rsync {} /tmp/backup/ \;
 find "$(pwd)/Assets" -name '*.meta' -exec grep -l guid {} \;
 0 0000 - command substitution inside single quotes is inert and must not trip the unparseable arm
 find Assets -name '*.meta' -exec grep -l '$(rm -rf /)' {} \;
+0 0000 - a read whose only .meta is a grep pattern: a dollar-paren made the token stream unparseable and the arm blocked with no find, no xargs and no -exec anywhere - nothing runs over anything. Measured on the shipped gate before the routing precondition; the four historic versions all permitted it, so this false positive was introduced by the universal scan and this row is the agreement being restored
+out="$(ls Assets/)"; echo "$out" | grep -c cs.meta
+0 0000 - .meta as JSON DATA plus a command substitution. This repository contains no .meta file at all, and this shape cost seven agents more than ten first-attempt blocks. The dollar-paren is what did it: without one the identical command was already permitted at every version, which is the whole asymmetry
+python3 -c "import json; print(json.dumps({'p':'Assets/x.meta'}))" > "$(mktemp)"
+0 0000 - an append to a log naming a .meta path, with a command substitution inside the message
+echo "$(date -u) Assets/Player.cs.meta" >> audit.log
+2 0002 - THE CONTROL for the three rows above: the same unparseable shape WITH a routing construct - a command substitution running find, whose paths sed then rewrites in place. The precondition is a routing construct, not the absence of a dollar-paren
+sed -i s/a/b/ "$(find Assets -name '*.meta')"
+0 0000 - LIVE HOLE, and it is the CALIBRATION the routing precondition rests on: an unlisted verb rewriting every .meta file in a directory, permitted at all five versions because it is parseable and carries no find/xargs route. Until the precondition was added, the identical act blocked only when the command line happened to also contain a dollar-paren - which is an accident of spelling, not a guard. Making the two agree does not open this; it was already open, at every version, and it is the disclosed DIRECT shape from the hook's own WHAT IT DOES NOT CLOSE list
+sed -i s/a/b/ Assets/*.meta
 2 2222 - a command hidden behind command substitution blocks as unparseable
 find Assets -name '*.meta' -exec $(echo sed) -i {} \;
 2 2222 - a command hidden behind backticks blocks as unparseable
@@ -1542,8 +1552,17 @@ assert_eq "45" "$tbg_fp" \
 # asserted: it is the one figure here that a legitimate addition moves every time, so a ceiling
 # on it would be edited on every commit and would stop being read. The three counts above are
 # ceilings on DIVERGENCE, which is the thing that must only ever shrink.
-assert_eq "219" "$tbg_hist2" \
-    "the frozen hist column still records 219 payloads that an earlier hook version blocked"
+#
+# AND IT MOVED AGAIN, 219 -> 220, WHEN THE UNPARSEABLE ARM GAINED A ROUTING PRECONDITION.
+# 219 + 1 = 220. The one addition is `sed -i s/a/b/ "$(find Assets -name '*.meta')"`, hist `0002`
+# — the CONTROL for that change, measured against all four archived versions the same way every
+# other digit here was. It is a record an earlier version blocked and this one still blocks, so it
+# raises the divergence ceiling by nothing: `tbg_protected` counts it, `tbg_unexplained` does not.
+# The four other rows that change added are all `0000` (three false positives this version
+# introduced and now permits again, plus the direct-shape LIVE HOLE that has been open at every
+# version), which is what a precision fix is supposed to add.
+assert_eq "220" "$tbg_hist2" \
+    "the frozen hist column still records 220 payloads that an earlier hook version blocked"
 
 # --- the quote model's own direct evidence --------------------------------------------------
 # The corpus checks verdicts. These two check the tokeniser's output shape, which is where the

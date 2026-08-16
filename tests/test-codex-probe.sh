@@ -77,6 +77,15 @@ mode_of() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null || e
   echo "AUTH_MODE: $(mode_of "${CODEX_HOME:-/nonexistent}/auth.json")"
   home_entries="$( (cd "${CODEX_HOME:-/nonexistent}" 2>/dev/null && ls -A) | sort | tr '\n' ' ')"
   echo "HOME_ENTRIES: [${home_entries% }]"
+  # THE WHOLE TREE, BECAUSE THE LINE ABOVE IS ONLY THE TOP LEVEL. `ls -A` cannot
+  # see a leak nested inside a directory the seed already creates: a seed
+  # carrying `skills/` plus the owner's skills copied into it produces the
+  # expected entry list and the top-level assertion stays green. Task 5's whole
+  # subject is skill discovery, and a leaked `~/.codex/skills/` is precisely the
+  # contamination that would corrupt it under a green suite. Recursive,
+  # relative, sorted, so the test can compare it against the seed's own tree.
+  home_tree="$( (cd "${CODEX_HOME:-/nonexistent}" 2>/dev/null && find . -mindepth 1) | sed 's|^\./||' | sort | tr '\n' ' ')"
+  echo "HOME_TREE: [${home_tree% }]"
   # Stdin: the harness must hand codex /dev/null. A real read distinguishes the
   # two states that matter — EOF (redirected to /dev/null) versus a line of data
   # (the caller's stdin leaked through). `read -t 0` cannot: measured on this
@@ -232,6 +241,8 @@ check "$(logline 'HOME_MODE: ')" "700" "the disposable CODEX_HOME is mode 700"
 check "$(logline 'AUTH_MODE: ')" "600" "the copied credential is mode 600"
 check "$(logline 'HOME_ENTRIES: ')" "[auth.json]" \
       "the disposable home holds the credential and nothing else of the owner's"
+check "$(logline 'HOME_TREE: ')" "[auth.json]" \
+      "and nothing else at ANY depth — the entry list above is a top-level ls"
 
 # The disposable home held a credential; it must be gone. An empty or UNSET
 # path would make `[ ! -e ]` pass while proving nothing, so it is rejected here.
@@ -246,14 +257,38 @@ fi
 # --seed is the one way anything is meant to reach that home besides the
 # credential, and it is how Task 3 will plant a config. Same assertion, one file
 # added: the home is the credential plus exactly what was seeded.
-mkdir -p "$SANDBOX/seed"
+#
+# THE SEED CARRIES A NESTED DIRECTORY DELIBERATELY, and `skills/` is the one it
+# carries because that is the collision the top-level check cannot see. With a
+# flat seed, `ls -A` and a recursive listing agree in every direction and the
+# tree assertion below is decoration. With `skills/` seeded, the owner's
+# `~/.codex/skills/` can be copied INTO it without changing a single top-level
+# entry — measured: the entry assertion stays green while the tree assertion
+# goes red.
+mkdir -p "$SANDBOX/seed/skills/seeded-skill"
 printf 'seeded\n' > "$SANDBOX/seed/seedmarker.txt"
+printf 'name: seeded-skill\n' > "$SANDBOX/seed/skills/seeded-skill/SKILL.md"
 : > "$STUB_LOG"
 set +e
 run_probe --name seeded --prompt "$SANDBOX/prompt.txt" --out "$OUT" --seed "$SANDBOX/seed" >/dev/null 2>&1
 set -e
-check "$(logline 'HOME_ENTRIES: ')" "[auth.json seedmarker.txt]" \
+check "$(logline 'HOME_ENTRIES: ')" "[auth.json seedmarker.txt skills]" \
       "a seeded home holds the credential plus exactly what --seed carried"
+# Derived from the seed, not written down: the seed's own recursive tree plus
+# the one file the harness is allowed to add.
+SEED_TREE_EXPECTED="$( { (cd "$SANDBOX/seed" && find . -mindepth 1) | sed 's|^\./||'; printf 'auth.json\n'; } | sort | tr '\n' ' ')"
+SEED_TREE_EXPECTED="[${SEED_TREE_EXPECTED% }]"
+check "$(logline 'HOME_TREE: ')" "$SEED_TREE_EXPECTED" \
+      "and at every depth it is the seed's own tree plus the credential — a leak nested inside a seeded directory is invisible to the entry list above"
+# The floor under that comparison: a seed with no nested path makes the two
+# assertions equivalent and this one worthless.
+SEED_TOP_N="$( (cd "$SANDBOX/seed" && ls -A) | /usr/bin/grep -c . || true)"
+SEED_ALL_N="$( (cd "$SANDBOX/seed" && find . -mindepth 1) | /usr/bin/grep -c . || true)"
+if [ "$SEED_ALL_N" -gt "$SEED_TOP_N" ]; then
+  ok "the seed carries a nested path ($SEED_ALL_N paths, $SEED_TOP_N of them top-level), so the tree assertion above is not equivalent to the entry list"
+else
+  bad "the seed is flat ($SEED_ALL_N paths, all top-level), so the tree assertion above says exactly what the entry assertion says and the nested-leak case is unguarded again"
+fi
 
 # Codex warns "Refusing to create helper binaries under temporary dir" when
 # CODEX_HOME sits under /tmp, which would pollute every probe's stderr. The
@@ -336,6 +371,85 @@ elif [ -e "$REAP_OUT/.home-reaped.$victim" ]; then
   bad "a later probe did not reclaim the killed run's home: $REAP_OUT/.home-reaped.$victim"
 else
   ok "a later probe reclaims the killed run's disposable home"
+fi
+
+# --- 7. the sweep leaves a LIVE probe alone ---------------------------------
+# The reclamation loop in section 6 is only safe because it asks whether the pid
+# in a home's name is still alive. Delete that one `kill -0` line and the suite
+# stayed at 35/35 green while a concurrent probe's CODEX_HOME — and the copy of
+# the owner's credential inside it — was deleted out from under it mid-run,
+# reproduced 2/2 each way. That is not theoretical here: this file's own default
+# --out probe writes into the repository's evidence directory, which is the same
+# directory a live Task 3-7 probe uses.
+LIVE_OUT="$SANDBOX/evidence-live"
+mkdir -p "$LIVE_OUT"
+set -m
+STUB_SLEEP=20 PATH="$SANDBOX/bin:$PATH" HOME="$SANDBOX/home" \
+  bash "$REPO_DIR/scripts/codex-probe.sh" --name live --prompt "$SANDBOX/prompt.txt" \
+       --out "$LIVE_OUT" >/dev/null 2>&1 < "$SANDBOX/stdin.txt" &
+live=$!
+set +m
+live_wait=0
+while [ ! -f "$LIVE_OUT/.home-live.$live/auth.json" ] && [ "$live_wait" -lt 200 ]; do
+  sleep 0.05; live_wait=$((live_wait+1))
+done
+
+# Same shape as section 6's setup guard, and for the same reason: a home that was
+# never created survives a sweep by not existing, which would make the assertion
+# below pass while measuring nothing.
+live_made=no
+if [ -f "$LIVE_OUT/.home-live.$live/auth.json" ] && kill -0 "$live" 2>/dev/null; then
+  live_made=yes
+  ok "a running probe holds a disposable home with a credential in it (the state the sweep must not touch)"
+else
+  bad "the live-probe setup did not produce a running probe with a credential — the survival assertion below would be vacuous"
+fi
+
+# A second probe into the SAME --out. Its first act is the reclamation sweep.
+set +e
+run_probe --name sweeper --prompt "$SANDBOX/prompt.txt" --out "$LIVE_OUT" >/dev/null 2>&1
+set -e
+if [ "$live_made" != yes ]; then
+  bad "the sweep leaves a live probe's home and credential alone (no live probe existed, so nothing was left alone)"
+elif [ -f "$LIVE_OUT/.home-live.$live/auth.json" ]; then
+  ok "the sweep leaves a live probe's home and its credential alone"
+else
+  bad "a second probe deleted a LIVE probe's disposable home ($LIVE_OUT/.home-live.$live) while it was still running — the reclamation loop's kill -0 liveness check is what stops that, and without it a running probe loses both its home and the copied credential mid-run"
+fi
+kill -KILL -"$live" 2>/dev/null || true
+set +e; wait "$live" 2>/dev/null; set -e
+rm -rf "$LIVE_OUT/.home-live.$live"
+
+# --- 8. the signal arms are PRESENT (structural, and that is the point) ------
+#
+# READ THIS BEFORE TRUSTING THE THREE ASSERTIONS BELOW: they are PRESENCE checks
+# standing in for a behaviour this host cannot observe. They do not establish
+# that the harness cleans up on HUP, INT or TERM.
+#
+# Measured on this host (bash 5.2.21): removing all three `trap 'on_signal N'`
+# arms leaves the guard at 35/35 green, because bash runs the EXIT trap out of
+# its own terminating-signal handling for those three signals anyway. So a
+# BEHAVIOURAL assertion — send the signal, check the home is gone — passes with
+# the arms present and with them deleted, and asserting it would be a green
+# light wired to nothing. Task 1 was right to leave it unasserted.
+#
+# What the arms actually buy is the platforms where that is not true (bash 3.2,
+# which .claude/UPSTREAM's planned macOS pass targets) and the exit status
+# 128+signo. Neither is observable from here. A structural check is therefore
+# the honest instrument, and it is labelled as one so that it is never read as
+# the behavioural check it cannot be.
+PROBE_SRC="$REPO_DIR/scripts/codex-probe.sh"
+for arm in HUP INT TERM; do
+  if /usr/bin/grep -qE "^trap[[:space:]]+'on_signal[[:space:]]+[0-9]+'[[:space:]]+$arm[[:space:]]*$" "$PROBE_SRC"; then
+    ok "STRUCTURAL (presence, not behaviour): codex-probe.sh arms $arm"
+  else
+    bad "STRUCTURAL (presence, not behaviour): codex-probe.sh no longer arms $arm — on this host the EXIT trap covers it, so nothing else in this suite would notice; on bash 3.2 and for the 128+signo exit status it is the only cover there is"
+  fi
+done
+if /usr/bin/grep -qE '^on_signal\(\)[[:space:]]*\{[[:space:]]*cleanup;' "$PROBE_SRC"; then
+  ok "STRUCTURAL (presence, not behaviour): the arms route to cleanup, so an armed signal removes the disposable home"
+else
+  bad "STRUCTURAL (presence, not behaviour): on_signal no longer calls cleanup first — the three arms above would then be armed at something that leaves the credential on disk"
 fi
 
 printf '\n=== Codex Probe Harness: %d/%d passed, %d failed ===\n' \

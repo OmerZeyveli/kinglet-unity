@@ -819,7 +819,24 @@ if [ -f "$DOCTOR" ]; then
     gate_and=0
     /usr/bin/grep -qE '(^|[^A-Za-z])or([^A-Za-z]|$)'  <<< "$GATE_LINE" && gate_or=1
     /usr/bin/grep -qE '(^|[^A-Za-z])and([^A-Za-z]|$)' <<< "$GATE_LINE" && gate_and=1
-    if [ "$gate_or" -eq 1 ] && [ "$gate_and" -eq 0 ]; then
+    #
+    # THE DISJUNCTION IS TESTED FIRST, AND THE ORDER IS THE FIX. This read
+    # `gate_or -eq 1 && gate_and -eq 0` first, so the conjunction arm ran on any
+    # gate line carrying the word "and" ANYWHERE — including a correct
+    # disjunction whose sentence happens to use "and" for something else
+    # ("...has a `.codex/` directory *or* an `.agents/skills/` directory, and
+    # skip it silently otherwise"). That line is right, and this guard told its
+    # author it was "worse than the original defect". Wrong advice on correct
+    # work is the shape that costs an afternoon in this repository; CLAUDE.md
+    # records three implementers dismissing a real defect as a flake for the
+    # same reason.
+    #
+    # It costs nothing in the direction that matters. The mutation this exists
+    # for is a one-word edit from "or" to "and", which leaves NO "or" on the
+    # line — `gate_or` is 0, the first arm is skipped and the conjunction arm
+    # still fires. What it now permits is a line stating both connectives, and a
+    # gate that says "or" somewhere is not the defect being guarded against.
+    if [ "$gate_or" -eq 1 ]; then
       ok "the Codex check's skip gate joins the two layers with a disjunction"
     elif [ "$gate_and" -eq 1 ]; then
       bad "the Codex check's skip gate joins the two layers with a conjunction — that is worse than the original defect: it skips BOTH the skills-bridge-without-hooks case this check exists for AND the hooks-without-skills case. Either layer means a Codex layer was installed; only running the check says whether all of it was"
@@ -1361,6 +1378,11 @@ home_trust_rig() {   # $1 = label, $2 = mode, $3 = managed(true|null); echoes th
 }
 
 mode_of() { stat -c '%a' "$1" 2>/dev/null || echo unknown; }
+# GNU first, BSD second. `%y` carries nanoseconds where the filesystem does, and
+# that resolution is the point: two grants can land inside the same second, so a
+# whole-second mtime would report "unchanged" for a file that really was
+# rewritten and make the assertion below green in both directions.
+mtime_of() { stat -c '%y' "$1" 2>/dev/null || stat -f '%Fm' "$1" 2>/dev/null || echo unknown; }
 
 # ── Rig A: mode 644, the ordinary case ──────────────────────────────────────
 RIG_A="$(home_trust_rig a 644 null || true)"
@@ -1422,8 +1444,26 @@ if [ -n "$RIG_A" ] && [ -d "$RIG_A" ]; then
   # ── Idempotence, byte for byte ────────────────────────────────────────────
   CFG_A_AFTER1="$WORK/cfg-a-after1.toml"
   cp "$CFG_A" "$CFG_A_AFTER1"
+  # THE MTIME IS THE DIRECT WITNESS, AND NOTHING ASSERTED IT. install.sh's own
+  # comment promises that an identical re-grant writes "no copy, no reap, not
+  # even an mtime", and the only guard on that promise was the BACKUP COUNT
+  # below. A count is the right discrimination for unbounded churn, but it
+  # CONFLATES two claims: "no backup on a no-op" and "the bound". Tighten the
+  # bound to 1 while still backing up on every no-op and the count assertion
+  # stays green over a file the installer rewrites on every single install —
+  # measured, exactly that pair leaves 1 backup, leaves the original in it, and
+  # leaves the bytes identical. Only this line separates them.
+  CFG_A_MTIME_BEFORE="$(mtime_of "$CFG_A")"
   PATH="$STUBBIN:$PATH" CODEX_HOME="$HOME_A" bash install.sh \
     --project-dir "$RIG_A" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+  CFG_A_MTIME_AFTER="$(mtime_of "$CFG_A")"
+  if [ "$CFG_A_MTIME_BEFORE" = "unknown" ] || [ -z "$CFG_A_MTIME_BEFORE" ]; then
+    bad "MTIME: could not read the home config's modification time, so the no-op assertion below would compare two unknowns"
+  elif [ "$CFG_A_MTIME_AFTER" = "$CFG_A_MTIME_BEFORE" ]; then
+    ok "MTIME: an identical re-grant does not touch the home config at all — not even its modification time"
+  else
+    bad "MTIME: the second grant rewrote the home config ($CFG_A_MTIME_BEFORE -> $CFG_A_MTIME_AFTER) even though the result was byte-identical. Writing identical bytes is indistinguishable from writing nothing EXCEPT for the backup it drags in, and that backup is what pushes the user's pre-Kinglet original towards eviction"
+  fi
   if cmp -s "$CFG_A" "$CFG_A_AFTER1"; then
     ok "a second grant leaves the home config byte-identical"
   else
@@ -1608,6 +1648,12 @@ if [ -n "$RIG_E" ] && [ -d "$RIG_E" ]; then
   for ts in 20200101000000 20200102000000 20200103000000 20200104000000 20200105000000; do
     : > "$CFG_E.kinglet-backup.$ts"
   done
+  # The newest copy as the population stands BEFORE the grant below — the one the
+  # first grant made, timestamped today, sitting above all five seeded ones. The
+  # grant adds one newer still, so this is the SECOND-newest afterwards, and the
+  # second-newest is the record that tells the two reap orderings apart. Captured
+  # rather than named, because its timestamp is whenever this test runs.
+  E_BK_PREV_NEWEST="$(find "$WORK/home-e" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | sort | awk 'END { print }')"
   stub_response "$RIG_E" null "resalted"
   PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-e" bash install.sh \
     --project-dir "$RIG_E" --client codex --codex-trust --yes >/dev/null 2>&1 || true
@@ -1630,6 +1676,33 @@ if [ -n "$RIG_E" ] && [ -d "$RIG_E" ]; then
     ok "BACKUPS: the reaper keeps the oldest and the newest two, and drops the intermediates"
   else
     bad "BACKUPS:$E_BK_BAD — the surviving set must contain the pre-Kinglet original; a newest-three rule keeps three copies of the post-grant state and evicts the only irreplaceable one"
+  fi
+  # THE OTHER HALF OF "OLDEST PLUS THE NEWEST TWO", AND IT WAS UNGUARDED.
+  # Inverting the reap's `sort` to `sort -r` stays green on both assertions
+  # above — measured 138/138 — because the oldest survives either way: ascending
+  # it is kept as record 1, descending it falls outside the `NR <= total - 2`
+  # eviction window, and an intermediate is dropped either way. What silently
+  # degrades is the recency half: ascending keeps the two most recent copies,
+  # descending keeps only the newest and evicts the second-newest. So the
+  # second-newest is the only record that separates the two orderings, and
+  # nothing looked at it.
+  #
+  # The floor first: if the captured record were the oldest, the assertion would
+  # be satisfied by the oldest-survives rule and would measure nothing.
+  E_BK_PREV_BAD=""
+  [ -n "$E_BK_PREV_NEWEST" ] || E_BK_PREV_BAD="not-captured"
+  case "$E_BK_PREV_NEWEST" in *.20200101000000) E_BK_PREV_BAD="is-the-oldest" ;; esac
+  if [ -z "$E_BK_PREV_BAD" ]; then
+    ok "BACKUPS: a second-newest record exists and is not the oldest ($(basename "$E_BK_PREV_NEWEST")), so the ordering assertion below is not satisfied by the oldest-survives rule"
+  else
+    bad "BACKUPS: no usable second-newest record ($E_BK_PREV_BAD) — the ordering assertion below would prove nothing"
+  fi
+  if [ -n "$E_BK_PREV_BAD" ]; then
+    bad "BACKUPS: the reap is ordered oldest-first (no second-newest record to check)"
+  elif /usr/bin/grep -qF -- "$E_BK_PREV_NEWEST" <<< "$E_BK_LIST"; then
+    ok "BACKUPS: the second-newest survives too, so the reap is ordered oldest-first"
+  else
+    bad "BACKUPS: the second-newest backup ($(basename "$E_BK_PREV_NEWEST")) was evicted while the oldest and the newest survived — that is what reaping a DESCENDING list does, and it leaves ONE recent copy where the documented rule keeps two. The rule is oldest plus the newest TWO: the oldest cannot be reconstructed and the newest are what a recent mistake needs"
   fi
 fi
 

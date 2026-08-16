@@ -299,6 +299,16 @@ shim_watch() {
   # it arms a killer that fires at once rather than waiting forever — the caller
   # should have refused before reaching here, so this is the fail-closed floor
   # under that check, not a substitute for it.
+  #
+  # AND "FLOOR" IS A GENEROUS WORD FOR IT, WHICH IS SAID HERE RATHER THAN LEFT TO
+  # BE COUNTED AS A GUARD. Measured 2026-08-16 by mutating this line to
+  # `-gt 0`, which is the whole of its content: tests/test-codex-shim.sh stays at
+  # **149/149 green**. It is unobservable because `shim_check_budget` refuses
+  # before any caller can reach here with `0`, so the two spellings are
+  # equivalent GIVEN that check rather than independent of it. Keep it — the
+  # equivalence is what makes it free, and it is the right thing to find if the
+  # check above is ever moved — but do not read it as a second layer, and do not
+  # count it as one.
   if [ "$sw_ms" -ge 0 ]; then
     # `trap -` FIRST, and it is not tidiness. A subshell inherits this script's
     # traps, and the line below kills this one deliberately on the happy path —
@@ -310,6 +320,40 @@ shim_watch() {
     # the parent is gone. Shorten the sleep or make it interruptible and the
     # reset is the only thing left. Verified equivalent over 70 paired runs; kept
     # because "currently unreachable" is not a property worth depending on.
+    #
+    # THAT RACE IS NOT UNREACHABLE. IT FIRES TODAY, AND HERE IS THE MEASUREMENT.
+    # The paragraph above is right that the reset is the defence and wrong that
+    # nothing gets past it, because THE RESET IS NOT ATOMIC WITH THE FORK. Two
+    # facts combine:
+    #
+    #   * a `( )` subshell resets the SIGNAL traps at fork, but INHERITS the EXIT
+    #     trap — and bash runs an EXIT trap when a fatal signal has no handler
+    #     installed (this file's own header says so, at THE SIGNAL ARMS ARE
+    #     LOAD-BEARING);
+    #   * `wait "$sw_pid"` below returns in milliseconds when the watched child is
+    #     fast, and the parent then sends this subshell a TERM.
+    #
+    # If that TERM lands before this subshell has executed the `trap -` on the
+    # next line, the subshell runs `shim_guard` -> `shim_cleanup` -> `rm -rf` of
+    # the temp directory THE PARENT IS STILL FILLING, and dies quietly: fd 9 is
+    # closed and stdout/stderr go to /dev/null, so the refusal it prints is
+    # discarded. The parent keeps looping and fails on the next payload write.
+    #
+    # Measured 2026-08-16 on a 400-file envelope under `--timeout 2` with a
+    # no-op hook — tests/test-codex-shim.sh's own budget case:
+    #   * reproduced 3 of 6, then 3 of 12, and once inside a full suite run;
+    #   * `shim_cleanup` instrumented with `$BASHPID` vs `$$` caught it in the
+    #     act — `bashpid=2195504 dollar=2194143 funcs=[shim_cleanup shim_guard
+    #     shim_watch run_hook main]`, i.e. the EXIT trap running inside THIS
+    #     subshell, one line of trace per miss and none per pass;
+    #   * making `shim_cleanup` return early when `$BASHPID != $$` took it to
+    #     0 of 12 with no temp directory left behind.
+    #
+    # IT IS FAIL-CLOSED AND IT IS UNFIXED. The invocation still refuses; what it
+    # loses is the reason — it reports a staging failure instead of the budget,
+    # so the count of files checked never reaches the user. The fix is not
+    # applied here because this was scoped as an investigation; it is one line,
+    # in `shim_cleanup`, and the measurement above is what a review needs.
     #
     # `9>&-` closes the saved stderr for the killer, and that IS a correctness
     # fix. Descriptor 9 is a dup of the caller's stderr, so anything holding it

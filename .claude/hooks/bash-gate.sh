@@ -831,14 +831,58 @@ if [ "$META_ROUTE" = "1" ]; then
                 break
             fi
         done <<< "$(find_exec_commands "$COMMAND")"
-        if [ -n "$META_UNPARSEABLE" ]; then
+        # THE UNPARSEABLE ARM NEEDS THE SAME PRECONDITION THE `-delete` ARM HAS, and not having
+        # it is the same defect that arm's comment names, one branch over: it "fires on any
+        # command that merely carries the word next to a .meta path".
+        #
+        # `bad` is set by `$(`, a backtick or `$'` ANYWHERE outside single quotes — constructs
+        # that appear in an enormous number of ordinary read-only commands. Paired with a route
+        # that fires on any token whose dequoted value merely CONTAINS `.meta` — including a
+        # JSON string, a grep pattern, or a heredoc body being written to a file — the arm below
+        # blocked reads that touch nothing. Measured: more than ten first-attempt blocks across
+        # seven agents, one of them on `.meta` appearing as test DATA, and this repository does
+        # not contain a single .meta file. Reproduced here as
+        # `out="$(ls Assets/)"; echo "$out" | grep -c cs.meta`.
+        #
+        # AND THE BLOCK IT BOUGHT WAS NOT A GUARD, IT WAS AN ACCIDENT OF SPELLING. Measured
+        # against the shipped gate: `sed -i s/a/b/ Assets/*.meta` — an unlisted verb rewriting
+        # every .meta file in a directory — returns 0 today, because it is parseable and carries
+        # no find/xargs route. The identical act blocked only when the command line happened to
+        # also contain a `$(`. Requiring a routing construct makes the two consistent rather than
+        # opening a new class: the direct shape is already this file's disclosed residual (see
+        # "WHAT IT DOES NOT CLOSE" above), and it stays exactly as disclosed.
+        #
+        # THE TEST IS ON THE RAW STRING, DELIBERATELY, and the cost is stated rather than hidden.
+        # A quote-blind test misses `x\args`; the pre-filter rejected above was rejected for
+        # exactly that. The difference is what the two decide. That one decided whether to RUN
+        # the quote model, so being blind let a command past the model entirely — while
+        # `ls Packages/*.me\ta | x\args sed -i …` is parseable, reaches find_exec_commands, and
+        # is caught by the META_EXEC arm below, not by this one. This one decides only whether an
+        # UNPARSEABLE command is blocked without a named command, and the class it lets go —
+        # a routing word spelled through quoting inside a command substitution — is the same
+        # class as the quoted introducer already disclosed above.
+        #
+        # `*/xargs` is covered: the left boundary admits `/`, so `./evil/xargs` matches.
+        META_ROUTING=0
+        if grep -qE '(^|[^A-Za-z0-9_-])(find|xargs)([^A-Za-z0-9_-]|$)' <<< "$COMMAND" \
+           || grep -qE '(^|[^A-Za-z0-9_-])-(exec|execdir|ok|okdir)([^A-Za-z0-9_-]|$)' <<< "$COMMAND"; then
+            META_ROUTING=1
+        fi
+        if [ -n "$META_UNPARSEABLE" ] && [ "$META_ROUTING" -eq 1 ]; then
             # The gate could not tokenise this command, so it does not know WHICH command runs
             # over the .meta files. Unparseable is treated as unrecognised, never as safe: the
             # only alternative is to guess at a clause boundary, and guessing wrong in this
             # direction is what let a quoted awk program truncate every .meta file it touched.
             DANGER_KIND="meta-mutation"
             DANGER_MSG="This gate could not parse this command's quoting (${META_UNPARSEABLE}), so it cannot tell which command runs over these .meta files. .meta files hold the GUIDs every scene, prefab and ScriptableObject reference resolves through — a command that rewrites them breaks those references silently, so an unparseable one is treated as unrecognised rather than as safe."
-        elif [ -n "$META_EXEC" ]; then
+        elif [ -n "$META_EXEC" ] && [ -z "$META_UNPARSEABLE" ]; then
+            # `-z "$META_UNPARSEABLE"` IS LOAD-BEARING NOW THAT THE ARM ABOVE CAN DECLINE. The
+            # loop sets META_EXEC to the literal string `(unparsed)` on the unparseable path, so
+            # without this the declined case would fall through to here and block anyway — with
+            # a message reporting that the command runs `(unparsed)`. It cannot mask a real
+            # command: the `!!` marker is emitted LAST, so a genuine non-read-only command is
+            # always reached first and leaves META_UNPARSEABLE empty.
+            #
             # ONE classification, and the message names the command rather than guessing its
             # category. Once the decision stops depending on knowing the verb, a message that
             # says "deleting" or "renaming" would be asserting knowledge the gate no longer
