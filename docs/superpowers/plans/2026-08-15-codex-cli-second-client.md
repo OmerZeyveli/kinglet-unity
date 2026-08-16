@@ -2146,12 +2146,23 @@ exclusion holds because the always-injected `AGENTS.md` carries the `/name` tran
 **reversing Task 9's decision needs a reason, not just a mechanism** — the reason is that the file is
 now load-bearing for a rule, and a frozen copy of a rule is a rule that stops being true.
 
-**What Task 12 already closed, and must not be redone.** The exclusion no longer rests on the
-freezable copy alone: `using-kinglet`'s intro block states the `/name` rule inline, and that is a
-symlinked skill no install branch can freeze. `CLAUDE.md`'s criterion names the load path, names the
-freeze mechanism, names this task as the real fix, and carries the standing instruction *"if you add a
-surface whose only correction lives in `AGENTS.md`, you are relying on a file the user can freeze —
-put it in a symlinked skill too, or qualify the surface."*
+**What Task 12 already closed, and must not be redone.** The exclusion no longer rests on one copy:
+`using-kinglet`'s intro block states the `/name` rule inline as a second home.
+
+**This paragraph said that second home was "a symlinked skill no install branch can freeze" until
+2026-08-17, and that was false** — measured by Task 12's own second re-review: appending a line to
+`.claude/skills/using-kinglet/SKILL.md` makes every later install keep the user's copy, receipt row
+`user-modified`, shipped text never landing. Both files are freezable. **What differs is who
+initiates it and how much it takes down** — nothing in this toolkit ever tells a user to edit a skill,
+whereas the installer's own Codex Next step 2 tells them to edit `AGENTS.md`; and a frozen skill costs
+one file where a frozen entry document costs the whole generated block, Project Facts refreshes
+included. That asymmetry is the argument for two homes, and it is the residual risk this task is
+being asked to remove — not a safety property it can assume.
+
+Do not re-derive that from scratch: `CLAUDE.md`'s criterion carries the true statement, the load path,
+the freeze mechanism, and the standing instruction that a surface whose only correction lives in
+`AGENTS.md` must get a second home **knowing that copy is freezable too**. Read it there rather than
+here, because this brief has already been wrong about it once.
 
 **What this task must do.** Give `AGENTS.md` the treatment `CLAUDE.md` gets, or decide against it with
 an argument as explicit as Task 9's. Either way the freeze must stop being silent. Reuse
