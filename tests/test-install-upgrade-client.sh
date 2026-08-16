@@ -204,55 +204,92 @@ tiuc_eq "ok" "$TIUC_P2_FLOOR" \
 # whose recorded sha equals the file on disk reads as "we installed it and
 # nobody touched it".
 #
-# So this arm asserts the property directly (the row still carries the PRE-edit
-# checksum) and then asserts its consequence (the edit survives the uninstall).
+# So this arm asserts the property directly (each row still carries the PRE-edit
+# checksum) and then asserts its consequence (every edit survives the uninstall).
 # Either one alone reddens the mutation; both are here because the first says
 # *what* is wrong and the second says *what it costs*.
+#
+# IT EDITS THE WHOLE CARRIED SET, NOT ONE FILE, AND THAT IS THE SECOND LESSON.
+# The first version of this arm picked the first row matching `^\.agents/`. A
+# re-derivation scoped to `AGENTS.md` and `.codex/*` — the rows OUTSIDE that
+# prefix — then passed it 16/16 while `uninstall.sh` reported `remove 99 file(s)
+# — unchanged since install` and **deleted a user-edited `AGENTS.md`**: the very
+# file the installer's own Codex Next step 2 instructs the user to edit. A guard
+# that walks one prefix certifies one prefix. The argument it protects is about
+# every carried row, so the set is derived from the receipt — every non-symlink
+# row `codex_layer_path` selects — and the floor below requires it to span more
+# than one top-level prefix, so narrowing the selector back cannot go quiet.
 # ─────────────────────────────────────────────────────────────────────────────
 P3="$TIUC_ROOT/codex-then-edit-then-claude"
 bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P3" >/dev/null 2>&1
 bash "$REPO_DIR/install.sh" --project-dir "$P3" --client codex --yes >/dev/null 2>&1
 
-# A REGULAR FILE, DERIVED FROM THE RECEIPT RATHER THAN NAMED. The mutation this
-# arm exists for is scoped to regular files precisely because `sha_of` on a
-# symlink-to-directory returns the empty string, so a symlink row cannot show the
-# difference. Picking the first non-`symlink` Codex-layer row keeps the arm
-# pointed at a file that can, without hardcoding which command happens to sort
-# first.
-TIUC_E_REL="$(awk -F'\t' '
+# EVERY non-symlink Codex-layer row, derived from the receipt. Non-symlink
+# because `sha_of` on a symlink-to-directory is the empty string, so those rows
+# cannot show a re-derivation either way — they are covered by arm 1, whose
+# `uninstall.sh removes the Codex layer` assertion a symlink-scoped
+# re-derivation reddens. The selector is the same allowlist install.sh and
+# studio-doctor.sh share, spelled as an awk condition because awk has no `case`.
+TIUC_E_ROWS="$(awk -F'\t' '
   /^#/ { next }
   $1 == "path" { next }
-  $1 ~ /^\.claude\// { next }
   $3 == "symlink" { next }
-  $1 ~ /^\.agents\// { print $1; exit }
+  $1 == "AGENTS.md" || $1 ~ /^\.agents\/skills\// || $1 ~ /^\.codex\// || $1 == ".claude/state/codex-trust.tsv" { print $1 }
 ' "$P3/.claude/state/install-receipt.tsv" 2>/dev/null)"
 
-if [ -n "$TIUC_E_REL" ] && [ -f "$P3/$TIUC_E_REL" ]; then TIUC_E_OK=yes; else TIUC_E_OK="no candidate row (got '$TIUC_E_REL')"; fi
+TIUC_E_N=$(printf '%s\n' "$TIUC_E_ROWS" | grep -c . || true)
+# THE TWO FLOORS, AND THE SECOND IS THE ONE THIS ARM WAS REWRITTEN FOR. A count
+# alone cannot see the set collapse onto a single prefix — nine converted skills
+# satisfy "at least three" while covering exactly the ground the broken version
+# already covered. Counting DISTINCT first path segments is what makes
+# "more than one prefix" an assertion rather than a hope.
+TIUC_E_PREFIXES=$(printf '%s\n' "$TIUC_E_ROWS" | awk -F/ 'NF { print $1 }' | sort -u | grep -c . || true)
+if [ "$TIUC_E_N" -ge 3 ]; then TIUC_E_OK=yes; else TIUC_E_OK="only $TIUC_E_N non-symlink Codex-layer row(s)"; fi
 tiuc_eq "yes" "$TIUC_E_OK" \
-  "the receipt carries a non-symlink Codex-layer row pointing at a real file — without one, every assertion in this arm is about nothing"
+  "the receipt carries non-symlink Codex-layer rows to edit — without them every assertion in this arm is about nothing"
+if [ "$TIUC_E_PREFIXES" -ge 2 ]; then TIUC_E_SPREAD=yes; else TIUC_E_SPREAD="all $TIUC_E_N row(s) share one prefix"; fi
+tiuc_eq "yes" "$TIUC_E_SPREAD" \
+  "…and they span more than one top-level prefix ($TIUC_E_PREFIXES), so a re-derivation scoped to any single prefix cannot hide inside this arm"
 
-TIUC_E_BEFORE="$(tiuc_receipt_sha "$P3" "$TIUC_E_REL")"
-printf 'a line the user added\n' >> "$P3/$TIUC_E_REL"
-TIUC_E_ONDISK="$(tiuc_sha "$P3/$TIUC_E_REL")"
-
-# THE FLOOR THAT STOPS THE NEXT ASSERTION COMPARING A VALUE TO ITSELF. If the
-# append silently did nothing — a read-only path, a mode this fixture does not
-# produce — the recorded and on-disk checksums stay equal and "the row still
-# carries the pre-edit sha" is true for the wrong reason, in both arms of the
-# mutation.
-if [ -n "$TIUC_E_BEFORE" ] && [ "$TIUC_E_BEFORE" != "$TIUC_E_ONDISK" ]; then TIUC_E_DIFF=yes; else TIUC_E_DIFF=no; fi
-tiuc_eq "yes" "$TIUC_E_DIFF" \
-  "the edit actually changed the file's checksum, so 'the row was not re-derived' is a claim with two distinguishable answers"
+# Snapshot every recorded checksum, then edit every file. A trailing newline is
+# enough to move a sha and cannot invalidate JSON, TOML or Markdown — these are
+# real project files and the point is the checksum, not the content.
+TIUC_E_SNAP=""
+TIUC_E_UNMOVED=0
+while IFS= read -r tiuc_e; do
+  [ -n "$tiuc_e" ] || continue
+  tiuc_e_before="$(tiuc_receipt_sha "$P3" "$tiuc_e")"
+  printf '\n' >> "$P3/$tiuc_e"
+  # THE PER-ROW FLOOR. If an append silently did nothing the recorded and on-disk
+  # checksums stay equal, and "the row was not re-derived" is then true for the
+  # wrong reason — in BOTH arms of the mutation, which is what makes it useless.
+  if [ "$tiuc_e_before" = "$(tiuc_sha "$P3/$tiuc_e")" ]; then
+    TIUC_E_UNMOVED=$((TIUC_E_UNMOVED + 1))
+  fi
+  TIUC_E_SNAP="${TIUC_E_SNAP}${tiuc_e}	${tiuc_e_before}"$'\n'
+done <<< "$TIUC_E_ROWS"
+tiuc_eq "0" "$TIUC_E_UNMOVED" \
+  "every edit actually changed its file's checksum, so 'the row was not re-derived' is a claim with two distinguishable answers for each of them"
 
 bash "$REPO_DIR/install.sh" --project-dir "$P3" --yes >/dev/null 2>&1
 
-tiuc_eq "$TIUC_E_BEFORE" "$(tiuc_receipt_sha "$P3" "$TIUC_E_REL")" \
-  "the carried row keeps the checksum the Codex run recorded — re-deriving it from disk would newly claim a file the user edited"
+TIUC_E_DRIFT=""
+while IFS=$'\t' read -r tiuc_e tiuc_e_before; do
+  [ -n "$tiuc_e" ] || continue
+  tiuc_e_now="$(tiuc_receipt_sha "$P3" "$tiuc_e")"
+  if [ "$tiuc_e_now" != "$tiuc_e_before" ]; then TIUC_E_DRIFT="${TIUC_E_DRIFT}${tiuc_e} "; fi
+done <<< "$TIUC_E_SNAP"
+tiuc_eq "" "$TIUC_E_DRIFT" \
+  "every carried row keeps the checksum the Codex run recorded — re-deriving any of them from disk would newly claim a file the user edited"
 
 bash "$REPO_DIR/uninstall.sh" --project-dir "$P3" --yes >/dev/null 2>&1
-if [ -f "$P3/$TIUC_E_REL" ]; then TIUC_E_SURVIVED=present; else TIUC_E_SURVIVED=deleted; fi
-tiuc_eq "present" "$TIUC_E_SURVIVED" \
-  "…and uninstall.sh therefore leaves the edited file alone, which is what that checksum is FOR"
+TIUC_E_LOST=""
+while IFS=$'\t' read -r tiuc_e _tiuc_e_before; do
+  [ -n "$tiuc_e" ] || continue
+  [ -f "$P3/$tiuc_e" ] || TIUC_E_LOST="${TIUC_E_LOST}${tiuc_e} "
+done <<< "$TIUC_E_SNAP"
+tiuc_eq "" "$TIUC_E_LOST" \
+  "…and uninstall.sh therefore leaves every edited file alone, which is what those checksums are FOR"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Arm 4 — a Codex-layer path that is GONE. The row is dropped, and the drop is
@@ -267,14 +304,40 @@ tiuc_eq "present" "$TIUC_E_SURVIVED" \
 #
 # Dropping the row is still the right behaviour: a row for a path that is not
 # there is a ghost, and keeping it would give a user who deliberately removed the
-# Codex layer a doctor that fails forever with no way to clear it. What must not
-# be silent is the drop. Both sentences are asserted here because either alone
-# leaves the loop open at the other end.
+# Codex layer a doctor that fails forever with no TARGETED way to clear it —
+# `uninstall.sh` then `install.sh` does clear one, using only shipped commands,
+# but there is no per-layer flag, so the cure is tearing the whole toolkit down.
+# What must not be silent is the drop. Both sentences are asserted here because
+# either alone leaves the loop open at the other end.
+#
+# THE PATH IS CHOSEN SO THAT NO CONSTANT CAN SATISFY THE ASSERTION, and the first
+# version of this arm failed exactly that test. It deleted `.codex/hooks.json`
+# and grepped the whole run output for that literal — while `install.sh`'s
+# `note_not_done` carried the same literal in a fixed sentence, so the predicate
+# was true whatever had been dropped. Suppressing the per-path `printf`
+# altogether left this file 16/16 green. Two changes close it: the arm deletes a
+# converted skill, whose path appears in no constant anywhere in `install.sh`,
+# and it reads the indented block under `GONE from disk:` rather than the whole
+# run. Either alone would do; both are here because this is the second time a
+# hollow assertion has shipped on this branch.
 # ─────────────────────────────────────────────────────────────────────────────
 P4="$TIUC_ROOT/codex-then-missing"
 bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P4" >/dev/null 2>&1
 bash "$REPO_DIR/install.sh" --project-dir "$P4" --client codex --yes >/dev/null 2>&1
-rm -f "$P4/.codex/hooks.json"
+
+# Derived, not named: the first converted command skill in the receipt. A
+# converted skill is a Codex-layer regular file whose path `install.sh` never
+# writes as a literal.
+TIUC_GONE_REL="$(awk -F'\t' '
+  /^#/ { next }
+  $1 == "path" { next }
+  $3 == "symlink" { next }
+  $1 ~ /^\.agents\/skills\// { print $1; exit }
+' "$P4/.claude/state/install-receipt.tsv" 2>/dev/null)"
+if [ -n "$TIUC_GONE_REL" ] && ! grep -qF -- "$TIUC_GONE_REL" "$REPO_DIR/install.sh"; then TIUC_GONE_OK=yes; else TIUC_GONE_OK="no unnamed candidate (got '$TIUC_GONE_REL')"; fi
+tiuc_eq "yes" "$TIUC_GONE_OK" \
+  "the path this arm deletes appears in no literal inside install.sh, so an assertion that finds it in the output cannot be satisfied by a constant"
+rm -f "$P4/$TIUC_GONE_REL"
 
 TIUC_DOC="$(bash "$REPO_DIR/scripts/studio-doctor.sh" --project-dir "$P4" 2>&1 || true)"
 # Here-string, never a pipe: `grep -q` exits at the first match without draining
@@ -284,9 +347,18 @@ tiuc_eq "named" "$TIUC_DOC_R" \
   "the doctor's remedy for a missing Codex-layer path names --client codex — a bare 're-run install.sh' steers the user into the drop below"
 
 TIUC_INS="$(bash "$REPO_DIR/install.sh" --project-dir "$P4" --yes 2>&1 || true)"
-if grep -qF -- '.codex/hooks.json' <<< "$TIUC_INS"; then TIUC_INS_NAMED=yes; else TIUC_INS_NAMED=no; fi
+# BLOCK-SCOPED. The paths are printed indented under the `GONE from disk:` warn
+# line and the block ends at the next unindented line, so `awk` takes exactly
+# that region — nothing elsewhere in the run can satisfy this by accident. awk
+# drains its input, so there is no early-exit reader to SIGPIPE anything.
+TIUC_GONE_BLOCK="$(awk '
+  /GONE from disk:/ { inblock = 1; next }
+  inblock && /^       [^ ]/ { print; next }
+  inblock { inblock = 0 }
+' <<< "$TIUC_INS" | sed 's/^ *//')"
+if grep -qxF -- "$TIUC_GONE_REL" <<< "$TIUC_GONE_BLOCK"; then TIUC_INS_NAMED=yes; else TIUC_INS_NAMED=no; fi
 tiuc_eq "yes" "$TIUC_INS_NAMED" \
-  "…and when the default client then drops that row, the run names the path it dropped rather than only counting what it kept"
+  "…and when the default client then drops that row, the GONE-from-disk block names the path it dropped rather than only counting what it kept"
 
 if grep -qF -- '--client codex' <<< "$TIUC_INS"; then TIUC_INS_FIX=yes; else TIUC_INS_FIX=no; fi
 tiuc_eq "yes" "$TIUC_INS_FIX" \
@@ -299,6 +371,83 @@ while IFS= read -r tiuc_r; do
 done <<< "$(tiuc_receipt_paths "$P4")"
 tiuc_eq "0" "$TIUC_P4_GHOST" \
   "…and the row really is dropped rather than carried as a ghost, so the receipt still describes the disk"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Arm 5 — the classifier that chooses between the two remedies, in both
+# directions, plus the thing that keeps its two copies from drifting.
+#
+# WHY BOTH DIRECTIONS. The doctor's Codex-layer test shipped as
+# `grep -vE '^\.claude/'` under a comment claiming it was "the criterion Step 8e
+# uses, spelled the same way". It was neither.
+#
+#   FALSE POSITIVE — `.mcp.json` and `MCP-SETUP.md` are receipted, outside
+#   `.claude/`, and written by a PLAIN install. Deleting one on a project that
+#   had never had a Codex layer produced `re-run install.sh --client codex` and
+#   three false explanatory lines; a user who followed that remedy got
+#   `AGENTS.md`, `.agents/` and `.codex/` created in a project that had asked
+#   for neither.
+#
+#   FALSE NEGATIVE — `.claude/state/codex-trust.tsv` is written only by the
+#   Codex arm and lives under `.claude/`, so the one row where the concealing
+#   remedy genuinely applies got the bare form.
+#
+# A one-directional guard would have passed the shipped bug in whichever
+# direction it did not test, which is how the bug got there.
+# ─────────────────────────────────────────────────────────────────────────────
+P5="$TIUC_ROOT/claude-only-missing-mcp"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P5" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P5" --yes >/dev/null 2>&1
+if [ -f "$P5/.mcp.json" ]; then TIUC_P5_PRE=present; else TIUC_P5_PRE=absent; fi
+tiuc_eq "present" "$TIUC_P5_PRE" \
+  "the plain install wrote .mcp.json — a receipted path outside .claude/ that a plain install restores, which is what makes the next assertion a test"
+rm -f "$P5/.mcp.json"
+TIUC_P5_DOC="$(bash "$REPO_DIR/scripts/studio-doctor.sh" --project-dir "$P5" 2>&1 || true)"
+if grep -qF -- 'missing — re-run install.sh --client codex' <<< "$TIUC_P5_DOC"; then TIUC_P5_R=codex; else TIUC_P5_R=bare; fi
+tiuc_eq "bare" "$TIUC_P5_R" \
+  "a missing .mcp.json on a Claude-Code-only project gets the BARE remedy — telling that user to re-run with --client codex converts their project to a two-client install to restore one documentation file"
+if grep -qF -- 'written only by --client codex' <<< "$TIUC_P5_DOC"; then TIUC_P5_E=claimed; else TIUC_P5_E=silent; fi
+tiuc_eq "silent" "$TIUC_P5_E" \
+  "…and the explanatory lines that go with that remedy are not printed either, since every one of them would be false here"
+
+# The false negative, on the row the two halves must agree about most: the trust
+# receipt is Codex-only AND under `.claude/`, so a prefix rule gets it wrong
+# whichever prefix it picks.
+P6="$TIUC_ROOT/codex-missing-trust-receipt"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P6" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P6" --client codex --yes >/dev/null 2>&1
+# `--codex-trust` is never run by this suite (it writes the user's home), so the
+# trust receipt is synthesised here exactly as that path would record it: a file
+# and a matching row. The classifier is what is under test, not the grant.
+printf 'stub\n' > "$P6/.claude/state/codex-trust.tsv"
+printf '.claude/state/codex-trust.tsv\t%s\t644\ttoolkit\n' \
+  "$(tiuc_sha "$P6/.claude/state/codex-trust.tsv")" >> "$P6/.claude/state/install-receipt.tsv"
+rm -f "$P6/.claude/state/codex-trust.tsv"
+TIUC_P6_DOC="$(bash "$REPO_DIR/scripts/studio-doctor.sh" --project-dir "$P6" 2>&1 || true)"
+if grep -qF -- 'missing — re-run install.sh --client codex' <<< "$TIUC_P6_DOC"; then TIUC_P6_R=codex; else TIUC_P6_R=bare; fi
+tiuc_eq "codex" "$TIUC_P6_R" \
+  "a missing .claude/state/codex-trust.tsv gets the --client codex remedy even though it is under .claude/ — a prefix rule gets this row wrong whichever prefix it picks"
+
+# THE TWO COPIES, HELD TOGETHER. install.sh is not in the payload, so the
+# shipped script cannot source it and there is no file both can read. What there
+# is instead is this comparison: extract the marked region from each and require
+# them to be character-for-character equal. Change one, change the other, or the
+# suite goes red — which is the difference between a copy and a duplicate.
+tiuc_criterion() {   # $1 = file
+  awk '/kinglet:codex-layer-criterion:begin/ { f = 1; next }
+       /kinglet:codex-layer-criterion:end/   { f = 0 }
+       f' "$1"
+}
+TIUC_CRIT_A="$(tiuc_criterion "$REPO_DIR/install.sh")"
+TIUC_CRIT_B="$(tiuc_criterion "$REPO_DIR/scripts/studio-doctor.sh")"
+# THE FLOOR FIRST: two empty strings are equal. If a marker is renamed or
+# deleted, both extractions go empty and the comparison below passes over
+# nothing — the exact vacuity this repository names as its worst shape.
+TIUC_CRIT_N=$(printf '%s\n' "$TIUC_CRIT_A" | grep -c . || true)
+if [ "$TIUC_CRIT_N" -ge 4 ] && grep -qF -- 'codex_layer_path' <<< "$TIUC_CRIT_A"; then TIUC_CRIT_OK=yes; else TIUC_CRIT_OK="extraction returned $TIUC_CRIT_N line(s)"; fi
+tiuc_eq "yes" "$TIUC_CRIT_OK" \
+  "the criterion markers still delimit a real function in install.sh — a renamed marker would make the equality below compare two empty strings"
+tiuc_eq "$TIUC_CRIT_A" "$TIUC_CRIT_B" \
+  "install.sh and scripts/studio-doctor.sh carry the SAME codex_layer_path, character for character — the shipped script cannot source the installer, so this comparison is what stops the two spellings drifting apart again"
 
 printf '  %s passed, %s failed\n' "$TIUC_PASS" "$TIUC_FAIL"
 [ "$TIUC_FAIL" -eq 0 ]

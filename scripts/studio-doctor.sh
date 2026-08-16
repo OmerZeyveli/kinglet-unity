@@ -61,6 +61,27 @@ print_first_5() {
   awk 'NF && NR <= 5 { printf "       %s\n", $0 }' <<< "$1"
 }
 
+# ── Which receipted paths only a `--client codex` run writes ─────────────────
+#
+# A BYTE-IDENTICAL COPY OF `install.sh`'s DEFINITION, AND THE COPY IS DELIBERATE. This script ships
+# into a project; `install.sh` does not, so there is no file both can source. The two are held
+# together by `tests/test-install-upgrade-client.sh`, which extracts both marked regions and
+# compares them character for character — so a change to one that is not made to the other is a red
+# suite, not a silent divergence. The markers are what it extracts; do not rename them, and do not
+# "tidy" this copy.
+#
+# What it answers is one question — *will a plain `install.sh` write this path?* — and it decides
+# which remedy a missing receipted file is given below. See `install.sh`'s copy for the two measured
+# failures that came from spelling this as `not under .claude/` instead.
+# kinglet:codex-layer-criterion:begin
+codex_layer_path() {   # $1 = project-relative path; 0 = written only by `--client codex`
+  case "$1" in
+    AGENTS.md|.agents/skills/*|.codex/*|.claude/state/codex-trust.tsv) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+# kinglet:codex-layer-criterion:end
+
 usage() { sed -n '3,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 PROJECT_DIR="$(pwd)"
@@ -565,18 +586,29 @@ else
     # files still gone. A remedy that turns a loud failure into a silent one is worse than the
     # original defect on this branch, which at least kept complaining.
     #
-    # The Codex-layer paths are exactly the receipted rows that are NOT under `.claude/` — the
-    # criterion `install.sh` Step 8e uses, spelled the same way. Nothing here parses the receipt a
-    # second time; MISSING_LIST is already the answer.
+    # THE CLASSIFIER IS `codex_layer_path`, DEFINED ABOVE, AND IT IS A BYTE-IDENTICAL COPY OF
+    # `install.sh`'s. It read `grep -vE '^\.claude/'` until 2026-08-16, under a comment claiming that
+    # was "the criterion Step 8e uses, spelled the same way" — it was neither, and it was wrong in
+    # both directions. `.mcp.json` and `MCP-SETUP.md` sit outside `.claude/` on a project that has
+    # never had a Codex layer, so deleting one produced `re-run install.sh --client codex` and three
+    # false explanatory lines, and a user who followed that remedy got `AGENTS.md`, `.agents/` and
+    # `.codex/` created in a project that had asked for neither. In the other direction
+    # `.claude/state/codex-trust.tsv` IS Codex-only and IS under `.claude/`, so the one row where the
+    # concealing remedy actually applies was the one row that got the bare form.
+    #
     # ONE `fail` FOR ONE PROBLEM. The explanation goes out through `printf`, not through `fail` —
     # `fail` increments FAIL_C, and the summary line is what `.claude/commands/unity-doctor.md`
     # tells the model to read first, so three lines about one missing pair would report
     # `3 failure(s)` for one fault. The count is the finding, not the sentence count.
-    dr_codex="$(printf '%s' "$MISSING_LIST" | grep -vE '^\.claude/' | grep -c . || true)"
+    dr_codex=0
+    while IFS= read -r dr_m; do
+      [ -n "$dr_m" ] || continue
+      if codex_layer_path "$dr_m"; then dr_codex=$((dr_codex + 1)); fi
+    done <<< "$MISSING_LIST"
     if [ "$dr_codex" -gt 0 ]; then
       fail "$MISSING receipted file(s) missing — re-run install.sh --client codex"
       print_first_5 "$MISSING_LIST"
-      printf '       %s\n' "$dr_codex of these are Codex-layer paths (AGENTS.md, .agents/, .codex/)."
+      printf '       %s\n' "$dr_codex of these are written only by --client codex."
       printf '       %s\n' "A plain install.sh will NOT restore them — it drops their rows instead,"
       printf '       %s\n' "and this check then passes with the files still missing."
     else

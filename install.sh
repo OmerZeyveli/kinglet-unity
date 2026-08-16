@@ -134,6 +134,40 @@ RECEIPT_REL=".claude/state/install-receipt.tsv"
 # declared here rather than beside its writer. See the note above that writer.
 CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
 
+# ── Which receipted paths only a `--client codex` run writes ─────────────────
+#
+# ONE DEFINITION, THREE READERS IN THIS FILE, AND A FOURTH IN A DIFFERENT FILE. It answers exactly
+# one question — *will a plain `install.sh` write this path?* — and the answer decides three
+# behaviours: which previous-receipt rows Step 8e carries forward, what the dry run announces, and
+# (in `scripts/studio-doctor.sh`) which remedy a missing receipted file is given.
+#
+# IT WAS THREE SEPARATE SPELLINGS UNTIL 2026-08-16, AND THE THIRD WAS WRONG IN BOTH DIRECTIONS.
+# `studio-doctor.sh` classified a path as Codex-layer by `not under .claude/`, under a comment
+# asserting it was "the criterion Step 8e uses, spelled the same way." Measured: on a project that
+# had never had a Codex layer, deleting `.mcp.json` produced `re-run install.sh --client codex`,
+# `1 of these are Codex-layer paths`, and `A plain install.sh will NOT restore them` — every line
+# false, with `.mcp.json` printed one line above; following that remedy created `AGENTS.md`,
+# `.agents/` and `.codex/` in a project that had asked for neither. The other direction:
+# `.claude/state/codex-trust.tsv` IS written only by the Codex arm and is under `.claude/`, so it got
+# the bare, concealing remedy this whole repair exists to remove.
+#
+# THE COPY IN `scripts/studio-doctor.sh` IS BYTE-IDENTICAL AND CANNOT DRIFT. install.sh is not in
+# the payload, so the shipped script cannot source it; the two copies are therefore held together by
+# `tests/test-install-upgrade-client.sh`, which extracts both marked regions and compares them. If
+# you change one, change the other in the same commit — the guard makes that an obligation rather
+# than a hope. The markers are what it extracts; do not rename them.
+#
+# THE TRUST RECEIPT IS SPELLED OUT rather than written `$CODEX_TRUST_REL`, because the other copy
+# has no such variable and a textual comparison is the whole mechanism.
+# kinglet:codex-layer-criterion:begin
+codex_layer_path() {   # $1 = project-relative path; 0 = written only by `--client codex`
+  case "$1" in
+    AGENTS.md|.agents/skills/*|.codex/*|.claude/state/codex-trust.tsv) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+# kinglet:codex-layer-criterion:end
+
 # ── Args ─────────────────────────────────────────────────────────────────────
 PROJECT_DIR="$(pwd)"
 WITH_MCP=0; WITH_INPUT_SYSTEM=0; ASSUME_YES=0; DRY_RUN=0
@@ -1222,18 +1256,15 @@ if [ "$DRY_RUN" -eq 1 ]; then
     # a `warn` block about it. That is exactly the announcement-vs-write divergence Step 3b's header
     # forbids, in the newest write.
     #
-    # THE CONDITION IS STEP 8e's, SPELLED THE SAME WAY, and the counts are derived from the same
-    # receipt it reads — not from a second walk of the disk. `$RECEIPT` still holds the previous
-    # run's receipt here, which is what makes the announcement able to answer at all.
+    # THE CONDITION IS STEP 8e's — the same FUNCTION, not a second spelling of it, which is the
+    # whole point of `codex_layer_path` existing. The counts are derived from the same receipt Step
+    # 8e reads, not from a second walk of the disk; `$RECEIPT` still holds the previous run's
+    # receipt here, which is what makes the announcement able to answer at all.
     DRY_CX_KEEP=0; DRY_CX_GONE=0
     if [ "$MODE" = ours ] && [ -f "$RECEIPT" ]; then
       while IFS=$'\t' read -r dcx_rel _dcx_sha _dcx_mode _dcx_origin; do
-        case "$dcx_rel" in
-          ''|\#*|path) continue ;;
-          AGENTS.md|.agents/skills/*|.codex/*) ;;
-          "$CODEX_TRUST_REL") ;;
-          *) continue ;;
-        esac
+        case "$dcx_rel" in ''|\#*|path) continue ;; esac
+        codex_layer_path "$dcx_rel" || continue
         if [ -e "$PROJECT_DIR/$dcx_rel" ] || [ -L "$PROJECT_DIR/$dcx_rel" ]; then
           DRY_CX_KEEP=$((DRY_CX_KEEP + 1))
         else
@@ -3032,9 +3063,16 @@ else
   #
   # A ROW WHOSE PATH IS GONE IS DROPPED — AND THE DROP IS SAID OUT LOUD, WHICH IS THE HALF THAT WAS
   # MISSING. Dropping is right: a row for a path that is not there is a ghost, and keeping it would
-  # give a user who deliberately removed the Codex layer a permanently failing doctor with no way to
-  # clear it — a false-alarm generator, which this repository's own ledger rates as the most
-  # expensive kind of red. But SILENT dropping is worse than either. Measured 2026-08-16:
+  # give a user who deliberately removed the Codex layer a permanently failing doctor with **no
+  # targeted way to clear it** — a false-alarm generator, which this repository's own ledger rates as
+  # the most expensive kind of red. *Targeted* is the load-bearing word and it replaced a categorical
+  # that measurement refuted: `uninstall.sh --yes` followed by `install.sh --yes` does clear a ghost
+  # row (0 Codex rows, `8 passed · 1 warning(s) · 0 failure(s)`), using only the two shipped commands
+  # and keeping user-modified files by default. What does not exist is a per-layer route —
+  # `uninstall.sh` takes `--project-dir/--yes/--purge/--keep-local/--no-backup` and nothing narrower —
+  # so the only cure would be tearing the whole toolkit down and putting it back to silence a warning
+  # about files the user deleted on purpose. That is still the wrong trade; it is a smaller claim than
+  # the one this comment used to make. But SILENT dropping is worse than either. Measured 2026-08-16:
   # `studio-doctor.sh` correctly reports `FAIL 2 receipted file(s) missing — re-run install.sh`
   # (rc 1); following that remedy literally, with the DEFAULT client, dropped both rows and the next
   # doctor run read `8 passed · 1 warning(s) · 0 failure(s)` with both files still gone. The branch's
@@ -3050,12 +3088,8 @@ else
   CODEX_DROPPED_LIST=""
   if [ "$MODE" = ours ] && [ -f "$RECEIPT" ]; then
     while IFS=$'\t' read -r cx_rel cx_sha cx_mode cx_origin; do
-      case "$cx_rel" in
-        ''|\#*|path) continue ;;
-        AGENTS.md|.agents/skills/*|.codex/*) ;;
-        "$CODEX_TRUST_REL") ;;
-        *) continue ;;
-      esac
+      case "$cx_rel" in ''|\#*|path) continue ;; esac
+      codex_layer_path "$cx_rel" || continue
       if [ ! -e "$PROJECT_DIR/$cx_rel" ] && [ ! -L "$PROJECT_DIR/$cx_rel" ]; then
         CODEX_DROPPED=$((CODEX_DROPPED + 1))
         CODEX_DROPPED_LIST="${CODEX_DROPPED_LIST}${cx_rel}"$'\n'
@@ -3076,7 +3110,18 @@ else
     done <<< "$CODEX_DROPPED_LIST"
     warn "Their receipt rows were dropped — this run installed Claude Code only and did not"
     warn "restore them. Re-run with --client codex to get that layer back."
-    note_not_done "$CODEX_DROPPED Codex-layer path(s) listed above were missing from disk and their receipt rows were dropped, so nothing owns or reports them any more. This run was --client claude and does not write that layer. If .codex/hooks.json is among them this project is advisory rather than enforcing under Codex. Re-run: ./install.sh --project-dir \"$PROJECT_DIR\" --client codex"
+    # THE ENFORCEMENT CLAUSE IS ADDED ONLY WHEN IT IS TRUE OF THIS RUN. It used to be an
+    # unconditional "If .codex/hooks.json is among them…", which is a true sentence and was still a
+    # defect: `tests/test-install-upgrade-client.sh` arm 4 asserted "the run names the path it
+    # dropped" by grepping the whole run output for that literal, and the literal was present
+    # whatever had actually been dropped. The assertion could not fail — the same hollow shape the
+    # round before had just repaired elsewhere. Making the clause conditional removes the constant
+    # AND makes the message per-run accurate; the arm now reads the `GONE from disk:` block instead.
+    CODEX_DROP_NOTE="$CODEX_DROPPED Codex-layer path(s) listed above were missing from disk and their receipt rows were dropped, so nothing owns or reports them any more. This run was --client claude and does not write that layer."
+    if grep -qxF -- '.codex/hooks.json' <<< "$CODEX_DROPPED_LIST"; then
+      CODEX_DROP_NOTE="$CODEX_DROP_NOTE The hook config is one of them, so this project is advisory rather than enforcing under Codex."
+    fi
+    note_not_done "$CODEX_DROP_NOTE Re-run: ./install.sh --project-dir \"$PROJECT_DIR\" --client codex"
   fi
 fi
 

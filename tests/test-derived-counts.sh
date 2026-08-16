@@ -1315,7 +1315,8 @@ assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
 # of scope on the ground that its figures are "**overwhelmingly** per-run measurements … so they are
 # pinned history and must not be re-derived". *Overwhelmingly* was doing load-bearing work it could
 # not do: it is true of most of that directory and false of some, and under it hid a SECOND,
-# UNGUARDED COPY of the very `982` this block guards in `install.sh`. A hedge adverb is not a scope
+# UNGUARDED COPY of the very command-body line count this block guards in `install.sh`. A hedge
+# adverb is not a scope
 # statement. So:
 #
 #   * The live figures in `findings.md` that this block DOES now cover are listed in DCT_CLAIMS by
@@ -1351,7 +1352,7 @@ DCT_TEMPLATES=$(git -C "$REPO_DIR" ls-files templates 2>/dev/null | grep -c . ||
 DCT_ROOTS=$((DCT_CLAIM_ROOT + DCT_DOCS + DCT_SCRIPTS + DCT_EXAMPLES + DCT_TEMPLATES))
 DCT_TESTS_SH=$(ls -1 "$REPO_DIR"/tests/*.sh 2>/dev/null | grep -c . || true)
 # `wc -l`, NOT `grep -c ''`, AND THE REASON IS THAT THE FAILURE MESSAGE BELOW TELLS THE READER TO
-# RE-DERIVE WITH `wc -l`. The two agree at 982 today only because every `.claude/commands/*.md` ends
+# RE-DERIVE WITH `wc -l`. The two agree today only because every `.claude/commands/*.md` ends
 # in a newline; one file without a trailing newline and `grep -c ''` counts the final partial line
 # while `wc -l` does not, so the guard and its own printed remedy would disagree about the number
 # and the reader following the remedy would "fix" a correct figure. A guard whose repair instruction
@@ -1529,6 +1530,24 @@ assert_eq "1" "$DCT_WIDE" \
 # it, and was wrong four ways on the day it shipped. This list is compared, mechanically, every run,
 # in both directions — its only job is to disagree. A hand-written list that is checked is a
 # declaration; one that is not is a rumour.
+#
+# ── AN OPEN RESIDUAL, NAMED HERE SO IT IS INHERITED RATHER THAN REDISCOVERED ──
+#
+# **THIS FILE IS NOT IN THE LIST, AND THIS FILE QUOTES FIGURES.** `DCT_DECLARED` names ten paths and
+# `tests/test-derived-counts.sh` is not one of them, so the guard whose entire subject is stale
+# numerals does not scan its own prose. That is not hypothetical: two comment blocks above carried
+# `982` as the value of `cat .claude/commands/*.md | wc -l`, in the present tense and undated, while
+# the claims table three hundred lines below was correctly guarding `1023`. The figure moved three
+# times across one wave (919 → 982 → 1010 → 1023); every guarded site followed it and both
+# unguarded sites here did not, through two review sweeps that were keyed on the guarded sites.
+# Repaired 2026-08-16 by DELETING the numerals rather than re-transcribing them — the surviving
+# sentences make the same point without a value, which is the only repair that cannot go stale again.
+#
+# **Whether this file should scan itself is a real design question and it is Task 13's**, not a
+# one-line addition here. Adding `tests/test-derived-counts.sh` to `DCT_DECLARED` requires a claim
+# row, and a claim row over this file's own comments is a guard reading the file it lives in — the
+# `DCT_ABOVE` extraction already shows how sharp that edge is (it must stop at a line number derived
+# from an anchor in this same file). Decide it there; do not bolt it on.
 DCT_DECLARED="docs/ANTI-VACUITY.md
 docs/research/codex-client/findings.md
 install.sh

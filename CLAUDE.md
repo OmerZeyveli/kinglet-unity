@@ -198,17 +198,29 @@ a second copy in the one file whose length is its failure mode.
 
 **The exclusion has a known load path, and it is not single-copy — check that before you lean on it
 again.** It rests on the rule being somewhere a Codex session cannot fail to meet. Today that is two
-places: the generated `AGENTS.md` (injected whole, unconditionally) **and** `using-kinglet`'s intro
-block (a symlinked skill, which no install branch can freeze). The second exists *because* the first
-can be lost: `AGENTS.md` has **no marked-region merge** — unlike `CLAUDE.md`, which the installer
-refreshes between its markers — so once a user edits it, every later `--client codex` run prints
-*"AGENTS.md exists and is not ours — keeping yours, untouched"* and the translation stops being
-updatable. This task's own Next step 2 tells the user to edit that file, which is the awkward part.
-**Giving `AGENTS.md` the merge is the real fix and it is a task, not a paragraph** — it means a new
-write path into a user-owned file, reversing a decision Task 9 argued deliberately, and its own
-state-by-state guards. Until then: if you add a surface whose only correction lives in `AGENTS.md`,
-you are relying on a file the user can freeze. Put it in a symlinked skill too, or qualify the
-surface.
+places: the generated `AGENTS.md`, injected whole before every turn, and `using-kinglet`'s intro
+block, which states the rule inline rather than pointing at it.
+
+**Both can be frozen by a user edit, and the difference is risk, not mechanism.** An earlier version
+of this paragraph called the skill *"a symlinked skill, which no install branch can freeze"*, and
+that is false — measured: append a line to `.claude/skills/using-kinglet/SKILL.md`, re-run any
+install, and the payload loop's `if is_modified …; then KEPT=…; continue; fi` keeps the user's copy
+forever, with the receipt row reading `user-modified`. It is the same freeze `AGENTS.md` gets, by the
+same mechanism. What differs is **who initiates it and how much it takes down**: nothing in this
+toolkit ever tells a user to edit a skill, whereas the installer's own Codex Next step 2 tells them
+to edit `AGENTS.md`, and a frozen skill costs one file where a frozen entry document costs the whole
+generated block — Project Facts refreshes included. **That asymmetry is why two copies are worth
+more than one, and it is the whole of the residual risk being accepted here.** Not "may vary": both
+are freezable, one is instructed.
+
+`AGENTS.md` has **no marked-region merge** — unlike `CLAUDE.md`, which the installer refreshes
+between its markers — so once it is edited, every later `--client codex` run prints *"AGENTS.md
+exists and is not ours — keeping yours, untouched"*. **Giving it the merge is the real fix and it is
+a task, not a paragraph**: a new write path into a user-owned file, reversing a decision Task 9
+argued deliberately, with its own state-by-state guards. Until then, if you add a surface whose only
+correction lives in `AGENTS.md`, you are relying on the copy a user is *instructed* to overwrite.
+Put it in a skill too — knowing that copy is freezable as well, which is an argument for two homes
+rather than for treating either as safe.
 
 The membership that criterion selected, 2026-08-16 — **every member, including the ones handled
 elsewhere**, because a member that appears in the rule and vanishes from the result is the one thing

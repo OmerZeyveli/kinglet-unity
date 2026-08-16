@@ -86,9 +86,10 @@ own, one of them born wrong in the commit that moved its target. A rule stated i
 contradicted in the file beside it is a rule nobody is following.
 
 **Under Codex CLI the dispatch below has no destination, and the loop still runs.** Kinglet's agents
-are excluded from the Codex layer entirely — `.claude/agents/` is not installed there — so
-`unity-coder` and `unity-reviewer` are names with nothing behind them, and there is no `Agent` tool
-to call them with. What Codex does have is a session-level sandbox (`codex --sandbox read-only`, and
+are excluded from the Codex layer entirely: the files are installed under `.claude/agents/` and
+receipted, and **nothing bridges them** — `.agents/skills/` holds no agent entry, so nothing surfaces
+one to a Codex session. `unity-coder` and `unity-reviewer` are names with nothing behind them, and
+there is no `Agent` tool to call them with. What Codex does have is a session-level sandbox (`codex --sandbox read-only`, and
 `sandbox` on its thread-start parameters, `sandboxPolicy` on its turn-start ones) and `subagentStart` / `subagentStop`
 hook events; what it does **not** have is a per-agent tool allowlist, which is the one thing the
 reviewer's read-only guarantee rests on. So the degraded path is: run the implementer turn and the
