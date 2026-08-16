@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "description": "Human-owned Plan 01 migration evidence for the tracked Claude legacy surface. Update only after intentional review. 2026-08-03: the 39 skills moved from .claude/skills/<category>/<name>/ to .claude/skills/<name>/ because Claude Code discovers skills only one level deep, and the inert alwaysApply/globs frontmatter keys were stripped — so every skill record changed both path and sha256. baseline-regenerate refuses this by design (a move reads as an add plus a delete), so it was applied by hand and verified by tests/kinglet/test_baseline_inventory.py.",
-  "source_commit": "195bbb1f17959866a498f29bfe2430510d975706",
+  "source_commit": "a342a474fbab6c257fbf02eaadf337ab014ea4a2",
   "full_claude_tree": {
     "description": "Every tracked file under .claude/. This complete-tree evidence closes category gaps while the seven migration category counts remain independently fixed.",
     "expected_count": 62,
@@ -63,7 +63,7 @@
       },
       {
         "path": ".claude/commands/unity-doctor.md",
-        "sha256": "9b9edf713bd9abc0d2420fd66e82fe1f7fb9aa1204f48f331d2f677cad1a909b",
+        "sha256": "af46b028bfcb2d0ad12ca79ab0785f1b2e0a83e6eec160e0810149787c423173",
         "git_mode": "100644"
       },
       {
@@ -248,7 +248,7 @@
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
-        "sha256": "6e9a081ea129a5fae44cbae358a47edd020f0b8ac73b8a068397b08d939b10e8",
+        "sha256": "32be97af78390988b63f02be4ead2485caabc981e2bec2e040f218f7a359f5a6",
         "git_mode": "100644"
       },
       {
@@ -258,7 +258,7 @@
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/implementer-prompt.md",
-        "sha256": "d8ef03e9a519cb04b79d3bf26f7389b7c87455d2dd6c7ec893301c669db88529",
+        "sha256": "ff018ff7f151289e39cd64166e44d1c5251d260250c0d5dadd641781e9addb7e",
         "git_mode": "100644"
       },
       {
@@ -268,7 +268,7 @@
       },
       {
         "path": ".claude/skills/subagent-driven-implementation/task-reviewer-prompt.md",
-        "sha256": "29d65506bc9881127e66f111072c32b3d282e2d0a305b2a5064ba39020ed1855",
+        "sha256": "5f49c51583263d9af5246334691317e2b9bf513f332d1d0a92fc9e25c063a173",
         "git_mode": "100644"
       },
       {
@@ -371,7 +371,7 @@
       "files": [
         {
           "path": ".claude/commands/unity-doctor.md",
-          "sha256": "9b9edf713bd9abc0d2420fd66e82fe1f7fb9aa1204f48f331d2f677cad1a909b",
+          "sha256": "af46b028bfcb2d0ad12ca79ab0785f1b2e0a83e6eec160e0810149787c423173",
           "git_mode": "100644"
         },
         {
@@ -457,7 +457,7 @@
         },
         {
           "path": ".claude/skills/subagent-driven-implementation/SKILL.md",
-          "sha256": "6e9a081ea129a5fae44cbae358a47edd020f0b8ac73b8a068397b08d939b10e8",
+          "sha256": "32be97af78390988b63f02be4ead2485caabc981e2bec2e040f218f7a359f5a6",
           "git_mode": "100644"
         },
         {
