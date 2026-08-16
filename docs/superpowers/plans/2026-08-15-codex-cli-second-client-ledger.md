@@ -278,6 +278,24 @@ observed in Task 2. Payloads differ by event, derived mechanically rather than a
 **Do not quote a method count as a constant.** The app-server enumeration returned 129 to one agent
 and 123 to another on the same build.
 
+### A negative about a tool this large is a claim about a search — and here is the search
+
+Twice in this wave a superlative over *the routes that happened to be tried* was written as a
+superlative over *the routes that exist*, and both times a reviewer found the missing one in the same
+place. **The method, which is executable rather than a moral:**
+
+```bash
+codex app-server generate-json-schema   # then enumerate the bundle for the capability noun
+```
+
+- Task 5's *"the measured minimum is one directory symlink"* → `skills/extraRoots/set` sits at
+  `oneOf[22]`, **one entry past `skills/list`**.
+- Task 6's *"nothing measured restores the narrowing"* → `ThreadStartParams.sandbox`,
+  `TurnStartParams.sandboxPolicy` and `permissionProfile/list`, found by grepping
+  `ClientRequest.json`.
+
+**Enumerate the schema bundle for the noun before writing any "there is no…" sentence.** Two for two.
+
 ### Codex is pinned at 0.145.0 for this wave
 
 `0.147.0` is available. Do not upgrade. Record `codex --version` in every probe's metadata; a
@@ -356,7 +374,7 @@ The event stream shape, measured against the real binary:
 | 3 | Codex's hook mechanism, measured | **DONE** | `1993b1b..952cd7a` | general-purpose implementer; 1 fix round; F4 **and** F5 delivered — my RE-PLANNED header had wrongly dropped F5 |
 | 4 | Kinglet's 12 hooks under Codex | **DONE** | `23e2444..53daafb` | general-purpose implementer; **3 fix rounds**, one Critical; the shim ships and all 9 tool-event hooks enforce |
 | 5 | Kinglet's 16 skills under Codex | **DONE** | `1bb6135..f4f19c4` | general-purpose implementer; 1 fix round; skills **are** invoked unnamed, and the spec's payload-location proposal was refuted |
-| 6 | Rules, `AGENTS.md`, commands and agents | open | — | **RE-PLANNED: split.** `AGENTS.md` and agent conversion settled; rules and commands became design work |
+| 6 | Rules, `AGENTS.md`, commands and agents | **DONE** | `4898876..56183ef` | general-purpose implementer; 2 fix rounds, one Critical; the pointer verdict was prompt-conditional and became a **positive** ship recommendation |
 | 7 | Layer B — MCP routes against the live bridge | open | — | *(brief pending)* — needs a free Editor |
 | 8 | Ship the payload the measurement supports | open | — | *(brief pending)* — ship list decided by Tasks 2–7 |
 | 9 | Installer writes and removes the Codex layout | open | — | *(brief pending)* |
@@ -655,6 +673,63 @@ works. The trust entry going 0 → 12 is what makes the refutation mean anything
 | **The importer writes `timeoutSec: 3000` un-converted.** Task 4 fixed the units at the source via `--emit-config`, but a user who reaches Codex through `externalAgentConfig/import` rather than through Kinglet's installer still gets the millisecond value read as seconds | **Not safe to leave implicit.** It is the gap between what Kinglet installs and what Codex's own importer produces, and a reader who used the import would have 33-to-83-minute hook timeouts with nothing saying so | **Task 8** (ship list must state which path a user is on) and **Task 9** (the installer must not assume the import ran) |
 | A control drifted on a clean-slate re-run: a fresh `t5-control` loaded `using-kinglet` where the committed one loaded nothing | Safe: of five control runs now in existence four loaded nothing, and `t5-control-api` loaded nothing with **no shell command at all** on two independent runs. The section already discloses `n = 1` | **Task 10 Step 5**, to record that the `none` cells are per-run facts rather than invariants |
 | The `### Reproducing` recipe leaves three gitignored `repro-*.out` files behind | Dropped: they are evidence, the directory is gitignored, and removing them would remove the only artefacts a re-runner produces | — |
+
+---
+
+## Task 6 — close, and the finding that inverted twice
+
+Implementer: **general-purpose**. `DONE`, two fix rounds. Review: **Spec ✅, Quality Needs work — 1
+Critical, 6 Important, 4 Minor**; re-review 1 closed all seven and raised two; re-review 2 **clean**.
+Range **`4898876..56183ef`**.
+
+### `AGENTS.md` is injected; `CLAUDE.md` is only findable
+
+The sentinel came back with **zero `command_execution` items**. The same sentinel in `CLAUDE.md` also
+came back — **but only after an `rg`.** Under Codex, `CLAUDE.md` is a file the model can locate, not a
+document it is given.
+
+### The rules pointer: three statements, each truer than the last
+
+This is the wave's best example of a finding improving under adversarial review rather than surviving
+it.
+
+1. **"The pointer is ignored"** — the implementer's first measurement, Kinglet's own wording read
+   **0 of 6** and obeyed 0 of 6, indistinguishable from a control.
+2. **"The pointer is prompt-conditional"** — the reviewer's counter-experiment on byte-identical rigs,
+   changing *only* the prompt: **3 of 3** under a request that says "follow this project's
+   conventions", against **0 of 3** for the same prompt with the pointer removed.
+3. **"Removing the pointer produces confidently wrong conventions"** — the implementer's own
+   counter-experiment, which it ran rather than re-scoping on the reviewer's numbers. All three
+   control runs asserted *"This follows the project's current convention…"* while sourcing the answer
+   from `GameLifetimeScope.cs`, with the real rule sitting unread.
+
+**The verdict is a gradient, not a conjunction.** The pointer is **necessary** — `nopointer` opened
+`.claude/rules/` **0 times in 24 runs** across all three prompt shapes, and the reviewer derived 18 of
+those 24 itself. It is **not sufficient** — 1 of 12 under a terse prompt. And **the request sets the
+rate**: 1/12 → 4/6 → 6/6.
+
+So the finding ended as a **positive ship recommendation — keep the declarative pointer** — where it
+began as a retraction.
+
+### The restriction that has no destination
+
+Agent tool grants were not dropped in transit: **there is no destination.** Codex's own agent
+definitions carry no tools key, and all six of its `openai.yaml` files agree. So capability is
+**ambient** under Codex, and what evaporated is the **restriction** — **5 of 8** Kinglet agents carry
+a narrowing that vanishes. `unity-reviewer` gains `Write`, `Edit`, `Bash` **and** MCP.
+
+A read-only reviewer that can write is not a degraded reviewer; **this wave's own loop depends on a
+reviewer being unable to repair what it reviews.** Neither the TOML route nor the skill route restores
+the narrowing — a skill has no tools contract either. Per-thread sandbox routes *do* exist (see the
+schema-enumeration rule above), so the honest statement is that **Kinglet's measured shape**
+(`codex exec`, one `--sandbox` per run) has no remedy, not that Codex has none.
+
+### Deferred, with owners
+
+| Finding | Ruling | Owner |
+|---|---|---|
+| The round that fixed categoricals **introduced a new one**: *"`AGENTS.md` is the only document that reaches the model unasked"*, contradicted one section up by `## Skills`, where names and descriptions are injected with no tool call | Safe: it does not change Task 8's action either way, since the skills injection is frontmatter-only and Task 5 covers it. The repair is one word — *"the only project document whose **body** reaches the model unasked"* | **Task 10 Step 5**, which re-derives both research documents |
+| The `### Reproducing` sweep has now found something **three times out of three** — and the third instance was introduced by the round doing the sweeping | Recorded as method, not as an incident: **after any round that rewrites categoricals, sweep for categoricals the rewrite introduced** | Standing method; applied by every remaining task |
 
 ---
 
