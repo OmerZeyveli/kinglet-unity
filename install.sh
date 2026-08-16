@@ -282,7 +282,6 @@ NEW_PATHS=$(
       b=$(basename "$f")
       [ "$b" = "check-provenance.sh" ] && continue
       [ "$b" = "codex-probe.sh" ] && continue
-      [ "$b" = "codex-hook-shim.sh" ] && continue
       printf '.claude/%s/%s\n' "$group" "$b"
     done
   done
@@ -1283,16 +1282,19 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 # correct in a harness the toolkit's maintainers run deliberately, and not something to hand every
 # installed project a copy of.
 #
-# codex-hook-shim.sh joined them on 2026-08-15, and its reason is the cleanest of the three: it is
-# not part of the Claude Code payload at all. It exists to make Kinglet's hooks enforce under Codex
-# CLI, whose file tool hands them a patch envelope none of them can read; under Claude Code the
-# hooks already receive the shape they parse and the shim has nothing to do. Installing it here
-# would put a script in every project that no agent, command or skill names and that nothing in a
-# Claude Code session ever invokes. Which layer ships the Codex configuration — and therefore where
-# this script belongs at install time — is decided by the tasks that own the Codex ship list and its
-# installer, not by this loop.
+# codex-hook-shim.sh joined them on 2026-08-15 and LEFT AGAIN on 2026-08-16, which is the question
+# that skip was holding open. Its reason had been that no agent, command or skill named it and
+# nothing in a Claude Code session invokes it — true, and the wrong test, because the reader it
+# exists for is not in a Claude Code session. The Codex ship list settled it: the hook config
+# `--emit-config` writes carries an ABSOLUTE path to this script, so it has to be in the project
+# it points into. A shim excluded from the payload is a `.codex/hooks.json` pointing at a file that
+# is not there, which under Codex is not an error — it is nine registered hooks that enforce
+# nothing. It now ships, and `.claude/skills/using-kinglet/SKILL.md` and
+# `.claude/commands/unity-doctor.md` name it, so the reachability rule is satisfied rather than
+# waived. codex-command-to-skill.sh ships for the same reason and was never skipped: Codex has no
+# command surface, so Kinglet's commands only reach a Codex reader as generated skills.
 #
-# All three skips use the identical one-name-per-line comparison form on
+# Both remaining skips use the identical one-name-per-line comparison form on
 # purpose: tests/test-derived-counts.sh and tests/test-shipped-citations.sh both extract the skipped
 # names from these lines by matching that exact shape, and derive the installed-script set from
 # them — so a skip written any other way (a `case` list, a loop over an array) would make those
@@ -1357,7 +1359,6 @@ for group in scripts; do
     b=$(basename "$f")
     [ "$b" = "check-provenance.sh" ] && continue
     [ "$b" = "codex-probe.sh" ] && continue
-    [ "$b" = "codex-hook-shim.sh" ] && continue
     dest="$CLAUDE_DIR/$group/$b"
     if is_modified ".claude/$group/$b"; then
       # Kept, so counted as kept: WRITTEN and KEPT both appear in the summary line, and a kept file

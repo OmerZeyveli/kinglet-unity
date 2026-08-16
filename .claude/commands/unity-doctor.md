@@ -123,6 +123,48 @@ do not keep both.
 4. **Frontmatter.** Each file in `.claude/commands/` has `name` and `description`; each in
    `.claude/agents/` has `name`, `description`, `model` and `tools`. Invalid → **WARNING**.
 
+## Check 3b: The second client, and only if the project asked for one
+
+**Skip this whole check unless a `.codex/` directory exists in the project root.** A project
+installed for Claude Code alone has no Codex layer, and reporting its absence would fail every
+healthy install.
+
+If it exists, the project has a Codex CLI layer, and that layer has one failure mode worth checking
+by hand because it is **silent**: hooks that are registered, listed, and never run.
+
+1. **`.codex/hooks.json` exists.** Absent while `.agents/skills/` is present → **WARNING**: the
+   skills bridge was installed and the hook layer was not, so this project is advisory rather than
+   enforcing under Codex. Say that in those words.
+2. **The shim it points at is present and executable:** `.claude/scripts/codex-hook-shim.sh`. The
+   config carries an **absolute** path to it, so a moved or renamed project directory breaks every
+   entry at once. Missing → **ERROR**: under Codex a hook whose command cannot run is not an error
+   the user sees, it is an allow.
+3. **The timeouts are seconds, not milliseconds.** Read `.codex/hooks.json` and check every
+   `timeout`. `.claude/settings.json` declares milliseconds; Codex reads seconds. A value in the
+   thousands → **ERROR**: that is an unconverted millisecond figure, and a hook that should die in
+   three seconds will hold the turn for fifty minutes. The fix is to regenerate rather than edit:
+
+   ```bash
+   bash .claude/scripts/codex-hook-shim.sh --emit-config > .codex/hooks.json
+   ```
+
+   Report it as **ERROR** rather than **WARNING** even though nothing is broken today, because the
+   symptom only appears when a hook hangs — which is exactly when the timeout mattered.
+4. **The skill root resolves.** `.agents/skills/` should hold one entry per directory in
+   `.claude/skills/`, and each entry should resolve to a file. A dangling entry → **WARNING**: Codex
+   lists what it can resolve and says nothing about the rest. If commands were converted, each also
+   has an entry; regenerate with:
+
+   ```bash
+   bash .claude/scripts/codex-command-to-skill.sh
+   ```
+
+5. **Hook trust is not in this project and cannot be checked from here.** A registered hook does not
+   run until its entry is trusted in the user's own `CODEX_HOME` config, which lives in their home
+   directory. Do not read it, do not write it, and do not report its state — say instead that trust
+   is granted at install time and that `hooks/list` is where the user verifies it. Reporting a
+   green hook layer without it would be the one claim this check exists to avoid making.
+
 ## Check 4: Unity Project Structure
 
 1. Check for `Assets/` directory → **ERROR** if missing

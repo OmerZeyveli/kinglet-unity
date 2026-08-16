@@ -9,6 +9,12 @@ Task 5 `## Skills`, Task 6 `## Rules and AGENTS.md`, `## Commands` and
 decision and the stranded-machinery debt. A section that is absent has not been
 measured, and no section here speaks for another.
 
+**`## Ship list` at the foot of this file is the exception, and it is not a
+measurement.** Task 8 wrote it, it decides what Kinglet actually ships, and every
+row of it cites the section above that decided the row. `tests/test-codex-surface.sh`
+reads it: a Codex payload file the ship list does not name fails, and a ship-list
+path that does not exist fails too.
+
 ---
 
 ## Hooks
@@ -1908,3 +1914,146 @@ That one cannot be fixed by protecting the file from the importer; it needs the
 body written differently for the second client, or written so that it names no
 client-specific mechanism. Whichever, it travels with `developer_instructions`
 wherever that lands, so it is the ship list's problem and not the importer's.
+
+---
+
+## Ship list
+
+*Written by Task 8 on 2026-08-16, before any payload file was created, from the
+verdicts above. Not a measurement — a decision, with the measurement that decided
+it attached to every row. `tests/test-codex-surface.sh` guards it in both
+directions.*
+
+### Which arrival path this describes
+
+**There are two, they produce different trees, and every row below describes the
+first:**
+
+| Path | What it is | Who writes it |
+|---|---|---|
+| **the Kinglet path** | `install.sh` writes the Codex layout from this repository's payload | Kinglet |
+| **the importer path** | the user runs `externalAgentConfig/detect` → `externalAgentConfig/import` | Codex |
+
+The two are not variants of one layout. The importer drops 7 of 9 commands
+silently, migrates no rules at all, rewrites 84 `.claude/` references to a
+`.Codex/` that exists under no spelling, strips every agent's tool grants, and —
+measured — copies `timeout: 3000` into `timeoutSec` **unconverted**, so a user who
+arrives that way has hook timeouts of 33 to 83 minutes. It reports 31 successes and
+0 failures while doing all of it.
+
+**Kinglet does not write the importer's tree and does not repair it.** The ship
+list therefore makes no claim about a project that arrived by import, and the
+entry document says so in itself, so that a user who imported does not read
+Kinglet's guarantees onto a tree Kinglet never touched.
+
+### Ships
+
+| # | Surface class | What ships, by path | The verdict that decided it |
+|---|---|---|---|
+| 1 | **Hooks** | `scripts/codex-hook-shim.sh`, now in `install.sh`'s payload → `.claude/scripts/codex-hook-shim.sh`; `.codex/hooks.json` **generated** by `--emit-config` at install time; hook trust granted at install time | `## Hooks`: all nine tool-event hooks enforce through the shim; without it eight of the nine fire and do nothing. The config's top level must be a `hooks` wrapper — a bare event map is rejected with a parse warning. `timeout` is milliseconds in `.claude/settings.json` and **seconds** in Codex, so the generator converts by ceiling division and orders the two ceilings: shim `--timeout ceil(ms/1000)`, Codex `timeout ceil(ms/1000)+1` |
+| 2 | **Skills** | `<project>/.agents/skills/` — a real directory holding one symlink per skill, `<name>` → `../../.claude/skills/<name>` | `## Skills`: `.claude/skills/` unaided gives **0**; the `skills` config key gives 0 under two spellings; a symlink root gives 16, enabled, with invocation observed. The root is per-entry rather than the single directory symlink because row 3 needs generated entries beside the symlinked ones — measured 2026-08-16 under this task, see **The mixed root** below |
+| 3 | **Commands** | `scripts/codex-command-to-skill.sh`, in the payload → `.claude/scripts/codex-command-to-skill.sh`; it writes `<project>/.agents/skills/<command-name>/SKILL.md`, one per `.claude/commands/*.md` | `## Commands`: 7 of the 9 are dropped silently by the importer on an argument token, the loss is **content and not routing** (919 lines of Unity diagnostics that exist nowhere else in the toolkit), no command name collides with a skill name, and a converted command was observed loading unnamed. Under the Kinglet path with row 2 alone, 9 of 9 would be lost — worse than the importer |
+| 4 | **The entry document** | `scripts/generate-claude-md.sh --client codex` emits it; Task 9 writes it to `<project>/AGENTS.md`. This repository gets its own tracked `AGENTS.md` | `## Rules and AGENTS.md`: `AGENTS.md` is **injected** (sentinel returned with 0 shell commands); `CLAUDE.md` is *findable*, not loaded (same sentinel, recovered only after an `rg`). This half is unconditional — the injection happens before the turn |
+| 5 | **Rules** | unchanged: `.claude/rules/` ships as it already does, and the Codex entry document keeps the **declarative pointer** and the existing inlined digest. Nothing new is inlined | `## Rules and AGENTS.md`: without the pointer `.claude/rules/` was opened **0 times in 24 runs**, and the failure mode is not "no conventions" but **confidently wrong** ones. The pointer is not sufficient (1 of 12 under a conventions-blind request) and the request sets the rate. The digest already inlines the shortlist — see **What is not inlined, and why** below |
+| 6 | **MCP** | the `mcp_servers.UnityMCP` row for `<project>/.codex/config.toml`, written by Task 9. The entry document names the file and **marks the client-behaviour question open** | `codex-facts.md`: the importer writes exactly that row pointing at the bridge's `localhost:8080/mcp` URL, so the **configuration shape** is measured. **Whether the routes behave is not** — Task 7 has not run. See **Open, not answered** below |
+| 7 | **The guard** | `tests/test-codex-surface.sh` | Task 8's own deliverable. Derives both sides from the tree, fails in both directions, carries an anti-vacuity floor |
+
+### Excluded, each with its measurement
+
+| Surface | Excluded | The measurement |
+|---|---|---|
+| **Agents, as `.codex/agents/` TOML** | wholly | `## Agents`: the converted files carry exactly 3 keys — `name`, `description`, `developer_instructions` — and no capability. Codex's own agent shape has no tools key in any of the 6 built-ins. The only `tools` in the `Config` schema is session-scoped `web_search`. **5 of 8** Kinglet agents carry a narrowing that has no destination, and `unity-reviewer` — deliberately read-only — would gain `Write`, `Edit`, `Bash` **and** MCP |
+| **Agents, re-expressed as skills** | wholly, in this wave | `## Agents`: a skill has no tools contract either, so the skill route drops the narrowing exactly as completely. Re-expressing the *content* is possible and is not done here: the two agent bodies worth crossing (`unity-fixer`, `unity-reviewer`) are the same skill-shaped material row 3 carries for commands, and shipping them would double the surface without a measurement that anyone reaches them — `## Skills` observed **6 distinct skills ever loading out of 16–18 discovered** |
+| **`.codex/hooks.json` as a tracked file** | wholly | `## Hooks`: the config's command strings carry **absolute paths** to both the shim and the hook, so a tracked copy would carry one machine's paths. A hand-written one also reintroduces the fifty-minute timeout silently, because `--emit-config` is the ms-to-s conversion's only home. Recorded in `provenance-skip.tsv` as `rule=absent` so it cannot drift back in |
+| **`.codex/agents/` in this repository** | wholly | as above; `rule=absent` |
+| **The importer's `AGENTS.md`** | wholly | `## Rules and AGENTS.md`: the imported file carries 3 `.Codex/rules/` references pointing at a directory that exists under no spelling, and the rules it points at never migrate. A document that is injected whole is the worst file in the tree to let a blind substitution rewrite |
+| **`skills/extraRoots/set`** | as a ship route | `## Skills`: it works, and it lands at `scope:"user"` — every other project the session touches would get Kinglet's 16 skills — and it does not persist. After the call the home holds no file naming the root |
+| **The `skills` configuration key** | — | `## Skills`: refuted under two spellings, each against a control in the same file that took effect |
+| **The hook-trust bypass flag** | from everything Kinglet tells a user to run | `## Hooks`: it is a measurement instrument. Nothing in that section needed it, and every live hook result was measured under legitimate trust |
+| **An imperative rules pointer in the project entry document** | not adopted | `## Rules and AGENTS.md` item 4: it is **12 of 12** read and obeyed under the very request that leaves the declarative form at 1 of 12, and it reads *every* file it names on every task whether or not the rules are relevant. That cost is paid per turn, the declarative form plus the digest already covers the conventions-blind case for the highest-value rules, and 12 of 12 is not a guarantee. **This repository's own `AGENTS.md` does use the imperative form** — one file, a maintainer reading it, and no per-turn cost in a user's project |
+
+### The mixed root — measured under this task, 2026-08-16
+
+Row 2 changes the skill root's shape from the one `## Skills` measured, so the new
+shape was measured rather than assumed. Two rigs, one `skills/list` call, `cwds` as
+an array, `forceReload: true`, a disposable `CODEX_HOME` (mode 700, outside `/tmp`,
+credential 600, removed as one named path), `codex-cli 0.145.0`:
+
+| Rig | `.agents/skills/` is | Repo-scope skills |
+|---|---|---|
+| `t8-dirlink` | one directory symlink to `../.claude/skills` (the shape `## Skills` measured) | **16**, all `enabled:true`, `errors: []` |
+| `t8-mixedroot` | a **real directory**: 16 per-entry symlinks to `../../.claude/skills/<name>`, plus **one real generated directory** beside them | **17**, all `enabled:true`, `errors: []` |
+
+Both rigs are `mkproject.sh` fixture Unity projects with `install.sh --yes` run
+against them, so the only difference is the root's shape. Every symlinked entry's
+reported `path` is the **real** `.claude/skills/<name>/SKILL.md` in both rigs — the
+same "discovery device, not a load path" behaviour `## Skills` records for the
+directory symlink, now confirmed per entry.
+
+**What this does and does not license.** It licenses row 2's layout and row 3's
+generated entries sitting in it. It does **not** re-measure invocation: `## Skills`
+observed 2 of 16 loading through the directory symlink, and nothing here loaded
+anything, because `skills/list` is an app-server call and no model ran. A generated
+command-skill is **discoverable**; whether it is reached is the same open question
+`## Commands` and `## Agents` both attach to their recommendations.
+
+### What is not inlined, and why
+
+Row 5 adds nothing to the digest, and that is a decision against the obvious
+alternative. The generated document's `## Conventions reminder` already inlines
+`[SerializeField] private`, `_lowerCamelCase`, `== null` (never `?.` / `is null`),
+`[FormerlySerializedAs]`, zero-allocation `Update`/`FixedUpdate`/`LateUpdate` and
+the `GetComponent` / `Camera.main` caching rule — which is the `inline` mechanism,
+measured at 12 of 12, applied to exactly the conventions a conventions-blind request
+would otherwise miss.
+
+The spine non-negotiables that are *not* in the digest — no legacy `Input.*`, no
+hand-edited `.meta` or scene files, no unguarded `UnityEditor` reference in runtime
+code — are the ones a **hook** enforces, and row 1 makes those hooks enforce under
+Codex. They bind by mechanism rather than by prose, so inlining them buys a second
+copy of a rule that is already refused at the router. Prose that duplicates an
+enforced gate is the cheapest thing to add and the first thing to go stale.
+
+**The residual is named rather than hidden:** if row 1 is not installed — a user who
+took the skills bridge and not the hook layer — those rules are neither inlined nor
+enforced, and the entry document says so in that case rather than implying the
+toolkit is enforcing.
+
+### Open, not answered
+
+- **MCP client behaviour under Codex is UNMEASURED.** Task 7 has not run. Nothing
+  here establishes that the `manage_*` action names resolve, that Codex hits the
+  same tool-versus-resource split, that the silent-failure shape (`isError` false
+  beside a `success` false payload) appears, or that an inactive tool group is
+  diagnosed. Row 6 ships the *configuration*, which is measured, and says the rest
+  is unknown. Assuming parity with Claude Code is the move that produced four of
+  this wave's five silent-failure layers.
+- **Whether `multi_agent` dispatch propagates a per-thread sandbox** to a sub-agent
+  is unmeasured (`## Agents`). It is the difference between *a client could enforce
+  a read-only reviewer* and *Codex will*. Nothing in this wave dispatched an agent,
+  and the exclusion of agents does not depend on the answer.
+- **Whether a directory symlink survives on Windows**, and whether Unity's asset
+  pipeline objects to one outside `Assets/` (`## Skills`). Row 2 rests on symlinks;
+  `.claude/UPSTREAM` claims one shipped host, `linux-x64`.
+- **`session-brief`'s firing** (`## Hooks`) — registered, matcher untested against
+  Codex's `sessionStart` source string.
+
+### The three imported-tree defects, and who owns each
+
+`## Rules and AGENTS.md` and `## Agents` leave three repairs unassigned. They are
+not one problem:
+
+| Defect | Owner | Why |
+|---|---|---|
+| **The 29 `.Codex/rules/` references** and the 22 surviving `.claude/` ones | **the importer's** — Kinglet leaves them alone | They are produced by a blind substitution that runs **only on the importer path**. Kinglet's installer copies no surface body and rewrites nothing, so on the Kinglet path every `.claude/rules/` reference in a skill, command or agent resolves against a `.claude/rules/` that is right there. Repairing files Kinglet does not write is not available to it |
+| **The dead pointer wording** in the imported entry document | **the importer's**, and answered by not using it | Row 4 generates the entry document instead. The exclusion above is the repair |
+| **The 16 skill-tool references** | **split, and the split is the point** | All 16 are in `.claude/agents/`, where they are **correct** — Claude Code has that tool — and where they are false only once a Codex reader loads the body. Since agents do not ship to Codex at all, Kinglet repairs none of them. What Kinglet *does* own is the one reference of the same kind that **does** cross: the generated entry document's own instruction to load a skill with that tool, which under `--client codex` becomes the measured mechanism — the model reads the `SKILL.md`, because `ThreadItem` carries no skill item and Codex has no skill tool. `.claude/skills/` and `.claude/commands/` carry **0** references of this shape; derive it rather than trusting the sentence |
+
+### Success criterion 1
+
+`## Hooks` measured that the hooks port with a named translation, so the "if hooks
+did not port" branch of the plan does not apply: Kinglet on Codex is **enforcing,
+not advisory** — provided row 1 and its trust step are installed. The entry
+document states that conditional in those terms rather than claiming enforcement
+unconditionally, because a user who bridged only the skills has an advisory install
+and no way to tell from the inside.

@@ -72,23 +72,26 @@ Each cost below was measured against a manual copy, not assumed:
 - **No `.claude/scripts/`.** That directory does not exist in this repository — Option A builds it
   by copying the repo-root `scripts/`. A manual copy of `.claude/` therefore has no
   `.claude/scripts/`, which this guide points at by that exact path and which `install.sh` writes.
-  (6 of the 6 installed scripts are named by some agent, command or skill, so a model can reach
+  (8 of the 8 installed scripts are named by some agent, command or skill, so a model can reach
   them; any that were not would be reachable only by a user who went looking for them. That count
   is derived by `tests/test-derived-counts.sh` rather than maintained by hand.) To match Option A,
-  copy them yourself — **all except `check-provenance.sh`, `codex-probe.sh` and
-  `codex-hook-shim.sh`**, which Option A deliberately skips in both its announcement and its write
-  loop. The first two measure *this repository*: one validates its `provenance.tsv` and expects the
-  repo's layout, the other runs Codex CLI against Kinglet's own surfaces, writing into a
-  `docs/research/` directory that does not ship. The third belongs to a different client entirely —
-  it makes Kinglet's hooks readable to Codex CLI, whose file tool hands them a patch envelope
-  instead of a file path, and under Claude Code it has nothing to do.
-  The repo has 9 scripts; an installed project has 6:
+  copy them yourself — **all except `check-provenance.sh` and `codex-probe.sh`**, which Option A
+  deliberately skips in both its announcement and its write loop. Both measure *this repository*:
+  one validates its `provenance.tsv` and expects the repo's layout, the other runs Codex CLI
+  against Kinglet's own surfaces, writing into a `docs/research/` directory that does not ship.
+  Two of the eight that **do** copy belong to Codex CLI rather than Claude Code —
+  `codex-hook-shim.sh`, which makes Kinglet's hooks readable to a client whose file tool hands them
+  a patch envelope instead of a file path, and `codex-command-to-skill.sh`, which converts the
+  commands into skills for a client that has no command surface. Neither does anything in a Claude
+  Code session; both have to be *in* the project because the Codex hook config points at an
+  absolute path inside it.
+  The repo has 10 scripts; an installed project has 8:
 
   ```bash
   mkdir -p your-unity-project/.claude/scripts
   for f in kinglet-unity/scripts/*.sh; do
     case "$(basename "$f")" in
-      check-provenance.sh|codex-probe.sh|codex-hook-shim.sh) continue ;;
+      check-provenance.sh|codex-probe.sh) continue ;;
     esac
     cp "$f" your-unity-project/.claude/scripts/
   done

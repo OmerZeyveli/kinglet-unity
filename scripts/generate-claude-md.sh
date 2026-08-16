@@ -12,6 +12,14 @@
 #                  lives between the generated:begin/end markers). Used to
 #                  refresh an existing CLAUDE.md without touching prose.
 #
+#   --client NAME  claude (default) or codex. `--client codex` emits the entry
+#                  document for the second client: the same project facts, the
+#                  same rules pointer and the same inlined conventions digest,
+#                  with the Claude Code mechanisms Codex does not have (the
+#                  Skill tool, slash commands, sub-agent dispatch) replaced by
+#                  the ones Codex was measured to have. Write it to AGENTS.md —
+#                  Codex injects that file whole and never loads CLAUDE.md.
+#
 # CONTRACT: the document goes to STDOUT. Every log line goes to STDERR. The
 # caller owns the destination file.
 #
@@ -59,7 +67,7 @@ NL=$'\n'
 # The line numbers above were REMOVED from this paragraph deliberately. It used to name 27, 25, 2
 # and 24 by hand, and one added header line made three of the four wrong at once while the fourth
 # stayed right by luck. The guard derives A and B from the line below, so the prose does not have to.
-usage() { sed -n '3,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
+usage() { sed -n '3,33p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 # ---------------------------------------------------------------------------
 # Args
@@ -67,9 +75,22 @@ usage() { sed -n '3,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 FACTS_ONLY=0
 PROJECT_DIR=""
 PROVIDER=""
+# The client this document is written FOR. It changes which mechanisms the prose
+# names, never which facts it reports — the detected block, the rules pointer and
+# the inlined conventions digest are byte-identical across both, because Task 6
+# measured the pointer as necessary (`.claude/rules/` opened 0 times in 24 runs
+# without one) and the digest as the mechanism that binds when the request gives
+# the model no reason to look (inlined 12 of 12, pointer 1 of 12).
+CLIENT="claude"
 while [ $# -gt 0 ]; do
     case "$1" in
         --facts-only) FACTS_ONLY=1; shift ;;
+        --client)     [ $# -ge 2 ] || { error "--client needs a value"; exit 2; }
+                      case "$2" in
+                          claude|codex) CLIENT="$2" ;;
+                          *) error "--client must be claude or codex, not: $2"; exit 2 ;;
+                      esac
+                      shift 2 ;;
         --provider)   [ $# -ge 2 ] || { error "--provider needs a value"; exit 2; }
                       PROVIDER="$2"; shift 2 ;;
         -h|--help)    usage ;;
@@ -403,10 +424,22 @@ MDEOF
 
     if [ -n "$SUGGESTED_SKILLS" ]; then
         echo ""
-        echo "**Skills matching this project** — load with the \`Skill\` tool by name."
-        echo "Nothing loads them for you: no glob matching, no always-apply. A skill you do not"
-        echo "invoke is a skill you do not have."
-        echo ""
+        # The MECHANISM differs by client and the advice does not. Claude Code has
+        # a Skill tool; Codex does not — `ThreadItem`'s variant list carries no
+        # skill item, and a skill is loaded by the model reading its SKILL.md with
+        # the shell tool. Naming a tool the reader does not have is the one defect
+        # this document can least afford, because Codex injects it whole.
+        if [ "$CLIENT" = "codex" ]; then
+            echo "**Skills matching this project** — read the file to load one."
+            echo "There is no skill tool here: a skill is loaded by reading its \`SKILL.md\`."
+            echo "Nothing loads them for you. A skill you do not read is a skill you do not have."
+            echo ""
+        else
+            echo "**Skills matching this project** — load with the \`Skill\` tool by name."
+            echo "Nothing loads them for you: no glob matching, no always-apply. A skill you do not"
+            echo "invoke is a skill you do not have."
+            echo ""
+        fi
         printf '%s\n' "$SUGGESTED_SKILLS" | while IFS= read -r s; do [ -n "$s" ] && echo "- \`$s\`"; done
     fi
 }
@@ -606,8 +639,29 @@ cat <<'MDEOF'
   That section is measured against this project's code and it is the authority; this list is not.
   The toolkit's default is Model-View-System with VContainer (DI), MessagePipe (cross-system
   messaging) and UniTask (async), and it is a default, not a finding.
+MDEOF
+
+# The Input bullet is the one Engineering Stance row whose truth is client-conditional.
+# Under Claude Code the hook runs and the rule is enforced. Under Codex the same hook
+# runs only through the shim, registered in .codex/hooks.json and trusted in the user's
+# own CODEX_HOME — measured: registered-but-untrusted hooks are silently skipped, and
+# eight of the nine tool-event hooks are inert without the shim. Claiming enforcement
+# that may not be installed is exactly the failure this wave exists to avoid.
+if [ "$CLIENT" = "codex" ]; then
+cat <<'MDEOF'
+- **Input:** the **New Input System**. Legacy `Input.*` is blocked by a hook. Under Codex that gate
+  runs through `.claude/scripts/codex-hook-shim.sh` and is enforced **only if** `.codex/hooks.json`
+  exists and its entries are trusted in your own `CODEX_HOME` config — otherwise it is a rule you
+  keep yourself. See **Running under Codex CLI** below.
+MDEOF
+else
+cat <<'MDEOF'
 - **Input:** the **New Input System**. Legacy `Input.*` is blocked by a hook, so this one is
   enforced rather than recommended.
+MDEOF
+fi
+
+cat <<'MDEOF'
 - **Platform:** PC / console. No mobile code, touch input, or mobile performance budgets.
 - **Rules** live in `.claude/rules/` and are binding:
   - `architecture.md` · `csharp-unity.md` · `performance.md` · `serialization.md` ·
@@ -620,6 +674,51 @@ cat <<'MDEOF'
 - **Game code:** `Assets/Scripts/`. Tuning data lives in ScriptableObjects / external config —
   never hardcoded.
 
+MDEOF
+
+if [ "$CLIENT" = "codex" ]; then
+cat <<'MDEOF'
+## How to work
+
+- **Feature work:** the `unity-brainstorming` skill clarifies requirements and records the design
+  decision, `unity-planning` turns it into a plan and chooses how the plan runs, and that choice
+  runs it — `subagent-driven-implementation` or `unity-execution`. The `unity-review` skill reviews
+  the result.
+- **MCP:** the CoplayDev Unity MCP bridge must be running for editor control — see `MCP-SETUP.md`.
+  Verify with "What's in the current scene?"
+
+## Running under Codex CLI (the second client)
+
+This file is `AGENTS.md`, and Codex injects it whole before the turn begins. `CLAUDE.md` sits
+beside it carrying the same generated block; Codex does **not** load that one, so this is the
+document that speaks.
+
+- **Skills** live at `.claude/skills/<name>/SKILL.md` and are discovered through `.agents/skills/`,
+  one symlink per skill. The listing hands you the real `.claude/` path, and that is the path to
+  read — `.agents/skills/` is a discovery device, not a load path. Kinglet's commands are here too,
+  one skill per command, because Codex has no command surface: there is nothing to type, and a skill
+  is loaded only because you chose to read it.
+- **Hooks** are Kinglet's own hooks run through `.claude/scripts/codex-hook-shim.sh` and registered
+  in `.codex/hooks.json`. Codex's file tool hands a hook a patch envelope rather than a file path;
+  the shim normalises it into the shape the hooks already read. **A registered hook does not run
+  until its entry is trusted in your own `CODEX_HOME` config** — untrusted, it is listed and
+  silently skipped. If `.codex/hooks.json` is absent or untrusted, this install is **advisory, not
+  enforcing**, and every rule below binds only because you keep it.
+- **Sub-agents carry no capabilities here.** Codex has no per-agent tool allowlist, so Kinglet's
+  agents are deliberately not installed — a read-only reviewer cannot be expressed, only requested.
+  Where a body asks for an agent, take its degraded path: do the work inline and say that you did.
+- **MCP** is configured in `.codex/config.toml`. **Whether the Unity bridge's routes behave the same
+  way under Codex has not been measured.** If a call reports success and the editor did not change,
+  suspect the client, verify in Unity, and do not assume parity with Claude Code.
+- **If this project was set up by Codex's own configuration importer rather than by Kinglet's
+  installer, none of the above holds.** That path drops most commands silently, migrates no rules at
+  all, rewrites paths to a directory that exists under no spelling, and copies hook timeouts without
+  converting milliseconds to seconds — which turns a three-second gate into a fifty-minute one.
+
+## Conventions reminder (see `.claude/rules/`)
+MDEOF
+else
+cat <<'MDEOF'
 ## How to work
 
 - **Feature work:** the `unity-brainstorming` skill clarifies requirements and records the design
@@ -630,6 +729,10 @@ cat <<'MDEOF'
   Verify with "What's in the current scene?"
 
 ## Conventions reminder (see `.claude/rules/`)
+MDEOF
+fi
+
+cat <<'MDEOF'
 
 - `[SerializeField] private` for inspector fields; `_lowerCamelCase` privates; `== null` (never `?.`
   / `is null`) on Unity objects; `[FormerlySerializedAs]` on every renamed serialized field; zero GC
@@ -640,4 +743,8 @@ cat <<'MDEOF'
 <!-- Anything project-specific: gotchas, conventions, context for future sessions. -->
 MDEOF
 
-info "CLAUDE.md emitted to stdout."
+if [ "$CLIENT" = "codex" ]; then
+    info "AGENTS.md (Codex CLI) emitted to stdout."
+else
+    info "CLAUDE.md emitted to stdout."
+fi
