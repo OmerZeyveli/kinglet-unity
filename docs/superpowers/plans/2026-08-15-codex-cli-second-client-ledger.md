@@ -471,7 +471,7 @@ The event stream shape, measured against the real binary:
 | 4 | Kinglet's 12 hooks under Codex | **DONE** | `23e2444..53daafb` | general-purpose implementer; **3 fix rounds**, one Critical; the shim ships and all 9 tool-event hooks enforce |
 | 5 | Kinglet's 16 skills under Codex | **DONE** | `1bb6135..f4f19c4` | general-purpose implementer; 1 fix round; skills **are** invoked unnamed, and the spec's payload-location proposal was refuted |
 | 6 | Rules, `AGENTS.md`, commands and agents | **DONE** | `4898876..56183ef` | general-purpose implementer; 2 fix rounds, one Critical; the pointer verdict was prompt-conditional and became a **positive** ship recommendation |
-| 7 | Layer B — MCP routes against the live bridge | **DEFERRED TO LAST** | — | **The owner is using the Editor.** See the ruling below |
+| 7 | Layer B — MCP routes against the live bridge | **NOT RUN** | — | Needs the owner's Unity Editor and a live bridge. Deferred for contention, now blocked by absence |
 | 8 | Ship the payload the measurement supports | **DONE** | `b713f09..993dee2` | general-purpose implementer; 2 fix rounds; the payload ships and its guard is 86 assertions |
 | 9 | Installer writes and removes the Codex layout | **DONE** | `b3ecfb2..ce09521` | general-purpose implementer; 2 fix rounds; writes the user's **home** for the first time in this toolkit's history |
 | 10 | Findings synthesis, decision, debt | **DONE** | `1870afe..f729a74` | general-purpose implementer; 1 fix round; decision is **none of A/B/C** |
@@ -998,4 +998,20 @@ evidence supports it, but **must mark the client-behaviour question as open rath
 parity with Claude Code.** Assuming parity is exactly the move that produced four of this wave's five
 silent-failure layers.
 
-*(No scene has been touched. Nothing to record yet.)*
+**Status at 2026-08-16, after Tasks 8–11 closed:** the Editor is **no longer running** and the bridge
+on `127.0.0.1:8080` **does not answer** (HTTP 000). So the contention is gone and the prerequisite
+went with it — Task 7 needs a live Editor holding a real project, and there is none.
+
+**Task 7 is the only part of this wave that cannot be completed without the owner.** Everything else
+is done. To close it: open a Unity project with the MCP bridge running, confirm no other agent holds
+the Editor, and dispatch Task 7 against `docs/research/codex-client/` with the harness at
+`scripts/codex-probe.sh`.
+
+**What stays unmeasured until then**, and is recorded as unmeasured rather than assumed, in
+`README.md`, `docs/ARCHITECTURE.md` and `findings.md`: whether Codex hits the same tool-versus-resource
+split, whether `manage_*` action names resolve under its MCP client, whether the
+`isError: false` + `"success": false` silent-failure shape appears, and whether it diagnoses an
+inactive tool group. **Assuming parity with Claude Code is the move that produced four of this wave's
+six silent-failure layers**, so nothing in the shipped documents assumes it.
+
+*(No scene was ever touched by this wave.)*
