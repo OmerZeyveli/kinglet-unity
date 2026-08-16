@@ -2387,11 +2387,11 @@ if [ "$CLIENT" = codex ]; then
       ok "Converted $CMDSKILL_W command(s) into .agents/skills/$([ "$CMDSKILL_K" -gt 0 ] && printf ', kept %s of yours' "$CMDSKILL_K")"
     else
       warn "codex-command-to-skill.sh failed — the commands did not cross to Codex."
-      # 982 IS DERIVED — `cat .claude/commands/*.md | wc -l` — AND IT IS GUARDED. It read 919 until
+      # 1010 IS DERIVED — `cat .claude/commands/*.md | wc -l` — AND IT IS GUARDED. It read 919 until
       # 2026-08-16, which was correct until Task 8 added 63 lines to unity-doctor.md inside the same
       # wave; that task corrected the research document and left this string, which is the half a
       # user reads. tests/test-derived-counts.sh's tree-size block now reds when the two disagree.
-      note_not_done "The nine commands were NOT converted into .agents/skills/, so 982 lines of Unity diagnostics that exist nowhere else in the toolkit are unreachable under Codex. Run .claude/scripts/codex-command-to-skill.sh by hand to see why it failed."
+      note_not_done "The nine commands were NOT converted into .agents/skills/, so 1010 lines of Unity diagnostics that exist nowhere else in the toolkit are unreachable under Codex. Run .claude/scripts/codex-command-to-skill.sh by hand to see why it failed."
     fi
     rm -rf "$CONV_TMP"
   fi
@@ -2922,7 +2922,13 @@ CODEXCFG
     fi
   elif [ "$HOOKS_JSON_OK" -eq 1 ]; then
     # THE HONEST HALF-STATE, NAMED. A hook layer on disk that nothing has vouched for enforces
-    # nothing, and `## Success criterion 1` says a user cannot tell from inside the session.
+    # nothing, and `## Success criterion 1` says a user cannot tell from inside the session. That
+    # last clause is scoped rather than absolute, and README.md § Hook trust now says where the line
+    # falls: THIS state — registered, untrusted — is the one Codex WILL report, as
+    # `trustStatus: "untrusted"` on an entry `hooks/list` still returns. The state nothing can see
+    # is the project being untrusted, where the list comes back empty and there is no entry to carry
+    # a status at all. Nothing in the shipped toolkit asks after install time either way, which is
+    # why this note exists.
     note_not_done "Codex hook trust was not granted, so the $([ -f "$CODEX_HOOKS_JSON" ] && grep -c '"type": "command"' "$CODEX_HOOKS_JSON" 2>/dev/null || echo 0) registered hook(s) in .codex/hooks.json will NOT run: Codex ignores an untrusted hook silently. Grant it by running 'codex' once in this project and accepting its hook review, or re-run install.sh with --client codex --codex-trust."
   fi
 
@@ -2942,6 +2948,59 @@ CODEXCFG
   # `requirements` non-null, so nothing here demonstrates that a policy an organisation has actually
   # SET surfaces through that field. The correct sentence is "cannot repair, and does not yet detect
   # a set policy" — not "cannot detect", and not "detects".
+else
+  # ── Step 8e: a Codex layer this run did not write, and still owns ────────────
+  #
+  # THE DEFECT THIS CLOSES, MEASURED ON A FIXTURE 2026-08-16 (figures pinned to that tree: one row
+  # per skill, one per command, plus three). `install.sh --client codex` writes its receipt rows
+  # outside `.claude/` — the skill symlinks, the converted command skills, `AGENTS.md`,
+  # `.codex/hooks.json`, `.codex/config.toml` — and the receipt is rebuilt from scratch on every run
+  # with every one of those appends INSIDE the `--client codex` branch. So installing
+  # `--client claude` over that project took the rows **28 -> 0** while leaving all 28 paths on disk.
+  # The orphan prune in Step 3 cannot reach them either — it filters the previous receipt to
+  # `^\.claude/` — so nothing removed the files and nothing owned them. `uninstall.sh` is
+  # receipt-driven by design ("Refusing to guess which files are ours"), so the result was a project
+  # the uninstaller left permanently dirty while every signal read healthy: `PASS Install intact:
+  # 71 file(s) verified against the receipt`, `8 passed · 1 warning(s) · 0 failure(s)`, and an
+  # uninstall that removed 71 of 99 and reported success with 28 files still there.
+  #
+  # THE ANSWER IS TO KEEP BOTH LAYERS AND KEEP BOTH SETS OF ROWS, and the alternative was weighed
+  # rather than skipped. Removing the Codex layer on a Claude install is defensible in the abstract
+  # and wrong here for one concrete reason: `claude` is the DEFAULT client, so every ordinary upgrade
+  # — `./install.sh --project-dir X`, no `--client` at all — would silently delete a layer the user
+  # asked for once, including the `.codex/hooks.json` whose per-hook trust tables live in their HOME
+  # and whose only removal route is the receipt row this run would have just thrown away. It also
+  # inverts the promise the other arm makes: `--client codex` never removes anything Claude Code
+  # reads, and the mirror of that has to hold or the pair is a trap.
+  #
+  # THE ROWS ARE CARRIED VERBATIM, AND ONLY WHEN THE PATH STILL EXISTS. Verbatim, because a row means
+  # "the toolkit wrote this file with this checksum": re-deriving the sha would newly claim ownership
+  # of a file the user edited after the Codex install, and `uninstall.sh` would then delete it as
+  # unchanged — the exact data loss its two-test classifier exists to prevent. A row whose path is
+  # gone is dropped, because there is nothing left to own; `-e || -L` and not `-f`, since the skill
+  # rows are symlinks to directories and `-f` is false for every one of them (that spelling is what
+  # made `studio-doctor.sh` fail every correct Codex install).
+  #
+  # `$RECEIPT` still holds the PREVIOUS run's receipt at this point — Step 9 is what replaces it —
+  # which is the same fact four `owned_by_installer` call sites depend on.
+  CODEX_CARRIED=0
+  if [ "$MODE" = ours ] && [ -f "$RECEIPT" ]; then
+    while IFS=$'\t' read -r cx_rel cx_sha cx_mode cx_origin; do
+      case "$cx_rel" in
+        ''|\#*|path) continue ;;
+        AGENTS.md|.agents/skills/*|.codex/*) ;;
+        "$CODEX_TRUST_REL") ;;
+        *) continue ;;
+      esac
+      [ -e "$PROJECT_DIR/$cx_rel" ] || [ -L "$PROJECT_DIR/$cx_rel" ] || continue
+      printf '%s\t%s\t%s\t%s\n' "$cx_rel" "$cx_sha" "$cx_mode" "$cx_origin" >> "$RECEIPT_TMP"
+      CODEX_CARRIED=$((CODEX_CARRIED + 1))
+    done < "$RECEIPT"
+  fi
+  if [ "$CODEX_CARRIED" -gt 0 ]; then
+    info "Codex layer: $CODEX_CARRIED receipted path(s) kept — this run installed Claude Code only."
+    info "Nothing Codex reads was removed. Re-run with --client codex to regenerate that layer."
+  fi
 fi
 
 # ── Step 9: Write the receipt ────────────────────────────────────────────────
@@ -2997,12 +3056,46 @@ count_hooks() {
     printf '%s\n' "$live"
   fi
 }
+# THE CODEX BLOCK BELOW EXISTS BECAUSE THE FIVE NUMBERS ABOVE ARE TRUE AND MISLEADING AT ONCE.
+# They count what landed under `.claude/`, which is correct for both clients — `--client codex` adds
+# a layer and removes nothing Claude Code reads. But printed alone to a Codex user they say
+# `Agents 8` about agents this toolkit deliberately EXCLUDES from the Codex layer, and `Commands 9`
+# about a surface `codex-cli 0.145.0` does not have at all. The branch's headline finding and the
+# installer's last line contradicted each other on one screen, and the last line is what a user
+# screenshots.
+#
+# COUNTED FROM DISK AT THIS POINT, like every other figure here, and NOT from the SKILLS_LINKED /
+# CMDSKILL_W accumulators above: those are what THIS RUN wrote, and on a re-install that keeps a
+# user's edited file the accumulator and the tree disagree. `-type l` does not follow the link, so
+# the two arms partition the root exactly: symlinks are the bridged skills, directories are the
+# converted commands.
+count_agents_root() {   # $1 = find predicate
+  find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 "$@" 2>/dev/null | wc -l | tr -d ' '
+}
 printf '\n%s\n' "${BOLD}${GREEN}Installation complete.${NC}"
-printf '  %sAgents%s    %s\n'   "$CYAN" "$NC" "$(count_in agents '*.md')"
-printf '  %sCommands%s  %s\n'   "$CYAN" "$NC" "$(count_in commands '*.md')"
-printf '  %sSkills%s    %s\n'   "$CYAN" "$NC" "$(count_in skills 'SKILL.md')"
-printf '  %sHooks%s     %s\n'   "$CYAN" "$NC" "$(count_hooks)"
-printf '  %sRules%s     %s\n'   "$CYAN" "$NC" "$(count_in rules '*.md')"
+if [ "$CLIENT" = codex ]; then
+  printf '  %s.claude/ — what Claude Code reads%s\n' "$CYAN" "$NC"
+  printf '    Agents    %s\n'   "$(count_in agents '*.md')"
+  printf '    Commands  %s\n'   "$(count_in commands '*.md')"
+  printf '    Skills    %s\n'   "$(count_in skills 'SKILL.md')"
+  printf '    Hooks     %s\n'   "$(count_hooks)"
+  printf '    Rules     %s\n'   "$(count_in rules '*.md')"
+  printf '  %sCodex CLI — what crosses%s\n' "$CYAN" "$NC"
+  printf '    Skills    %s  (%s bridged from .claude/skills/, %s commands converted)\n' \
+    "$(count_agents_root)" "$(count_agents_root -type l)" "$(count_agents_root -type d)"
+  printf '    Hooks     %s  %s\n' \
+    "$([ -f "$PROJECT_DIR/.codex/hooks.json" ] && grep -c '"type": "command"' "$PROJECT_DIR/.codex/hooks.json" 2>/dev/null || echo 0)" \
+    "$(if [ "${TRUST_N:-0}" -gt 0 ] && [ "${CODEX_TRUST_GRANT:-0}" -eq 1 ]; then printf 'in .codex/hooks.json, trusted'; else printf 'in .codex/hooks.json — NOT trusted yet, so they will not run'; fi)"
+  printf '    Commands  0  no command surface exists in Codex; the nine crossed as skills above\n'
+  printf '    Agents    0  excluded on purpose — Codex has no per-agent tool allowlist\n'
+  printf '    Rules     %s  reachable, but nothing loads them for you — AGENTS.md carries the pointer\n' "$(count_in rules '*.md')"
+else
+  printf '  %sAgents%s    %s\n'   "$CYAN" "$NC" "$(count_in agents '*.md')"
+  printf '  %sCommands%s  %s\n'   "$CYAN" "$NC" "$(count_in commands '*.md')"
+  printf '  %sSkills%s    %s\n'   "$CYAN" "$NC" "$(count_in skills 'SKILL.md')"
+  printf '  %sHooks%s     %s\n'   "$CYAN" "$NC" "$(count_hooks)"
+  printf '  %sRules%s     %s\n'   "$CYAN" "$NC" "$(count_in rules '*.md')"
+fi
 # The CLAUDE.md step names whichever file this run actually wrote to — not a fixed string. See
 # defect 9: telling the user to edit CLAUDE.md in the run where CLAUDE.md.generated was written
 # instead sends them to markers that live in a file the message never mentioned.
@@ -3049,6 +3142,37 @@ esac
 # BEFORE `Next steps:`, DELIBERATELY. What a user does next depends on what did not happen, and a
 # block printed after the numbered list reads as a footnote to it.
 print_not_done
+# THE LIST FORKS BY CLIENT, AND THREE OF THE FOUR CLAUDE-CODE STEPS WERE WRONG FOR A CODEX USER.
+# Step 2 sent them to `CLAUDE.md`'s FILL: markers — the document Codex never loads — while the
+# `AGENTS.md` it DOES load carries its own unfilled markers that nothing mentioned. Step 3 named the
+# wrong binary and two slash commands this branch measured as having no surface at all. And step 1's
+# destination, MCP-SETUP.md, listed "Claude Code (this CLI)" as a prerequisite.
+#
+# STEP 1 ON THE CODEX ARM IS THE ONE THAT DID NOT EXIST BEFORE. Project trust is the sixth
+# silent-failure layer and the one a real user meets first: until `codex` has been run once in the
+# project and its trust prompt accepted, `hooks/list` returns an EMPTY list — the hooks are not
+# reported as untrusted, they are not registered at all, and nothing anywhere says so. `--codex-trust`
+# grants PER-HOOK trust and cannot grant PROJECT trust, so a run whose `--codex-trust` succeeded
+# still needs this. It used to be told only to the user whose trust step FAILED, which is precisely
+# backwards: the failing run is loud, and the succeeding one is where the gap is silent.
+if [ "$CLIENT" = codex ]; then
+  case "${AGENTS_BRANCH:-skipped}" in
+    written)    AGENTS_MD_STEP='Fill in the FILL: markers in AGENTS.md — genre, pillars, vision, scope. Codex injects that file whole; CLAUDE.md carries its own copy for Claude Code and is not read here.' ;;
+    kept-yours) AGENTS_MD_STEP='Your own AGENTS.md was kept, so no Codex entry document was generated. Rename or delete it and re-run with --client codex to get one.' ;;
+    *)          AGENTS_MD_STEP='No AGENTS.md was generated this run — see the warning above. Without it, none of these conventions reach a Codex session.' ;;
+  esac
+cat <<EOF
+
+Next steps:
+  1. Grant PROJECT trust: run 'codex' once in this project and accept its trust prompt.
+     Until you do, Codex registers no hooks here at all and reports no error about it.
+  2. $AGENTS_MD_STEP
+  3. Install the Unity MCP bridge — see MCP-SETUP.md, § "If your client is Codex CLI".
+  4. Start 'codex' in your project and ask for a health check. There are no slash commands in
+     Codex: the /unity-* content is installed as skills — read .agents/skills/<name>/SKILL.md.
+  5. Health check any time: ./.claude/scripts/studio-doctor.sh --project-dir "$PROJECT_DIR"
+EOF
+else
 cat <<EOF
 
 Next steps:
@@ -3057,4 +3181,5 @@ Next steps:
   3. Run 'claude' in your project and try /unity-init, or /unity-doctor for a health check.
   4. Health check any time: ./.claude/scripts/studio-doctor.sh --project-dir "$PROJECT_DIR"
 EOF
+fi
 exit 0

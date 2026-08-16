@@ -85,6 +85,18 @@ every finding *at file:line* — and the same wave then rotted two line-number s
 own, one of them born wrong in the commit that moved its target. A rule stated in one file and
 contradicted in the file beside it is a rule nobody is following.
 
+**Under Codex CLI the dispatch below has no destination, and the loop still runs.** Kinglet's agents
+are excluded from the Codex layer entirely — `.claude/agents/` is not installed there — so
+`unity-coder` and `unity-reviewer` are names with nothing behind them, and there is no `Agent` tool
+to call them with. What Codex does have is a session-level sandbox (`codex --sandbox read-only`, and
+`sandbox` / `sandboxPolicy` on its thread and turn parameters) and `subagentStart` / `subagentStop`
+hook events; what it does **not** have is a per-agent tool allowlist, which is the one thing the
+reviewer's read-only guarantee rests on. So the degraded path is: run the implementer turn and the
+review turn **separately**, hand the reviewer the brief, the report and the diff as three paths, and
+instruct it to change nothing. **The separation becomes an instruction rather than a capability —
+record that in the ledger for the run**, because a reviewer that could have repaired what it
+reviewed and says it did not is a different piece of evidence from one that could not.
+
 **Per task, in plan order:**
 
 1. **Dispatch one implementer.** `unity-coder` via the `Agent` tool, using `implementer-prompt.md` as

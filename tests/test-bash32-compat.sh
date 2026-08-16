@@ -145,11 +145,11 @@ shipped_scripts() {
 #
 # THOSE TWO NUMBERS ARE PINNED, AND UNTIL 2026-08-16 THEY DID NOT SAY SO — they read "`tests/` alone
 # holds 39 files and `scripts/` holds 8", present tense, while THIS FILE'S OWN RUNTIME OUTPUT prints
-# `SHIPPED:tests=45 SHIPPED:scripts=10` on every single run. A whole-branch review flagged the
+# `SHIPPED:tests=46 SHIPPED:scripts=10` on every single run. A whole-branch review flagged the
 # contradiction; the ruling is that the figures are pinned and the TENSE was the defect, not the
 # values. The reason is what the sentence is for: it explains why the FIRST fix — a design this file
 # no longer has — was insufficient, and that argument was made against the tree of 2026-08-14.
-# Re-deriving them to 45 and 10 would attach today's tree to a claim about a superseded design,
+# Re-deriving them to 46 and 10 would attach today's tree to a claim about a superseded design,
 # which is exactly the error `docs/ANTI-VACUITY.md` names when it rules that a pinned figure is
 # *about another tree* and must not be edited to match this one. So the verbs are past tense and the
 # date now governs both numbers explicitly.

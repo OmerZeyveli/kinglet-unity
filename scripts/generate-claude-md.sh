@@ -689,24 +689,41 @@ cat <<'MDEOF'
 
 ## Running under Codex CLI (the second client)
 
-This file is `AGENTS.md`, and Codex injects it whole before the turn begins. `CLAUDE.md` sits
-beside it carrying the same generated block; Codex does **not** load that one, so this is the
-document that speaks.
+This file is `AGENTS.md`, and Codex injects it whole before the turn begins. `CLAUDE.md` sits beside
+it, generated in the same run from the same project scan; Codex does **not** load that one, so this
+is the document that speaks. **The two are not copies of each other, and every difference is
+deliberate rather than drift.** They fork wherever a statement is client-conditional: the Input
+bullet, which this file makes conditional on the hook layer being installed and trusted while
+`CLAUDE.md` states it flatly (because under Claude Code it is), and — where this project has skills
+to suggest — the skill-loading paragraph, which there names a loading mechanism this client does not
+have and here says to read the file. Each is correct for its own client. **If you go and read
+`CLAUDE.md`, read it as the other client's copy:** its claims are the stronger ones and they are not
+about the session you are in.
 
 - **Skills** live at `.claude/skills/<name>/SKILL.md` and are discovered through `.agents/skills/`,
   one symlink per skill. The listing hands you the real `.claude/` path, and that is the path to
   read — `.agents/skills/` is a discovery device, not a load path. Kinglet's commands are here too,
   one skill per command, because Codex has no command surface: there is nothing to type, and a skill
   is loaded only because you chose to read it.
+- **`/name` is Claude Code's spelling, and it appears throughout Kinglet's surfaces.** Wherever a
+  skill, a rule or this file names `/unity-fix`, `/unity-review`, `/unity-doctor` or any other
+  `/name`, read `.agents/skills/<name>/SKILL.md` instead and follow it. The routing is unchanged;
+  only the way you reach it is. **Translate it, do not treat it as a dead reference** — every one of
+  Kinglet's commands is installed here as a skill of the same name.
 - **Hooks** are Kinglet's own hooks run through `.claude/scripts/codex-hook-shim.sh` and registered
   in `.codex/hooks.json`. Codex's file tool hands a hook a patch envelope rather than a file path;
   the shim normalises it into the shape the hooks already read. **A registered hook does not run
   until its entry is trusted in your own `CODEX_HOME` config** — untrusted, it is listed and
   silently skipped. If `.codex/hooks.json` is absent or untrusted, this install is **advisory, not
   enforcing**, and every rule below binds only because you keep it.
-- **Sub-agents carry no capabilities here.** Codex has no per-agent tool allowlist, so Kinglet's
-  agents are deliberately not installed — a read-only reviewer cannot be expressed, only requested.
-  Where a body asks for an agent, take its degraded path: do the work inline and say that you did.
+- **Sub-agents carry no capabilities here.** Codex has no **per-agent** tool allowlist, so Kinglet's
+  agents are deliberately not installed: `unity-coder` and `unity-reviewer` are names with nothing
+  behind them and there is no `Agent` tool to call them with. Read-only is not what is missing —
+  this session can run under `--sandbox read-only`, and `subagentStart` / `subagentStop` are real
+  hook events — what is missing is attaching a capability set to a *named* agent, so a reviewer
+  cannot be started narrowed. Where a body asks for an agent, take its degraded path: do the work
+  inline and say that you did, and if the body wanted a read-only reviewer, say that the separation
+  was an instruction you kept rather than a capability you were held to.
 - **MCP** is configured in `.codex/config.toml`. **Whether the Unity bridge's routes behave the same
   way under Codex has not been measured.** If a call reports success and the editor did not change,
   suspect the client, verify in Unity, and do not assume parity with Claude Code.

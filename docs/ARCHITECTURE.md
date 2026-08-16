@@ -325,10 +325,10 @@ decision strands* in `findings.md`.
 | Class | Codex | Note |
 |---|---|---|
 | Hooks | **enforce, through the shim, after trust** | the timeout unit differs — milliseconds here, seconds there — and `--emit-config` is the only place that conversion happens |
-| Skills | **discovered and invoked unnamed** | Codex does not read `.claude/skills/`; a symlink root is what makes it look |
+| Skills | **discovered and invoked unnamed** | Codex does not read `.claude/skills/`; the symlink root is what makes it look here. It is not the only route that could — `skills/extraRoots/set` and `skills/config/write` are live app-server methods that take a root — but it is the one measured, and it needs no client-side call at install time |
 | Rules | pointer + inlined digest in `AGENTS.md` | the Claude Code entry document is byte-identical to what it was; only the Codex arm gained the extra inlined block |
 | Commands | **no such surface exists** | content converts to skills; dispatch does not survive |
-| Agents | **excluded** | Codex has no per-agent capability contract, so a read-only reviewer would arrive able to write |
+| Agents | **excluded** | Codex has no **per-agent** capability contract, so a read-only reviewer would arrive able to write. Read-only itself exists — `codex --sandbox read-only`, `sandbox` / `sandboxPolicy` on thread and turn start, `permissionProfile/list` — and so does a sub-agent lifecycle (`subagentStart` / `subagentStop` are hook events). What has no expression is attaching a capability set to a *named agent definition*, which is the whole content of the `tools:` key |
 | MCP | configuration only | route behaviour under Codex's client is **unmeasured** |
 
 ### The failure mode to know

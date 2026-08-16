@@ -145,6 +145,54 @@ directory-as-provenance.
 Precedence: the five spine rules bind. `pc-console.md` adds platform specifics on top; it does not
 override them.
 
+### When a surface needs a Codex qualification — the criterion, so it is not decided per file
+
+There are two clients now, and the wave that added the second one measured it honestly into
+`README.md` and `docs/ARCHITECTURE.md` and never went back to the Claude-Code-era surfaces those
+measurements falsified. A whole-branch review found the result: *"Can a reader tell what Kinglet on
+Codex enforces and what it does not? From `README.md`, yes. From inside the installed project, no."*
+The repair was **not** to add a `codex` mention to every shipped surface — that is noise in files a
+session pays to read, and it is a worse outcome than none. It was this criterion, applied 2026-08-16.
+
+**A shipped surface gets a Codex qualification when, and only when, a reader who can reach it under
+Codex would act on a sentence in it that is false or unreachable there.** Both halves are required.
+
+1. **Can a Codex reader reach it at all?** `.claude/agents/` is **not installed** under Codex — the
+   agents are excluded deliberately — so their `Skill`-tool and sub-agent sentences have no Codex
+   reader and need no edit. `.claude/commands/` reaches a Codex reader only through
+   `scripts/codex-command-to-skill.sh`, which prepends a caveat banner, so a command-body claim is
+   qualified **once, in the banner**, not once per command file. `docs/` does not ship into a
+   project at all; it is qualified for the human evaluating the toolkit, which is a different reader
+   and a different bar. What a Codex session really reads is `AGENTS.md`, `.agents/skills/*`,
+   `.claude/rules/*` (only when something points at them), and `MCP-SETUP.md`.
+2. **Does it assert a Claude Code mechanism as automatic, or route somewhere Codex has not got?**
+   *"loads automatically"*, *"always loaded"*, *"blocked by a hook"*, *"the `Skill` tool"*, an
+   `Agent`-tool dispatch. A surface carrying only Unity/C# knowledge — `physics`, `object-pooling`,
+   `addressables`, `urp-pipeline`, `save-system`, `state-machine`, `assembly-definitions` — asserts
+   nothing about the client and gets nothing.
+
+**One exception, and it is about the user rather than the model:** a document the *installer sends a
+Codex user to* is in scope whatever it says about mechanisms, because the installer chose the
+destination. That is `MCP-SETUP.md` and `scripts/studio-doctor.sh`.
+
+**One deliberate exclusion, and it is what keeps this from carpet-bombing.** A claim that a
+generated, always-injected document already corrects is corrected **there**, once — not in every
+surface that makes it. `/name` is the case: Codex has no slash-command surface, but every command in
+`.claude/commands/` is installed there as a skill of the same name, so a `/unity-review` in a skill body is
+a *spelling* difference and not a dead reference. The generated `AGENTS.md` carries the translation
+rule and Codex injects it whole, so `unity-brainstorming` and `verification-before-completion` — both
+of which name slash commands as live routes — are correctly left alone. `using-kinglet` gets one
+clause pointing at that rule and nothing more: it was in scope for test 2 anyway (it claimed the
+rules load automatically), and a whole section restating the translation was written, measured
+against `tests/test-surface-references.sh`'s five-section budget, and **deleted** — a second copy of
+a rule the reader has already been handed, in the one file whose length is its failure mode.
+
+The membership that criterion selected: `.claude/skills/using-kinglet/`,
+`.claude/skills/input-system/`, `.claude/skills/subagent-driven-implementation/`,
+`.claude/rules/unity-specifics.md`, `.claude/rules/pc-console.md`, `.claude/commands/unity-doctor.md`
+and `MCP-SETUP.md`. **Re-run the criterion, do not copy the list** — it is the answer for one tree on
+one date.
+
 ## Shell conventions
 
 Everything here is bash. A macOS host pass is planned (`.claude/UPSTREAM` currently claims exactly

@@ -6,7 +6,7 @@ Complete catalog of hooks in Kinglet Pioneer.
 
 ## Overview
 
-Kinglet Pioneer includes 12 hooks that provide safety enforcement, quality warnings and session management. Hooks are bash scripts in `.claude/hooks/` configured in `.claude/settings.json`. 11 of the 12 hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, state paths, and utility functions. **`session-brief.sh` sources nothing** — it runs at `SessionStart`, where a library failure is a session that does not start — and carries `DISABLE_UNITY_HOOKS` and `DISABLE_HOOK_SESSION_BRIEF` inline instead. Until 2026-08-14 it carried neither, and was the one hook the kill switch did not reach.
+Kinglet Pioneer includes 12 hooks that provide safety enforcement, quality warnings and session management. Hooks are bash scripts in `.claude/hooks/` configured in `.claude/settings.json` — **under Codex CLI the registration file, the timeout unit and the tool payload are all different, and the section below this one is the translation.** 11 of the 12 hooks source a shared library (`_lib.sh`) that provides kill switches, profile filtering, state paths, and utility functions. **`session-brief.sh` sources nothing** — it runs at `SessionStart`, where a library failure is a session that does not start — and carries `DISABLE_UNITY_HOOKS` and `DISABLE_HOOK_SESSION_BRIEF` inline instead. Until 2026-08-14 it carried neither, and was the one hook the kill switch did not reach.
 
 `_lib.sh` is that shared library and not itself a hook, which is why the count is one less than the number of `.sh` files in the directory. Derive it rather than trusting this sentence:
 
@@ -27,6 +27,31 @@ this directory for the first time. Seven had never run (they declared `strict` w
 warned about prose describing a mistake while permitting the mistake itself.
 `provenance-skip.tsv` records the ground for each, and `scripts/check-provenance.sh` fails if any of
 them reappears.
+
+---
+
+## Everything below assumes Claude Code. What Codex CLI changes
+
+`README.md` and `docs/ARCHITECTURE.md` both send you here as the hook authority, so this has to be
+said at the top rather than in a footnote. **The hook *bodies* are the same code under both clients
+— `.claude/hooks/` was not touched by the Codex wave at all — and nothing else in this document
+carries over unqualified.** Measured against `codex-cli 0.145.0`; every claim below has a command
+behind it in `docs/research/codex-client/findings.md`.
+
+| This document says | Under Codex CLI |
+|---|---|
+| configured in `.claude/settings.json` | configured in **`.codex/hooks.json`**, *generated* from `.claude/settings.json` at install time by `.claude/scripts/codex-hook-shim.sh --emit-config`. It is not committed and must not be hand-edited — see below |
+| `timeout` is milliseconds | **seconds.** Kinglet's `2000` / `3000` / `5000` become 33, 50 and 83 minutes if anything copies them across unconverted. `--emit-config` is the only place that conversion happens |
+| **Type:** Blocking (exit 2) | still exit 2 — but a hook that Codex **times out is an ALLOW**, silently, and a hook that dies any other way (`exit 1`, malformed JSON, plain text on stdout) is an unlogged allow too. The shim's deadline is set one second under Codex's so a hung hook refuses instead |
+| these hooks run before any Edit or Write tool invocation | Codex's file tool is **`apply_patch`**, whose `tool_input` carries only a patch envelope — no `file_path`, no `content`, no `new_string`. `Edit` and `Write` survive as matcher *aliases*. Unaided, **8 of the 9 tool-event hooks match, run, and do nothing**; the shim normalises the envelope into the shape they already read |
+| a registered hook runs | **only after two trust steps.** The project must be trusted (run `codex` once in it) *and* each entry trusted in the user's own `CODEX_HOME` config. Both failures are silent — see `README.md` § *Hook trust* |
+| `UNITY_HOOK_MODE=warn` downgrades blocking hooks to warnings | the warning reaches the model through the shim, which re-emits an exit-0 hook's stderr as `hookSpecificOutput.additionalContext`. **Without the shim it is shown zero times anywhere** — not "block downgraded to warning" but "block downgraded to nothing" |
+
+**Do not hand-edit `.codex/hooks.json` to fix a timeout.** The trust hash covers a hook's
+*declaration* — command string, timeout, matcher, event — so any edit drops every entry to
+*"modified since last trusted"*, which Codex treats as untrusted and does not run. Regenerating and
+re-granting in one step is
+`./install.sh --project-dir <project> --client codex --codex-trust`.
 
 ---
 

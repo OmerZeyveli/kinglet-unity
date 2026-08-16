@@ -115,9 +115,9 @@ The floor sees the sum. One source can reach zero and the survivors carry the to
 **Tightening the number moves the boundary; it does not close the class.** Worked on the real subject
 this shape was found in — `tests/test-bash32-compat.sh`'s bash-4 sweep, whose five sources
 (`.claude/hooks`, `scripts`, `tests`, `install.sh`, `uninstall.sh`) measure
-**13 + 10 + 45 + 1 + 1 = 70** files. That is the guard's own printed census rather than a count taken
-by hand — *"SHIPPED:.claude/hooks=13 SHIPPED:scripts=10 SHIPPED:tests=45 SHIPPED:install.sh=1
-SHIPPED:uninstall.sh=1 … (70 shipped, 25 in the early-exit-reader scope)"*.
+**13 + 10 + 46 + 1 + 1 = 71** files. That is the guard's own printed census rather than a count taken
+by hand — *"SHIPPED:.claude/hooks=13 SHIPPED:scripts=10 SHIPPED:tests=46 SHIPPED:install.sh=1
+SHIPPED:uninstall.sh=1 … (71 shipped, 25 in the early-exit-reader scope)"*.
 
 **That figure is live, it has rotted three times, and it is the one number in this document under a
 guard.** It read `40` / `62` until 2026-08-15 (the derivation at `5881463`), and then **64** —
@@ -160,10 +160,10 @@ No single constant catches every source. The table says which floor each one wou
 
 | source that dies | total left | the smallest floor that would catch it |
 |---|---|---|
-| `tests` (45) | 25 | 26 |
-| `.claude/hooks` (13) | 57 | 58 |
-| `scripts` (10) | 60 | 61 |
-| `install.sh` or `uninstall.sh` (1) | 69 | 70 |
+| `tests` (46) | 25 | 26 |
+| `.claude/hooks` (13) | 58 | 59 |
+| `scripts` (10) | 61 | 62 |
+| `install.sh` or `uninstall.sh` (1) | 70 | 71 |
 
 A floor of `F` over a total of `T` catches exactly the sources **larger than `T - F`**; every source
 inside that slack dies green. Raising `F` shrinks the slack and catches more sources, so tightening
@@ -204,7 +204,7 @@ Two of the eleven above are green for exactly this reason, and they are the two 
   `docs/` alone holds **196**, so the floor cleared with **zero files under `.claude/`**. Measured
   in a clone: **17 passed, 0 failed, rc 0** — identical in verdict to a healthy tree.
 - `tests/test-bash32-compat.sh` — `SS_ALL_N > 0` over five sources and `SS_PIPE_N > 0` over four.
-  `tests/` holds **45** `.sh` files (40 when this was written), so both totals cleared with
+  `tests/` holds **46** `.sh` files (40 when this was written), so both totals cleared with
   `.claude/hooks/` — the directory the file was originally written for — completely empty. Measured:
   **8 passed, 0 failed, rc 0**.
 

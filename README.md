@@ -32,7 +32,7 @@ worth reading before you adopt it.** Every claim below is checkable with the com
 | **Client** | **Claude Code, fully. Codex CLI, partially and measurably** — `codex-cli 0.145.0`, measured on this host 2026-08-15/16, not inferred. Hooks, skills, rules and the entry document cross; **commands and agents do not cross as surfaces**. `./install.sh --client codex` writes that layer. The per-class verdicts, with the command that produced each, are in `docs/research/codex-client/findings.md`. |
 | **Host** | **linux-x64 only** (`.claude/UPSTREAM`). The shell avoids bash-4 and GNU-only constructs so a macOS pass stays possible, but that pass has not happened. Windows: nothing — and the Codex skill root is a directory of **symlinks**, which nothing has tested on Windows. |
 | **The build system** | **Scaffolded, and now measurably unused.** `src/catalog/routing.json` is still `{"routes": []}` and `python3 -m tools.kinglet_build validate` still reports *0 canonical units, 0 routes, 2 adapters* — the second client shipped without one route being written, and without `src/`, `tools/` or `adapters/` changing by a line. `.claude/` is still the hand-authored surface, pinned by a human-owned manifest in `migration/`. |
-| **Unity MCP** | **Session-bound.** Tool schemas register when the client process starts, so Unity must be open and the bridge listening *before* you start the session, and must stay up. A session that begins without it can never acquire it — registering mid-session succeeds and changes nothing. |
+| **Unity MCP** | **Session-bound — measured in Claude Code, and only there.** Tool schemas register when the client process starts, so Unity must be open and the bridge listening *before* you start the session, and must stay up. A session that begins without it can never acquire it — registering mid-session succeeds and changes nothing. **Do not read this row onto Codex:** the `.codex/config.toml` row is written and nothing has measured how the bridge behaves under Codex's MCP client at all — see *What is not measured* below. |
 | **Verification in your project** | **None ships.** The hooks below are prompt-time guards: they refuse a tool call. The toolkit installs no tests, no gates, no CI, and no pre-push chain for your game. Build-time verification is yours to write. |
 
 ### The architecture is a constraint, not a default
@@ -74,7 +74,9 @@ invocation under real-ish prompts against the live competitor is now measured, n
 - **PC / console only.** No mobile. Keyboard/mouse + gamepad with rebinding, no touch. Desktop and
   console performance framing throughout. This is enforced by a test, not just requested.
 - **Fixed architecture:** Unity 6 · C# · **VContainer** (DI) + **MessagePipe** (messaging) +
-  **UniTask** (async) + New Input System. Legacy `Input.*` is blocked by a hook.
+  **UniTask** (async) + New Input System. Legacy `Input.*` is blocked by a hook — under Claude Code
+  unconditionally, under Codex CLI only once `.codex/hooks.json` is installed and trusted (see
+  [Kinglet on Codex CLI](#kinglet-on-codex-cli)).
 - **Medium-weight process.** Enough structure for a solo dev or small team. Senior
   "creative/technical director" reviews are optional, not gates.
 - **One MCP.** The open-source [CoplayDev Unity MCP](https://github.com/CoplayDev/unity-mcp) bridge,
@@ -140,6 +142,19 @@ outside your Unity project.
   into. Five of the eight agents narrow their own tools; `unity-reviewer` is deliberately read-only
   and under Codex would run with write, edit, shell **and** MCP access. Rather than ship a reviewer
   that can silently repair what it reviews, the agents are excluded from the Codex layer entirely.
+
+  **What is missing is the per-agent grant, not read-only itself, and the difference is worth being
+  exact about.** Codex has a session- and turn-level sandbox — `codex --sandbox read-only`
+  (`[possible values: read-only, workspace-write, danger-full-access]`), `sandbox` on its
+  thread-start parameters, `sandboxPolicy` on its turn-start parameters, and a
+  `permissionProfile/list` route that enumerates named profiles — and it has a sub-agent lifecycle,
+  since its hook event list carries `subagentStart` and `subagentStop`. What has no expression is
+  *attaching* a capability set to a named agent definition, the way `.claude/agents/<name>.md`'s
+  `tools:` key does, so **Kinglet's agents cannot be shipped with their narrowing intact** — which
+  is the reason above and is unchanged. A user who wants a read-only reviewer under Codex can get
+  one by running the whole session that way. **None of those routes has been measured by this
+  toolkit**; they are read from the committed schema bundle and from `codex --help`, and they are
+  named here so the exclusion is not read as a bigger claim than it is.
 - **Codex's own `externalAgentConfig/import`.** If you migrate that way instead, you get a tree
   Kinglet did not write and does not repair: it drops seven of the nine commands, migrates no rules,
   rewrites 84 path references to a directory that exists under no spelling, strips every tool grant,
@@ -160,7 +175,9 @@ wrong is silent**:
    meet: it is what a correct install looks like from the inside before you have ever run `codex` in
    the project. Fix it by running `codex` once there and accepting its trust prompt.
 2. **The hooks are registered but individually untrusted.** They report `enabled: true` and fire
-   **zero** times, with no prompt and nothing logged. `--codex-trust` grants this by appending one
+   **zero** times, with no prompt and nothing logged — though they also report
+   `trustStatus: untrusted` beside it, which is the half of this that *is* answerable and is scoped
+   below. `--codex-trust` grants this by appending one
    table per hook to `$CODEX_HOME/config.toml`; the installer backs the file up, keeps its mode, and
    records the exact tables in the receipt so `uninstall.sh` removes them.
 3. **A hook that Codex times out is an ALLOW**, and a silent one — the edit lands and the model is
@@ -172,8 +189,26 @@ wrong is silent**:
 research above was measured under legitimate trust.
 
 **So: with the Codex layer installed and trust granted, Kinglet on Codex is enforcing. With only the
-skills bridged, it is advisory — and there is no way to tell from inside the session.** That
-sentence is why this section exists.
+skills bridged, it is advisory.** That distinction is why this section exists.
+
+**How much of it a session can tell about itself, exactly.** This paragraph used to end *"— and
+there is no way to tell from inside the session"*. That is true of failure 1 and **false of failures
+2 and 3**, and the difference decides whether a diagnostic can ever be written. `hooks/list` takes
+`cwds` — the project — and reads no home, and `trustStatus` is a **required** field of every entry
+it returns, drawn from `["managed", "untrusted", "trusted", "modified"]`:
+
+- **Failure 1 is genuinely invisible.** An untrusted project's response carries **zero** entries,
+  and an entry that is not there has no `trustStatus`. It is indistinguishable from a project with
+  no hook config at all.
+- **Failures 2 and 3 are visible.** A registered-but-untrusted hook reports
+  `trustStatus: "untrusted"` next to its `enabled: true`; a `.codex/hooks.json` regenerated since it
+  was trusted reports the enumerated value `"modified"`.
+
+What remains true is that **nothing in the shipped toolkit asks after install time.** `install.sh`
+calls `hooks/list` while granting trust and nothing calls it again, so a session still has no
+running diagnostic — the route exists and no shipped surface takes it. Verified against the
+committed schema bundle in `docs/research/codex-client/evidence/f1-schema/`, not against a live
+session.
 
 ### What is not measured
 

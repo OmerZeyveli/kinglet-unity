@@ -94,11 +94,18 @@ Kinglet installer from the toolkit checkout.
 
 ## Check 3: What the doctor script does not read
 
-Check 2 covers the install. These four are outside what it **reports** — and only these, so the
-duplication Check 2 removed does not creep back in. The list was five until 2026-08-14: the
-payload-directory item is gone because the script issues that verdict itself now, and that is the
-direction to take every time one of these becomes something the script reports — delete the item,
-do not keep both.
+Check 2 covers the install. These four are outside what it **reports**, and they are the only ones
+*this* check carries — the duplication Check 2 removed does not creep back in here. The list was
+five until 2026-08-14: the payload-directory item is gone because the script issues that verdict
+itself now, and that is the direction to take every time one of these becomes something the script
+reports — delete the item, do not keep both.
+
+**"And only these" used to close the sentence, and the branch below falsified it six lines later.**
+`scripts/studio-doctor.sh` contains zero occurrences of `codex`, `AGENTS.md` or `.agents`, so the
+whole second-client surface is outside what it reports too — and it is covered by **Check 3b**,
+behind its own skip gate, not by this list. Four here plus 3b's five is the real membership. If you
+add an item, decide which of the two checks owns it and say so; a closed-world claim in one of them
+is what went wrong the first time.
 
 1. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
    other direction: for every `.sh` in `.claude/hooks/` except `_lib.sh`, confirm it appears in
@@ -180,11 +187,32 @@ checking by hand because it is **silent**: hooks that are registered, listed, an
    bash .claude/scripts/codex-command-to-skill.sh
    ```
 
-5. **Hook trust is not in this project and cannot be checked from here.** A registered hook does not
-   run until its entry is trusted in the user's own `CODEX_HOME` config, which lives in their home
-   directory. Do not read it, do not write it, and do not report its state — say instead that trust
-   is granted at install time and that `hooks/list` is where the user verifies it. Reporting a
-   green hook layer without it would be the one claim this check exists to avoid making.
+5. **Hook trust is not in this project, and the state of it is partly knowable and partly not.**
+   A registered hook does not run until its entry is trusted in the user's own `CODEX_HOME` config,
+   which lives in their home directory. **Never read that file and never write it** — that
+   prohibition is unchanged and it is absolute.
+
+   This step used to end *"do not report its state"*, full stop, and that was too wide. The route
+   that answers without touching the home is `hooks/list`: it takes `cwds` — the project — and
+   `trustStatus` is a **required** field of every entry it returns, from
+   `["managed", "untrusted", "trusted", "modified"]`. So one of the three states is invisible and
+   two are not: an **untrusted project** returns an empty list, and an entry that is not there has
+   no `trustStatus` to read; a **registered-but-untrusted hook** reports `trustStatus: "untrusted"`,
+   and a config regenerated since it was trusted reports `"modified"`.
+
+   **Do not run that call as part of this check.** Reaching it means driving `codex app-server`
+   over JSON-RPC, and that protocol has two measured traps that each return something shaped like an
+   answer: passing `cwd` instead of `cwds` yields a well-formed reply **about the wrong repository**,
+   and a `printf … | codex app-server` pipeline that closes stdin loses the reply entirely — 12 of 12
+   runs. A diagnostic that improvises a two-trap protocol and reports the result confidently is worse
+   than one that declines, and this whole check exists to avoid exactly that claim. It also needs the
+   `codex` binary on PATH, which a Claude Code user running `/unity-doctor` may not have.
+
+   **So report it this way:** trust is granted at install time by
+   `./install.sh --project-dir <this project> --client codex --codex-trust`, that grant covers
+   per-hook trust and **not** project trust (for which the user runs `codex` once in the project and
+   accepts the prompt), and `hooks/list` with `cwds` is where the user verifies it themselves.
+   Say that the hook layer's enforcement is **unverified from here**, not that it is fine.
 
 ## Check 4: Unity Project Structure
 

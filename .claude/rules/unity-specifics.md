@@ -145,7 +145,13 @@ BootstrapScene (loads once, contains persistent services)
 
 ## Input System (NON-NEGOTIABLE)
 
-The New Input System package is **mandatory**. Legacy `Input.GetKey`/`Input.GetAxis` is **BLOCKED** by hooks.
+The New Input System package is **mandatory**. Legacy `Input.GetKey`/`Input.GetAxis` is **blocked by
+a hook** — under Claude Code the hook runs and the rule is enforced rather than recommended.
+
+**Under Codex CLI that gate is conditional.** It runs only through
+`.claude/scripts/codex-hook-shim.sh`, registered in `.codex/hooks.json` and trusted in your own
+`CODEX_HOME` config; without both, nothing blocks legacy input and this is a rule you keep yourself.
+The rule is identical either way — what changes is whether anything catches you breaking it.
 
 ### Generated C# Class (Preferred Approach)
 
@@ -209,7 +215,7 @@ public sealed class InputView : MonoBehaviour
 | **Subscribe in OnEnable, unsubscribe in OnDisable** | Every `+=` must have a matching `-=` in OnDisable |
 | **Read continuous input in Update** | FixedUpdate runs at different rate — input can be missed |
 | **Cache input, apply in FixedUpdate** | Physics forces use cached values, not raw reads |
-| **Never use legacy Input API** | `Input.GetKey`, `Input.GetAxis`, `Input.GetButton` are BLOCKED |
+| **Never use legacy Input API** | `Input.GetKey`, `Input.GetAxis`, `Input.GetButton` are blocked by a hook under Claude Code, and under Codex CLI only once `.codex/hooks.json` is installed and trusted — see the conditional above |
 | **InputView is a View** | Pure thin adapter — reads input, calls Systems. Zero logic |
 | **One InputView per scene** | Centralized input reading prevents duplicate subscriptions |
 
