@@ -1298,7 +1298,7 @@ export KINGLET_STUB_RESPONSE="$WORK/stub-response.jsonl"
 
 # One canned reply per rig, because every key embeds that rig's absolute path —
 # which is the whole reason the hash cannot be precomputed and shipped.
-stub_response() {   # $1 = project dir, $2 = managed (true|null)
+stub_response() {   # $1 = project dir, $2 = managed (true|null), $3 = hash salt (optional)
   {
     if [ "$2" = "true" ]; then
       printf '{"id":2,"result":{"requirements":{"allowManagedHooksOnly":true}}}\n'
@@ -1309,8 +1309,11 @@ stub_response() {   # $1 = project dir, $2 = managed (true|null)
     sr_n=0
     while [ "$sr_n" -lt 3 ]; do
       [ "$sr_n" -eq 0 ] || printf ','
-      printf '{"key":"%s/.codex/hooks.json:pre_tool_use:0:%s","currentHash":"sha256:stub%s","trustStatus":"untrusted"}' \
-        "$1" "$sr_n" "$sr_n"
+      # THE SALT IS WHAT MAKES A RE-GRANT A REAL CHANGE. Same keys, different hashes — exactly what
+      # a hook whose timeout moved produces, and the only way to exercise the write path a second
+      # time now that an identical re-grant deliberately writes nothing at all.
+      printf '{"key":"%s/.codex/hooks.json:pre_tool_use:0:%s","currentHash":"sha256:stub%s%s","trustStatus":"untrusted"}' \
+        "$1" "$sr_n" "${3:-}" "$sr_n"
       sr_n=$((sr_n + 1))
     done
     printf ']}]}}\n'
@@ -1432,8 +1435,51 @@ if [ -n "$RIG_A" ] && [ -d "$RIG_A" ]; then
     bad "MODE: the second grant moved the mode to $(mode_of "$CFG_A")"
   fi
 
+  # ── FIVE GRANTS, AND WHAT THE SURVIVING BACKUP HOLDS ──────────────────────
+  #
+  # A backup exists so the ORIGINAL can come back. Because the grant is
+  # idempotent, every re-grant used to copy the POST-grant state — so backup 1
+  # held the user's original and 2..N were byte-identical copies of a state they
+  # already had, and a newest-three bound then evicted the only irreplaceable
+  # one. Measured on exactly this rig: no surviving backup held the original.
+  #
+  # Two assertions, because the rule has two halves: an identical re-grant takes
+  # no backup at all, and what survives five grants is the pre-Kinglet file.
+  htr_a_i=3
+  while [ "$htr_a_i" -le 5 ]; do
+    PATH="$STUBBIN:$PATH" CODEX_HOME="$HOME_A" bash install.sh \
+      --project-dir "$RIG_A" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+    htr_a_i=$((htr_a_i + 1))
+  done
+  BK5_N="$(find "$HOME_A" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | /usr/bin/grep -c . || true)"
+  if [ "$BK5_N" -eq 1 ]; then
+    ok "BACKUPS: five grants leave exactly one backup — an identical re-grant writes nothing, so it copies nothing"
+  else
+    bad "BACKUPS: five grants left $BK5_N backup(s); a re-grant that would write identical bytes must not take a copy, or every re-install pushes the original one step closer to eviction"
+  fi
+  BK5_OLDEST="$(find "$HOME_A" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | sort | awk 'NR==1')"
+  if [ -n "$BK5_OLDEST" ] && cmp -s "$BK5_OLDEST" "$CFG_A_ORIG"; then
+    ok "BACKUPS: the surviving backup is the user's pre-Kinglet original, byte for byte"
+  else
+    bad "BACKUPS: no surviving backup holds the user's original — the backups are copies of a state the user already has, which is the one thing a backup must not be"
+  fi
+
   # ── The reversal ──────────────────────────────────────────────────────────
+  # SEEDED FIRST, so uninstall's own reaper has a population to get wrong. Four
+  # install-pattern copies plus the real one plus the one uninstall makes is six,
+  # which is past any bound — so a reaper whose glob reaches install's pattern
+  # evicts copies it does not own, and one whose glob is correct touches none.
+  for ts in 20200101000000 20200102000000 20200103000000 20200104000000; do
+    : > "$CFG_A.kinglet-backup.$ts"
+  done
+  BK_BEFORE_UN="$(find "$HOME_A" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | sort | tr '\n' ' ')"
   if bash uninstall.sh --project-dir "$RIG_A" --yes --no-backup >"$WORK/htr-a-un.out" 2>&1; then
+    BK_AFTER_UN="$(find "$HOME_A" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | sort | tr '\n' ' ')"
+    if [ "$BK_BEFORE_UN" = "$BK_AFTER_UN" ]; then
+      ok "BACKUPS: uninstall reaps only its own pattern — install's copies are not its to evict"
+    else
+      bad "BACKUPS: uninstall changed the set of install-made backups. Before: [$BK_BEFORE_UN] After: [$BK_AFTER_UN]. Its reaper's glob reaches a pattern it does not own, and the copy it evicts may be the user's pre-Kinglet original"
+    fi
     if cmp -s "$CFG_A" "$CFG_A_ORIG"; then
       ok "uninstall gives the home config back byte-identical to the user's original"
     else
@@ -1446,6 +1492,37 @@ if [ -n "$RIG_A" ] && [ -d "$RIG_A" ]; then
     fi
   else
     bad "uninstall failed after a stubbed trust grant"
+  fi
+fi
+
+# ── Rig N: the stickiness must not rest on one witness ──────────────────────
+#
+# The reversal record carries the only memory of whether the user's config ended
+# in a newline. Delete it between grants and the next one re-asks against the
+# file AS THE TOOLKIT LEFT IT, records `yes`, and the reversal hands back a file
+# one byte longer than the original — the exact bug the flag was added to fix,
+# reached by a different route, and reachable by deleting one gitignored file.
+#
+# The second witness is the OLDEST surviving backup, which is a copy from before
+# Kinglet first wrote: that is why the backup-selection rule and this are one
+# change rather than two. The rig therefore deletes the record and keeps the
+# backup, which is the state a user who cleaned out `.claude/state/` is in.
+RIG_N="$(home_trust_rig n 644 null || true)"
+if [ -n "$RIG_N" ] && [ -d "$RIG_N" ]; then
+  CFG_N="$WORK/home-n/config.toml"
+  CFG_N_ORIG="$WORK/cfg-n-orig.toml"
+  cp "$CFG_N" "$CFG_N_ORIG"
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-n" bash install.sh \
+    --project-dir "$RIG_N" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+  rm -f "$RIG_N/.claude/state/codex-trust.tsv"
+  stub_response "$RIG_N" null "second"
+  PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-n" bash install.sh \
+    --project-dir "$RIG_N" --client codex --codex-trust --yes >/dev/null 2>&1 || true
+  bash uninstall.sh --project-dir "$RIG_N" --yes --no-backup >/dev/null 2>&1 || true
+  if cmp -s "$CFG_N" "$CFG_N_ORIG"; then
+    ok "WITNESS: the reversal survives the record being deleted between grants"
+  else
+    bad "WITNESS: deleting .claude/state/codex-trust.tsv between grants re-opens the trailing-newline bug — $(wc -c < "$CFG_N") bytes against an original of $(wc -c < "$CFG_N_ORIG"). The record cannot be the only memory of the original state"
   fi
 fi
 
@@ -1522,32 +1599,37 @@ if [ -n "$RIG_E" ] && [ -d "$RIG_E" ]; then
     bad "EMPTY: $E_OURS table(s), mode $(mode_of "$CFG_E")"
   fi
 
-  # ── The backups are bounded ───────────────────────────────────────────────
+  # ── The bound, and WHICH three it keeps ───────────────────────────────────
   # Seeded rather than accumulated, because proving a bound by running the
-  # installer five times tests patience rather than the reaper.
+  # installer five times tests patience rather than the reaper. The second grant
+  # is given a DIFFERENT hash salt, so it is a real change: an identical re-grant
+  # now writes nothing and therefore reaps nothing, which is the other half of
+  # this fix and would otherwise make this rig untestable.
   for ts in 20200101000000 20200102000000 20200103000000 20200104000000 20200105000000; do
     : > "$CFG_E.kinglet-backup.$ts"
   done
+  stub_response "$RIG_E" null "resalted"
   PATH="$STUBBIN:$PATH" CODEX_HOME="$WORK/home-e" bash install.sh \
     --project-dir "$RIG_E" --client codex --codex-trust --yes >/dev/null 2>&1 || true
   E_BK="$(find "$WORK/home-e" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | /usr/bin/grep -c . || true)"
   if [ "$E_BK" -le 3 ]; then
-    ok "BACKUPS: bounded at 3 — older ones are reaped rather than accumulating in the home ($E_BK present)"
+    ok "BACKUPS: bounded at 3 — intermediates are reaped rather than accumulating in the home ($E_BK present)"
   else
-    bad "BACKUPS: $E_BK backups in the home and nothing reaps them; every grant adds one, forever, in the directory this toolkit works hardest to stay out of"
+    bad "BACKUPS: $E_BK backups in the home and nothing reaps them; every changed grant adds one, forever, in the directory this toolkit works hardest to stay out of"
   fi
-  # WHICH THREE SURVIVE, not merely how many. A reaper with its sort inverted keeps three files and
-  # deletes the recent ones — the count assertion above is green either way, and the copy a user
-  # actually needs is the newest. Six exist at this point (five seeded plus the one this run made),
-  # so the oldest seeded must be gone and the newest seeded must remain.
+  # WHICH THREE SURVIVE IS THE WHOLE POINT, and the count above is green under
+  # every wrong answer. The rule is OLDEST PLUS THE NEWEST TWO: the oldest is the
+  # only copy that predates Kinglet and the only one that cannot be reconstructed,
+  # while the newest are the states a recent mistake needs. A newest-three bound
+  # keeps three copies of what the user already has and throws the original away.
   E_BK_LIST="$(find "$WORK/home-e" -maxdepth 1 -name 'config.toml.kinglet-backup.*' | sort || true)"
   E_BK_BAD=""
-  /usr/bin/grep -qF -- 'kinglet-backup.20200101000000' <<< "$E_BK_LIST" && E_BK_BAD="$E_BK_BAD oldest-kept"
-  /usr/bin/grep -qF -- 'kinglet-backup.20200105000000' <<< "$E_BK_LIST" || E_BK_BAD="$E_BK_BAD newest-seeded-deleted"
+  /usr/bin/grep -qF -- 'kinglet-backup.20200101000000' <<< "$E_BK_LIST" || E_BK_BAD="$E_BK_BAD oldest-evicted"
+  /usr/bin/grep -qF -- 'kinglet-backup.20200103000000' <<< "$E_BK_LIST" && E_BK_BAD="$E_BK_BAD intermediate-kept"
   if [ -z "$E_BK_BAD" ]; then
-    ok "BACKUPS: the reaper dropped the oldest and kept the newest"
+    ok "BACKUPS: the reaper keeps the oldest and the newest two, and drops the intermediates"
   else
-    bad "BACKUPS:$E_BK_BAD — the names are UTC timestamps, so a reverse lexical sort is a date sort, and getting it backwards deletes exactly the copies a recovery would want"
+    bad "BACKUPS:$E_BK_BAD — the surviving set must contain the pre-Kinglet original; a newest-three rule keeps three copies of the post-grant state and evicts the only irreplaceable one"
   fi
 fi
 

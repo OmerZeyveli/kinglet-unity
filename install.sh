@@ -2668,41 +2668,40 @@ CODEXCFG
         warn "    ./install.sh --project-dir \"$PROJECT_DIR\" --client codex --codex-trust"
         note_not_done "Codex hook trust was NOT granted: 'hooks/list' returned no hooks for this project, which is what Codex reports for a project it has not been told to trust. The hooks are on disk and will not run. Run 'codex' once in the project, accept its trust prompt, then re-run install.sh with --client codex --codex-trust."
       else
+        # ── COMPUTE, COMPARE, THEN BACK UP AND WRITE ──────────────────────
+        #
+        # THE ORDER USED TO BE BACK UP, THEN WRITE, AND THAT MADE THE BACKUP WORTHLESS. A backup
+        # exists so the original can come back. Because the grant is idempotent, every re-grant
+        # produced a copy of the POST-grant state — so backup 1 held the user's true original and
+        # backups 2..N were byte-identical copies of a state the user already had. Keeping the
+        # newest three then kept three copies of the same thing and evicted the only irreplaceable
+        # one. Measured on a five-grant rig: no surviving backup held the original.
+        #
+        # BOTH HALVES OF THE FIX, because either alone leaves a hole:
+        #
+        #   1. NO CHANGE, NO BACKUP. The whole result is built in a temp file and compared with what
+        #      is on disk. A re-grant that would write identical bytes writes nothing at all — no
+        #      copy, no reap, not even an mtime — so the original is never pushed out in the common
+        #      case, and the file the user sees is untouched rather than rewritten with its own
+        #      content.
+        #   2. THE OLDEST IS NEVER REAPED. When the result genuinely differs — a hook's timeout
+        #      changed, so the hashes did — a backup is warranted and the set can still grow. The
+        #      bound keeps the OLDEST (the pre-Kinglet original) plus the newest two, rather than
+        #      the newest three, because "the state before any of this" is the one a recovery
+        #      actually wants and it is the one that can never be reconstructed.
         TRUST_BACKUP="-"
         TRUST_WROTE=1
-        # A BACKUP BEFORE THE FIRST BYTE. This is the user's file and it is outside the project, so
-        # `git checkout` is not available to them the way it is for everything else this installer
-        # touches.
-        if [ -f "$TRUST_CFG" ]; then
-          TRUST_BACKUP="$TRUST_CFG.kinglet-backup.$(date -u +%Y%m%d%H%M%S)"
-          cp "$TRUST_CFG" "$TRUST_BACKUP" || TRUST_WROTE=0
-        else
+        TRUST_REAPED=0
+        TRUST_UNCHANGED=0
+        TRUST_PREEXISTED=1
+        if [ ! -f "$TRUST_CFG" ]; then
+          TRUST_PREEXISTED=0
           : > "$TRUST_CFG" || TRUST_WROTE=0
         fi
 
-        # BOUNDED, BECAUSE NOTHING ELSE REAPS THEM. Every grant left another `.kinglet-backup.<ts>`
-        # in the user's home and nothing — not a later install, not uninstall — ever removed one, so
-        # a project re-installed weekly accumulated a copy a week, forever, in the one directory
-        # this toolkit otherwise works hardest to keep its footprint out of. The newest three are
-        # kept: enough that a bad run is recoverable past the run that followed it, bounded so the
-        # set cannot grow without limit. Only OUR pattern is matched, and only for THIS config.
-        #
-        # The names are UTC `%Y%m%d%H%M%S`, so lexical order is chronological and `sort -r` is a
-        # date sort without parsing a date.
-        TRUST_REAP=$(mktemp)
-        for tb in "$TRUST_CFG".kinglet-backup.*; do
-          if [ -f "$tb" ]; then printf '%s\n' "$tb" >> "$TRUST_REAP"; fi
-        done
-        TRUST_REAPED=0
-        while IFS= read -r tb; do
-          [ -n "$tb" ] || continue
-          rm -f "$tb" && TRUST_REAPED=$((TRUST_REAPED + 1))
-        done <<< "$(sort -r "$TRUST_REAP" 2>/dev/null | awk 'NR > 3' || true)"
-        rm -f "$TRUST_REAP"
-
         if [ "$TRUST_WROTE" -eq 0 ]; then
-          warn "Could not back up $TRUST_CFG — hook trust not granted, and nothing was written."
-          note_not_done "Codex hook trust was NOT granted: $TRUST_CFG could not be backed up, and this installer does not edit a home file it cannot first copy."
+          warn "Could not create $TRUST_CFG — hook trust not granted, and nothing was written."
+          note_not_done "Codex hook trust was NOT granted: $TRUST_CFG could not be created."
         else
           # IDEMPOTENT BY DELETE-THEN-APPEND, not by append-if-absent. A re-install whose hook
           # config changed keeps the same KEYS and gets new HASHES, so appending would write a
@@ -2725,16 +2724,53 @@ CODEXCFG
           # appended table, which certainly ends in a newline, so grant 2 recorded `yes` and undid
           # grant 1's correct `no`. The reversal then reintroduced the byte, and the failure appeared
           # only on the second install — the shape this installer has already paid for twice with
-          # `user-modified`. The previous record is the only witness to the original state, so it
-          # wins; the question is asked exactly once, on the grant that finds no record.
+          # `user-modified`.
+          #
+          # THREE WITNESSES, IN ORDER, BECAUSE ONE WAS A SINGLE POINT OF FAILURE. The record alone
+          # meant deleting `.claude/state/codex-trust.tsv` between grants re-opened the exact bug
+          # this flag fixes — grant 2 re-asks against the file as the toolkit left it and records
+          # `yes`. So:
+          #
+          #   1. the reversal record, which is authoritative and free;
+          #   2. failing that, the OLDEST surviving `.kinglet-backup.*` — a copy of the file from
+          #      before Kinglet first touched it, which the reaping rule above now guarantees is
+          #      never evicted. This is why these two findings are one change: the backup policy is
+          #      what makes the second witness durable enough to be worth consulting;
+          #   3. failing both, the config itself — correct only when Kinglet has never written it,
+          #      which is exactly the case where our marker is absent.
+          #
+          # AND WHEN ALL THREE FAIL, SAY SO. Marker present, no record, no backup: the original
+          # state is genuinely unrecoverable. The conservative answer is `yes` (leave the newline),
+          # whose cost is one byte on the reversal — but a user who deleted both witnesses is owed
+          # the sentence rather than a silent guess.
           TRUST_HAD_NL=""
+          TRUST_NL_SRC=""
           if [ -f "$PROJECT_DIR/$CODEX_TRUST_REL" ]; then
             TRUST_HAD_NL=$(awk '/^# original-trailing-newline: /{sub(/^# original-trailing-newline: /, ""); print; exit}' \
               "$PROJECT_DIR/$CODEX_TRUST_REL")
+            [ -z "$TRUST_HAD_NL" ] || TRUST_NL_SRC="the reversal record"
+          fi
+          if [ -z "$TRUST_HAD_NL" ]; then
+            TRUST_OLDEST_BK=""
+            for tb in "$TRUST_CFG".kinglet-backup.*; do
+              if [ -f "$tb" ]; then TRUST_OLDEST_BK="$tb"; break; fi
+            done
+            if [ -n "$TRUST_OLDEST_BK" ]; then
+              TRUST_HAD_NL=yes
+              if [ -s "$TRUST_OLDEST_BK" ] && [ -n "$(tail -c1 "$TRUST_OLDEST_BK")" ]; then TRUST_HAD_NL=no; fi
+              TRUST_NL_SRC="the oldest backup ($(basename "$TRUST_OLDEST_BK"))"
+            fi
           fi
           if [ -z "$TRUST_HAD_NL" ]; then
             TRUST_HAD_NL=yes
             if [ -s "$TRUST_CFG" ] && [ -n "$(tail -c1 "$TRUST_CFG")" ]; then TRUST_HAD_NL=no; fi
+            TRUST_NL_SRC="the config itself"
+            if grep -qF -- 'kinglet:codex-trust' "$TRUST_CFG" 2>/dev/null; then
+              warn "$TRUST_CFG already carries a Kinglet grant, but neither its reversal record nor a"
+              warn "backup survives — so whether it originally ended in a newline cannot be recovered."
+              warn "The reversal may leave one extra byte. Neither file should be deleted by hand."
+              TRUST_NL_SRC="a guess — both witnesses are gone"
+            fi
           fi
           TRUST_KEYS=$(mktemp)
           cut -f1 "$TRUST_PAIRS" > "$TRUST_KEYS"
@@ -2756,21 +2792,7 @@ CODEXCFG
               if (inblock) { next }
               print
             }
-          ' "$TRUST_CFG" > "$TRUST_NEW" && cat "$TRUST_NEW" > "$TRUST_CFG" || TRUST_CLEANED=0
-          rm -f "$TRUST_NEW"
-          # `cat >` RATHER THAN `mv`, AND THE REASON IS THE FILE'S MODE. `mv` from `mktemp` replaces
-          # the inode and carries 0600 with it, so a home config at 644 came out 600 and one at 444
-          # came out 600 — a silent change to a property of a file this toolkit did not create, in
-          # the one place it is least entitled to make one. Measured, three ways, in both directions
-          # of the round trip. The same trap is documented twice elsewhere in this file for project
-          # files, with `chmod 644` as the fix; here there is no correct constant to chmod TO, because
-          # the right mode is whatever the user already chose.
-          #
-          # Rewriting the existing inode keeps mode, ownership and any ACL by construction, on every
-          # platform, with no `stat` and therefore no GNU/BSD split. What it gives up is atomicity: a
-          # crash between truncate and write leaves a short file. The backup taken a few lines above
-          # is the mitigation, it is taken unconditionally, and its path is printed and recorded —
-          # and the alternative trades a rare, loud, recoverable failure for a silent certain one.
+          ' "$TRUST_CFG" > "$TRUST_NEW" || TRUST_CLEANED=0
 
           # THE APPEND IS GATED ON THE CLEAN HAVING HAPPENED, and that is not defensive
           # decoration. Appending to a file the removal pass failed on writes a SECOND
@@ -2778,17 +2800,73 @@ CODEXCFG
           # is a TOML parse error in the user's home config, produced by the step meant to repair it.
           if [ "$TRUST_CLEANED" -eq 0 ]; then
             warn "Could not rewrite $TRUST_CFG — hook trust NOT granted, and the file is as it was."
-            [ "$TRUST_BACKUP" = "-" ] || warn "Its backup is at $TRUST_BACKUP."
             note_not_done "Codex hook trust was NOT granted: $TRUST_CFG could not be rewritten, so nothing was appended to it. The hooks are registered and will not run."
+            rm -f "$TRUST_NEW"
           else
 
+          # The whole result, assembled where nobody can see it. Nothing has touched the user's file
+          # at this point, which is what lets the comparison below decide whether to touch it at all.
+          TRUST_CAND=$(mktemp)
           {
+            cat "$TRUST_NEW"
             printf '%s\n' "$TRUST_MARK"
             while IFS=$'\t' read -r tk th; do
               [ -n "$tk" ] || continue
               printf '[hooks.state."%s"]\nenabled = true\ntrusted_hash = "%s"\n' "$tk" "$th"
             done < "$TRUST_PAIRS"
-          } >> "$TRUST_CFG"
+          } > "$TRUST_CAND"
+          rm -f "$TRUST_NEW"
+
+          if cmp -s "$TRUST_CAND" "$TRUST_CFG"; then
+            # ALREADY EXACTLY RIGHT. The common case on every re-install: same hooks, same config,
+            # same hashes. Writing identical bytes would be indistinguishable from writing nothing
+            # except for the backup it drags in — and that backup is the one that used to push the
+            # user's original out of the bound.
+            TRUST_UNCHANGED=1
+          else
+            # A BACKUP ONLY WHERE THERE IS SOMETHING TO LOSE. `TRUST_PREEXISTED` is 0 when this run
+            # created the file, and an empty file this run made needs no copy.
+            if [ "$TRUST_PREEXISTED" -eq 1 ]; then
+              TRUST_BACKUP="$TRUST_CFG.kinglet-backup.$(date -u +%Y%m%d%H%M%S)"
+              cp "$TRUST_CFG" "$TRUST_BACKUP" || TRUST_WROTE=0
+            fi
+            if [ "$TRUST_WROTE" -eq 0 ]; then
+              warn "Could not back up $TRUST_CFG — hook trust not granted, and nothing was written."
+              note_not_done "Codex hook trust was NOT granted: $TRUST_CFG could not be backed up, and this installer does not edit a home file it cannot first copy."
+            else
+              # `cat >` RATHER THAN `mv`, AND THE REASON IS THE FILE'S MODE. `mv` from `mktemp`
+              # replaces the inode and carries 0600 with it, so a home config at 644 came out 600 and
+              # one at 444 came out 600 — a silent change to a property of a file this toolkit did
+              # not create, in the one place it is least entitled to make one. Measured, three ways,
+              # in both directions of the round trip; a reviewer then held it at 664, 640 and 755.
+              # The same trap is documented twice elsewhere in this file for project files, with
+              # `chmod 644` as the fix; here there is no correct constant to chmod TO, because the
+              # right mode is whatever the user already chose.
+              #
+              # Rewriting the existing inode keeps mode, ownership and any ACL by construction, on
+              # every platform, with no `stat` and therefore no GNU/BSD split. What it gives up is
+              # atomicity: a crash between truncate and write leaves a short file. The backup taken
+              # immediately above is the mitigation, and the alternative trades a rare, loud,
+              # recoverable failure for a silent certain one.
+              cat "$TRUST_CAND" > "$TRUST_CFG" || TRUST_WROTE=0
+
+              # OLDEST PLUS THE NEWEST TWO. Sorted ascending, so record 1 is the pre-Kinglet
+              # original: it is kept unconditionally, and the eviction window is everything between
+              # it and the last two. `NR <= total - 2` with `NR != 1` is that window; at three or
+              # fewer it selects nothing, which is why no separate guard is needed for a small set.
+              TRUST_REAP=$(mktemp)
+              for tb in "$TRUST_CFG".kinglet-backup.*; do
+                if [ -f "$tb" ]; then printf '%s\n' "$tb" >> "$TRUST_REAP"; fi
+              done
+              TRUST_REAP_N=$(grep -c . "$TRUST_REAP" || true)
+              while IFS= read -r tb; do
+                [ -n "$tb" ] || continue
+                rm -f "$tb" && TRUST_REAPED=$((TRUST_REAPED + 1))
+              done <<< "$(sort "$TRUST_REAP" 2>/dev/null | awk -v total="$TRUST_REAP_N" 'NR != 1 && NR <= total - 2' || true)"
+              rm -f "$TRUST_REAP"
+            fi
+          fi
+          rm -f "$TRUST_CAND"
 
           # THE RECEIPT FOR A FILE THAT IS NOT OURS TO DELETE. Every other row in the receipt says
           # "this path is ours to remove"; this one cannot, because the file is the user's and only
@@ -2800,11 +2878,16 @@ CODEXCFG
             printf '# kinglet codex hook-trust record\n'
             printf '# Written by install.sh --client codex --codex-trust. uninstall.sh removes exactly\n'
             printf '# the [hooks.state."<key>"] tables listed below from the config named here.\n'
+            printf '# DO NOT DELETE THIS FILE BY HAND. It is the only cheap record of what the home\n'
+            printf '# config looked like before Kinglet touched it. Delete it and a later grant\n'
+            printf '# falls back to the oldest .kinglet-backup.* copy; delete both and the reversal\n'
+            printf '# can leave one byte behind. uninstall.sh removes it for you.\n'
             printf '# config: %s\n' "$TRUST_CFG"
             printf '# backup: %s\n' "$TRUST_BACKUP"
             printf '# granted-at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             printf '# marker: %s\n' "$TRUST_MARK"
             printf '# original-trailing-newline: %s\n' "$TRUST_HAD_NL"
+            printf '# trailing-newline-source: %s\n' "$TRUST_NL_SRC"
             printf 'key\thash\n'
             cat "$TRUST_PAIRS"
           } > "$PROJECT_DIR/$CODEX_TRUST_REL"
@@ -2812,9 +2895,16 @@ CODEXCFG
             "$(sha_of "$PROJECT_DIR/$CODEX_TRUST_REL")" \
             "$(stat -c '%a' "$PROJECT_DIR/$CODEX_TRUST_REL" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
 
-          ok "Granted Codex hook trust for $TRUST_N hook(s) in $TRUST_CFG"
-          [ "$TRUST_BACKUP" = "-" ] || ok "Backup: $TRUST_BACKUP"
-          [ "$TRUST_REAPED" -eq 0 ] || info "Reaped $TRUST_REAPED older Kinglet backup(s); the newest 3 are kept."
+          # THE TWO OUTCOMES ARE DIFFERENT SENTENCES. "Granted" on a run that wrote nothing is a
+          # small lie about a file outside the project, and it is exactly the run on which a user
+          # would want to know their home was left alone.
+          if [ "$TRUST_UNCHANGED" -eq 1 ]; then
+            ok "Codex hook trust already granted for $TRUST_N hook(s) — $TRUST_CFG left untouched"
+          else
+            ok "Granted Codex hook trust for $TRUST_N hook(s) in $TRUST_CFG"
+            [ "$TRUST_BACKUP" = "-" ] || ok "Backup: $TRUST_BACKUP"
+            [ "$TRUST_REAPED" -eq 0 ] || info "Reaped $TRUST_REAPED intermediate backup(s); the original and the newest two are kept."
+          fi
           warn "Hook trust vouches for a COMMAND LINE, not for code: anything that can write"
           warn "$CLAUDE_DIR/hooks/*.sh from now on changes what runs, with no re-review."
           fi

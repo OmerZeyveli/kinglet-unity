@@ -50,8 +50,39 @@ implementer's full-suite run went red on one assertion, and it **reproduces at `
 task's changes stashed, 3 of 4 runs.** So it is pre-existing, not Task 9's.
 
 It is **fail-closed** — the shim still refuses — but it refuses on a failed staging write rather than
-on the budget, so the count is lost. The shim's own header documents a race of exactly this shape and
-calls it *"currently unreachable… not a property worth depending on"*, which the reproduction refutes.
+on the budget, so the count is lost.
+
+**THE CAUSE IS UNKNOWN, and an earlier version of this entry said otherwise.** It read that the
+shim's own header *"documents a race of exactly this shape and calls it 'currently unreachable… not a
+property worth depending on', which the reproduction refutes."* That is wrong on the load-bearing
+half. The comment near `shim_watch` describes what would happen **without** the `trap - EXIT TERM INT
+HUP PIPE` reset in the killer subshell — and the reset **is there**, kept deliberately, *"verified
+equivalent over 70 paired runs"*. So the specific race it names is already defended against and the
+reproduction **does not refute that sentence**. Attributing the failure to it would send the next
+implementer to a line that is already correct.
+
+That argues **for** routing rather than guessing, so the disposition is unchanged and only the
+confidence is: this is an unexplained failure in a fail-closed surface, not a diagnosed one.
+
+**3 of 4 is not a flake rate, it is the majority outcome.** Recording it makes the next red readable;
+it does not stop the suite's most likely failure being a known-good surface, which is how a team
+learns to skim red. **It needs an owner, and it has one: Task 11.** The expensive half — the
+reproduction — is done:
+
+```bash
+# From a clean tree at the commit under test:
+git stash push install.sh uninstall.sh tests/test-codex-surface.sh   # if Task 9's changes are present
+for i in 1 2 3 4; do
+  bash tests/test-codex-shim.sh 2>&1 | /usr/bin/grep -cE '^\s*FAIL'
+done
+# Observed at b6bc214: 1 0 1 1  (3 of 4 red).  Observed on Task 9's tree: 0 1 1  (2 of 3 red).
+```
+
+The failing assertion is *"the refusal names how many of the envelope's files were checked"* in the
+400-file budget case. The symptom is `<tmpdir>/payload.<N>.json: No such file or directory` on stderr
+followed by `BLOCKED: codex-hook-shim: could not stage payload <N>` — i.e. the shim's temp directory
+has gone while the staging loop is still running, so it refuses on the staging failure and the
+`of 400 file(s)` count never appears. **What removes that directory mid-loop is the open question.**
 
 The controller re-ran the whole suite independently on 2026-08-16 and got **3865 / 0 failed, 434 s** —
 **it did not hit.** That is what a race looks like, and it is precisely the shape `CLAUDE.md` warns
