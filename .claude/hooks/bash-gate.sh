@@ -862,6 +862,16 @@ if [ "$META_ROUTE" = "1" ]; then
         # a routing word spelled through quoting inside a command substitution — is the same
         # class as the quoted introducer already disclosed above.
         #
+        # AND THE RESIDUAL RUNS THE OTHER WAY TOO, WHICH IS THE HALF THIS PARAGRAPH USED TO
+        # LEAVE OUT. A raw-string test cannot tell a routing word in a COMMAND from one in
+        # DATA, so `echo "$(date -u) xargs Assets/Player.cs.meta" >> audit.log` — a pure
+        # append whose message happens to name xargs — still blocks: measured 2 before this
+        # change and 2 after. **This narrows the false-positive class; it does not close it**,
+        # and it fired on a reviewer, after the fix, on the first command of the review. Closing
+        # it means deciding the route from TOKENS rather than from the raw string, which is a
+        # bigger change than this arm was given. Recorded with a corpus row rather than left to
+        # be rediscovered — the argument this file already makes at its own H-ceiling block.
+        #
         # `*/xargs` is covered: the left boundary admits `/`, so `./evil/xargs` matches.
         META_ROUTING=0
         if grep -qE '(^|[^A-Za-z0-9_-])(find|xargs)([^A-Za-z0-9_-]|$)' <<< "$COMMAND" \

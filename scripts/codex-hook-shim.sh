@@ -349,11 +349,43 @@ shim_watch() {
     #   * making `shim_cleanup` return early when `$BASHPID != $$` took it to
     #     0 of 12 with no temp directory left behind.
     #
+    # AND 3 OF 12 IS THE CEILING ON WHAT IS OBSERVABLE, NOT THE FIRE RATE. In the
+    # shipped shim the first fire deletes the directory and ends that run, so a
+    # run can show at most one. With the cleanup made harmless but still LOGGED,
+    # three paced runs of 12 recorded **1, 9 and 4** subshell entries against
+    # **0** misses. The window is several times wider than the miss rate makes it
+    # look, which strengthens the case for closing it rather than weakening it.
+    #
     # IT IS FAIL-CLOSED AND IT IS UNFIXED. The invocation still refuses; what it
     # loses is the reason — it reports a staging failure instead of the budget,
-    # so the count of files checked never reaches the user. The fix is not
-    # applied here because this was scoped as an investigation; it is one line,
-    # in `shim_cleanup`, and the measurement above is what a review needs.
+    # so the count of files checked never reaches the user.
+    #
+    # "IT IS ONE LINE" WAS THE ONE THING THE INVESTIGATION GOT WRONG, and the
+    # correction is why this is not applied here. The obvious spelling above uses
+    # `BASHPID`, which arrived in **bash 4.0**, on a repository that keeps bash
+    # 3.2 viable for the planned macOS pass — the same 3.2 the signal arms in
+    # `scripts/codex-probe.sh` exist for. Where it is absent it fails in one of
+    # two ways, both measured here rather than reasoned:
+    #
+    #   * `"$BASHPID"` bare under `set -u` -> `BASHPID: unbound variable`, on
+    #     every invocation, inside the EXIT trap;
+    #   * `"${BASHPID:-}"` -> empty, so the comparison is false forever and the
+    #     guard inverts from "skip cleanup in a subshell" to "skip cleanup
+    #     always" — one leaked temp directory per invocation, on a hook that runs
+    #     on every tool call.
+    #
+    # `tests/test-bash32-compat.sh` guards five bash-4 constructs and `BASHPID`
+    # is not among them, so that spelling would ship green through the gate that
+    # exists to stop exactly this. Anyone choosing it must add `BASHPID` to that
+    # bundle in the same change.
+    #
+    # THE PORTABLE ALTERNATIVE CLOSES THE WINDOW INSTEAD OF MAKING IT HARMLESS:
+    # send the killer `-KILL` rather than `-TERM` below. SIGKILL cannot run a
+    # trap — this file's own header already names it as the untrappable one — so
+    # the subshell never reaches the EXIT trap at all. Measured on the same rig,
+    # three runs of 12: **0 misses and 0 subshell entries**, against the `-TERM`
+    # arm's 3 misses and the log-only variant's 1/9/4. It needs its own look at
+    # what else the killer was going to do, which is a judgement, not a line.
     #
     # `9>&-` closes the saved stderr for the killer, and that IS a correctness
     # fix. Descriptor 9 is a dup of the caller's stderr, so anything holding it
