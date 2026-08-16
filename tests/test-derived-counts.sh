@@ -1535,9 +1535,13 @@ assert_eq "1" "$DCT_WIDE" \
 #
 # **THIS FILE IS NOT IN THE LIST, AND THIS FILE QUOTES FIGURES.** `DCT_DECLARED` names ten paths and
 # `tests/test-derived-counts.sh` is not one of them, so the guard whose entire subject is stale
-# numerals does not scan its own prose. That is not hypothetical: two comment blocks above carried
-# `982` as the value of `cat .claude/commands/*.md | wc -l`, in the present tense and undated, while
-# the claims table three hundred lines below was correctly guarding `1023`. The figure moved three
+# numerals does not scan its own prose. That is not hypothetical: two comment blocks in this file
+# carried `982` as the value of `cat .claude/commands/*.md | wc -l`, in the present tense and
+# undated, while `DCT_CLAIMS`'s `install.sh` row was correctly guarding `1023`. (Cited by construct,
+# not by direction and distance — the first version of this sentence said "three hundred lines
+# below" and that table is 99 lines *above*. `docs/ARCHITECTURE.md` states the rule as *"cite by
+# anchor, not by distance"*, and `tests/test-citations-resolve.sh` cannot catch a prose distance:
+# it reads `file:line` forms.) The figure moved three
 # times across one wave (919 → 982 → 1010 → 1023); every guarded site followed it and both
 # unguarded sites here did not, through two review sweeps that were keyed on the guarded sites.
 # Repaired 2026-08-16 by DELETING the numerals rather than re-transcribing them — the surviving

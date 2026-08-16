@@ -136,10 +136,16 @@ CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
 
 # ── Which receipted paths only a `--client codex` run writes ─────────────────
 #
-# ONE DEFINITION, THREE READERS IN THIS FILE, AND A FOURTH IN A DIFFERENT FILE. It answers exactly
-# one question — *will a plain `install.sh` write this path?* — and the answer decides three
-# behaviours: which previous-receipt rows Step 8e carries forward, what the dry run announces, and
-# (in `scripts/studio-doctor.sh`) which remedy a missing receipted file is given.
+# ONE DEFINITION, READ HERE AND IN A DIFFERENT FILE. It answers exactly one question — *will a plain
+# `install.sh` write this path?* — and the answer decides three behaviours: which previous-receipt
+# rows Step 8e carries forward, what the dry run announces, and (in `scripts/studio-doctor.sh`) which
+# remedy a missing receipted file is given. Derive the call sites rather than trusting a numeral
+# here: grep each file for the function's name followed by a quoted argument. **Do not write that
+# pattern out in a comment** — the first attempt at this sentence did, and the comment then matched
+# its own instruction and inflated the answer from 2 to 3, which is the trap `CLAUDE.md` already
+# records for `install.sh`'s script-skip shape. This sentence also read "THREE READERS IN THIS FILE,
+# AND A FOURTH IN A DIFFERENT FILE" for one commit, contradicting the enumeration on the line above
+# it, in the comment whose entire job is to establish that there is one criterion.
 #
 # IT WAS THREE SEPARATE SPELLINGS UNTIL 2026-08-16, AND THE THIRD WAS WRONG IN BOTH DIRECTIONS.
 # `studio-doctor.sh` classified a path as Codex-layer by `not under .claude/`, under a comment
@@ -151,11 +157,22 @@ CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
 # `.claude/state/codex-trust.tsv` IS written only by the Codex arm and is under `.claude/`, so it got
 # the bare, concealing remedy this whole repair exists to remove.
 #
-# THE COPY IN `scripts/studio-doctor.sh` IS BYTE-IDENTICAL AND CANNOT DRIFT. install.sh is not in
-# the payload, so the shipped script cannot source it; the two copies are therefore held together by
-# `tests/test-install-upgrade-client.sh`, which extracts both marked regions and compares them. If
-# you change one, change the other in the same commit — the guard makes that an obligation rather
-# than a hope. The markers are what it extracts; do not rename them.
+# THE COPY IN `scripts/studio-doctor.sh` IS BYTE-IDENTICAL, AND WHAT HOLDS IT THERE IS TWO
+# DIFFERENT GUARDS. install.sh is not in the payload, so the shipped script cannot source it; the
+# two copies are held together by `tests/test-install-upgrade-client.sh`, which extracts both marked
+# regions and compares them. If you change one, change the other in the same commit — the guard
+# makes that an obligation rather than a hope. The markers are what it extracts; do not rename them.
+#
+# **THAT COMPARISON GUARDS THE REGION'S BYTES AND NOTHING ELSE**, and the scope matters because this
+# sentence read "CANNOT DRIFT" for one commit. Measured: three shadow redefinitions of
+# `codex_layer_path` placed *after* the marked region — bash takes the last one — left both regions
+# byte-identical and the equality assertion **green**, in `install.sh` and in the doctor, returning
+# both constant 0 and constant 1. What caught all three was arms 4 and 5's **behavioural**
+# assertions (2, 2 and 5 red). So: the comparison catches a textual edit to one copy (a whitespace-
+# only change reds it), its floor catches the vacuous case where both markers are renamed and the
+# comparison would pass over two empty strings, and *which predicate actually runs, in which scope,
+# with which argument* is guarded by those arms and by nothing here. The pair is adequate; either
+# half alone is not, and the half in this file is the weaker one.
 #
 # THE TRUST RECEIPT IS SPELLED OUT rather than written `$CODEX_TRUST_REL`, because the other copy
 # has no such variable and a textual comparison is the whole mechanism.

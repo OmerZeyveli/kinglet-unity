@@ -201,17 +201,28 @@ again.** It rests on the rule being somewhere a Codex session cannot fail to mee
 places: the generated `AGENTS.md`, injected whole before every turn, and `using-kinglet`'s intro
 block, which states the rule inline rather than pointing at it.
 
-**Both can be frozen by a user edit, and the difference is risk, not mechanism.** An earlier version
-of this paragraph called the skill *"a symlinked skill, which no install branch can freeze"*, and
-that is false — measured: append a line to `.claude/skills/using-kinglet/SKILL.md`, re-run any
-install, and the payload loop's `if is_modified …; then KEPT=…; continue; fi` keeps the user's copy
-forever, with the receipt row reading `user-modified`. It is the same freeze `AGENTS.md` gets, by the
-same mechanism. What differs is **who initiates it and how much it takes down**: nothing in this
-toolkit ever tells a user to edit a skill, whereas the installer's own Codex Next step 2 tells them
-to edit `AGENTS.md`, and a frozen skill costs one file where a frozen entry document costs the whole
-generated block — Project Facts refreshes included. **That asymmetry is why two copies are worth
-more than one, and it is the whole of the residual risk being accepted here.** Not "may vary": both
-are freezable, one is instructed.
+**Both can be frozen by a user edit, and they are frozen by different mechanisms with different
+consequences.** An earlier version of this paragraph called the skill *"a symlinked skill, which no
+install branch can freeze"*, and that is false. Its replacement then said the two freeze *"by the
+same mechanism"*, and that is false too — measured on one fixture, editing both files and re-running
+`--client codex`:
+
+| | `.claude/skills/using-kinglet/SKILL.md` | `AGENTS.md` |
+|---|---|---|
+| what decides | `is_modified` in the Step-5 payload loop | `owned_by_installer 'AGENTS.md' ''` in Step 8d.1 |
+| receipt row after | `user-modified` — **kept** | **none at all** |
+| `studio-doctor.sh` | *"1 file(s) modified since install"*, named | never mentioned; the verified set silently drops from 99 to 97 |
+| `uninstall.sh` | `keep 1 file(s) you modified` — left on disk **and reported** | **never reached**, left on disk and not reported |
+
+**The receipt row is the whole difference, and it is a sharper argument for two copies than "risk"
+was.** A frozen skill stays *tracked*: it is still ours, the doctor says so, and the uninstaller
+declines it out loud. A frozen `AGENTS.md` stops being a file this toolkit knows about — outside
+`uninstall.sh`'s reach, outside the doctor's verified set, and silently so. On top of that, nothing
+in this toolkit ever tells a user to edit a skill, whereas the installer's own Codex Next step 2
+tells them to edit `AGENTS.md`; and a frozen skill costs one file where a frozen entry document
+costs the whole generated block, Project Facts refreshes included. **That is the residual risk being
+accepted here, stated rather than softened**: both are freezable, only one is instructed, and only
+one disappears from the toolkit's own records when it happens.
 
 `AGENTS.md` has **no marked-region merge** — unlike `CLAUDE.md`, which the installer refreshes
 between its markers — so once it is edited, every later `--client codex` run prints *"AGENTS.md
