@@ -325,6 +325,23 @@ fi
 # already asserts exactly this identity (`EMITTED_N -eq CMD_N`); the asymmetry
 # was the defect. Compared as SETS and per-event COUNTS, not as one total, so a
 # hook swapped for another cannot net out.
+#
+# WHAT THIS IDENTITY DOES NOT CHECK, AND THE OPTION NOT TAKEN. Event names are
+# passed through from settings.json unvalidated, and Codex's `HookEventName` enum
+# has 11 members against the four in use. This identity narrows that to a
+# reviewed edit — an unknown event can no longer arrive through generator drift,
+# only by someone adding one to settings.json — but such an edit still emits a
+# key Codex answers with a parse warning. Not checked here for two reasons and
+# ONE non-reason: deriving the enum needs `codex app-server generate-json-schema`
+# (a binary the other 43 test files do not require), and hardcoding the 11
+# members is the stale-list-inside-a-guard failure CLAUDE.md names. The
+# non-reason is "so it cannot be checked at all": this suite already skips with a
+# stated reason — tests/test-codex-shim.sh's %N clock probe does exactly that —
+# so a check that derives the enum WHEN `codex` is on PATH and skips otherwise
+# adds no dependency and hardcodes nothing. That is a real third option; it is
+# left undone because the residual is one reviewed edit wide, not because it is
+# unavailable. Recorded so the next reader inherits the option rather than the
+# false dichotomy.
 SETTINGS_HOOKS="$(python3 - "$REPO_DIR/.claude/settings.json" <<'PY'
 import json, os, sys
 cfg = json.load(open(sys.argv[1])).get("hooks", {})
@@ -658,12 +675,20 @@ if [ "$GEN_OK" -eq 1 ] && [ -s "$DOC_CODEX" ] && [ -s "$DOC_CLAUDE" ]; then
   # of findings.md claimed all of these were hook-enforced; the only UNITY_EDITOR
   # occurrence in .claude/hooks/ is an EXEMPTION in block-legacy-input.sh, not a
   # check, so nothing was covering four of them.
+  # ONE token list, used for both directions below, so the two can never drift
+  # into checking different things.
+  NN_TOKENS='ServiceLocator
+Minimum visibility
+PlayerControls
+MaterialPropertyBlock
+UNITY_EDITOR'
   NN_MISSING=""
   NN_SEEN=0
-  for token in 'ServiceLocator' 'Minimum visibility' 'PlayerControls' 'MaterialPropertyBlock' 'UNITY_EDITOR'; do
+  while IFS= read -r token; do
+    [ -n "$token" ] || continue
     NN_SEEN=$((NN_SEEN + 1))
     /usr/bin/grep -qF -- "$token" "$DOC_CODEX" || NN_MISSING="$NN_MISSING $token"
-  done
+  done <<< "$NN_TOKENS"
   if [ "$NN_SEEN" -ge 5 ] && [ -z "$NN_MISSING" ]; then
     ok "the Codex entry document inlines all $NN_SEEN non-negotiables that no hook covers"
   else
@@ -674,10 +699,23 @@ if [ "$GEN_OK" -eq 1 ] && [ -s "$DOC_CODEX" ] && [ -s "$DOC_CLAUDE" ]; then
   # Code's rule reachability, so the shipping client's document is left alone;
   # this pins that as a decision rather than an oversight, and it fails loudly if
   # someone later inlines into both without measuring the other client.
-  if /usr/bin/grep -qF -- 'Non-negotiables not covered by a gate' "$DOC_CLAUDE"; then
-    bad "the Claude Code entry document has grown the Codex-only inlined block — every pointer rate behind it was measured under Codex, so adding it here is the substitution this wave exists to avoid. Measure Claude Code's rule reachability first"
+  #
+  # THE CONTENT, NOT THE HEADING. This matched the literal heading string until
+  # 2026-08-16, which caught only a maintainer who copied the heading verbatim —
+  # and that is not the failure mode. Someone persuaded the rules belong in both
+  # documents writes their own heading: measured, the same five rules inlined
+  # under `## Rules that no gate checks` grew the Claude document from 4870 to
+  # 5250 bytes with every token present, and this assertion stayed green. It is
+  # the same token list the forward direction uses, so the two cannot disagree.
+  NN_LEAKED=""
+  while IFS= read -r token; do
+    [ -n "$token" ] || continue
+    ! /usr/bin/grep -qF -- "$token" "$DOC_CLAUDE" || NN_LEAKED="$NN_LEAKED $token"
+  done <<< "$NN_TOKENS"
+  if [ -z "$NN_LEAKED" ]; then
+    ok "the inlined non-negotiables are Codex-only — none of the $NN_SEEN appears in the Claude Code document"
   else
-    ok "the inlined non-negotiables are Codex-only; the Claude Code document is untouched by them"
+    bad "the Claude Code entry document has grown the Codex-only inlined content:$NN_LEAKED — every pointer rate behind that decision was measured under Codex, so inlining here is the substitution this wave exists to avoid. Measure Claude Code's rule reachability first, and change this assertion deliberately rather than around it"
   fi
 
   # The skill root. Codex reads `.agents/skills/`; `.claude/skills/` unaided
@@ -765,6 +803,28 @@ if [ -f "$DOCTOR" ]; then
       ok "the Codex check's skip gate names both layers, so the skills-bridge-without-hooks case reaches it"
     else
       bad "the Codex check's skip gate does not name:$gate_bad — gating on one layer skips the check in exactly the case it was written to detect (skills bridge installed, hook layer absent)"
+    fi
+
+    # THE CONNECTIVE, NOT JUST THE TERMS. Naming both directories says nothing
+    # about the relation between them, and the relation is the whole finding: a
+    # one-word edit from "or" to "and" left this green while making the gate
+    # STRICTLY WORSE than the defect it replaced — a conjunction re-closes the
+    # skills-bridge-without-hooks case and additionally closes the
+    # hooks-without-skills case. The comment two screens up says prose that reads
+    # fine is how this gate stopped being a disjunction, and a prose edit is
+    # exactly what slipped past. Matched as whole words with a portable ERE: no
+    # `\b`, which is a GNU extension absent from BSD grep on the macOS host this
+    # repository keeps compatible.
+    gate_or=0
+    gate_and=0
+    /usr/bin/grep -qE '(^|[^A-Za-z])or([^A-Za-z]|$)'  <<< "$GATE_LINE" && gate_or=1
+    /usr/bin/grep -qE '(^|[^A-Za-z])and([^A-Za-z]|$)' <<< "$GATE_LINE" && gate_and=1
+    if [ "$gate_or" -eq 1 ] && [ "$gate_and" -eq 0 ]; then
+      ok "the Codex check's skip gate joins the two layers with a disjunction"
+    elif [ "$gate_and" -eq 1 ]; then
+      bad "the Codex check's skip gate joins the two layers with a conjunction — that is worse than the original defect: it skips BOTH the skills-bridge-without-hooks case this check exists for AND the hooks-without-skills case. Either layer means a Codex layer was installed; only running the check says whether all of it was"
+    else
+      bad "the Codex check's skip gate names both layers but states no disjunction between them — the relation is the finding, not the terms; a reader cannot tell whether one directory or both are required"
     fi
   fi
 fi

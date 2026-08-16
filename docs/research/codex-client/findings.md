@@ -1950,13 +1950,28 @@ Kinglet's guarantees onto a tree Kinglet never touched.
 
 | # | Surface class | What ships, by path | The verdict that decided it |
 |---|---|---|---|
-| 1 | **Hooks** | `scripts/codex-hook-shim.sh`, now in `install.sh`'s payload → `.claude/scripts/codex-hook-shim.sh`; `.codex/hooks.json` **generated** by `--emit-config` at install time; hook trust granted at install time | `## Hooks`: all nine tool-event hooks enforce through the shim; without it eight of the nine fire and do nothing. The config's top level must be a `hooks` wrapper — a bare event map is rejected with a parse warning. `timeout` is milliseconds in `.claude/settings.json` and **seconds** in Codex, so the generator converts by ceiling division and orders the two ceilings: shim `--timeout ceil(ms/1000)`, Codex `timeout ceil(ms/1000)+1` |
+| 1 | **Hooks** | `scripts/codex-hook-shim.sh`, now in `install.sh`'s payload → `.claude/scripts/codex-hook-shim.sh`; `.codex/hooks.json` **generated** by `--emit-config` at install time, **after `scripts/` is already in place** — see the ordering note below the table, which is a contract on the installer and not a preference; hook trust granted at install time | `## Hooks`: all nine tool-event hooks enforce through the shim; without it eight of the nine fire and do nothing. The config's top level must be a `hooks` wrapper — a bare event map is rejected with a parse warning. `timeout` is milliseconds in `.claude/settings.json` and **seconds** in Codex, so the generator converts by ceiling division and orders the two ceilings: shim `--timeout ceil(ms/1000)`, Codex `timeout ceil(ms/1000)+1` |
 | 2 | **Skills** | `<project>/.agents/skills/` — a real directory holding one symlink per skill, `<name>` → `../../.claude/skills/<name>` | `## Skills`: `.claude/skills/` unaided gives **0**; the `skills` config key gives 0 under two spellings; a symlink root gives 16, enabled, with invocation observed. The root is per-entry rather than the single directory symlink because row 3 needs generated entries beside the symlinked ones — measured 2026-08-16 under this task, see **The mixed root** below |
 | 3 | **Commands** | `scripts/codex-command-to-skill.sh`, in the payload → `.claude/scripts/codex-command-to-skill.sh`; it writes `<project>/.agents/skills/<command-name>/SKILL.md`, one per `.claude/commands/*.md` | `## Commands`: 7 of the 9 are dropped silently by the importer on an argument token, the loss is **content and not routing** (919 lines of Unity diagnostics that exist nowhere else in the toolkit), no command name collides with a skill name, and a converted command was observed loading unnamed. Under the Kinglet path with row 2 alone, 9 of 9 would be lost — worse than the importer |
 | 4 | **The entry document** | `scripts/generate-claude-md.sh --client codex` emits it; Task 9 writes it to `<project>/AGENTS.md`. This repository gets its own tracked `AGENTS.md` | `## Rules and AGENTS.md`: `AGENTS.md` is **injected** (sentinel returned with 0 shell commands); `CLAUDE.md` is *findable*, not loaded (same sentinel, recovered only after an `rg`). This half is unconditional — the injection happens before the turn |
 | 5 | **Rules** | `.claude/rules/` ships as it already does; the Codex entry document keeps the **declarative pointer** and the existing digest **and adds the four `NON-NEGOTIABLE` sections that are in neither the digest nor a hook**, plus the editor-guard rule. The Claude Code document is byte-identical to base | `## Rules and AGENTS.md`: without the pointer `.claude/rules/` was opened **0 times in 24 runs**, and the failure mode is not "no conventions" but **confidently wrong** ones. The pointer is not sufficient (1 of 12 under a conventions-blind request) while the same rule inlined binds 12 of 12. The membership is derived, not asserted — see **What is and is not inlined** below, which corrects a false claim this row carried for one round |
 | 6 | **MCP** | the `mcp_servers.UnityMCP` row for `<project>/.codex/config.toml`, written by Task 9. The entry document names the file and **marks the client-behaviour question open** | `codex-facts.md`: the importer writes exactly that row pointing at the bridge's `localhost:8080/mcp` URL, so the **configuration shape** is measured. **Whether the routes behave is not** — Task 7 has not run. See **Open, not answered** below |
 | 7 | **The guard** | `tests/test-codex-surface.sh` | Task 8's own deliverable. Derives both sides from the tree, fails in both directions, carries an anti-vacuity floor |
+
+### The ordering row 1 depends on, and which nothing in the suite can enforce
+
+**Copy `scripts/` into the project before calling `--emit-config`.** The generator picks the shim
+path it writes into all twelve command strings by preferring
+`<project>/.claude/scripts/codex-hook-shim.sh` and falling back to the toolkit clone it was invoked
+from. Emit before copying and every entry points into the clone — a directory the user is under no
+obligation to keep, and per `## Hooks` a hook command Codex cannot run is a **silent allow**, not an
+error. That is the whole defect shipping the shim closed, reintroduced by sequence alone.
+
+**`tests/test-codex-surface.sh` does not catch this and cannot.** It installs and then emits, so it
+exercises the generator's *preference logic*, not an installer's *sequence*; an installer that emits
+first reds nothing in the suite. The constraint is recorded here, in the row Task 9's implementer
+reads, because a guard the wave does not own is not where it belongs — Task 9 owns guarding its own
+ordering.
 
 ### Excluded, each with its measurement
 
