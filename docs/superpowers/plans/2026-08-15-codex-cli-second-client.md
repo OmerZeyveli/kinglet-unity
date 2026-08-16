@@ -1987,6 +1987,145 @@ arms removed."
 
 ---
 
+## Task 12: The installed project does not know it is on Codex
+
+**Added 2026-08-16**, after the whole-branch review. It owns the review's user-facing remainder — the
+findings its fix loop deliberately did not take, because they are documentation correctness rather
+than defects in the branch's own new code.
+
+**The finding, in the review's own words:** *"Can a reader tell what Kinglet on Codex enforces and
+what it does not? From `README.md`, yes, clearly. From inside the installed project, no."* The wave
+measured Codex honestly and wrote the measurement into `README.md` and `docs/ARCHITECTURE.md`. It did
+not go back to the shipped surfaces those measurements falsified. A Codex session opens its
+orientation skill, is told the rules load automatically, and therefore does not read them.
+
+**What a session reads and is misled by**
+
+- `.claude/skills/using-kinglet/SKILL.md` — *"Five rules in `.claude/rules/` load automatically and
+  bind."* Symlinked **verbatim** into `.agents/skills/`, so it never gets the converter's caveat
+  banner. Measured: `.claude/rules/` opened **0 times in 24 runs** under Codex without a pointer. The
+  same file routes to 8 `/unity-*` commands Codex has no surface for.
+- Five unqualified copies of *"legacy `Input.*` is blocked by a hook"* — `.claude/rules/unity-specifics.md`
+  (two sites), `.claude/rules/pc-console.md`, `.claude/skills/input-system/SKILL.md`, `README.md`.
+  `scripts/generate-claude-md.sh` **already forks exactly this bullet by client**, with the comment
+  *"Claiming enforcement that may not be installed is exactly the failure this wave exists to avoid."*
+  The fork was applied to one generated bullet and none of the five shipped copies.
+- Zero `codex` mentions across all 8 agents, 8 of 9 commands, all 16 skills, all 6 rules.
+  **Do not carpet-bomb this** — decide the criterion (which surfaces make a claim that is false or
+  unreachable under Codex), apply it, and write the criterion down. Two that matter concretely:
+  `docs/AGENT-GUIDE.md` teaches `tools:` as an access control with no destination under Codex, and
+  `MCP-SETUP.md` lists *"Claude Code (this CLI)"* as a prerequisite — and is where `install.sh`'s
+  Next step 1 sends every Codex user.
+
+**What a user reads and is misled by**
+
+- `install.sh`'s closing summary, client-unconditional: prints `Agents 8 / Commands 9 / Skills 16` to
+  a client whose agents README says are excluded entirely and whose command surface ARCHITECTURE says
+  does not exist. The run created 25 entries in `.agents/skills/` (16 links + 9 converted).
+- `install.sh`'s Next steps, also unconditional: step 1 → `MCP-SETUP.md`; step 2 → fill `CLAUDE.md`'s
+  `FILL:` markers, the file Codex never loads, while the generated `AGENTS.md` carries its own
+  unfilled markers nothing mentions; step 3 → *"Run `claude` … try `/unity-init`"*, wrong binary and
+  two commands with no Codex surface. **Also missing:** nothing tells a Codex user to run `codex` once
+  to grant project trust — the layer-6 fix — unless trust happens to fail.
+- `docs/GETTING-STARTED.md` never introduces the second client. `:16` says *"Claude Code is the only
+  hard requirement."* `## Installation` shows no `--client codex`. § *Hooks Not Firing* has six
+  Claude-shaped bullets and none of the six ways this branch measured hooks silently failing under
+  Codex — which is that section's literal title. § *Quick Diagnostic* says *"Its four checks are…"*
+  against five `## Check` headings.
+- `.claude/commands/unity-doctor.md` § Check 3 — *"and only these"* is a closed-world claim the branch
+  falsified six lines below its own paragraph.
+
+**Two categoricals the branch's own committed schema refutes — scope them, do not delete them**
+
+- *"there is no way to tell from inside the session"* whether hooks are trusted. `HookTrustStatus` is
+  `["managed","untrusted","trusted","modified"]` and `trustStatus` is a **required** field of
+  `HookMetadata` in the `hooks/list` response, which takes `cwds` and reads no home. The categorical
+  **holds for layer 6** and is **false for layers 3–5**. `unity-doctor.md` currently forbids reporting
+  trust state at all, which forbids the one route that answers without touching the user's home — and
+  `install.sh` already calls `hooks/list`.
+- *"a read-only reviewer cannot be expressed, only requested."* The narrow claim (no per-agent tool
+  allowlist) is true; the sentences built on it are over-broad. `SandboxMode` is
+  `["read-only","workspace-write","danger-full-access"]`, `permissionProfile/list` exists, and
+  `HookEventName` carries `subagentStart`/`subagentStop`.
+
+**One behaviour defect, here because this task already opens `install.sh`**
+
+Installing `--client claude` over an existing `--client codex` install takes the receipt's symlink
+rows **16 → 0** while `.agents/` stays on disk — sixteen files with no reader that owns them, and a
+receipt-driven `uninstall.sh` that can no longer remove them. Pre-existing branch behaviour.
+**Its guard is an upgrade fixture, not an assertion:** install one client, install the other over it,
+then assert the resulting tree is internally consistent — every file owned by a row, every row present
+on disk. Silently keeping the files and dropping the rows is the one answer that is wrong.
+
+**Must not:** measure Codex behaviour that is not already measured (if closing an item needs a live
+Unity bridge it belongs to Task 7); weaken an honest sentence into a vague one; add a `codex` mention
+to a surface that makes no client-specific claim.
+
+---
+
+## Task 13: The record documents — residuals, floors, criteria, and the guard's edge
+
+**Added 2026-08-16.** The whole-branch review's internal-record remainder, plus everything its fix
+loop closed on rather than carrying into a fourth round.
+
+**Disclosed residuals that undercount.** `docs/research/codex-client/README.md` says *"nothing in
+`tests/` reads these two files"* — `tests/test-codex-surface.sh` reads `findings.md` **as its
+authority** and reds on its absence; `codex-facts.md` is read by `tests/test-codex-shim.sh`. Falsified
+twice independently. `tests/test-shipped-citations.sh`'s residual says *"NINE in `.claude/scripts/`"*
+against a derived fifteen, total at least twenty-one; its neighbouring site-counts were never
+re-derived while `scripts/` grew by three.
+
+**The anti-vacuity floor set.** `docs/ANTI-VACUITY.md` declares `tests/*.sh` and `scripts/*.sh` in
+scope and has zero `codex` rows, while the branch added three test files carrying six qualifying
+floors. The document's *"zero rows means swept and empty"* rule cannot distinguish swept from never
+swept, because that segment has rows. Derive the membership from the document's own criterion.
+
+**One stale ordinal at three sites.** The wave ended with **six** silent-failure layers;
+`findings.md`, `install.sh` and `README.md` still say five (README's number is right and its **scope
+word** is wrong). `codex-facts.md` already annotates the identical shape at a fourth site — the class
+was identified and the sweep ran against one site of three. Derive the class yourself.
+
+**The deliverable: the live-vs-pinned criterion for `docs/research/codex-client/*`.** Fix round 1
+named this as the honest blocker on guarding that directory — its figures are *mostly* per-run
+measurements against gitignored transcripts that must **not** be re-derived, and *mostly* is what let a
+second unguarded copy of `install.sh`'s `982` hide there. Writing the criterion is the work; the guard
+rows follow from it. If the criterion selects nothing guardable, write it down anyway with what it
+excluded and why.
+
+**What the fix loop handed over rather than opening a round 4.** Its measured pathology is the reason:
+each round discharged its findings and produced a smaller, same-shaped crop of false statements inside
+the prose written to close them — four, then two, then five.
+
+- **`DCT_DECLARED` compares files, not rows** (Important, and a mechanism rather than a sentence).
+  Deleting one row from any multi-row file — `findings.md` ×4, `ANTI-VACUITY` ×3,
+  `test-shipped-citations` ×2 — leaves the suite green, **including the row that added it**. The
+  block's prose claims otherwise and the honest paragraph it replaced was true for those nine.
+- **The surface-pool block excludes `CLAUDE.md` on a false ground** — *"a file that quotes no number
+  cannot quote a stale one"*, while `CLAUDE.md` quotes the agent count twice in present tense. Four
+  more live unguarded sites travel with it (`docs/AGENT-GUIDE.md`, `CONTRIBUTING.md`,
+  `tests/test-studio-doctor.sh`, five `Kinglet ships N …` sentences in `findings.md`). All correct
+  today — a guard gap, not a stale figure, and the **ground** matters more than the sites.
+- **Word-numeral forms have never been swept in any round.** A word-numeral arm produced two class
+  members no digit sweep across three rounds could see, and a positive control against known members
+  killed one sweep pass outright by returning zero. Take both instruments.
+- `scripts/studio-doctor.sh` says *"called from FOUR sites"* and names five, in the paragraph whose
+  point is enumerating rather than characterising; a four-reader table has an orphaned row; a `sed`
+  comment's *"each of those paths also appears in bare form"* is false for 2 of 9; `DCT_HOOKS_SH` is
+  derived and floor-checked and read by no row.
+- `findings.md` says the importer *"reports 31 successes"* at three sites with the importer path as
+  the subject — the same subject/figure mismatch already corrected in `README.md`.
+- `MERGE-NOTES.md` Part 2's `## What shipped` table reads `28 / 36 / 39 / 25` against a live
+  `8 / 9 / 16 / 12`, under the heading *"Counts verified against disk"*. The file's
+  *"records of what a wave produced on a date"* disclaimer exists but is scoped to a different
+  section.
+- **Ledger items 8 and 14** — close them or give each a ruling that names a task. A ruling naming a
+  role is not a deferral.
+
+**Every guard added or repaired here must be proved by mutation in both directions**, with the mutant
+confirmed applied before measuring and `MUTANT DID NOT APPLY` emitted explicitly when it is not.
+
+---
+
 ## Notes for the controller
 
 - **Write each brief just before its task is dispatched, not up front.** Tasks 4

@@ -548,6 +548,9 @@ The event stream shape, measured against the real binary:
 | 9 | Installer writes and removes the Codex layout | **DONE** | `b3ecfb2..ce09521` | general-purpose implementer; 2 fix rounds; writes the user's **home** for the first time in this toolkit's history |
 | 10 | Findings synthesis, decision, debt | **DONE** | `1870afe..f729a74` | general-purpose implementer; 1 fix round; decision is **none of A/B/C** |
 | 11 | Close the probe harness's residual guard gaps | **DONE** | `84e756a..42667d0` | added during the run and grown by five later tasks; 1 fix round; **found the flake's cause** |
+| WBR | Whole-branch review + fix loop | **CLOSED** | `599792f..e76b84e` | 3 rounds, closed by ruling at round 3 rather than at the cap; both Criticals discharged; see *The whole-branch review* below |
+| 12 | The installed project does not know it is on Codex | **OPEN** | — | added 2026-08-16 from the whole-branch review's user-facing remainder; brief in the plan |
+| 13 | The record documents — residuals, floors, criteria, the guard's edge | **OPEN** | — | added 2026-08-16; owns what the fix loop closed on rather than carrying to a round 4 |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
 configuration natively, Tasks 3–6 shrink and Task 8's ship list changes. Re-plan rather than
@@ -1087,3 +1090,127 @@ inactive tool group. **Assuming parity with Claude Code is the move that produce
 six silent-failure layers**, so nothing in the shipped documents assumes it.
 
 *(No scene was ever touched by this wave.)*
+
+---
+
+## The whole-branch review, and the fix loop it opened
+
+Dispatched 2026-08-16 against `9a2ebec → 20e3140` — 56 commits, 33 files, ~13,600 insertions — on the
+most capable model available, per `final-reviewer-prompt.md`.
+
+**Verdict: do not merge as-is; three fixes first, the rest can follow.** Two Critical, twenty-two
+Important, eleven Minor. Task 7's absence was checked mechanically and **does not block** — every
+shipped surface touching MCP marks the client question open, so Task 7 costs a measurement, not a
+correction.
+
+### The diagnosis, which is what made the remainder tractable
+
+> Can a reader tell what Kinglet on Codex enforces and what it does not? **From `README.md`, yes,
+> clearly. From inside the installed project, no.**
+
+Every remaining Important finding has one shape: **the Claude-Code-era surfaces the wave did not
+re-read.** The wave measured Codex honestly and wrote that measurement into `README.md` and
+`docs/ARCHITECTURE.md`; it never returned to the shipped surfaces those measurements falsified. The
+research documents are clean. The things surrounding them were not.
+
+**What the two Criticals had in common is worth more than either fix.** Neither was a Codex defect.
+Both were **Claude-era code meeting a Codex-era tree** — a receipt reader that predates symlinks, and
+a subshell race that predates the load a second client's guard puts on the host. The branch's
+measurement discipline never pointed at either, because it was aimed across the boundary.
+
+### Round 1 — `599792f`
+
+Six findings, both Criticals. The doctor's fix was **two changes, not the one character the review
+proposed**: `[ -e ] || [ -L ]` alone moves all 16 rows from MISSING to MODIFIED, because `sha256sum`
+fails on a directory symlink. The receipt's third column, discarded as `_mode` since the loop was
+written, is now read, and the `toolkit` arm compares `readlink` against the recorded target in
+`uninstall.sh`'s grammar. The flake closed with `kill -KILL`, with the positive control established
+**before** anything changed: the unfixed shim read **0/8 unloaded and 6/6 under load** — the
+null-instrument trap demonstrated on its own subject.
+
+Also closed: `provenance.tsv`'s reversed-exclusion clause, eight tree-size numerals, `README.md`'s
+`31`→`32`, and the first widening of `tests/test-derived-counts.sh` past its ten-`.md` scanned set.
+
+### Round 2 — `01975b8`
+
+The re-review verdicted all six ADDRESSED — the doctor across six fixture states round 1 never built,
+and the flake by a **different instrument entirely**: no load at all, the killer shape isolated and
+killed immediately after fork, **SIGTERM ran the inherited EXIT trap 43/500 and 74/500; SIGKILL 0/500
+and 0/500**. It also reported a negative result worth keeping: the window sits between `fork()` and
+the child's trap reset and **cannot be widened from inside the killer's body**.
+
+What came back was the fix diff's own breakage. `"Twelve paths, all .md"` was wrong four ways in the
+commit that widened the guard against descriptions-written-by-their-own-author. Round 2 **deleted the
+sentence rather than correcting it** — replacing one hand-written census with another would have
+repeated the defect — and derived the boundary from the file. Its own first attempt at that was
+hollow and its own mutation caught it: the assertion survived deleting four research rows and two
+tests rows, because one original row kept the set difference non-empty. **A count cannot say "still
+reaches both places the widening was for."**
+
+Round 2 also found the class member that breaks the pattern: `tests/test-pipeline-detector.sh` said
+91 and derives 75 — stale **downward**, from the 2026-08-13 cut. Every sweep to that point was keyed
+on *"off by exactly what this branch added"*, which is structurally blind to shrinkage.
+
+### Round 3 — `e76b84e`
+
+An eleventh class member: `tests/test-shipped-citations.sh` said the payload has 67 entries against a
+derived 69, stale by exactly this branch's +2 payload scripts, in a file that **prints
+`payload derivation produced 69 entries` on every run**.
+
+**Its diagnosis is the most valuable artifact of the loop.** The criterion was sound; a **keyword
+proxy** applied during narrowing (`holds|today|tracked|now`) was not — the sentence says the payload
+*has* N entries. Eight hits from that file entered the narrowing and zero survived, with no floor, no
+positive control, and no check that the 446 discarded hits were empty of members. It also explains
+why the cruder branch-delta sweep missed it: **both criteria ran over the same already-narrowed set**,
+so the second was never an independent check. The rule earned — *measure the proxy's recall* — is
+recorded beside the figure.
+
+Round 3 refused `head` at the multi-match constraint (SIGPIPE under `set -euo pipefail`, hides on
+small inputs, fires on large ones) and took the first match inside `awk`. For the dead `sed` it
+measured **the fold, not the verdict**, because the assertion is `≥1` and cannot flip: a path above
+the block counts 4 with the fix and 5 without — the inflation, made visible.
+
+### Ruling: the loop closes at round 3, and the remainder is two tasks
+
+The round-3 re-review recommended CLOSE and its argument is empirical rather than tired: **each round
+discharged its findings and produced a smaller, same-shaped crop of false statements inside the prose
+written to close them** — four, then two, then five. A fourth round of the same implementer fixing
+sentences with sentences was the worse bet against a fresh implementer with a different frame.
+
+It also established that round 3's diagnosis is **incomplete**: a proxy-free derivation finds row 11
+*and seven more live sites*, all correct today and all unguarded, and the surface-pool block excludes
+`CLAUDE.md` on the written ground that *"a file that quotes no number cannot quote a stale one"* while
+`CLAUDE.md` quotes the agent count twice in present tense. The reviewer's own sweep had two recall
+failures, both caught by instruments the rounds kept saying nobody ran: **a positive control against
+known members** (it returned 0 and killed a pass) and **a word-numeral arm** (two members no digit
+sweep in three rounds could see).
+
+**Nothing from the whole-branch review is deferred to a role.** Every open item names a task:
+
+| Open | Owner |
+|---|---|
+| The user-facing remainder — `using-kinglet`, the five `Input.*` copies, `HOOK-REFERENCE.md`, the installer's summary and Next steps, `GETTING-STARTED.md`, the two scope-corrected categoricals, and the `--client claude`-over-codex orphaning | **Task 12** |
+| The record documents — residuals, the anti-vacuity floors, the stale ordinal at three sites, the live-vs-pinned criterion, `DCT_DECLARED`'s row-vs-file comparison, the false exclusion ground, and the unswept word-numeral forms | **Task 13** |
+| MCP route behaviour under Codex's client | **Task 7**, owner-blocked |
+
+Gate at `e76b84e`, verified independently by the controller as well as by each round:
+`Total: 3926 · Passed: 3923 · Failed: 0 · Skipped: 3`, 44 headers = 44 files, `provenance OK`,
+tree clean. 59 commits on the branch. **Nothing pushed.**
+
+### One observation recorded as a negative result, not a finding
+
+A single full-suite run went red at `tests/test-codex-shim.sh`'s **SIGHUP** row (`exit 0, 0 bytes`) —
+not the flake signature, not a mutation, unreproduced in **0/61** afterwards. All four arms of that
+probe read zero, so there was **no positive control and the zero proves nothing**. One mechanism was
+eliminated by measurement (`$!` under `set -m` still names the pipeline's last process, so the kill
+lands on the shim, not a long-gone `printf` — which would have explained `exit 0, 0 bytes` exactly).
+The ledger's *"a red in this file is a real break again"* is withdrawn and re-scoped to the budget
+assertion, which does rest on a control.
+
+### A process defect the loop committed twice, recorded because it is this wave's own subject
+
+Round 1's CPU load generators orphaned to `PPID=1` at load 16.29. Its bounded second batch was worse
+in an instructive way: `nice -n 19 timeout 420 bash -c '…' &` then `kill "$!"` **kills the `timeout`
+wrapper and frees the child**, defeating the guarantee the wrapper existed to provide. Rounds 2 and 3
+generated no load at all, and the flake question was settled without any — **the instrument that
+answered it needed a quiet host, not a loud one.**
