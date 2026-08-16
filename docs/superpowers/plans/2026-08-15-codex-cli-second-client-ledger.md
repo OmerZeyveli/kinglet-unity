@@ -30,18 +30,22 @@ ls tests/test-*.sh | wc -l
 The runner colours its headers, so an anchored `grep -c` on raw output returns **0** on a completely
 healthy suite — indistinguishable from the catastrophe the count exists to detect.
 
-### THE SUITE TAKES 434 SECONDS — re-measured 2026-08-16, and it is still growing
+### THE SUITE TAKES 405–434 SECONDS — a range, because a single figure was wrong
 
 **Use a timeout of at least 600000 ms.** A truncated run reads as red, and a red that is really a
 truncation is the most expensive false signal this repository produces.
 
-**This figure has moved twice inside one wave** — 364 s at setup on 2026-08-15, **434 s** today — as
-the suite went 3543 → 3865 assertions. The guidance that stood until now was "at least 450000 ms",
-which against a 434 s run leaves **sixteen seconds** of headroom. That is not a margin, and a previous
-wave already paid for exactly this: it wrote 150000 ms into its constraints against a suite that
-really took 191–255 s and dispatched four implementers under a number that manufactured failures.
+**Measured 2026-08-16 on one host, in one day: 405, 423, 425, 434 s.** An earlier version of this
+entry read *"THE SUITE TAKES 434 SECONDS"* and computed *"sixteen seconds of headroom"* from it.
+**434 is the maximum of four runs, not the runtime**, and the other three existed nowhere tracked.
+Using the maximum to size a timeout is right; presenting it as *the* figure is not — it is the shape
+this wave has caught six times over, a range collapsed into a constant.
 
-**Re-measure before quoting.** The number is a moving property of the tree, not a constant.
+The figure has also moved across the wave: **364 s at setup** on 2026-08-15 against 3543 assertions,
+**405–434 s** today against 3876. A previous wave wrote 150000 ms into its constraints against a suite
+that really took 191–255 s and dispatched four implementers under a number that manufactured failures.
+
+**Re-measure before quoting, and quote what you measured, including the spread.**
 
 ### A flaky assertion exists in `tests/test-codex-shim.sh` — do not call it a flake and move on
 
@@ -90,6 +94,13 @@ length and toward **the teardown of the preceding case**. That is a constraint, 
 
 Reproduction rates across three independent attempts: **3/4, 2/3, 1/4** — consistent with a race, and
 every reader so far has stood by routing rather than guessing.
+
+**And the rates are tree-state dependent, which is the sharpest clue anyone has.** Those three were
+measured at `b6bc214` with Task 9's changes stashed. **At HEAD it did not hit in four consecutive
+full-suite runs during Task 10, nor in the controller's own run.** That is *four runs deep*, **not**
+evidence the race is gone — but a defect that reproduces at one commit and not at a later one is a
+defect with a handle on it. **Task 11 should bisect the tree state before chasing the code**, because
+the cheapest available experiment is already half-run.
 
 The controller re-ran the whole suite independently on 2026-08-16 and got **3865 / 0 failed, 434 s** —
 **it did not hit.** That is what a race looks like, and it is precisely the shape `CLAUDE.md` warns
@@ -437,7 +448,7 @@ The event stream shape, measured against the real binary:
 | 7 | Layer B — MCP routes against the live bridge | **DEFERRED TO LAST** | — | **The owner is using the Editor.** See the ruling below |
 | 8 | Ship the payload the measurement supports | **DONE** | `b713f09..993dee2` | general-purpose implementer; 2 fix rounds; the payload ships and its guard is 86 assertions |
 | 9 | Installer writes and removes the Codex layout | **DONE** | `b3ecfb2..ce09521` | general-purpose implementer; 2 fix rounds; writes the user's **home** for the first time in this toolkit's history |
-| 10 | Findings synthesis, decision, debt | open | — | *(brief pending)* — gained **Step 5a** during the run: re-derive `docs/ANTI-VACUITY.md`'s bash-4 census and put it under a guard |
+| 10 | Findings synthesis, decision, debt | **DONE** | `1870afe..f729a74` | general-purpose implementer; 1 fix round; decision is **none of A/B/C** |
 | 11 | Close the probe harness's residual guard gaps | open | — | **added during the run** by Task 1's completion sweep and re-review. Runs after Task 9, when the harness has stopped changing |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
