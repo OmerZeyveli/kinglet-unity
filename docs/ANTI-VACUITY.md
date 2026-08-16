@@ -131,8 +131,15 @@ added to any of them fails here instead of quietly widening the gap. One trap th
 earlier mis-statement: `tests/*.sh` is **not** `tests/test-*.sh` — it counts `run-tests.sh`, which is
 why the tests figure sits one above the suite's file count.
 
-**The guard covers this section and nothing else in this document, and the difference is not that
-everything else is pinned.** Some other figures are pinned — `## The measured class` records a past
+**Two regions of this document are guarded, and the difference from the rest is not that everything
+else is pinned.** This section is one; the four tree-size figures under `### Shape 2` — the five-root
+total, its `docs` and `scripts` components, and the `tests/*.sh` count — are the other, added
+2026-08-16 by the same file after they went stale by the same mechanism as this census, in the same
+wave. That sentence read *"the guard covers this section and nothing else in this document"* until
+then, and it was made false by the round that widened the guard rather than by any later drift —
+which is why it now names the regions instead of counting them, and why anything guarded here
+should be added to this list in the commit that guards it. Some other figures are pinned —
+`## The measured class` records a past
 sweep whose own table sums to 39, and `15 hooks and 4 scripts were cut` records a past wave — but
 `## The floor set`'s `Today` columns are **dated snapshots that are known to be stale**, including
 this same census in per-source form, and that section says so at the point of use with the specific
@@ -183,16 +190,24 @@ it — a narrowing to 17 files **does** fire a floor of 30, and raising 30 to 10
 
 Two of the eleven above are green for exactly this reason, and they are the two converted here:
 
-- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **273** tracked files
-  today (`.claude` 62, `docs` 189, `scripts` 8, `examples` 4, `templates` 10; re-derived
-  2026-08-15 — it was **271** with `docs/` at 187 when this bullet was written, and the guard then
-  printed its own answer, `the mobile sweep has roots to read (271 file(s))`). `docs/` alone holds
-  **189**, so the floor cleared with **zero files under `.claude/`**. Measured in a clone:
-  **17 passed, 0 failed, rc 0** — identical in verdict to a healthy tree.
+- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **283** tracked files
+  today (`.claude` 62, `docs` 196, `scripts` 11, `examples` 4, `templates` 10; re-derived
+  2026-08-16 — it read **271** when this bullet was written and **273** through the Codex wave, and
+  the guard then printed its own answer, `the mobile sweep has roots to read (271 file(s))`).
+  `docs/` alone holds **196**, so the floor cleared with **zero files under `.claude/`**. Measured
+  in a clone: **17 passed, 0 failed, rc 0** — identical in verdict to a healthy tree.
 - `tests/test-bash32-compat.sh` — `SS_ALL_N > 0` over five sources and `SS_PIPE_N > 0` over four.
-  `tests/` holds **42** `.sh` files (40 when this was written), so both totals cleared with
+  `tests/` holds **45** `.sh` files (40 when this was written), so both totals cleared with
   `.claude/hooks/` — the directory the file was originally written for — completely empty. Measured:
   **8 passed, 0 failed, rc 0**.
+
+  **These four figures — the five-root total, its `docs`/`scripts` components and the `tests/` count
+  — are now GUARDED**, by the tree-size block in `tests/test-derived-counts.sh` alongside the bash-4
+  census. They are the fourth and fifth live figures in this document, and they went stale by the
+  same mechanism as the census did and in the same wave: the Codex branch added 3 files to
+  `scripts/`, 7 to `docs/` and 3 to `tests/`, and every one of these numbers was off by exactly
+  that. They are live, not pinned — the pinned readings kept beside them (271, 273, 40) are dated
+  and stay.
 
 **The fix is one shape for both: assert per source, not per union.** Both are converted; the
 mutations are recorded under [Proof](#proof) below.

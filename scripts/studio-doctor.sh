@@ -398,12 +398,51 @@ else
   # The sha comparison stays fail-closed the same way uninstall.sh's `sha_of` is: an unreadable file
   # yields the empty string, which never equals a recorded checksum, so the row lands in MODIFIED and
   # is reported rather than silently passed.
+  #
+  # THE EXISTENCE TEST IS `-e` OR `-L`, NOT `-f`, AND THE MODE COLUMN IS READ RATHER THAN DISCARDED.
+  # `.agents/skills/<name>` is a symlink to a DIRECTORY. `-f` follows the link and then asks "is the
+  # target a regular file", which is false — so every one of those rows counted as MISSING. Measured
+  # 2026-08-16 on a clean `--client codex --yes` fixture, run immediately after the installer
+  # reported success: `FAIL 16 receipted file(s) missing — re-run install.sh`, rc=1, with all 16
+  # present on disk. The remedy that message prints reproduces the identical state, so a user who
+  # follows install.sh's own Next step 4 loops. `-L` is the second disjunct rather than a
+  # replacement because `-e` is false through a DANGLING link, and a dangling link of ours is a real
+  # defect this check should name rather than skip.
+  #
+  # This is uninstall.sh's grammar, deliberately — see its classifier's own `-e`/`-L` paragraph,
+  # which records the same defect on that side and fixed it there first.
+  #
+  # WHERE THE OTHER READERS OF THIS RECEIPT STAND, since "only the doctor was wrong" is the obvious
+  # summary and it is too coarse to be useful. There are four readers of the origin column and this
+  # is the third of them to be visited about symlinks:
+  #
+  #   install.sh, the skill-root loop (8d.2)  — WRITES these rows and owns them correctly: `-L` plus
+  #                                             a `readlink` comparison against the target it wrote,
+  #                                             and someone else's link at our path is kept, not
+  #                                             clobbered, and given no row.
+  #   uninstall.sh's classifier               — `-e` OR `-L`, then the same mode-column split. Fixed
+  #                                             there first, and the shape copied from here.
+  #   install.sh, the MODIFIED_FILES scan     — carries `[ -f "$PROJECT_DIR/$rel" ] || continue` and
+  #                                             therefore skips every symlink row. HARMLESS TODAY
+  #                                             AND NOT A SECOND BUG: that scan feeds the `.claude/**`
+  #                                             payload loops, the symlink rows are `.agents/`, and
+  #                                             the loop that writes them never calls `is_modified`.
+  #                                             It is the same shape, one edit away from mattering,
+  #                                             which is why it is named here rather than left for
+  #                                             someone to rediscover.
+  #   this file                               — was the one that reached a user with it.
+  #
+  # The third column stopped being `_mode` in the same change. A symlink to a directory has no
+  # sha256 — `sha256sum` fails and the substitution is empty — so fixing existence alone moves all
+  # 16 rows from MISSING to MODIFIED and the run still misreports a correct install, just under a
+  # different heading. What install.sh records for these rows is the LINK TARGET, and that is what
+  # the `toolkit` arm below compares: the link is ours while it still points where we pointed it.
   VERIFIED=0; MODIFIED=0; MISSING=0; UNREADABLE=0; REVERTED=0; STICKY=0
   MODIFIED_LIST=""; MISSING_LIST=""; UNREADABLE_LIST=""; REVERTED_LIST=""
-  while IFS=$'\t' read -r rel recorded _mode origin; do
+  while IFS=$'\t' read -r rel recorded mode origin; do
     case "$rel" in ''|\#*|path) continue ;; esac
     abs="$PROJECT_DIR/$rel"
-    if [ ! -f "$abs" ]; then
+    if [ ! -e "$abs" ] && [ ! -L "$abs" ]; then
       MISSING=$((MISSING + 1)); MISSING_LIST="${MISSING_LIST}${rel}"$'\n'
       continue
     fi
@@ -454,7 +493,16 @@ else
         fi
         ;;
       toolkit)
-        if [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
+        # TWO PROOFS OF OWNERSHIP FOR TWO KINDS OF FILE, chosen by the mode column — the same split
+        # uninstall.sh's `toolkit` arm makes, for the same reason and in the same order, so the two
+        # readers of this receipt cannot drift into disagreeing about the same row.
+        if [ "$mode" = symlink ]; then
+          if [ -L "$abs" ] && [ "$(readlink "$abs")" = "$recorded" ]; then
+            VERIFIED=$((VERIFIED + 1))
+          else
+            MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+          fi
+        elif [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
           VERIFIED=$((VERIFIED + 1))
         else
           MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'

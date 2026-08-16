@@ -2387,7 +2387,11 @@ if [ "$CLIENT" = codex ]; then
       ok "Converted $CMDSKILL_W command(s) into .agents/skills/$([ "$CMDSKILL_K" -gt 0 ] && printf ', kept %s of yours' "$CMDSKILL_K")"
     else
       warn "codex-command-to-skill.sh failed — the commands did not cross to Codex."
-      note_not_done "The nine commands were NOT converted into .agents/skills/, so 919 lines of Unity diagnostics that exist nowhere else in the toolkit are unreachable under Codex. Run .claude/scripts/codex-command-to-skill.sh by hand to see why it failed."
+      # 982 IS DERIVED — `cat .claude/commands/*.md | wc -l` — AND IT IS GUARDED. It read 919 until
+      # 2026-08-16, which was correct until Task 8 added 63 lines to unity-doctor.md inside the same
+      # wave; that task corrected the research document and left this string, which is the half a
+      # user reads. tests/test-derived-counts.sh's tree-size block now reds when the two disagree.
+      note_not_done "The nine commands were NOT converted into .agents/skills/, so 982 lines of Unity diagnostics that exist nowhere else in the toolkit are unreachable under Codex. Run .claude/scripts/codex-command-to-skill.sh by hand to see why it failed."
     fi
     rm -rf "$CONV_TMP"
   fi

@@ -1011,6 +1011,62 @@ fast_err="$(printf '%s' "$PATCH_OK" | bash "$SHIM" --hook "$FASTHOOK" --timeout 
 assert_eq "0" "$fast_rc" "an allowed call still exits 0 with the watchdog armed"
 assert_eq "" "$fast_err" "an allowed call writes nothing to stderr — the watchdog's killer emits no spurious refusal"
 
+# ── The killer is killed with a signal that CANNOT run a trap ──────────────
+#
+# The `trap -` reset the block above describes is the intended defence, and it is
+# not sufficient, because IT IS NOT ATOMIC WITH THE FORK. A subshell resets the
+# SIGNAL traps at fork but INHERITS the EXIT trap, and `wait "$sw_pid"` returns in
+# microseconds when the wrapped hook is fast — so the parent's kill can land
+# before the subshell has executed its first builtin. The inherited EXIT trap then
+# runs shim_guard -> shim_cleanup -> `rm -rf` of the temp directory THE PARENT IS
+# STILL FILLING, and the parent fails on its next payload write with
+# `payload.N.json: No such file or directory`. That is the intermittent red this
+# suite carried, in the assertion "the refusal does not name how far it got":
+# three independent readers reproduced it and called it a flake.
+#
+# SIGKILL cannot run a trap, so the window closes rather than being made harmless.
+# The assertion has two halves because the structural one alone would be satisfied
+# by any signal name someone believed was untrappable.
+#
+# THE SIGNAL IS DERIVED FROM THE SHIM, NOT WRITTEN DOWN HERE. A guard that
+# hardcodes `KILL` on both sides tests nothing about the file it guards.
+SW_KILL_SIG="$(awk 'match($0, /kill -[A-Z0-9]+ "\$sw_killer"/) {
+    s = substr($0, RSTART + 6, RLENGTH - 6)
+    sub(/ .*$/, "", s)
+    print s
+    exit
+  }' "$SHIM")"
+assert_eq "yes" "$([ -n "$SW_KILL_SIG" ] && echo yes || echo no)" \
+  "the shim's kill of the watchdog killer was located — an extraction that matches nothing makes every assertion below it vacuous"
+
+# THE BEHAVIOURAL HALF, WITH ITS POSITIVE CONTROL ASSERTED RATHER THAN ASSUMED.
+# A subshell installs an EXIT trap, announces that it has, and blocks; the signal
+# is sent only after the announcement, so there is NO RACE here — this measures
+# what the signal does to an already-installed trap, which is the property the fix
+# rests on. That matters because the obvious rig for this defect (fork, kill
+# immediately, count trap entries) reads ZERO IN BOTH ARMS unless the kill beats
+# the subshell's first instruction: measured at 11/50, 4/50 and 29/50 at zero
+# delay and 0/50 with 10 ms inserted. A probe with no live positive control cannot
+# detect the event it tests for, so the TERM arm below is an assertion and not a
+# comment.
+sw_trap_probe() {
+  # $1 = signal name. Echoes `ran` if the subshell's EXIT trap fired, `silent` if not.
+  sw_pd="$WORK/sigprobe.$1.$$"
+  rm -rf "$sw_pd"; mkdir -p "$sw_pd"
+  ( trap 'printf x > "'"$sw_pd"'/ran"' EXIT; printf r > "$sw_pd/ready"; sleep 0.3 ) &
+  sw_pp=$!
+  sw_pn=0
+  while [ ! -f "$sw_pd/ready" ] && [ "$sw_pn" -lt 300 ]; do sleep 0.01; sw_pn=$((sw_pn + 1)); done
+  kill "-$1" "$sw_pp" >/dev/null 2>&1 || true
+  wait "$sw_pp" >/dev/null 2>&1 || true
+  if [ -f "$sw_pd/ran" ]; then printf 'ran\n'; else printf 'silent\n'; fi
+  rm -rf "$sw_pd"
+}
+assert_eq "ran" "$(sw_trap_probe TERM)" \
+  "the probe is live: SIGTERM DOES run an inherited EXIT trap on this host — the positive control, without which the next assertion is green over a broken instrument"
+assert_eq "silent" "$(sw_trap_probe "$SW_KILL_SIG")" \
+  "…and the signal the shim actually sends its watchdog killer (-$SW_KILL_SIG) cannot run that trap, so the killer can never reach shim_cleanup and delete the parent's temp directory"
+
 # The pipe-release property is asserted at the top of this file, where it can
 # name itself before a regression makes everything else slow. See the note there
 # for why the capture must go through a pipe: written as `>/dev/null 2>&1` it

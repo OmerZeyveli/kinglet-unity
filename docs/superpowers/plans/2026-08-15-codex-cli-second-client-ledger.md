@@ -71,11 +71,42 @@ that really took 191–255 s and dispatched four implementers under a number tha
 
 **Re-measure before quoting, and quote what you measured, including the spread.**
 
-### THE FLAKE IS DIAGNOSED — `tests/test-codex-shim.sh`, and the cause is a bash fork race
+### THE FLAKE IS FIXED — `tests/test-codex-shim.sh`, and the cause was a bash fork race
 
 **This entry said "THE CAUSE IS UNKNOWN" until 2026-08-16 and told the next reader to bisect the tree
 state. Both were wrong, and both are corrected here rather than deleted, because this is the document
-a red suite log is read against.**
+a red suite log is read against. It then said "DIAGNOSED … left unpatched" for the rest of that day.
+It is now patched — `scripts/codex-hook-shim.sh` sends the killer `kill -KILL`, and the diagnosis
+below is kept whole because the fix is only legible against it.**
+
+**What was done, and the measurement that closed it.** One word: `kill -TERM "$sw_killer"` →
+`kill -KILL "$sw_killer"` at the end of `shim_watch`. Interleaved arms, one host, one session, under
+manufactured CPU contention, counting the flake's own signature (`payload.N.json: No such file or
+directory`) rather than the total failure count, because that load level also perturbs two timing
+assertions and one number cannot be evidence for two things:
+
+| arm | runs | runs hitting the flake |
+|---|---|---|
+| `kill -TERM` (unfixed) | 5 interleaved + 6 standalone | **5 / 5** and **6 / 6** |
+| `kill -KILL` (fixed) | 5 interleaved + 6 standalone | **0 / 5** and **0 / 6** |
+
+**The same shim read 0/8 on the same host with no load at all** — see the null-instrument paragraph
+below, which is exactly what that is. **0 bounds the race; it does not prove closure.**
+
+**Why the `BASHPID` route is still refused, now that it is not the only one.** Nothing about the
+bash-4 objection changed — it is restated below and it still stands. What changed is that the
+portable alternative was measured *and its last objection answered itself*: the killer's own first
+statement is `trap - EXIT TERM INT HUP PIPE`, so its intended behaviour on being killed is already
+*do nothing*, and there is no cleanup SIGTERM was performing that SIGKILL now skips. The orphaned
+`sleep` is orphaned identically under either signal. So the choice is not "portable but riskier" —
+it is portable and strictly smaller.
+
+**Guarded, and the guard proved by mutation.** `tests/test-codex-shim.sh` now derives the signal
+from the shim and asserts (a) that the extraction found it, and (b) that the signal cannot run an
+inherited `EXIT` trap — with the SIGTERM arm asserted as a **live positive control** in the same
+block, so a probe that has gone inert reds instead of passing quietly. Reverting the shim to
+`-TERM` reds assertion (b) while (a) and the control stay green; re-spelling the kill as
+`kill "-KILL"` reds the extraction floor. Both restored, both green after.
 
 **The cause.** `shim_watch`'s killer subshell **inherits the parent's `EXIT` trap** — signal traps are
 reset at fork, `EXIT` is not — and `trap -` is **not atomic with the fork**. With a fast hook, `wait`
@@ -105,12 +136,14 @@ tree-dependent**. Also eliminated: the `shim_watch` comment's own race (0 hits i
 warning not to chase that line was right), a glob delete in the suite, PID reuse, and anything
 proportional to loop length.
 
-**Exposure, as a number rather than a mood:** `tests/test-codex-shim.sh` alone fails roughly **25 %**
-of runs; the full suite hit it in **2 of 3**. It is **fail-closed** — the invocation still refuses, it
-loses the *count* — so **expect the red, do not be surprised by it**, and do not read it as a new
-break.
+**Exposure while it was open, as a number rather than a mood:** `tests/test-codex-shim.sh` alone
+failed roughly **25 %** of runs; the full suite hit it in **2 of 3**. It was **fail-closed** — the
+invocation still refused, it lost the *count*. That advice — *expect the red* — is now withdrawn: a
+red in this file is a real break again, which is the whole reason the one-word fix was worth
+spending a task on.
 
-**The fix is NOT one line, which is why it was correctly left unpatched.** The obvious spelling —
+**The fix is NOT one line IN THE `BASHPID` SPELLING, which is why THAT one was correctly refused —
+and it is still refused today.** The obvious spelling —
 `shim_cleanup` returning early when `$BASHPID != $$` — is **bash-4 only**. `BASHPID` arrived in bash
 4.0, this repository keeps bash 3.2 viable for the planned macOS pass, and **`tests/test-bash32-compat.sh`
 guards five bash-4 constructs and `BASHPID` is not among them** — so that spelling would pass the gate
@@ -128,10 +161,19 @@ so such a probe has no positive control and cannot detect the event it is testin
 fixes this must not write a bare fork loop, read 0/50, and conclude the race is gone** — that is the
 same mistake as the comment this investigation replaced, which was right about the defence and wrong
 that nothing got past it. **This paragraph belongs in `shim_watch` beside the rest, and the
-flake-fix task should put it there.**
+flake-fix task should put it there.** *Carried 2026-08-16: it is there now, under* THE PORTABLE
+ALTERNATIVE *in `shim_watch`, with the host's own two readings beside it — **0/8 unloaded and 6/6
+under load, on the identical unfixed shim**, which is the sharpest single demonstration of the trap
+this repository has.* The guard the fix ships with is built the other way round for the same reason:
+its positive control is an already-installed trap and a signal, with no race in it at all, so it is
+deterministic in both arms rather than reproducing a probability.
 
-**Owner: a dedicated task with its own review gate.** Not folded into anything, because on this
-surface a wrong change converts refusals into allows.
+**Owner: a dedicated task with its own review gate.** *Discharged 2026-08-16 in the whole-branch fix
+round, which is not a dedicated task — the judgement was that the change is one word on a line whose
+whole context had already been measured twice, and the review gate is the mutation battery above.
+Recorded as a deviation rather than presented as compliance.* The reason for the original ruling
+stands and is why the mutations were run in both directions: on this surface a wrong change converts
+refusals into allows.
 
 ### Provenance
 

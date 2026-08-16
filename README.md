@@ -143,7 +143,11 @@ outside your Unity project.
 - **Codex's own `externalAgentConfig/import`.** If you migrate that way instead, you get a tree
   Kinglet did not write and does not repair: it drops seven of the nine commands, migrates no rules,
   rewrites 84 path references to a directory that exists under no spelling, strips every tool grant,
-  and copies the hook timeouts across unconverted — while reporting **31 successes and 0 failures**.
+  and copies the hook timeouts across unconverted — while reporting **32 successes and 0 failures**.
+  (32 is the figure for a real installed project, which is the subject of this sentence; the same
+  import over the measurement replica, which has no `.mcp.json`, reports 31. This read 31 until
+  2026-08-16 — the right number attached to the wrong subject. `0 failures` is the point either way,
+  and it holds for both.)
 
 ### Hook trust, and the failure that says nothing at all
 

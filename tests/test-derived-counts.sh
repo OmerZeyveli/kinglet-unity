@@ -1263,3 +1263,146 @@ assert_eq "0" "$(printf '%s' "$DCV_VACUOUS" | grep -c . || true)" \
 DCV_SUM_SEEN=$(tr '\n' ' ' < "$REPO_DIR/$DCV_DOC" | tr -s ' ' | grep -oE '[0-9]+ [+] [0-9]+ [+] [0-9]+ [+] 1 [+] 1 = [0-9]+' | sed -n 1p || true)
 assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
   "$DCV_DOC's bash-4 census sums its own five sources correctly"
+
+# ============================================================================
+# TREE-SIZE FIGURES, AND THE EDGE OF THIS FILE'S OWN SCANNED SET
+#
+# EVERY BLOCK ABOVE CHECKS ITS NUMERALS IN A DOCUMENT: README.md, CLAUDE.md, MERGE-NOTES.md,
+# CREDITS.md, .claude/NOTICE.md, two SKILL.md files and four under docs/. Twelve paths, all `.md`.
+# `install.sh` is read above too — but only as a DERIVATION SOURCE, for the script-skip list — and no
+# block before this one asks whether a number written in it is true. That distinction is the whole
+# finding: the whole-branch review of 2026-08-16 found that **every numeral defect on the branch sat
+# outside the set whose numerals are checked** — and that the figures inside it were all correct. The
+# guard was not weak; its EDGE was where the defects lived. Four of them were tree-size figures the branch's own file
+# additions falsified, and the attribution is exact: 3 files added to `scripts/`, 7 to `docs/`,
+# 3 to `tests/`, and each stale number off by precisely that.
+#
+# | site | stated | derived |
+# |---|---|---|
+# | docs/ANTI-VACUITY.md — five roots summing to N (`docs` D, `scripts` S) | 273 / 189 / 8 | 283 / 196 / 11 |
+# | docs/ANTI-VACUITY.md — `tests/` holds N `.sh` files                    | 42            | 45            |
+# | tests/test-provenance-origins.sh — `scripts/` holds N now              | 8             | 11            |
+# | tests/test-no-mobile.sh — `docs/` holds N tracked today                | 189           | 196           |
+#
+# THREE OF THE FOUR SITES TELL THE READER TO DERIVE IT, IN THE SAME SENTENCE, and one of them —
+# test-provenance-origins.sh — is a paragraph *about* that very figure having gone stale once
+# before, ending "Derive both, never transcribe". It went stale again by the same mechanism, one
+# wave later. That is the argument for this block: an instruction to derive is executed by nobody,
+# and the repository has now watched the same request fail on the same number twice.
+#
+# THIS BLOCK SCANS `.sh` FILES AND `install.sh`, WHICH NOTHING ABOVE DOES. Two consequences:
+#
+#   * The flattener strips a leading `#` per line before joining, because three of these figures
+#     live in shell COMMENT BLOCKS wrapped across lines. Without that, a sentence spanning two
+#     comment lines reads as `… holds 11 # now …` and no pattern matches it. `awk` drains its
+#     input and `tr` drains its input, so nothing here can SIGPIPE a writer under pipefail.
+#   * `scripts/` here counts ALL TRACKED FILES, not `*.sh` — `git ls-files 'scripts/*'` is 11 while
+#     `ls scripts/*.sh` is 10. The bash-4 census block above uses the OTHER one. Two figures, one
+#     directory, both live, and reading the wrong glob is how one of them went wrong before.
+#
+# WHAT THIS DOES NOT COVER, STATED AS A RESIDUAL RATHER THAN LEFT TO BE DISCOVERED. The review named
+# four regions outside the scanned set; this block closes two of them (`install.sh`, and `tests/*.sh`
+# comment blocks) and part of a third (ANTI-VACUITY's Shape 2 body prose, for its tree-size figures
+# only). It does NOT cover `docs/research/codex-client/*` — findings.md, codex-facts.md and that
+# directory's README. Those carry hundreds of figures that are overwhelmingly PER-RUN MEASUREMENTS
+# against transcripts that are gitignored, so they are pinned history and must not be re-derived
+# against today's tree; a guard there needs a criterion separating the live figures from the pinned
+# ones FIRST, and writing that criterion is the work, not the guard. Nor does it cover every numeral
+# in the two `.sh` files it now reads — only the two named figures. Both remainders are one row in
+# DCT_CLAIMS away once the criterion exists.
+echo "--- derived counts: tree-size figures outside the .md documents ---"
+
+DCT_CLAIM_ROOT=$(git -C "$REPO_DIR" ls-files .claude 2>/dev/null | grep -c . || true)
+DCT_DOCS=$(git -C "$REPO_DIR" ls-files docs 2>/dev/null | grep -c . || true)
+DCT_SCRIPTS=$(git -C "$REPO_DIR" ls-files 'scripts/*' 2>/dev/null | grep -c . || true)
+DCT_EXAMPLES=$(git -C "$REPO_DIR" ls-files examples 2>/dev/null | grep -c . || true)
+DCT_TEMPLATES=$(git -C "$REPO_DIR" ls-files templates 2>/dev/null | grep -c . || true)
+DCT_ROOTS=$((DCT_CLAIM_ROOT + DCT_DOCS + DCT_SCRIPTS + DCT_EXAMPLES + DCT_TEMPLATES))
+DCT_TESTS_SH=$(ls -1 "$REPO_DIR"/tests/*.sh 2>/dev/null | grep -c . || true)
+DCT_CMD_LINES=$(cat "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | grep -c '' || true)
+
+# THE DERIVATION HAS TO BE ABLE TO FAIL. Run outside a git checkout, every `git ls-files` is empty,
+# five zeros sum to zero, and zero compared with zero is a green suite that inspected nothing —
+# which is also exactly what a bad pathspec produces. Asserted before anything is compared.
+DCT_DERIVATION="ok"
+[ "$DCT_CLAIM_ROOT" -ge 1 ] || DCT_DERIVATION="git ls-files .claude is empty — not a checkout, or the pathspec stopped matching"
+[ "$DCT_DOCS"       -ge 1 ] || DCT_DERIVATION="git ls-files docs is empty"
+[ "$DCT_SCRIPTS"    -ge 1 ] || DCT_DERIVATION="git ls-files 'scripts/*' is empty"
+[ "$DCT_EXAMPLES"   -ge 1 ] || DCT_DERIVATION="git ls-files examples is empty"
+[ "$DCT_TEMPLATES"  -ge 1 ] || DCT_DERIVATION="git ls-files templates is empty"
+[ "$DCT_TESTS_SH"   -ge 1 ] || DCT_DERIVATION="no .sh files under \$REPO_DIR/tests"
+[ "$DCT_CMD_LINES"  -ge 1 ] || DCT_DERIVATION="\$REPO_DIR/.claude/commands/*.md is empty, so the line count is not a subject"
+assert_eq "ok" "$DCT_DERIVATION" \
+  "the tree-size figures are derived from a tree that actually has files in it"
+
+# path <TAB> extended-regex pattern <TAB> comma-separated expected numbers, in the order the match
+# carries them. One row per SITE — the multisite check below refuses a pattern that matches two,
+# because a vacuity check over a union cannot see one of them disappear.
+DCT_CLAIMS="docs/ANTI-VACUITY.md	five roots summing to [*][*][0-9]+[*][*] tracked files today [(].[.]claude. [0-9]+, .docs. [0-9]+, .scripts. [0-9]+, .examples. [0-9]+, .templates. [0-9]+	$DCT_ROOTS,$DCT_CLAIM_ROOT,$DCT_DOCS,$DCT_SCRIPTS,$DCT_EXAMPLES,$DCT_TEMPLATES
+docs/ANTI-VACUITY.md	.docs/. alone holds [*][*][0-9]+[*][*]	$DCT_DOCS
+docs/ANTI-VACUITY.md	.tests/. holds [*][*][0-9]+[*][*] ..sh. files	$DCT_TESTS_SH
+tests/test-provenance-origins.sh	and holds [0-9]+ now	$DCT_SCRIPTS
+tests/test-no-mobile.sh	holds [0-9]+ tracked today	$DCT_DOCS
+install.sh	so [0-9]+ lines of Unity diagnostics	$DCT_CMD_LINES"
+
+# THE WIDENING IS ASSERTED, NOT ASSUMED. Every block above this one reads a `.md` file; if a later
+# edit quietly narrows this table back to documents, the review finding it exists for is reopened
+# with nothing red. The claim is that this table reaches install.sh and at least two `.sh` files.
+DCT_SCANNED=$(cut -f1 <<< "$DCT_CLAIMS" | sort -u)
+DCT_NON_MD=$(grep -cv '[.]md$' <<< "$DCT_SCANNED" || true)
+DCT_HAS_INSTALL="no"
+grep -qxF -- "install.sh" <<< "$DCT_SCANNED" && DCT_HAS_INSTALL="yes"
+assert_eq "yes" "$DCT_HAS_INSTALL" \
+  "the tree-size guard CHECKS A NUMBER IN install.sh — every block above reads that file only for its skip list, so a user-facing derived count sat there unchecked and stayed wrong through the wave that corrected its source"
+if [ "$DCT_NON_MD" -ge 3 ]; then DCT_WIDE=1; else DCT_WIDE=0; fi
+assert_eq "1" "$DCT_WIDE" \
+  "…and at least three non-.md files ($DCT_NON_MD), so this block still covers shell sources whose numerals nothing else in this file examines"
+
+DCT_BAD=""
+DCT_VACUOUS=""
+DCT_MULTISITE=""
+while IFS=$'\t' read -r dct_rel dct_pat dct_want; do
+  [ -n "$dct_rel" ] || continue
+  if [ ! -f "$REPO_DIR/$dct_rel" ]; then
+    DCT_VACUOUS="${DCT_VACUOUS}${dct_rel} is not present, so its '${dct_pat}' claim was never checked"$'\n'
+    continue
+  fi
+  # Strip one leading comment marker per line, then join. awk and tr both drain their input.
+  dct_flat="$(awk '{ sub(/^[[:space:]]*#[[:space:]]?/, ""); printf "%s ", $0 }' "$REPO_DIR/$dct_rel" | tr -s ' ')"
+  dct_hits=0
+  while IFS= read -r dct_claim; do
+    [ -n "$dct_claim" ] || continue
+    dct_hits=$((dct_hits + 1))
+    dct_seen=$(grep -oE '[0-9]+' <<< "$dct_claim" | tr '\n' ',' | sed 's/,$//')
+    if [ "$dct_seen" != "$dct_want" ]; then
+      DCT_BAD="${DCT_BAD}${dct_rel} states '${dct_claim}' — the tree derives ${dct_want}"$'\n'
+    fi
+  done <<< "$(grep -oE "$dct_pat" <<< "$dct_flat" || true)"
+
+  if [ "$dct_hits" -lt 1 ]; then
+    DCT_VACUOUS="${DCT_VACUOUS}${dct_rel} no longer states its '${dct_pat}' claim in a form this guard can read"$'\n'
+  elif [ "$dct_hits" -gt 1 ]; then
+    DCT_MULTISITE="${DCT_MULTISITE}${dct_rel}'s '${dct_pat}' row matches ${dct_hits} sites — its vacuity check is a union over them. Split it into one row per site, with lexically disjoint patterns."$'\n'
+  fi
+done <<< "$DCT_CLAIMS"
+
+if [ -n "$DCT_MULTISITE" ]; then
+  printf '%s' "$DCT_MULTISITE"
+fi
+assert_eq "0" "$(printf '%s' "$DCT_MULTISITE" | grep -c . || true)" \
+  "every tree-size claim row matches exactly one site in its file"
+
+if [ -n "$DCT_BAD" ]; then
+  printf '%s' "$DCT_BAD"
+  printf '     %s\n' "Re-derive with: for d in .claude docs scripts examples templates; do git ls-files \"\$d\" | wc -l; done ; ls tests/*.sh | wc -l ; cat .claude/commands/*.md | wc -l"
+  printf '     %s\n' "scripts/ here is ALL tracked files (git ls-files 'scripts/*'), not scripts/*.sh — the bash-4 census block above uses the other one."
+  printf '     %s\n' "Do not 'fix' this by editing a pinned historical reading (271, 273, 187, 189, 40, 42, 919) kept beside the live figure."
+fi
+assert_eq "0" "$(printf '%s' "$DCT_BAD" | grep -c . || true)" \
+  "every tree-size figure outside the .md documents matches the tree (roots $DCT_ROOTS = $DCT_CLAIM_ROOT+$DCT_DOCS+$DCT_SCRIPTS+$DCT_EXAMPLES+$DCT_TEMPLATES, tests/*.sh $DCT_TESTS_SH, command body lines $DCT_CMD_LINES)"
+
+if [ -n "$DCT_VACUOUS" ]; then
+  printf '%s' "$DCT_VACUOUS"
+fi
+assert_eq "0" "$(printf '%s' "$DCT_VACUOUS" | grep -c . || true)" \
+  "every tree-size phrasing this guard covers is still present in the file that carries it"

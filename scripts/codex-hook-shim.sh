@@ -356,12 +356,17 @@ shim_watch() {
     # **0** misses. The window is several times wider than the miss rate makes it
     # look, which strengthens the case for closing it rather than weakening it.
     #
-    # IT IS FAIL-CLOSED AND IT IS UNFIXED. The invocation still refuses; what it
-    # loses is the reason — it reports a staging failure instead of the budget,
-    # so the count of files checked never reaches the user.
+    # IT IS FAIL-CLOSED, AND IT IS NOW FIXED — see THE PORTABLE ALTERNATIVE
+    # below, which is the route taken. While it was open the invocation still
+    # refused; what it lost was the reason — it reported a staging failure
+    # instead of the budget, so the count of files checked never reached the
+    # user. That is the assertion in tests/test-codex-shim.sh that went red
+    # intermittently, and three independent readers reproduced it before it was
+    # closed on 2026-08-16.
     #
     # "IT IS ONE LINE" WAS THE ONE THING THE INVESTIGATION GOT WRONG, and the
-    # correction is why this is not applied here. The obvious spelling above uses
+    # correction is why the `BASHPID` route is STILL REFUSED even now that the
+    # race is closed by the other one. The obvious spelling above uses
     # `BASHPID`, which arrived in **bash 4.0**, on a repository that keeps bash
     # 3.2 viable for the planned macOS pass — the same 3.2 the signal arms in
     # `scripts/codex-probe.sh` exist for. Where it is absent it fails in one of
@@ -379,13 +384,43 @@ shim_watch() {
     # exists to stop exactly this. Anyone choosing it must add `BASHPID` to that
     # bundle in the same change.
     #
-    # THE PORTABLE ALTERNATIVE CLOSES THE WINDOW INSTEAD OF MAKING IT HARMLESS:
-    # send the killer `-KILL` rather than `-TERM` below. SIGKILL cannot run a
-    # trap — this file's own header already names it as the untrappable one — so
-    # the subshell never reaches the EXIT trap at all. Measured on the same rig,
-    # three runs of 12: **0 misses and 0 subshell entries**, against the `-TERM`
-    # arm's 3 misses and the log-only variant's 1/9/4. It needs its own look at
-    # what else the killer was going to do, which is a judgement, not a line.
+    # THE PORTABLE ALTERNATIVE CLOSES THE WINDOW INSTEAD OF MAKING IT HARMLESS,
+    # AND IT IS WHAT THE `kill -KILL` BELOW NOW IS: send the killer SIGKILL
+    # rather than SIGTERM. SIGKILL cannot run a trap — this file's own header
+    # already names it as the untrappable one — so the subshell never reaches
+    # the EXIT trap at all. `kill -KILL` is POSIX, so the bash-3.2 gate is
+    # untouched, and `wait` reaps a SIGKILLed child normally.
+    #
+    # "IT NEEDS ITS OWN LOOK AT WHAT ELSE THE KILLER WAS GOING TO DO" WAS THE
+    # LAST OBJECTION, AND THE KILLER ANSWERS IT IN ITS OWN FIRST STATEMENT.
+    # The subshell is `( trap - EXIT TERM INT HUP PIPE; sleep …; kill -TERM
+    # "$sw_pid" )`. It clears every trap before it does anything else, so its
+    # intended behaviour on being killed is already *do nothing* — there is no
+    # cleanup SIGTERM was running that SIGKILL now skips. The only thing it
+    # leaves behind is the `sleep` it is blocked in, and that `sleep` is
+    # orphaned identically under either signal: killing the subshell has never
+    # killed it. `9>&-` is why that orphan is harmless, and that clause is
+    # unchanged.
+    #
+    # Measured 2026-08-16 on this host, one session, positive control live:
+    # under twelve busy-loop CPU competitors the `-TERM` arm failed **6 of 6**
+    # runs of tests/test-codex-shim.sh with the signature
+    # `payload.N.json: No such file or directory`; the `-KILL` arm failed **0**.
+    # The paired figures the investigation recorded on its own rig — three runs
+    # of 12 giving 0 misses and 0 subshell entries against `-TERM`'s 3 — stand
+    # unchanged. 0 bounds the race; it does not prove closure.
+    #
+    # DO NOT RE-MEASURE THIS WITH A BARE FORK LOOP: THAT INSTRUMENT READS ZERO
+    # IN BOTH ARMS AND LOOKS LIKE A REFUTATION. An isolated
+    # `( trap - EXIT; sleep …) & kill -TERM $!` harness reproduces the EXIT-trap
+    # entry only when the kill is IMMEDIATE — measured at 11/50, 4/50 and 29/50
+    # with no delay at all, and **0/50** with 10 ms inserted before the kill.
+    # The real window here is the one `wait "$sw_pid"` opens when the wrapped
+    # hook returns in microseconds, and any pacing at all closes it. So a probe
+    # that reads 0 in the `-TERM` arm has NO POSITIVE CONTROL and cannot detect
+    # the event it is testing for; the arm that must fail first is the unfixed
+    # one, and on a quiet host it will not. This host read **0/8** unloaded and
+    # **6/6** under load, on the identical unfixed shim.
     #
     # `9>&-` closes the saved stderr for the killer, and that IS a correctness
     # fix. Descriptor 9 is a dup of the caller's stderr, so anything holding it
@@ -401,7 +436,13 @@ shim_watch() {
   wait "$sw_pid" >/dev/null 2>&1
   sw_rc=$?
   if [ -n "$sw_killer" ]; then
-    kill -TERM "$sw_killer" >/dev/null 2>&1
+    # `-KILL`, NOT `-TERM`, AND IT IS THE FIX FOR A LIVE RACE RATHER THAN A
+    # STYLE CHOICE — the argument, the measurement and the null-instrument
+    # warning are all at THE PORTABLE ALTERNATIVE in the block above. In one
+    # line: the killer inherits this script's EXIT trap, `trap -` is not atomic
+    # with the fork, and a SIGTERM that lands first makes the killer `rm -rf`
+    # the parent's temp directory mid-loop. SIGKILL cannot run a trap.
+    kill -KILL "$sw_killer" >/dev/null 2>&1
     wait "$sw_killer" >/dev/null 2>&1
   fi
   return "$sw_rc"
