@@ -232,24 +232,74 @@ shim_block() {
 # step and used to bound each one. `date +%s` is whole seconds — coarse, and
 # portable to bash 3.2 without `date +%s%N` or `EPOCHREALTIME`.
 # ---------------------------------------------------------------------------
-SHIM_START="$(date +%s)"
+# MILLISECONDS, BECAUSE WHOLE SECONDS MADE THE VERDICT NON-DETERMINISTIC.
+# `date +%s` truncates, so the recorded start could be up to a second earlier
+# than the real one and the effective budget was `(N-1, N]` rather than `N`.
+# Measured on a 1.2 s workload under a declared 2 s budget: **allowed 22 of 24
+# runs and refused 2 of 24** — the same input, nothing changed, two different
+# verdicts. `track-edits` is the only shipped hook with a 2 s budget, so this was
+# reachable with what Kinglet ships, and an intermittent gate is worse than a
+# strict one: this repository's own guide records a flake that three implementers
+# each dismissed before anyone found it was deterministic under load.
+#
+# GNU `date` has `%N`; BSD/macOS `date` prints a literal `N`, so the resolution
+# is detected once rather than assumed, and the whole-second behaviour is the
+# documented fallback there. `%s%N` is always the seconds followed by exactly
+# nine zero-padded digits, so stripping six characters yields milliseconds
+# without arithmetic on a value that could overflow.
+if case "$(date +%N 2>/dev/null)" in ''|*[!0-9]*) true ;; *) false ;; esac; then
+  SHIM_HAVE_MS=no
+else
+  SHIM_HAVE_MS=yes
+fi
 
-# Seconds left in the invocation budget. `-1` means "no budget was set", which
-# is `--timeout 0`, an explicit opt-out.
-shim_left() {
+shim_now_ms() {
+  if [ "$SHIM_HAVE_MS" = yes ]; then
+    snm_n="$(date +%s%N)"
+    printf '%s\n' "${snm_n%??????}"
+  else
+    printf '%s\n' "$(( $(date +%s) * 1000 ))"
+  fi
+}
+
+SHIM_START_MS="$(shim_now_ms)"
+
+# Milliseconds left in the invocation budget. `-1` means "no budget was set",
+# which is `--timeout 0`, an explicit opt-out.
+#
+# `-1` IS THE ONLY VALUE THAT MEANS UNBOUNDED, and that is the whole point of
+# this comment. This function used to clamp an expired budget to `0` while
+# `shim_watch` read `0` as "arm no watchdog" — so once the budget was gone, the
+# next step ran with NO ceiling at all. Demonstrated with a slow stdin that
+# consumed the budget before parsing began: the refusal arrived at 4.07 s
+# normally and at 12.14 s with the pre-parse check removed, the gap being an
+# unbounded parse. Two opposite meanings on one in-band number, and the only
+# thing standing between them was a check one layer up.
+shim_left_ms() {
   if [ "${HOOK_TIMEOUT:-0}" -le 0 ]; then printf '%s\n' '-1'; return 0; fi
-  sl_left=$(( SHIM_START + HOOK_TIMEOUT - $(date +%s) ))
-  [ "$sl_left" -lt 0 ] && sl_left=0
-  printf '%s\n' "$sl_left"
+  slm_left=$(( SHIM_START_MS + HOOK_TIMEOUT * 1000 - $(shim_now_ms) ))
+  [ "$slm_left" -lt 0 ] && slm_left=0
+  printf '%s\n' "$slm_left"
+}
+
+# Milliseconds as an argument `sleep` accepts. On a host without `%N` every
+# value here is already a whole number of seconds, so the fraction is `.000`.
+shim_ms_to_sleep() {
+  if [ "$1" -le 0 ]; then printf '0\n'; return 0; fi
+  printf '%s.%03d\n' "$(( $1 / 1000 ))" "$(( $1 % 1000 ))"
 }
 
 # Wait for an already-backgrounded child, killing it after $1 seconds. `$1 = 0`
 # arms no watchdog and waits indefinitely; the child is still a background job,
 # so this script stays interruptible either way.
 shim_watch() {
-  sw_secs="$1"; sw_pid="$2"
+  sw_ms="$1"; sw_pid="$2"
   sw_killer=""
-  if [ "$sw_secs" -gt 0 ]; then
+  # `-1` and ONLY `-1` means unbounded. `0` means the budget is already gone, and
+  # it arms a killer that fires at once rather than waiting forever — the caller
+  # should have refused before reaching here, so this is the fail-closed floor
+  # under that check, not a substitute for it.
+  if [ "$sw_ms" -ge 0 ]; then
     # `trap -` FIRST, and it is not tidiness. A subshell inherits this script's
     # traps, and the line below kills this one deliberately on the happy path —
     # so without the reset the killer would run shim_signal, whose FIRST act is
@@ -268,7 +318,8 @@ shim_watch() {
     # reading this script through a pipe (which is how Codex reads it) blocked
     # for the FULL timeout on every invocation, allow or refuse: the suite's own
     # shim test went from 4 s to over 150 s.
-    ( trap - EXIT TERM INT HUP PIPE; sleep "$sw_secs"; kill -TERM "$sw_pid" ) 9>&- >/dev/null 2>&1 &
+    sw_sleep="$(shim_ms_to_sleep "$sw_ms")"
+    ( trap - EXIT TERM INT HUP PIPE; sleep "$sw_sleep"; kill -TERM "$sw_pid" ) 9>&- >/dev/null 2>&1 &
     sw_killer=$!
   fi
   wait "$sw_pid" >/dev/null 2>&1
@@ -281,10 +332,22 @@ shim_watch() {
 }
 
 # Refuse if the invocation budget is gone. Called before every bounded step.
+# INITIALISED TO 0, MEANING "EXPIRED", NOT TO -1 MEANING "UNBOUNDED". This value
+# is only ever read after shim_check_budget has written it; if a future edit ever
+# reaches a bounded step without that call, the step is killed at once rather
+# than running with no ceiling. Measured with the pre-parse check deleted: at -1
+# the parse ran unbounded and a slow-stdin payload was refused at 12.4 s instead
+# of 4.1 s, so the wrong initialiser reproduced the exact defect the sentinel
+# split was meant to remove.
+SHIM_LEFT_MS=0
 shim_check_budget() {
-  scb_left="$(shim_left)"
-  [ "$scb_left" = "-1" ] && return 0
-  [ "$scb_left" -gt 0 ] && return 0
+  # The value it checked is the value the caller then uses. Reading the clock a
+  # second time cost a fork (~1 ms) and opened a window in which a boundary
+  # crossing between the two reads produced a `0` for the step — which, before
+  # the sentinel was separated, meant "unbounded".
+  SHIM_LEFT_MS="$(shim_left_ms)"
+  [ "$SHIM_LEFT_MS" = "-1" ] && return 0
+  [ "$SHIM_LEFT_MS" -gt 0 ] && return 0
   shim_block "$SHIM_NAME: the ${HOOK_TIMEOUT}s budget for $HOOK_LABEL expired $1. Refusing: a gate that did not finish checking has approved nothing, and a hook Codex stops waiting for is a silent allow. If this is a legitimately large change, split it or raise this hook's timeout in .claude/settings.json."
 }
 
@@ -385,7 +448,7 @@ SHIM_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)" || SHIM_DIR=""
 # the jq parse and the aggregate loop free to run past Codex's ceiling with every
 # individual step inside its budget — 40 000 added lines parsed for 8.4 s under a
 # 3 s budget, and 200 files ran 4.24 s against a 4 s ceiling. See the budget block
-# near shim_left() for the measurements and for why a signal cannot rescue either.
+# near shim_left_ms() for the measurements and for why a signal cannot rescue either.
 #
 # The first draft emitted the bare conversion and passed no `--timeout` at all,
 # which left the shim on its 15 s default underneath a 2–5 s Codex ceiling — so
@@ -570,8 +633,7 @@ if [ "$ROUTE" = "patch" ]; then
   shim_check_budget "before the patch envelope could be parsed"
   printf '%s' "$PAYLOAD" > "$SHIM_TMPDIR/payload.raw" \
     || shim_block "$SHIM_NAME: could not stage the payload for $HOOK_LABEL"
-  JQ_BUDGET="$(shim_left)"
-  [ "$JQ_BUDGET" = "-1" ] && JQ_BUDGET=0
+  JQ_BUDGET="$SHIM_LEFT_MS"
   jq -c '
     def flush: if .cur == null then . else (.files += [.cur] | .cur = null) end;
 
@@ -725,8 +787,7 @@ while IFS= read -r shim_line; do
   # leaving the invocation unbounded — which is how 200 files ran 4.24 s under a
   # 3 s budget with no single run anywhere near it.
   shim_check_budget "after checking $((LINE_NO - 1)) of $PAYLOAD_COUNT file(s) in this patch"
-  LOOP_BUDGET="$(shim_left)"
-  [ "$LOOP_BUDGET" = "-1" ] && LOOP_BUDGET=0
+  LOOP_BUDGET="$SHIM_LEFT_MS"
 
   run_hook "$SHIM_TMPDIR/payload.$LINE_NO.json" \
            "$SHIM_TMPDIR/out.$LINE_NO" "$SHIM_TMPDIR/err.$LINE_NO" "$LOOP_BUDGET"
@@ -749,7 +810,7 @@ while IFS= read -r shim_line; do
   fi
 
   if [ "$hook_rc" -ge 128 ]; then
-    shim_block "$HOOK_LABEL was killed by a signal (status $hook_rc) after ${LOOP_BUDGET}s of the ${HOOK_TIMEOUT}s budget remaining at that point. Refusing: a gate that did not finish has not approved anything."
+    shim_block "$HOOK_LABEL was killed by a signal (status $hook_rc) with ${LOOP_BUDGET}ms of the ${HOOK_TIMEOUT}s budget remaining at that point. Refusing: a gate that did not finish has not approved anything."
   fi
 
   if [ "$hook_rc" -ne 0 ]; then

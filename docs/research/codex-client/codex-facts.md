@@ -957,12 +957,24 @@ produced exit 2 + stderr"). The reasoning was right and it is now a measurement.
 Two live runs, same rig, same never-finishing `PreToolUse` hook (`sleep 600`),
 differing **only** in which ceiling is allowed to fire first:
 
-| Which ceiling stops the hook | `file_change` items | the file | model told |
-|---|---|---|---|
-| the wrapper's own watchdog — shim 3 s, Codex 6 s | **0** | **ABSENT** | verbatim: `BLOCKED: … was killed by a signal (status 143) …` |
-| **Codex's `timeoutSec`** — shim 60 s, Codex 4 s | **1** | **PRESENT** | *nothing* |
+| Which ceiling stops the hook | `file_change` items | the file | model told | `hook:` lines on Codex's stderr |
+|---|---|---|---|---|
+| the wrapper's own watchdog — shim **3 s**, Codex **4 s** | **0** | **ABSENT** | verbatim: `BLOCKED: … was killed by a signal (status 143) …` | **1** |
+| **Codex's `timeoutSec`** — shim **60 s**, Codex **4 s** | **1** | **PRESENT** | *nothing* | **0** |
 
-**The first version of this experiment was confounded and the numbers above are
+**Only ONE knob moves between the arms: the wrapper's own `--timeout`.** Codex's
+ceiling is held at 4 s in both, so the arms differ in the *ordering* of the two
+ceilings and in nothing else. An earlier version of this row read "Codex 6 s" for
+the first arm; that figure was real — reconstructing that config and re-reading
+`hooks/list` returns `preToolUse timeoutSec=6` — but it moved a second knob for no
+reason, so the first arm was re-run with Codex held at 4.
+
+**The `hook:` column is independent corroboration of "silent".** Codex printed a
+hook line for the call its own hook refused and **nothing at all** for the one it
+timed out — not a refusal, not a warning, not a failure. Grepping that arm's
+stderr for `hook`, `block` or `timeout` in any case returns **0**.
+
+**The first version of this experiment was also confounded, and the numbers above are
 the re-run.** It disabled the wrapper's watchdog for the second arm, which also
 changed the construct the wrapper was blocked in — a foreground hook instead of a
 backgrounded one — so the two arms differed in the ceiling *and* in whether the

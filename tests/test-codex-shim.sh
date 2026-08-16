@@ -911,6 +911,90 @@ if command -v python3 >/dev/null 2>&1; then
   fi
   assert_eq "yes" "$([ "$R3_ELAPSED" -le 3 ] && echo yes || echo no)" \
     "and the invocation stops inside its budget (${R3_ELAPSED}s of 3s), not one budget per file"
+
+  # --- A BUDGET ALREADY SPENT MUST NOT MAKE THE NEXT STEP UNBOUNDED ----------
+  #
+  # `shim_left_ms` returns 0 for "expired" and -1 for "no budget set", and
+  # `shim_watch` arms no watchdog only for -1. Those were once the same number:
+  # 0 meant BOTH "expired" and "unbounded", so once the budget was gone the next
+  # step ran with no ceiling at all.
+  #
+  # The shape that exposes it is a payload delivered slowly enough to consume the
+  # budget before parsing begins — nothing inside the shim is slow here, the
+  # clock simply ran out first. Measured with the overloaded sentinel: refusal at
+  # 12.4 s under a 3 s budget, the gap being an unbounded parse of a large
+  # envelope. Fixed: 4.1 s, which is when stdin closes.
+  SLOW_RAW="$WORK/slow-payload.json"
+  big_envelope 40000 > "$SLOW_RAW"
+  SLOW_START=$(date +%s)
+  slow_err="$( { sleep 4; cat "$SLOW_RAW"; } | bash "$SHIM" --hook "$NOOP" --timeout 3 2>&1 >/dev/null )" && slow_rc=0 || slow_rc=$?
+  SLOW_ELAPSED=$(( $(date +%s) - SLOW_START ))
+  if [ "$slow_rc" -eq 2 ] && [ -n "$slow_err" ]; then
+    pass "a budget spent before parsing begins is refused (${SLOW_ELAPSED}s, ${#slow_err} bytes)"
+  else
+    fail "a budget spent before parsing was NOT refused (exit $slow_rc, ${SLOW_ELAPSED}s)"
+  fi
+  # 4.1s fixed versus 12.4s with the sentinel overloaded; 8 separates them with
+  # room, and the assertion is about the PARSE being bounded, not about stdin.
+  assert_eq "yes" "$([ "$SLOW_ELAPSED" -le 8 ] && echo yes || echo no)" \
+    "and it refuses when the clock runs out (${SLOW_ELAPSED}s), not after an unbounded parse of the envelope"
+
+  # --- THE VERDICT MUST NOT DEPEND ON WHERE THE START FELL IN A SECOND -------
+  #
+  # `date +%s` truncates, so the recorded start could be up to a second early and
+  # the effective budget was `(N-1, N]` rather than N. Measured on a 1.2 s
+  # workload under a declared 2 s budget: allowed 22 of 24 runs, refused 2 of 24
+  # — the same input, two verdicts. `track-edits` is the only shipped 2 s hook,
+  # so it was reachable with what Kinglet ships.
+  #
+  # A 1.5 s workload under a 2 s budget is the sharpest probe available: with
+  # truncation it is refused whenever the start falls in the second half of a
+  # second, i.e. about half the time, so six runs make a regression practically
+  # certain to show. The margin is deliberate and stated rather than incidental:
+  # 0.5 s of headroom against a budget the clock can no longer shorten.
+  # SAMPLING THIS PROPERTY DOES NOT GUARD IT, AND THAT IS WHY THE PROBE BELOW
+  # LOOKS AT RESOLUTION INSTEAD. The truncation only bites when a second boundary
+  # falls inside the shim's own startup — a window of a few tens of milliseconds,
+  # so a few percent of runs. Six repetitions of a 1.5 s workload therefore catch
+  # a reverted clock only about a fifth of the time, and a mutation to whole
+  # seconds SURVIVED exactly that assertion. The repetitions are kept, cheaply,
+  # because "same input, same verdict" is the user-facing property; the guard is
+  # the resolution probe.
+  DET_HOOK="$WORK/det-hook.sh"
+  printf '#!/usr/bin/env bash\nsleep 1.5\nexit 0\n' > "$DET_HOOK"; chmod +x "$DET_HOOK"
+  DET_ALLOWED=0; DET_REFUSED=0
+  for det_i in 1 2 3; do
+    if many_files 1 | bash "$SHIM" --hook "$DET_HOOK" --timeout 2 >/dev/null 2>&1; then
+      DET_ALLOWED=$((DET_ALLOWED + 1))
+    else
+      DET_REFUSED=$((DET_REFUSED + 1))
+    fi
+  done
+  assert_eq "3" "$DET_ALLOWED" \
+    "a 1.5s workload under a 2s budget is allowed every time ($DET_ALLOWED allowed, $DET_REFUSED refused)"
+
+  # THE RESOLUTION ITSELF, PROBED THROUGH BEHAVIOUR RATHER THAN THE SOURCE.
+  #
+  # Three files against a 0.4 s hook under a 1 s budget: the third run is killed
+  # by the watchdog with a fraction of a second left, and the refusal reports how
+  # much. With a millisecond clock that number is ~143 and is not a multiple of
+  # 1000. With a whole-second clock the message does not appear at all — the
+  # budget goes 1000 -> 0 with nothing in between, so the pre-run check refuses
+  # first and no watchdog kill ever happens. Either way the observable differs
+  # deterministically, which sampling the verdict did not.
+  if case "$(date +%N 2>/dev/null)" in ''|*[!0-9]*) false ;; *) true ;; esac; then
+    RES_HOOK="$WORK/res-hook.sh"
+    printf '#!/usr/bin/env bash\nsleep 0.4\nexit 0\n' > "$RES_HOOK"; chmod +x "$RES_HOOK"
+    res_err="$(many_files 3 | bash "$SHIM" --hook "$RES_HOOK" --timeout 1 2>&1 >/dev/null)" || true
+    res_ms="$(awk 'match($0, /with [0-9]+ms/) { print substr($0, RSTART + 5, RLENGTH - 7); exit }' <<< "$res_err")"
+    if [ -n "$res_ms" ] && [ "$((res_ms % 1000))" -ne 0 ]; then
+      pass "the invocation clock has sub-second resolution (${res_ms}ms left when the watchdog fired)"
+    else
+      fail "the invocation clock looks like whole seconds (reported '${res_ms:-no watchdog kill at all}') — the effective budget becomes (N-1, N] and the same input gets two verdicts"
+    fi
+  else
+    printf '  SKIP: this host has no sub-second `date +%%N`, so the millisecond clock cannot be probed; the shim falls back to whole seconds there by design\n'
+  fi
 else
   fail "python3 unavailable — the budget bounds went unmeasured"
 fi

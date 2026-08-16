@@ -216,10 +216,15 @@ hook never silently loses budget it was declared with; subtracting would turn
 runs, same never-finishing hook, differing only in which ceiling fires first
 (`codex-facts.md`, "A hook Codex times out is a silent ALLOW"):
 
-| Which ceiling stops the hook | `file_change` | the file | model told |
-|---|---|---|---|
-| the shim's own watchdog — shim 3 s, Codex 6 s | **0** | **ABSENT** | verbatim refusal |
-| Codex's `timeoutSec` — shim 60 s, Codex 4 s | **1** | **PRESENT** | *nothing* |
+| Which ceiling stops the hook | `file_change` | the file | model told | `hook:` lines on Codex's stderr |
+|---|---|---|---|---|
+| the shim's own watchdog — shim **3 s**, Codex **4 s** | **0** | **ABSENT** | verbatim refusal | **1** |
+| Codex's `timeoutSec` — shim **60 s**, Codex **4 s** | **1** | **PRESENT** | *nothing* | **0** |
+
+Codex's ceiling is held at 4 s in both arms, so the only thing that moves is the
+shim's own `--timeout` and therefore which ceiling is lower. The stderr column is
+independent corroboration of "silent": Codex printed a hook line for the call its
+hook refused and **nothing at all** for the one it timed out.
 
 The watchdog is **armed in both arms** and merely set above Codex's ceiling in the
 second, so the shim sits in the same interruptible `wait` either way and the only
