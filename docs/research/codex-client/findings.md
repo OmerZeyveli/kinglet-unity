@@ -487,3 +487,300 @@ CODEX_HOME="$PROBE_HOME" codex exec --json --skip-git-repo-check \
 
 Raw transcripts land under `docs/research/codex-client/evidence/`, which
 `.gitignore` excludes — the verdicts are here, the credentials never are.
+
+---
+
+## Skills
+
+Kinglet ships 16 skills at `.claude/skills/<name>/SKILL.md`, flat. Derive that
+rather than trusting this sentence:
+
+```bash
+ls -d .claude/skills/*/ | wc -l
+```
+
+| Question | Verdict | Evidence |
+|---|---|---|
+| Discovered once a skill root exists | **yes** — **18 at `scope:"repo"`** after the importer runs, every one `"enabled":true`, `errors: []` | `skills/list` with `cwds` against `skillrig` |
+| App-server `skills/list` agrees with the model's self-report | **yes for all 18 repo-scope**, name for name; **no** at system scope — the model omits one built-in | `t5-selfreport` |
+| **Invoked when relevant without being named** | **yes** — a topic-appropriate skill was loaded in **5 of 5** relevant probes and in **0 of 1** control | `t5-unnamed-*`, `t5-chain`, `t5-control` |
+| Second copy needed | **one directory symlink** — `.agents/skills → ../.claude/skills` both discovers and invokes all 16. Codex reading `.claude/skills/` unaided is **refuted**. A byte copy is not needed and the importer's copy is worse than the symlink | `skillrig-nolink`, `skillrig-symlink`, `t5-symlink-input` |
+
+**Verdict: skills port, and of the surface classes measured in this wave so far they
+are the only one that needs no translation at all** — `## Hooks` above needed a shim;
+rules, commands and agents are Task 6's and unmeasured here. They need a *root* —
+`.claude/skills/` is not one — and the cheapest root that works is a symlink. The importer's own copy
+also works for discovery and invocation, but it arrives with 13 skill→skill path
+references rewritten to a directory that does not exist; the symlink route has zero
+of those, because it leaves the files untouched.
+
+Every measurement below ran under a disposable `CODEX_HOME` (mode 700, outside
+`/tmp`, a 600 copy of `~/.codex/auth.json`, removed by an EXIT trap) with
+`--ignore-user-config`, so nothing here is a fact about the owner's own skills. The
+probe rigs are real fixture Unity projects with Kinglet installed by `install.sh`,
+not hand-built directories.
+
+**No project trust was granted anywhere in this section, and skills loaded anyway.**
+That is the sharp difference from `## Hooks` above: a hook is registered and silently
+skipped until `$CODEX_HOME/config.toml` vouches for it, while a skill in an untrusted
+project is listed, injected and read. Codex says so itself in the warning
+`codex-facts.md` §F5 records — *"…are disabled in the following folders until the
+project is trusted, but skills still load"* — and every probe here is that sentence
+measured.
+
+### The 18 is 16 + 2, and the 2 are commands
+
+The repo scope reports **18** while `.claude/skills/` holds **16**. The two extras
+are not skills at all: they are the two commands the importer converts *into* skills,
+because Codex has no command surface to migrate them to.
+
+```bash
+ls .agents/skills | /usr/bin/grep '^source-command-'
+# source-command-unity-doctor
+# source-command-unity-init
+```
+
+Each is a generated `SKILL.md` whose body is the original command file under a
+`## Command Template` heading, with the frontmatter `description:` copied from the
+command's own. `externalAgentConfig/detect` reports them under `COMMANDS`, not
+`SKILLS` — 16 skills and 2 commands go in, 18 directories come out of one tree — and
+`skills/list` cannot tell them apart afterwards, because by then they are just
+directories with a `SKILL.md`.
+
+They are the *two* commands that survive the `$ARGUMENTS` drop (`codex-facts.md`
+§"Three losses"); the other seven never reach the importer at all. So the 18 is
+16 + 2 in this repository and would be 16 + N in a project whose commands differ.
+**Quote the repo-scope figure and say it is repo-scope.** The scope-mixed total is
+not stable across homes and is not a fact about Kinglet: this run's home saw 24
+(18 repo + 6 system built-ins), a home in Task 2 saw 59, the extra 35 fetched over
+the network from `plugins/cache/openai-curated-remote/`.
+
+### One skill root is required, and `.claude/skills/` is not it
+
+Three trees, one `skills/list` call, `cwds` as an array:
+
+| Rig | What it has | Repo-scope skills |
+|---|---|---|
+| `skillrig-nolink` | Kinglet installed, `.claude/skills/` with all 16, nothing else | **0** |
+| `skillrig-symlink` | the same, plus `.agents/skills → ../.claude/skills` | **16**, all `enabled:true`, `errors: []` |
+| `skillrig` | the same, after `externalAgentConfig/import` | **18**, all `enabled:true`, `errors: []` |
+
+The first row is the one that decides the ship: a project with `.claude/skills/`
+sitting right there and no `.agents/skills/` gives Codex **no** Kinglet skills. "No
+second copy — Codex reads `.claude/skills/` directly" is refuted, not unmeasured.
+
+The symlink is fully transparent in both directions. `skills/list` resolves it and
+reports the **real** path — `…/skillrig-symlink/.claude/skills/input-system/SKILL.md`,
+not the `.agents/` route — and the model then reads that real path
+(`t5-symlink-input`). One symlink, 16 skills, no duplicated bytes and nothing to keep
+in sync.
+
+Untested, and it matters for a second host: whether a directory symlink survives on
+Windows, and whether Unity's asset pipeline objects to one outside `Assets/`
+(`.agents/` is outside, so it should not import at all). Neither was measured here.
+
+### The detector, and its one false-positive class
+
+Codex has no skill *tool*. `ThreadItem`'s variant list — derived from
+`ItemCompletedNotification.json` — carries `commandExecution`, `mcpToolCall`,
+`dynamicToolCall` and fifteen others, and **no skill item**. The names and
+descriptions are injected into the model's context instead (a bare "list your skills"
+prompt is answered with **no tool call at all**, off 16 580 input tokens), and a skill
+is *loaded* when the model reads its `SKILL.md` with the shell tool. So the
+observable is a `command_execution`:
+
+```bash
+/bin/bash -lc "sed -n '1,240p' .agents/skills/using-kinglet/SKILL.md"
+```
+
+**Read the `command` field, never the raw transcript.** A loaded skill's body is
+echoed into `aggregated_output`, and Kinglet's skill bodies cite each other by path —
+which the importer rewrote to `.Codex/skills/<name>/SKILL.md`. Grepping the whole
+`.jsonl` therefore scores those citations as loads: on `t5-unnamed-save-noguide` the
+loose pattern reports four skills where two were loaded, and the two phantoms are
+paths that exist nowhere on disk. The correct derivation:
+
+```bash
+python3 - <<'PY'
+import json, re, sys
+pat = re.compile(r'[A-Za-z0-9_./-]*skills/[a-z0-9-]+/SKILL\.md')
+loaded = set()
+for line in open(sys.argv[1] if len(sys.argv) > 1 else 'evidence/t5-unnamed-save.jsonl'):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        event = json.loads(line)
+    except ValueError:
+        continue
+    item = event.get('item') or {}
+    if item.get('type') == 'command_execution':
+        loaded.update(pat.findall(item.get('command') or ''))
+print(' '.join(sorted(loaded)) or '(none)')
+PY
+```
+
+A model sentence like *"I'm using the `using-kinglet` skill"* is not evidence either.
+It happens to have been true in every probe here, but it is the model's claim about
+itself, and the whole point of the `command` field is that it is not.
+
+### Invocation, measured against a control
+
+Eight probes, one prompt each, `--sandbox read-only`, `codex-cli 0.145.0`. `skillrig`
+is the imported rig; `skillrig-noguide` is that rig with `AGENTS.md`, `CLAUDE.md`,
+`.claude/` and `.codex/` **deleted**, leaving `.agents/skills/` as the only Kinglet
+text in the tree.
+
+| Probe | Rig | Skill named in the prompt? | Skills loaded | Reads as |
+|---|---|---|---|---|
+| `t5-selfreport` | `skillrig` | asks for the list | **none** | a self-report is not a load |
+| `t5-named` | `skillrig` | yes — `save-system` | `save-system` | **detector positive control**: naming one does load it |
+| `t5-unnamed-save` | `skillrig` | no | `using-kinglet`, `source-command-unity-init` | routed by the unfilled `FILL:` markers |
+| `t5-unnamed-input` | `skillrig` | no | `using-kinglet`, `input-system` | domain skill reached |
+| `t5-unnamed-input-noguide` | `skillrig-noguide` | no | `using-kinglet`, `input-system` | same, with no project guide in the tree |
+| `t5-unnamed-save-noguide` | `skillrig-noguide` | no | `using-kinglet`, `unity-brainstorming` | the process chain's entry |
+| `t5-chain` | `skillrig` | no | `using-kinglet`, `unity-planning` | the chain's *next* hop |
+| `t5-control` | `skillrig` | no — and no skill is relevant | **none** | **the control**: not everything loads a skill |
+
+**The control is what makes the other seven rows mean anything.** `t5-control` asks
+how many lines `ProjectSettings/ProjectVersion.txt` has; the model ran `wc -l`,
+answered `2`, and loaded nothing. Without it, "the relevant skill loaded" and "a skill
+always loads" are the same observation — and `using-kinglet`'s own description says
+*"use at the start of every session"*, which is exactly the hypothesis that would have
+gone unrefuted.
+
+**The `noguide` rows are what rule out the second confound.** The imported `AGENTS.md`
+carries a *"Skills matching this project"* block naming `input-system` and
+`urp-pipeline`, so the `skillrig` rows alone cannot separate "Codex's skill index
+routed the model" from "the project guide told it to". Two things separate them.
+First, `AGENTS.md` never names `using-kinglet`, `save-system` or
+`source-command-unity-init` — `/usr/bin/grep -c` returns 0 for each — and those are
+the skills the unnamed probes loaded. Second, with `AGENTS.md`, `CLAUDE.md`, `.claude/`
+and `.codex/` deleted outright, `input-system` and `using-kinglet` were still loaded
+unnamed. The routing is Codex's own injected index, not Kinglet's guide.
+
+**The answers are Kinglet-shaped, not generic Unity advice**, which is the second half
+of the distinction the brief demanded. `t5-unnamed-input-noguide`, with no rules file
+anywhere in the tree, answered: *"The project's `InputView` should own
+`PlayerControls`, enable it in `OnEnable`, disable it in `OnDisable` … pass that value
+to the movement system through `SetMoveInput(Vector2)`; don't use the legacy `Input`
+API"* — `InputView`, `SetMoveInput`, one owner of `PlayerControls`, all of it
+`architecture.md`'s Input System section restated after reading
+`.agents/skills/input-system/SKILL.md`. Generic advice here is `Input.GetAxis`, and
+none of the five probes produced it.
+
+**The three outcomes, kept separate as required:**
+
+- **loaded** — 5 of 5 relevant unnamed probes, observable in the `command` field.
+- **Kinglet-shaped guidance produced *without* loading** — **not observed**, in any
+  probe. Every Kinglet-shaped answer here followed a read of the skill that carries it.
+- **neither** — 1 of 1 control, which is the correct outcome for that prompt.
+
+**What this is not.** Each probe is n = 1 against a stochastic model. The verdict is
+"a relevant skill is reached for", not "a relevant skill is reached for every time",
+and no probe here measured *which* skill is chosen when several are relevant. What the
+control does establish is that loading is topic-driven rather than unconditional.
+
+### What the model claims, and what the harness loaded
+
+`t5-selfreport` asked the model to list its skills; `skills/list` was asked the same
+question about the same tree.
+
+- **All 18 repo-scope skills agree, name for name.** The set difference is empty in
+  that direction.
+- **They disagree by one at system scope**: the app server reports six built-ins, the
+  model lists five, omitting `review-agent`. The app server wins — it is reading the
+  disk, the model is reporting its own context.
+
+The disagreement is small and it is in the harmless direction for Kinglet (nothing of
+Kinglet's is missing), but it is recorded because the rule that produced it is the
+load-bearing one: **a model's self-report is not evidence of what the harness loaded.**
+Both figures are scope-mixed totals; neither reproduces across homes, and neither
+should be quoted as a fact about anything.
+
+### What the importer's copy costs, and the symlink does not
+
+The skills that arrive via `externalAgentConfig/import` carry the blind
+`Claude` → `Codex` substitution `codex-facts.md` measured tree-wide. Scoped to
+`.agents/skills/` in `skillrig`:
+
+| Rewritten to | Occurrences |
+|---|---|
+| `.Codex/rules/…` | 19 |
+| `.Codex/skills/…` | 13 |
+| `.Codex/scripts/…` | 7 |
+| everything else (`.Codex/`, `settings.json`, `NOTICE.md`, `state`, `hooks`, `commands`, `agents`) | 11 |
+
+**17 of the 18 skill directories carry at least one** — `verification-before-completion`
+is the only clean one. Two of those groups matter here:
+
+- **The 19 `.Codex/rules/` references point at rules that never migrate at all** —
+  there is no `RULES` item type. A skill that says *"where this skill and the rule
+  disagree, the rule wins"* now cites a path that exists under no spelling.
+- **The 13 `.Codex/skills/…/SKILL.md` references are the process chain's own wiring**,
+  spanning 8 distinct targets. **0 of the 8 resolve. All 8 exist**, one directory
+  over, at `.agents/skills/<name>/SKILL.md`. The rewrite broke every skill→skill hop
+  in the library and reported 32 successes, 0 failures.
+
+The same references in the untouched tree — the symlink route — resolve 8 of 8.
+
+**The chain still worked in the probe, and that is not a licence to leave the paths
+broken.** `t5-chain` loaded `using-kinglet` and then `unity-planning` by its real
+path, never attempting the dead `.Codex/` one: the model routes by *name* from the
+injected index and constructs the path itself, so a dead path in the body is text it
+can work around. It worked around it in 5 of 5 probes here. That is one model, at
+n = 1 per probe, and the failure mode when it does not work around it is a silent
+`No such file or directory` mid-turn.
+
+### What this means for the ship
+
+Three things, and none of them is code:
+
+1. **A skill root must exist.** `install.sh` writes `.claude/skills/`; Codex reads
+   `.agents/skills/`. Something has to bridge them, and the measured minimum is one
+   directory symlink.
+2. **Prefer the symlink to the importer's copy.** Same discovery, same invocation,
+   zero rewritten paths, zero duplicated bytes, nothing to re-sync when a skill is
+   edited — against a copy in which 17 of the 18 skills point at directories that do
+   not exist. The trade is that the symlink route brings no `source-command-*` skills, so
+   the two commands that do cross under the importer do not cross under it.
+3. **Skills need no trust step.** Unlike hooks, nothing must be written to the user's
+   `$CODEX_HOME` for a skill to load. Whatever the hook layer's consent story becomes,
+   the skill layer does not share it.
+
+Which layer performs the bridge, and whether the two command-derived skills are worth
+generating separately, are the ship list's decisions and not this section's.
+
+### Reproducing
+
+```bash
+EV=docs/research/codex-client/evidence
+
+# 1. a real rig: fixture Unity project + a real install
+bash tests/fixtures/mkproject.sh "$EV/skillrig" --variant urp
+( cd "$EV/skillrig" && git init -q . )
+bash install.sh --project-dir "$PWD/$EV/skillrig" --yes
+
+# 2. the symlink variant, for the discovery comparison
+ln -s ../.claude/skills "$EV/skillrig-symlink/.agents/skills"
+
+# 3. ask the app server, holding stdin open past the reply, `cwds` as an ARRAY
+{ printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"clientInfo":{"name":"kinglet","version":"1"}}}' \
+  '{"jsonrpc":"2.0","method":"initialized"}' \
+  "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"skills/list\",\"params\":{\"cwds\":[\"$PWD/$EV/skillrig\"]}}"; sleep 10; } \
+  | CODEX_HOME="$PROBE_HOME" codex app-server
+#    result.data[].skills[] — count only scope=="repo", and check the echoed cwd
+
+# 4. invocation, one prompt per probe, plus the control
+bash scripts/codex-probe.sh --name t5-unnamed-save \
+  --prompt "$EV/prompt-t5-unnamed-save.txt" --workdir "$PWD/$EV/skillrig"
+bash scripts/codex-probe.sh --name t5-control \
+  --prompt "$EV/prompt-t5-control.txt"      --workdir "$PWD/$EV/skillrig"
+#    then the detector above over each NAME.jsonl — the `command` field, not the file
+```
+
+The import in step 1's rig is `externalAgentConfig/detect` chained into
+`externalAgentConfig/import` exactly as `codex-facts.md` §"What the import actually
+writes" gives it, against the rig and never against this repository. Raw transcripts
+land under `docs/research/codex-client/evidence/`, which `.gitignore` excludes.
