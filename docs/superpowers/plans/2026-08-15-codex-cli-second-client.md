@@ -2126,6 +2126,46 @@ confirmed applied before measuring and `MUTANT DID NOT APPLY` emitted explicitly
 
 ---
 
+## Task 14: `AGENTS.md` has no marked-region merge, and something now depends on it
+
+**Added 2026-08-16**, from Task 12's fix round. Task 12 raised it, closed the half it could close, and
+ruled the rest a task rather than rushing a new write path into a user-owned file inside a fix round.
+That ruling is correct and this task is the other half.
+
+**The defect.** `install.sh` generates `AGENTS.md` with `FILL:` markers and its own Next steps tell a
+Codex user to fill them. `CLAUDE.md` has marked-region merge machinery — five branches plus a
+marker-state detector, each with a state arm in `tests/test-install-ownership.sh` — and `AGENTS.md`
+has none. So the moment the user does what the installer instructs, the file is **permanently
+frozen**: no reinstall, upgrade or fix can ever update it again, silently.
+
+**Why it is not merely symmetry.** Task 9 argued the absence deliberately — *"no `separate` sibling
+and no in-place refresh arm, because there is no established convention of hand-written prose in an
+`AGENTS.md` this installer wrote."* That reasoning was sound when `AGENTS.md` carried only generated
+content. Task 12 changed the premise by making a correctness argument depend on the file: the J2-20
+exclusion holds because the always-injected `AGENTS.md` carries the `/name` translation once. So
+**reversing Task 9's decision needs a reason, not just a mechanism** — the reason is that the file is
+now load-bearing for a rule, and a frozen copy of a rule is a rule that stops being true.
+
+**What Task 12 already closed, and must not be redone.** The exclusion no longer rests on the
+freezable copy alone: `using-kinglet`'s intro block states the `/name` rule inline, and that is a
+symlinked skill no install branch can freeze. `CLAUDE.md`'s criterion names the load path, names the
+freeze mechanism, names this task as the real fix, and carries the standing instruction *"if you add a
+surface whose only correction lives in `AGENTS.md`, you are relying on a file the user can freeze —
+put it in a symlinked skill too, or qualify the surface."*
+
+**What this task must do.** Give `AGENTS.md` the treatment `CLAUDE.md` gets, or decide against it with
+an argument as explicit as Task 9's. Either way the freeze must stop being silent. Reuse
+`CLAUDE.md`'s machinery rather than writing a second one — two merge implementations over two
+generated files is how the branch's other paired readers drifted.
+
+**The guard is a fixture, not an assertion**, and this is the shape that has caught every install
+defect on this branch: install, **edit the file the way the installer told the user to**, install
+again, then assert the resulting tree is internally consistent — the user's prose preserved, the
+generated regions current, and `uninstall.sh` still able to remove what it owns and nothing else.
+`install.sh` has previously destroyed user files; that is why Task 12 refused to rush this.
+
+---
+
 ## Notes for the controller
 
 - **Write each brief just before its task is dispatched, not up front.** Tasks 4

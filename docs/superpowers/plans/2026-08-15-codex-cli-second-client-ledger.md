@@ -551,6 +551,7 @@ The event stream shape, measured against the real binary:
 | WBR | Whole-branch review + fix loop | **CLOSED** | `599792f..e76b84e` | 3 rounds, closed by ruling at round 3 rather than at the cap; both Criticals discharged; see *The whole-branch review* below |
 | 12 | The installed project does not know it is on Codex | **OPEN** | — | added 2026-08-16 from the whole-branch review's user-facing remainder; brief in the plan |
 | 13 | The record documents — residuals, floors, criteria, the guard's edge | **OPEN** | — | added 2026-08-16; owns what the fix loop closed on rather than carrying to a round 4 |
+| 14 | `AGENTS.md` has no marked-region merge | **OPEN** | — | added 2026-08-16 from Task 12's fix round, which closed the half it could and ruled the new write path a task rather than a round; Task 9's deliberate absence now needs reversing **with a reason**, because Task 12 made a correctness rule depend on the file |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
 configuration natively, Tasks 3–6 shrink and Task 8's ship list changes. Re-plan rather than
