@@ -1267,13 +1267,22 @@ assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
 # ============================================================================
 # TREE-SIZE FIGURES, AND THE EDGE OF THIS FILE'S OWN SCANNED SET
 #
-# EVERY BLOCK ABOVE CHECKS ITS NUMERALS IN A DOCUMENT: README.md, CLAUDE.md, MERGE-NOTES.md,
-# CREDITS.md, .claude/NOTICE.md, two SKILL.md files and four under docs/. Twelve paths, all `.md`.
-# `install.sh` is read above too — but only as a DERIVATION SOURCE, for the script-skip list — and no
-# block before this one asks whether a number written in it is true. That distinction is the whole
-# finding: the whole-branch review of 2026-08-16 found that **every numeral defect on the branch sat
-# outside the set whose numerals are checked** — and that the figures inside it were all correct. The
-# guard was not weak; its EDGE was where the defects lived. Four of them were tree-size figures the branch's own file
+# THE BOUNDARY THIS BLOCK EXTENDS IS **DERIVED BELOW, NOT LISTED HERE**, and that is a correction
+# rather than a style choice. The first version of this header enumerated the paths the blocks above
+# check — *"README.md, CLAUDE.md, MERGE-NOTES.md, CREDITS.md, .claude/NOTICE.md, two SKILL.md files
+# and four under docs/. Twelve paths, all `.md`."* Re-review found it wrong four ways in one
+# sentence: `CLAUDE.md` is excluded by this file's own line 385 (*"CLAUDE.md is deliberately NOT in
+# the table below"*), `.claude/NOTICE.md` appears in no claim row at all, the enumeration sums to
+# eleven while the sentence says twelve, and `DCE_QUOTING_FILES` — 940 lines above — already checks a
+# numeral in `provenance.tsv` and in **this very file**, neither of them `.md`. A hand-written census
+# of a scanned set, written by the same commit as the widening it describes, inside the block whose
+# entire subject is figures that go stale unwatched. It is replaced by `DCT_ABOVE`, which reads the
+# region above this block out of this file and is therefore incapable of the same rot.
+#
+# The finding the block exists for is unchanged: the whole-branch review of 2026-08-16 found that
+# **every numeral defect on the branch sat outside the set whose numerals are checked** — and that
+# the figures inside it were all correct. The guard was not weak; its EDGE was where the defects
+# lived. Four of them were tree-size figures the branch's own file
 # additions falsified, and the attribution is exact: 3 files added to `scripts/`, 7 to `docs/`,
 # 3 to `tests/`, and each stale number off by precisely that.
 #
@@ -1290,26 +1299,41 @@ assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
 # wave later. That is the argument for this block: an instruction to derive is executed by nobody,
 # and the repository has now watched the same request fail on the same number twice.
 #
-# THIS BLOCK SCANS `.sh` FILES AND `install.sh`, WHICH NOTHING ABOVE DOES. Two consequences:
+# THIS BLOCK SCANS SHELL SOURCES AND `install.sh`. Two consequences:
 #
-#   * The flattener strips a leading `#` per line before joining, because three of these figures
+#   * The flattener strips a leading `#` per line before joining, because most of these figures
 #     live in shell COMMENT BLOCKS wrapped across lines. Without that, a sentence spanning two
 #     comment lines reads as `… holds 11 # now …` and no pattern matches it. `awk` drains its
 #     input and `tr` drains its input, so nothing here can SIGPIPE a writer under pipefail.
-#   * `scripts/` here counts ALL TRACKED FILES, not `*.sh` — `git ls-files 'scripts/*'` is 11 while
-#     `ls scripts/*.sh` is 10. The bash-4 census block above uses the OTHER one. Two figures, one
-#     directory, both live, and reading the wrong glob is how one of them went wrong before.
+#   * `scripts/` appears here under TWO different derivations and both are live: `git ls-files
+#     'scripts/*'` is 11 (all tracked files) and `ls scripts/*.sh` is 10. The bash-4 census block
+#     above uses the second. One directory, two correct numbers, and reading the wrong glob is how
+#     one of them went wrong before — which is why each row below names the derivation it wants.
 #
-# WHAT THIS DOES NOT COVER, STATED AS A RESIDUAL RATHER THAN LEFT TO BE DISCOVERED. The review named
-# four regions outside the scanned set; this block closes two of them (`install.sh`, and `tests/*.sh`
-# comment blocks) and part of a third (ANTI-VACUITY's Shape 2 body prose, for its tree-size figures
-# only). It does NOT cover `docs/research/codex-client/*` — findings.md, codex-facts.md and that
-# directory's README. Those carry hundreds of figures that are overwhelmingly PER-RUN MEASUREMENTS
-# against transcripts that are gitignored, so they are pinned history and must not be re-derived
-# against today's tree; a guard there needs a criterion separating the live figures from the pinned
-# ones FIRST, and writing that criterion is the work, not the guard. Nor does it cover every numeral
-# in the two `.sh` files it now reads — only the two named figures. Both remainders are one row in
-# DCT_CLAIMS away once the criterion exists.
+# WHAT THIS DOES NOT COVER, STATED AS A RESIDUAL RATHER THAN LEFT TO BE DISCOVERED — and stated
+# PRECISELY, because the first version of this paragraph said `docs/research/codex-client/*` was out
+# of scope on the ground that its figures are "**overwhelmingly** per-run measurements … so they are
+# pinned history and must not be re-derived". *Overwhelmingly* was doing load-bearing work it could
+# not do: it is true of most of that directory and false of some, and under it hid a SECOND,
+# UNGUARDED COPY of the very `982` this block guards in `install.sh`. A hedge adverb is not a scope
+# statement. So:
+#
+#   * The live figures in `findings.md` that this block DOES now cover are listed in DCT_CLAIMS by
+#     name, like every other row.
+#   * What remains uncovered there is the per-run measurement class — figures counted against probe
+#     transcripts that are gitignored, which cannot be re-derived from this tree at all and must not
+#     be edited to match it. That is a genuine criterion problem: separating them from the live ones
+#     needs a rule written first, and writing that rule is the work. It is not a hedge, it is a named
+#     piece of missing infrastructure, and it is the same rule `docs/ANTI-VACUITY.md` needs for its
+#     `## The floor set` Today column.
+#   * It does not cover every numeral in the shell files it reads — only the rows named below.
+#
+# The four figures it covers in `docs/ANTI-VACUITY.md` are in that file's `### Shape 1`
+# worked-example bullets, NOT `### Shape 2`. Both this comment and the document's own new paragraph
+# said Shape 2 for one commit; derived, Shape 1 spans lines 111-219 and the figures are at 193-207,
+# while Shape 2 begins at 220. `tests/test-citations-resolve.sh` guards path citations and not
+# section citations, so nothing mechanical catches a wrong section name — which is the reason to
+# derive it once and write it down rather than repeat it from memory a second time.
 echo "--- derived counts: tree-size figures outside the .md documents ---"
 
 DCT_CLAIM_ROOT=$(git -C "$REPO_DIR" ls-files .claude 2>/dev/null | grep -c . || true)
@@ -1319,7 +1343,24 @@ DCT_EXAMPLES=$(git -C "$REPO_DIR" ls-files examples 2>/dev/null | grep -c . || t
 DCT_TEMPLATES=$(git -C "$REPO_DIR" ls-files templates 2>/dev/null | grep -c . || true)
 DCT_ROOTS=$((DCT_CLAIM_ROOT + DCT_DOCS + DCT_SCRIPTS + DCT_EXAMPLES + DCT_TEMPLATES))
 DCT_TESTS_SH=$(ls -1 "$REPO_DIR"/tests/*.sh 2>/dev/null | grep -c . || true)
-DCT_CMD_LINES=$(cat "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | grep -c '' || true)
+# `wc -l`, NOT `grep -c ''`, AND THE REASON IS THAT THE FAILURE MESSAGE BELOW TELLS THE READER TO
+# RE-DERIVE WITH `wc -l`. The two agree at 982 today only because every `.claude/commands/*.md` ends
+# in a newline; one file without a trailing newline and `grep -c ''` counts the final partial line
+# while `wc -l` does not, so the guard and its own printed remedy would disagree about the number
+# and the reader following the remedy would "fix" a correct figure. A guard whose repair instruction
+# computes a different quantity than the guard is a trap with a green suite in front of it.
+DCT_CMD_LINES=$(cat "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | wc -l | tr -d ' ')
+[ -n "$DCT_CMD_LINES" ] || DCT_CMD_LINES=0
+DCT_SKILL_DIRS=$(find "$REPO_DIR/.claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -c . || true)
+DCT_PIPE_SWEEP=$(git -C "$REPO_DIR" ls-files -- .claude/ scripts/ install.sh uninstall.sh 2>/dev/null | grep -c . || true)
+# The pathspec `tests/test-mcp-naming.sh` actually sweeps, character for character, so this guard
+# and that file cannot drift into deriving two different sets. Its `docs/*` element excludes
+# research/ and superpowers/, which is why a bare `git ls-files docs` is the wrong number here.
+DCT_MCPN_CLAUDE=$(git -C "$REPO_DIR" ls-files '.claude/*' 2>/dev/null | grep -c . || true)
+DCT_MCPN_DOCS=$(git -C "$REPO_DIR" ls-files 'docs/*' ':!docs/research/*' ':!docs/superpowers/*' 2>/dev/null | grep -c . || true)
+DCT_MCPN_TOTAL=$(git -C "$REPO_DIR" ls-files '.claude/*' 'scripts/*' 'docs/*' install.sh uninstall.sh \
+                   CLAUDE.md CONTRIBUTING.md README.md MCP-SETUP.md \
+                   ':!docs/research/*' ':!docs/superpowers/*' 2>/dev/null | grep -c . || true)
 
 # THE DERIVATION HAS TO BE ABLE TO FAIL. Run outside a git checkout, every `git ls-files` is empty,
 # five zeros sum to zero, and zero compared with zero is a green suite that inspected nothing —
@@ -1332,6 +1373,10 @@ DCT_DERIVATION="ok"
 [ "$DCT_TEMPLATES"  -ge 1 ] || DCT_DERIVATION="git ls-files templates is empty"
 [ "$DCT_TESTS_SH"   -ge 1 ] || DCT_DERIVATION="no .sh files under \$REPO_DIR/tests"
 [ "$DCT_CMD_LINES"  -ge 1 ] || DCT_DERIVATION="\$REPO_DIR/.claude/commands/*.md is empty, so the line count is not a subject"
+[ "$DCT_SKILL_DIRS" -ge 1 ] || DCT_DERIVATION="no skill directories under \$REPO_DIR/.claude/skills"
+[ "$DCT_PIPE_SWEEP" -ge 1 ] || DCT_DERIVATION="the pipeline-detector sweep pathspec matches nothing"
+[ "$DCT_MCPN_TOTAL" -ge 1 ] || DCT_DERIVATION="the mcp-naming pathspec matches nothing"
+[ "$DCT_MCPN_DOCS"  -ge 1 ] || DCT_DERIVATION="the mcp-naming docs/* element (less research and superpowers) matches nothing"
 assert_eq "ok" "$DCT_DERIVATION" \
   "the tree-size figures are derived from a tree that actually has files in it"
 
@@ -1343,20 +1388,74 @@ docs/ANTI-VACUITY.md	.docs/. alone holds [*][*][0-9]+[*][*]	$DCT_DOCS
 docs/ANTI-VACUITY.md	.tests/. holds [*][*][0-9]+[*][*] ..sh. files	$DCT_TESTS_SH
 tests/test-provenance-origins.sh	and holds [0-9]+ now	$DCT_SCRIPTS
 tests/test-no-mobile.sh	holds [0-9]+ tracked today	$DCT_DOCS
-install.sh	so [0-9]+ lines of Unity diagnostics	$DCT_CMD_LINES"
+install.sh	so [0-9]+ lines of Unity diagnostics	$DCT_CMD_LINES
+tests/test-mcp-naming.sh	[Tt]he pathspecs list [0-9]+ tracked paths: .[.]claude/[*]. [0-9]+, .scripts/[*]. [0-9]+, .docs/[*]. [(]less research/ and superpowers/[)] [0-9]+	$DCT_MCPN_TOTAL,$DCT_MCPN_CLAUDE,$DCT_SCRIPTS,$DCT_MCPN_DOCS
+tests/test-pipeline-detector.sh	[0-9]+ tracked paths is nowhere near ARG_MAX	$DCT_PIPE_SWEEP
+tests/test-mcp-doc-instructions.sh	against [0-9]+ tracked paths under .[.]claude/. today	$DCT_MCPN_CLAUDE
+docs/research/codex-client/findings.md	[(][0-9]+ lines of Unity diagnostics	$DCT_CMD_LINES
+docs/research/codex-client/findings.md	command bodies are [*][*][0-9]+[*][*] lines	$DCT_CMD_LINES
+docs/research/codex-client/findings.md	while .[.]claude/skills/. holds [*][*][0-9]+[*][*]	$DCT_SKILL_DIRS
+docs/research/codex-client/findings.md	where .[.]claude/skills/. holds [0-9]+	$DCT_SKILL_DIRS"
 
-# THE WIDENING IS ASSERTED, NOT ASSUMED. Every block above this one reads a `.md` file; if a later
-# edit quietly narrows this table back to documents, the review finding it exists for is reopened
-# with nothing red. The claim is that this table reaches install.sh and at least two `.sh` files.
+# THE WIDENING IS ASSERTED AGAINST A DERIVED BOUNDARY, NOT AGAINST A WRITTEN ONE.
+#
+# `DCT_ABOVE` is every path-shaped literal appearing in this file BEFORE this block — deliberately
+# OVER-INCLUSIVE: it collects paths merely mentioned in a comment as well as paths whose numerals are
+# genuinely checked. Over-inclusion is the safe direction. The claim below is that this block's
+# scanned set contains a path that does not appear above it AT ALL, which is strictly stronger than
+# "a path no block above checks", and it cannot be inflated by a mention. If a later edit narrows
+# this table back to documents already handled above, that difference empties and this reds.
+#
+# This replaces a hand-written census that was wrong four ways on the day it shipped. The lesson is
+# in the header; the mechanism is here. `sed` and `sort` both drain their input.
 DCT_SCANNED=$(cut -f1 <<< "$DCT_CLAIMS" | sort -u)
-DCT_NON_MD=$(grep -cv '[.]md$' <<< "$DCT_SCANNED" || true)
+DCT_BLOCK_LINE=$(grep -n '^# TREE-SIZE FIGURES, AND THE EDGE' "$REPO_DIR/tests/test-derived-counts.sh" | cut -d: -f1)
+DCT_ABOVE=$(awk -v stop="${DCT_BLOCK_LINE:-0}" 'NR < stop' "$REPO_DIR/tests/test-derived-counts.sh" \
+            | grep -oE '[A-Za-z0-9_./-]+\.(md|tsv|sh)' \
+            | sed 's|^\$REPO_DIR/||' | sort -u)
+DCT_NEW=$(comm -23 <(printf '%s\n' "$DCT_SCANNED") <(printf '%s\n' "$DCT_ABOVE"))
+DCT_NEW_N=$(printf '%s' "$DCT_NEW" | grep -c . || true)
+
+# The derivation's own floor, before it is used as an oracle: an anchor that stopped matching gives
+# `stop=0`, `DCT_ABOVE` empty, and then EVERY scanned path looks new — a green assertion over a
+# reader that read nothing.
+DCT_ABOVE_N=$(printf '%s' "$DCT_ABOVE" | grep -c . || true)
+if [ -n "$DCT_BLOCK_LINE" ] && [ "$DCT_ABOVE_N" -ge 10 ]; then DCT_ABOVE_OK=1; else DCT_ABOVE_OK=0; fi
+assert_eq "1" "$DCT_ABOVE_OK" \
+  "the region above this block was actually read ($DCT_ABOVE_N path literals) — an anchor that stopped matching would make every path below look new and this assertion vacuous"
+
 DCT_HAS_INSTALL="no"
 grep -qxF -- "install.sh" <<< "$DCT_SCANNED" && DCT_HAS_INSTALL="yes"
 assert_eq "yes" "$DCT_HAS_INSTALL" \
   "the tree-size guard CHECKS A NUMBER IN install.sh — every block above reads that file only for its skip list, so a user-facing derived count sat there unchecked and stayed wrong through the wave that corrected its source"
-if [ "$DCT_NON_MD" -ge 3 ]; then DCT_WIDE=1; else DCT_WIDE=0; fi
+if [ "$DCT_NEW_N" -ge 1 ]; then DCT_WIDE=1; else DCT_WIDE=0; fi
+if [ "$DCT_WIDE" -ne 1 ]; then
+  printf '     %s\n' "every path this block scans is already named above it — the widening has been narrowed away"
+fi
 assert_eq "1" "$DCT_WIDE" \
-  "…and at least three non-.md files ($DCT_NON_MD), so this block still covers shell sources whose numerals nothing else in this file examines"
+  "…and it reaches $DCT_NEW_N path(s) this file does not mention anywhere above this block, so the widening is real rather than a restatement of what was already covered"
+
+# BY REGION, NOT ONLY BY COUNT — and this is here because a mutation showed the count alone is not
+# enough. Deleting the four `docs/research/codex-client/` rows and the two other new `tests/*.sh`
+# rows in one edit left the assertion above GREEN: `tests/test-no-mobile.sh` is still in the table
+# and still unmentioned above, so the difference stayed non-empty while the coverage this block was
+# built for was gone. A count cannot express "still reaches both places the widening was for". The
+# two regions are named because they are the two the review identified as outside every scanned set,
+# and a region is a stable thing to assert where a number is not.
+DCT_HAS_TESTS="no"; DCT_HAS_RESEARCH="no"
+grep -qE '^tests/' <<< "$DCT_SCANNED" && DCT_HAS_TESTS="yes"
+grep -qE '^docs/research/' <<< "$DCT_SCANNED" && DCT_HAS_RESEARCH="yes"
+assert_eq "yes" "$DCT_HAS_TESTS" \
+  "…and it still reaches tests/ — the comment blocks in this suite's own files, where two figures went stale in a paragraph instructing the reader to derive them"
+assert_eq "yes" "$DCT_HAS_RESEARCH" \
+  "…and docs/research/, where a second unguarded copy of install.sh's own command-body line count was hiding behind the word 'overwhelmingly' in this block's first residual statement"
+
+# ROW DELETION IS SILENT, AND SAYING SO IS THE HONEST END OF THIS SECTION. Nothing above notices a
+# single claim row being removed: the vacuity check only fires for a row whose FILE still exists and
+# whose phrasing has gone, so deleting the row deletes its own guard with it. That is a property of
+# every claims table in this file, not of this one, and it is why the region assertions above are
+# worth more than the count — they are the part that survives an edit made in good faith by someone
+# tidying a table they do not know the history of.
 
 DCT_BAD=""
 DCT_VACUOUS=""

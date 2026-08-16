@@ -727,6 +727,8 @@ assert_eq "0" "$TSD_SYM_OK_RC" \
 # Repointed: ours no longer. `-e` and `-L` are both true, so this cannot be answered by existence —
 # only by reading the mode column and comparing the target.
 TSD_SYM_ONE=$(awk -F'\t' '$3 == "symlink" { print $1; exit }' "$TSD_SYM_RECEIPT")
+TSD_SYM_WANT=$(awk -F'\t' '$3 == "symlink" { print $2; exit }' "$TSD_SYM_RECEIPT")
+TSD_SYM_SKILL=$(basename "$TSD_SYM_ONE")
 TSD_SYM_OTHER=$(awk -F'\t' '$3 == "symlink" { n++; if (n == 2) { print $2; exit } }' "$TSD_SYM_RECEIPT")
 rm -f "$TSD_SYM/$TSD_SYM_ONE"
 ln -s "$TSD_SYM_OTHER" "$TSD_SYM/$TSD_SYM_ONE"
@@ -738,19 +740,59 @@ assert_eq "" "$(tsd_missing "$TSD_SYM_REPOINT_OUT")" \
 assert_eq "1" "$(tsd_modified "$TSD_SYM_REPOINT_OUT")" \
     "…it is MODIFIED, decided by the recorded target and not by a checksum a directory symlink cannot have"
 
-# Dangling: the `-L` disjunct, alone. `-e` is false through a broken link, so an `-e`-only fix
-# reports this one missing — which is the shape uninstall.sh's own classifier names as the case it
-# most wants to see.
+# Repointed at a target that does not exist. THIS STATE WAS LABELLED `dangling` UNTIL 2026-08-16 AND
+# THAT WAS WRONG in a way worth keeping the correction for: the link here points somewhere we never
+# pointed it, so the verdict comes from the `readlink` comparison and NOT from the `-L` disjunct,
+# and the row would be MODIFIED whether `-L` were present or not. It tests the target comparison
+# under a broken target, which is worth testing — it just is not the `-L` case, and calling it that
+# left the `-L` disjunct with no assertion of its own. The state below is the real one.
 rm -f "$TSD_SYM/$TSD_SYM_ONE"
 ln -s "../../.claude/skills/no-such-skill-$$" "$TSD_SYM/$TSD_SYM_ONE"
 if [ -L "$TSD_SYM/$TSD_SYM_ONE" ] && [ ! -e "$TSD_SYM/$TSD_SYM_ONE" ]; then TSD_SYM_DANGLE=1; else TSD_SYM_DANGLE=0; fi
 assert_eq "1" "$TSD_SYM_DANGLE" \
-    "the fixture reaches the state under test — the link is present and its target is not, so -e is false and -L is true"
+    "the fixture reaches the state under test — the link points at a target that does not exist, so -e is false and -L is true"
 TSD_SYM_DANGLE_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_SYM" 2>&1)
 assert_eq "" "$(tsd_missing "$TSD_SYM_DANGLE_OUT")" \
-    "a dangling receipted link is still not a missing file — -L is the second disjunct for exactly this row, and an -e-only existence test would count it gone"
+    "a link with a broken target is still not a missing file — an -e-only existence test would count it gone and send the user to re-run the installer"
 assert_eq "1" "$(tsd_modified "$TSD_SYM_DANGLE_OUT")" \
-    "…and it is reported, as modified, rather than passing unnamed"
+    "…and it is reported, as modified, because the target it names is not the one we recorded"
+
+# TRULY DANGLING — the state the round's first version never built. The link is UNTOUCHED and still
+# points exactly where install.sh pointed it; the TARGET DIRECTORY is what is gone. `readlink`
+# therefore still matches the recorded value, so the TARGET COMPARISON CANNOT SEPARATE THIS FROM A
+# HEALTHY LINK and `-L` is the only test that sees anything unusual at all.
+#
+# THAT IS THE DISTINCTION, AND IT IS NOT THE ONE THIS COMMENT FIRST CLAIMED. It said this was "the
+# only state in this section where dropping `-L` changes the verdict" — measured false in the same
+# hour by the mutation that was supposed to confirm it: `-e`-only reds FOUR assertions, two here and
+# two in the repointed state above, because `-e` is false through ANY broken link and both states
+# have one. `-L` is load-bearing in both. What is unique here is what happens AFTER existence: the
+# repointed link is then caught by the target comparison, and this one is not — so this is the state
+# whose entire verdict rests on `-L`, rather than the only state that needs it.
+#
+# THE ASSERTED OUTCOME IS `VERIFIED`, AND THAT IS A DELIBERATE LIMIT RATHER THAN AN OVERSIGHT. The
+# link row's question is ownership, the same question uninstall.sh asks of the same row; naming a
+# missing target is the job of the target's OWN receipt rows, which fire as MISSING in any receipt
+# install.sh actually writes. This section removes them on purpose so that the link row is the only
+# thing that can speak — see scripts/studio-doctor.sh's own paragraph, which states the residual.
+# If a later change makes the doctor name this state, this assertion is the one that must be
+# rewritten, and it should be, rather than deleted.
+rm -f "$TSD_SYM/$TSD_SYM_ONE"
+ln -s "$TSD_SYM_WANT" "$TSD_SYM/$TSD_SYM_ONE"
+rm -rf "$TSD_SYM/.claude/skills/$TSD_SYM_SKILL"
+grep -v "^\.claude/skills/$TSD_SYM_SKILL/" "$TSD_SYM_RECEIPT" > "$TSD_SYM_RECEIPT.tmp" && mv "$TSD_SYM_RECEIPT.tmp" "$TSD_SYM_RECEIPT"
+if [ -L "$TSD_SYM/$TSD_SYM_ONE" ] && [ ! -e "$TSD_SYM/$TSD_SYM_ONE" ] \
+   && [ "$(readlink "$TSD_SYM/$TSD_SYM_ONE")" = "$TSD_SYM_WANT" ]; then TSD_SYM_TRUE=1; else TSD_SYM_TRUE=0; fi
+assert_eq "1" "$TSD_SYM_TRUE" \
+    "the fixture reaches the state under test — the link still points where install.sh pointed it and the target directory is gone, which is the only state where -L alone decides"
+TSD_SYM_TRUE_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_SYM" 2>&1)
+TSD_SYM_TRUE_RC=$?
+assert_eq "" "$(tsd_missing "$TSD_SYM_TRUE_OUT")" \
+    "a truly dangling receipted link is NOT reported missing — this is the -L disjunct doing its whole job, and without it the link on disk would be called gone"
+assert_eq "" "$(tsd_modified "$TSD_SYM_TRUE_OUT")" \
+    "…and not modified either: it points where we pointed it, so by the receipt's own ownership test it is still ours"
+assert_eq "0" "$TSD_SYM_TRUE_RC" \
+    "…and the doctor exits 0 over it — the documented limit, measured, not assumed: naming the missing target belongs to that skill's own receipt rows, which this state deleted"
 
 # Removed: the negative control. Delete `[ -e ] || [ -L ]` entirely and every assertion above stays
 # green; this one does not.

@@ -131,14 +131,21 @@ added to any of them fails here instead of quietly widening the gap. One trap th
 earlier mis-statement: `tests/*.sh` is **not** `tests/test-*.sh` — it counts `run-tests.sh`, which is
 why the tests figure sits one above the suite's file count.
 
-**Two regions of this document are guarded, and the difference from the rest is not that everything
-else is pinned.** This section is one; the four tree-size figures under `### Shape 2` — the five-root
-total, its `docs` and `scripts` components, and the `tests/*.sh` count — are the other, added
-2026-08-16 by the same file after they went stale by the same mechanism as this census, in the same
-wave. That sentence read *"the guard covers this section and nothing else in this document"* until
-then, and it was made false by the round that widened the guard rather than by any later drift —
-which is why it now names the regions instead of counting them, and why anything guarded here
-should be added to this list in the commit that guards it. Some other figures are pinned —
+**More than one region of this document is guarded, and the difference from the rest is not that
+everything else is pinned.** This section is one. The tree-size figures in the worked-example
+bullets of `### Shape 1` — the five-root total, its `docs` and `scripts` components, and the
+`tests/*.sh` count — are another, added 2026-08-16 after they went stale by the same mechanism as
+this census, in the same wave. Both are guarded by `tests/test-derived-counts.sh`; **ask that file
+which figures here it reads, rather than trusting this paragraph to have kept up.** Its tree-size
+block prints every claim it checks when one goes wrong, and a row naming this document is what makes
+the claim above true.
+
+That sentence read *"the guard covers this section and nothing else in this document"* until
+2026-08-16, and it was falsified by the round that widened the guard rather than by any later drift.
+Its replacement then said **"Two regions"** — a count, in the document that rules a count must be
+derived and never quoted, describing a set that grows every time someone adds a row. The count is
+gone for that reason: a list with no number cannot disagree with the tree about how long it is, and
+the pointer to the guard is what a reader should follow anyway. Some other figures are pinned —
 `## The measured class` records a past
 sweep whose own table sums to 39, and `15 hooks and 4 scripts were cut` records a past wave — but
 `## The floor set`'s `Today` columns are **dated snapshots that are known to be stale**, including

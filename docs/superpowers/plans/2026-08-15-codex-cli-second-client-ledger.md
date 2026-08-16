@@ -138,9 +138,39 @@ proportional to loop length.
 
 **Exposure while it was open, as a number rather than a mood:** `tests/test-codex-shim.sh` alone
 failed roughly **25 %** of runs; the full suite hit it in **2 of 3**. It was **fail-closed** — the
-invocation still refused, it lost the *count*. That advice — *expect the red* — is now withdrawn: a
-red in this file is a real break again, which is the whole reason the one-word fix was worth
-spending a task on.
+invocation still refused, it lost the *count*.
+
+**The withdrawal of *expect the red*, scoped to what is actually defensible.** *A red in the budget
+assertion — "the refusal names how many of the envelope's files were checked" — is a real break
+again.* That is the claim the measurements support and it is the whole reason the one-word fix was
+worth a task.
+
+**It is NOT a claim about the whole file, and the round that wrote it said more than it could
+defend.** The first version of this paragraph read *"a red in this file is a real break again"*.
+Re-review then hit a different red in the same file, in a full-suite run:
+
+> `--- codex shim: a signal lands on a refusal ---` · `FAIL: SIGHUP did NOT refuse (exit 0, 0 bytes)`
+
+It is **not** the flake's signature, not the budget assertion, and not attributable to any mutation
+live at the time. **One unreproduced red, 2026-08-16.** The follow-up ruled on 2026-08-16 by the same
+round that wrote the over-broad sentence:
+
+- Not reproduced in the re-review's four further executions under two-way self-concurrency.
+- Not reproduced by a dedicated probe running that block's loop body character-for-character with the
+  signal as a parameter: **0 of 25 iterations per signal** on a quiet host, then **0 of 12 per signal
+  in each of three concurrent instances**. SIGHUP totals **0 of 61**.
+- **All four arms read zero, so that probe has no positive control** and cannot distinguish "the
+  event does not occur" from "this instrument cannot see it". By the same standard this ledger
+  applies to the killer race two paragraphs up, it proves nothing. It is recorded as a negative
+  result, not as a refutation.
+- One mechanism was tested and eliminated rather than assumed: that `set -m` makes `$!` name the
+  pipeline's *first* process (`printf`), which would produce exactly `exit 0, 0 bytes` when `wait`
+  reaps the long-gone writer. Measured on this host — `$!` is the **last** process with and without
+  job control, and the kill lands on the shim in both. Not the cause.
+
+**So: the signal block carries an unexplained, unreproduced red, and this entry says so rather than
+rounding it to zero.** Do not read a red there as expected; do read it as unexplained, and add the
+run to this list.
 
 **The fix is NOT one line IN THE `BASHPID` SPELLING, which is why THAT one was correctly refused —
 and it is still refused today.** The obvious spelling —

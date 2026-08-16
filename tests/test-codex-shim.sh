@@ -767,6 +767,22 @@ echo "--- codex shim: a signal lands on a refusal, not a silent allow ---"
 SIGHOOK="$WORK/sig-hook.sh"
 printf '#!/usr/bin/env bash\nsleep 45\n' > "$SIGHOOK"; chmod +x "$SIGHOOK"
 
+# ONE UNEXPLAINED RED HAS BEEN SEEN HERE, AND IT IS RECORDED RATHER THAN ROUNDED OFF.
+# 2026-08-16, inside a full-suite run: `FAIL: SIGHUP did NOT refuse (exit 0, 0 bytes)`.
+# It is NOT the killer-subshell race fixed in scripts/codex-hook-shim.sh the same
+# day — that one has a different signature (`payload.N.json: No such file or
+# directory`) and a different assertion. Follow-up, same day: not reproduced in four
+# further executions under two-way self-concurrency, and not reproduced by a probe
+# running this loop body character-for-character with the signal as a parameter —
+# 0 of 25 iterations per signal on a quiet host, then 0 of 12 per signal in each of
+# three concurrent instances, SIGHUP 0 of 61 in total. ALL FOUR ARMS READ ZERO, so
+# that probe has no positive control and proves nothing; it is a negative result.
+# One mechanism was eliminated rather than assumed: `$!` under `set -m` still names
+# the LAST process of the pipeline on this host (measured both ways), so the kill
+# lands on the shim and not on the long-gone `printf`, which would have explained
+# `exit 0, 0 bytes` exactly. If you meet this red, add your run to the ledger's
+# entry — do not treat it as expected, and do not treat it as the fixed race.
+#
 # `set -m` IS LOAD-BEARING AND THE SIGINT ROW IS WHY. POSIX requires a
 # non-interactive shell to start an ASYNC job with SIGINT and SIGQUIT set to
 # SIG_IGN, and bash cannot trap a signal that was ignored on entry — so without

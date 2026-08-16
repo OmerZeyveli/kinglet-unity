@@ -405,9 +405,36 @@ else
   # 2026-08-16 on a clean `--client codex --yes` fixture, run immediately after the installer
   # reported success: `FAIL 16 receipted file(s) missing — re-run install.sh`, rc=1, with all 16
   # present on disk. The remedy that message prints reproduces the identical state, so a user who
-  # follows install.sh's own Next step 4 loops. `-L` is the second disjunct rather than a
-  # replacement because `-e` is false through a DANGLING link, and a dangling link of ours is a real
-  # defect this check should name rather than skip.
+  # follows install.sh's own Next step 4 loops.
+  #
+  # `-L` IS THE SECOND DISJUNCT RATHER THAN A REPLACEMENT BECAUSE `-e` IS FALSE THROUGH A DANGLING
+  # LINK — and what that buys is that such a row is not called MISSING, which would be wrong twice
+  # over: the link is on disk and it is still ours, and the remedy `re-run install.sh` would be
+  # printed for something install.sh's own prune loop already handles.
+  #
+  # WHAT IT DOES NOT BUY, STATED BECAUSE THIS COMMENT CLAIMED THE OPPOSITE FOR ONE COMMIT. It said
+  # "a dangling link of ours is a real defect this check should name rather than skip". This check
+  # does not name it. A link still pointing where we pointed it passes the `readlink` test in the
+  # `toolkit` arm below and is counted VERIFIED, target or no target. Measured 2026-08-16 on a
+  # `--client codex` fixture with `.claude/skills/addressables/` deleted and that skill's own receipt
+  # rows removed so the link row was the only thing that could report:
+  # `PASS Install intact: 98 file(s) verified against the receipt`, rc 0, with a dangling link on
+  # disk.
+  #
+  # THAT IS THE RIGHT BEHAVIOUR HERE AND THE COMMENT WAS THE DEFECT, for three reasons. (1) The link
+  # row's question is ownership — "does it still point where we pointed it" — and it is deliberately
+  # the same question `uninstall.sh` asks, so that one receipt is not read two ways; making this file
+  # answer a different one re-opens the drift this fix closed. (2) In the shipped configuration the
+  # state IS named, by the target's own rows: with the receipt intact, deleting that skill directory
+  # gives `FAIL 1 receipted file(s) missing`, rc 1. The silent reading above requires deleting those
+  # rows, which is not a state install.sh can produce. (3) A third bucket — present, ours, pointing
+  # at nothing — is a new count and a new message on a shipped health check, which is a behaviour
+  # change and not a comment fix.
+  #
+  # The residual, so it is not rediscovered: a receipt that has lost a skill's own rows while keeping
+  # its link row reports that link as verified. `uninstall.sh` is the file whose paragraph says a
+  # dangling link "is exactly what we most want to remove" — and it does remove it. That sentence is
+  # true there and was copied here, where it is not.
   #
   # This is uninstall.sh's grammar, deliberately — see its classifier's own `-e`/`-L` paragraph,
   # which records the same defect on that side and fixed it there first.

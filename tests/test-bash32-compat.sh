@@ -137,11 +137,26 @@ shipped_scripts() {
 #
 # The first fix was two totals: `SS_ALL_N > 0` over SHIPPED_SCRIPT_DIRS + ROOT_SCRIPTS, and
 # `SS_PIPE_N > 0` over PIPE_CHECK_DIRS + PIPE_CHECK_FILES. Five sources summed into one number and
-# four into another. `tests/` alone holds 39 files and `scripts/` holds 8, so BOTH totals cleared
-# with `.claude/hooks/` — the directory this file was originally written for — completely empty.
-# MEASURED 2026-08-14 in a clone with ZERO files under `.claude/`: **8 passed, 0 failed, rc 0**,
-# byte-identical in verdict to a healthy tree. The bash-4 and early-exit sweeps certified a payload
-# that was not there.
+# four into another. `tests/` alone HELD 39 files and `scripts/` HELD 8 **on 2026-08-14**, so BOTH
+# totals cleared with `.claude/hooks/` — the directory this file was originally written for —
+# completely empty. MEASURED that day in a clone with ZERO files under `.claude/`: **8 passed,
+# 0 failed, rc 0**, byte-identical in verdict to a healthy tree. The bash-4 and early-exit sweeps
+# certified a payload that was not there.
+#
+# THOSE TWO NUMBERS ARE PINNED, AND UNTIL 2026-08-16 THEY DID NOT SAY SO — they read "`tests/` alone
+# holds 39 files and `scripts/` holds 8", present tense, while THIS FILE'S OWN RUNTIME OUTPUT prints
+# `SHIPPED:tests=45 SHIPPED:scripts=10` on every single run. A whole-branch review flagged the
+# contradiction; the ruling is that the figures are pinned and the TENSE was the defect, not the
+# values. The reason is what the sentence is for: it explains why the FIRST fix — a design this file
+# no longer has — was insufficient, and that argument was made against the tree of 2026-08-14.
+# Re-deriving them to 45 and 10 would attach today's tree to a claim about a superseded design,
+# which is exactly the error `docs/ANTI-VACUITY.md` names when it rules that a pinned figure is
+# *about another tree* and must not be edited to match this one. So the verbs are past tense and the
+# date now governs both numbers explicitly.
+#
+# The live counterpart is the per-source census below, which writes no number down at all and
+# asserts only "at least one, each" — the property that cannot go stale. If you want today's
+# figures, read that line's output; do not update this paragraph.
 #
 # A floor over a summed multi-source subject cannot detect one source dying, however tight the
 # number — see docs/ANTI-VACUITY.md. So the census is per source: every directory in either array

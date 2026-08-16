@@ -43,11 +43,23 @@ SHIPPED_SERVER=$(awk -F'"' '/^ *"[A-Za-z]*MCP": \{/ {print $2; exit}' "$REPO_DIR
 # it produces exactly that state.
 #
 # The rc is captured rather than promoted, and the list is counted. An unreadable index is a named
-# failure; a list that is merely SHORT is a floor failure. Measured 2026-08-14, the pathspecs list
-# 82 tracked paths: `.claude/*` 62, `scripts/*` 8, `docs/*` (less research/ and superpowers/) 6, and
+# failure; a list that is merely SHORT is a floor failure. The pathspecs list
+# 86 tracked paths: `.claude/*` 62, `scripts/*` 11, `docs/*` (less research/ and superpowers/) 7, and
 # the six named root files. The floor is 40 — below `.claude/*` alone, so no plausible surface
 # removal trips it, and above every other root combined, so a pathspec typo that drops `.claude/*`
 # (the root carrying the agents whose `tools:` lines are the original defect) does.
+#
+# THIS SENTENCE READ "Measured 2026-08-14, the pathspecs list 82 … `scripts/*` 8 … `docs/*` … 6"
+# UNTIL 2026-08-16, and the date is what made it look safe. It was not a pinned measurement: the
+# numbers are load-bearing for the floor argument on the next line — 40 has to sit *below* `.claude/*`
+# alone and *above* every other root combined — so they are re-read as live every time anyone checks
+# that the floor is still the right size, and a wrong reading silently invalidates the argument
+# rather than the number. `scripts/* 8 → 11` is exactly the three scripts the Codex branch added, the
+# same delta that falsified four other sites in the same wave; `docs/* 6 → 7` was already stale
+# before it. The figure is now DERIVED AND GUARDED in tests/test-derived-counts.sh's tree-size block,
+# against the identical pathspec — including the `:!docs/research/*` and `:!docs/superpowers/*`
+# exclusions, without which the `docs/*` element derives a different set. The floor argument still
+# holds at the corrected values: 62 > 40 > 11 + 7 + 6 = 24.
 TMN_LIST="$(mktemp "${TMPDIR:-/tmp}/kinglet-mcp-naming.XXXXXX")"
 TMN_ERR="$(mktemp "${TMPDIR:-/tmp}/kinglet-mcp-naming-err.XXXXXX")"
 TMN_RC=0
