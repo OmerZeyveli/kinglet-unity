@@ -549,7 +549,7 @@ The event stream shape, measured against the real binary:
 | 10 | Findings synthesis, decision, debt | **DONE** | `1870afe..f729a74` | general-purpose implementer; 1 fix round; decision is **none of A/B/C** |
 | 11 | Close the probe harness's residual guard gaps | **DONE** | `84e756a..42667d0` | added during the run and grown by five later tasks; 1 fix round; **found the flake's cause** |
 | WBR | Whole-branch review + fix loop | **CLOSED** | `599792f..e76b84e` | 3 rounds, closed by ruling at round 3 rather than at the cap; both Criticals discharged; see *The whole-branch review* below |
-| 12 | The installed project does not know it is on Codex | **OPEN** | — | added 2026-08-16 from the whole-branch review's user-facing remainder; brief in the plan |
+| 12 | The installed project does not know it is on Codex | **DONE** | `195bbb1..40c3967` | general-purpose implementer; **3 fix rounds**, one of them prose-only; L-5 measured at 28 orphaned rows, not 16 |
 | 13 | The record documents — residuals, floors, criteria, the guard's edge | **OPEN** | — | added 2026-08-16; owns what the fix loop closed on rather than carrying to a round 4 |
 | 14 | `AGENTS.md` has no marked-region merge | **OPEN** | — | added 2026-08-16 from Task 12's fix round, which closed the half it could and ruled the new write path a task rather than a round; Task 9's deliberate absence now needs reversing **with a reason**, because Task 12 made a correctness rule depend on the file |
 
@@ -1215,3 +1215,98 @@ in an instructive way: `nice -n 19 timeout 420 bash -c '…' &` then `kill "$!"`
 wrapper and frees the child**, defeating the guarantee the wrapper existed to provide. Rounds 2 and 3
 generated no load at all, and the flake question was settled without any — **the instrument that
 answered it needed a quiet host, not a loud one.**
+
+---
+
+## Task 12 — close: the installed project says which client it is on
+
+Implementer: **general-purpose**. `DONE`, then **three fix rounds**. Review: **Spec ✅, Quality needs
+work** — 7 Important, 5 Minor. Commit range `195bbb1..40c3967`. Gate at close:
+`Total: 3950 · Passed: 3947 · Failed: 0 · Skipped: 3`, 45 headers = 45 files, `provenance OK`.
+
+**What shipped.** The J2-20 criterion, written into `CLAUDE.md`: a shipped surface gets a Codex
+qualification **when and only when a reader who can reach it under Codex would act on a sentence in it
+that is false or unreachable there** — reachability *and* the claim test, both halves required. It
+selected seven payload surfaces and correctly left 13 skills, 4 rules and 8 commands untouched; an
+independent derivation by the reviewer agreed on the whole negative half, which is the half that would
+have shown carpet-bombing. **The criterion caught its own author once**: a sixth `using-kinglet`
+section was written, the five-section budget reddened, and the section was deleted rather than the
+budget raised — the first time that budget has ever fired.
+
+**J2-21 declined with an argument.** The doctor scopes the trust categorical (layer 6 genuinely
+invisible; layers 3–5 report `untrusted`/`modified`) and names `hooks/list` with `cwds` as the user's
+own route, but does **not** make the call: reaching it means a markdown command file driving
+`codex app-server` over JSON-RPC, whose two measured traps each return something shaped like an answer
+— `cwd` instead of `cwds` gives a well-formed reply **about the wrong repository**, and a pipeline
+that closes stdin loses the reply, 12 of 12. A confident wrong answer is the one claim that check
+exists not to make.
+
+### L-5 was nearly twice the size the review measured
+
+Not 16 orphaned rows — **28**: 16 skill symlinks, 9 converted command skills, `AGENTS.md`,
+`.codex/hooks.json`, `.codex/config.toml`. `uninstall.sh` removed 71 of 99 and **reported success**;
+the doctor printed `PASS Install intact: 71 file(s) verified`. Both readers agreed the project was
+clean while 28 files sat on disk permanently unremovable.
+
+**Chosen behaviour: keep both layers, keep both sets of rows**, carried forward **verbatim** and only
+where the path still exists. Verbatim because re-deriving the checksum would newly claim ownership of
+a file the user edited after the Codex install — **measured, not argued**: the reviewer's counterfactual
+re-derived two shas by hand and `uninstall.sh` reported `remove 99 file(s) — unchanged since install`
+and deleted both user edits.
+
+### The three rounds, and what each cost
+
+1. **The doctor's remedy loop came back, concealing instead of reproducing.** A user told *"2 receipted
+   file(s) missing — re-run install.sh"* who followed that remedy got a **green doctor with both files
+   still missing**. Resolved as *keep dropping the row, make the drop loud on both sides* — dropping
+   stays because carrying hands a deliberate remover a doctor that fails forever. The explanatory
+   lines go through `printf`, **not `fail`**, because `fail` increments `FAIL_C` and `unity-doctor.md`
+   tells the model to read the summary line first: one fault must count as one failure.
+2. **The guard held for one path prefix.** Re-deriving shas for `AGENTS.md` and `.codex/*` while
+   leaving `.agents/skills/*` alone passed the fixture **16/16 green** and then deleted a user-edited
+   `AGENTS.md`. And the doctor's Codex-layer test was a **second spelling** of Step 8e's criterion
+   whose own comment claimed they were identical — wrong in both directions, telling a Claude-only
+   user to install a Codex layer they had never asked for. Fixed by **one function,
+   `codex_layer_path`, with four readers**; `install.sh` is not in the payload so the shipped script
+   cannot source it, so the two copies sit between named markers and the suite requires them
+   character-for-character equal, with a floor against the both-markers-renamed vacuity case.
+3. **Four sentences.** Including the measurement that replaced *"the same mechanism"*.
+
+### The freeze asymmetry, measured — and it is Task 14's justification
+
+| | `.claude/skills/using-kinglet/SKILL.md` | `AGENTS.md` |
+|---|---|---|
+| what decides | `is_modified` (Step 5 payload loop) | `owned_by_installer 'AGENTS.md' ''` (Step 8d.1) |
+| receipt row after a user edit | `user-modified` — **kept** | **none** |
+| `studio-doctor.sh` | `WARN 1 file(s) modified since install`, by name | never mentioned |
+| `uninstall.sh` | `keep 1 file(s) you modified` — left **and reported** | never reached, never reported |
+
+A frozen skill stays a file this toolkit knows about. **A frozen `AGENTS.md` stops being one, and
+silently** — the reviewer's own extra runs found the freeze is permanent across a third install and
+that the installer then stops listing it under local edits too. *"A symlinked skill no install branch
+can freeze"* was asserted twice — once by the implementer, once by me in Task 14's brief — and
+measured false both times.
+
+### Carried to Task 14 and Task 13, not deferred to a role
+
+| Item | Ruling | Owner |
+|---|---|---|
+| `CLAUDE.md`'s *"the receipt row is the whole difference"* over-states its own paragraph, its own table's first row, and the measurement — a frozen `AGENTS.md` also stops the entry document being generated at all | Safe: it **understates** the asymmetry, so nothing built on it over-claims. But it is the sentence Task 14 leans on, so Task 14's brief now carries the measured version rather than this one | **Task 14** |
+| The `99 → 97` cell is a two-file figure standing in the `AGENTS.md` column; alone it is 99 → 98. Two undated unguarded numerals in the file that says *"derive it, never quote it"* | Safe — same paragraph, same direction of error | **Task 14**, which rewrites that paragraph by construction |
+| `install.sh`'s *"the trap `CLAUDE.md` already records"* — a flattened probe over `CLAUDE.md` returns 0 for every phrasing; the trap is recorded at `install.sh:1475` and `provenance.tsv` | Safe: the lesson is right and filed, only the address is wrong | **Task 13** |
+| *"The pair is adequate"* is false in the untested direction: a shadow `codex_layer_path() { return 0; }` leaves `tests/test-install-upgrade-client.sh` at **24/24 green**, because arms 1–4 never assert a non-Codex path is *excluded*. The full suite does red on it, elsewhere | Safe — nothing ships silently. The fix is one negative-direction assertion, which is a test change and was out of scope for a prose round | **Task 13** |
+
+**Why the loop closed at three rounds rather than five.** Its crop went 4 → 2 → 5 → 3 → 4: not
+converging. Everything behavioural is finished and mutation-verified by two reviewers with disjoint
+probe shapes — 13 mutations and 13 reds in one round alone, and the predicate checked **from the
+installer rather than from the function**: 4 installs, 2 clients, 103 receipted paths, 0 false
+positives, 0 false negatives, with the Codex install adding exactly 28 files and all 28 receipted. The
+residual is four sentences that change nothing a program does, and a fifth prose round is predicted to
+trade them for two or three more.
+
+### One instrument worth reusing
+
+The byte-for-byte marker comparison **guards bytes, not behaviour**: three shadow redefinitions left
+both regions byte-identical with the equality assertion green, and it was the *behavioural* arms that
+caught all three. The comment above it now says which half of the pair is weaker. A guard that
+documents its own weaker half is more useful than one that claims neither.

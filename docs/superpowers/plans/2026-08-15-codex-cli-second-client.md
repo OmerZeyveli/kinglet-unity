@@ -2121,6 +2121,15 @@ the prose written to close them — four, then two, then five.
 - **Ledger items 8 and 14** — close them or give each a ruling that names a task. A ruling naming a
   role is not a deferral.
 
+**Two items handed over from Task 12's fix loop, both guard defects rather than prose.**
+`install.sh`'s comment cites *"the trap `CLAUDE.md` already records"* — a flattened probe over
+`CLAUDE.md` returns 0 for every phrasing; the lesson is right and filed at `install.sh:1475` and in
+`provenance.tsv`, so only the address is wrong. And `tests/test-install-upgrade-client.sh` needs **one
+negative-direction assertion**: a shadow `codex_layer_path() { return 0; }` leaves it at 24/24 green,
+because arms 1–4 all assert that Codex paths are *included* and none asserts that a non-Codex path is
+*excluded*. The full suite reds on it elsewhere, so nothing ships silently — but a guard that only
+ever tests one direction of a predicate is half a guard.
+
 **Every guard added or repaired here must be proved by mutation in both directions**, with the mutant
 confirmed applied before measuring and `MUTANT DID NOT APPLY` emitted explicitly when it is not.
 
@@ -2159,10 +2168,19 @@ one file where a frozen entry document costs the whole generated block, Project 
 included. That asymmetry is the argument for two homes, and it is the residual risk this task is
 being asked to remove — not a safety property it can assume.
 
-Do not re-derive that from scratch: `CLAUDE.md`'s criterion carries the true statement, the load path,
-the freeze mechanism, and the standing instruction that a surface whose only correction lives in
-`AGENTS.md` must get a second home **knowing that copy is freezable too**. Read it there rather than
-here, because this brief has already been wrong about it once.
+Do not re-derive that from scratch: `CLAUDE.md`'s criterion carries the load path, the freeze
+mechanism, and the standing instruction that a surface whose only correction lives in `AGENTS.md` must
+get a second home **knowing that copy is freezable too**. Read it there rather than here, because this
+brief has already been wrong about it once.
+
+**One correction to carry with you, because `CLAUDE.md` is where you will read it.** That paragraph
+concludes *"the receipt row is the whole difference"*, and it is over-stated — measured, the receipt
+row is the **sharpest** difference, not the only one. A frozen `AGENTS.md` also stops the entry
+document being generated at all, the freeze is permanent across every later install, and from the
+third run on the installer stops listing the file under local edits too. Its `99 → 97` cell is a
+two-file figure standing in a single-file column; `AGENTS.md` alone is 99 → 98. Every error there runs
+in the same direction — it **understates** the asymmetry — so nothing built on it over-claims, and
+your rewrite of that paragraph is where the measured version belongs.
 
 **What this task must do.** Give `AGENTS.md` the treatment `CLAUDE.md` gets, or decide against it with
 an argument as explicit as Task 9's. Either way the freeze must stop being silent. Reuse
