@@ -32,8 +32,12 @@ healthy suite — indistinguishable from the catastrophe the count exists to det
 
 ### GIVE THE SUITE 600000 MS. Wall-clock is host- and load-dependent, not a health signal
 
-**Observed 405–459 s across 2026-08-15/16 at load average 2.0–3.6, against 3876–3893 assertions.
+**Observed 399–459 s across 2026-08-15/16 at load average 1.5–3.8, against 3876–3895 assertions.
 A slower green run is not a regression.**
+
+**The decisive pairing: the fastest run had the most assertions** — 399 s at 3895 against 459 s at
+3876. That is the thesis of this section as a measurement rather than a claim, and it is why
+wall-clock cannot be read as a health signal.
 
 **Quote the load average and the assertion count beside any figure**, or the range widens for reasons
 no later reader can attribute. `405–434` (load unrecorded) and `430–459` (load 2.8–3.6) are not two
@@ -116,6 +120,15 @@ measured as **one leaked temp directory per invocation**, on the hook that runs 
 
 **The portable alternative, measured:** send the killer **`SIGKILL`**, which cannot run a trap.
 Paired probe, 50 forks each — `kill -TERM` **10/50** subshell EXIT-trap hits, `kill -KILL` **0/50**.
+
+**A probe that reads 0 in both arms is a null instrument, not a refutation.** The isolated fork loop
+reproduces **only when the kill is immediate** — 11/50, 4/50, 29/50 at zero delay, and **0/50 with
+10 ms inserted before the kill**. With the window shut, `-TERM` and `-KILL` become indistinguishable,
+so such a probe has no positive control and cannot detect the event it is testing for. **Whoever
+fixes this must not write a bare fork loop, read 0/50, and conclude the race is gone** — that is the
+same mistake as the comment this investigation replaced, which was right about the defence and wrong
+that nothing got past it. **This paragraph belongs in `shim_watch` beside the rest, and the
+flake-fix task should put it there.**
 
 **Owner: a dedicated task with its own review gate.** Not folded into anything, because on this
 surface a wrong change converts refusals into allows.
@@ -462,7 +475,7 @@ The event stream shape, measured against the real binary:
 | 8 | Ship the payload the measurement supports | **DONE** | `b713f09..993dee2` | general-purpose implementer; 2 fix rounds; the payload ships and its guard is 86 assertions |
 | 9 | Installer writes and removes the Codex layout | **DONE** | `b3ecfb2..ce09521` | general-purpose implementer; 2 fix rounds; writes the user's **home** for the first time in this toolkit's history |
 | 10 | Findings synthesis, decision, debt | **DONE** | `1870afe..f729a74` | general-purpose implementer; 1 fix round; decision is **none of A/B/C** |
-| 11 | Close the probe harness's residual guard gaps | open | — | **added during the run** by Task 1's completion sweep and re-review. Runs after Task 9, when the harness has stopped changing |
+| 11 | Close the probe harness's residual guard gaps | **DONE** | `84e756a..42667d0` | added during the run and grown by five later tasks; 1 fix round; **found the flake's cause** |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
 configuration natively, Tasks 3–6 shrink and Task 8's ship list changes. Re-plan rather than
