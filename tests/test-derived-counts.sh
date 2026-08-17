@@ -1970,8 +1970,13 @@ done
 # reading it out of the log. The 49/0/rc-127 figure reproduces only with errexit live inside the
 # subshell (`$-` = `ehmtuBc`), which is what the measuring harness did and what the runner does not.
 #
-# **So the hazard is real and its blast radius is elsewhere: the 29 self-contained test files that
-# set `-euo pipefail` themselves.** Here it is inert, which two comments in this same file already
+# **So the hazard is real and its blast radius is elsewhere: the self-contained test files, the ones
+# that enable errexit at their own top level.** (Not *"that set `-euo pipefail` themselves"*, which
+# was wrong twice in one clause: it carried a live count in this file's prose, against the standing
+# rule at `DCT_DECLARED`'s residual, and all but one of them write `-euo pipefail` — the odd one
+# writes bare `set -e`, so the criterion is errexit, not the spelling. The count now lives only in
+# the documents that quote it, where `DCT_SELFC`'s claim rows compare it against the tree.)
+# Here it is inert, which two comments in this same file already
 # said — see the `dck_lvl` paragraph (*"the runner does `set +e` before sourcing"*) and the
 # `dck_extra` one (*"Inert under the runner"*). The round that wrote 49/0 asserted the opposite of a
 # comment 1250 lines above it, in the same file.
@@ -2024,7 +2029,7 @@ DCW_DERIVATION="ok"
 #
 # A mangled diagnostic and a spurious error line, not a truncation. The earlier claim — *"killed the
 # whole file … 49 passes, 0 failures, every DCW assertion below never ran … a single-file run reads
-# as green"* — is **withdrawn**; it was true only with errexit live, which is the 29 self-contained
+# as green"* — is **withdrawn**; it was true only with errexit live, which is the self-contained
 # test files and not this one. Under `set -e` it does exit 127 at this line, which is why the repair
 # stays: the shape is wrong on its own terms wherever it is written.
 [ "$DCW_SKILLREF"    -ge 1 ] || DCW_DERIVATION="no Skill-tool reference under .claude/agents/"
