@@ -468,10 +468,18 @@ tiuc_eq "$TIUC_CRIT_A" "$TIUC_CRIT_B" \
 # reads the REGION, so a shadow appended AFTER the end marker — the shape that
 # started this whole thread — is invisible to it. Both halves were run:
 #
-#   shadow in scripts/studio-doctor.sh -> 24/26 here, the two behavioural arms red
-#   shadow in install.sh               -> 26/26 GREEN here; 38 red across the full
-#                                         suite, in test-install-prune.sh and
-#                                         test-studio-doctor.sh
+#   shadow in scripts/studio-doctor.sh -> 2 red here, the two behavioural arms
+#   shadow in install.sh               -> fully GREEN here; 38 red across the full
+#                                         suite, distributed 33 / 3 / 1 / 1 across
+#                                         test-install-ownership.sh,
+#                                         test-studio-doctor.sh, test-install-prune.sh
+#                                         and test-doctor-reverted.sh
+#
+# THE FIRST WRITE-UP OF THIS HAD 38 RIGHT AND THE FILES WRONG. Its harvest matched
+# only `  FAIL `, the runner's helper shape; a self-contained test file prints
+# `FAIL: `, and 33 of the 38 are in one. It saw 4 and named the two files those 4
+# were in. `tests/run-tests.sh` counts both shapes — a harvest that counts one
+# reports a subset as the whole and gives no sign of it.
 #
 # Nothing ships silently either way, and the three guards have three different
 # blind spots: the byte comparison catches a textual edit and no shadow, the

@@ -715,7 +715,14 @@ and why nothing but this comparison would have found them. A stale *Today* is no
 *Ratio* and *Survives* columns are computed from it, and those are the whole argument.
 
 **The whole column is undated since 2026-08-14 and has NOT been re-derived in this wave, so no cell
-in it should be trusted without re-running the command above.** How many are stale is unknown —
+in it should be trusted without re-running the command above.** **A fifth cell went stale on the
+Codex branch itself and is recorded here rather than patched:** the `test-bash-gate-precision.sh`
+*"payloads an earlier hook version blocked"* row reads *"170 (of 219 carrying a historic block)"*
+while that file's live assertion is now `assert_eq "220" "$tbg_hist2"` — 219 → 220 on this branch.
+It is left wrong on purpose, under the same ruling as the other four: this column is re-derived
+**whole, from one gating suite log**, and a column that is part fresh and part 2026-08-14 with
+nothing saying which is worse than one that is uniformly stale and says so. How many are stale is
+unknown —
 that is what re-deriving would establish — but **at least four** are, found by inspection rather than
 by the sweep: the `test-bash32-compat.sh` per-source row reads `13/7/42/1/1 + 13/7/1/1` where the tree
 derives `13/10/45/1/1 + 13/10/1/1`; the *What they replaced* paragraph below reads *"over 64 and 22
@@ -869,14 +876,24 @@ tabled elsewhere in this file before it was trusted; two of the eight first read
 were errors in the *verification string*, not the sweep — **the bound and its failure message sit on
 different lines**, so a line-keyed candidate list cannot be checked by grepping the message.
 
-**Thirty-four rows, thirty-four sites, thirty-five bounds, in six files.** One row carries two bounds
-(the skills/commands pair), exactly as `test-no-mobile.sh`'s per-source row does; two rows are a
-single site each over 19 and 3 sources. Four of the six files are new (`test-codex-surface.sh`,
-`test-codex-shim.sh`, `test-codex-probe.sh`, `test-install-upgrade-client.sh`) and two gained floors
-while being modified. The review that raised this said *"at least six"*; that was a lower bound from
-a hand-count of **three** files, and the fourth new file — `test-install-upgrade-client.sh`, which
-carries five — was not in it, because a review that enumerates by reading cannot see a file it did
-not open.
+**Six files.** Four of them are new (`test-codex-surface.sh`, `test-codex-shim.sh`,
+`test-codex-probe.sh`, `test-install-upgrade-client.sh`) and two gained floors while being modified.
+The review that raised this said *"at least six"* bounds; that was a lower bound from a hand-count of
+**three** files, and the fourth new file — `test-install-upgrade-client.sh` — was not in it, because
+a review that enumerates by reading cannot see a file it did not open.
+
+**No row total is written here, for the reason this section's own opening gives.** The first draft of
+this paragraph wrote one — spelled out as a word, three paragraphs after the ruling that deleted
+`83 rows`, and out of reach of every digit sweep in the repository. Derive it with the same command:
+
+```bash
+awk '/^### Added by the 2026-08-15/{f=1;next} /^## Proof/{f=0} f && /^\| `/{n++} END{print n}' docs/ANTI-VACUITY.md
+```
+
+Rows and sites and bounds are three different quantities here and always will be: one row carries two
+bounds (the skills/commands pair), exactly as `test-no-mobile.sh`'s per-source row does, and two rows
+are a single site each over many sources. Deriving any of the three means reading every row's
+assertion, which is the same ruling `## The floor set` opens with.
 
 | Guard · assertion anchor | Subject | Mechanism | Bound |
 |---|---|---|---|
@@ -923,7 +940,20 @@ sentinel rows are **one site each over 19 and 3 sources**; everything else is on
 judgement: `test-codex-surface.sh`'s *".codex/ is not tracked"* (`== 0` — **C4**, the claim is
 emptiness); its *"the home config was backed up"* (the arm's claim, not a floor under a later
 sweep); every elapsed-time bound in `test-codex-shim.sh` (`-lt 6`, `-le 5`, `-le 8` — **C1**, a
-duration is not a tree read, and **C2**, an upper bound).
+duration is not a tree read, and **C2**, an upper bound); and `test-bash-gate-precision.sh`'s new
+`assert_eq "220" "$tbg_hist2"`, which is an equality against a **literal** rather than against a
+second derivation, so **C2(d)** fails and **C4** excludes it as the claim under test.
+
+**`scripts/*.sh` GREW BY THREE FILES ON THIS BRANCH AND HOLDS NO FLOOR — swept 2026-08-17, and said
+so rather than left to be assumed.** `codex-command-to-skill.sh`, `codex-hook-shim.sh` and
+`codex-probe.sh` carry only argument and input preconditions (`[ -d "$CMD_DIR" ] || die`,
+`[ -f "$SETTINGS" ] || exit 1`, `[ $# -ge 2 ] || die`); the actual vacuity hole in each — a
+zero-result run — reaches only `info`, so **C3** fails exactly as it does for `install.sh`. The
+segment's answer is unchanged at *exactly one, `scripts/check-provenance.sh`'s* — and it was
+unchanged **and unrestated** through a wave that added three files to it, in the document whose rule
+is that a swept-and-empty segment says which. `install.sh`, `uninstall.sh` and
+`.claude/hooks/bash-gate.sh` were also modified on the branch and nothing added to them reaches an
+assertion, so those segments' standing "none" holds too.
 
 ---
 

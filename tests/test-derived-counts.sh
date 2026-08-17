@@ -471,18 +471,30 @@ CLAUDE.md	All [0-9]+ current agents	$DCS_AGENTS	-
 docs/AGENT-GUIDE.md	All [0-9]+ Agents at a Glance	$DCS_AGENTS	-
 CONTRIBUTING.md	All [0-9]+ shipping agents	$DCS_AGENTS	-"
 
-# EVERY PATTERN IN EVERY CLAIMS TABLE IN THIS FILE IS DIGIT-ONLY, AND A WORD NUMERAL IS THEREFORE
-# INVISIBLE TO ALL OF THEM. That is a property of the guard, not of the tree, and it is stated here
-# because three consecutive review rounds swept this class with digit-only expressions and each one
-# read its own zero as coverage. `CONTRIBUTING.md`'s agent count read *"All eight shipping agents"*
-# until 2026-08-17 — live, correct, and unreachable by any row above; it was converted to a digit in
-# the same commit as the row that now guards it, which is the only repair that works, because a
-# pattern arm for every spelled-out number would still miss the next spelling.
+# COVERAGE HERE IS PHRASE-KEYED, NOT FILE-KEYED, AND "CLAUDE.md IS NOW IN THE TABLE" DOES NOT MEAN
+# WHAT IT SOUNDS LIKE. A row watches one sentence. A brand-new wrong figure in a file this block
+# already reads ships silently: measured, inserting `Kinglet currently ships 99 agents.` into
+# `CLAUDE.md` leaves this file green and `tests/test-surface-references.sh` green too. That is not a
+# defect in any row — it is the shape of the mechanism, and it is written here because the next
+# maintainer reading a file name in the table above will otherwise assume the file is covered.
+# A file-level backstop (*"this file carries N numerals beside a surface noun; M of them have
+# rows"*) is a real design with a real cost and it is not this block's to bolt on.
 #
-# So: **a live figure written as a word is a figure this file cannot guard.** When you find one,
-# convert it and add a row. When it is genuinely pinned — a quoted run output, a measured mutation
-# narrative — leave the word alone, because the word is part of what marks it as prose about a
-# reading rather than a claim about today.
+# EVERY PATTERN IN EVERY CLAIMS TABLE ABOVE IS DIGIT-ONLY, AND A WORD NUMERAL IS THEREFORE INVISIBLE
+# TO ALL OF THEM. That is a property of the guard, not of the tree. Three consecutive review rounds
+# swept this class with digit-only expressions and each one read its own zero as coverage;
+# `CONTRIBUTING.md`'s agent count read *"All eight shipping agents"* until 2026-08-17 — live,
+# correct, and unreachable by any row above.
+#
+# THE PER-INSTANCE REMEDY WAS "CONVERT IT AND ADD A ROW", AND IT WAS NOT ENOUGH. Written here in
+# round 1, applied to `CONTRIBUTING.md`, and NOT applied to that same round's own sweep over
+# `docs/research/codex-client/*` — where an independent derivation then found eight further live
+# figures, four of them word numerals, and falsified five at once with the full suite reading
+# `Failed: 0`. A remedy that has to be remembered at every site is a remedy that will be forgotten
+# at one. **The class is now closed by an instrument instead: the word-numeral block at the foot of
+# this file, which normalises words to digits in its own flattener and guards them with ordinary
+# rows.** Convert-and-add is still fine where it is natural; it is no longer the only option, and it
+# is no longer the answer to "is this class swept".
 
 DCS_BAD=""
 DCS_VACUOUS=""
@@ -1364,11 +1376,19 @@ assert_eq "$DCV_SUM_WANT" "$DCV_SUM_SEEN" \
 #     is computable from this repository's tracked files alone, **L2** the sentence asserts it of the
 #     present tree (a probe name, a `<replica>`, `codex-cli 0.145.0` or *"measured <date>"* pins it;
 #     *"re-derived <date>"* does not), **L3** writing a re-derived value in would leave the
-#     surrounding sentence true. It selected **eleven distinct figures across fourteen rows**: six
-#     in `findings.md`'s `Kinglet ships N …` family, its three stranded-machinery counts stated
-#     twice each (code block and table, so six rows for three figures), and the hook total plus its
-#     two partitions in `codex-facts.md`, which states the total at two sites. Every one of them is
-#     a sentence that already tells the reader to derive rather than trust it. All are rows below.
+#     surrounding sentence true. Every figure it selected is a sentence that already tells the
+#     reader to derive rather than trust it; the rows are split between `DCT_CLAIMS` below and
+#     `DCW_CLAIMS` at the foot of this file, by alphabet rather than by subject. **The size of the
+#     selection is not written here.** Derive it — the criterion document carries the same command:
+#
+#       awk '/^DC[TW]_CLAIMS="/{f=1} f{print} f&&/"$/{f=0}' tests/test-derived-counts.sh \
+#         | cut -f1 | grep '^docs/research/codex-client/' | sort | uniq -c
+#
+#     The first version of this bullet did write it — *"eleven distinct figures across fourteen
+#     rows"* — and it was an unguarded live figure describing the guard, wrong within a day, in the
+#     block whose subject is unguarded live figures. It also said the hook total appears at TWO
+#     sites in `codex-facts.md`; it appears at three, and the third is in a different section, which
+#     is how a per-section reading produced a whole-file claim.
 #   * What remains uncovered there is the per-run measurement class — figures counted against probe
 #     transcripts that are gitignored, which cannot be re-derived from this tree at all and must not
 #     be edited to match it. That is now an EXCLUSION UNDER A WRITTEN CRITERION rather than a hedge,
@@ -1761,3 +1781,214 @@ if [ -n "$DCT_VACUOUS" ]; then
 fi
 assert_eq "0" "$(printf '%s' "$DCT_VACUOUS" | grep -c . || true)" \
   "every tree-size phrasing this guard covers is still present in the file that carries it"
+
+# ============================================================================
+# WORD-NUMERAL FIGURES — the class every claims table above is blind to BY CONSTRUCTION
+#
+# Every pattern in every table above is written with `[0-9]+`, and every value check harvests
+# `grep -oE '[0-9]+'` from the match. A figure spelled *twelve* therefore produces no digits, cannot
+# match, and cannot be compared: it is invisible to this file end to end, and invisible in a way
+# that reports coverage rather than a gap, because the row that would have caught it was never
+# written.
+#
+# THIS BLOCK EXISTS BECAUSE THE OMISSION WAS MEASURED, IN THE SWEEP WRITTEN TO PREVENT IT. The
+# 2026-08-17 live-vs-pinned pass over `docs/research/codex-client/*` named the word-numeral arm as
+# the instrument three earlier rounds had never run — and then ran it on `CONTRIBUTING.md` and not
+# on its own subject. An independent derivation found eight further live figures there, four of
+# them word numerals, and falsified five at once with the **full suite still reading Failed: 0**.
+# The remedy round 1 wrote down was *"convert it and add a row"*. That is a remedy per instance;
+# this is the remedy for the class, and it costs one flattener.
+#
+# THE FLATTENER IS THIS BLOCK'S OWN, AND THAT IS THE WHOLE RISK CONTROL. Normalising word numerals
+# in the shared flatten would change the text every table above matches against, so a stray `one of
+# the` becoming `1 of the` could give an existing row a second site and red a correct document.
+# Here the normalisation is applied only to the text THIS table reads, so no row above can be
+# affected by it; and this table's own multisite check is what catches a normalisation that creates
+# a second match for one of its rows.
+#
+# `one` IS DELIBERATELY NOT NORMALISED. It is the word numeral with by far the highest rate of
+# non-numeric use in English prose (`one of`, `the one that`, `no one`), so mapping it would
+# manufacture digits everywhere and make every pattern here ambiguous. No figure this block guards
+# needs it. If one ever does, spell that figure as a digit in its own document instead.
+#
+# Both `awk` passes drain their input and `tr` drains its input, so nothing here can SIGPIPE a
+# writer under `set -euo pipefail`. Token-wise substitution, not `sed` with `\b`: BSD `sed` has no
+# `\b`, and this repository is kept macOS-clean.
+echo "--- derived counts: figures spelled as words ---"
+
+dcw_flat() {
+  awk '{ sub(/^[[:space:]]*#[[:space:]]?/, ""); printf "%s ", $0 }' "$1" | tr -s ' ' | awk '
+    BEGIN {
+      n = split("two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty", w, " ")
+      for (i = 1; i <= n; i++) map[w[i]] = i + 1
+    }
+    {
+      for (i = 1; i <= NF; i++) {
+        t = $i; core = t; gsub(/[^A-Za-z]/, "", core); lc = tolower(core)
+        if (lc in map) { sub(core, map[lc], t) }
+        printf "%s ", t
+      }
+    }
+  '
+}
+
+# Derivations this block needs and no block above has. Each is one command, and each names the
+# exclusion it encodes rather than leaving it to be inferred.
+#   spine rules  — `.claude/rules/` less pc-console.md, which the rules themselves and CLAUDE.md
+#                  both describe as an addendum ON TOP OF the spine rather than a member of it
+#   advisory     — the `warn-*` hooks: exit 0, write to stderr, block nothing
+#   arg commands — commands whose frontmatter declares `args:`
+#   events       — distinct event keys in settings.json
+#   matchers     — distinct non-empty tool-name matchers, and the entries they cover
+DCW_SPINE=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -vc 'pc-console' || true)
+DCW_NONNEG=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -v 'pc-console' | tr '\n' '\0' \
+             | xargs -0 grep -hcE '^#+ .*(NON-NEGOTIABLE|CRITICAL)' 2>/dev/null | awk '{s+=$1} END{print s+0}')
+DCW_ADVISORY=$(ls -1 "$REPO_DIR"/.claude/hooks/warn-*.sh 2>/dev/null | grep -c . || true)
+DCW_ARGCMDS=$(grep -lE '^args:' "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | grep -c . || true)
+DCW_EVENTS=$(printf '%s\n' "$DCK_REG_TRIPLES" | awk -F'\t' '$2 != "" { print $2 }' | sort -u | grep -c . || true)
+DCW_MATCHERS=$(printf '%s\n' "$DCK_REG_TRIPLES" \
+               | awk -F'\t' '($2 == "PreToolUse" || $2 == "PostToolUse") && $3 != "(all)" { print $3 }' \
+               | sort -u | grep -c . || true)
+DCW_MATCHED=$(printf '%s\n' "$DCK_REG_TRIPLES" \
+              | awk -F'\t' '($2 == "PreToolUse" || $2 == "PostToolUse") && $3 != "(all)" { print $1 "\t" $2 }' \
+              | grep -c . || true)
+DCW_NOARG=$((DCS_COMMANDS - DCW_ARGCMDS))
+DCW_AGENTS_LINES=$(wc -l < "$REPO_DIR/AGENTS.md" 2>/dev/null | tr -d ' ')
+[ -n "$DCW_AGENTS_LINES" ] || DCW_AGENTS_LINES=0
+
+# THE DERIVATION HAS TO BE ABLE TO FAIL, and it has to be able to fail PER SOURCE. Eight sources
+# feed the rows below; a single total would clear while any one of them died.
+DCW_DERIVATION="ok"
+[ "$DCW_SPINE"        -ge 1 ] || DCW_DERIVATION="no spine rules under \$REPO_DIR/.claude/rules (less pc-console.md)"
+[ "$DCW_NONNEG"       -ge 1 ] || DCW_DERIVATION="no NON-NEGOTIABLE/CRITICAL headings in the spine rules"
+[ "$DCW_ADVISORY"     -ge 1 ] || DCW_DERIVATION="no warn-* hooks under \$REPO_DIR/.claude/hooks"
+[ "$DCW_ARGCMDS"      -ge 1 ] || DCW_DERIVATION="no command declares args: in its frontmatter"
+[ "$DCW_NOARG"        -ge 1 ] || DCW_DERIVATION="every command declares args:, so the complement is empty and its row cannot be a claim"
+[ "$DCW_EVENTS"       -ge 1 ] || DCW_DERIVATION="settings.json yields no event names"
+[ "$DCW_MATCHERS"     -ge 1 ] || DCW_DERIVATION="settings.json yields no tool-name matchers"
+[ "$DCW_MATCHED"      -ge 1 ] || DCW_DERIVATION="no hook entry sits under a tool-name matcher"
+[ "$DCW_AGENTS_LINES" -ge 1 ] || DCW_DERIVATION="AGENTS.md is absent or empty"
+[ "$DCS_AGENTS"       -ge 1 ] || DCW_DERIVATION="no agents (shared with the surface-pool block)"
+assert_eq "ok" "$DCW_DERIVATION" \
+  "the word-numeral figures are derived from a tree that actually has surfaces in it"
+
+# THE INSTRUMENT'S OWN POSITIVE CONTROL, and it is not ceremony. If the normaliser stops working,
+# every row below stops matching and the vacuity check reds — but it would red saying a document was
+# reworded, which sends the next reader to the documents instead of to the flattener. This asserts
+# the normaliser directly, so a broken one says so in its own words.
+#
+# IT CALLS `dcw_flat`. The first version of this probe carried its OWN COPY of the awk and asserted
+# against that — measured: disabling the substitution inside `dcw_flat` left this assertion GREEN and
+# reddened only the phrasing check, which is exactly the failure the probe existed to prevent, in the
+# probe. A guard that hardcodes the mechanism on both sides tests nothing; this file's own
+# `tests/test-codex-shim.sh` neighbour states the same rule about extracting a signal from the shim
+# rather than writing it in the test. `**twelve**` is in the fixture on purpose: emphasis around the
+# word is the spelling these documents actually use, so the probe covers the case rather than the
+# bare one.
+DCW_PROBE_SRC="$(mktemp "${TMPDIR:-/tmp}/dcw-probe.XXXXXX")"
+printf '# twelve entries and **sixteen** skills\n' > "$DCW_PROBE_SRC"
+DCW_PROBE="$(dcw_flat "$DCW_PROBE_SRC" | sed 's/ *$//')"
+rm -f "$DCW_PROBE_SRC"
+assert_eq "12 entries and **16** skills" "$DCW_PROBE" \
+  "the word-numeral normaliser converts words to digits, through emphasis and through a comment marker — every row below is vacuous if it does not"
+
+# path <TAB> extended-regex pattern (matched against the NORMALISED flattened file) <TAB> expected
+# numbers in the order the match carries them. One row per SITE.
+DCW_CLAIMS="CLAUDE.md	the [0-9]+ spine rules, .settings.json.	$DCW_SPINE
+CLAUDE.md	the [0-9]+ spine rules bind	$DCW_SPINE
+README.md	of the [0-9]+ agents narrow their own tools	$DCS_AGENTS
+docs/research/codex-client/findings.md	The [0-9]+ spine rules carry [*][*][0-9]+[*][*]	$DCW_SPINE,$DCW_NONNEG
+docs/research/codex-client/findings.md	all [0-9]+ command strings	$DCK_REGISTERED
+docs/research/codex-client/findings.md	its [0-9]+ entries	$DCK_REGISTERED
+docs/research/codex-client/findings.md	the [0-9]+ entries, their matchers	$DCK_REGISTERED
+docs/research/codex-client/findings.md	the same [0-9]+ hooks with no guard	$DCK_HOOKS
+docs/research/codex-client/findings.md	the same [0-9]+ hooks, needing its own	$DCK_HOOKS
+docs/research/codex-client/findings.md	[0-9]+ of Kinglet.s hooks are advisory	$DCW_ADVISORY
+docs/research/codex-client/findings.md	the [0-9]+ .warn-[*]. hooks	$DCW_ADVISORY
+docs/research/codex-client/findings.md	Every one of the [0-9]+ entries in .[.]claude/settings.json.	$DCK_REGISTERED
+docs/research/codex-client/findings.md	none of the [0-9]+ command names	$DCS_COMMANDS
+docs/research/codex-client/findings.md	.AGENTS.md., tracked, [0-9]+ lines	$DCW_AGENTS_LINES
+docs/research/codex-client/findings.md	would get Kinglet.s [0-9]+ skills	$DCS_SKILLS
+docs/research/codex-client/findings.md	gets Kinglet.s [0-9]+ skills too	$DCS_SKILLS
+docs/research/codex-client/findings.md	Kinglet.s [0-9]+ argument-taking commands all carry	$DCW_ARGCMDS
+docs/research/codex-client/findings.md	the [0-9]+ that carry no .[$]. token	$DCW_NOARG
+docs/research/codex-client/findings.md	blocks the other [0-9]+	$DCW_ARGCMDS
+docs/research/codex-client/findings.md	Could Kinglet.s [0-9]+ be expressed	$DCS_AGENTS
+docs/research/codex-client/findings.md	Kinglet.s [0-9]+ rules can ship as pointers	$DCS_RULES
+docs/research/codex-client/codex-facts.md	Kinglet.s [0-9]+ argument-taking commands	$DCW_ARGCMDS
+docs/research/codex-client/codex-facts.md	All [0-9]+ of the events Kinglet registers	$DCW_EVENTS
+docs/research/codex-client/codex-facts.md	ships exactly [0-9]+ tool-name matchers	$DCW_MATCHERS
+docs/research/codex-client/codex-facts.md	covering [0-9]+ of its [0-9]+ hook entries	$DCW_MATCHED,$DCK_REGISTERED
+docs/research/codex-client/codex-facts.md	Kinglet.s [0-9]+ advisory hooks	$DCW_ADVISORY
+docs/research/codex-client/codex-facts.md	[0-9]+ binding spine rules plus .pc-console.md.	$DCW_SPINE
+.claude/commands/unity-doctor.md	whose [0-9]+ binding spine rules	$DCW_SPINE"
+
+# Declared path<TAB>rowcount, compared in BOTH directions — the same repair the tree-size block
+# needed, built in from the start rather than after a mutation found it.
+DCW_DECLARED=".claude/commands/unity-doctor.md	1
+CLAUDE.md	2
+README.md	1
+docs/research/codex-client/codex-facts.md	6
+docs/research/codex-client/findings.md	18"
+DCW_SCANNED_COUNTS=$(cut -f1 <<< "$DCW_CLAIMS" | sort | uniq -c | awk '{ printf "%s\t%s\n", $2, $1 }' | sort)
+DCW_DECLARED_COUNTS=$(printf '%s\n' "$DCW_DECLARED" | grep -v '^$' | sort)
+DCW_UNDECLARED=$(comm -23 <(printf '%s\n' "$DCW_SCANNED_COUNTS") <(printf '%s\n' "$DCW_DECLARED_COUNTS"))
+DCW_UNSCANNED=$(comm -13 <(printf '%s\n' "$DCW_SCANNED_COUNTS") <(printf '%s\n' "$DCW_DECLARED_COUNTS"))
+if [ -n "$DCW_UNDECLARED" ]; then
+  printf '%s\n' "$DCW_UNDECLARED" | sed 's|^|     scanned rows not matching the declaration: |'
+fi
+if [ -n "$DCW_UNSCANNED" ]; then
+  printf '%s\n' "$DCW_UNSCANNED" | sed 's|^|     declared but NO LONGER SCANNED at that row count: |'
+fi
+assert_eq "" "$DCW_UNDECLARED" \
+  "every file this block scans is declared, at the row count it actually carries"
+assert_eq "" "$DCW_UNSCANNED" \
+  "every declared file is still scanned at its declared row count — deleting a word-numeral row is loud"
+
+DCW_BAD=""
+DCW_VACUOUS=""
+DCW_MULTISITE=""
+while IFS=$'\t' read -r dcw_rel dcw_pat dcw_want; do
+  [ -n "$dcw_rel" ] || continue
+  if [ ! -f "$REPO_DIR/$dcw_rel" ]; then
+    DCW_VACUOUS="${DCW_VACUOUS}${dcw_rel} is not present, so its '${dcw_pat}' claim was never checked"$'\n'
+    continue
+  fi
+  dcw_text="$(dcw_flat "$REPO_DIR/$dcw_rel")"
+  dcw_hits=0
+  while IFS= read -r dcw_claim; do
+    [ -n "$dcw_claim" ] || continue
+    dcw_hits=$((dcw_hits + 1))
+    dcw_seen=$(grep -oE '[0-9]+' <<< "$dcw_claim" | tr '\n' ',' | sed 's/,$//')
+    if [ "$dcw_seen" != "$dcw_want" ]; then
+      DCW_BAD="${DCW_BAD}${dcw_rel} states '${dcw_claim}' — the tree derives ${dcw_want}"$'\n'
+    fi
+  done <<< "$(grep -oE "$dcw_pat" <<< "$dcw_text" || true)"
+
+  if [ "$dcw_hits" -lt 1 ]; then
+    DCW_VACUOUS="${DCW_VACUOUS}${dcw_rel} no longer states its '${dcw_pat}' claim in a form this guard can read"$'\n'
+  elif [ "$dcw_hits" -gt 1 ]; then
+    DCW_MULTISITE="${DCW_MULTISITE}${dcw_rel}'s '${dcw_pat}' row matches ${dcw_hits} sites — its vacuity check is a union over them. Split it into one row per site, with lexically disjoint patterns."$'\n'
+  fi
+done <<< "$DCW_CLAIMS"
+
+if [ -n "$DCW_MULTISITE" ]; then
+  printf '%s' "$DCW_MULTISITE"
+fi
+assert_eq "0" "$(printf '%s' "$DCW_MULTISITE" | grep -c . || true)" \
+  "every word-numeral claim row matches exactly one site in its file"
+
+if [ -n "$DCW_BAD" ]; then
+  printf '%s' "$DCW_BAD"
+  printf '     %s\n' "These are compared against the NORMALISED text, so 'twelve' reads as 12. Re-derive with:"
+  printf '     %s\n' "  ls .claude/rules/*.md | grep -v pc-console | wc -l ; ls .claude/hooks/warn-*.sh | wc -l"
+  printf '     %s\n' "  grep -lE '^args:' .claude/commands/*.md | wc -l ; wc -l < AGENTS.md"
+fi
+assert_eq "0" "$(printf '%s' "$DCW_BAD" | grep -c . || true)" \
+  "every figure spelled as a word matches the tree ($DCW_SPINE spine rules, $DCW_NONNEG non-negotiable sections, $DCW_ADVISORY advisory hooks, $DCW_ARGCMDS arg-taking commands, $DCW_EVENTS events, $DCW_MATCHERS matchers over $DCW_MATCHED entries, AGENTS.md $DCW_AGENTS_LINES lines)"
+
+if [ -n "$DCW_VACUOUS" ]; then
+  printf '%s' "$DCW_VACUOUS"
+fi
+assert_eq "0" "$(printf '%s' "$DCW_VACUOUS" | grep -c . || true)" \
+  "every word-numeral phrasing this guard covers is still present in the file that carries it"

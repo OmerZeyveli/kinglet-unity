@@ -152,7 +152,8 @@ Re-review then hit a different red in the same file, in a full-suite run:
 > `--- codex shim: a signal lands on a refusal ---` · `FAIL: SIGHUP did NOT refuse (exit 0, 0 bytes)`
 
 It is **not** the flake's signature, not the budget assertion, and not attributable to any mutation
-live at the time. **One unreproduced red, 2026-08-16.** The follow-up ruled on 2026-08-16 by the same
+live at the time. **One unreproduced red, 2026-08-16 — and a second on 2026-08-17, logged below.**
+The follow-up ruled on 2026-08-16 by the same
 round that wrote the over-broad sentence:
 
 - Not reproduced in the re-review's four further executions under two-way self-concurrency.
@@ -168,9 +169,27 @@ round that wrote the over-broad sentence:
   reaps the long-gone writer. Measured on this host — `$!` is the **last** process with and without
   job control, and the kill lands on the shim in both. Not the cause.
 
-**So: the signal block carries an unexplained, unreproduced red, and this entry says so rather than
+**SECOND SIGHTING, 2026-08-17 — Task 13's first review, and it is added to this list as the entry
+asks.** Same row, same signature character for character (`FAIL: SIGHUP did NOT refuse (exit 0,
+0 bytes)`), on the reviewer's **first** full-suite run, taken while unrelated work of its own ran
+concurrently on the same host — greps, `git archive`, `tar`. Re-run alone: green. Nothing about the
+tree had changed; the mutation battery had not started.
+
+**The new information is the condition, not the count.** The 0-of-61 probe above ran on a quiet host
+and under this suite's own *self*-concurrency. Both sightings were under **external** load from an
+unrelated process tree, which that probe never produced — self-concurrency contends on a schedule the
+suite itself creates, unrelated load does not. **Two sightings, two under external load, zero on a
+quiet host.** So the cheapest next experiment is that loop body under generated unrelated load rather
+than under more copies of itself; and whoever runs it should bound the load and reap by pattern,
+because this wave has already orphaned two batches of load generators doing exactly that.
+
+**A negative result is only as broad as the instrument that produced it,** and the 0-of-61 was
+written here without its conditions attached — which is how it came to read as *absent* rather than
+*absent under the two conditions we tried*. Both files now say which.
+
+**So: the signal block carries an unexplained red seen twice, and this entry says so rather than
 rounding it to zero.** Do not read a red there as expected; do read it as unexplained, and add the
-run to this list.
+run to this list **with the load condition it occurred under**.
 
 **The fix is NOT one line IN THE `BASHPID` SPELLING, which is why THAT one was correctly refused —
 and it is still refused today.** The obvious spelling —

@@ -83,12 +83,21 @@ of the work is saying which those are.
 
 Written before the set was selected. Every figure in these three documents is one or
 the other, and *"overwhelmingly per-run measurements"* was the honest summary of the
-majority, not a property of the whole: applying the criterion below finds **eleven
-guardable figures, carried as fourteen claim rows, in two of the three files** — and
-it was the un-audited *mostly* that let a second unguarded copy of `install.sh`'s
-command-body line count sit here while the guarded copy moved. **This file holds
-none of the eleven**, which is the one place *overwhelmingly* was too weak rather
-than too strong.
+majority, not a property of the whole — it was the un-audited *mostly* that let a
+second unguarded copy of `install.sh`'s command-body line count sit here while the
+guarded copy moved. **The selection is large enough that it is not written down as a
+number anywhere.** Derive it:
+
+```bash
+awk '/^DC[TW]_CLAIMS="/{f=1} f{print} f&&/"$/{f=0}' tests/test-derived-counts.sh \
+  | cut -f1 | grep '^docs/research/codex-client/' | sort | uniq -c
+```
+
+A total in this paragraph would be a live figure inside the swept directory, with no
+row watching it and no way for the next reader to tell whether it had kept up — the
+exact object this whole section exists to eliminate, one paragraph above the list of
+what it eliminated. **This file still holds none of the selected figures**, which is
+the one place *overwhelmingly* was too weak rather than too strong.
 
 A figure is **live**, and may be guarded, if and only if all three hold:
 
@@ -113,14 +122,35 @@ A figure is **live**, and may be guarded, if and only if all three hold:
   pinned history and a guard that updated it would destroy exactly what it was added
   to protect.
 
-**What it selected.** Values are written as `N` here on purpose: this file is inside the swept
-directory, and a table that transcribed the guarded numbers would be a fresh set of unguarded copies
-of exactly the figures below it. All are carried as claim rows in
-`tests/test-derived-counts.sh` and each one a sentence that already tells the reader
-to derive rather than trust it. Eleven figures, fourteen rows — the counts differ
-because three figures are stated twice in one section and one is stated at two
-sites, and a table that reported only one of those numbers would be describing a
-different set than the guard holds:
+### The instruments, because a coverage claim is a claim about a search
+
+**Round 1's selection was produced by a digit sweep alone, and it under-selected by
+eight figures** — second copies of the very figures it guarded, plus one
+(`AGENTS.md, tracked, N lines`) with no guarded copy anywhere. Five were falsified at
+once with the full suite still reading `Failed: 0`. The instrument that would have
+found four of the eight is the word-numeral arm, which the same round named as *the*
+arm three earlier rounds had never run — and then ran on `CONTRIBUTING.md` rather
+than on its own subject. So the instruments are named here, and any future coverage
+claim over this directory must name its own:
+
+| Arm | Finds | Why it is separate |
+|---|---|---|
+| **A · digits** | `12`, `**3**`, `` `16` `` | must tolerate markdown emphasis and backticks around the digits — a pattern demanding a space after them misses the dominant spelling here |
+| **B · word numerals** | *twelve*, *sixteen*, *seven* | invisible to A, and invisible to every claim row in `tests/test-derived-counts.sh` except the word-numeral table, because those patterns are `[0-9]+` and their value check harvests digits |
+| **C · derivation commands** | `… \| wc -l   # N` | carries no noun at all, so neither A nor B reaches it |
+
+**Positive control, and it is not optional.** The union must recover every figure
+already selected; run against the pre-existing selection it returned all of them, and
+it caught three of its own recall failures on the way there — a noun list of whole
+words that could not reach *registered*, a gap expression that could not span two
+consecutive tokens, and the emphasis problem above. Each was a miss the control found
+and no reader would have.
+
+**What it selected.** Values are written as `N` here on purpose: this file is inside
+the swept directory, and a table that transcribed the guarded numbers would be a
+fresh set of unguarded copies of exactly the figures below it. Every row below is
+carried in `tests/test-derived-counts.sh`, and every one is a sentence that already
+tells the reader to derive rather than trust it:
 
 | Site | Figure |
 |---|---|
@@ -130,7 +160,10 @@ different set than the guard holds:
 | `findings.md` § *Commands* | `Kinglet ships N commands` |
 | `findings.md` § *Agents* | `Kinglet ships N agents` |
 | `findings.md` § stranded machinery | the `src/catalog` file count, the `tools/kinglet_build` Python-module count, the `adapters/*/profile.json` count — each in the code block **and** restated in the table beside it |
-| `codex-facts.md` § *Hooks* | the hook total at **two** sites — `N of Kinglet's M hooks are PostToolUse` and `the remaining N of Kinglet's M hooks` — with both partitions derived as well as the total, because guarding a total and leaving its partition unguarded is how one sentence becomes internally inconsistent and stays green |
+| `codex-facts.md` § *Hooks* and § *matcher aliases* | the hook total at **three** sites — `N of Kinglet's M hooks are PostToolUse`, `the remaining N of Kinglet's M hooks`, and `covering N of its M hook entries` — with every partition derived as well as the total, because guarding a total and leaving its partition unguarded is how one sentence becomes internally inconsistent and stays green. It read *"two sites"* until this was re-derived; the third is in a different section and a per-section reading missed it |
+| `findings.md`, word-numeral sites | the registered-hook total spelled *twelve* at four sites, the advisory-hook count, the argument-taking command count and its complement, the spine-rule count and the non-negotiable-section count, the agent count, the skill count at two further sites, `AGENTS.md`'s own line count |
+| `codex-facts.md`, word-numeral sites | the argument-taking command count, the registered-event count, the tool-name matcher count and the entries it covers, the advisory-hook count, the spine-rule count |
+| `CLAUDE.md`, `README.md`, `.claude/commands/unity-doctor.md` | the spine-rule count (twice), the agent count, the spine-rule count again — **outside this directory**, found by the same word-numeral arm and guarded by the same table, because the class is not a property of these three documents |
 
 **What it excluded, and why, so the next reader is deciding rather than
 rediscovering:**
@@ -138,9 +171,17 @@ rediscovering:**
 - Every probe reading, every `<replica>` table, every `NAME.meta.json` quotation and
   every schema-bundle count — **L1**. This is the majority of the numerals here and
   it is what the directory exists to hold.
-- `findings.md`'s *"drops 7 of 9 commands"*, `codex-facts.md`'s *"16 skills + 2
-  commands-as-skills"* and their kin — **L1**, on the coincidence rule above. The
-  denominator is a tree figure; the sentence is a measurement of a run.
+- `findings.md`'s *"drops 7 of 9 commands"*, `README.md`'s *"drops seven of the nine
+  commands"*, `codex-facts.md`'s *"16 skills + 2 commands-as-skills"* and their kin —
+  **L1**, on the coincidence rule above. The denominator is a tree figure; the
+  sentence is a measurement of a run. The word-numeral spelling of the same sentence
+  is excluded for the same reason as the digit one, which is the test that the
+  criterion is being applied rather than the alphabet.
+- `findings.md`'s probe-result tables — *"discovers all 16"*, *"reports 18 at repo
+  scope"*, *"`.claude/hooks/` | 0 | **0**"* — **L2**: the column header is a probe.
+- The one derivation command that counts the **replica** rather than this tree
+  (`… "$EV"/skillrig/.codex/agents/*.toml | wc -l`) — **L1**. Arm C found it and the
+  criterion rejected it, which is the arm's negative direction working.
 - Every *"it read N until &lt;date&gt;"* correction — **L3**. There are several, and each
   one is the record of a figure that moved.
 - `findings.md`'s *"`.claude/skills/` and `.claude/commands/` carry **0** references

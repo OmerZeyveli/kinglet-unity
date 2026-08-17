@@ -786,6 +786,23 @@ printf '#!/usr/bin/env bash\nsleep 45\n' > "$SIGHOOK"; chmod +x "$SIGHOOK"
 # 0 of 25 iterations per signal on a quiet host, then 0 of 12 per signal in each of
 # three concurrent instances, SIGHUP 0 of 61 in total. ALL FOUR ARMS READ ZERO, so
 # that probe has no positive control and proves nothing; it is a negative result.
+#
+# **AND THE NEGATIVE IS ONLY AS BROAD AS THE INSTRUMENT THAT PRODUCED IT.** That 0-of-61
+# was measured on a quiet host and under this suite's own self-concurrency — two
+# conditions — so it bounds the race under those two and says nothing about any
+# other. Read it as "absent under what we tried", never as "absent".
+#
+# SECOND SIGHTING, 2026-08-17, and its condition is the new information. A reviewer's
+# first full-suite run reported this exact red — `FAIL: SIGHUP did NOT refuse (exit 0,
+# 0 bytes)`, character for character — while UNRELATED work ran concurrently on the
+# same host (greps, `git archive`, `tar`). Re-run alone: green. That is a third
+# condition, external load from another process tree, and it is precisely the one the
+# 0-of-61 probe never covered: self-concurrency contends for CPU on a schedule this
+# suite creates, unrelated load does not. Two sightings, both under external load,
+# none on a quiet host. **The cheapest next experiment is therefore this loop body
+# under a generated unrelated load rather than under more copies of itself** — and
+# whoever runs it should bound the load and reap by pattern, because this repository
+# has already orphaned two batches of load generators doing exactly that.
 # One mechanism was eliminated rather than assumed: `$!` under `set -m` still names
 # the LAST process of the pipeline on this host (measured both ways), so the kill
 # lands on the shim and not on the long-gone `printf`, which would have explained

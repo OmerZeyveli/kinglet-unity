@@ -191,11 +191,23 @@ CODEX_TRUST_REL=".claude/state/codex-trust.tsv"
 # rather than asserted. Re-run 2026-08-17 against the shape that motivated all of this — a shadow
 # appended AFTER the end marker, so both regions stay byte-identical:
 #
-#   shadow in `scripts/studio-doctor.sh`  -> test-install-upgrade-client.sh **24/26, 2 red** (the
+#   shadow in `scripts/studio-doctor.sh`  -> test-install-upgrade-client.sh **2 red** (the
 #                                            behavioural arms, which drive the doctor)
-#   shadow in `install.sh`                -> test-install-upgrade-client.sh **26/26 GREEN**; the
-#                                            full suite **38 red**, in test-install-prune.sh and
-#                                            test-studio-doctor.sh
+#   shadow in `install.sh`                -> test-install-upgrade-client.sh **fully GREEN**; the
+#                                            full suite **38 red**, distributed
+#                                            **33 / 3 / 1 / 1** across
+#                                            `tests/test-install-ownership.sh`,
+#                                            `tests/test-studio-doctor.sh`,
+#                                            `tests/test-install-prune.sh` and
+#                                            `tests/test-doctor-reverted.sh`
+#
+# THE FIRST VERSION OF THAT ROW HAD THE COUNT RIGHT AND THE ENUMERATION WRONG, and the mechanism is
+# worth more than the correction. The harvest that produced it matched only the runner's helper
+# shape, `  FAIL `, and this suite has two: a self-contained file prints `FAIL: `. It therefore saw
+# 4 of the 38 and named the two files those 4 sat in — the file carrying 33 of them appeared
+# nowhere. `tests/run-tests.sh` counts both shapes; a harvest that counts one reports a subset as a
+# whole, with no sign that it has done so. Same class as writing FOUR and then naming five, three
+# hundred lines up in the file this same pass corrected for it.
 #
 # So no shape ships silently, and the file that owns the criterion is still not the file that
 # catches every abuse of it. Three guards, three different blind spots: the byte comparison sees a
