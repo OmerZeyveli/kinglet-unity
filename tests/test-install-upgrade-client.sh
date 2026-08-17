@@ -125,6 +125,22 @@ tiuc_sha() {   # $1 = file
   sha256sum "$1" 2>/dev/null | cut -d' ' -f1
 }
 
+# tiuc_agents_line <project> — the dry run's one claim about AGENTS.md, by exact
+# first-field match INSIDE the `Would install:` block. `AGENTS.md` is a prefix of
+# nothing here, but field equality is the claim and substring presence is not.
+#
+# THE BLOCK SCOPE IS NOT TIDINESS — it was measured. A dry run against a project
+# whose AGENTS.md has local edits prints that path, indented and alone, under the
+# upgrade scan's `keeping yours:` list, which runs BEFORE this block. An unscoped
+# first-field match reads that list entry as the claim and gets a bare path with
+# no verdict in it, so the assertion fails against a correct installer — the
+# false-red half of the same mistake the claim line itself used to make.
+tiuc_agents_line() {   # $1 = project dir
+  bash "$REPO_DIR/install.sh" --project-dir "$1" --client codex --yes --dry-run 2>&1 \
+    | sed $'s/\x1b\\[[0-9;]*m//g' \
+    | awk '/^Would install:/ { inblock = 1; next } inblock && $1 == "AGENTS.md" { print; exit }'
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Arm 1 — codex first, then the DEFAULT (claude) invocation over it.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -618,6 +634,28 @@ TIUC_REGION_BEFORE="$(tiuc_region "$P7/AGENTS.md" | sha256sum | cut -d' ' -f1)"
 mkdir -p "$P7/Assets/Scripts"
 printf 'using VContainer;\npublic sealed class SentinelSystem { }\n' > "$P7/Assets/Scripts/SentinelSystem.cs"
 
+# WHAT THE REGION DOES NOT COVER, ASSERTED SO THE PROSE CANNOT DRIFT FROM IT.
+# The merge maintains the project-facts block and nothing else: the /name
+# translation, the hooks-and-trust paragraph and the rest of the Codex sections
+# are emitted OUTSIDE the pair by the full generate only, so they stay as install
+# 1 wrote them once the user has edited the file. Three documents now state that
+# residual — install.sh § 8d.1, CLAUDE.md's criterion, README.md — and the reason
+# it is asserted here rather than trusted is that all three would silently become
+# wrong the day someone widens the region. This is the assertion that reddens.
+TIUC_SCOPE_IN=$(tiuc_region "$P7/AGENTS.md" | grep -c 'Project Facts' || true)
+TIUC_SCOPE_OUT=$(tiuc_region "$P7/AGENTS.md" | grep -c 'is Claude Code' || true)
+if [ "$TIUC_SCOPE_IN" -ge 1 ] && [ "$TIUC_SCOPE_OUT" -eq 0 ] \
+   && grep -qF -- 'is Claude Code' "$P7/AGENTS.md"; then TIUC_SCOPE=facts-only; else TIUC_SCOPE="in=$TIUC_SCOPE_IN out=$TIUC_SCOPE_OUT"; fi
+tiuc_eq "facts-only" "$TIUC_SCOPE" \
+  "the marked region holds the project facts and NOT the /name translation, which is in the file and outside the pair — the residual three documents now state in prose, asserted here so widening the region reddens instead of silently falsifying them"
+
+# The mode the merged file carries. 640 rather than the default, so the assertion
+# distinguishes 'preserved' from 'whatever this host's umask produces' — under
+# umask 0002 a dropped restore yields 664 and under 0022 it yields 644, and both
+# differ from 640. It must also be OWNER-WRITABLE: a read-only target is refused
+# before the merge, which is a different arm and is asserted in 7e.
+chmod 640 "$P7/AGENTS.md"
+
 TIUC_OUT7="$(bash "$REPO_DIR/install.sh" --project-dir "$P7" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
 
 # THE BRANCH FLOOR, FIRST. A branch that declines everything would satisfy the
@@ -653,6 +691,15 @@ if [ "$TIUC_REGION_BEFORE" = "$(sha256sum < "$TIUC_ROOT/region7.txt" | cut -d' '
 tiuc_eq "yes" "$TIUC_REGION_MOVED" \
   "…and it MOVED: the project gained a C# file between the two installs and the merged region followed it, so a merge that quietly did nothing cannot satisfy the comparison above"
 
+# THE MODE, WHICH THE MERGE WRITES THROUGH A NEW FILE AND A RENAME. Without a
+# restore the target's permissions become the umask's answer to a question nobody
+# asked — measured under umask 0002, that moved 600 to 664 (wider) and 666 to 664
+# (narrower), in both directions and by accident. 640 is chosen because no umask
+# on this host produces it, so 'preserved' and 'whatever the umask gives' are
+# distinguishable answers rather than the same number.
+tiuc_eq "640" "$(stat -c '%a' "$P7/AGENTS.md" 2>/dev/null || echo unknown)" \
+  "the refresh left the file's mode exactly as the user had it — a merge that renames a temp file over the target silently re-permissions it, in whichever direction the umask happens to point"
+
 # THE ROW, AND ITS ORIGIN IS THE WHOLE POINT. A 'toolkit' row here would be a
 # claim uninstall.sh acts on, and it would delete the prose the installer told
 # the user to write.
@@ -687,10 +734,29 @@ if grep -qF -- 'AGENTS.md' <<< "$TIUC_DOC7"; then TIUC_DOC7_R=named; else TIUC_D
 tiuc_eq "named" "$TIUC_DOC7_R" \
   "studio-doctor.sh names AGENTS.md — a frozen entry document used to sit outside its verified set entirely, so the health check called the project intact while the file it injects whole was unreachable to every later run"
 
+# THE DRY RUN'S REFRESH VERDICT, ON THE ONE PROJECT THAT IS IN THAT STATE, AND IT
+# IS THE VERDICT THIS TASK ADDED. Asserted here rather than in arm 7 because arm
+# 7's fixtures are all files the installer declines — none of them can reach the
+# refresh line at all. Without this, a dry run that announced a decline over a
+# file the real run refreshes — the S3b defect, one file over — left the whole
+# suite green: measured, and it is why this assertion exists rather than being
+# implied by the block's own comment about the parser contract.
+TIUC_DRY7="$(tiuc_agents_line "$P7")"
+if grep -qF -- 'refresh the generated section only' <<< "$TIUC_DRY7"; then TIUC_DRY7_R=refresh; else TIUC_DRY7_R="$TIUC_DRY7"; fi
+tiuc_eq "refresh" "$TIUC_DRY7_R" \
+  "the dry run announces a refresh for the project whose AGENTS.md the real run refreshes — the announcement and the act are computed from one predicate, and a decline announced here would promise to leave alone a file about to be rewritten"
+
 # The tree, as a set: nothing on disk without a row, nothing in the receipt
 # without a path.
 TIUC_DISK7=$(tiuc_codex_paths "$P7")
 TIUC_ROWS7=$(tiuc_receipt_paths "$P7")
+# THE FLOOR THE PAIR BELOW NEEDS. Both are `== 0` verdicts and an empty
+# derivation satisfies each of them — docs/ANTI-VACUITY.md's C4 names exactly this
+# shape. Arm 1 guards its analogue the same way and this arm had no counterpart.
+TIUC_DISK7_N=$(printf '%s\n' "$TIUC_DISK7" | grep -c . || true)
+if [ "$TIUC_DISK7_N" -ge 25 ]; then TIUC_DISK7_FLOOR=ok; else TIUC_DISK7_FLOOR="only $TIUC_DISK7_N Codex-layer path(s) on disk"; fi
+tiuc_eq "ok" "$TIUC_DISK7_FLOOR" \
+  "there is a Codex layer on disk to be consistent ABOUT after the edit and two more installs — the two set comparisons below are both satisfied by an empty derivation"
 TIUC_UNOWNED7=$(comm -23 <(printf '%s\n' "$TIUC_DISK7") <(printf '%s\n' "$TIUC_ROWS7") | grep -c . || true)
 tiuc_eq "0" "$TIUC_UNOWNED7" \
   "after the edit and two more installs, no Codex-layer file on disk is left without a receipt row"
@@ -723,8 +789,12 @@ tiuc_eq "1" "$TIUC_LEFT7" \
   "…while the rest of the Codex layer is gone — the uninstaller still removes what it owns, and exactly what it owns"
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Arm 7 — the four states of an AGENTS.md that is NOT ours, and the dry run that
-# has to describe each of them before the real run does it.
+# Arm 7 — the states of an AGENTS.md the installer does not simply rewrite, and
+# the dry run that has to describe each of them before the real run acts.
+#
+# DERIVE THE COUNT FROM THE `# 7x —` HEADERS RATHER THAN READING ONE HERE. This
+# opened "the four states" and there were four; two more arrived in the same wave
+# and the sentence did not, which is the shape this repository keeps paying for.
 #
 # WHY THE DRY RUN IS HALF OF EVERY ROW. The line here read
 # 'AGENTS.md — the Codex entry document (generated…)' unconditionally, so against
@@ -735,29 +805,19 @@ tiuc_eq "1" "$TIUC_LEFT7" \
 # definition, and a second definition drifts.
 #
 # THE STATES, AND WHAT SEPARATES THEM. Ownership alone cannot answer here —
-# 'not ours' covers a file we wrote and the user then edited, a file we wrote and
-# the user then damaged, and a file we never wrote at all, and those three want
-# three different outcomes. What separates the last from the first two is whether
-# a PREVIOUS RECEIPT carried the path, and 7b is the row that holds that
-# distinction: a hand-written AGENTS.md carrying a well-formed pair fails only
-# that test, and an earlier draft of the installer told its owner their markers
-# were malformed — a diagnosis that is false of the file in front of them.
+# 'not ours' covers a file we wrote and the user then edited, one we wrote and the
+# user then damaged, one we wrote and the user then REPLACED, and one we never
+# wrote at all, and those want different outcomes. Two tests separate them and
+# each has an arm that fails without it: whether a previous receipt carried the
+# PATH (7b — a hand-written AGENTS.md with a well-formed pair fails only that
+# test, and an earlier draft told its owner their markers were malformed, a
+# diagnosis false of the file in front of them), and whether the FILE still
+# carries the marker pair we wrote (7f — the path test alone let --purge delete a
+# file the same run had just called 'not ours, keeping yours').
 # ─────────────────────────────────────────────────────────────────────────────
-# tiuc_agents_line <project> — the dry run's one claim about AGENTS.md, by exact
-# first-field match INSIDE the `Would install:` block. `AGENTS.md` is a prefix of
-# nothing here, but field equality is the claim and substring presence is not.
-#
-# THE BLOCK SCOPE IS NOT TIDINESS — it was measured. A dry run against a project
-# whose AGENTS.md has local edits prints that path, indented and alone, under the
-# upgrade scan's `keeping yours:` list, which runs BEFORE this block. An unscoped
-# first-field match reads that list entry as the claim and gets a bare path with
-# no verdict in it, so the assertion fails against a correct installer — the
-# false-red half of the same mistake the claim line itself used to make.
-tiuc_agents_line() {   # $1 = project dir
-  bash "$REPO_DIR/install.sh" --project-dir "$1" --client codex --yes --dry-run 2>&1 \
-    | sed $'s/\x1b\\[[0-9;]*m//g' \
-    | awk '/^Would install:/ { inblock = 1; next } inblock && $1 == "AGENTS.md" { print; exit }'
-}
+# `tiuc_agents_line` is defined with the other helpers at the top of this file,
+# because arm 6 calls it too and a definition here would be reached only after
+# that call had already failed.
 
 # 7a — a user's own AGENTS.md, no markers, no install has ever run here.
 P8="$TIUC_ROOT/agents-not-ours-plain"
@@ -781,6 +841,10 @@ P9="$TIUC_ROOT/agents-not-ours-marked"
 bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P9" >/dev/null 2>&1
 printf '# My own AGENTS file\n\n<!-- kinglet:generated:begin -->\nmine, not yours\n<!-- kinglet:generated:end -->\n\nNOT-KINGLETS-FILE\n' > "$P9/AGENTS.md"
 TIUC_SHA9="$(tiuc_sha "$P9/AGENTS.md")"
+TIUC_DRY9="$(tiuc_agents_line "$P9")"
+if grep -qF -- 'would keep yours' <<< "$TIUC_DRY9"; then TIUC_DRY9_R=decline; else TIUC_DRY9_R="$TIUC_DRY9"; fi
+tiuc_eq "decline" "$TIUC_DRY9_R" \
+  "7b: the dry run says it would keep this one too — the marker pair is the one thing that could make an announcement read it as refreshable, and it must not"
 TIUC_OUT9="$(bash "$REPO_DIR/install.sh" --project-dir "$P9" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
 tiuc_eq "$TIUC_SHA9" "$(tiuc_sha "$P9/AGENTS.md")" \
   "7b: a file we have never written is kept whatever is inside it — a well-formed pair in it is not permission to merge into it"
@@ -824,12 +888,200 @@ tiuc_eq "user-modified" "$(awk -F'\t' '/^#/ { next } $1 == "AGENTS.md" { print $
 P11="$TIUC_ROOT/agents-ours-untouched"
 bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P11" >/dev/null 2>&1
 bash "$REPO_DIR/install.sh" --project-dir "$P11" --client codex --yes >/dev/null 2>&1
+TIUC_DRY11="$(tiuc_agents_line "$P11")"
+if grep -qF -- 'the Codex entry document (generated' <<< "$TIUC_DRY11"; then TIUC_DRY11_R=generated; else TIUC_DRY11_R="$TIUC_DRY11"; fi
+tiuc_eq "generated" "$TIUC_DRY11_R" \
+  "7d: the dry run promises to generate over an AGENTS.md that is ours and untouched — the fourth verdict, and the one an all-declines announcement would lose"
 TIUC_OUT11="$(bash "$REPO_DIR/install.sh" --project-dir "$P11" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
 if grep -qF -- 'Generated AGENTS.md' <<< "$TIUC_OUT11"; then TIUC_R11=written; else TIUC_R11=other; fi
 tiuc_eq "written" "$TIUC_R11" \
   "7d: an untouched AGENTS.md of ours is still rewritten whole on the next install — an installer that declined everything would pass every other row in this arm"
 tiuc_eq "toolkit" "$(awk -F'\t' '/^#/ { next } $1 == "AGENTS.md" { print $4; exit }' "$P11/.claude/state/install-receipt.tsv" 2>/dev/null)" \
   "7d: …and its row still says toolkit, so uninstall.sh removes a document nobody has edited"
+
+# 7e — the read-only entry document, which is the normal state of every unopened
+# file on a Perforce-managed Unity project.
+#
+# THE DEFECT THIS ARM EXISTS FOR, MEASURED UNDER A PTY. `mv` onto a file with no
+# write bit ASKS before overwriting, and exits 1 when the answer is no; the
+# installer's own --yes does not reach it. The first version of the merge ignored
+# that status, so a declined rename produced 'ok Refreshed the generated section
+# of AGENTS.md (your prose untouched)', Next step 2 repeating it, a user-modified
+# receipt row carrying the sha of the UNREFRESHED file, and rc 0. The commit
+# before it had aborted the whole install instead — a loud failure replaced by a
+# quiet false success, which this branch rates as the worse of the two.
+#
+# NO PTY IS NEEDED TO ASSERT THE FIX, and that is the point of fixing it by
+# refusing rather than by handling mv's status alone: the refusal is decided
+# before anything is written, so it is observable on a plain non-interactive run.
+# What a pty would add is the reproduction of the OLD failure, which needs the
+# prompt; that measurement lives in the merge function's header.
+P12="$TIUC_ROOT/agents-read-only"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P12" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P12" --client codex --yes >/dev/null 2>&1
+python3 - "$P12/AGENTS.md" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = re.sub(r'<!-- FILL:[^>]*-->', 'FILLED-BY-THE-USER', open(path).read())
+open(path, 'w').write(text + '\n## My Own Notes\n\nSENTINEL-READONLY\n')
+PY
+mkdir -p "$P12/Assets/Scripts"
+printf 'using VContainer;\npublic sealed class ReadOnlyProbe { }\n' > "$P12/Assets/Scripts/ReadOnlyProbe.cs"
+chmod 444 "$P12/AGENTS.md"
+TIUC_SHA12="$(tiuc_sha "$P12/AGENTS.md")"
+TIUC_RC12=0
+TIUC_OUT12="$(bash "$REPO_DIR/install.sh" --project-dir "$P12" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')" || TIUC_RC12=$?
+tiuc_eq "$TIUC_SHA12" "$(tiuc_sha "$P12/AGENTS.md")" \
+  "7e: a read-only AGENTS.md is not modified — the merge refuses before it writes anything rather than renaming a temp file over a file the user's VCS is holding closed"
+if grep -qF -- 'Refreshed the generated section of AGENTS.md' <<< "$TIUC_OUT12"; then TIUC_CLAIM12=claimed; else TIUC_CLAIM12=none; fi
+tiuc_eq "none" "$TIUC_CLAIM12" \
+  "7e: …and the run does NOT claim it refreshed it, which is the whole finding: a merge that reports success over a file it never touched is worse than one that fails"
+if grep -qF -- 'AGENTS.md is read-only' <<< "$TIUC_OUT12"; then TIUC_WHY12=named; else TIUC_WHY12=vague; fi
+tiuc_eq "named" "$TIUC_WHY12" \
+  "7e: …and says why, naming the file's mode rather than reporting a generic failure the user cannot act on"
+TIUC_ND12="$(awk '/^Not done:/ { inblock = 1; next } inblock && /^Next steps:/ { inblock = 0 } inblock' <<< "$TIUC_OUT12")"
+if grep -qF -- 'AGENTS.md' <<< "$TIUC_ND12"; then TIUC_ND12_R=listed; else TIUC_ND12_R=absent; fi
+tiuc_eq "listed" "$TIUC_ND12_R" \
+  "7e: …and records it under 'Not done:', which is the contract MCP-SETUP.md states for work this installer was asked for and did not do"
+tiuc_eq "0" "$TIUC_RC12" \
+  "7e: …while the run still exits 0 — the payload landed and the run reported what it skipped, which is that contract's other half"
+tiuc_eq "user-modified" "$(awk -F'\t' '/^#/ { next } $1 == "AGENTS.md" { print $4; exit }' "$P12/.claude/state/install-receipt.tsv" 2>/dev/null)" \
+  "7e: …and the row still describes the file that is actually on disk, rather than recording a merge that did not happen"
+tiuc_eq "$TIUC_SHA12" "$(tiuc_receipt_sha "$P12" 'AGENTS.md')" \
+  "7e: …with the checksum of the unrefreshed file, so the next run recognises it instead of reading a stale claim"
+
+# 7f — ours once, then replaced WHOLESALE by the user's own marker-less file. The
+# receipt still names the path, so 'did a run of ours write this path' says yes
+# while not one byte of ours is left. The row is withheld on the marker pair, and
+# this arm is why that second test exists: with the path test alone, --purge
+# deleted a file the same run had just called 'not ours — keeping yours'.
+P13="$TIUC_ROOT/agents-ours-then-replaced"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P13" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P13" --client codex --yes >/dev/null 2>&1
+if [ -n "$(tiuc_receipt_sha "$P13" 'AGENTS.md')" ]; then TIUC_PRE13=claimed; else TIUC_PRE13=unclaimed; fi
+tiuc_eq "claimed" "$TIUC_PRE13" \
+  "7f: install 1 claimed the path, so the receipt really does say yes to 'did we ever write here' and this arm is not vacuous"
+printf '# My own entry document\n\nNO-KINGLET-MARKERS-AT-ALL\n' > "$P13/AGENTS.md"
+TIUC_SHA13="$(tiuc_sha "$P13/AGENTS.md")"
+TIUC_OUT13="$(bash "$REPO_DIR/install.sh" --project-dir "$P13" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+if grep -qF -- 'keeping yours, untouched' <<< "$TIUC_OUT13"; then TIUC_SAY13=kept; else TIUC_SAY13=other; fi
+tiuc_eq "kept" "$TIUC_SAY13" \
+  "7f: the run says it is keeping the user's file untouched"
+tiuc_eq "" "$(tiuc_receipt_sha "$P13" 'AGENTS.md')" \
+  "7f: …and claims no row while saying it — a row here would be the false-reassurance pair this installer already records at its unreadable-origins block, with --purge acting on a file the sentence just disowned"
+bash "$REPO_DIR/uninstall.sh" --project-dir "$P13" --yes --purge --no-backup >/dev/null 2>&1
+if [ -f "$P13/AGENTS.md" ]; then TIUC_PURGE13=present; else TIUC_PURGE13=deleted; fi
+tiuc_eq "present" "$TIUC_PURGE13" \
+  "7f: …so even --purge leaves it, which is what 'not ours' has to mean at the one call site that can delete a file the user wrote"
+tiuc_eq "$TIUC_SHA13" "$(tiuc_sha "$P13/AGENTS.md")" \
+  "7f: …byte-for-byte"
+
+# 7g — read-only and UNEDITED, which is the other half of 7e and a different code
+# path. Perforce keeps every submitted, unopened file at 0444, so this is a
+# project where the user has changed nothing at all: ownership says the file is
+# ours, the whole-file write arm runs, and its `mv` lands on a read-only target.
+# Measured under a pty before the guard: `mv` asked, the declined prompt exited 1,
+# and because that `mv` is a bare command `set -e` ended the install — payload on
+# disk, receipt written for what it had, rc 1. The merge arm had just been taught
+# to refuse the identical condition, so the two arms answered it in opposite ways.
+P14="$TIUC_ROOT/agents-read-only-unedited"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P14" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P14" --client codex --yes >/dev/null 2>&1
+chmod 444 "$P14/AGENTS.md"
+TIUC_SHA14="$(tiuc_sha "$P14/AGENTS.md")"
+TIUC_RC14=0
+TIUC_OUT14="$(bash "$REPO_DIR/install.sh" --project-dir "$P14" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')" || TIUC_RC14=$?
+tiuc_eq "0" "$TIUC_RC14" \
+  "7g: an install over a read-only, unedited AGENTS.md finishes — a bare mv onto that file aborted the whole run once the prompt was declined, with the payload already written"
+tiuc_eq "444" "$(stat -c '%a' "$P14/AGENTS.md" 2>/dev/null || echo unknown)" \
+  "7g: …and the file's mode is untouched, which is the observable half on a non-interactive host: the write arm ends in chmod 644, so a guard that let it run would clear the VCS's read-only bit"
+if grep -qF -- 'AGENTS.md is read-only' <<< "$TIUC_OUT14"; then TIUC_WHY14=named; else TIUC_WHY14=silent; fi
+tiuc_eq "named" "$TIUC_WHY14" \
+  "7g: …and the run says which file and why rather than skipping it quietly"
+tiuc_eq "$TIUC_SHA14" "$(tiuc_sha "$P14/AGENTS.md")" \
+  "7g: …with its bytes as they were"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Arm 8 — merge_marked_region's own status contract, run from the extracted
+# function rather than from a re-spelling of it.
+#
+# WHY IT IS NOT REACHED BY AN INSTALL. Two of the three outcomes are: the merge
+# succeeds (every arm above), and the target is not writable (7e). The third —
+# the RENAME fails — needs a condition no install fixture can produce from the
+# outside: a read-only parent directory, a full filesystem, or, the shape this
+# was found through, `mv`'s interactive overwrite prompt being declined on a tty.
+# Deleting the `if mv …; then` test and letting the function fall through to
+# `return 0` left this whole file GREEN before this arm existed, which is exactly
+# the state the original defect shipped in: a merge that reports success over a
+# file it never touched, with a receipt row recording the checksum of the file as
+# it was before.
+#
+# It `eval`s the region inside a subshell, the same device arm 5 uses for the
+# criterion: the definition cannot leak into this file's scope, and a change to
+# install.sh's real function is what runs.
+tiuc_merge_fn() {
+  awk '/kinglet:merge-marked-region:begin/ { f = 1; next }
+       /kinglet:merge-marked-region:end/   { f = 0 }
+       f' "$REPO_DIR/install.sh"
+}
+TIUC_MERGE_SRC="$(tiuc_merge_fn)"
+TIUC_MERGE_N=$(printf '%s\n' "$TIUC_MERGE_SRC" | grep -c . || true)
+if [ "$TIUC_MERGE_N" -ge 8 ] && grep -qF -- 'merge_marked_region()' <<< "$TIUC_MERGE_SRC"; then TIUC_MERGE_OK=yes; else TIUC_MERGE_OK="extraction returned $TIUC_MERGE_N line(s)"; fi
+tiuc_eq "yes" "$TIUC_MERGE_OK" \
+  "the merge-function markers still delimit a real function — a renamed marker would make every call below run against an empty definition, and an empty eval reds nothing on its own"
+
+TIUC_M8="$TIUC_ROOT/merge-contract"
+mkdir -p "$TIUC_M8/dir"
+tiuc_m8_reset() {   # rebuild a target with one well-formed pair and a facts file
+  # `rm` FIRST, not a bare `>`. The previous case leaves the target at 0444 and a
+  # redirection onto a file with no write bit is `Permission denied` — which under
+  # this file's `set -euo pipefail` ends the run mid-arm with every later
+  # assertion unreported, the failure shape this suite calls worse than a red.
+  rm -f "$TIUC_M8/dir/target.md"
+  printf 'above\n<!-- kinglet:generated:begin -->\nOLD-REGION\n<!-- kinglet:generated:end -->\nbelow\n' > "$TIUC_M8/dir/target.md"
+  printf 'NEW-REGION\n' > "$TIUC_M8/facts.txt"
+  chmod 640 "$TIUC_M8/dir/target.md"
+}
+
+# rc 0 — the ordinary path, and the control that keeps the two failure rows from
+# passing over a function that always refuses.
+tiuc_m8_reset
+TIUC_M8_RC=0
+( eval "$TIUC_MERGE_SRC"; merge_marked_region "$TIUC_M8/dir/target.md" "$TIUC_M8/facts.txt" ) || TIUC_M8_RC=$?
+tiuc_eq "0" "$TIUC_M8_RC" \
+  "8: a writable target with a well-formed pair merges and returns 0 — the control, without which a function that refused everything would pass both rows below"
+if grep -qF -- 'NEW-REGION' "$TIUC_M8/dir/target.md" && ! grep -qF -- 'OLD-REGION' "$TIUC_M8/dir/target.md" \
+   && grep -qF -- 'below' "$TIUC_M8/dir/target.md"; then TIUC_M8_BODY=merged; else TIUC_M8_BODY=wrong; fi
+tiuc_eq "merged" "$TIUC_M8_BODY" \
+  "8: …with the region replaced and the text outside the pair still there"
+
+# rc 2 — not writable. Asserted here as well as end-to-end in 7e, because this is
+# where the STATUS is visible rather than the sentence it produces.
+tiuc_m8_reset
+chmod 444 "$TIUC_M8/dir/target.md"
+TIUC_M8_SHA="$(tiuc_sha "$TIUC_M8/dir/target.md")"
+TIUC_M8_RC2=0
+( eval "$TIUC_MERGE_SRC"; merge_marked_region "$TIUC_M8/dir/target.md" "$TIUC_M8/facts.txt" ) || TIUC_M8_RC2=$?
+tiuc_eq "2" "$TIUC_M8_RC2" \
+  "8: a read-only target returns 2 — its own status, so the caller can say 'read-only' instead of a generic failure the user cannot act on"
+tiuc_eq "$TIUC_M8_SHA" "$(tiuc_sha "$TIUC_M8/dir/target.md")" \
+  "8: …and nothing was written to it"
+
+# rc 1 — the rename fails. A read-only PARENT is the portable, tty-free way to
+# produce that: awk still writes its temp beside the facts file, so only the `mv`
+# fails, which is the one line this arm exists for.
+tiuc_m8_reset
+chmod 555 "$TIUC_M8/dir"
+TIUC_M8_SHA3="$(tiuc_sha "$TIUC_M8/dir/target.md")"
+TIUC_M8_RC3=0
+( eval "$TIUC_MERGE_SRC"; merge_marked_region "$TIUC_M8/dir/target.md" "$TIUC_M8/facts.txt" ) 2>/dev/null || TIUC_M8_RC3=$?
+tiuc_eq "1" "$TIUC_M8_RC3" \
+  "8: a rename that fails returns 1 rather than 0 — the status the first version of this function ignored, which is how a declined overwrite came to be reported as a successful refresh"
+tiuc_eq "$TIUC_M8_SHA3" "$(tiuc_sha "$TIUC_M8/dir/target.md")" \
+  "8: …and the target still holds the bytes it had, so the caller's decline is about a file that really was left alone"
+# Restored immediately: the EXIT trap removes this root as one named path, and a
+# 555 directory inside it would defeat that.
+chmod 755 "$TIUC_M8/dir"
 
 printf '  %s passed, %s failed\n' "$TIUC_PASS" "$TIUC_FAIL"
 [ "$TIUC_FAIL" -eq 0 ]

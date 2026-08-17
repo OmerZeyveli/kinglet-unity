@@ -43,7 +43,11 @@ skill per command, a generated `.codex/hooks.json`, and a `.codex/config.toml` r
 bridge. Two things then need doing that a Claude Code install does not need, and the installer's
 closing "Next steps" repeats both: **run `codex` once in the project and accept its trust prompt**
 (without it Codex registers no hooks there at all and says nothing about it), and fill the `FILL:`
-markers in `AGENTS.md` rather than in `CLAUDE.md`. Per-hook trust is a separate grant —
+markers in `AGENTS.md` rather than in `CLAUDE.md`. Once you have made that edit, a later install
+refreshes **only** the `kinglet:generated` region of that file — the project-facts block — and leaves
+everything else, including what the document says about hooks, skills and slash-command names, as the
+install that wrote it left them; the file is also recorded as yours from then on, so `uninstall.sh`
+keeps it and reports it, and `--purge` is what removes it. Per-hook trust is a separate grant —
 `--client codex --codex-trust` — and it is the only thing in this toolkit that writes a file outside
 your Unity project, so it is opt-in. [Kinglet on Codex CLI](../README.md#kinglet-on-codex-cli) is the
 full account.

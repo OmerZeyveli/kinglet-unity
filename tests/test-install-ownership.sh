@@ -2625,7 +2625,7 @@ fi
 #   * A malformed pair inside a file the user WROTE, rather than one this installer generated and the
 #     user then damaged. The distinction is invisible to install.sh — it reads markers, not history —
 #     but it is the difference between "repair the pair" being good advice and being confusing.
-#   * Duplicate markers (two begins, or two ends). `claude_md_marker_state` classifies them
+#   * Duplicate markers (two begins, or two ends). `marked_region_state` classifies them
 #     `malformed-count` by construction and no fixture here produces one, so that token's message is
 #     reasoned about, not measured. Review round 1 ran both by hand and both decline.
 #   * CRLF line endings, and a marker appearing inside a fenced code block in the user's own prose —

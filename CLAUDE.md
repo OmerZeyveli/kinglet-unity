@@ -201,13 +201,15 @@ again.** It rests on the rule being somewhere a Codex session cannot fail to mee
 places: the generated `AGENTS.md`, injected whole before every turn, and `using-kinglet`'s intro
 block, which states the rule inline rather than pointing at it.
 
-**A user edit no longer freezes either of them, and the half that used to is the half this section
-was wrong about twice.** An earlier version of this paragraph called the skill *"a symlinked skill,
-which no install branch can freeze"* — false. Its replacement said the two freeze *"by the same
-mechanism"* — also false. What was true until 2026-08-17, measured on one fixture by editing both
-files and re-running `--client codex`, is the left column of this table; the right column is what
-`AGENTS.md` did **before it was given `CLAUDE.md`'s marked-region merge**, and it is kept because the
-argument for two homes is only legible against it:
+**A user edit no longer freezes the `AGENTS.md` copy SILENTLY, and it still freezes most of it.** Read
+that as two claims, because a shorter version of this sentence — *"a user edit no longer freezes
+either of them"* — stood here for a day and was falsified by measurement within it. This paragraph has
+now been wrong three times in the same place: it called the skill *"a symlinked skill, which no
+install branch can freeze"*, then said the two freeze *"by the same mechanism"*, then said the freeze
+was over. What was true until 2026-08-17, measured on one fixture by editing both files and re-running
+`--client codex`, is the left column of this table; the right column is what `AGENTS.md` did **before
+it was given `CLAUDE.md`'s marked-region merge**, and it is kept because the argument for two homes is
+only legible against it:
 
 | | `.claude/skills/using-kinglet/SKILL.md` | `AGENTS.md`, until 2026-08-17 |
 |---|---|---|
@@ -226,21 +228,38 @@ run's loss. The doctor's verified count fell by one file (its `99 → 97` was a 
 standing in a single-file column; `AGENTS.md` alone is one). Every one of those errors ran in the
 same direction — they **understated** the asymmetry — so nothing built on the sentence over-claimed.
 
-**Both files now keep a `user-modified` row when the user edits them, and `AGENTS.md` keeps its
-generated region current on top of that.** Step 8d.1 refreshes between the markers exactly as Step 6
-does for `CLAUDE.md` — same predicate, same diagnosis, same remedy, and the same merge function
-rather than a second copy of it — so the vision half the user filled in survives byte-for-byte while
-the Project Facts follow the project. A file a previous run wrote keeps its row whatever state the
-user leaves it in; a file no run of ours ever wrote still gets none, which is what keeps
-`uninstall.sh --purge` off a document that was never ours. `tests/test-install-upgrade-client.sh`
-arms 6 and 7 hold all of it, including the direction that costs the user work.
+**What the merge changed, stated at its real size.** Step 8d.1 refreshes between the markers exactly
+as Step 6 does for `CLAUDE.md` — same predicate, same diagnosis, same remedy, and the same merge
+function rather than a second copy of it — so the vision half the user filled in survives
+byte-for-byte while the Project Facts follow the project, and an edited `AGENTS.md` now keeps a
+`user-modified` receipt row, which is what puts it back inside `studio-doctor.sh`'s report and
+`uninstall.sh`'s reach. An `AGENTS.md` no run of ours wrote, or one whose marker pair is gone because
+the user replaced the document wholesale, still gets no row — `--purge` must not reach a file that is
+not ours. `tests/test-install-upgrade-client.sh` arms 6 and 7 hold all of it, including the direction
+that costs the user work.
 
-**So the argument for two homes is no longer about one of them disappearing.** It is that a rule with
-one home has one thing to go wrong: `AGENTS.md` can still be declined — a marker pair the installer
-cannot bound is left alone with a diagnosis, which is the correct refusal and still a run where the
-generated half did not land — and a skill can still be kept as the user's. Neither is silent now, and
-neither is a reason to rely on a single copy. If you add a surface whose only correction lives in
-`AGENTS.md`, put it in a skill too.
+**Two things that sentence must not be read as saying.** `CLAUDE.md` gets **no receipt row at all** —
+it is never in the local-edits list and `--purge` has never reached it, so the two files are alike in
+the merge and unlike in the ownership claim; `tests/test-install-ownership.sh`'s S…S4 header is the
+durable statement of that. And **the marked region is only the Project Facts block.** Measured
+2026-08-17 with a sentinel line patched in above the `/name` bullet in the generator: it lands on a
+fresh install and does **not** land on an upgrade over a filled-in `AGENTS.md`. `## Running under
+Codex CLI`, the hooks-and-trust paragraph, the sub-agents paragraph and `## Non-negotiables not
+covered by a gate` all sit outside the pair and are written by the full generate only — so every
+Codex-specific *rule* in that document is still frozen by the instructed edit. Widening the region
+was considered and refused: everything inside it is replaced wholesale on every run, so widening
+would retroactively convert bytes users may already have edited into bytes the installer overwrites.
+
+**So the argument for two homes is stronger after the fix than before it, not weaker.** The `/name`
+rule is precisely the kind of sentence the merge does **not** reach: it lives outside the marked
+region, and the measurement above says an upgrade over a filled-in `AGENTS.md` never updates it. Three
+further ways the `AGENTS.md` copy fails to arrive, all of them now loud rather than silent — the file
+can be declined (a marker pair the installer cannot bound is left alone with a diagnosis), the refresh
+can be refused (a read-only file, which is every unopened file on a Perforce project), and the user
+can replace the document wholesale. The skill copy can be kept as the user's. **If you add a surface
+whose only correction lives in `AGENTS.md`, put it in a skill too** — that instruction is unchanged,
+and the reason it is unchanged is that the freeze this task closed was never the one that threatened
+this exclusion.
 
 The membership that criterion selected, 2026-08-16 — **every member, including the ones handled
 elsewhere**, because a member that appears in the rule and vanishes from the result is the one thing

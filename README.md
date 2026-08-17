@@ -266,10 +266,13 @@ never written unless you ask for it.
 with its checksum — what is ours to remove again, rather than a log of what any one run wrote. A
 `.gitignore` you already had is not in it: the installer appends to that one and never claims it. One
 this installer **created** is ours, until you edit it. On upgrade, files you edited are reported and
-kept. In `CLAUDE.md` — and, on a `--client codex` install, in `AGENTS.md`, which is the file that
-installer tells you to fill in — only the region between the `kinglet:generated` markers is
-refreshed: your prose is left byte-for-byte, and the file keeps its receipt row as yours, so the
-health check names it and `uninstall.sh` leaves it and says so.
+kept. In `CLAUDE.md` — and, on a `--client codex` install, in `AGENTS.md`, the file that installer
+tells you to fill in — only the region between the `kinglet:generated` markers is refreshed and your
+prose is left byte-for-byte. The rest of each document, including everything the Codex install writes
+about hooks, skills and slash-command names, is **not** refreshed once you have edited the file.
+`AGENTS.md` additionally keeps a receipt row recording it as yours, so the health check names it and
+`uninstall.sh` leaves it and says so; `CLAUDE.md` has never had a row at all, and nothing —
+`--purge` included — removes it.
 
 ### Then set up the MCP bridge
 
