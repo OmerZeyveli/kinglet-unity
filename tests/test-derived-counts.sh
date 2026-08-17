@@ -1522,6 +1522,38 @@ DCT_CATALOG=$(git -C "$REPO_DIR" ls-files 'src/catalog/*' 2>/dev/null | grep -c 
 DCT_KBUILD_PY=$(git -C "$REPO_DIR" ls-files 'tools/kinglet_build/*.py' 2>/dev/null | grep -c . || true)
 DCT_ADAPTERS=$(git -C "$REPO_DIR" ls-files 'adapters/*/profile.json' 2>/dev/null | grep -c . || true)
 
+# THE SELF-CONTAINED TEST FILES — the blast radius two documents now quote, derived here so the
+# quote moves with the tree. A test file is self-contained iff it executes a `set` enabling errexit
+# at its own top level; the runner does `set +e` before sourcing, so this partition decides which
+# files a `$(…)`-in-a-failure-message or an unguarded fallible substitution can kill outright.
+# The figure entered the tree on 2026-08-17 as prose and nothing could reach it: mutated by two at
+# every site, `test-derived-counts.sh`, `test-shipped-citations.sh`, `test-citations-resolve.sh`,
+# `test-mcp-citations.sh` and `check-provenance.sh` all stayed green. No numeral is written into
+# this comment, per the standing rule stated at `DCT_DECLARED`'s open residual (cited by construct,
+# not by distance): no live figure in this file's prose.
+#
+# NO DCT_DERIVATION FLOOR, AND THAT IS DELIBERATE RATHER THAN AN OMISSION — the same standing
+# as `DCT_ROOTS` and `DCT_MCPN_CLAUDE`, which are also read by rows and floored by none. A floor
+# guards a derivation whose emptiness would let an assertion pass; this one's emptiness cannot,
+# because the claim rows below compare it against a written numeral, so a derivation that collapsed
+# to zero reds by name against the document. Adding a floor would also silently move the per-source
+# count this block publishes into `docs/ANTI-VACUITY.md`'s floor-set row — which is the figure the
+# round that wrote this comment was dispatched to correct, having gone stale exactly this way.
+#
+# THE SENTENCE ABOVE IS SPELLED WITHOUT THE FLOOR'S OWN SYNTAX ON PURPOSE. The block publishes its
+# per-source count as `grep -cE '\|\| DCT_DERIVATION='` over this file, so a comment that writes the
+# floor literally IS a source as far as that command can tell. The first draft of this paragraph did
+# exactly that and moved the published count by one — a numeral falsified by the prose explaining why
+# it should not be falsified, inside the round dispatched to correct that same numeral. Caught by
+# re-deriving after the edit rather than before it.
+#
+# `awk` reads each file directly and `grep -c` drains its input, so nothing here can exit early on a
+# writer. Long-form `set -o errexit` is matched too: zero occurrences today, and a criterion that
+# only reads one spelling is how this repository's counts have gone wrong before.
+DCT_SELFC=$(for dct_tf in "$REPO_DIR"/tests/test-*.sh; do
+              awk '/^[[:space:]]*set[[:space:]]+(-[a-z]*e|-o[[:space:]]+errexit)/ { print FILENAME; exit }' "$dct_tf"
+            done 2>/dev/null | grep -c . || true)
+
 # THE DERIVATION HAS TO BE ABLE TO FAIL. Run outside a git checkout, every `git ls-files` is empty,
 # five zeros sum to zero, and zero compared with zero is a green suite that inspected nothing —
 # which is also exactly what a bad pathspec produces. Asserted before anything is compared.
@@ -1585,7 +1617,9 @@ docs/research/codex-client/findings.md	.src/catalog/. [|] [*][*][0-9]+[*][*] fil
 docs/research/codex-client/findings.md	[*][*][0-9]+[*][*] Python modules	$DCT_KBUILD_PY
 docs/research/codex-client/findings.md	profile.json. [|] [*][*][0-9]+[*][*] files	$DCT_ADAPTERS
 docs/research/codex-client/codex-facts.md	[0-9]+ of Kinglet.s [0-9]+ hooks are .PostToolUse.	$DCT_CF_POST,$DCK_HOOKS
-docs/research/codex-client/codex-facts.md	remaining [0-9]+ of Kinglet.s [0-9]+ hooks	$DCT_CF_NONTOOL,$DCK_HOOKS"
+docs/research/codex-client/codex-facts.md	remaining [0-9]+ of Kinglet.s [0-9]+ hooks	$DCT_CF_NONTOOL,$DCK_HOOKS
+docs/ANTI-VACUITY.md	live in the [0-9]+ self-contained test files	$DCT_SELFC
+provenance.tsv	live in the [0-9]+ self-contained test files	$DCT_SELFC"
 
 # THE WIDENING IS ASSERTED AGAINST A DERIVED BOUNDARY, NOT AGAINST A WRITTEN ONE.
 #
@@ -1730,10 +1764,11 @@ assert_eq "1" "$DCT_WIDE" \
 # compared in both directions on every run and is therefore not a quoted figure at all.
 #
 # A reader who disagrees should reopen it as its own task with a mutation battery, not add a row.
-DCT_DECLARED="docs/ANTI-VACUITY.md	3
+DCT_DECLARED="docs/ANTI-VACUITY.md	4
 docs/research/codex-client/codex-facts.md	2
 docs/research/codex-client/findings.md	16
 install.sh	1
+provenance.tsv	1
 tests/test-bash32-compat.sh	1
 tests/test-mcp-doc-instructions.sh	1
 tests/test-mcp-naming.sh	1

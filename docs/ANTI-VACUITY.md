@@ -941,20 +941,36 @@ row's assertion, which is the same ruling `## The floor set` opens with.
 | `test-install-upgrade-client.sh` · *…and they span more than one top-level prefix* | distinct first path segments of those rows | (a) | ≥ 2 |
 | `test-install-upgrade-client.sh` · *the criterion markers still delimit a real function* | lines between the named markers | (a) + (b) | ≥ 4 **and** the function name present |
 | `test-studio-doctor.sh` · *the codex fixture's receipt actually carries symlink rows* | symlink rows in a `--client codex` receipt | (a) | > 0 |
-| `test-derived-counts.sh` · *the tree-size figures are derived from a tree that has files in it* | **19 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each |
+| `test-derived-counts.sh` · *the tree-size figures are derived from a tree that has files in it* | **21 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each |
 | `test-derived-counts.sh` · *the region above this block was actually read* | path literals before the block | (a) + (f) | ≥ 10 |
 | `test-derived-counts.sh` · *…reaches N path(s) this file does not mention above* | the scanned set minus the mentioned set | (a) | ≥ 1 |
-| `test-derived-counts.sh` · *every tree-size claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row — **derive the count, do not read it here**; it was written as `20` and the table now holds 30 |
+| `test-derived-counts.sh` · *every tree-size claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row — **derive the count, do not read it here**; it was written as `20`, then as `30`, and the table has moved again since each |
 | `test-derived-counts.sh` · *every declared file is still scanned at its declared row count* (tree-size) | the claims table **vs** `DCT_DECLARED` | (d), **and it is the direction that catches emptiness**: measured on the emptied table, the `UNDECLARED` half fires only through the degenerate empty row while this half fires semantically | identity |
-| `test-derived-counts.sh` · *the vacuity-census figures are derived from a tree with files in it* | 3 sources, one sentinel, one site | (a) + (f) | ≥ 1 each |
+| `test-derived-counts.sh` · *the vacuity-census figures are derived from a tree with files in it* | 5 sources, one sentinel, one site | (a) + (f) | ≥ 1 each |
 | `test-derived-counts.sh` · *every vacuity-census claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row |
 | `test-derived-counts.sh` · *the word-numeral figures are derived from a tree that has surfaces in it* | **14 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each — **four of the fourteen were given `\|\| true` after mutation showed their derivation could fail before the floor read it**. The cell claimed those mutants *"killed the file outright … 49 passes / 0 failures"*: **withdrawn**. Re-measured under the gate, the suite reads `Failed: 2` with the floor's own sentence first and every assertion below it run; 49/0 reproduces only with errexit live inside the subshell, and `tests/run-tests.sh:341` turns it off (`$-` = `huB`, measured). The repairs stand — the shape is live in the 29 self-contained test files — but the consequence recorded here was a property of the measuring harness |
 | `test-derived-counts.sh` · *every declared file is still scanned at its declared row count* (word-numeral) | the claims table **vs** `DCW_DECLARED` | (d), same direction as the tree-size row above | identity |
 | `test-derived-counts.sh` · *every word-numeral claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row |
 
 **Row count versus site count, since this section's own rules demand the distinction:** the two
-`derived N skill(s) and M command(s)` bounds are **one** site; the two `test-derived-counts.sh`
-sentinel rows are **one site each over 19 and 3 sources**; everything else is one row per site.
+`derived N skill(s) and M command(s)` bounds are **one** site; the three `test-derived-counts.sh`
+sentinel rows are **one site each over 21, 5 and 14 sources** — tree-size, vacuity-census and
+word-numeral, in the order they appear above; everything else is one row per site.
+
+**This sentence said *two … over 19 and 3* until 2026-08-17, and the two source figures were never
+true — not stale by drift, wrong on the day they were written.** Measured across the branch rather
+than assumed: the commit that first wrote this sentence wrote both cells with it, and at that same
+commit the tree already derived **21** and **5**. It had moved the tree-size sources from 17 to 21
+itself and then wrote 19 beside them; the vacuity-census count has read 5 at every commit since that
+block existed and no commit on this branch ever derived 3. The third sentinel joined the table two
+commits later and this sentence still said two. The round then dispatched to fix precisely this line
+edited the paraphrase in the paragraph above the table instead and left this one, so for one commit
+the section stated the same quantity two ways. **Re-derive rather than trust any of it** — that is
+the whole ruling of the paragraph above the table, applied to the paragraph below it:
+
+```bash
+grep -cE '\|\| DCT_DERIVATION=' tests/test-derived-counts.sh   # and DCV_, and DCW_
+```
 
 **One construct in the word-numeral block was examined and NOT admitted, and it is the interesting
 one.** `DCW_PROBE` asserts that the normaliser turns words into digits — without it every row in that
