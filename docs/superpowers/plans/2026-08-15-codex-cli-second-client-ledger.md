@@ -569,7 +569,7 @@ The event stream shape, measured against the real binary:
 | 11 | Close the probe harness's residual guard gaps | **DONE** | `84e756a..42667d0` | added during the run and grown by five later tasks; 1 fix round; **found the flake's cause** |
 | WBR | Whole-branch review + fix loop | **CLOSED** | `599792f..e76b84e` | 3 rounds, closed by ruling at round 3 rather than at the cap; both Criticals discharged; see *The whole-branch review* below |
 | 12 | The installed project does not know it is on Codex | **DONE** | `195bbb1..40c3967` | general-purpose implementer; **3 fix rounds**, one of them prose-only; L-5 measured at 28 orphaned rows, not 16 |
-| 13 | The record documents — residuals, floors, criteria, the guard's edge | **OPEN** | — | added 2026-08-16; owns what the fix loop closed on rather than carrying to a round 4 |
+| 13 | The record documents — residuals, floors, criteria, the guard's edge | **DONE** | `7fcdadf..d9990e1` | general-purpose implementer, **fresh one from round 4**; **5 fix rounds**, the cap, closed on a CLOSE verdict not at the cap |
 | 14 | `AGENTS.md` has no marked-region merge | **OPEN** | — | added 2026-08-16 from Task 12's fix round, which closed the half it could and ruled the new write path a task rather than a round; Task 9's deliberate absence now needs reversing **with a reason**, because Task 12 made a correctness rule depend on the file |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
@@ -1329,3 +1329,100 @@ The byte-for-byte marker comparison **guards bytes, not behaviour**: three shado
 both regions byte-identical with the equality assertion green, and it was the *behavioural* arms that
 caught all three. The comment above it now says which half of the pair is weaker. A guard that
 documents its own weaker half is more useful than one that claims neither.
+
+---
+
+## Task 13 — close: the record documents, and the instruments the wave paid for
+
+Implementer: **general-purpose**, replaced by a **fresh one at round 4** per this skill's own rule, after
+three resumes on the same class. Report `DONE_WITH_CONCERNS`, then **five fix rounds** — the cap — but
+closed on an explicit CLOSE verdict rather than adjudicated at it. Commit range `7fcdadf..d9990e1`.
+Gate at close: `Total: 3959 · Passed: 3956 · Failed: 0 · Skipped: 3`, `SUITE_RC=0`, 45 headers = 45
+files, both `FAIL ` and `FAIL: ` token shapes 0, `provenance OK`.
+
+### The deliverable
+
+**The live-vs-pinned criterion** — L1 subject, L2 tense-and-binding, L3 repair direction — written into
+`docs/research/codex-client/README.md`, replacing the false *"nothing in `tests/` reads these two
+files"* (three guards read them). It is what unblocked guarding the last unguarded directory, and the
+thing it was blocked on was one word: fix round 1 of the whole-branch loop called those figures
+*"overwhelmingly per-run measurements"*, and **"overwhelmingly" is what let a second unguarded copy of
+`install.sh`'s `982` hide there**.
+
+### What the sweeps cost, and what they bought
+
+The class was declared complete four times and grew three times. Each growth had a *structural* cause,
+and the causes are worth more than the members:
+
+1. **A keyword proxy standing in for the criterion.** Eight hits from the file that mattered entered
+   the narrowing and zero survived. **Two criteria run over the same narrowed set are not two
+   independent checks** — which is also why the cruder branch-delta sweep missed the same row.
+2. **A word-numeral arm applied to one document and not to the deliverable's own sweep.** Digit-only
+   sweeps ran three times over this class and never saw two members written as words.
+3. **All three arms narrow by selecting a span, and a span is not a sentence** — so none of them can
+   see a second numeral sharing a sentence with an already-selected one. The cleanest instance:
+   `README.md`'s *"Five of the eight agents"*, a partition of a total **the same commit guards at the
+   same site**. Recorded in the criterion document with the two instruments that would close it and an
+   explicit ruling that Task 13 does not build them.
+
+**Three instruments this wave paid for, and any later sweep should start from:**
+
+- **A positive control against known members.** It caught three recall failures before any result was
+  trusted — a noun list that could not reach `registered`, a gap expression that could not span two
+  consecutive tokens, and a numeral pattern demanding a space where markdown emphasis sits.
+- **A reverse control.** Stripping a repair back off and checking the member *reappears*. It caught a
+  member the instrument could not have found: under a direct-only criterion the whole `pipefail` class
+  reads **zero**, not merely one short.
+- **Derivation-command sweeps** (`… | wc -l  # N`) — figures with no noun, invisible to every
+  noun-keyed search. Nobody asked for this arm; it was built because the criterion implied it.
+
+### Two guard defects found inside the fixing, and one figure that was never true
+
+- **Backticks in an assertion's failure message are command substitution**, evaluated when the
+  assertion fires. Harmless under the runner, which uses `set +e` — **fatal in the 29 self-contained
+  files**, measured at `9 pass / 0 fail / rc 127` against a baseline of 18/0, everything below unrun.
+  Class swept tree-wide: **one member, now zero.**
+- **`grep` matching nothing takes an assignment down under `pipefail` before the floor meant to catch
+  the emptiness can fire.** Class derived by *shape* rather than by block: **five members**, one fixed,
+  one deliberately argued at its site, three named unexamined rather than swept in silently.
+- **`19` and `3` were never true.** All 76 commits swept: `DCT` takes {0, 7, 11, 17, 21} across the
+  branch and `DCV` takes {0, 5}. The sentence and both cells were born together and wrong. Three
+  rounds had framed it as drift; it was false on arrival.
+
+### The mistake that recurred, and the sentence it earned
+
+**Twice on this task an instrument differed from its subject in one flag, and produced a number true
+of nothing that ships.** First a failure harvest matching one of the suite's two `FAIL` token shapes —
+it saw **4 of 38**. Then a mutation harness keeping errexit live where `tests/run-tests.sh` turns it
+off, which produced a `49 pass / 0 fail` truncation that does not happen. Both numbers were real
+measurements of the harness.
+
+> An instrument that differs from its subject in one flag produces a number that is true of nothing
+> that ships — and it looks exactly like a measurement, because it is one.
+
+The withdrawal is recorded at all four sites with what was measured, what it was measured **under**,
+and what the shape does instead. **Check `$-` inside any harness before trusting a figure from it.**
+
+### The controller was wrong twice, and the work caught both
+
+I told the implementer to restate 21/5/14 in the sentence — putting those values in four places with
+nothing comparing them, **reproducing the mechanism that produced the wrong sentence**. Proven by
+mutation: falsifying the value at cell *and* sentence leaves every guard green. I then offered a fenced
+derivation command as mitigation; the F6 cell three lines up carried exactly that mitigation and still
+shipped a stale `30` the same diff had to fix. Both were reported by the implementer before the
+reviewer reached them.
+
+### Closing measurement, and it is a measurement
+
+The file now satisfies its own rule — *"this file does NOT scan itself; no live figure is written into
+this file's prose"* — proved by flattening its comments and intersecting every integer against the
+**71 numeric values the file derives at runtime, dumped from a live sourced run rather than read off
+the page**: no integer in its prose is stated in the present tense as the current value of anything it
+derives. Every surviving coincidence is pinned history, and the proof they are read as history is that
+one is already stale on purpose.
+
+### Carried open — one item, one owner
+
+| Item | Ruling | Owner |
+|---|---|---|
+| The 21/5/14 sentinel-source class is unguarded — correct and consistent today, and it moves only when someone edits a floor in the file that carries the derivation | Safe: guardedness did not regress, and the durable fix is for the sentence to point at the cells rather than restate them, which is a design change rather than a correction | **Task 14**, whose row already owns the analogous unguarded-numeral item |
