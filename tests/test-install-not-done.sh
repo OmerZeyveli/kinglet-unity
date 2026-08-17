@@ -346,13 +346,29 @@ fi
 #     attribution is not a guess: without the `|| true` the same input gives 1, and with only the
 #     FIRST `printf` failing the status is still 0.
 #
-# NO FIXTURE CAN REACH THE SECOND ONE, AND THIS IS WHY THE GUARD IS SOURCE-SHAPED. A write that
-# fails after a successful open needs ENOSPC, EIO or EDQUOT at a real path. The one portable device
-# that produces it is `/dev/full`, and pointing the fixture's `.gitignore` at it is a trap rather
-# than a test: `install.sh` checksums a `.gitignore` it created, `sha256sum /dev/full` reads zeros
-# forever, and the suite would hang instead of failing. So this asserts the SHAPE the measurement
-# blessed — one status per redirection, read by an `if` — and it is weaker than a run in exactly the
-# way Section A's other members are.
+# THIS GUARD IS SOURCE-SHAPED BY CHOICE, NOT BECAUSE THE STATE IS UNREACHABLE — AND THE FIRST VERSION
+# OF THIS PARAGRAPH SAID *"NO FIXTURE CAN REACH THE SECOND ONE"*, WHICH IS FALSE.
+#
+# The half of that reasoning that holds: `/dev/full` really is a trap rather than a test. `install.sh`
+# checksums a `.gitignore` it created, and `/dev/full` reads zeros forever —
+# `timeout 3 sha256sum /dev/full` returns **rc 124** on this host — so a fixture pointed there would
+# HANG the suite instead of failing it, which is worse than no fixture.
+#
+# The half that does not: `/dev/full` is not the only route to ENOSPC. This environment permits
+# `unshare -Urm` plus `mount -t tmpfs -o size=64k` with no privileges at all (measured: the mount
+# succeeds, the tmpfs gets its own device number, and a page-aligned file on a filesystem filled to
+# 100 %% gives a real `printf: write error: No space left on device` while `sha256sum` on that same
+# file returns instantly, rc 0). A behavioural version of this guard is therefore buildable, and the
+# review that found this built one: the shipped shape reports the failure and the pre-fix group shape
+# prints `ok Updated .gitignore (4 entries)` over the same unchanged file.
+#
+# WHY IT IS STILL SHAPE-SHAPED HERE, stated as a decision rather than as a limit: it would put a
+# mount namespace and a skip guard into the closing round of a fix loop, on a host capability the
+# suite depends on nowhere else, and the property it would establish is the one this guard already
+# establishes — one status per redirection, unmasked. That trade is a judgement, and the honest form
+# of it is a paragraph that says the state is reachable and this file chooses not to reach it. The
+# instrument is recorded so the next reader can take it up without re-deriving it. It is weaker than
+# a run in exactly the way Section A's other members are.
 #
 # CONTINUATIONS ARE FOLDED FIRST, the same fix the receipt guard above needed: the append's
 # redirection sits on a continuation line, so a physical-line classifier would read a fragment that
@@ -390,11 +406,22 @@ fi
 # bytes, `jq` refused it, and the arm that had just failed printed *"the previous config (if any) is
 # untouched rather than half-written"*. Under Codex an unparseable hook config is a silent ALLOW.
 #
-# STRUCTURAL FOR A REASON NO FIXTURE CAN GET AROUND: whether a rename is atomic is a property of the
-# HOST, and the suite runs on one. A run on a machine where `$TMPDIR` and the project share a
-# filesystem — this one — is green either way, which is exactly how the claim came to be written down
-# as unconditional. So the guard is that the temps are created where they land, which is the property
-# that makes the claim host-independent.
+# SOURCE-SHAPED BY THE SAME CHOICE, AND THIS PARAGRAPH ALSO OVER-CLAIMED. It read *"structural for a
+# reason no fixture can get around … a run on a machine where `$TMPDIR` and the project share a
+# filesystem — this one — is green either way."* Measured: this host has a SECOND filesystem already
+# mounted and needs no namespace for it — `/dev/shm` is device 31 against the repository's 2067 — and
+# an earlier round used it. The round that wrote the sentence had one in its own cross-device
+# measurements while asserting it did not.
+#
+# What a behavioural version needs on top of that is a `.codex/` with a SPACE limit, because a
+# writable `.codex/` succeeds under both code shapes: the discriminator is a small tmpfs over
+# `.codex/` (the same unprivileged `unshare -Urm` instrument as A.5) with `TMPDIR=/dev/shm`, on which
+# the shipped code declines and keeps the old config while the pre-fix code replaces it through a
+# cross-device copy. Buildable, built by the review that found this, and not adopted here for the
+# reason A.5 gives.
+#
+# The property this guard does establish is that the temps are created where they land, which is what
+# makes the atomicity claim host-independent instead of true only where the suite happens to run.
 #
 # `/tmp` IS A tmpfs BY DEFAULT on Fedora, RHEL, Arch, openSUSE and in most containers, and any Unity
 # project on a second drive is cross-device even on a Debian-family host. `$TMPDIR` is also the
@@ -917,6 +944,19 @@ if grep -qF -- 'Next steps:' <<< "$INSTALL_OUT"; then
 else
   fail "B.7f: the run never reached 'Next steps:' — one read-only converted skill took the rest of the Codex layer with it"
 fi
+# THE ROW, WHICH IS THE HALF THIS STATE WAS BUILT WITHOUT ASKING. A refusal put around a row that was
+# inside the write disowns the file it declined to rewrite: measured 1 row before and 0 after, with
+# the file still on disk, unedited and ours, and `uninstall.sh --yes` walking past it. The receipt
+# states what we own at the END of the run, not what the run happened to write — the same rule
+# `.codex/hooks.json` was given one screen away, in the same commit that created this leak.
+B7F_REL="${B7F_VICTIM#"$B7F/"}"
+if [ -n "$B7F_VICTIM" ] && [ -f "$B7F_VICTIM" ] \
+   && awk -F'\t' -v w="$B7F_REL" '$1 == w && $4 == "toolkit" { found = 1 } END { exit !found }' \
+        "$B7F/.claude/state/install-receipt.tsv" 2>/dev/null; then
+  pass "B.7f: …and the converted skill it could not rewrite keeps its receipt row, so uninstall.sh can still take a file that is ours"
+else
+  fail "B.7f: $B7F_REL is on disk and ours, and the new receipt has no toolkit row for it — the run disowned a file it declined to rewrite, and uninstall.sh now walks past it forever"
+fi
 
 # ── B.7g: a stale skill link that cannot be removed ────────────────────────
 # THE THIRD `.agents/` WRITE, AND THE ONE NEITHER OF THE OTHER TWO STATES REACHES. B.7c seals the
@@ -946,6 +986,18 @@ if [ -L "$B7G/.agents/skills/a-skill-this-payload-does-not-ship" ]; then
   pass "B.7g: …and the link is still there, so the entry describes the disk rather than a wish"
 else
   fail "B.7g: the link was removed by a run that reported it could not be — the count and the file disagree"
+fi
+# THE ROW, THE SAME QUESTION B.7f ASKS. A link this run failed to prune is one nothing else in the
+# run can record — the loop that writes skill rows walks the PAYLOAD, and this link's skill is not in
+# it, which is what made it a prune candidate. Without a row here it is a link of ours that
+# `uninstall.sh` can never take: measured 1 row before and 0 after, `uninstall.sh --yes` leaving it.
+# The prune's own `case` is the ownership test — this block is willing to DELETE on that evidence, so
+# recording a row on the evidence it could not delete is strictly weaker.
+if awk -F'\t' '$1 == ".agents/skills/a-skill-this-payload-does-not-ship" && $4 == "toolkit" { found = 1 } END { exit !found }' \
+     "$B7G/.claude/state/install-receipt.tsv" 2>/dev/null; then
+  pass "B.7g: …and it keeps a receipt row, so uninstall.sh can finish the removal the sealed directory stopped"
+else
+  fail "B.7g: the stale link is still on disk and the new receipt has no toolkit row for it — the run disowned a link it could not remove, and nothing can take it away now"
 fi
 
 # ── B.8: a receipt row whose origin column cannot be read ──────────────────

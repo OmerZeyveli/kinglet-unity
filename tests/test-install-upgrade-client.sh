@@ -1078,11 +1078,26 @@ tiuc_eq "none" "$TIUC_CM15_FALSE" \
 # was a bare `mktemp`, so on a host where `/tmp` is a tmpfs — the default on
 # Fedora, RHEL, Arch, openSUSE and in most containers — or where the project sits
 # on a second drive, it degraded to a copy. Measured with `$TMPDIR` elsewhere and
-# the real 5429-byte config as the destination: an interrupted cross-device `mv`
-# left 4096 bytes that `jq` refuses, while the failure arm printed *"untouched
-# rather than half-written"*. The temp is created inside `.codex/` now, so the
-# claim holds on every host rather than on the one it was written on — and no
-# fixture here can tell the two apart, which is why this paragraph exists.
+# the real 5429-byte config as the destination: the file came out 4096 bytes and
+# `jq` refused it, while the failure arm printed *"untouched rather than
+# half-written"*. `strace` on this coreutils shows the sequence is worse than the
+# word "truncated" suggests — `renameat2` EXDEV, `renameat` EXDEV, then
+# **`unlinkat` of the destination** and a fresh `openat(O_CREAT|O_EXCL)`: the old
+# config is DELETED before the copy starts, so an interrupted copy has no old
+# bytes to fall back to. The temp is created inside `.codex/` now, so the claim
+# holds on every host rather than on the one it was written on.
+#
+# THIS PARAGRAPH USED TO END *"and no fixture here can tell the two apart"*, WHICH
+# IS FALSE and is corrected rather than deleted. One fixture distinguishes the two
+# shapes deterministically: `.codex/` mounted as a small tmpfs with a few kB free
+# and `TMPDIR=/dev/shm` (device 31 against this repository's 2067, no privileges
+# needed for either half — `unshare -Urm` plus `mount -t tmpfs` is permitted
+# unprivileged here, measured). The shipped code declines and leaves `hooks.json`
+# byte-identical and parseable; the pre-fix code writes it through the
+# cross-device copy above. Not adopted in this file for the reason
+# `tests/test-install-not-done.sh`'s A.6 gives — it is a host capability the suite
+# relies on nowhere else — and recorded here so that the limitation reads as a
+# choice rather than as a measurement.
 P16="$TIUC_ROOT/hooks-read-only"
 bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P16" >/dev/null 2>&1
 bash "$REPO_DIR/install.sh" --project-dir "$P16" --client codex --yes >/dev/null 2>&1

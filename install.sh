@@ -1142,8 +1142,9 @@ can_replace() {
 #   .codex/hooks.json              .codex/hooks.json       can_replace + rename reports
 #   .codex/config.toml create      .codex/config.toml      status               reports
 #   .agents/skills/ link           .agents/skills/<name>   status               counts, reports
-#   .agents/skills/ stale prune    .agents/skills/<name>   status               counts, reports
-#   .agents/skills/ command copy   .agents/skills/<c>/…    status               counts, reports
+#   .agents/skills/ stale prune    .agents/skills/<name>   status               counts, reports, rows
+#   .agents/skills/ command copy   .agents/skills/<c>/…    status               counts, reports, rows
+#   .codex/ stale-config delete    .codex/hooks.json       status               reports, keeps the row
 #   .codex/ mkdir                  .codex/                 status               becomes a skip reason
 #
 # THE MEMBERS THE VERB COULD NOT SEE, all measured, all **rc 1 mid-install** before the commit that
@@ -3406,6 +3407,20 @@ if [ "$CLIENT" = codex ]; then
             SKILLS_PRUNED=$((SKILLS_PRUNED + 1))
           else
             SKILLS_PRUNE_FAILED=$((SKILLS_PRUNE_FAILED + 1))
+            # THE ROW SURVIVES THE FAILED PRUNE, AND THIS IS THE SAME DEFECT AS `.codex/hooks.json`'S
+            # ONE ARM OVER. That row states what we OWN at the end of the run, not what this run
+            # wrote — and the moment a delete gained a failure arm, the row for the path it could not
+            # delete stopped being written at all. The link is not in the loop above (its skill is no
+            # longer in the payload, which is why it is a prune candidate), so nothing else can write
+            # it. Measured 2026-08-17: 1 row before, **0** after, the link still on disk, and
+            # `uninstall.sh --yes` walking past it — a link of ours that nothing can now remove.
+            #
+            # THE PREFIX IS THE OWNERSHIP TEST, and it is the one this loop already trusts. The `case`
+            # above admits only targets we write, and on that evidence alone this block is willing to
+            # DELETE the link; recording a row for one it failed to delete is strictly weaker than
+            # deleting it, and it is what lets `uninstall.sh` finish the job the seal prevented.
+            printf '.agents/skills/%s\t%s\tsymlink\ttoolkit\n' \
+              "$(basename "$slink")" "$starget" >> "$RECEIPT_TMP"
           fi
         fi ;;
     esac
@@ -3450,25 +3465,42 @@ if [ "$CLIENT" = codex ]; then
             "$(stat -c '%a' "$cdest" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
           continue
         fi
-        # THE COPY'S STATUS, AND THE `continue` BEFORE THE ROW. `is_modified` compares CONTENT, so a
-        # converted skill a VCS is holding read-only and nobody has edited is not modified: this arm
-        # takes it, and until 2026-08-17 the bare `cp` then ended the run at rc 1 with the links and
-        # AGENTS.md already written and `.codex/` not yet. Counted rather than fatal now — and no
-        # `toolkit` row is written for a file this run did not put there, since that row is what
-        # `uninstall.sh` acts on.
+        # THE COPY'S STATUS. `is_modified` compares CONTENT, so a converted skill a VCS is holding
+        # read-only and nobody has edited is not modified: this arm takes it, and until 2026-08-17
+        # the bare `cp` then ended the run at rc 1 with the links and AGENTS.md already written and
+        # `.codex/` not yet. Counted rather than fatal now.
+        #
+        # AND THE ROW IS OUTSIDE THE WRITE, WHICH THE FIRST VERSION OF THIS ARM GOT BACKWARDS. It
+        # `continue`d past the row on failure and argued *"no `toolkit` row is written for a file
+        # this run did not put there"* — true of a path nothing has ever written, and FALSE of this
+        # one, where an earlier run of ours wrote the file and this run merely declined to rewrite
+        # it. Measured 2026-08-17 on the state `tests/test-install-not-done.sh` B.7f already builds:
+        # 1 row before, **0** after, the file still on disk unedited and ours, and `uninstall.sh
+        # --yes` leaving it behind. That is the same leak this commit's sibling paragraph diagnosed
+        # for `.codex/hooks.json`, created one screen away by the same mechanism — a refusal added
+        # around a row that was inside the write.
+        #
+        # SO THE TEST IS OWNERSHIP AT THE END OF THE RUN, in the two disjuncts `.codex/hooks.json`
+        # uses: this run's own knowledge (we just wrote it), or `owned_by_installer`. `[ -f ]` is
+        # what keeps the other direction closed — a `cp` that failed with nothing at the path, which
+        # is B.7c's sealed-root state, still gets no row, and neither does a link that was never
+        # created.
         mkdir -p "$(dirname "$cdest")" 2>/dev/null || true
-        if ! cp "$cf" "$cdest" 2>/dev/null; then
+        cmd_wrote=0
+        if cp "$cf" "$cdest" 2>/dev/null; then
+          CMDSKILL_W=$((CMDSKILL_W + 1)); cmd_wrote=1
+        else
           CMDSKILL_F=$((CMDSKILL_F + 1))
-          continue
         fi
-        CMDSKILL_W=$((CMDSKILL_W + 1))
-        printf '%s\t%s\t%s\ttoolkit\n' "$crel" "$(sha_of "$cdest")" \
-          "$(stat -c '%a' "$cdest" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+        if [ -f "$cdest" ] && { [ "$cmd_wrote" -eq 1 ] || owned_by_installer "$crel" "$cf"; }; then
+          printf '%s\t%s\t%s\ttoolkit\n' "$crel" "$(sha_of "$cdest")" \
+            "$(stat -c '%a' "$cdest" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+        fi
       done <<< "$(find "$CONV_TMP" -type f 2>/dev/null | sort)"
       ok "Converted $CMDSKILL_W command(s) into .agents/skills/$([ "$CMDSKILL_K" -gt 0 ] && printf ', kept %s of yours' "$CMDSKILL_K")"
       if [ "$CMDSKILL_F" -gt 0 ]; then
         warn "$CMDSKILL_F converted command skill(s) could not be written into .agents/skills/."
-        note_not_done "$CMDSKILL_F of the converted command skills could not be written into .agents/skills/ — the file or its directory is read-only — so those Unity diagnostics are unreachable under Codex and no receipt row claims them. Make .agents/skills/ and its contents writable (under Perforce: check them out) and re-run install.sh --client codex."
+        note_not_done "$CMDSKILL_F of the converted command skills could not be written into .agents/skills/ — the file or its directory is read-only — so under Codex those Unity diagnostics are either absent or a version behind. Whichever of ours is still at that path keeps its receipt row, so uninstall.sh can still take it. Make .agents/skills/ and its contents writable (under Perforce: check them out) and re-run install.sh --client codex."
       fi
     else
       warn "codex-command-to-skill.sh failed — the commands did not cross to Codex."
@@ -3482,8 +3514,14 @@ if [ "$CLIENT" = codex ]; then
   fi
 
   # ── 8d.4 .codex/hooks.json ──────────────────────────────────────────────
-  # EVERY ARM HERE IS A REFUSAL BEFORE A BYTE IS WRITTEN, and each closes a measured way to end up
-  # with a config that registers and enforces nothing. The number is deliberately not written down:
+  # EVERY ARM HERE IS A REFUSAL BEFORE THE HOOK CONFIG IS REPLACED, and each closes a measured way to
+  # end up with a config that registers and enforces nothing. It read *"before a byte is written"*
+  # until 2026-08-17, and the commit that moved the temp into `.codex/` — for the atomicity the
+  # rename depends on — falsified it in the same diff: the shim writes ~5.4 kB into
+  # `.codex/.hooks.json.XXXXXX` before the read-only arm below refuses anything, and on a space-
+  # limited `.codex/` that write is exactly what runs out of room. Bytes land in the user's `.codex/`
+  # first now; what no arm here does is touch `hooks.json` itself before deciding. The number of arms
+  # is deliberately not written down:
   # this comment read `THREE REFUSALS` from the day the block was built, and the count has moved
   # twice since — once when the read-only check arrived, once when `.codex/` itself became a skip
   # reason instead of an abort — with the sentence carried forward as context both times. Read the
@@ -3579,10 +3617,24 @@ if [ "$CLIENT" = codex ]; then
         note_not_done ".codex/hooks.json was NOT written: the config derived from .claude/settings.json $(printf '%s' "$HCFG_DEFECTS" | tr '\n' ';' ). Fix those registrations in .claude/settings.json and re-run with --client codex."
         # And do not leave OUR own stale one behind if it is equally unrunnable. A config that
         # matches nothing on disk is the state this whole branch exists to refuse.
+        #
+        # THE DELETE READS ITS STATUS, LIKE ITS SIBLING IN 8d.2. It was bare while `rm -f "$slink"`
+        # two hundred lines up was given one in the same commit, in a round whose claim was that the
+        # class had been re-derived over every write verb — and `rm` is on that list. `rm -f` is
+        # silent about a missing file and not about a directory that refuses the unlink, so this was
+        # an abort on a `.codex/` that will not take the change. It needs a defective emitted config
+        # AND a sealed `.codex/` at once, which is why it is reported rather than given a fixture:
+        # the entry names the consequence, and the row below still claims the file so `uninstall.sh`
+        # can take away what this run could not.
         if [ -f "$CODEX_HOOKS_JSON" ] && owned_by_installer '.codex/hooks.json' '' \
            && [ -n "$(codex_config_defects "$CODEX_HOOKS_JSON")" ]; then
-          rm -f "$CODEX_HOOKS_JSON"
-          warn "Removed the previous .codex/hooks.json — its commands could not run either."
+          if rm -f "$CODEX_HOOKS_JSON" 2>/dev/null; then
+            warn "Removed the previous .codex/hooks.json — its commands could not run either."
+          else
+            warn "The previous .codex/hooks.json could not be removed, and its commands cannot run"
+            warn "either — Codex will register them and silently allow every call they should refuse."
+            note_not_done ".codex/hooks.json — the previous config could not be removed and its commands cannot run, so Codex registers hooks that allow silently. Delete .codex/hooks.json by hand, or make .codex/ writable and re-run install.sh --client codex."
+          fi
         fi
       fi
     else
@@ -3600,7 +3652,15 @@ if [ "$CLIENT" = codex ]; then
   # removes only what the receipt lists — can no longer take it, while `studio-doctor.sh` stops
   # checking it. The keep arms for AGENTS.md two hundred lines up already answer this the same way,
   # and the same reasoning covers the not-ours keep (no row, because it is not ours), the skip
-  # reasons, and the defects arm (which deletes an unrunnable config of ours, so `-f` is false).
+  # reasons, and the defects arm (which deletes an unrunnable config of ours when it can, so `-f`
+  # is false — and when it cannot, the file is still there and still ours and this row claims it).
+  #
+  # AND IT COVERS 8d.2's TWO NEW REFUSAL ARMS, WHICH IT DID NOT WHEN THIS PARAGRAPH WAS WRITTEN. The
+  # commit that diagnosed the leak here gave `.agents/` a `cp` refusal and a prune refusal in the
+  # same diff and left both rows inside their writes, so both leaked the same way — 1 row → 0, file
+  # and link still on disk, `uninstall.sh --yes` walking past them. A class is not closed by fixing
+  # the member you were looking at, and this paragraph is the evidence: it was written about
+  # `.codex/hooks.json` while two siblings were being created two hundred lines above it.
   #
   # TWO DISJUNCTS, and the first is this run's own knowledge: after a successful write the file no
   # longer matches the PREVIOUS receipt's checksum, so `owned_by_installer` alone would decline the
