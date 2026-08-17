@@ -40,11 +40,18 @@
 #
 # "NO FILE ON DISK WITHOUT A ROW" IS TRUE OF THE CLEAN PATH AND MUST NOT BE
 # TIGHTENED INTO A UNIVERSAL. A `--client codex` run over a user-edited
-# `AGENTS.md` or `.codex/hooks.json` leaves the file on disk and writes NO row —
-# "not ours, no claim", which is the installer's documented rule and the reason
-# `uninstall.sh` never removes a file it did not install. Every arm below starts
-# from a tree this suite built, so that state does not arise here; a future arm
-# that introduces it should assert the rule, not the invariant.
+# `.codex/hooks.json` leaves the file on disk and writes NO row — "not ours, no
+# claim", which is the installer's documented rule and the reason `uninstall.sh`
+# never removes a file it did not install.
+#
+# THAT PARAGRAPH NAMED `AGENTS.md` FIRST UNTIL 2026-08-17, AND IT IS NO LONGER
+# TRUE OF THAT FILE. Arms 6 and 7 are the ones that introduce the state, and they
+# assert the rule as it now stands rather than the invariant: a user-edited
+# `AGENTS.md` that a PREVIOUS RUN WROTE keeps a row, `user-modified`, carrying
+# its edited checksum — because the installer's own Codex Next step 2 tells the
+# user to edit that file, and a file that leaves the receipt when they do is a
+# file this toolkit stops knowing about. An `AGENTS.md` no run of ours ever wrote
+# still gets no row, and arm 7 asserts that direction in the same fixture set.
 #
 # Self-contained: defines its own helpers and sets `set -euo pipefail`, so
 # `bash tests/test-install-upgrade-client.sh` is a valid way to run it.
@@ -103,7 +110,18 @@ tiuc_receipt_sha() {   # $1 = project dir, $2 = path
     "$1/.claude/state/install-receipt.tsv" 2>/dev/null
 }
 
+# A missing file hashes to the empty string, and the `[ -f ]` guard is what makes
+# that true rather than fatal. `sha256sum` exits 1 on a missing path, `pipefail`
+# promotes that through the `| cut`, and at an assignment site `set -e` ends this
+# file with no message, mid-arm, every later assertion unrun — which reads as
+# absent rather than as red. Measured 2026-08-17 while mutation-proving arm 6: a
+# mutant that made the installer claim an edited AGENTS.md as `toolkit` got it
+# DELETED by the uninstaller, and the arm that exists to catch exactly that died
+# at the next hash instead of reporting it. A probe that dies is a probe that
+# reports nothing; the identical lesson is recorded in
+# tests/test-install-ownership.sh's own `sha_of`.
 tiuc_sha() {   # $1 = file
+  [ -f "$1" ] || return 0
   sha256sum "$1" 2>/dev/null | cut -d' ' -f1
 }
 
@@ -526,6 +544,292 @@ tiuc_eq "ok" "$TIUC_PRED_FLOOR" \
 if [ -n "$TIUC_PRED_BAD" ]; then printf '%s' "$TIUC_PRED_BAD" | sed 's|^|       |'; fi
 tiuc_eq "" "$TIUC_PRED_BAD" \
   "install.sh's codex_layer_path answers correctly in BOTH directions — every Codex-layer shape included AND every plain-install path excluded"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Arm 6 — the edit the installer ASKS FOR, and the freeze it used to cause.
+#
+# THE DEFECT, MEASURED ON THIS FIXTURE BEFORE THE FIX. `install.sh --client
+# codex` generates AGENTS.md with nine FILL: markers and its own Next step 2
+# tells the user to fill them in. Doing that made the file permanently frozen:
+# run 2 said "keeping yours, untouched" and dropped the receipt row, run 3 could
+# no longer list it under local edits (the list is built from the receipt),
+# `studio-doctor.sh` reported 98 files verified and never named it, and
+# `uninstall.sh` removed 98 and left it behind without reporting it. CLAUDE.md
+# has had a marked-region merge for this since the beginning; AGENTS.md had none,
+# so the moment the user did what the installer instructed, no reinstall, upgrade
+# or fix ever updated that document again — including the Project Facts and the
+# /name translation rule a Codex session depends on.
+#
+# WHY IT IS A FIXTURE AND NOT AN ASSERTION ON A FRESH INSTALL — this file's own
+# header, and it applies twice over here: the broken tree is one a user builds by
+# following instructions, and no fresh-install check ever constructs it.
+#
+# THE ORDER OF THE ASSERTIONS IS THE ORDER THE DAMAGE HAPPENS IN: the run's own
+# claim first (so a later green cannot come from a branch that never ran), then
+# the user's bytes, then the generated half, then the receipt, then the two
+# readers that were silent, then the uninstaller.
+# ─────────────────────────────────────────────────────────────────────────────
+P7="$TIUC_ROOT/codex-then-fill-markers"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P7" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P7" --client codex --yes >/dev/null 2>&1
+
+# Everything between the markers, which is the half the installer owns.
+tiuc_region() {   # $1 = file
+  awk '/kinglet:generated:begin/ { f = 1; next }
+       /kinglet:generated:end/   { f = 0 }
+       f' "$1" 2>/dev/null
+}
+
+# THE FLOOR. If install 1 stopped emitting the pair, every marker assertion below
+# would be satisfied by a file with no region at all — the vacuity this file
+# already carries two other floors against.
+TIUC_M7="$(awk '/kinglet:generated:begin/ { b++ } /kinglet:generated:end/ { e++ } END { print (b + 0) "," (e + 0) }' "$P7/AGENTS.md" 2>/dev/null || echo 0,0)"
+tiuc_eq "1,1" "$TIUC_M7" \
+  "install 1 wrote an AGENTS.md carrying exactly one marker pair — without it there is no region to refresh and every assertion in this arm is about nothing"
+TIUC_FILL7="$(awk '/FILL:/ { n++ } END { print n + 0 }' "$P7/AGENTS.md" 2>/dev/null || echo 0)"
+if [ "$TIUC_FILL7" -gt 0 ]; then TIUC_FILL7_OK=yes; else TIUC_FILL7_OK="no FILL: markers in the generated file"; fi
+tiuc_eq "yes" "$TIUC_FILL7_OK" \
+  "…and it carries the FILL: markers Next step 2 tells the user to fill in, so the edit below is the one the installer asks for and not an invented one"
+
+# The instructed edit, plus a section of the user's own below the region — the
+# two shapes of prose an AGENTS.md acquires once a human has opened it.
+python3 - "$P7/AGENTS.md" <<'PY'
+import re, sys
+path = sys.argv[1]
+text = open(path).read()
+text = text.replace('# [FILL: Game Title] — Project Guide', '# Kingdom of Wire — Project Guide')
+text = re.sub(r'<!-- FILL:[^>]*-->', 'FILLED-BY-THE-USER', text)
+text += '\n## My Own Notes\n\nSENTINEL-AGENTS-PROSE\n'
+open(path, 'w').write(text)
+PY
+TIUC_FILL7_AFTER="$(awk '/FILL:/ { n++ } END { print n + 0 }' "$P7/AGENTS.md" 2>/dev/null || echo 0)"
+tiuc_eq "0" "$TIUC_FILL7_AFTER" \
+  "the edit really filled every FILL: marker — otherwise 'the markers did not come back' below is true for the wrong reason"
+
+# THE PROJECT MOVES ON BETWEEN THE TWO INSTALLS, AND WITHOUT THAT HALF THIS ARM
+# CANNOT SEE A MERGE THAT DID NOTHING. On an unchanged project a refresh writes
+# back the region install 1 already wrote, so 'the region equals a fresh
+# generate' is satisfied by a merge that ran, by a merge that no-opped, and by a
+# branch that declined the file entirely. One more first-party C# file moves the
+# detected-stack table, which is exactly the kind of fact this document exists to
+# keep current — and it is what makes the two assertions below distinguish a
+# refresh from a file that was simply left alone.
+TIUC_REGION_BEFORE="$(tiuc_region "$P7/AGENTS.md" | sha256sum | cut -d' ' -f1)"
+mkdir -p "$P7/Assets/Scripts"
+printf 'using VContainer;\npublic sealed class SentinelSystem { }\n' > "$P7/Assets/Scripts/SentinelSystem.cs"
+
+TIUC_OUT7="$(bash "$REPO_DIR/install.sh" --project-dir "$P7" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+
+# THE BRANCH FLOOR, FIRST. A branch that declines everything would satisfy the
+# byte assertions below outright, because their whole content is that the user's
+# prose is still there.
+if grep -qF -- 'Refreshed the generated section of AGENTS.md' <<< "$TIUC_OUT7"; then TIUC_R7=refreshed; else TIUC_R7=other; fi
+tiuc_eq "refreshed" "$TIUC_R7" \
+  "the second install refreshed AGENTS.md in place rather than declining it — a branch that kept every edited file would pass every byte assertion below without merging anything"
+
+if grep -qF -- 'SENTINEL-AGENTS-PROSE' "$P7/AGENTS.md"; then TIUC_S7=kept; else TIUC_S7=lost; fi
+tiuc_eq "kept" "$TIUC_S7" \
+  "the user's own section below the region survived the refresh"
+TIUC_FILL7_BACK="$(awk '/FILL:/ { n++ } END { print n + 0 }' "$P7/AGENTS.md" 2>/dev/null || echo 0)"
+tiuc_eq "0" "$TIUC_FILL7_BACK" \
+  "…and the FILL: markers did not come back, so the vision half the user filled in is what is on disk"
+
+# THE GENERATED HALF IS CURRENT, AND THIS IS THE ASSERTION THAT READS THE CLIENT.
+# The region is client-conditional — it names the Skill tool for Claude Code and
+# says to read the SKILL.md for Codex, which has no skill tool — so a refresh
+# that forgot to pass the client would write the wrong client's sentence into the
+# one document Codex injects whole, on every re-install. Comparing against a
+# fresh generate for the same project catches that AND a region left stale.
+bash "$REPO_DIR/scripts/generate-claude-md.sh" --facts-only --client codex "$P7" > "$TIUC_ROOT/facts7.txt" 2>/dev/null
+tiuc_region "$P7/AGENTS.md" > "$TIUC_ROOT/region7.txt"
+TIUC_REGION_N=$(grep -c . < "$TIUC_ROOT/region7.txt" || true)
+if [ "$TIUC_REGION_N" -ge 10 ]; then TIUC_REGION_FLOOR=ok; else TIUC_REGION_FLOOR="extracted $TIUC_REGION_N line(s)"; fi
+tiuc_eq "ok" "$TIUC_REGION_FLOOR" \
+  "the extraction found a real region in the refreshed AGENTS.md — two empty files compare equal, which is how this comparison would go quiet"
+if cmp -s "$TIUC_ROOT/region7.txt" "$TIUC_ROOT/facts7.txt"; then TIUC_REGION_EQ=same; else TIUC_REGION_EQ=different; fi
+tiuc_eq "same" "$TIUC_REGION_EQ" \
+  "the refreshed region is byte-for-byte what a fresh generate produces for this project and this client — a refresh that dropped the client would put Claude Code's skill-loading sentence into the document Codex injects"
+if [ "$TIUC_REGION_BEFORE" = "$(sha256sum < "$TIUC_ROOT/region7.txt" | cut -d' ' -f1)" ]; then TIUC_REGION_MOVED=no; else TIUC_REGION_MOVED=yes; fi
+tiuc_eq "yes" "$TIUC_REGION_MOVED" \
+  "…and it MOVED: the project gained a C# file between the two installs and the merged region followed it, so a merge that quietly did nothing cannot satisfy the comparison above"
+
+# THE ROW, AND ITS ORIGIN IS THE WHOLE POINT. A 'toolkit' row here would be a
+# claim uninstall.sh acts on, and it would delete the prose the installer told
+# the user to write.
+TIUC_ROW7="$(awk -F'\t' '/^#/ { next } $1 == "AGENTS.md" { print $4; exit }' "$P7/.claude/state/install-receipt.tsv" 2>/dev/null)"
+tiuc_eq "user-modified" "$TIUC_ROW7" \
+  "the refreshed AGENTS.md keeps a receipt row and it says user-modified — before this fix the row vanished, and a file with no row is one uninstall.sh, studio-doctor.sh and the next install can all no longer see"
+TIUC_SHA7="$(tiuc_receipt_sha "$P7" 'AGENTS.md')"
+tiuc_eq "$(tiuc_sha "$P7/AGENTS.md")" "$TIUC_SHA7" \
+  "…carrying the checksum of the merged file, so the next run recognises it as the same edited file rather than as a stranger"
+
+# The third install: the run that used to be silent, and the one that proves the
+# refresh reproduces itself instead of growing the file.
+TIUC_BEFORE7="$(tiuc_sha "$P7/AGENTS.md")"
+TIUC_OUT7B="$(bash "$REPO_DIR/install.sh" --project-dir "$P7" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+tiuc_eq "$TIUC_BEFORE7" "$(tiuc_sha "$P7/AGENTS.md")" \
+  "a third install left AGENTS.md byte-for-byte identical — the merge reproduces the region rather than adding to it once per run"
+# BLOCK-SCOPED, not a whole-output grep: the paths are printed indented under the
+# local-edits warn line, and every other line naming this file would satisfy a
+# loose search. This is the reader that went silent from run 3 on.
+TIUC_EDIT_BLOCK="$(awk '
+  /installed file\(s\) have local edits/ { inblock = 1; next }
+  inblock && /^       [^ ]/ { print; next }
+  inblock { inblock = 0 }
+' <<< "$TIUC_OUT7B" | sed 's/^ *//')"
+if grep -qxF -- 'AGENTS.md' <<< "$TIUC_EDIT_BLOCK"; then TIUC_LISTED7=named; else TIUC_LISTED7=silent; fi
+tiuc_eq "named" "$TIUC_LISTED7" \
+  "the third install lists AGENTS.md under the files it is keeping for you — the run that was silent about it before, because that list is built from the receipt row the previous run had thrown away"
+
+# The doctor: the second reader that never mentioned the file.
+TIUC_DOC7="$(bash "$REPO_DIR/scripts/studio-doctor.sh" --project-dir "$P7" 2>&1 || true)"
+if grep -qF -- 'AGENTS.md' <<< "$TIUC_DOC7"; then TIUC_DOC7_R=named; else TIUC_DOC7_R=silent; fi
+tiuc_eq "named" "$TIUC_DOC7_R" \
+  "studio-doctor.sh names AGENTS.md — a frozen entry document used to sit outside its verified set entirely, so the health check called the project intact while the file it injects whole was unreachable to every later run"
+
+# The tree, as a set: nothing on disk without a row, nothing in the receipt
+# without a path.
+TIUC_DISK7=$(tiuc_codex_paths "$P7")
+TIUC_ROWS7=$(tiuc_receipt_paths "$P7")
+TIUC_UNOWNED7=$(comm -23 <(printf '%s\n' "$TIUC_DISK7") <(printf '%s\n' "$TIUC_ROWS7") | grep -c . || true)
+tiuc_eq "0" "$TIUC_UNOWNED7" \
+  "after the edit and two more installs, no Codex-layer file on disk is left without a receipt row"
+TIUC_GHOST7=0
+while IFS= read -r tiuc_r7; do
+  [ -n "$tiuc_r7" ] || continue
+  [ -e "$P7/$tiuc_r7" ] || [ -L "$P7/$tiuc_r7" ] || TIUC_GHOST7=$((TIUC_GHOST7 + 1))
+done <<< "$TIUC_ROWS7"
+tiuc_eq "0" "$TIUC_GHOST7" \
+  "…and every row in that receipt names a path that is actually there"
+
+# The uninstaller, which is where a wrong row costs the user their work.
+TIUC_KEEP7="$(tiuc_sha "$P7/AGENTS.md")"
+TIUC_UNINST7="$(bash "$REPO_DIR/uninstall.sh" --project-dir "$P7" --yes --no-backup 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+if [ -f "$P7/AGENTS.md" ]; then TIUC_ALIVE7=present; else TIUC_ALIVE7=deleted; fi
+tiuc_eq "present" "$TIUC_ALIVE7" \
+  "uninstall.sh left the edited AGENTS.md on disk — the row is user-modified, and that is the origin its classifier must never delete"
+tiuc_eq "$TIUC_KEEP7" "$(tiuc_sha "$P7/AGENTS.md")" \
+  "…with the user's bytes unchanged"
+TIUC_KEPT_BLOCK="$(awk '
+  /keep .*file\(s\) you modified/ { inblock = 1; next }
+  inblock && /^ *[^ ]/ { print; next }
+  inblock { inblock = 0 }
+' <<< "$TIUC_UNINST7" | sed 's/^ *//')"
+if grep -qxF -- 'AGENTS.md' <<< "$TIUC_KEPT_BLOCK"; then TIUC_UNI7=named; else TIUC_UNI7=silent; fi
+tiuc_eq "named" "$TIUC_UNI7" \
+  "…and said so, under the files it kept because you modified them, rather than leaving it behind unreported"
+TIUC_LEFT7=$(tiuc_codex_paths "$P7" | grep -c . || true)
+tiuc_eq "1" "$TIUC_LEFT7" \
+  "…while the rest of the Codex layer is gone — the uninstaller still removes what it owns, and exactly what it owns"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Arm 7 — the four states of an AGENTS.md that is NOT ours, and the dry run that
+# has to describe each of them before the real run does it.
+#
+# WHY THE DRY RUN IS HALF OF EVERY ROW. The line here read
+# 'AGENTS.md — the Codex entry document (generated…)' unconditionally, so against
+# a project whose AGENTS.md the real run declines, the dry run promised to
+# generate one. That is the defect state S3b in tests/test-install-ownership.sh
+# guards one file over, and this file's installer has already paid for it twice:
+# an announcement computed from a copy of the write's condition is a second
+# definition, and a second definition drifts.
+#
+# THE STATES, AND WHAT SEPARATES THEM. Ownership alone cannot answer here —
+# 'not ours' covers a file we wrote and the user then edited, a file we wrote and
+# the user then damaged, and a file we never wrote at all, and those three want
+# three different outcomes. What separates the last from the first two is whether
+# a PREVIOUS RECEIPT carried the path, and 7b is the row that holds that
+# distinction: a hand-written AGENTS.md carrying a well-formed pair fails only
+# that test, and an earlier draft of the installer told its owner their markers
+# were malformed — a diagnosis that is false of the file in front of them.
+# ─────────────────────────────────────────────────────────────────────────────
+# tiuc_agents_line <project> — the dry run's one claim about AGENTS.md, by exact
+# first-field match INSIDE the `Would install:` block. `AGENTS.md` is a prefix of
+# nothing here, but field equality is the claim and substring presence is not.
+#
+# THE BLOCK SCOPE IS NOT TIDINESS — it was measured. A dry run against a project
+# whose AGENTS.md has local edits prints that path, indented and alone, under the
+# upgrade scan's `keeping yours:` list, which runs BEFORE this block. An unscoped
+# first-field match reads that list entry as the claim and gets a bare path with
+# no verdict in it, so the assertion fails against a correct installer — the
+# false-red half of the same mistake the claim line itself used to make.
+tiuc_agents_line() {   # $1 = project dir
+  bash "$REPO_DIR/install.sh" --project-dir "$1" --client codex --yes --dry-run 2>&1 \
+    | sed $'s/\x1b\\[[0-9;]*m//g' \
+    | awk '/^Would install:/ { inblock = 1; next } inblock && $1 == "AGENTS.md" { print; exit }'
+}
+
+# 7a — a user's own AGENTS.md, no markers, no install has ever run here.
+P8="$TIUC_ROOT/agents-not-ours-plain"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P8" >/dev/null 2>&1
+printf '# My own AGENTS file\n\nNOT-KINGLETS-FILE\n' > "$P8/AGENTS.md"
+TIUC_SHA8="$(tiuc_sha "$P8/AGENTS.md")"
+TIUC_DRY8="$(tiuc_agents_line "$P8")"
+if grep -qF -- 'would keep yours' <<< "$TIUC_DRY8"; then TIUC_DRY8_R=decline; else TIUC_DRY8_R="$TIUC_DRY8"; fi
+tiuc_eq "decline" "$TIUC_DRY8_R" \
+  "7a: the dry run says it would keep a user's own AGENTS.md rather than promising to generate one over it"
+bash "$REPO_DIR/install.sh" --project-dir "$P8" --client codex --yes >/dev/null 2>&1
+tiuc_eq "$TIUC_SHA8" "$(tiuc_sha "$P8/AGENTS.md")" \
+  "7a: …and the real run left it byte-for-byte alone"
+tiuc_eq "" "$(tiuc_receipt_sha "$P8" 'AGENTS.md')" \
+  "7a: …and claimed no row for it, so uninstall.sh --purge can never reach a file no run of ours wrote"
+
+# 7b — the same, but the user's file carries a well-formed marker pair. Ownership
+# says 'not ours' and the markers say 'refreshable', and only the absence of a
+# previous row tells them apart.
+P9="$TIUC_ROOT/agents-not-ours-marked"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P9" >/dev/null 2>&1
+printf '# My own AGENTS file\n\n<!-- kinglet:generated:begin -->\nmine, not yours\n<!-- kinglet:generated:end -->\n\nNOT-KINGLETS-FILE\n' > "$P9/AGENTS.md"
+TIUC_SHA9="$(tiuc_sha "$P9/AGENTS.md")"
+TIUC_OUT9="$(bash "$REPO_DIR/install.sh" --project-dir "$P9" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+tiuc_eq "$TIUC_SHA9" "$(tiuc_sha "$P9/AGENTS.md")" \
+  "7b: a file we have never written is kept whatever is inside it — a well-formed pair in it is not permission to merge into it"
+tiuc_eq "" "$(tiuc_receipt_sha "$P9" 'AGENTS.md')" \
+  "7b: …and it gets no row either"
+if grep -qF -- 'do not form exactly one begin/end pair' <<< "$TIUC_OUT9"; then TIUC_DIAG9=wrong; else TIUC_DIAG9=none; fi
+tiuc_eq "none" "$TIUC_DIAG9" \
+  "7b: …and the run does not tell its owner their markers are malformed, which is false of a file whose pair is well formed"
+
+# 7c — ours, and then the user damages the pair. The decline arm, with the
+# diagnosis that names which half is wrong.
+P10="$TIUC_ROOT/agents-ours-then-broken"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P10" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P10" --client codex --yes >/dev/null 2>&1
+python3 - "$P10/AGENTS.md" <<'PY'
+import sys
+path = sys.argv[1]
+lines = [l for l in open(path).read().split('\n') if 'kinglet:generated:end' not in l]
+open(path, 'w').write('\n'.join(lines) + '\nSENTINEL-BROKEN-PAIR\n')
+PY
+TIUC_SHA10="$(tiuc_sha "$P10/AGENTS.md")"
+TIUC_DRY10="$(tiuc_agents_line "$P10")"
+if grep -qF -- 'NOT touched' <<< "$TIUC_DRY10"; then TIUC_DRY10_R=decline; else TIUC_DRY10_R="$TIUC_DRY10"; fi
+tiuc_eq "decline" "$TIUC_DRY10_R" \
+  "7c: the dry run declines a damaged marker pair instead of promising a refresh the real run will not perform"
+TIUC_OUT10="$(bash "$REPO_DIR/install.sh" --project-dir "$P10" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+tiuc_eq "$TIUC_SHA10" "$(tiuc_sha "$P10/AGENTS.md")" \
+  "7c: the real run left every byte of the damaged file alone — the merge against an unbounded pair is what deletes the rest of a user's file"
+if grep -qF -- 'begin marker has no closing' <<< "$TIUC_OUT10"; then TIUC_DIAG10=named; else TIUC_DIAG10=vague; fi
+tiuc_eq "named" "$TIUC_DIAG10" \
+  "7c: …and said which half of the pair is missing, so the reader can check the sentence against their own file"
+if grep -qF -- 'install.sh --client codex' <<< "$TIUC_OUT10"; then TIUC_FIX10=named; else TIUC_FIX10=bare; fi
+tiuc_eq "named" "$TIUC_FIX10" \
+  "7c: …and pointed at the invocation that writes this file, since a bare re-run of the default client never touches AGENTS.md"
+tiuc_eq "user-modified" "$(awk -F'\t' '/^#/ { next } $1 == "AGENTS.md" { print $4; exit }' "$P10/.claude/state/install-receipt.tsv" 2>/dev/null)" \
+  "7c: …and the declined file keeps a row, so the one file carrying a fault the user must repair is not also the one file nothing reports"
+
+# 7d — ours and untouched, the anti-'decline everything' control. A predicate
+# mutated to keep every file passes 7a, 7b and 7c outright, because their whole
+# content is that nothing happened.
+P11="$TIUC_ROOT/agents-ours-untouched"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P11" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P11" --client codex --yes >/dev/null 2>&1
+TIUC_OUT11="$(bash "$REPO_DIR/install.sh" --project-dir "$P11" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')"
+if grep -qF -- 'Generated AGENTS.md' <<< "$TIUC_OUT11"; then TIUC_R11=written; else TIUC_R11=other; fi
+tiuc_eq "written" "$TIUC_R11" \
+  "7d: an untouched AGENTS.md of ours is still rewritten whole on the next install — an installer that declined everything would pass every other row in this arm"
+tiuc_eq "toolkit" "$(awk -F'\t' '/^#/ { next } $1 == "AGENTS.md" { print $4; exit }' "$P11/.claude/state/install-receipt.tsv" 2>/dev/null)" \
+  "7d: …and its row still says toolkit, so uninstall.sh removes a document nobody has edited"
 
 printf '  %s passed, %s failed\n' "$TIUC_PASS" "$TIUC_FAIL"
 [ "$TIUC_FAIL" -eq 0 ]

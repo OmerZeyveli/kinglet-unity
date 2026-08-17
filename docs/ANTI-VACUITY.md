@@ -940,6 +940,12 @@ row's assertion, which is the same ruling `## The floor set` opens with.
 | `test-install-upgrade-client.sh` · *the receipt carries non-symlink Codex-layer rows to edit* | non-symlink rows | (a) | ≥ 3 |
 | `test-install-upgrade-client.sh` · *…and they span more than one top-level prefix* | distinct first path segments of those rows | (a) | ≥ 2 |
 | `test-install-upgrade-client.sh` · *the criterion markers still delimit a real function* | lines between the named markers | (a) + (b) | ≥ 4 **and** the function name present |
+| `test-install-upgrade-client.sh` · *install 1 wrote an AGENTS.md carrying exactly one marker pair* | begin/end markers in the generated entry document | **(g)** + (a) | == one of each |
+| `test-install-upgrade-client.sh` · *…and it carries the FILL: markers Next step 2 tells the user to fill in* | `FILL:` occurrences before the edit | (a) | > 0 |
+| `test-install-upgrade-client.sh` · *the second install refreshed AGENTS.md in place rather than declining it* | the branch the run announced | **(g)** | announced |
+| `test-install-upgrade-client.sh` · *the extraction found a real region in the refreshed AGENTS.md* | lines between the markers after the merge | (a) | ≥ 10 |
+| `test-install-upgrade-client.sh` · *…and it MOVED* | the same region, before **vs** after a fact-changing edit to the project | (c) + (e) | changed — **the row that stops a no-op merge passing**: on an unchanged project the region a refresh writes back is the one install 1 wrote, so the equality above holds for a merge that ran, one that did nothing, and a branch that declined |
+| `test-install-upgrade-client.sh` · *7d: an untouched AGENTS.md of ours is still rewritten whole* | the branch the run announced | **(g)** | announced — the anti-*decline-everything* control, without which 7a–7c pass over an installer that keeps every file |
 | `test-studio-doctor.sh` · *the codex fixture's receipt actually carries symlink rows* | symlink rows in a `--client codex` receipt | (a) | > 0 |
 | `test-derived-counts.sh` · *the tree-size figures are derived from a tree that has files in it* | **21 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each |
 | `test-derived-counts.sh` · *the region above this block was actually read* | path literals before the block | (a) + (f) | ≥ 10 |

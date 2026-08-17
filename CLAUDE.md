@@ -201,37 +201,46 @@ again.** It rests on the rule being somewhere a Codex session cannot fail to mee
 places: the generated `AGENTS.md`, injected whole before every turn, and `using-kinglet`'s intro
 block, which states the rule inline rather than pointing at it.
 
-**Both can be frozen by a user edit, and they are frozen by different mechanisms with different
-consequences.** An earlier version of this paragraph called the skill *"a symlinked skill, which no
-install branch can freeze"*, and that is false. Its replacement then said the two freeze *"by the
-same mechanism"*, and that is false too — measured on one fixture, editing both files and re-running
-`--client codex`:
+**A user edit no longer freezes either of them, and the half that used to is the half this section
+was wrong about twice.** An earlier version of this paragraph called the skill *"a symlinked skill,
+which no install branch can freeze"* — false. Its replacement said the two freeze *"by the same
+mechanism"* — also false. What was true until 2026-08-17, measured on one fixture by editing both
+files and re-running `--client codex`, is the left column of this table; the right column is what
+`AGENTS.md` did **before it was given `CLAUDE.md`'s marked-region merge**, and it is kept because the
+argument for two homes is only legible against it:
 
-| | `.claude/skills/using-kinglet/SKILL.md` | `AGENTS.md` |
+| | `.claude/skills/using-kinglet/SKILL.md` | `AGENTS.md`, until 2026-08-17 |
 |---|---|---|
-| what decides | `is_modified` in the Step-5 payload loop | `owned_by_installer 'AGENTS.md' ''` in Step 8d.1 |
+| what decides | `is_modified` in the Step-5 payload loop | `owned_by_installer 'AGENTS.md' ''` in Step 8d.1, alone |
 | receipt row after | `user-modified` — **kept** | **none at all** |
-| `studio-doctor.sh` | *"1 file(s) modified since install"*, named | never mentioned; the verified set silently drops from 99 to 97 |
+| `studio-doctor.sh` | *"1 file(s) modified since install"*, named | never mentioned; it left the verified set entirely |
 | `uninstall.sh` | `keep 1 file(s) you modified` — left on disk **and reported** | **never reached**, left on disk and not reported |
 
-**The receipt row is the whole difference, and it is a sharper argument for two copies than "risk"
-was.** A frozen skill stays *tracked*: it is still ours, the doctor says so, and the uninstaller
-declines it out loud. A frozen `AGENTS.md` stops being a file this toolkit knows about — outside
-`uninstall.sh`'s reach, outside the doctor's verified set, and silently so. On top of that, nothing
-in this toolkit ever tells a user to edit a skill, whereas the installer's own Codex Next step 2
-tells them to edit `AGENTS.md`; and a frozen skill costs one file where a frozen entry document
-costs the whole generated block, Project Facts refreshes included. **That is the residual risk being
-accepted here, stated rather than softened**: both are freezable, only one is instructed, and only
-one disappears from the toolkit's own records when it happens.
+**The receipt row was the sharpest difference and not the only one, and the sentence here said
+"the whole difference" for a day.** Re-measured 2026-08-17 on a urp fixture — install, fill in the
+`FILL:` markers the installer's own Codex Next step 2 asks for, install twice more: the row vanished
+on run 2, and from run 3 on the installer could no longer list the file under local edits either,
+because that list is built from the receipt. The generated block stopped being generated at all —
+Project Facts refreshes included — and the freeze was permanent across every later install, not one
+run's loss. The doctor's verified count fell by one file (its `99 → 97` was a two-file figure
+standing in a single-file column; `AGENTS.md` alone is one). Every one of those errors ran in the
+same direction — they **understated** the asymmetry — so nothing built on the sentence over-claimed.
 
-`AGENTS.md` has **no marked-region merge** — unlike `CLAUDE.md`, which the installer refreshes
-between its markers — so once it is edited, every later `--client codex` run prints *"AGENTS.md
-exists and is not ours — keeping yours, untouched"*. **Giving it the merge is the real fix and it is
-a task, not a paragraph**: a new write path into a user-owned file, reversing a decision Task 9
-argued deliberately, with its own state-by-state guards. Until then, if you add a surface whose only
-correction lives in `AGENTS.md`, you are relying on the copy a user is *instructed* to overwrite.
-Put it in a skill too — knowing that copy is freezable as well, which is an argument for two homes
-rather than for treating either as safe.
+**Both files now keep a `user-modified` row when the user edits them, and `AGENTS.md` keeps its
+generated region current on top of that.** Step 8d.1 refreshes between the markers exactly as Step 6
+does for `CLAUDE.md` — same predicate, same diagnosis, same remedy, and the same merge function
+rather than a second copy of it — so the vision half the user filled in survives byte-for-byte while
+the Project Facts follow the project. A file a previous run wrote keeps its row whatever state the
+user leaves it in; a file no run of ours ever wrote still gets none, which is what keeps
+`uninstall.sh --purge` off a document that was never ours. `tests/test-install-upgrade-client.sh`
+arms 6 and 7 hold all of it, including the direction that costs the user work.
+
+**So the argument for two homes is no longer about one of them disappearing.** It is that a rule with
+one home has one thing to go wrong: `AGENTS.md` can still be declined — a marker pair the installer
+cannot bound is left alone with a diagnosis, which is the correct refusal and still a run where the
+generated half did not land — and a skill can still be kept as the user's. Neither is silent now, and
+neither is a reason to rely on a single copy. If you add a surface whose only correction lives in
+`AGENTS.md`, put it in a skill too.
 
 The membership that criterion selected, 2026-08-16 — **every member, including the ones handled
 elsewhere**, because a member that appears in the rule and vanishes from the result is the one thing

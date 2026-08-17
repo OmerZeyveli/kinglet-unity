@@ -266,8 +266,10 @@ never written unless you ask for it.
 with its checksum — what is ours to remove again, rather than a log of what any one run wrote. A
 `.gitignore` you already had is not in it: the installer appends to that one and never claims it. One
 this installer **created** is ours, until you edit it. On upgrade, files you edited are reported and
-kept. In `CLAUDE.md`, only the region between the `kinglet:generated` markers is refreshed — your
-prose is left byte-for-byte.
+kept. In `CLAUDE.md` — and, on a `--client codex` install, in `AGENTS.md`, which is the file that
+installer tells you to fill in — only the region between the `kinglet:generated` markers is
+refreshed: your prose is left byte-for-byte, and the file keeps its receipt row as yours, so the
+health check names it and `uninstall.sh` leaves it and says so.
 
 ### Then set up the MCP bridge
 

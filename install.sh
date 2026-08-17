@@ -650,12 +650,24 @@ if [ "$MODE" = ours ]; then
         #
         # EVERYTHING ELSE KEEPS THE FLAG, and that is the fail-closed direction. A row with no
         # reference copy on disk — a retired surface this payload no longer ships, or a project-root
-        # path — cannot be proved reverted, so it is not. Note that no writer in this file emits a
-        # `user-modified` row for a project-root path (.mcp.json, MCP-SETUP.md, CLAUDE.md.generated,
-        # .gitignore and the manifest backup are all written `toolkit` or not at all), so the only
-        # way one reaches this arm is a hand-edited receipt — where declining to act is the whole
-        # policy. MCP-SETUP.md does ship a static copy at $SCRIPT_DIR/MCP-SETUP.md and is still not
-        # given a reference here: adding one would be a behaviour with no producer.
+        # path — cannot be proved reverted, so it is not.
+        #
+        # THERE IS EXACTLY ONE PROJECT-ROOT WRITER OF A `user-modified` ROW, AND IT ARRIVED
+        # 2026-08-17. This paragraph read *"no writer in this file emits a `user-modified` row for a
+        # project-root path … so the only way one reaches this arm is a hand-edited receipt"*, and
+        # Step 8d.1 now does emit one, for `AGENTS.md`, on every run that keeps or refreshes a Codex
+        # entry document a previous run wrote. That row reaches this arm on the next install and is
+        # correctly kept: `AGENTS.md` is generated per project, so it has no reference copy here and
+        # no `case` arm below matches it — which is the right answer rather than a gap, because there
+        # is nothing to compare it against and "put back to the shipped bytes" is not a state this
+        # file has. The consequence is that the flag is permanent once set, and that is the same
+        # contract `CLAUDE.md` has had all along: after the user has edited it, only the marked
+        # region is maintained.
+        #
+        # The other project-root paths are unchanged — .mcp.json, MCP-SETUP.md, CLAUDE.md.generated,
+        # .gitignore and the manifest backup are all still written `toolkit` or not at all.
+        # MCP-SETUP.md does ship a static copy at $SCRIPT_DIR/MCP-SETUP.md and is still not given a
+        # reference here: adding one would be a behaviour with no producer.
         ref=''
         case "$rel" in
           .claude/scripts/*) ref="$SCRIPT_DIR/scripts/${rel#.claude/scripts/}" ;;
@@ -779,7 +791,16 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 # computed from a COPY of the write's condition is a second definition of that condition, and a
 # second definition drifts. Call the predicate; never restate it.
 
-# ── The CLAUDE.md marker-pair decision ───────────────────────────────────────
+# ── The marker-pair decision, for BOTH generated entry documents ─────────────
+# IT ANSWERS FOR TWO FILES, NOT ONE, AND THE SECOND ARRIVED ON 2026-08-17. `CLAUDE.md` and the
+# `--client codex` arm's `AGENTS.md` are emitted by the same generator, from the same template, and
+# both carry the same `kinglet:generated` pair — install 1 of either writes a file with exactly one
+# begin and one end. Until this date only CLAUDE.md's branch ever LOOKED at them, so an `AGENTS.md`
+# the user had edited was frozen for good: no reinstall, upgrade or fix could update it again. These
+# three functions were named `claude_md_marker_*` and are named for the region now, because a
+# function whose name states one file while two files call it is a false sentence in the tree, and
+# this repository has already paid for several of those.
+#
 # WHICH CLAUDE.md BRANCH A RUN TAKES USED TO BE `grep -q kinglet:generated:begin`, IN TWO PLACES —
 # the dry run's announcement and Step 6's write — and both asked only whether the OPENING marker
 # exists. A file carrying a begin and no end satisfied that test, so the refresh arm ran its awk
@@ -810,7 +831,7 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 # `awk` over the file, not `grep | ...`: nothing here may pipe into a reader that can exit early.
 #
 # IT ALWAYS EXITS 0 AND ALWAYS PRINTS A TOKEN. This comment claimed for one round that without the
-# `-r` guard an unreadable CLAUDE.md would kill the run at `X="$(claude_md_marker_state …)"`, after
+# `-r` guard an unreadable CLAUDE.md would kill the run at `X="$(marked_region_state …)"`, after
 # the payload had landed, leaving the trap to write an INCOMPLETE receipt. THAT IS FALSE, AND IT WAS
 # FALSE FOR TWO INDEPENDENT REASONS, BOTH MEASURED against a `chmod 000` CLAUDE.md with the guard and
 # the `|| out=""` fallback both removed: rc **0**, the run completed, the receipt was written, and it
@@ -846,7 +867,7 @@ ORPHAN_KEPT_COUNT=$(printf '%s' "$ORPHANS_KEPT" | grep -c . || true)
 # nobody could open, and immunity to the second shape above if this file ever gains inherit_errexit.
 # `unreadable` is a real state, not a fallback: it declines, like every other state this function
 # cannot certify.
-claude_md_marker_state() {
+marked_region_state() {
   local out
   [ -f "$1" ] || { printf 'absent\n'; return 0; }
   [ -r "$1" ] || { printf 'unreadable\n'; return 0; }
@@ -876,7 +897,7 @@ claude_md_marker_state() {
 # line, on a file where the remedy sentence was nevertheless right. The action was never in question;
 # the diagnosis was, and a diagnosis a reader can check against their own file is the point of having
 # one at all.
-claude_md_marker_problem() {
+marked_region_problem() {
   case "$1" in
     malformed-no-end)     printf 'its kinglet:generated:begin marker has no closing :end marker' ;;
     malformed-no-begin)   printf 'its kinglet:generated:end marker has no opening :begin marker' ;;
@@ -890,11 +911,72 @@ claude_md_marker_problem() {
 # And the remedy, which is NOT the same sentence for every declined state — "repair the marker pair"
 # is wrong advice for a file the installer could not open. A whole sentence, naming the file: the
 # `Next steps` summary embeds it with no context around it.
-claude_md_marker_remedy() {
+#
+# THREE ARGUMENTS, ALL REQUIRED, AND THE THIRD IS NOT DECORATION. The file name was a literal here
+# until AGENTS.md became a caller; the re-run command is separate from it because the two files are
+# restored by different invocations. `AGENTS.md` is written only by `--client codex`, and Task 12
+# measured what a bare `re-run install.sh` does to a reader who follows it on a Codex-layer path: the
+# default client does not write that file, so the remedy silently fails to remedy anything. This is
+# the same sentence `scripts/studio-doctor.sh` has to say for the same reason, and
+# tests/test-install-upgrade-client.sh arm 4 already guards that spelling on the doctor's side.
+#
+# No `${2:-CLAUDE.md}` default: a default here would let a new call site forget the argument and get
+# a remedy naming a file it is not about, which is precisely the failure the parameter exists to end.
+marked_region_remedy() {
   case "$1" in
-    unreadable) printf 'Make CLAUDE.md readable and re-run install.sh.' ;;
-    *)          printf 'Repair the kinglet:generated marker pair in CLAUDE.md — one :begin line, one :end line after it — then re-run install.sh.' ;;
+    unreadable) printf 'Make %s readable and re-run %s.' "$2" "$3" ;;
+    *)          printf 'Repair the kinglet:generated marker pair in %s — one :begin line, one :end line after it — then re-run %s.' "$2" "$3" ;;
   esac
+}
+
+# ── The merge itself, and it is ONE implementation for both files ────────────
+# Replace everything between the target's markers with $2's contents, in place, leaving every byte
+# outside the pair alone. Callers must have proved the pair `wellformed` first — the awk sets `skip`
+# at the begin line and clears it only at the end line, so against an unbounded pair it deletes the
+# rest of the file. That is not a hypothetical: it is the measured defect recorded above
+# `marked_region_state`, and the whole reason that predicate exists.
+#
+# A SECOND COPY OF THIS AWK IS THE FAILURE MODE THIS FUNCTION EXISTS TO PREVENT. Task 12 found two
+# spellings of one criterion in two files, one of which was wrong in both directions, and had to hold
+# them together with a byte-comparison guard because `install.sh` is not in the payload and the
+# shipped script cannot source it. Here both callers are in THIS file, so the drift is closable
+# outright rather than guarded: one function, two call sites, no copies, nothing to compare.
+#
+# THE MODE IS PRESERVED ACROSS THE `mv`. The merged text is written to a NEW file and moved over the
+# target, so without this the target's permissions become whatever the umask says — a mode change on
+# the user's own file that no run asked for. `stat -c` is GNU; on a host where it fails the
+# substitution is empty and the chmod is skipped, which is exactly the behaviour this had before the
+# preservation was added.
+#
+# Returns non-zero without touching the target if the merge could not be written.
+merge_marked_region() {
+  local target="$1" facts="$2" tmp="$2.merged" mode
+  mode="$(stat -c '%a' "$target" 2>/dev/null || true)"
+  if awk -v factsfile="$facts" '
+      /kinglet:generated:begin/ { print; while ((getline l < factsfile) > 0) print l; skip=1; next }
+      /kinglet:generated:end/   { print; skip=0; next }
+      !skip { print }
+    ' "$target" > "$tmp"; then
+    mv "$tmp" "$target"
+    if [ -n "$mode" ]; then chmod "$mode" "$target"; fi
+    return 0
+  fi
+  rm -f "$tmp"
+  return 1
+}
+
+# ── Did a PREVIOUS run of this installer write this path? ────────────────────
+# Presence of a row, whatever its origin — deliberately weaker than `owned_by_installer`, which also
+# requires the bytes to be unchanged. It answers the one question that separates "our file, which the
+# user has since edited" from "a file of the user's that we have never written", and it is the guard
+# that keeps the `user-modified` row for AGENTS.md fail-closed: a project whose AGENTS.md predates
+# every install has no row, gets no row, and `uninstall.sh --purge` therefore never reaches it.
+#
+# $RECEIPT still holds the PREVIOUS run's receipt at every call site — see owned_by_installer's own
+# paragraph on that, which enumerates the four statements that could have changed it and does not.
+receipt_has() {
+  [ -f "$RECEIPT" ] || return 1
+  awk -F'\t' -v want="$1" '$1 == want { found = 1 } END { exit !found }' "$RECEIPT"
 }
 
 # ── The .gitignore decision ──────────────────────────────────────────────────
@@ -1073,8 +1155,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # `grep -q ...begin`, so a begin-only CLAUDE.md was announced as `refresh the generated section
   # only; your prose untouched` by the dry run and then amputated by the real run — the dry run
   # promising exactly the thing the real run destroyed, on the only step that can destroy work.
-  # `claude_md_marker_state` is called, not restated, for the reason this block's header gives.
-  DRY_MARKER_STATE="$(claude_md_marker_state "$PROJECT_DIR/CLAUDE.md")"
+  # `marked_region_state` is called, not restated, for the reason this block's header gives.
+  DRY_MARKER_STATE="$(marked_region_state "$PROJECT_DIR/CLAUDE.md")"
   if [ "$DRY_MARKER_STATE" = absent ]; then
     printf '  CLAUDE.md (new — generated)\n'
   elif [ "$DRY_MARKER_STATE" = wellformed ]; then
@@ -1085,7 +1167,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
     # tests/test-install-dryrun.sh recognises; a rewording that leaves that list reads as a PROMISE
     # of a write this arm does not make.
     printf '  CLAUDE.md — %s, so it is NOT touched and nothing is generated\n' \
-      "$(claude_md_marker_problem "$DRY_MARKER_STATE")"
+      "$(marked_region_problem "$DRY_MARKER_STATE")"
   else
     # TWO FILES, TWO FATES, AND THIS ARM USED TO NAME ONE AND DESCRIBE THE OTHER:
     #
@@ -1255,7 +1337,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # narrowings are load-bearing, and the wording above earns neither:
   #   - This branch has no discriminator for who wrote the file. On a re-run the file present is the
   #     toolkit's, written by the previous run, so "yours" is false in the installer's own upgrade
-  #     path. The CLAUDE.md branch may say "yours" because `claude_md_marker_state`'s test has
+  #     path. The CLAUDE.md branch may say "yours" because `marked_region_state`'s test has
   #     already proved the file is not ours; .mcp.json, which has no such test either, correctly
   #     claims nothing. (This read line 274 until 2026-08-14, by which point line 274 was a comment
   #     about the scripts write group.)
@@ -1283,7 +1365,42 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # The counts are DERIVED from the same trees the real run walks, so the announcement cannot promise
   # a number the write does not produce.
   if [ "$CLIENT" = codex ]; then
-    printf '  AGENTS.md — the Codex entry document (generated; Codex injects it whole)\n'
+    # FOUR VERDICTS, NOT ONE, AND THE UNCONDITIONAL LINE WAS WRONG ON THE BRANCH THAT MATTERS. This
+    # read `AGENTS.md — the Codex entry document (generated; Codex injects it whole)` on every run,
+    # including the run against a project whose AGENTS.md the real install declines to touch — the
+    # same defect the CLAUDE.md branch above was built to end, in the newest write, and the same one
+    # S3b in tests/test-install-ownership.sh guards one file over. Measured 2026-08-17 on a urp
+    # fixture with a user-owned AGENTS.md: the dry run promised a generated document and the real run
+    # printed `keeping yours, untouched`.
+    #
+    # THE PREDICATES ARE THE REAL RUN'S, CALLED RATHER THAN RESTATED — Step 3b's rule, and the reason
+    # this block computes nothing of its own. `$RECEIPT` still holds the previous run's receipt here,
+    # which is what lets `receipt_has` answer at all.
+    #
+    # THE DECLINE PHRASINGS ARE A CONTRACT WITH tests/test-install-dryrun.sh'S PARSER: a line whose
+    # first field is a path reads as a PROMISE unless it carries one of that file's recognised
+    # phrases. `NOT touched` and `would keep yours` are both in that set.
+    #
+    # `-e` AND NOT THE `absent` TOKEN ON THE FIRST ARM, because they are not the same question. A
+    # DIRECTORY at that path makes `marked_region_state` say `absent` — it opens with `[ -f ]` — while
+    # the real run's `[ -e ]` sees it and keeps it. Reading the token here would promise a generated
+    # file for the one shape where `mv` would move our file INSIDE the user's directory.
+    DRY_AGENTS_STATE="$(marked_region_state "$PROJECT_DIR/AGENTS.md")"
+    if [ ! -e "$PROJECT_DIR/AGENTS.md" ] || owned_by_installer 'AGENTS.md' ''; then
+      printf '  AGENTS.md — the Codex entry document (generated; Codex injects it whole)\n'
+    elif [ "$DRY_AGENTS_STATE" = wellformed ] && receipt_has 'AGENTS.md'; then
+      printf '  AGENTS.md — refresh the generated section only; your prose untouched\n'
+    elif [ "$DRY_AGENTS_STATE" != none ] && [ "$DRY_AGENTS_STATE" != absent ] \
+         && [ "$DRY_AGENTS_STATE" != wellformed ]; then
+      # `!= wellformed` for the reason the real run's decline arm carries it: a well-formed pair in a
+      # file no previous run wrote is the user's own file, and diagnosing it as a marker fault states
+      # something false about it. Both spellings carry the exclusion because both are the same
+      # decision, and this block's whole rule is that the two must not disagree.
+      printf '  AGENTS.md — %s, so it is NOT touched and nothing is generated\n' \
+        "$(marked_region_problem "$DRY_AGENTS_STATE")"
+    else
+      printf '  AGENTS.md exists and is not ours — would keep yours, and generate nothing\n'
+    fi
     DRY_SKILL_N=$(ls -d "$SCRIPT_DIR/.claude/skills"/*/ 2>/dev/null | grep -c . || true)
     DRY_CMD_N=$(ls -1 "$SCRIPT_DIR/.claude/commands"/*.md 2>/dev/null | grep -c . || true)
     printf '  .agents/skills/ — %s symlink(s) into .claude/skills/ and %s converted command skill(s)\n' \
@@ -1754,7 +1871,7 @@ CLAUDE_MD_BRANCH="skipped"
 # The same predicate the dry run announced from, called rather than restated — see Step 3b. It is
 # read ONCE, here, and every arm below keys off the token: two calls could disagree only if
 # something between them rewrote the file, and the arms are what rewrite the file.
-CLAUDE_MD_MARKER_STATE="$(claude_md_marker_state "$CLAUDE_MD")"
+CLAUDE_MD_MARKER_STATE="$(marked_region_state "$CLAUDE_MD")"
 if [ -f "$GEN" ]; then
   TMP_MD=$(mktemp)
   if [ "$CLAUDE_MD_MARKER_STATE" = absent ]; then
@@ -1787,14 +1904,18 @@ if [ -f "$GEN" ]; then
       # byte-identical, so it was bounded rather than compounding. It was still a byte of the user's
       # file that no run asked to change, and the first /unity-init after a refresh install normalised
       # it away as a one-line `git diff` nobody requested. The rule now prints the end marker alone.
-      awk -v factsfile="$TMP_MD" '
-        /kinglet:generated:begin/ { print; while ((getline l < factsfile) > 0) print l; skip=1; next }
-        /kinglet:generated:end/   { print; skip=0; next }
-        !skip { print }
-      ' "$CLAUDE_MD" > "$TMP_MD.merged" && mv "$TMP_MD.merged" "$CLAUDE_MD"
+      #
+      # THE MERGE ITSELF MOVED OUT OF THIS ARM ON 2026-08-17, unchanged, because `AGENTS.md` needed the
+      # same four lines and two copies of a merge over two generated files is how this branch's other
+      # paired readers drifted. Both callers are in this file, so there is one definition and no
+      # comparison guard to keep two of them honest.
+      if merge_marked_region "$CLAUDE_MD" "$TMP_MD"; then
+        ok "Refreshed the generated section of CLAUDE.md (your prose untouched)"
+        CLAUDE_MD_BRANCH="refreshed"
+      else
+        warn "CLAUDE.md refresh failed — left as-is."
+      fi
       rm -f "$TMP_MD"
-      ok "Refreshed the generated section of CLAUDE.md (your prose untouched)"
-      CLAUDE_MD_BRANCH="refreshed"
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md refresh failed — left as-is."
     fi
@@ -1829,9 +1950,9 @@ if [ -f "$GEN" ]; then
     # markers into your CLAUDE.md") is advice that would give them a second stray marker. The remedy
     # here is to repair the pair, and that is what the entry says.
     rm -f "$TMP_MD"
-    warn "CLAUDE.md — $(claude_md_marker_problem "$CLAUDE_MD_MARKER_STATE"), so it was NOT touched."
+    warn "CLAUDE.md — $(marked_region_problem "$CLAUDE_MD_MARKER_STATE"), so it was NOT touched."
     warn "Nothing was merged into it and nothing was generated beside it."
-    warn "$(claude_md_marker_remedy "$CLAUDE_MD_MARKER_STATE")"
+    warn "$(marked_region_remedy "$CLAUDE_MD_MARKER_STATE" CLAUDE.md install.sh)"
     CLAUDE_MD_BRANCH="malformed"
   else
     # ASK BEFORE WRITING. The `mv` below used to be unconditional, and this is the arm where that
@@ -1931,7 +2052,7 @@ case "$CLAUDE_MD_BRANCH" in
     note_not_done "CLAUDE.md — yours has no generated markers, so the toolkit's configuration went to CLAUDE.md.generated beside it. Claude Code reads CLAUDE.md: none of it applies until you merge that block in, or paste the kinglet:generated markers into your CLAUDE.md and re-run to have it refreshed in place."
     ;;
   malformed)
-    note_not_done "CLAUDE.md — $(claude_md_marker_problem "$CLAUDE_MD_MARKER_STATE"), so the generated block was NOT refreshed and your file was left exactly as it was. $(claude_md_marker_remedy "$CLAUDE_MD_MARKER_STATE")"
+    note_not_done "CLAUDE.md — $(marked_region_problem "$CLAUDE_MD_MARKER_STATE"), so the generated block was NOT refreshed and your file was left exactly as it was. $(marked_region_remedy "$CLAUDE_MD_MARKER_STATE" CLAUDE.md install.sh)"
     ;;
 esac
 
@@ -2387,14 +2508,92 @@ if [ "$CLIENT" = codex ]; then
   # commands — where CLAUDE.md is merely findable. That is what makes overwriting a user's own
   # AGENTS.md the most expensive mistake available on this arm, and why the decline comes first.
   #
-  # No marker-pair merge, unlike CLAUDE.md. The generated Codex document has no `separate` sibling
-  # and no in-place refresh arm, because there is no established convention of hand-written prose in
-  # an AGENTS.md this installer wrote. Ownership decides instead: ours is replaced, yours is kept.
+  # IT GETS THE MARKED-REGION MERGE NOW, AND THAT REVERSES A DECISION TASK 9 ARGUED DELIBERATELY.
+  # This block read: *"No marker-pair merge, unlike CLAUDE.md. The generated Codex document has no
+  # `separate` sibling and no in-place refresh arm, because there is no established convention of
+  # hand-written prose in an AGENTS.md this installer wrote."* That was sound while the file carried
+  # only generated content. **The premise changed and the conclusion followed it:**
+  #
+  #   * The installer's own Codex Next step 2 tells the user to fill in this file's FILL: markers. So
+  #     hand-written prose in an AGENTS.md this installer wrote is not merely a convention, it is an
+  #     INSTRUCTION — and the moment the user followed it the file was frozen for good. Measured
+  #     2026-08-17 on a urp fixture, install → fill the nine markers → install twice more: run 2 said
+  #     `keeping yours, untouched` and dropped the row; run 3 could no longer even list it under local
+  #     edits, because the loop that produces that list reads the receipt; `studio-doctor.sh` reported
+  #     `98 file(s) verified` and never named it; `uninstall.sh` removed 98 and left it behind
+  #     unreported. A frozen skill stays a file this toolkit knows about — a frozen AGENTS.md stopped
+  #     being one.
+  #   * Task 12 then made a correctness rule depend on this file: the `/name` translation reaches a
+  #     Codex session because the always-injected AGENTS.md carries it. A frozen copy of a rule is a
+  #     rule that stops being true.
+  #
+  # WHAT DID NOT COME BACK WITH IT, AND THIS HALF OF TASK 9'S ARGUMENT STILL STANDS. There is no
+  # `AGENTS.md.generated` sibling. CLAUDE.md has one because a project that already has a CLAUDE.md is
+  # the common case and the toolkit still owes that user the block; an AGENTS.md with no markers is
+  # somebody else's entry document (Codex's own, or another tool's), and a second file beside it would
+  # be a path Codex never injects, that nothing reads, that uninstall must then own — debris with a
+  # receipt row. The `none` state is kept exactly as Task 9 left it: yours is kept, untouched, and
+  # said out loud.
+  #
+  # SO THE BRANCHES ARE: ours -> rewritten whole; absent -> generated; edited-but-ours-once ->
+  # the region refreshed and the prose kept; not ours and marker-less -> kept; markers that are not
+  # one ordered pair -> declined WITH the diagnosis, exactly as CLAUDE.md declines. The predicate,
+  # the diagnosis, the remedy and the merge are the same four functions CLAUDE.md's arm calls.
   AGENTS_MD="$PROJECT_DIR/AGENTS.md"
   AGENTS_BRANCH=skipped
+  # `absent` for a path that is a directory or a dangling link too — `marked_region_state` opens with
+  # `[ -f ]`. That is why the ownership arms below test `-e` as well: `mv` onto a directory moves the
+  # file INSIDE it rather than replacing it, which is the trap CLAUDE.md's beside-yours arm records.
+  AGENTS_MARKER_STATE="$(marked_region_state "$AGENTS_MD")"
+  # A previous run wrote this file, whatever has happened to it since. It is what separates "ours,
+  # which the user then filled in" — the refresh case, and the one the installer told them to create
+  # — from "a file of the user's we have never written", which is kept and never claimed.
+  AGENTS_WAS_OURS=0
+  if receipt_has 'AGENTS.md'; then AGENTS_WAS_OURS=1; fi
   if [ ! -f "$GEN" ]; then
     warn "$GEN not found — AGENTS.md was not generated."
     note_not_done "AGENTS.md — the generator is missing, so this project has no Codex entry document. Codex injects that file whole, so without it none of the toolkit's conventions reach a Codex session."
+  elif [ -e "$AGENTS_MD" ] && ! owned_by_installer 'AGENTS.md' '' \
+       && [ "$AGENTS_MARKER_STATE" = wellformed ] && [ "$AGENTS_WAS_OURS" -eq 1 ]; then
+    # THE REFRESH. Same contract CLAUDE.md's has: the generator owns every byte between the markers
+    # and nothing else, so the FILL: half the user filled in survives byte-for-byte and the Project
+    # Facts follow the project.
+    #
+    # `--client codex` ON THE FACTS CALL IS LOAD-BEARING AND IT IS NOT SYMMETRY. The region is
+    # client-conditional: it names the `Skill` tool for Claude Code and says to read the SKILL.md for
+    # Codex, because Codex has no skill tool. Dropping the flag here would write the wrong client's
+    # sentence into the one document Codex injects whole, on every re-install, and the file would
+    # stop matching what a fresh install produces.
+    TMP_AG=$(mktemp)
+    if bash "$GEN" --facts-only --client codex ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_AG" 2>/dev/null \
+       && merge_marked_region "$AGENTS_MD" "$TMP_AG"; then
+      ok "Refreshed the generated section of AGENTS.md (your prose untouched)"
+      AGENTS_BRANCH=refreshed
+    else
+      warn "AGENTS.md refresh failed — left as-is."
+      note_not_done "AGENTS.md — the generated section could not be refreshed, so this project's Codex entry document still carries the facts of an earlier run. Your own prose was not touched."
+    fi
+    rm -f "$TMP_AG"
+  elif [ -e "$AGENTS_MD" ] && ! owned_by_installer 'AGENTS.md' '' \
+       && [ "$AGENTS_MARKER_STATE" != none ] && [ "$AGENTS_MARKER_STATE" != absent ] \
+       && [ "$AGENTS_MARKER_STATE" != wellformed ]; then
+    # DECLINE, DO NOT REPAIR — CLAUDE.md's ruling, reached through CLAUDE.md's functions. A pair this
+    # installer cannot bound is a region boundary it would be guessing at, and the guess is applied
+    # to the document Codex injects whole. `absent` is excluded because a directory at this path
+    # reports `absent` and must not be diagnosed as a marker fault.
+    #
+    # `wellformed` IS EXCLUDED TOO, AND THE FIRST VERSION OF THIS ARM DID NOT EXCLUDE IT — measured,
+    # not foreseen. The arm above requires the pair AND a previous receipt row; a hand-written
+    # AGENTS.md of the user's own that happens to carry a well-formed pair fails only the second
+    # test, and it then fell through to here and was told its markers "do not form exactly one
+    # begin/end pair" — a diagnosis that is false of the file in front of them, about a fault they do
+    # not have. It belongs in the keep arm below, which is what "we have never written this file"
+    # means whatever is inside it. The same shape as `malformed-same-line` one file over: the action
+    # was right and the sentence was not.
+    warn "AGENTS.md — $(marked_region_problem "$AGENTS_MARKER_STATE"), so it was NOT touched."
+    warn "$(marked_region_remedy "$AGENTS_MARKER_STATE" AGENTS.md 'install.sh --client codex')"
+    AGENTS_BRANCH=malformed
+    note_not_done "AGENTS.md — $(marked_region_problem "$AGENTS_MARKER_STATE"), so the generated block was NOT refreshed and your file was left exactly as it was. $(marked_region_remedy "$AGENTS_MARKER_STATE" AGENTS.md 'install.sh --client codex')"
   elif [ -e "$AGENTS_MD" ] && ! owned_by_installer 'AGENTS.md' ''; then
     warn "AGENTS.md exists and is not ours — keeping yours, untouched."
     warn "No Codex entry document was generated this run. Rename or delete AGENTS.md and re-run"
@@ -2420,8 +2619,37 @@ if [ "$CLIENT" = codex ]; then
   # where the file is ours and unchanged the writing branch still runs, but on a run where it was
   # kept the row must not appear, and `owned_by_installer` is the only thing that can tell them
   # apart. There is no reference copy — the document is generated per project — so the ref is ''.
+  #
+  # THE SECOND ROW SHAPE, AND IT IS THE HALF THAT ENDS THE SILENCE. A refreshed AGENTS.md is part
+  # ours and part the user's, so a `toolkit` row would be a claim `uninstall.sh` acts on — it would
+  # delete the prose the installer told the user to write. `user-modified` is the vocabulary that
+  # already exists for exactly this: uninstall.sh reports it under `keep N file(s) you modified` and
+  # leaves it, `--purge` still removes it, `studio-doctor.sh` counts it under `modified since
+  # install` BY NAME, and install.sh's own MODIFIED_FILES loop lists it under `keeping yours` on
+  # every later run. That is the whole of the asymmetry Task 12 measured against a frozen skill, and
+  # it is closed by writing the row rather than by arguing about it.
+  #
+  # IT IS FAIL-CLOSED THROUGH $AGENTS_WAS_OURS AND THAT IS NOT DECORATION. A `user-modified` row is
+  # still a claim of ownership and `--purge` acts on every claim — this file's own ownership header
+  # says so. So the row is written only where a PREVIOUS RECEIPT already carried this path: a
+  # project whose AGENTS.md predates every install never gets one, exactly as it does not today.
+  # That evidence is what MCP-SETUP.md's call site does not have and this one does.
+  #
+  # `refreshed` IS NOT ADDED TO THE `written` DISJUNCT. That arm writes a `toolkit` row, and a
+  # refreshed file is not toolkit-owned. Reading the two as one branch — "we wrote to it, so it is
+  # ours" — is authorship, and this file's header is about the difference.
   if [ "$AGENTS_BRANCH" = written ] || owned_by_installer 'AGENTS.md' ''; then
     printf 'AGENTS.md\t%s\t%s\ttoolkit\n' \
+      "$(sha_of "$AGENTS_MD")" \
+      "$(stat -c '%a' "$AGENTS_MD" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+  elif [ "$AGENTS_WAS_OURS" -eq 1 ] && [ -f "$AGENTS_MD" ]; then
+    # EVERY KEEPING BRANCH, NOT ONLY THE REFRESH, AND THE CONDITION DELIBERATELY NAMES NONE OF THEM.
+    # A refreshed, declined or kept AGENTS.md that a previous run wrote is in exactly the state this
+    # row exists to stop being invisible — on disk, ours in origin, edited or damaged by the user,
+    # and outside every reader that reports. A branch list here would be a second enumeration to keep
+    # in step with the block above; what the row is actually about is the FILE, and the two things it
+    # needs to know are that a previous run wrote it and that it is still a regular file.
+    printf 'AGENTS.md\t%s\t%s\tuser-modified\n' \
       "$(sha_of "$AGENTS_MD")" \
       "$(stat -c '%a' "$AGENTS_MD" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
   fi
@@ -3304,7 +3532,7 @@ case "$CLAUDE_MD_BRANCH" in
   # point, `refreshed`'s line — "your own prose was left untouched" — is what this branch printed
   # before the decline existed, on runs that had just deleted the prose.
   malformed)
-    CLAUDE_MD_STEP="$(claude_md_marker_remedy "$CLAUDE_MD_MARKER_STATE") Nothing was written to it this run."
+    CLAUDE_MD_STEP="$(marked_region_remedy "$CLAUDE_MD_MARKER_STATE" CLAUDE.md install.sh) Nothing was written to it this run."
     ;;
   *)
     CLAUDE_MD_STEP='CLAUDE.md generation was skipped — see the warning above.'
@@ -3342,6 +3570,12 @@ print_not_done
 if [ "$CLIENT" = codex ]; then
   case "${AGENTS_BRANCH:-skipped}" in
     written)    AGENTS_MD_STEP='Fill in the FILL: markers in AGENTS.md — genre, pillars, vision, scope. Codex injects that file whole; CLAUDE.md carries its own copy for Claude Code and is not read here.' ;;
+    # THE STEP THAT CLOSES THE INSTRUCTION'S OWN LOOP. Step 2 tells the user to edit this file; until
+    # 2026-08-17 the next run answered that edit with `Rename or delete it and re-run`, which is the
+    # installer telling a user to throw away the work it had just asked for. A refreshed run says the
+    # edit was kept and that the generated half is current, because both are now true.
+    refreshed)  AGENTS_MD_STEP='AGENTS.md already had its generated section refreshed — the vision half you filled in was left untouched.' ;;
+    malformed)  AGENTS_MD_STEP="$(marked_region_remedy "$AGENTS_MARKER_STATE" AGENTS.md 'install.sh --client codex') Nothing was written to it this run." ;;
     kept-yours) AGENTS_MD_STEP='Your own AGENTS.md was kept, so no Codex entry document was generated. Rename or delete it and re-run with --client codex to get one.' ;;
     *)          AGENTS_MD_STEP='No AGENTS.md was generated this run — see the warning above. Without it, none of these conventions reach a Codex session.' ;;
   esac
