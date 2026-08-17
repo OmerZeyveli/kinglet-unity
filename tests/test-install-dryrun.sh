@@ -136,6 +136,15 @@
 #     produced zero. That is the path every user is on after install 1. Closing it needs a per-path
 #     expectation for `.claude/` rather than a count, which is a different oracle from the two count
 #     lines the dry run prints.
+#   * `.agents/skills/` IS OUT OF THE PER-PATH ORACLES, THE WAY `.claude/` IS, AND FOR THE SAME
+#     REASON. The dry run announces that directory as one count line — `N symlink(s) … and M
+#     converted command skill(s)` — and `dry_claims` mints no claim from a line whose first field
+#     ends in `/`, because a directory claim satisfied by PREFIX is how a vague announcement
+#     silences real reds (measured, one line closed three of them). So the paths are filtered out of
+#     `written` and skipped by the receipt loop, and a COUNT oracle takes their place beside the
+#     `codex` fixture: the two announced numbers against the links and the SKILL.md files on disk,
+#     with a floor so two zeroes cannot agree. What that does NOT cover is WHICH skill or WHICH
+#     command — a run that linked the right number of the wrong things is green here.
 #   * THE SNAPSHOT IS FILES-BY-CONTENT ONLY, so FILE MODES, EMPTY DIRECTORIES and SYMLINKS are
 #     outside all three oracles. `snapshot` is `find . -type f` plus a sha256: a mode change moves
 #     no checksum, an empty directory is not a file, and a symlink to a directory is not one either.
@@ -147,24 +156,29 @@
 #     WHY THE MODE ONE MATTERS, corrected 2026-08-13 — the reason first written here was false in
 #     all three of its clauses, which is the exact defect this file exists to catch, committed by
 #     this file, in the round that withdrew the previous one. It claimed install.sh writes
-#     `stat -c '%a'` into EVERY receipt row and that uninstall.sh ACTS on it. Measured: of the nine
-#     row writers, six read the mode and THREE HARDCODE IT — the scripts-toolkit row (`755`),
-#     `.mcp.json` (`644`) and `MCP-SETUP.md` (`644`); and `grep -n 'chmod\|_mode' uninstall.sh`
+#     `stat -c '%a'` into EVERY receipt row and that uninstall.sh ACTS on it. Measured: MOST row
+#     writers read the mode and a MINORITY hardcode it — the scripts-toolkit row (`755`),
+#     `.mcp.json` (`644`), `MCP-SETUP.md` (`644`), the `.agents/skills/` symlink rows (whose mode
+#     column carries the literal `symlink`, a kind rather than a number) and Step 8e's carry-forward
+#     (which copies the previous receipt's column verbatim, deliberately); and
+#     `grep -n 'chmod\|_mode' uninstall.sh`
 #     returns exactly one line, the destructuring read `read -r rel recorded _mode origin`, whose
 #     underscore is this repo's discard convention. There is no `chmod` in that file at all. The
 #     mutation above compounds it: `ProjectSettings/ProjectVersion.txt` never enters a receipt row,
 #     so the receipt-mode story did not even connect to the thing measured.
 #
-#     THE COUNTS ABOVE READ eight/five UNTIL 2026-08-14, and the correction is the same shape as the
-#     defect they describe: the installer-ownership wave added a ninth writer (the `.gitignore` row,
-#     which reads the mode rather than hardcoding it), and a number written into a comment moved with
-#     nothing watching it. Re-derive both rather than trusting this line — the writers are the
+#     THE COUNTS ABOVE READ eight/five UNTIL 2026-08-14 AND nine/six UNTIL 2026-08-17, and the
+#     correction is the same shape as the defect they describe: the installer-ownership wave added a
+#     writer (the `.gitignore` row), the Codex wave added several more, and a number written into a
+#     comment moved with nothing watching it — twice, inside the paragraph that already said not to
+#     trust it. The numbers are gone rather than corrected. Derive them — the writers are the
 #     `>> "$RECEIPT_TMP"` sites and the readers are the subset carrying `stat -c '%a'`:
 #
 #       grep -c '>> "\$RECEIPT_TMP"' install.sh
 #       grep -c "stat -c '%a'" install.sh
 #
-#     The THREE HARDCODED rows and their three names are unchanged and were right.
+#     The hardcoded set is the one named above; its scripts-toolkit, `.mcp.json` and `MCP-SETUP.md`
+#     members have been there since this paragraph was first written and were right then.
 #
 #     The honest version is smaller and still worth the disclosure: the mode is RECORDED by
 #     install.sh, on most rows, and CURRENTLY UNUSED by uninstall.sh — so the exposure is a
@@ -441,8 +455,17 @@ probe() {
   snapshot "$d" "$after"
 
   # ORACLE 1 and ORACLE 3, unioned: what the run actually put on disk, at the project root.
+  #
+  # `.agents/skills/` IS EXCLUDED ALONGSIDE `.claude/`, AND FOR THE SAME REASON THAT DIRECTORY IS.
+  # The dry run announces it as one count line — `N symlink(s) … and M converted command skill(s)` —
+  # exactly as it announces the payload, and `dry_claims` deliberately mints no claim from a line
+  # whose first field ends in `/`: a directory claim satisfied by PREFIX is a way for a vague
+  # announcement to silence real reds, which this file measured and refused. So the honest guard for
+  # a wholesale-generated directory is the one `.claude/` already gets — the paths leave the per-path
+  # oracles, and a COUNT oracle takes their place, asserted beside the codex fixture below rather
+  # than here so that `probe` stays the same instrument for every fixture.
   { new_paths "$before" "$after"; changed_paths "$before" "$after"; } \
-    | grep -v '^\.claude/' | canon_backup | LC_ALL=C sort -u > "$written" || true
+    | grep -Ev '^(\.claude|\.agents)/' | canon_backup | LC_ALL=C sort -u > "$written" || true
 
   # ── written => promised ────────────────────────────────────────────────────
   while IFS= read -r p; do
@@ -463,7 +486,7 @@ probe() {
   # touch is the block telling the truth, and saying so is what makes a later regression visible as
   # a lost PASS rather than as silence.
   while IFS=$'\t' read -r p v; do
-    case "${p:-}" in ''|.claude/*) continue ;; esac
+    case "${p:-}" in ''|.claude/*|.agents/*) continue ;; esac
     if grep -qxF -- "$p" "$written"; then
       # Written. Both verdicts were already reported by the loop above, from the other side.
       continue
@@ -527,7 +550,7 @@ probe() {
   # claim a path that was already there.
   if [ -f "$d/$RECEIPT_REL" ]; then
     while IFS= read -r p; do
-      case "${p:-}" in ''|.claude/*) continue ;; esac
+      case "${p:-}" in ''|.claude/*|.agents/*) continue ;; esac
       v="$(claim_of "$p" "$claims")"
       if [ -n "$v" ]; then
         pass "$label: the receipt claims $p and the dry run named it ($v)"
@@ -666,14 +689,18 @@ fi
 # an ordinary red. That is the suite's own recorded hazard — a probe that dies is a probe that reports
 # nothing — so the pair is checked first and the mutation runs only when there is one to damage.
 STALE_NEEDLE='STALE-REGION-LINE-THE-REFRESH-MUST-REMOVE'
-stale_region() {
-  local d="$1" pair
-  pair="$(awk '/kinglet:generated:begin/ { b++ } /kinglet:generated:end/ { e++ } END { print (b + 0) "," (e + 0) }' "$d/CLAUDE.md" 2>/dev/null || echo 0,0)"
+# `stale_region` is `stale_region_in` against CLAUDE.md, which is what every caller wanted until the
+# codex fixtures below needed the same treatment for AGENTS.md. One implementation, two entry
+# documents — the same rule install.sh follows for the merge itself.
+stale_region() { stale_region_in "$1" "$1/CLAUDE.md"; }
+stale_region_in() {
+  local d="$1" f="$2" pair
+  pair="$(awk '/kinglet:generated:begin/ { b++ } /kinglet:generated:end/ { e++ } END { print (b + 0) "," (e + 0) }' "$f" 2>/dev/null || echo 0,0)"
   if [ "$pair" != "1,1" ]; then
-    fail "$(basename "$d"): install 1 left no single kinglet:generated marker pair in CLAUDE.md (counts $pair) — the probe below would measure a fixture that never reaches the refresh branch"
+    fail "$(basename "$d"): install 1 left no single kinglet:generated marker pair in $(basename "$f") (counts $pair) — the probe below would measure a fixture that never reaches the refresh branch"
     return 0
   fi
-  python3 - "$d/CLAUDE.md" "$STALE_NEEDLE" <<'PY'
+  python3 - "$f" "$STALE_NEEDLE" <<'PY'
 import sys
 path, needle = sys.argv[1], sys.argv[2]
 lines = open(path).read().split('\n')
@@ -685,14 +712,15 @@ PY
 
 # assert_region_refreshed <label> <project-dir> — the other half: the sentinel is gone, so the change
 # oracle 3 saw at that path was the refresh doing its job and not some unrelated write.
-assert_region_refreshed() {
-  local label="$1" d="$2"
-  if [ ! -f "$d/CLAUDE.md" ]; then
-    fail "$label: CLAUDE.md is not there at all after the run"
-  elif grep -qF -- "$STALE_NEEDLE" "$d/CLAUDE.md"; then
-    fail "$label: the stale line is still inside the generated region — the run announced a refresh it did not perform, and whatever oracle 3 saw change at that path came from somewhere else"
+assert_region_refreshed() { assert_region_refreshed_in "$1" "$2/CLAUDE.md"; }
+assert_region_refreshed_in() {
+  local label="$1" f="$2"
+  if [ ! -f "$f" ]; then
+    fail "$label: $(basename "$f") is not there at all after the run"
+  elif grep -qF -- "$STALE_NEEDLE" "$f"; then
+    fail "$label: the stale line is still inside $(basename "$f")'s generated region — the run announced a refresh it did not perform, and whatever oracle 3 saw change at that path came from somewhere else"
   else
-    pass "$label: the refresh removed the stale line from the generated region"
+    pass "$label: the refresh removed the stale line from $(basename "$f")'s generated region"
   fi
 }
 
@@ -940,6 +968,106 @@ if [ -n "$(awk -F'\t' -v want="$WITHMCP_BAK" '$1 == want { print }' "$F_BAKMINE/
   fail "bakmine: the receipt claims $WITHMCP_BAK — the installer took ownership of a file the user wrote, and uninstall.sh would delete it"
 else
   pass "bakmine: the receipt does not claim $WITHMCP_BAK — no row, so uninstall.sh can never take the user's file"
+fi
+
+# ── Fixture: codex — the second client, which this file could not see at all ─
+#
+# WHY THIS FIXTURE IS THE REASON THE OTHER SEVEN KEPT FAILING. Every fixture above runs the DEFAULT
+# client, so nothing here had ever exercised `--client codex` — and the two oracles exclude only
+# `.claude/`, so they would cover `AGENTS.md`, `.codex/hooks.json` and `.codex/config.toml` the
+# moment a fixture existed to run them on. The consequence is measured rather than argued: the
+# dry-run/real-run divergence class has now been reopened FIVE times on this branch, and the fifth
+# member — an unconditional `.codex/hooks.json` promise against a run that had just been taught to
+# refuse a read-only one — was written INTO the commit dispatched to close the fourth. The machinery
+# that catches that shipped two waves ago and could not see half the announcement.
+#
+# FRESH, so the count line's equality is asserted too, and every Codex path is a CREATE.
+F_CODEX="$SCRATCH/codex"
+mkfixture codex "$F_CODEX"
+probe codex "$F_CODEX" fresh --client codex
+# ── The count oracle for .agents/skills/, which probe excludes by path ───────
+# The dry run makes one claim about that directory and it is a pair of NUMBERS, so the assertion is
+# about numbers. Read off the block the probe already saved, and compared against the disk — not
+# against a constant, which would go stale the next time a skill or a command is added.
+CODEX_BLOCK="$SCRATCH/codex.block"
+CODEX_SAY_LINKS="$(awk '$1 == ".agents/skills/" { for (i = 1; i <= NF; i++) if ($(i+1) ~ /^symlink/) print $i }' "$CODEX_BLOCK")"
+CODEX_SAY_CMDS="$(awk '$1 == ".agents/skills/" { for (i = 1; i <= NF; i++) if ($(i+1) ~ /^converted/) print $i }' "$CODEX_BLOCK")"
+case "${CODEX_SAY_LINKS:-x}${CODEX_SAY_CMDS:-x}" in
+  *[!0-9]*) fail "codex: the .agents/skills/ line did not parse (symlinks='${CODEX_SAY_LINKS:-}', commands='${CODEX_SAY_CMDS:-}') — the count oracle below is not running, and the per-path oracles skip that directory" ;;
+  *)        pass "codex: the dry run announces $CODEX_SAY_LINKS symlink(s) and $CODEX_SAY_CMDS converted command skill(s) into .agents/skills/" ;;
+esac
+CODEX_GOT_LINKS="$(find "$F_CODEX/.agents/skills" -mindepth 1 -maxdepth 1 -type l 2>/dev/null | grep -c . || true)"
+CODEX_GOT_CMDS="$(find "$F_CODEX/.agents/skills" -mindepth 2 -type f -name SKILL.md 2>/dev/null | grep -c . || true)"
+if [ -n "${CODEX_SAY_LINKS:-}" ] && [ "$CODEX_SAY_LINKS" = "$CODEX_GOT_LINKS" ]; then
+  pass "codex: …and the real run created exactly that many symlinks ($CODEX_GOT_LINKS)"
+else
+  fail "codex: the dry run announced ${CODEX_SAY_LINKS:-no} symlink(s) into .agents/skills/ and the real run created $CODEX_GOT_LINKS — the one claim the block makes about that directory is a count, and it is wrong"
+fi
+if [ -n "${CODEX_SAY_CMDS:-}" ] && [ "$CODEX_SAY_CMDS" = "$CODEX_GOT_CMDS" ]; then
+  pass "codex: …and exactly that many converted command skills ($CODEX_GOT_CMDS)"
+else
+  fail "codex: the dry run announced ${CODEX_SAY_CMDS:-no} converted command skill(s) and the real run wrote $CODEX_GOT_CMDS"
+fi
+# The floor. Both numbers agreeing at zero is the shape `docs/ANTI-VACUITY.md` names: a run that
+# wrote nothing satisfies both equalities above and proves nothing about either.
+if [ "$CODEX_GOT_LINKS" -ge 10 ] && [ "$CODEX_GOT_CMDS" -ge 5 ]; then
+  pass "codex: …and both counts are real ($CODEX_GOT_LINKS links, $CODEX_GOT_CMDS command skills), so the equalities above are not two zeroes agreeing"
+else
+  fail "codex: .agents/skills/ holds $CODEX_GOT_LINKS link(s) and $CODEX_GOT_CMDS command skill(s) — too few for the equalities above to mean anything"
+fi
+
+# ── Fixture: codexro — a read-only .codex/hooks.json of ours ────────────────
+# THE FIFTH MEMBER OF THE DIVERGENCE CLASS, WITH THE ONE STATE THAT SHOWS IT. Measured 2026-08-17
+# before the arm existed: `  .codex/hooks.json — generated from .claude/settings.json AFTER scripts/
+# is in place` from the dry run, and `warn .codex/hooks.json is read-only, so it was NOT written`
+# from the run, on this exact fixture. The mode is fully observable at dry-run time, so this is a
+# mirrorable branch that was not mirrored rather than an inherent TOCTOU.
+#
+# BOTH ENTRY DOCUMENTS GET A STALE LINE FIRST, for the reason `stale_region`'s own header gives: on
+# an upgrade the refresh reproduces the same bytes, the file therefore does not change, and the
+# promise reads as broken by a run that did exactly what it said. The AGENTS.md edit does double
+# duty — it also takes the file out of `owned_by_installer`, which is what routes it to the refresh
+# arm rather than the whole-file rewrite.
+F_CODEXRO="$SCRATCH/codexro"
+mkfixture codexro "$F_CODEXRO"
+CODEXRO_RC=0
+KINGLET_USER_SETTINGS="$ABSENT_SETTINGS" \
+  bash "$REPO/install.sh" --project-dir "$F_CODEXRO" --yes --client codex >/dev/null 2>&1 </dev/null || CODEXRO_RC=$?
+if [ "$CODEXRO_RC" -eq 0 ]; then
+  pass "codexro: the first --client codex install exited 0"
+else
+  fail "codexro: the first --client codex install exited $CODEXRO_RC — the probe below is not an upgrade of anything"
+fi
+if [ -f "$F_CODEXRO/.codex/hooks.json" ]; then
+  pass "codexro: install 1 wrote a .codex/hooks.json of ours for install 2 to refuse"
+else
+  fail "codexro: install 1 wrote no .codex/hooks.json — there is nothing for the read-only arm to reach, and the probe measures a fresh Codex layer instead"
+fi
+stale_region "$F_CODEXRO"
+stale_region_in "$F_CODEXRO" "$F_CODEXRO/AGENTS.md"
+CODEXRO_SHA="$(sha256sum "$F_CODEXRO/.codex/hooks.json" | cut -d' ' -f1)"
+chmod 444 "$F_CODEXRO/.codex/hooks.json"
+probe codexro "$F_CODEXRO" upgrade --client codex
+# Restored immediately: the EXIT trap removes $SCRATCH as one named path.
+chmod 644 "$F_CODEXRO/.codex/hooks.json"
+assert_region_refreshed "codexro" "$F_CODEXRO"
+assert_region_refreshed_in "codexro" "$F_CODEXRO/AGENTS.md"
+# The thing the three oracles cannot say about a path nobody wrote: the bytes are the ones install 1
+# left. Without it, "declined" and "rewritten with identical bytes" are the same observation.
+if [ "$(sha256sum "$F_CODEXRO/.codex/hooks.json" | cut -d' ' -f1)" = "$CODEXRO_SHA" ]; then
+  pass "codexro: the read-only .codex/hooks.json still carries install 1's bytes"
+else
+  fail "codexro: the read-only .codex/hooks.json was rewritten — under Codex a hook config that does not match .claude/settings.json enforces whatever it still names and nothing else"
+fi
+# AND ITS RECEIPT ROW SURVIVED THE REFUSAL. The row used to be written inside the success arm only,
+# so the run that correctly declined to touch the file also stopped claiming it: measured, 1 row
+# before and 0 after, leaving a file that is ours on disk and unowned in the receipt, which
+# `uninstall.sh` can no longer remove and `studio-doctor.sh` stops checking.
+if awk -F'\t' '$1 == ".codex/hooks.json" { found = 1 } END { exit !found }' \
+     "$F_CODEXRO/$RECEIPT_REL" 2>/dev/null; then
+  pass "codexro: …and the receipt still claims it, so declining to rewrite a file of ours does not quietly disown it"
+else
+  fail "codexro: the receipt has no .codex/hooks.json row after a run that kept the file — uninstall.sh can no longer take it and the doctor stops checking it"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1

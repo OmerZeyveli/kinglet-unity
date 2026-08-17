@@ -333,6 +333,103 @@ else
   fail "A.4: install.sh has $A_PRINTERS non-comment lines carrying the block header — the contract in MCP-SETUP.md describes one block from one writer"
 fi
 
+# ── A.5: every write to .gitignore has its own status read, and nothing masks it ─
+# STRUCTURAL, AND SAYING WHY IS HALF OF IT. The two defects this guards were both about a status:
+#
+#   * the CREATE was `[ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; … }` — a truncation whose failure
+#     `set -e` turned into rc 1 mid-install, which B.7c reaches end to end;
+#   * the APPEND was `{ …; …| grep -v '^$' || true; } >> "$GITIGNORE"`, and a `{ …; } > f` compound
+#     exits with the status of its LAST command. Measured against `/dev/full`, which accepts every
+#     open and refuses every write: `printf: write error: No space left on device`, `grep: write
+#     error: …`, group status **0** — so the run printed `ok Updated .gitignore (4 entries)` over a
+#     file carrying part of our block or none of it. Two controls in the same measurement, so the
+#     attribution is not a guess: without the `|| true` the same input gives 1, and with only the
+#     FIRST `printf` failing the status is still 0.
+#
+# NO FIXTURE CAN REACH THE SECOND ONE, AND THIS IS WHY THE GUARD IS SOURCE-SHAPED. A write that
+# fails after a successful open needs ENOSPC, EIO or EDQUOT at a real path. The one portable device
+# that produces it is `/dev/full`, and pointing the fixture's `.gitignore` at it is a trap rather
+# than a test: `install.sh` checksums a `.gitignore` it created, `sha256sum /dev/full` reads zeros
+# forever, and the suite would hang instead of failing. So this asserts the SHAPE the measurement
+# blessed — one status per redirection, read by an `if` — and it is weaker than a run in exactly the
+# way Section A's other members are.
+#
+# CONTINUATIONS ARE FOLDED FIRST, the same fix the receipt guard above needed: the append's
+# redirection sits on a continuation line, so a physical-line classifier would read a fragment that
+# begins with a format string and call it unguarded on a correct installer.
+A_GI="$(awk '
+  { line = $0
+    sub(/^[ \t]+/, "", line)
+    if (sub(/\\$/, "", line)) { acc = acc line " "; next }
+    logical = acc line; acc = ""
+    if (logical ~ /^#/) next
+    if (logical !~ /> *"\$GITIGNORE"/) next
+    n++
+    if (logical !~ /^(if|elif) /)  { bare++;   print "BARE: " logical > "/dev/stderr" }
+    if (logical ~ /\|\| true/)     { masked++; print "MASKED: " logical > "/dev/stderr" }
+  }
+  END { printf "%d,%d,%d\n", n + 0, bare + 0, masked + 0 }
+' "$INSTALLER" 2>/dev/null)"
+A_GI_N="${A_GI%%,*}"
+if [ "$A_GI_N" -ge 2 ]; then
+  pass "A.5: install.sh carries $A_GI_N redirection(s) into .gitignore, so the two checks below have a subject"
+else
+  fail "A.5: install.sh carries $A_GI_N redirection(s) into .gitignore — the create and the append are two separate writes, and a count below two means this guard is reading the wrong thing"
+fi
+if [ "$A_GI" = "$A_GI_N,0,0" ]; then
+  pass "A.5: every one of them is the direct command of an if/elif — its status is read — and none is masked by '|| true'"
+else
+  fail "A.5: install.sh has .gitignore redirections whose status is unread or masked ($A_GI = total,bare,masked) — a bare one ends the run at rc 1 with the payload on disk, and a masked one reports 'ok Updated .gitignore' over a file carrying half our block"
+fi
+
+# ── A.6: every temp renamed into the project is created beside its destination ─
+# `mv` is `rename(2)` only WITHIN one filesystem. Across one, coreutils copies — and an interrupted
+# copy leaves the DESTINATION truncated, which is the opposite of what every one of these arms tells
+# the user. Measured 2026-08-17 with `$TMPDIR` on another filesystem and a real 5429-byte
+# `.codex/hooks.json` as the destination: after an interrupted cross-device `mv` the file was 4096
+# bytes, `jq` refused it, and the arm that had just failed printed *"the previous config (if any) is
+# untouched rather than half-written"*. Under Codex an unparseable hook config is a silent ALLOW.
+#
+# STRUCTURAL FOR A REASON NO FIXTURE CAN GET AROUND: whether a rename is atomic is a property of the
+# HOST, and the suite runs on one. A run on a machine where `$TMPDIR` and the project share a
+# filesystem — this one — is green either way, which is exactly how the claim came to be written down
+# as unconditional. So the guard is that the temps are created where they land, which is the property
+# that makes the claim host-independent.
+#
+# `/tmp` IS A tmpfs BY DEFAULT on Fedora, RHEL, Arch, openSUSE and in most containers, and any Unity
+# project on a second drive is cross-device even on a Debian-family host. `$TMPDIR` is also the
+# user's to set.
+A_BESIDE_FN="$(awk '/^mktemp_beside\(\)/ { f = 1 } f { print } f && /^}/ { exit }' "$INSTALLER")"
+if grep -qF -- 'mktemp "$1/$2.XXXXXX"' <<< "$A_BESIDE_FN"; then
+  pass "A.6: mktemp_beside creates its temp inside the directory it is handed"
+else
+  fail "A.6: mktemp_beside does not create its temp inside its first argument — every caller below is then trusting a helper that does not do what its name says"
+fi
+# The temps that are renamed into the project, derived from the `mv` sites rather than listed: the
+# source operand of every `mv` whose destination is a project path.
+A_TEMP_BAD=0
+for a_v in TMP_MD TMP_AG HCFG_TMP; do
+  a_asg="$(awk -v v="$a_v" '!/^[[:space:]]*#/ && $0 ~ ("^[[:space:]]*" v "=\\$\\(") { print; n++ } END { if (n == 0) print "NONE" }' "$INSTALLER")"
+  if [ -z "$a_asg" ] || grep -qF -- 'NONE' <<< "$a_asg"; then
+    fail "A.6: no assignment of \$$a_v found in install.sh — this guard is reading a variable that no longer exists"
+    A_TEMP_BAD=$((A_TEMP_BAD + 1))
+  elif grep -qF -- 'mktemp_beside' <<< "$a_asg" && ! grep -qE '=\$\(mktemp\)' <<< "$a_asg"; then
+    pass "A.6: \$$a_v is created beside its destination, so the rename into the project is a rename on every host"
+  else
+    fail "A.6: \$$a_v is assigned from a bare mktemp — it lands in \$TMPDIR, and the mv that puts it in the project degrades to a copy whenever that is a different filesystem, leaving the destination truncated on an interrupted write while the run says it was untouched"
+    A_TEMP_BAD=$((A_TEMP_BAD + 1))
+  fi
+done
+# The merge's own temp is derived from the TARGET rather than from the facts file, which is the same
+# property reached a different way — the facts file is one of the three above, but the function is
+# also called directly by tests/test-install-upgrade-client.sh arm 8 with a facts file of its own.
+A_MERGE_TMP="$(awk '/^merge_marked_region\(\)/ { f = 1 } f && /local target=/ { print; exit }' "$INSTALLER")"
+if grep -qF -- 'tmp="$1.' <<< "$A_MERGE_TMP"; then
+  pass "A.6: merge_marked_region derives its temp from the TARGET, so its rename is a rename however the caller made the facts file"
+else
+  fail "A.6: merge_marked_region's temp is not derived from its target — it was '\$2.merged', which put it wherever the caller's facts file lives, and the function's own contract is that a failed merge leaves the target untouched"
+fi
+
 # ============================================================================
 # SECTION B — the block, on runs that abandon work
 # ============================================================================
@@ -581,8 +678,37 @@ assert_entry "B.7" '--with-mcp — declined: Packages/manifest.json.bak is not o
 # THE ASSERTIONS ARE THE THREE HALVES OF THAT: the run finishes, the file is untouched, and the work
 # it skipped is in the block rather than only in a warn line. The fourth — that the run got PAST
 # Step 7 — is what makes this different from a decline that happens to be last.
+# AND IT HOLDS SOME OF OUR ENTRIES ALREADY, WHICH IS WHAT MAKES THE NUMBER CHECK BELOW MEAN
+# ANYTHING. The dry run quotes the entries MISSING from the file and the run's entry quoted every
+# entry we know about — two different numbers about one set, in a pair added under the rule that one
+# predicate asked in two places is one predicate only if both ask it at the same point. On a file
+# holding none of them the two numbers coincide and no assertion can tell them apart; measured on a
+# file holding 2 of 4, the dry run said 3 and the run said 4. The planted entries and the total are
+# both DERIVED from install.sh's own list, so this cannot go stale when the list changes.
 B7A="$(new_fixture readonly-gitignore urp)"
 printf '/Builds/\n' > "$B7A/.gitignore"
+# THE ENTRIES ARE DERIVED FROM THE INSTALLER'S OWN ANNOUNCEMENT, not read out of its source and not
+# written down here: one dry run against the still-writable fixture prints `append N entries: a, b, …`
+# and the first two of that list are what gets planted. A list written into this file would go stale
+# the next time install.sh's set changes, in an assertion whose entire subject is a number going
+# stale.
+B7A_DRY0="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$INSTALLER" --project-dir "$B7A" --yes --dry-run 2>&1 </dev/null \
+  | sed $'s/\x1b\\[[0-9;]*m//g' | awk '$1 == ".gitignore" { print; exit }')"
+B7A_TOTAL="$(awk '{ for (i = 1; i <= NF; i++) if ($(i+1) == "entries:") print $i }' <<< "$B7A_DRY0" | head -1)"
+B7A_LIST="$(sed 's/.*entries: //' <<< "$B7A_DRY0" | tr ',' '\n' | sed 's/^ *//' | grep -c . >/dev/null 2>&1; \
+  sed 's/.*entries: //' <<< "$B7A_DRY0" | tr ',' '\n' | sed 's/^ *//' | head -2)"
+B7A_PLANTED="$(printf '%s\n' "$B7A_LIST" | grep -c . || true)"
+{ printf '/Builds/\n'; printf '%s\n' "$B7A_LIST"; } > "$B7A/.gitignore"
+case "${B7A_TOTAL:-x}" in
+  *[!0-9]*|'') B7A_WANT=-1 ;;
+  *)           B7A_WANT=$((B7A_TOTAL - B7A_PLANTED)) ;;
+esac
+if [ "$B7A_PLANTED" -eq 2 ] && [ "$B7A_WANT" -ge 1 ]; then
+  pass "B.7a: the installer announces $B7A_TOTAL entries for this project, the fixture plants 2 of them, so 'missing' ($B7A_WANT) and 'total' are different numbers and the check below can tell them apart"
+else
+  fail "B.7a: derived $B7A_PLANTED planted entr(ies) out of an announced '${B7A_TOTAL:-nothing}' — with the two numbers equal, the missing-vs-total check below passes whichever variable the installer reads"
+fi
 B7A_SHA="$(sha256sum "$B7A/.gitignore" | cut -d' ' -f1)"
 chmod 444 "$B7A/.gitignore"
 # THE ANNOUNCEMENT, BEFORE THE RUN. Teaching Step 7 to refuse without teaching its dry-run arm the
@@ -603,6 +729,15 @@ fi
 run_install "$B7A" "B.7a (a read-only .gitignore)" --client codex
 chmod 644 "$B7A/.gitignore"
 assert_entry "B.7a" '.gitignore — the file is read-only'
+# ONE SET, ONE NUMBER. Both halves read the PLAN now; the run's entry used to read the whole entry
+# list, so the two disagreed about a file they both declined.
+B7A_DRY_N="$(awk '{ for (i = 1; i <= NF; i++) if ($(i+1) == "entries") print $i }' <<< "$B7A_DRY" | head -1)"
+B7A_ENTRY_N="$(not_done_block | awk '/\.gitignore — the file is read-only/ { for (i = 1; i <= NF; i++) if ($(i+1) == "missing") print $i }' | head -1)"
+if [ "${B7A_DRY_N:-x}" = "$B7A_WANT" ] && [ "${B7A_ENTRY_N:-y}" = "$B7A_WANT" ]; then
+  pass "B.7a: the dry run and the run quote the same number of entries ($B7A_WANT), and it is the number MISSING from the file rather than the number that exists"
+else
+  fail "B.7a: the dry run says '${B7A_DRY_N:-nothing}' entries and the run's block entry says '${B7A_ENTRY_N:-nothing}', where $B7A_WANT of install.sh's $B7A_TOTAL entries are missing from this file — one predicate asked in two places is one predicate only if both halves read the same thing"
+fi
 if [ "$B7A_SHA" = "$(sha256sum "$B7A/.gitignore" | cut -d' ' -f1)" ]; then
   pass "B.7a: the read-only .gitignore is byte-for-byte as it was"
 else
@@ -665,6 +800,152 @@ if awk -F'\t' '$1 == "Packages/manifest.json.bak" && $4 == "toolkit" { found = 1
   pass "B.7b: the backup the failed rollback left behind is recorded as ours, so uninstall.sh can take it away"
 else
   fail "B.7b: the leftover backup has no receipt row — it is permanent debris, which is the defect that row exists to close"
+fi
+
+# ── B.7c: a sealed project root, on the run that has to create things in it ─
+# THE STATE THAT BROKE THE ROUND THAT FIXED B.7a. Teaching `.gitignore`'s APPEND to refuse left its
+# CREATE a bare `: > "$GITIGNORE"`, because `can_replace` is `[ ! -e ] || [ -w ]` and answers 0 for a
+# path that is not there — so `can_replace_or_report` waved the arm straight through to a truncation
+# with no status of its own. Measured 2026-08-17: `install.sh: line 2456: …/.gitignore: Permission
+# denied`, `set -e`, **rc 1**, one branch after the refusal that had just been added, with
+# `.mcp.json`, `MCP-SETUP.md`, the entire Codex layer and `Next steps:` never running.
+#
+# ONE FIXTURE, SEVEN SITES, AND THAT IS THE POINT. A sealed root is the state in which every
+# project-root create fails at once, so it is the cheapest available test of the CLASS rather than of
+# the member that was reported: the `.gitignore` create, `.mcp.json`, `MCP-SETUP.md`, `AGENTS.md`,
+# the `.agents/skills/` link root, the converted command skills, and `.codex/`. Four of those had a
+# status read and no assertion anywhere until this arm — measured by reverting all four at once with
+# the whole suite green and byte-identical.
+#
+# INSTALL 1 IS THE DEFAULT CLIENT, deliberately: `.agents/` and `.codex/` must NOT exist when the
+# sealed run reaches them, or their `mkdir -p` succeeds trivially and the two directory members are
+# never exercised.
+B7C="$(new_fixture sealed-root urp)"
+run_install "$B7C" "B.7c install 1 (an ordinary Claude Code install)"
+rm -f "$B7C/.gitignore" "$B7C/.mcp.json" "$B7C/MCP-SETUP.md"
+if [ ! -e "$B7C/.gitignore" ] && [ ! -e "$B7C/.mcp.json" ] && [ ! -e "$B7C/MCP-SETUP.md" ] \
+   && [ ! -e "$B7C/.agents" ] && [ ! -e "$B7C/.codex" ]; then
+  pass "B.7c: the five project-root paths the sealed run must create are all absent, so every assertion below is about a CREATE rather than a replace"
+else
+  fail "B.7c: one of the paths the sealed run is supposed to create is already there — the create arms are not reached and this fixture measures nothing"
+fi
+chmod 555 "$B7C"
+run_install "$B7C" "B.7c install 2 (project root sealed)" --client codex
+# Restored immediately: the EXIT trap removes $SCRATCH as one named path and a 555 directory in it
+# would defeat that.
+chmod 755 "$B7C"
+assert_entry "B.7c (.gitignore create)" '.gitignore — it does not exist and could not be created'
+assert_entry "B.7c (.mcp.json)"         '.mcp.json — it could not be written'
+assert_entry "B.7c (MCP-SETUP.md)"      'MCP-SETUP.md — it could not be written'
+assert_entry "B.7c (.codex/)"           '.codex/ does not exist and could not be created'
+assert_entry "B.7c (.agents/skills/)"   'could not be linked into .agents/skills/'
+if grep -qF -- 'Next steps:' <<< "$INSTALL_OUT"; then
+  pass "B.7c: …and the run reached its summary — every one of these was an abort before the status reads existed, and the first one to fire took the rest of the install with it"
+else
+  fail "B.7c: the run never reached 'Next steps:' — one of the project-root creates ended it, which is the whole failure this state exists to keep out"
+fi
+if [ ! -e "$B7C/.gitignore" ] && [ ! -e "$B7C/.mcp.json" ] && [ ! -e "$B7C/MCP-SETUP.md" ]; then
+  pass "B.7c: …and nothing was left behind at the three root paths — a failed create that leaves an empty file is a state nobody chose either"
+else
+  fail "B.7c: a create that could not finish left a file at the project root"
+fi
+
+# ── B.7d: a sealed Packages/, with no backup to overwrite ──────────────────
+# The manifest backup `cp`. It gained a status read in the same wave as the `mv` sites and had no
+# fixture: reverting it to a bare command left the whole gate green. B.7b's state cannot reach it —
+# that one needs the `.bak` to already exist so the `cp` SUCCEEDS — so this is its complement, and
+# the two together cover both sides of the same `cp`.
+B7D="$(new_fixture sealed-packages urp)"
+if [ ! -e "$B7D/Packages/manifest.json.bak" ]; then
+  pass "B.7d: no manifest backup in the way, so the cp below is a CREATE inside the sealed directory rather than an overwrite of an existing file"
+else
+  fail "B.7d: a manifest backup is already there — the cp would succeed on the existing file and this fixture would measure B.7b's state instead"
+fi
+B7D_SHA="$(sha256sum "$B7D/Packages/manifest.json" | cut -d' ' -f1)"
+chmod 555 "$B7D/Packages"
+run_install "$B7D" "B.7d (Packages/ sealed, no backup)" --with-mcp
+chmod 755 "$B7D/Packages"
+assert_entry "B.7d" 'the pre-edit backup could not be written'
+if [ "$B7D_SHA" = "$(sha256sum "$B7D/Packages/manifest.json" | cut -d' ' -f1)" ]; then
+  pass "B.7d: the manifest is byte-for-byte what the run found — the flag was declined rather than the edit made with no way back"
+else
+  fail "B.7d: the manifest was edited by a run that could not write its backup first"
+fi
+
+# ── B.7e: a sealed .codex/, on the run that has to write into it ───────────
+# `.codex/config.toml`'s status read, which had no assertion either, and `.codex/hooks.json`'s
+# rename failure beside it. The directory EXISTS here and refuses new entries, which is a different
+# state from B.7c's (where it cannot be created at all) and reaches a different pair of arms.
+B7E="$(new_fixture sealed-codex urp)"
+run_install "$B7E" "B.7e install 1 (--client codex)" --client codex
+rm -f "$B7E/.codex/config.toml"
+B7E_SHA="$(sha256sum "$B7E/.codex/hooks.json" | cut -d' ' -f1)"
+chmod 555 "$B7E/.codex"
+run_install "$B7E" "B.7e install 2 (.codex/ sealed)" --client codex
+chmod 755 "$B7E/.codex"
+assert_entry "B.7e (config.toml)" '.codex/config.toml — it could not be written'
+assert_entry "B.7e (hooks.json)"  '.codex/hooks.json — it could not be written'
+if [ ! -e "$B7E/.codex/config.toml" ]; then
+  pass "B.7e: the config.toml that could not be written is absent rather than empty"
+else
+  fail "B.7e: a config.toml that could not be written was left at the path anyway"
+fi
+if [ "$B7E_SHA" = "$(sha256sum "$B7E/.codex/hooks.json" | cut -d' ' -f1)" ]; then
+  pass "B.7e: …and the previous hook config really is untouched rather than half-written, which is what the arm's own message claims"
+else
+  fail "B.7e: the hook config changed under a run whose message says it was left untouched — an unparseable .codex/hooks.json is a silent ALLOW under Codex"
+fi
+
+# ── B.7f: a converted command skill a VCS is holding read-only ─────────────
+# The other half of R-6's pair. `is_modified` compares CONTENT, so a file nobody has edited and a VCS
+# has merely made read-only is not modified: the run takes the write arm and the bare `cp` ended it
+# at rc 1, after AGENTS.md and the sixteen skill links had landed and before `.codex/` was touched.
+B7F="$(new_fixture readonly-cmdskill urp)"
+run_install "$B7F" "B.7f install 1 (--client codex)" --client codex
+B7F_VICTIM="$(find "$B7F/.agents/skills" -mindepth 2 -name SKILL.md -type f 2>/dev/null | LC_ALL=C sort | head -1)"
+if [ -n "$B7F_VICTIM" ]; then
+  pass "B.7f: install 1 produced a converted command skill for install 2 to fail on"
+else
+  fail "B.7f: install 1 converted no commands into .agents/skills/ — there is nothing for the read-only arm to reach"
+fi
+if [ -n "$B7F_VICTIM" ]; then chmod 444 "$B7F_VICTIM"; fi
+run_install "$B7F" "B.7f install 2 (one converted skill read-only)" --client codex
+if [ -n "$B7F_VICTIM" ]; then chmod 644 "$B7F_VICTIM"; fi
+assert_entry "B.7f" 'could not be written into .agents/skills/'
+if grep -qF -- 'Next steps:' <<< "$INSTALL_OUT"; then
+  pass "B.7f: …and the run reached its summary, so .codex/hooks.json and .codex/config.toml were still written"
+else
+  fail "B.7f: the run never reached 'Next steps:' — one read-only converted skill took the rest of the Codex layer with it"
+fi
+
+# ── B.7g: a stale skill link that cannot be removed ────────────────────────
+# THE THIRD `.agents/` WRITE, AND THE ONE NEITHER OF THE OTHER TWO STATES REACHES. B.7c seals the
+# project root, so the skill root never exists and the prune loop's glob matches nothing; B.7f leaves
+# the root writable, so nothing needs pruning. This is a link of ours pointing at a skill the payload
+# no longer ships, inside a directory that will not take the unlink — `rm -f` is silent about a
+# MISSING file and not about a directory that refuses, so it was an abort, and it happens AFTER the
+# links and their receipt rows have already been written, which would leave the receipt describing
+# more than the run finished.
+#
+# THE SUBDIRECTORIES STAY WRITABLE, deliberately: only `.agents/skills/` itself is sealed, so the
+# converted command skills are still copied and this state isolates the prune from B.7f's `cp`.
+B7G="$(new_fixture stale-skill-link urp)"
+run_install "$B7G" "B.7g install 1 (--client codex)" --client codex
+ln -s '../../.claude/skills/a-skill-this-payload-does-not-ship' "$B7G/.agents/skills/a-skill-this-payload-does-not-ship"
+if [ -L "$B7G/.agents/skills/a-skill-this-payload-does-not-ship" ] \
+   && [ ! -d "$B7G/.claude/skills/a-skill-this-payload-does-not-ship" ]; then
+  pass "B.7g: there is a dangling link of ours for the prune to reach, and its target really is absent"
+else
+  fail "B.7g: the dangling link was not planted, or its target exists — the prune loop skips it and this fixture measures nothing"
+fi
+chmod 555 "$B7G/.agents/skills"
+run_install "$B7G" "B.7g install 2 (.agents/skills/ sealed)" --client codex
+chmod 755 "$B7G/.agents/skills"
+assert_entry "B.7g" 'could not be removed'
+if [ -L "$B7G/.agents/skills/a-skill-this-payload-does-not-ship" ]; then
+  pass "B.7g: …and the link is still there, so the entry describes the disk rather than a wish"
+else
+  fail "B.7g: the link was removed by a run that reported it could not be — the count and the file disagree"
 fi
 
 # ── B.8: a receipt row whose origin column cannot be read ──────────────────

@@ -2990,11 +2990,14 @@ fi
 # writable `.claude/` inside it is that state exactly, and until 2026-08-17 the `mv` there was a bare
 # command: `set -e` ended the run at exit 1 with the payload already written and no CLAUDE.md.
 #
-# It is one of the four `mv` sites this wave taught to report, and the only one S5 and S6 do NOT
-# cover: those two exercise PREDICATES — `merge_marked_region`'s `-w` and `can_replace` — and neither
-# asserts a status read at all. The other three sites are S8's (beside-yours), 7h's in
-# tests/test-install-upgrade-client.sh (the AGENTS.md write), and the manifest rollback's, which
-# tests/test-install-not-done.sh reaches at B.7b. Mutating this arm back to a
+# S5 AND S6 COVER NEITHER THIS SITE NOR ANY OTHER STATUS READ: those two exercise PREDICATES —
+# `merge_marked_region`'s `-w` and `can_replace` — and neither asserts a rename's status at all. A
+# sentence here used to call this arm *the only one* they do not cover and then list three more they
+# also do not cover; the covering fixtures are named instead, since a claim about which member is
+# uncovered goes stale every time the class gains one. The `mv` sites this wave taught to report are
+# asserted at: this state (the fresh arm), S8 (beside-yours), 7h in
+# tests/test-install-upgrade-client.sh (the AGENTS.md write), 7i there (`.codex/hooks.json`), and
+# B.7b in tests/test-install-not-done.sh (the manifest rollback). Mutating this arm back to a
 # bare `mv` left both install test files green before this state existed.
 #
 # THE ROOT IS SEALED AFTER INSTALL 1 AND CLAUDE.md IS REMOVED FIRST, so the run really does take the

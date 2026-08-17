@@ -776,38 +776,58 @@ echo "--- codex shim: a signal lands on a refusal, not a silent allow ---"
 SIGHOOK="$WORK/sig-hook.sh"
 printf '#!/usr/bin/env bash\nsleep 45\n' > "$SIGHOOK"; chmod +x "$SIGHOOK"
 
-# ONE UNEXPLAINED RED HAS BEEN SEEN HERE, AND IT IS RECORDED RATHER THAN ROUNDED OFF.
-# 2026-08-16, inside a full-suite run: `FAIL: SIGHUP did NOT refuse (exit 0, 0 bytes)`.
-# It is NOT the killer-subshell race fixed in scripts/codex-hook-shim.sh the same
-# day — that one has a different signature (`payload.N.json: No such file or
-# directory`) and a different assertion. Follow-up, same day: not reproduced in four
-# further executions under two-way self-concurrency, and not reproduced by a probe
-# running this loop body character-for-character with the signal as a parameter —
-# 0 of 25 iterations per signal on a quiet host, then 0 of 12 per signal in each of
-# three concurrent instances, SIGHUP 0 of 61 in total. ALL FOUR ARMS READ ZERO, so
-# that probe has no positive control and proves nothing; it is a negative result.
+# THE SIGHUP RED SEEN TWICE ON THIS BRANCH IS AN ARTIFACT OF HOW THE SUITE WAS
+# LAUNCHED, NOT OF LOAD — AND THAT IS THE THIRD CAUSE THIS PARAGRAPH HAS NAMED.
+# **DO NOT RUN THIS SUITE UNDER `nohup`.**
 #
-# **AND THE NEGATIVE IS ONLY AS BROAD AS THE INSTRUMENT THAT PRODUCED IT.** That 0-of-61
-# was measured on a quiet host and under this suite's own self-concurrency — two
-# conditions — so it bounds the race under those two and says nothing about any
-# other. Read it as "absent under what we tried", never as "absent".
+# The sightings are kept below because a red here is read against this comment, and
+# because the two wrong causes are the reason the right one took three rounds.
 #
-# SECOND SIGHTING, 2026-08-17, and its condition is the new information. A reviewer's
-# first full-suite run reported this exact red — `FAIL: SIGHUP did NOT refuse (exit 0,
-# 0 bytes)`, character for character — while UNRELATED work ran concurrently on the
-# same host (greps, `git archive`, `tar`). Re-run alone: green. That is a third
-# condition, external load from another process tree, and it is precisely the one the
-# 0-of-61 probe never covered: self-concurrency contends for CPU on a schedule this
-# suite creates, unrelated load does not. Two sightings, both under external load,
-# none on a quiet host. **The cheapest next experiment is therefore this loop body
-# under a generated unrelated load rather than under more copies of itself** — and
-# whoever runs it should bound the load and reap by pattern, because this repository
-# has already orphaned two batches of load generators doing exactly that.
-# One mechanism was eliminated rather than assumed: `$!` under `set -m` still names
-# the LAST process of the pipeline on this host (measured both ways), so the kill
-# lands on the shim and not on the long-gone `printf`, which would have explained
-# `exit 0, 0 bytes` exactly. If you meet this red, add your run to the ledger's
-# entry — do not treat it as expected, and do not treat it as the fixed race.
+#   2026-08-16, inside a full-suite run: `FAIL: SIGHUP did NOT refuse (exit 0, 0 bytes)`.
+#   2026-08-17, a reviewer's first full-suite run: the same line, character for character.
+#
+# Both were attributed to CPU contention — the second explicitly to *external* load
+# from an unrelated process tree, with "the cheapest next experiment" named as this
+# loop body under generated load. That experiment was never the one to run.
+#
+# THE MECHANISM, MEASURED 2026-08-17 AND DETERMINISTIC IN BOTH DIRECTIONS. `nohup`
+# sets SIGHUP to `SIG_IGN`, and an IGNORED disposition — unlike a trapped one — is
+# inherited across `fork` and `exec` into every descendant, however deep. So the
+# shim's process cannot be killed by the signal this loop sends it, `wait` reaps a
+# process that exited 0, and the assertion reds on a completely healthy tree:
+#
+#   foreground   `bash -c 'bash -c "trap -p SIGHUP"'`  →  (empty: default disposition)
+#   under nohup  the same command                      →  `trap -- '' SIGHUP`
+#   foreground   a grandchild that HUPs itself         →  `Hangup`, rc 129
+#   under nohup  the same grandchild                   →  rc 7, it survives
+#
+#   `bash tests/test-codex-shim.sh` in the foreground   →  0 of 3 runs red
+#   `nohup bash tests/test-codex-shim.sh`               →  3 of 3 red, and every time
+#                                                          it is SIGHUP alone while
+#                                                          TERM, INT and PIPE pass
+#
+# THAT LAST COLUMN IS WHY THE SHAPE LOOKED LIKE A FLAKE. Three sibling rows staying
+# green is exactly what a genuine intermittent single-signal regression would look
+# like — and it is also what a launcher that ignores exactly one signal produces,
+# every single time. The two are indistinguishable from the log alone, and the
+# distinguishing observation costs one command: `trap -p SIGHUP`.
+#
+# WHAT SURVIVES FROM THE LOAD HYPOTHESIS, because a superseded measurement is not a
+# false one. The probe that ran this loop body with the signal as a parameter read
+# 0 of 25 per signal on a quiet host and 0 of 12 per signal in three concurrent
+# instances — SIGHUP 0 of 61. All four arms read zero, so it had no positive control
+# and refuted nothing; it is now also consistent with the cause above, since none of
+# those runs was launched under `nohup`. It is NOT the killer-subshell race fixed in
+# scripts/codex-hook-shim.sh on 2026-08-16 either — that one has a different
+# signature (`payload.N.json: No such file or directory`) and a different assertion.
+# And one mechanism was eliminated rather than assumed: `$!` under `set -m` still
+# names the LAST process of the pipeline on this host (measured both ways), so the
+# kill lands on the shim and not on a long-gone `printf`.
+#
+# IF YOU MEET THIS RED: check the disposition first (`trap -p SIGHUP` inside the
+# harness, and `cat /proc/self/status | grep SigIgn`). If it is ignored, the finding
+# is about your launcher. Only a red with SIGHUP at its default disposition is a
+# claim about this shim, and that one belongs in the ledger with its conditions.
 #
 # `set -m` IS LOAD-BEARING AND THE SIGINT ROW IS WHY. POSIX requires a
 # non-interactive shell to start an ASYNC job with SIGINT and SIGQUIT set to

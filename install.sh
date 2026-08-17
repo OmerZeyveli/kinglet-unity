@@ -999,6 +999,24 @@ marked_region_remedy() {
 # RETURNS: 0 merged · 2 the target is not writable, nothing was written · 1 the merge could not be
 # written. The caller prints a different sentence for 2 than for 1 because the user's action differs.
 #
+# THE TEMP SITS BESIDE THE TARGET, NOT BESIDE THE FACTS FILE, AND THAT IS WHAT MAKES `1` TRUE. It was
+# `"$2.merged"` — the facts file is a `mktemp`, so the temp lived in `$TMPDIR`, and `mv` is
+# `rename(2)` only WITHIN one filesystem. With `/tmp` a tmpfs (the default on Fedora, RHEL, Arch,
+# openSUSE and in most containers) or the project on a second drive, the rename degraded to a copy:
+# measured 2026-08-17 on the sibling `.codex/hooks.json` write, an interrupted cross-device `mv`
+# PRESERVED the destination inode and left it truncated — the target opened and half-written by the
+# very statement whose failure this function reports as "nothing was touched". Same directory means
+# `rename(2)` on every host, so the target is the old file or the new file and never half of either.
+#
+# `$$` RATHER THAN `mktemp`, so the temp is created by the awk redirection under the caller's umask
+# exactly as `"$2.merged"` was — `mktemp` would give 0600 and change the mode the target ends up
+# with on any host where the `stat -c` below returns nothing. One installer runs at a time in one
+# project, so the name cannot collide with itself.
+#
+# WHEN THE TARGET'S DIRECTORY WILL NOT TAKE A FILE the awk redirection now fails where the `mv` used
+# to, and the function still returns 1 with the target untouched — the same status and the same
+# truth, one statement earlier. `tests/test-install-upgrade-client.sh` arm 8 measures exactly that.
+#
 # THE MARKERS BELOW ARE FOR EXTRACTION, NOT FOR A SECOND COPY. `codex_layer_path` carries a pair like
 # this because two files hold it and the suite compares them byte for byte; this function has exactly
 # one copy and nothing to compare. What the pair buys instead is that
@@ -1008,7 +1026,7 @@ marked_region_remedy() {
 # by mutation, deleting it left the whole file green.
 # kinglet:merge-marked-region:begin
 merge_marked_region() {
-  local target="$1" facts="$2" tmp="$2.merged" mode
+  local target="$1" facts="$2" tmp="$1.kinglet-merge.$$" mode
   [ -w "$target" ] || return 2
   mode="$(stat -c '%a' "$target" 2>/dev/null || true)"
   if awk -v factsfile="$facts" '
@@ -1027,6 +1045,33 @@ merge_marked_region() {
   return 1
 }
 # kinglet:merge-marked-region:end
+
+# ── A temp file whose rename into $1 is actually a rename ────────────────────
+#
+# `mv` is `rename(2)` only WITHIN one filesystem. Across one, coreutils copies — and a copy that is
+# interrupted leaves the DESTINATION truncated. Measured 2026-08-17 with `$TMPDIR` on another
+# filesystem and a real 5429-byte `.codex/hooks.json` as the destination: after an interrupted
+# cross-device `mv` the file was 4096 bytes, `jq` refused it, and the arm that had just failed
+# printed *"the previous config (if any) is untouched rather than half-written"*. Under Codex an
+# unparseable hook config is a silent ALLOW, so the atomicity was not a nicety.
+#
+# IT IS NOT AN EXOTIC HOST EITHER. `/tmp` is a tmpfs by default on Fedora, RHEL, Arch, openSUSE and
+# in most containers, and any Unity project on a second drive is cross-device even on a
+# Debian-family host. `$TMPDIR` is also the user's to set. So every temp this file renames into the
+# project is created in the directory it will land in, and the claim holds on every host rather than
+# on the one it was written on.
+#
+# THE FALLBACK IS NOT A SECOND ATOMICITY CLAIM — it preserves the BEHAVIOUR of the states where the
+# rename was never going to work. `mktemp` here fails exactly when we cannot create a file in that
+# directory, and `rename(2)` needs write and execute on the destination's directory too, so a host
+# that refuses the temp refuses the rename. Every caller below already reports that outcome, and the
+# fallback keeps it reaching the same `mv`, the same warn, and the same `Not done:` entry rather than
+# inventing a new failure shape at the `mktemp`. The one state in which the fallback can still write
+# is a cross-device `mv` onto a writable file inside a sealed directory, which coreutils performs by
+# truncating the destination in place: non-atomic, which is the pre-2026-08-17 behaviour everywhere.
+mktemp_beside() {   # $1 = the directory the file will be renamed into, $2 = a name prefix
+  mktemp "$1/$2.XXXXXX" 2>/dev/null || mktemp
+}
 
 # ── Can this run replace what is at that path? ───────────────────────────────
 # True when nothing is there, or when what is there is writable. It answers for the WHOLE-FILE write
@@ -1064,7 +1109,9 @@ merge_marked_region() {
 # posture anywhere else. Every other unhandleable state in this file is declined out loud."* The
 # second sentence is false one flag away, measured (W4): with `Packages/manifest.json` at 0444,
 # `--with-mcp` runs `sed -i` over it, which needs directory write rather than file write, succeeds,
-# prints `ok Added …`, and leaves the file rewritten at mode 444. The posture stated here is the
+# prints `ok Added …`, and leaves the file rewritten at mode 444 — and, because `sed -i` renames its
+# temp into place, at a NEW INODE. So that path both defeats the read-only bit silently and replaces
+# the file the user's VCS was tracking rather than editing it. The posture stated here is the
 # posture for the two GENERATED ENTRY DOCUMENTS — the files this task is about, and the ones a Codex
 # or Claude Code session reads on every turn. Whether the manifest edit should join them is a
 # behaviour change on a flagged path with its own backup and decline logic, and it is recorded for the
@@ -1088,22 +1135,35 @@ can_replace() {
 #   manifest rollback              Packages/manifest.json  status               reports
 #   AGENTS.md write                AGENTS.md               can_replace + status reports
 #   manifest backup `cp`           …manifest.json.bak      status               declines the flag
-#   .gitignore create + appends    .gitignore              can_replace + status reports
+#   .gitignore CREATE              .gitignore              status               reports
+#   .gitignore append              .gitignore              can_replace + status reports
 #   .mcp.json create               .mcp.json               status               reports
 #   MCP-SETUP.md copy              MCP-SETUP.md            status               reports
-#   .codex/hooks.json              .codex/hooks.json       can_replace + atomic reports
+#   .codex/hooks.json              .codex/hooks.json       can_replace + rename reports
 #   .codex/config.toml create      .codex/config.toml      status               reports
+#   .agents/skills/ link           .agents/skills/<name>   status               counts, reports
+#   .agents/skills/ stale prune    .agents/skills/<name>   status               counts, reports
+#   .agents/skills/ command copy   .agents/skills/<c>/…    status               counts, reports
+#   .codex/ mkdir                  .codex/                 status               becomes a skip reason
 #
-# THE TWO THAT WERE FOUND BY THE CRITERION AND NOT BY THE VERB, both measured 2026-08-17 and both
-# **rc 1 mid-install** before this commit — the exact failure this task exists to remove, on the
-# exact trigger the rest of it handles:
+# THE MEMBERS THE VERB COULD NOT SEE, all measured, all **rc 1 mid-install** before the commit that
+# closed them — the exact failure this task exists to remove, on the exact trigger the rest of it
+# handles, and every one of them found by re-deriving the class rather than by fixing the last one:
 #
 #   * a read-only `.gitignore` — `printf … >> "$GITIGNORE"` died at Step 7, so `.mcp.json`,
 #     `MCP-SETUP.md`, the entire Codex layer and `Next steps:` never ran, with the payload on disk;
+#   * an ABSENT `.gitignore` under a sealed project root — `: > "$GITIGNORE"` died in the very next
+#     branch, because `can_replace` answers 0 for a path that is not there and the CREATE is a
+#     different question from the REPLACE. That one shipped inside the round that fixed its sibling;
 #   * a read-only `.codex/hooks.json` of ours — `cat "$HCFG_TMP" > "$CODEX_HOOKS_JSON"` died
 #     mid-Codex-layer. That one is additionally a TRUNCATING, NON-ATOMIC write: a failure after the
 #     open leaves a half-written hook config, which Codex cannot parse, which is a silent ALLOW —
-#     the very outcome the block around it exists to refuse. It writes through a rename now.
+#     the very outcome the block around it exists to refuse. It writes through a rename now, and the
+#     temp is created inside `.codex/` so that the rename is a rename on every host (`mktemp_beside`);
+#   * `.agents/skills/` — the directory this criterion sentence has named since it was written, with
+#     no row in this table until 2026-08-17. A read-only converted command skill killed the `cp`; a
+#     sealed skill root killed the `ln -s` and the stale-link `rm -f`. `is_modified` compares content
+#     and cannot see a mode, so an unedited file a VCS holds read-only takes the write arm every time.
 #
 # WHAT IS DELIBERATELY LEFT ABORTING, and why each is not the same case:
 #
@@ -1112,8 +1172,17 @@ can_replace() {
 #   * every write under `.claude/` itself — the payload loop, the scripts loop, the receipt. That
 #     directory is the toolkit's, not the user's, so a failure there is a failed install rather than
 #     a user file left in a state nobody chose, and the receipt trap still records what landed;
-#   * `sed -i` on `Packages/manifest.json`, which SUCCEEDS on a 0444 file (it renames, so it needs
-#     directory write) and is a posture question routed to the ledger rather than a status question.
+#   * `sed -i` on `Packages/manifest.json`. It SUCCEEDS on a 0444 file, and "it succeeds" is not the
+#     same claim as "it is safe" — this line asserted the first as though it settled the second.
+#     Measured end to end with `--with-mcp` against a 0444 manifest: `ok Added com.coplaydev.unity-mcp
+#     to manifest.json`, rc 0, and afterwards the file has a NEW INODE with mode 444 and the owner
+#     preserved. So the read-only bit — the one signal a VCS uses to say *do not edit this* — is
+#     silently defeated, and the file the user's tooling was tracking has been replaced rather than
+#     modified. Every other user-visible write in this table now refuses that state and names it;
+#     this one edits it and prints `ok`. The decision to leave it stands — it is a behaviour change
+#     on a flagged path with its own backup and rollback, and it belongs with a measurement of what
+#     Perforce and Unity do with a replaced manifest inode — but the ground recorded here is now what
+#     was measured rather than the half of it that made the decision look free.
 can_replace_or_report() {   # $1 = path, $2 = what it is, $3 = the re-run command
   if can_replace "$1"; then return 0; fi
   warn "$2 is read-only, so it was NOT written and nothing else was changed at that path."
@@ -1625,7 +1694,42 @@ if [ "$DRY_RUN" -eq 1 ]; then
     DRY_CMD_N=$(ls -1 "$SCRIPT_DIR/.claude/commands"/*.md 2>/dev/null | grep -c . || true)
     printf '  .agents/skills/ — %s symlink(s) into .claude/skills/ and %s converted command skill(s)\n' \
       "$DRY_SKILL_N" "$DRY_CMD_N"
-    printf '  .codex/hooks.json — generated from .claude/settings.json AFTER scripts/ is in place\n'
+    # FOUR VERDICTS HERE TOO, AND THIS LINE WAS AN UNCONDITIONAL PROMISE UNTIL 2026-08-17 — WRITTEN
+    # UNCONDITIONAL BY THE SAME COMMIT THAT TAUGHT THE REAL RUN TO REFUSE. Measured on a `--client
+    # codex` project with `.codex/hooks.json` at 0444: this line promised the config and the run
+    # printed `warn .codex/hooks.json is read-only, so it was NOT written`. That is the divergence
+    # this block has now opened five times, and the fifth arrived one screen from the fourth, in the
+    # commit dispatched to close it.
+    #
+    # THE ARMS ARE THE RUN'S, IN THE RUN'S ORDER: its skip reasons first, then the not-ours keep,
+    # then the read-only refusal. The two skip reasons asked here are the two that are OBSERVABLE
+    # now — the project path, and whether `jq` is installed. The other two are not, and the
+    # difference is the criterion rather than convenience:
+    #
+    #   * the shim's presence in the project is a fact about a file THIS RUN WOULD WRITE, at Step 5,
+    #     before it reaches the hook config. Asking it now would answer about the wrong tree, which
+    #     is why the promise below names the ordering out loud instead;
+    #   * whether `.codex/` can be CREATED is a question about a directory's mode, and the block's
+    #     standing ruling on parent directories — the one S7 and 7h were written for — is that a
+    #     write into a sealed parent is announced and then reported as declined, because the
+    #     direction is safe and the alternative is a dry run that re-implements every `mkdir`.
+    DRY_HOOKS_SKIP=""
+    case "$PROJECT_DIR" in
+      *\'*) DRY_HOOKS_SKIP="the project path contains a single quote, which --emit-config cannot escape" ;;
+    esac
+    if [ -z "$DRY_HOOKS_SKIP" ] && ! command -v jq >/dev/null 2>&1; then
+      DRY_HOOKS_SKIP="jq is not on PATH, and every Kinglet hook needs it"
+    fi
+    if [ -n "$DRY_HOOKS_SKIP" ]; then
+      printf '  .codex/hooks.json — %s, so it is NOT touched and no hook config is generated\n' \
+        "$DRY_HOOKS_SKIP"
+    elif [ -e "$PROJECT_DIR/.codex/hooks.json" ] && ! owned_by_installer '.codex/hooks.json' ''; then
+      printf '  .codex/hooks.json exists and is not ours — would keep yours, and generate nothing\n'
+    elif ! can_replace "$PROJECT_DIR/.codex/hooks.json"; then
+      printf '  .codex/hooks.json is read-only — it is NOT touched; make it writable to have it regenerated\n'
+    else
+      printf '  .codex/hooks.json — generated from .claude/settings.json AFTER scripts/ is in place\n'
+    fi
     if [ ! -f "$PROJECT_DIR/.codex/config.toml" ]; then
       printf '  .codex/config.toml (new — mcp_servers.UnityMCP -> http://localhost:8080/mcp)\n'
     elif grep -qF -- 'mcp_servers.UnityMCP' "$PROJECT_DIR/.codex/config.toml" 2>/dev/null; then
@@ -2099,7 +2203,13 @@ CLAUDE_MD_BRANCH="skipped"
 # something between them rewrote the file, and the arms are what rewrite the file.
 CLAUDE_MD_MARKER_STATE="$(marked_region_state "$CLAUDE_MD")"
 if [ -f "$GEN" ]; then
-  TMP_MD=$(mktemp)
+  # BESIDE THE DESTINATION, SO THE RENAMES BELOW ARE RENAMES. Every use of this temp ends in a `mv`
+  # into $PROJECT_DIR — CLAUDE.md, CLAUDE.md.generated, and (as `merge_marked_region`'s facts file)
+  # the merge — and `mv` is `rename(2)` only within one filesystem. From `$TMPDIR` on a host where
+  # `/tmp` is a tmpfs, or where the project lives on a second drive, every one of those degraded to
+  # a copy that can be interrupted half-way, leaving a truncated entry document at the project root
+  # while the run reports that nothing was touched. See `mktemp_beside`.
+  TMP_MD=$(mktemp_beside "$PROJECT_DIR" .kinglet-claude-md)
   if [ "$CLAUDE_MD_MARKER_STATE" = absent ]; then
     if bash "$GEN" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
       # THE STATUS IS READ HERE TOO, and it was a bare `mv` until 2026-08-17. This arm needs no
@@ -2440,36 +2550,88 @@ case "${GITIGNORE_PLAN%%"$NL"*}" in
     # read-only is the same trigger the two entry documents already handle; nothing about this file
     # makes an abort more appropriate, and the cost of the abort is larger.
     #
-    # ONE APPEND, NOT FOUR-PLUS, AND ITS STATUS IS READ. The old shape appended the separator, the
-    # header and each entry as separate redirections, so a failure part-way through left a
-    # `.gitignore` carrying half our block — a state nobody chose, in a file whose whole job is to be
-    # read line by line. The group redirect makes one open and one status to test, and `ADDED` is
-    # counted in the same pass so the reported number is the number of lines the group actually
-    # carried.
+    # ONE APPEND, NOT FOUR-PLUS — AND THE OPEN'S STATUS AND THE WRITE'S ARE NOT THE SAME STATUS.
+    # The old shape appended the separator, the header and each entry as separate redirections, so a
+    # failure part-way through left a `.gitignore` carrying half our block — a state nobody chose, in
+    # a file whose whole job is to be read line by line. Collapsing it into one redirection was
+    # right; testing the GROUP was not. `{ …; } >> f` exits with the status of its LAST command, and
+    # that command ended in `|| true`, so on a filesystem that accepts the open and refuses the write
+    # the run printed `ok Updated .gitignore (4 entries)` over a `.gitignore` carrying part of our
+    # block or none of it. Measured 2026-08-17 against `/dev/full` with the shipped shape byte for
+    # byte: `printf: write error: No space left on device`, `grep: write error: …`, group status
+    # **0**. Two controls, so the attribution is not a guess — dropping the `|| true` gave a non-zero
+    # status on the same input, and making only the FIRST `printf` fail still gave 0. Before that
+    # commit this state was a loud `set -e` death; the shape that fixed the abort made it a silent
+    # lie, which is strictly worse and is the same trigger class (ENOSPC, I/O error) the commit
+    # invoked to justify its sibling change to `.codex/hooks.json`.
+    #
+    # SO THE BLOCK IS BUILT FIRST AND WRITTEN BY ONE `printf`, whose status is the write's. No pipe,
+    # so nothing to mask: the loop that counts the entries is the loop that assembles them, which is
+    # also what removes the `grep -v '^$'` whose no-match return was the reason for the `|| true`.
+    #
+    # AND A FAILURE HERE IS STILL A PARTIAL FILE — a single `write(2)` can be short. What changed is
+    # that the run now SAYS so instead of announcing a success; an append into the user's own file
+    # cannot be made atomic the way the two entry documents' whole-file writes are, because appending
+    # is not authorship and rewriting the file would claim it.
+    #
+    # THE COUNT IS THE PLAN'S, IN BOTH HALVES OF THE ARM. Until 2026-08-17 the refusal quoted
+    # `$GITIGNORE_ENTRY_COUNT` — every entry we know about — while the dry run quoted the number
+    # MISSING from the file. Measured on a read-only `.gitignore` already holding 2 of our 4: the dry
+    # run said 3 and the run said 4, about one set, in a pair added under the rule that one predicate
+    # asked in two places is one predicate only if both ask it at the same point. Both now count the
+    # plan, which is the only number either half can act on.
+    GITIGNORE_MISSING=0
+    GITIGNORE_BLOCK=""
+    while IFS= read -r e; do
+      [ -n "$e" ] || continue
+      GITIGNORE_MISSING=$((GITIGNORE_MISSING + 1))
+      GITIGNORE_BLOCK="$GITIGNORE_BLOCK$e$NL"
+    done <<< "${GITIGNORE_PLAN#*"$NL"}"
     if ! can_replace_or_report "$GITIGNORE" ".gitignore" "install.sh"; then
-      note_not_done ".gitignore — the file is read-only, so this run appended none of its $GITIGNORE_ENTRY_COUNT entries and .claude/ local state (settings.local.json, the session file, uninstall backups) can still reach your commits. Make it writable and re-run install.sh."
+      note_not_done ".gitignore — the file is read-only, so this run appended none of its $GITIGNORE_MISSING missing entries and .claude/ local state (settings.local.json, the session file, uninstall backups) can still reach your commits. Make it writable and re-run install.sh."
       # $GITIGNORE_PLAN IS NOT REWRITTEN HERE, and the first draft of this arm rewrote it. The `case`
       # below reads the same variable to decide whether to add its own entry, and its `*)` arm says
       # *"its plan could not be computed"* — which is false of this state twice over: the plan was
       # computed correctly and this arm is acting on it. One outcome, one entry.
     else
-      [ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; GITIGNORE_CREATED=1; info "Created .gitignore"; }
-      ADDED=0
-      GITIGNORE_SEP=""
-      # Only append a newline first if the file does not already end with one; otherwise our header
-      # lands on the end of their last line.
-      if [ -s "$GITIGNORE" ] && [ -n "$(tail -c1 "$GITIGNORE")" ]; then GITIGNORE_SEP=$'\n'; fi
-      while IFS= read -r e; do
-        [ -n "$e" ] || continue
-        ADDED=$((ADDED + 1))
-      done <<< "${GITIGNORE_PLAN#*"$NL"}"
-      if { printf '%s\n# Claude Code local settings and session state\n' "$GITIGNORE_SEP"
-           printf '%s\n' "${GITIGNORE_PLAN#*"$NL"}" | grep -v '^$' || true
-         } >> "$GITIGNORE"; then
-        ok "Updated .gitignore ($ADDED entries)"
-      else
-        warn ".gitignore could not be appended to — the write failed, so it was left as it was."
-        note_not_done ".gitignore — the append failed, so this run added none of its $GITIGNORE_ENTRY_COUNT entries and .claude/ local state can still reach your commits."
+      # THE CREATE'S OWN STATUS, AND `can_replace` CANNOT STAND IN FOR IT. That predicate is
+      # `[ ! -e "$1" ] || [ -w "$1" ]`, so it returns 0 for an ABSENT path — correctly, since there is
+      # no file there to be read-only — and `can_replace_or_report` waves this arm straight through
+      # to a truncation that reads no status of its own. Measured 2026-08-17 on a project whose
+      # `.gitignore` had been removed and whose root was then sealed: `install.sh: line 2456:
+      # …/.gitignore: Permission denied`, `set -e`, **rc 1** mid-install, with `.mcp.json`,
+      # `MCP-SETUP.md`, the entire Codex layer and `Next steps:` never running and the payload already
+      # on disk. That is the same abort the read-only arm above was written to remove, one branch
+      # over, in the member the class table called *"can_replace + status"* — the create is a
+      # different question from the replace and needs its own answer.
+      GITIGNORE_OPEN_OK=1
+      if [ ! -f "$GITIGNORE" ]; then
+        if : > "$GITIGNORE"; then
+          GITIGNORE_CREATED=1
+          info "Created .gitignore"
+        else
+          # NOTHING TO REMOVE ON THIS PATH. The truncation failed at the OPEN, so no file was
+          # created; an `rm -f` here would be aimed at a path that does not exist, and on the state
+          # that produces this failure it would be aimed at a directory that will not take the
+          # unlink either.
+          GITIGNORE_OPEN_OK=0
+          warn ".gitignore does not exist and could not be created — the project root would not take it."
+          note_not_done ".gitignore — it does not exist and could not be created, so none of its $GITIGNORE_MISSING entries were added and .claude/ local state (settings.local.json, the session file, uninstall backups) can still reach your commits. Check that the project root is writable and re-run install.sh."
+        fi
+      fi
+      if [ "$GITIGNORE_OPEN_OK" -eq 1 ]; then
+        GITIGNORE_SEP=""
+        # Only append a newline first if the file does not already end with one; otherwise our header
+        # lands on the end of their last line.
+        if [ -s "$GITIGNORE" ] && [ -n "$(tail -c1 "$GITIGNORE")" ]; then GITIGNORE_SEP=$'\n'; fi
+        if printf '%s\n# Claude Code local settings and session state\n%s' \
+             "$GITIGNORE_SEP" "$GITIGNORE_BLOCK" >> "$GITIGNORE"; then
+          ok "Updated .gitignore ($GITIGNORE_MISSING entries)"
+        else
+          warn ".gitignore could not be appended to — the write failed, so it carries some of our"
+          warn "block or none of it rather than all of it."
+          note_not_done ".gitignore — the append failed part-way or at the first byte, so some or none of its $GITIGNORE_MISSING entries are in the file and .claude/ local state can still reach your commits. Check the entries under '# Claude Code local settings and session state' by hand, then re-run install.sh."
+        fi
       fi
     fi ;;
   *)
@@ -3000,7 +3162,9 @@ if [ "$CLIENT" = codex ]; then
     # touched, with a receipt row carrying the stale sha. The function refuses before writing anything
     # now — see its header for the pty measurement — and rc 2 means exactly that refusal, which is a
     # state the user clears in one command rather than a failure they debug.
-    TMP_AG=$(mktemp)
+    # Beside the destination — see `mktemp_beside`. This one is the merge's facts file, and
+    # `merge_marked_region` derives its own temp from the TARGET, so both renames stay renames.
+    TMP_AG=$(mktemp_beside "$PROJECT_DIR" .kinglet-agents-md)
     AG_MERGE_RC=0
     if bash "$GEN" --facts-only --client codex ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_AG" 2>/dev/null; then
       merge_marked_region "$AGENTS_MD" "$TMP_AG" || AG_MERGE_RC=$?
@@ -3057,7 +3221,8 @@ if [ "$CLIENT" = codex ]; then
     AGENTS_BRANCH=read-only
     note_not_done "AGENTS.md — the file is read-only, so this run did not regenerate it and it still carries an earlier run's content. Make it writable (under Perforce: check it out) and re-run install.sh --client codex."
   else
-    TMP_AG=$(mktemp)
+    # Beside the destination — see `mktemp_beside`.
+    TMP_AG=$(mktemp_beside "$PROJECT_DIR" .kinglet-agents-md)
     if bash "$GEN" --client codex ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_AG" 2>/dev/null; then
       # THE STATUS, FOR THE REASON `can_replace`'s HEADER NOW GIVES. That predicate answers for the
       # FILE and this answers for everything else — measured (W1) in a project directory at 555 with a
@@ -3170,8 +3335,23 @@ if [ "$CLIENT" = codex ]; then
   # PER-ENTRY, NOT ONE DIRECTORY SYMLINK, because row 3 below writes generated command skills into
   # this same root and a directory symlink has nowhere to put them. The mixed root was measured
   # rather than assumed: 17 repo-scope skills, all enabled, errors [].
-  SKILLS_LINKED=0; SKILLS_KEPT=0
-  mkdir -p "$CODEX_SKILL_ROOT"
+  # `.agents/` IS ONE OF THE FOUR DIRECTORIES THE WRITE CLASS'S CRITERION NAMES, AND THIS BLOCK'S
+  # THREE WRITES WERE ALL BARE UNTIL 2026-08-17. Measured on the class's own trigger — a VCS holding
+  # an unopened file read-only, which is every submitted file on a Perforce-managed project:
+  #
+  #   `chmod 444 .agents/skills/unity-init/SKILL.md`, re-install  →  `cp: cannot create regular
+  #     file …: Permission denied`, **rc 1**, after AGENTS.md and the 16 skill links had landed and
+  #     before `.codex/hooks.json` and `.codex/config.toml`;
+  #   `chmod 555 .agents/skills`, remove one link, re-install     →  `ln: failed to create symbolic
+  #     link …: Permission denied`, **rc 1**.
+  #
+  # `is_modified` cannot see a mode change, so a read-only-but-unedited converted skill takes the
+  # `cp` arm every time. Both now count the failure and let the run finish; the counts are what the
+  # report is built from, so one sealed directory produces one line rather than seventeen.
+  SKILLS_LINKED=0; SKILLS_KEPT=0; SKILLS_FAILED=0
+  # `|| true` on the directory itself, not a status read: when it fails every `ln -s` below fails
+  # too, and the count those produce names the same cause with the number attached.
+  mkdir -p "$CODEX_SKILL_ROOT" 2>/dev/null || true
   for sd in "$CLAUDE_DIR"/skills/*/; do
     [ -d "$sd" ] || continue
     sname=$(basename "$sd")
@@ -3190,7 +3370,13 @@ if [ "$CLIENT" = codex ]; then
       SKILLS_KEPT=$((SKILLS_KEPT + 1))
       continue
     else
-      ln -s "$swant" "$slink"
+      # NO ROW EITHER, WHICH IS WHY THIS `continue`S RATHER THAN COUNTING AND CARRYING ON: the
+      # `printf` below records `.agents/skills/<name>` as ours, and a row for a link that was never
+      # created is a row `uninstall.sh` acts on by removing whatever ends up at that path later.
+      if ! ln -s "$swant" "$slink" 2>/dev/null; then
+        SKILLS_FAILED=$((SKILLS_FAILED + 1))
+        continue
+      fi
     fi
     SKILLS_LINKED=$((SKILLS_LINKED + 1))
     # MODE `symlink`, AND THE CHECKSUM COLUMN CARRIES THE TARGET. A symlink to a directory has no
@@ -3204,14 +3390,23 @@ if [ "$CLIENT" = codex ]; then
   # resolve and says nothing about the rest — so a dangling entry is invisible rather than noisy.
   # Only OUR links are pruned, identified by the target prefix we write, and only when the target is
   # gone: anything else in this directory belongs to someone else.
-  SKILLS_PRUNED=0
+  SKILLS_PRUNED=0; SKILLS_PRUNE_FAILED=0
   for slink in "$CODEX_SKILL_ROOT"/*; do
     [ -L "$slink" ] || continue
     starget="$(readlink "$slink")"
     case "$starget" in
       ../../.claude/skills/*)
         if [ ! -d "$CLAUDE_DIR/skills/${starget#../../.claude/skills/}" ]; then
-          rm -f "$slink"; SKILLS_PRUNED=$((SKILLS_PRUNED + 1))
+          # THE DELETE READS ITS STATUS FOR THE SAME REASON THE TWO CREATES DO. `rm -f` is silent
+          # about a missing file and NOT about a directory that refuses the unlink, so on a sealed
+          # `.agents/skills/` this was an abort — and this loop runs after the links and rows above
+          # have already landed, so the abort would leave the receipt describing more than the run
+          # finished.
+          if rm -f "$slink" 2>/dev/null; then
+            SKILLS_PRUNED=$((SKILLS_PRUNED + 1))
+          else
+            SKILLS_PRUNE_FAILED=$((SKILLS_PRUNE_FAILED + 1))
+          fi
         fi ;;
     esac
   done
@@ -3219,6 +3414,14 @@ if [ "$CLIENT" = codex ]; then
   if [ "$SKILLS_KEPT" -gt 0 ]; then
     warn "$SKILLS_KEPT entr(ies) in .agents/skills/ are not ours — left alone, so those skills may not reach Codex."
     note_not_done "$SKILLS_KEPT entr(ies) in .agents/skills/ were already there and are not ours, so this run did not link those skills. Remove them and re-run if you want Kinglet's copies."
+  fi
+  if [ "$SKILLS_FAILED" -gt 0 ]; then
+    warn "$SKILLS_FAILED skill link(s) could not be created — .agents/skills/ would not take them."
+    note_not_done "$SKILLS_FAILED of the toolkit's skills could not be linked into .agents/skills/, so a Codex session in this project cannot reach them and no receipt row claims them. Check that .agents/skills/ is writable (under Perforce: check the directory out) and re-run install.sh --client codex."
+  fi
+  if [ "$SKILLS_PRUNE_FAILED" -gt 0 ]; then
+    warn "$SKILLS_PRUNE_FAILED stale skill link(s) in .agents/skills/ could not be removed."
+    note_not_done "$SKILLS_PRUNE_FAILED link(s) in .agents/skills/ point at skills this payload no longer ships and could not be removed, so Codex sees entries that resolve to nothing and says so nowhere. Delete them by hand, or make .agents/skills/ writable and re-run install.sh --client codex."
   fi
 
   # ── 8d.3 the commands, converted ────────────────────────────────────────
@@ -3232,7 +3435,7 @@ if [ "$CLIENT" = codex ]; then
   # "the user edited this" survive an upgrade, and it is the same test, spelled the same way, that
   # both write loops in Step 5 use. Skipping it here would make these the only files in the tree an
   # upgrade destroys.
-  CMDSKILL_W=0; CMDSKILL_K=0
+  CMDSKILL_W=0; CMDSKILL_K=0; CMDSKILL_F=0
   CONV="$CLAUDE_DIR/scripts/codex-command-to-skill.sh"
   if [ -f "$CONV" ]; then
     CONV_TMP=$(mktemp -d)
@@ -3247,13 +3450,26 @@ if [ "$CLIENT" = codex ]; then
             "$(stat -c '%a' "$cdest" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
           continue
         fi
-        mkdir -p "$(dirname "$cdest")"
-        cp "$cf" "$cdest"
+        # THE COPY'S STATUS, AND THE `continue` BEFORE THE ROW. `is_modified` compares CONTENT, so a
+        # converted skill a VCS is holding read-only and nobody has edited is not modified: this arm
+        # takes it, and until 2026-08-17 the bare `cp` then ended the run at rc 1 with the links and
+        # AGENTS.md already written and `.codex/` not yet. Counted rather than fatal now — and no
+        # `toolkit` row is written for a file this run did not put there, since that row is what
+        # `uninstall.sh` acts on.
+        mkdir -p "$(dirname "$cdest")" 2>/dev/null || true
+        if ! cp "$cf" "$cdest" 2>/dev/null; then
+          CMDSKILL_F=$((CMDSKILL_F + 1))
+          continue
+        fi
         CMDSKILL_W=$((CMDSKILL_W + 1))
         printf '%s\t%s\t%s\ttoolkit\n' "$crel" "$(sha_of "$cdest")" \
           "$(stat -c '%a' "$cdest" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
       done <<< "$(find "$CONV_TMP" -type f 2>/dev/null | sort)"
       ok "Converted $CMDSKILL_W command(s) into .agents/skills/$([ "$CMDSKILL_K" -gt 0 ] && printf ', kept %s of yours' "$CMDSKILL_K")"
+      if [ "$CMDSKILL_F" -gt 0 ]; then
+        warn "$CMDSKILL_F converted command skill(s) could not be written into .agents/skills/."
+        note_not_done "$CMDSKILL_F of the converted command skills could not be written into .agents/skills/ — the file or its directory is read-only — so those Unity diagnostics are unreachable under Codex and no receipt row claims them. Make .agents/skills/ and its contents writable (under Perforce: check them out) and re-run install.sh --client codex."
+      fi
     else
       warn "codex-command-to-skill.sh failed — the commands did not cross to Codex."
       # 1023 IS DERIVED — `cat .claude/commands/*.md | wc -l` — AND IT IS GUARDED. It read 919 until
@@ -3266,9 +3482,19 @@ if [ "$CLIENT" = codex ]; then
   fi
 
   # ── 8d.4 .codex/hooks.json ──────────────────────────────────────────────
-  # THREE REFUSALS BEFORE A BYTE IS WRITTEN, and each closes a measured way to end up with a config
-  # that registers and enforces nothing.
-  mkdir -p "$CODEX_DIR"
+  # EVERY ARM HERE IS A REFUSAL BEFORE A BYTE IS WRITTEN, and each closes a measured way to end up
+  # with a config that registers and enforces nothing. The number is deliberately not written down:
+  # this comment read `THREE REFUSALS` from the day the block was built, and the count has moved
+  # twice since — once when the read-only check arrived, once when `.codex/` itself became a skip
+  # reason instead of an abort — with the sentence carried forward as context both times. Read the
+  # arms; they are all in this one `if`/`elif` chain and the `if`/`elif` inside its `else`.
+  #
+  # THE DIRECTORY IS A WRITE TOO, AND IT WAS BARE. `.codex/` is one of the four the write class's
+  # criterion names; on a sealed project root this `mkdir -p` ended the run at rc 1, after AGENTS.md
+  # and the skill root had landed. It becomes the fourth skip reason rather than an abort, so the
+  # cause is named once and `.codex/config.toml` below reports its own half in its own words.
+  CODEX_DIR_OK=1
+  mkdir -p "$CODEX_DIR" 2>/dev/null || CODEX_DIR_OK=0
   CODEX_SHIM="$CLAUDE_DIR/scripts/codex-hook-shim.sh"
   HOOKS_JSON_OK=0
   HOOKS_SKIP_WHY=""
@@ -3279,6 +3505,9 @@ if [ "$CLIENT" = codex ]; then
     # rather than emitted.
     *\'*) HOOKS_SKIP_WHY="the project path contains a single quote, which --emit-config cannot escape" ;;
   esac
+  if [ -z "$HOOKS_SKIP_WHY" ] && [ "$CODEX_DIR_OK" -eq 0 ]; then
+    HOOKS_SKIP_WHY=".codex/ does not exist and could not be created — the project root would not take it"
+  fi
   if [ -z "$HOOKS_SKIP_WHY" ] && [ ! -f "$CODEX_SHIM" ]; then
     # THE ORDERING SELF-CHECK. Unreachable while Step 5 runs first, which is the point: it makes the
     # ordering an invariant this file enforces rather than one a reviewer has to notice.
@@ -3295,11 +3524,18 @@ if [ "$CLIENT" = codex ]; then
     warn "It was not regenerated, so it may not match .claude/settings.json."
     note_not_done ".codex/hooks.json — yours was kept, so the hook config was not regenerated from this version's .claude/settings.json. Delete it and re-run to get a generated one."
   else
-    HCFG_TMP=$(mktemp)
+    # BESIDE THE DESTINATION — see `mktemp_beside`. `mktemp` alone put this in `$TMPDIR`, and the
+    # rename below is `rename(2)` only within one filesystem, so the atomicity the comment further
+    # down claims held on the host it was written on and nowhere else. Measured 2026-08-17 with
+    # `$TMPDIR` on another filesystem and the real 5429-byte config as the destination: an
+    # interrupted cross-device `mv` left 4096 bytes that `jq` refuses — a silent ALLOW — while this
+    # block printed *"untouched rather than half-written"*.
+    HCFG_TMP=$(mktemp_beside "$CODEX_DIR" .hooks.json)
     if bash "$CODEX_SHIM" --emit-config --project-dir "$PROJECT_DIR" > "$HCFG_TMP" 2>/dev/null; then
       HCFG_DEFECTS="$(codex_config_defects "$HCFG_TMP")"
       if [ -z "$HCFG_DEFECTS" ]; then
-        # THE FOURTH REFUSAL, AND THE ONE THAT WAS MISSING FROM A BLOCK BUILT OUT OF REFUSALS. This
+        # THE REFUSAL THAT WAS MISSING FROM A BLOCK BUILT OUT OF REFUSALS — the last one added, not
+        # the fourth one: see this block's header for why no ordinal is written here. This
         # write was `cat "$HCFG_TMP" > "$CODEX_HOOKS_JSON"`: truncating, non-atomic, and unread.
         # Measured 2026-08-17 with a read-only `.codex/hooks.json` of ours — the state a VCS puts
         # every unopened file in — it died with `Permission denied` and `set -e` ended the run at
@@ -3308,10 +3544,13 @@ if [ "$CLIENT" = codex ]; then
         # WORSE THAN ANY OF THE `mv` SITES, WHICH IS WHY IT MOVED TO A RENAME RATHER THAN GAINING A
         # STATUS TEST ALONE. A truncating write that fails AFTER the open — ENOSPC, an I/O error —
         # leaves a half-written hook config on disk. Codex cannot parse that, and per this block's
-        # own header an unparseable config is a silent ALLOW: the exact outcome the three refusals
-        # above it exist to prevent, arriving through the write instead of through the content. The
+        # own header an unparseable config is a silent ALLOW: the exact outcome the refusals above it
+        # exist to prevent, arriving through the write instead of through the content. The
         # temp file already exists three lines up, so a rename costs nothing and makes the file
-        # either the old one or the new one and never half of either.
+        # either the old one or the new one and never half of either — WHICH IS TRUE ONLY BECAUSE
+        # THAT TEMP IS NOW CREATED INSIDE `.codex/`. From `$TMPDIR` the same `mv` is a copy on any
+        # host where `/tmp` is a tmpfs or the project sits on a second drive, and an interrupted copy
+        # is exactly the half-written config this arm exists to make impossible. See `mktemp_beside`.
         #
         # `chmod` BEFORE THE RENAME, not after: `mktemp` gives 0600 and the receipt row reads the
         # mode off the file, so doing it in this order means the row cannot record a mode the file
@@ -3321,8 +3560,6 @@ if [ "$CLIENT" = codex ]; then
         elif chmod 644 "$HCFG_TMP" && mv "$HCFG_TMP" "$CODEX_HOOKS_JSON"; then
           HOOKS_JSON_OK=1
           ok "Wrote .codex/hooks.json (every command routed through the project's own shim)"
-          printf '.codex/hooks.json\t%s\t%s\ttoolkit\n' "$(sha_of "$CODEX_HOOKS_JSON")" \
-            "$(stat -c '%a' "$CODEX_HOOKS_JSON" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
         else
           warn ".codex/hooks.json could not be written — the rename into place failed, so the"
           warn "previous config (if any) is untouched rather than half-written."
@@ -3353,6 +3590,25 @@ if [ "$CLIENT" = codex ]; then
       note_not_done ".codex/hooks.json — --emit-config failed, so this project has no Codex hook layer and is advisory rather than enforcing under Codex."
     fi
     rm -f "$HCFG_TMP"
+  fi
+  # OUTSIDE THE BRANCHES, FOR THE REASON .mcp.json'S ROW AND MCP-SETUP.md'S ROW ARE: the row states
+  # what we OWN at the end of the run, not what this run happened to write. It sat inside the success
+  # arm, and the moment that block gained refusals the row started disappearing on every one of them.
+  # Measured 2026-08-17: install once with `--client codex` (1 row), `chmod 444 .codex/hooks.json`,
+  # install again — the refusal fires, the run correctly leaves the file alone, and the new receipt
+  # carries **0** rows for it. The file is still ours and still on disk, and `uninstall.sh` — which
+  # removes only what the receipt lists — can no longer take it, while `studio-doctor.sh` stops
+  # checking it. The keep arms for AGENTS.md two hundred lines up already answer this the same way,
+  # and the same reasoning covers the not-ours keep (no row, because it is not ours), the skip
+  # reasons, and the defects arm (which deletes an unrunnable config of ours, so `-f` is false).
+  #
+  # TWO DISJUNCTS, and the first is this run's own knowledge: after a successful write the file no
+  # longer matches the PREVIOUS receipt's checksum, so `owned_by_installer` alone would decline the
+  # row it was just asked to record.
+  if [ -f "$CODEX_HOOKS_JSON" ] \
+     && { [ "$HOOKS_JSON_OK" -eq 1 ] || owned_by_installer '.codex/hooks.json' ''; }; then
+    printf '.codex/hooks.json\t%s\t%s\ttoolkit\n' "$(sha_of "$CODEX_HOOKS_JSON")" \
+      "$(stat -c '%a' "$CODEX_HOOKS_JSON" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
   fi
 
   # ── 8d.5 .codex/config.toml — the MCP server row ────────────────────────
