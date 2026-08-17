@@ -491,10 +491,24 @@ CONTRIBUTING.md	All [0-9]+ shipping agents	$DCS_AGENTS	-"
 # `docs/research/codex-client/*` — where an independent derivation then found eight further live
 # figures, four of them word numerals, and falsified five at once with the full suite reading
 # `Failed: 0`. A remedy that has to be remembered at every site is a remedy that will be forgotten
-# at one. **The class is now closed by an instrument instead: the word-numeral block at the foot of
-# this file, which normalises words to digits in its own flattener and guards them with ordinary
-# rows.** Convert-and-add is still fine where it is natural; it is no longer the only option, and it
-# is no longer the answer to "is this class swept".
+# at one. So the word-numeral block at the foot of this file **makes the class reachable** — it
+# normalises words to digits in its own flattener, so an ordinary `[0-9]+` row can guard a figure
+# spelled *twelve*. That is the whole of what it does.
+#
+# **IT DOES NOT CLOSE THE CLASS, AND THE FIRST VERSION OF THIS PARAGRAPH SAID IT DID** — three lines
+# under the paragraph above explaining that coverage here is phrase-keyed, which is the reason it
+# cannot. What shipped is a hand-maintained table of rows, not a sweep: a *new* word-numeral live
+# figure in a file the block already reads is not caught, measured with a word numeral rather than a
+# digit (`Kinglet currently ships twelve agents and ninety-nine skills.` into `CLAUDE.md` leaves this
+# file and `tests/test-surface-references.sh` both green), and an independent derivation found four
+# further live members after the block shipped, falsified together with the full suite unchanged.
+#
+# **The honest statement is a method, not a closure**, and `docs/research/codex-client/README.md`'s
+# instruments section already carries it: *any coverage claim over a directory must name the
+# instruments that produced it*. Reaching a class is not sweeping it. Convert-and-add is still fine
+# where it is natural; it is no longer the only option; and neither it nor this block is an answer to
+# *"is this class swept"* — only a file-level backstop would be, and that is the design named above
+# as not this block's to bolt on.
 
 DCS_BAD=""
 DCS_VACUOUS=""
@@ -1842,7 +1856,7 @@ dcw_flat() {
 #   matchers     — distinct non-empty tool-name matchers, and the entries they cover
 DCW_SPINE=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -vc 'pc-console' || true)
 DCW_NONNEG=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -v 'pc-console' | tr '\n' '\0' \
-             | xargs -0 grep -hcE '^#+ .*(NON-NEGOTIABLE|CRITICAL)' 2>/dev/null | awk '{s+=$1} END{print s+0}')
+             | xargs -0 grep -hcE '^#+ .*(NON-NEGOTIABLE|CRITICAL)' 2>/dev/null | awk '{s+=$1} END{print s+0}' || true)
 DCW_ADVISORY=$(ls -1 "$REPO_DIR"/.claude/hooks/warn-*.sh 2>/dev/null | grep -c . || true)
 DCW_ARGCMDS=$(grep -lE '^args:' "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | grep -c . || true)
 DCW_EVENTS=$(printf '%s\n' "$DCK_REG_TRIPLES" | awk -F'\t' '$2 != "" { print $2 }' | sort -u | grep -c . || true)
@@ -1853,7 +1867,48 @@ DCW_MATCHED=$(printf '%s\n' "$DCK_REG_TRIPLES" \
               | awk -F'\t' '($2 == "PreToolUse" || $2 == "PostToolUse") && $3 != "(all)" { print $1 "\t" $2 }' \
               | grep -c . || true)
 DCW_NOARG=$((DCS_COMMANDS - DCW_ARGCMDS))
-DCW_AGENTS_LINES=$(wc -l < "$REPO_DIR/AGENTS.md" 2>/dev/null | tr -d ' ')
+#
+# FOUR MORE, ADDED 2026-08-17 FOR FIGURES NO ARM OF THAT DAY'S SWEEP COULD REACH. Arms A and B narrow
+# by a noun list and arm C by a command shape, so all three select a SPAN — and a span is not a
+# sentence. None of them can see a SECOND numeral sharing a sentence with an already-selected one,
+# which is how `README.md`'s `Five of the eight agents` kept an unguarded partition beside a total
+# the same commit guarded at the same site. The blind spot is written up where the criterion lives;
+# these are its four measured members.
+#
+#   narrow   — agents whose `tools:` omits at least one MUTATING capability. `Agent` is deliberately
+#              not in the list: every narrowed agent also lacks it, so counting it would make the
+#              figure 6 and the prose says 5. The definition lives in two places now, here and in the
+#              sentence it guards, and that is the cost of guarding a figure the tree does not yield
+#              on its own — a red here means the definition and the prose have parted, which is a
+#              red worth having.
+#   tmo      — Codex reads Kinglet's millisecond `timeout` as SECONDS, so the shipped values become
+#              minutes. Integer division, matching the prose's own rounding (2000 -> 33, 5000 -> 83).
+#              `grep`/`sort`/`awk` rather than `jq`: this file has no JSON-parser dependency, which
+#              its hook block states three hundred lines up.
+#   skillref — every ``Skill`` tool reference in `.claude/agents/`. `grep -o` then `grep -c .`, so
+#              two on one line count as two; a per-file `grep -c` would count that line once.
+DCW_NARROW=0
+for dcw_a in "$REPO_DIR"/.claude/agents/*.md; do
+  [ -f "$dcw_a" ] || continue
+  dcw_tools="$(grep -m1 '^tools:' "$dcw_a" || true)"
+  for dcw_cap in Write Edit Bash; do
+    if ! grep -qE "(^|[ ,])${dcw_cap}([ ,]|$)" <<< "$dcw_tools"; then
+      DCW_NARROW=$((DCW_NARROW + 1)); break
+    fi
+  done
+done
+# `|| true` ON THE ASSIGNMENT, NOT INSIDE THE PIPELINE. `grep` exits 1 when it matches nothing, and
+# under `set -euo pipefail` that status becomes the substitution's, then the assignment's, and kills
+# the file — 49 passes, 0 failures, every assertion below unrun. Measured by mutating the key name:
+# the floor two lines down never got to fire. The suite still reds, because the runner counts a file
+# that exits non-zero without reporting a failure — but it reds as an exit code instead of as this
+# floor's sentence, which sends the reader to the wrong place.
+DCW_TMOS="$(grep -oE '"timeout"[[:space:]]*:[[:space:]]*[0-9]+' "$REPO_DIR/.claude/settings.json" 2>/dev/null \
+            | grep -oE '[0-9]+$' | sort -n)" || true
+DCW_TMO_MIN=$(( $(printf '%s\n' "$DCW_TMOS" | awk 'NR==1 { print $1 + 0 }') / 60 ))
+DCW_TMO_MAX=$(( $(printf '%s\n' "$DCW_TMOS" | awk 'END { print $1 + 0 }') / 60 ))
+DCW_SKILLREF=$(grep -o '`Skill` tool' "$REPO_DIR"/.claude/agents/*.md 2>/dev/null | grep -c . || true)
+DCW_AGENTS_LINES=$(wc -l < "$REPO_DIR/AGENTS.md" 2>/dev/null | tr -d ' ' || true)
 [ -n "$DCW_AGENTS_LINES" ] || DCW_AGENTS_LINES=0
 
 # THE DERIVATION HAS TO BE ABLE TO FAIL, and it has to be able to fail PER SOURCE. Eight sources
@@ -1868,6 +1923,17 @@ DCW_DERIVATION="ok"
 [ "$DCW_MATCHERS"     -ge 1 ] || DCW_DERIVATION="settings.json yields no tool-name matchers"
 [ "$DCW_MATCHED"      -ge 1 ] || DCW_DERIVATION="no hook entry sits under a tool-name matcher"
 [ "$DCW_AGENTS_LINES" -ge 1 ] || DCW_DERIVATION="AGENTS.md is absent or empty"
+[ "$DCW_NARROW"      -ge 1 ] || DCW_DERIVATION="no agent narrows its tools — the tools: frontmatter may have moved"
+[ "$DCW_TMO_MIN"     -ge 1 ] || DCW_DERIVATION="no timeout: key in .claude/settings.json, so the minute figures are not derived"
+[ "$DCW_TMO_MAX"     -ge 1 ] || DCW_DERIVATION="the settings timeout maximum is under a minute once read as seconds"
+# NO BACKTICKS IN A FLOOR'S MESSAGE. This line read "no `Skill` tool reference…" for one
+# commit: inside double quotes those are COMMAND SUBSTITUTION, so the moment the floor fired
+# bash ran `Skill`, got 127, and killed the whole file at this line — 49 passes, 0 failures,
+# and every DCW assertion below never ran. The runner does add a failure for a file that
+# exits non-zero without reporting one, so the suite reds; but it reds as an exit code rather
+# than as this floor's sentence, and a single-file run reads as green. Found by mutating the
+# derivation this floor guards, which is the only probe that would have.
+[ "$DCW_SKILLREF"    -ge 1 ] || DCW_DERIVATION="no Skill-tool reference under .claude/agents/"
 [ "$DCS_AGENTS"       -ge 1 ] || DCW_DERIVATION="no agents (shared with the surface-pool block)"
 assert_eq "ok" "$DCW_DERIVATION" \
   "the word-numeral figures are derived from a tree that actually has surfaces in it"
@@ -1896,7 +1962,7 @@ assert_eq "12 entries and **16** skills" "$DCW_PROBE" \
 # numbers in the order the match carries them. One row per SITE.
 DCW_CLAIMS="CLAUDE.md	the [0-9]+ spine rules, .settings.json.	$DCW_SPINE
 CLAUDE.md	the [0-9]+ spine rules bind	$DCW_SPINE
-README.md	of the [0-9]+ agents narrow their own tools	$DCS_AGENTS
+README.md	[0-9]+ of the [0-9]+ agents narrow their own tools	$DCW_NARROW,$DCS_AGENTS
 docs/research/codex-client/findings.md	The [0-9]+ spine rules carry [*][*][0-9]+[*][*]	$DCW_SPINE,$DCW_NONNEG
 docs/research/codex-client/findings.md	all [0-9]+ command strings	$DCK_REGISTERED
 docs/research/codex-client/findings.md	its [0-9]+ entries	$DCK_REGISTERED
@@ -1914,12 +1980,17 @@ docs/research/codex-client/findings.md	Kinglet.s [0-9]+ argument-taking commands
 docs/research/codex-client/findings.md	the [0-9]+ that carry no .[$]. token	$DCW_NOARG
 docs/research/codex-client/findings.md	blocks the other [0-9]+	$DCW_ARGCMDS
 docs/research/codex-client/findings.md	Could Kinglet.s [0-9]+ be expressed	$DCS_AGENTS
+docs/research/codex-client/findings.md	hook timeouts of [0-9]+ to [0-9]+ minutes	$DCW_TMO_MIN,$DCW_TMO_MAX
+docs/research/codex-client/findings.md	[0-9]+-to-[0-9]+-minute	$DCW_TMO_MIN,$DCW_TMO_MAX
+docs/research/codex-client/findings.md	The [0-9]+ skill-tool references	$DCW_SKILLREF
+docs/research/codex-client/findings.md	All [0-9]+ are in .[.]claude/agents/.	$DCW_SKILLREF
 docs/research/codex-client/findings.md	Kinglet.s [0-9]+ rules can ship as pointers	$DCS_RULES
 docs/research/codex-client/codex-facts.md	Kinglet.s [0-9]+ argument-taking commands	$DCW_ARGCMDS
 docs/research/codex-client/codex-facts.md	All [0-9]+ of the events Kinglet registers	$DCW_EVENTS
 docs/research/codex-client/codex-facts.md	ships exactly [0-9]+ tool-name matchers	$DCW_MATCHERS
 docs/research/codex-client/codex-facts.md	covering [0-9]+ of its [0-9]+ hook entries	$DCW_MATCHED,$DCK_REGISTERED
 docs/research/codex-client/codex-facts.md	Kinglet.s [0-9]+ advisory hooks	$DCW_ADVISORY
+docs/research/codex-client/codex-facts.md	All [0-9]+ .[.]claude/agents/[*][.]md.	$DCS_AGENTS
 docs/research/codex-client/codex-facts.md	[0-9]+ binding spine rules plus .pc-console.md.	$DCW_SPINE
 .claude/commands/unity-doctor.md	whose [0-9]+ binding spine rules	$DCW_SPINE"
 
@@ -1928,8 +1999,8 @@ docs/research/codex-client/codex-facts.md	[0-9]+ binding spine rules plus .pc-co
 DCW_DECLARED=".claude/commands/unity-doctor.md	1
 CLAUDE.md	2
 README.md	1
-docs/research/codex-client/codex-facts.md	6
-docs/research/codex-client/findings.md	18"
+docs/research/codex-client/codex-facts.md	7
+docs/research/codex-client/findings.md	22"
 DCW_SCANNED_COUNTS=$(cut -f1 <<< "$DCW_CLAIMS" | sort | uniq -c | awk '{ printf "%s\t%s\n", $2, $1 }' | sort)
 DCW_DECLARED_COUNTS=$(printf '%s\n' "$DCW_DECLARED" | grep -v '^$' | sort)
 DCW_UNDECLARED=$(comm -23 <(printf '%s\n' "$DCW_SCANNED_COUNTS") <(printf '%s\n' "$DCW_DECLARED_COUNTS"))

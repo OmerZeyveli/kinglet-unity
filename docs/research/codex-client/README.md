@@ -146,6 +146,28 @@ words that could not reach *registered*, a gap expression that could not span tw
 consecutive tokens, and the emphasis problem above. Each was a miss the control found
 and no reader would have.
 
+**AND THREE ARMS THAT AGREE ARE STILL ONE SEARCH WHEN THEY SHARE A NARROWING STEP.**
+All three above select a **span**: A and B narrow by a noun list, C by a command
+shape. A span is not a sentence — so **none of the three can see a second numeral
+sharing a sentence with one they already selected.** That is a structural blind spot,
+not a tuning problem, and adding a fourth span-selecting arm would not touch it.
+
+It was found by an instrument with a different narrowing step entirely: take the
+sentence around every *already-guarded* match and report every numeral in it the row
+does not cover — arity-keyed rather than noun-keyed. Four live figures came out, and
+the cleanest is `README.md`'s *"Five of the eight agents narrow their own tools"*,
+where the **total** was guarded and the **partition beside it in the same sentence**
+was not, by the same commit, at the same site. All four are rows now, and the
+partition and its total are one row with two numerals — which is the shape this whole
+paragraph argues for.
+
+**This is recorded, not built.** Two instruments would close it — an arity-keyed pass
+over every guarded row's sentence, and a value-keyed pass whose only narrowing step is
+the value itself — and both are real designs with real costs, not a fix-round
+addition. A reader who wants to claim this directory is swept needs one of them; a
+reader who wants to add a row does not. **What is not acceptable is a coverage claim
+that names three span-selecting arms and calls that a search.**
+
 **What it selected.** Values are written as `N` here on purpose: this file is inside
 the swept directory, and a table that transcribed the guarded numbers would be a
 fresh set of unguarded copies of exactly the figures below it. Every row below is
@@ -185,8 +207,14 @@ rediscovering:**
 - Every *"it read N until &lt;date&gt;"* correction — **L3**. There are several, and each
   one is the record of a figure that moved.
 - `findings.md`'s *"`.claude/skills/` and `.claude/commands/` carry **0** references
-  of this shape"* — passes all three, and is **deliberately not guarded**: the row
-  would assert `0 == 0` over a sweep the guard would have to re-implement, which is
+  of this shape"* — passes all three, and is **still deliberately not guarded**: the
+  row would assert `0 == 0` over a sweep the guard would have to re-implement, which is
   the vacuity shape `docs/ANTI-VACUITY.md`'s C4 excludes unless a floor is added
   under it. Excluded on cost and shape, not on the criterion — the one place those
-  come apart, so it is named rather than folded into the list above.
+  come apart, so it is named rather than folded into the list above. **Its companion
+  in the same sentence, `The 16 skill-tool references` / `All 16 are in
+  `.claude/agents/``, IS now guarded**, and the ruling is that the `0 == 0` exclusion
+  does not extend to it: a positive count with a one-line derivation
+  (`grep -o '\`Skill\` tool' .claude/agents/*.md | grep -c .`) is not the shape C4
+  excludes. One sentence, two numerals, two different rulings — which is the arity
+  blind spot above, this time with both halves decided rather than one overlooked.

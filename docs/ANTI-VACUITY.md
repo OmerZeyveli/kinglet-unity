@@ -608,7 +608,7 @@ sites"* until 2026-08-14: 83 is the row count, stated in the unit the *"one row 
 below explicitly forbids — the section warning that rows are not sites opened by counting rows and
 calling them sites. It then read *"at least 81 distinct bounds"* for one round, from a restatement
 set of two that was really four. Rows and sites diverge in **both** directions here (five rows are
-two `assert_eq` calls in `tests/test-no-mobile.sh`; one row is the six `_VACUOUS` accumulators), so
+two `assert_eq` calls in `tests/test-no-mobile.sh`; one row is the nine `_VACUOUS` accumulators), so
 no site total is written down. Deriving one means reading every row's assertion, which nobody has
 done.
 
@@ -653,8 +653,10 @@ are three. A third bound is restated across tables in different words: `DCE_VACU
 is one of the six accumulators under *Presence floors*, and is marked in its own row as cross-listed.
 Corrected from an earlier draft that got this exactly backwards: the four
 `test-bash-gate-precision.sh` rows are **four independent `assert_eq` calls, four sites.** And in the
-other direction, the `_VACUOUS` accumulators are **six** sites in **one** row — not five, and not
-one.
+other direction, the `_VACUOUS` accumulators are **nine** sites in **one** row — not five, not six,
+and not one. That number has now been wrong three times in the same cell, always low and always
+because a commit added an accumulator and did not come here; it is the cheapest possible instance of
+this file's own subject, and it is why the row now carries the command that derives it.
 
 **RUN THE DEDUP. It takes five seconds and it has already caught a duplicate this paragraph missed:**
 
@@ -834,7 +836,7 @@ feature is that the first scan's C2 had no clause for them.**
 | `tests/test-install-ownership.sh` · *F: git does not track the manifest* | the fixture's git state | **(g)** | tracked |
 | `tests/test-install-ownership.sh` · *L: the fixture has no manifest* | the fixture | **(g)** | present |
 | `tests/test-install-ownership.sh` · *install 1 did not produce exactly one marker pair* | the thing the mutation damages | **(g)** + (a) | == 1 |
-| `tests/test-derived-counts.sh` · `DCE_VACUOUS` | ECU-survival phrasing, per quoting file | (a) | 3 files — **cross-listed**: one of the six `_VACUOUS` accumulators tabled under *Presence floors*. Kept in both because this table records what the first sweep missed and that one records the set; **counted once** |
+| `tests/test-derived-counts.sh` · `DCE_VACUOUS` | ECU-survival phrasing, per quoting file | (a) | 3 files — **cross-listed**: one of the nine `_VACUOUS` accumulators tabled under *Presence floors*. Kept in both because this table records what the first sweep missed and that one records the set; **counted once** |
 
 **And the residual this row set exposes**: `scripts/check-provenance.sh`'s `ENFORCED` counter — the
 number of `rule=absent` entries it enforces — has **no floor**. An unreadable or reshaped
@@ -852,7 +854,7 @@ was in the worked example's. Not fixed here; it is the second gate of every task
 | `test-derived-counts.sh` · *still has a readable hook Summary Table* | the table's profile column |
 | `test-derived-counts.sh` · *still has a readable Tracking Files writer column* | `docs/ARCHITECTURE.md`'s writer column |
 | `test-derived-counts.sh` · *still has a readable Event Types table* | `docs/ARCHITECTURE.md`'s event table |
-| `test-derived-counts.sh` · the **six** `…_VACUOUS` accumulators (`DC_PAIR`, `DC`, `DCF`, `DCE`, `DCS`, `DCK`) | one per claim row / quoting file — **this is where the F6 union lived**. An earlier draft said five. |
+| `test-derived-counts.sh` · the **nine** `…_VACUOUS` accumulators (`DC_PAIR`, `DC`, `DCF`, `DCE`, `DCS`, `DCK`, `DCT`, `DCV`, `DCW`) | one per claim row / quoting file — **this is where the F6 union lived**. An earlier draft said five, then six. **It read six until 2026-08-17 and the file held nine**: `DCT_` and `DCV_` arrived with the tree-size and vacuity-census blocks and `DCW_` with the word-numeral block, and none of the three commits that added them touched this cell. Derive the list — `grep -oE '[A-Z_]+_VACUOUS' tests/test-derived-counts.sh \| sort -u` — rather than reading it here. |
 | `test-hook-behaviour.sh` · *probe for X carries a non-empty needle* | the needle, per hook — **see F5 for what this predicate does not cover** |
 | `test-provenance-origins.sh` · *carries exactly one 40-hex pin* | the ECU pin in `provenance.tsv` |
 | `test-stack-arbitration.sh` · *the generator still emits the block every surface now points at* | the heading in `scripts/generate-claude-md.sh` |
@@ -881,6 +883,18 @@ different lines**, so a line-keyed candidate list cannot be checked by grepping 
 The review that raised this said *"at least six"* bounds; that was a lower bound from a hand-count of
 **three** files, and the fourth new file — `test-install-upgrade-client.sh` — was not in it, because
 a review that enumerates by reading cannot see a file it did not open.
+
+**AND THE SWEEP THAT WROTE THIS SECTION THEN CREATED FLOORS AND DID NOT COME BACK TO IT.** The commit
+that added the word-numeral block to `tests/test-derived-counts.sh` — a file inside the declared scope
+— created three qualifying floors and added **zero** rows here, in the same commit that re-dated this
+section *swept 2026-08-17*. Its predecessor had done it correctly for the tree-size and
+vacuity-census blocks, so this was a regression inside the pass whose own brief opens with *"the
+branch added test files carrying floors and added no rows."* **Nothing in the suite reads this list**,
+so the omission was silent by construction: the gate was green with the floors present and the rows
+absent, and it would have stayed green forever. The rows are below; the mechanism that let them go
+missing is not fixed, because there is no mechanism — a hand-maintained list must grow in the same
+commit or it is an assertion that decays without a signal, which is this document's own subject
+committed against this document.
 
 **No row total is written here, for the reason this section's own opening gives.** The first draft of
 this paragraph wrote one — spelled out as a word, three paragraphs after the ruling that deleted
@@ -928,13 +942,27 @@ assertion, which is the same ruling `## The floor set` opens with.
 | `test-derived-counts.sh` · *the tree-size figures are derived from a tree that has files in it* | **19 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each |
 | `test-derived-counts.sh` · *the region above this block was actually read* | path literals before the block | (a) + (f) | ≥ 10 |
 | `test-derived-counts.sh` · *…reaches N path(s) this file does not mention above* | the scanned set minus the mentioned set | (a) | ≥ 1 |
-| `test-derived-counts.sh` · *every tree-size claim row matches exactly one site* (F6) | sites per claim row | == 1 | 20 rows |
+| `test-derived-counts.sh` · *every tree-size claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row — **derive the count, do not read it here**; it was written as `20` and the table now holds 30 |
+| `test-derived-counts.sh` · *every declared file is still scanned at its declared row count* (tree-size) | the claims table **vs** `DCT_DECLARED` | (d), **and it is the direction that catches emptiness**: measured on the emptied table, the `UNDECLARED` half fires only through the degenerate empty row while this half fires semantically | identity |
 | `test-derived-counts.sh` · *the vacuity-census figures are derived from a tree with files in it* | 3 sources, one sentinel, one site | (a) + (f) | ≥ 1 each |
-| `test-derived-counts.sh` · *every vacuity-census claim row matches exactly one site* (F6) | sites per claim row | == 1 | 2 rows |
+| `test-derived-counts.sh` · *every vacuity-census claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row |
+| `test-derived-counts.sh` · *the word-numeral figures are derived from a tree that has surfaces in it* | **14 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each — **and four of the fourteen only reach this sentinel because their derivation was given `\|\| true`**: two of them killed the file outright when mutated (a `grep` that matched nothing, a redirect from an absent file), so the floor never fired and a single-file run read 49 passes / 0 failures. Found by mutating each derivation, which is the only probe that sees it |
+| `test-derived-counts.sh` · *every declared file is still scanned at its declared row count* (word-numeral) | the claims table **vs** `DCW_DECLARED` | (d), same direction as the tree-size row above | identity |
+| `test-derived-counts.sh` · *every word-numeral claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row |
 
 **Row count versus site count, since this section's own rules demand the distinction:** the two
 `derived N skill(s) and M command(s)` bounds are **one** site; the two `test-derived-counts.sh`
 sentinel rows are **one site each over 19 and 3 sources**; everything else is one row per site.
+
+**One construct in the word-numeral block was examined and NOT admitted, and it is the interesting
+one.** `DCW_PROBE` asserts that the normaliser turns words into digits — without it every row in that
+table is vacuous, which reads exactly like a floor. **C4 excludes it, and by measurement rather than
+by argument:** disabling the substitution inside `dcw_flat` reds **two** assertions, the probe and
+`DCW_VACUOUS`, so the assertions it guards do *not* pass over the broken subject. It adds diagnosis
+— it says *the normaliser is broken* where the vacuity arm says *a document was reworded*, which
+sends the next reader to the right half — but detection was already there. Contrast
+`test-codex-shim.sh`'s signal-extraction row two tables up, which is admitted: when that extraction
+returns nothing, everything below it genuinely passes.
 
 **What this sweep deliberately did not admit**, each rejected by a named clause rather than by
 judgement: `test-codex-surface.sh`'s *".codex/ is not tracked"* (`== 0` — **C4**, the claim is
