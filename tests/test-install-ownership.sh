@@ -2990,8 +2990,11 @@ fi
 # writable `.claude/` inside it is that state exactly, and until 2026-08-17 the `mv` there was a bare
 # command: `set -e` ended the run at exit 1 with the payload already written and no CLAUDE.md.
 #
-# It is the third of the four `mv` sites this wave taught to report; the first two are S5 and S6's,
-# and the fourth is the manifest rollback, which no fixture here reaches. Mutating this arm back to a
+# It is one of the four `mv` sites this wave taught to report, and the only one S5 and S6 do NOT
+# cover: those two exercise PREDICATES — `merge_marked_region`'s `-w` and `can_replace` — and neither
+# asserts a status read at all. The other three sites are S8's (beside-yours), 7h's in
+# tests/test-install-upgrade-client.sh (the AGENTS.md write), and the manifest rollback's, which
+# tests/test-install-not-done.sh reaches at B.7b. Mutating this arm back to a
 # bare `mv` left both install test files green before this state existed.
 #
 # THE ROOT IS SEALED AFTER INSTALL 1 AND CLAUDE.md IS REMOVED FIRST, so the run really does take the
@@ -3027,6 +3030,60 @@ if grep -qF -- 'CLAUDE.md' <<< "$(awk '/^Not done:/ { f = 1 } f && /^Next steps:
   pass "S7: …and recorded it under 'Not done:', so the documented caller check sees the abandonment"
 else
   fail "S7: the failed rename printed no 'Not done:' entry naming CLAUDE.md"
+fi
+
+# ── State S8: the beside-yours rename fails, and the dry run says so first ───
+# THE THIRD OF THIS WAVE'S STATUS READS AND THE LAST ONE WITH NO FIXTURE. Reverting this arm's `mv`
+# to a bare command — together with the manifest rollback's and the dry run's `.generated`
+# writability arm — left the WHOLE gate green and byte-identical to unmutated. Three behaviours, no
+# guard between them; this state and B.7b in tests/test-install-not-done.sh are two of the three.
+#
+# The shape is S6's with the mode moved: instead of the existing `CLAUDE.md.generated` being
+# read-only, the DIRECTORY it must be renamed into is sealed. So `can_replace` passes — the file is
+# writable, or absent — and only the rename fails, which is the half a predicate cannot see. It also
+# reaches the dry run's third writability arm, which announces the decline for a read-only
+# `.generated` before the run declines it.
+S8_DIR="$SCRATCH/state-s8"
+bash "$REPO/tests/fixtures/mkproject.sh" "$S8_DIR" >/dev/null
+printf '# My own CLAUDE.md\n\nNO-MARKERS-HERE\n' > "$S8_DIR/CLAUDE.md"
+run_install_flags "$S8_DIR" "S8 install 1"
+if [ -f "$S8_DIR/$CLAUDE_GEN_REL" ]; then
+  pass "S8: install 1 wrote $CLAUDE_GEN_REL, so install 2 below really does take the arm this state is about"
+else
+  fail "S8: install 1 wrote no $CLAUDE_GEN_REL — every assertion below is about an arm that never runs"
+fi
+# The dry run's third writability arm, on the state it is for: the file itself read-only.
+chmod 444 "$S8_DIR/$CLAUDE_GEN_REL"
+S8_DRY="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$REPO/install.sh" --project-dir "$S8_DIR" --yes --dry-run </dev/null 2>&1 \
+  | sed $'s/\x1b\\[[0-9;]*m//g' | awk '$1 == "CLAUDE.md.generated" { print; exit }')"
+if [ -z "$S8_DRY" ]; then
+  fail "S8: the dry run made no CLAUDE.md.generated claim at all for a project whose beside-yours arm it is about to decline"
+elif grep -qF -- 'NOT touched' <<< "$S8_DRY"; then
+  pass "S8: the dry run announces a decline for a read-only CLAUDE.md.generated rather than promising to write it"
+else
+  fail "S8: the dry run promised to generate a CLAUDE.md.generated the real run refuses to write — the announcement and the act computed from one predicate is this block's whole rule"
+fi
+chmod 644 "$S8_DIR/$CLAUDE_GEN_REL"
+# Now the rename half: the file is writable and the directory is not.
+S8_SHA="$(sha_of "$S8_DIR/$CLAUDE_GEN_REL")"
+chmod 555 "$S8_DIR"
+run_install_flags "$S8_DIR" "S8 install 2 (project root sealed)"
+chmod 755 "$S8_DIR"
+if [ "$S8_SHA" = "$(sha_of "$S8_DIR/$CLAUDE_GEN_REL")" ]; then
+  pass "S8: the failed rename left $CLAUDE_GEN_REL byte-for-byte as it was"
+else
+  fail "S8: $CLAUDE_GEN_REL changed under a rename the run could not complete"
+fi
+if grep -qF -- 'CLAUDE.md.generated could not be written' <<< "$INSTALL_OUT"; then
+  pass "S8: …and the run says the write did not happen, in a sentence distinct from the read-only one"
+else
+  fail "S8: the run did not report the failed rename — with a bare mv this arm ended the whole install at exit 1 instead"
+fi
+if grep -qF -- 'yours was kept untouched' <<< "$(s_not_done_block)"; then
+  fail "S8: the block borrows the sentence about a file the user chose to keep, for a file that is ours and a rename that failed"
+else
+  pass "S8: …and its 'Not done:' entry is not the one about a file the user chose to keep"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1

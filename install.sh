@@ -1073,6 +1073,54 @@ can_replace() {
   [ ! -e "$1" ] || [ -w "$1" ]
 }
 
+# ── THE CLASS THIS PREDICATE BELONGS TO, DERIVED FROM A CRITERION RATHER THAN FROM A VERB ────
+#
+# `mv` was a proxy for the question and not the question. The criterion is: **a statement that
+# creates, replaces, appends to or truncates a path the USER can see — project root, `Packages/`,
+# `.codex/`, `.agents/` — where a failure leaves that path in a state nobody chose, or is not
+# reported.** Derived by enumerating every write verb and every redirection to a variable path
+# (`mv`, `cp`, `sed -i`, `ln -s`, `rm`, and `>` / `>>`), not one regex:
+#
+#   merge_marked_region            CLAUDE.md / AGENTS.md   `-w` + status        reports
+#   .claude/ → backup rename       a fresh backup dir      abort, on purpose    see its site
+#   fresh CLAUDE.md                CLAUDE.md               status               reports
+#   beside-yours                   CLAUDE.md.generated     can_replace + status reports
+#   manifest rollback              Packages/manifest.json  status               reports
+#   AGENTS.md write                AGENTS.md               can_replace + status reports
+#   manifest backup `cp`           …manifest.json.bak      status               declines the flag
+#   .gitignore create + appends    .gitignore              can_replace + status reports
+#   .mcp.json create               .mcp.json               status               reports
+#   MCP-SETUP.md copy              MCP-SETUP.md            status               reports
+#   .codex/hooks.json              .codex/hooks.json       can_replace + atomic reports
+#   .codex/config.toml create      .codex/config.toml      status               reports
+#
+# THE TWO THAT WERE FOUND BY THE CRITERION AND NOT BY THE VERB, both measured 2026-08-17 and both
+# **rc 1 mid-install** before this commit — the exact failure this task exists to remove, on the
+# exact trigger the rest of it handles:
+#
+#   * a read-only `.gitignore` — `printf … >> "$GITIGNORE"` died at Step 7, so `.mcp.json`,
+#     `MCP-SETUP.md`, the entire Codex layer and `Next steps:` never ran, with the payload on disk;
+#   * a read-only `.codex/hooks.json` of ours — `cat "$HCFG_TMP" > "$CODEX_HOOKS_JSON"` died
+#     mid-Codex-layer. That one is additionally a TRUNCATING, NON-ATOMIC write: a failure after the
+#     open leaves a half-written hook config, which Codex cannot parse, which is a silent ALLOW —
+#     the very outcome the block around it exists to refuse. It writes through a rename now.
+#
+# WHAT IS DELIBERATELY LEFT ABORTING, and why each is not the same case:
+#
+#   * the `.claude/` → backup rename, documented at its own site: nothing has been written yet and
+#     continuing would install over a tree we failed to preserve;
+#   * every write under `.claude/` itself — the payload loop, the scripts loop, the receipt. That
+#     directory is the toolkit's, not the user's, so a failure there is a failed install rather than
+#     a user file left in a state nobody chose, and the receipt trap still records what landed;
+#   * `sed -i` on `Packages/manifest.json`, which SUCCEEDS on a 0444 file (it renames, so it needs
+#     directory write) and is a posture question routed to the ledger rather than a status question.
+can_replace_or_report() {   # $1 = path, $2 = what it is, $3 = the re-run command
+  if can_replace "$1"; then return 0; fi
+  warn "$2 is read-only, so it was NOT written and nothing else was changed at that path."
+  warn "Make it writable (under Perforce: check it out) and re-run $3."
+  return 1
+}
+
 # ── Did a PREVIOUS run of this installer write this path? ────────────────────
 # Presence of a row, whatever its origin — deliberately weaker than `owned_by_installer`, which also
 # requires the bytes to be unchanged. It answers the one question that separates "our file, which the
@@ -1274,14 +1322,29 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # rather than restated for the reason every other predicate here is — a copy of a condition is a
   # second definition of it.
   DRY_MARKER_STATE="$(marked_region_state "$PROJECT_DIR/CLAUDE.md")"
-  if ! can_replace "$PROJECT_DIR/CLAUDE.md"; then
-    # `NOT touched` is one of tests/test-install-dryrun.sh's recognised decline phrases; the sentence
-    # after it is the same remedy the real run prints, so a reader comparing the two sees one answer.
-    printf '  CLAUDE.md is read-only — it is NOT touched; make it writable to have it generated or refreshed\n'
-  elif [ "$DRY_MARKER_STATE" = absent ]; then
+  if [ "$DRY_MARKER_STATE" = absent ]; then
     printf '  CLAUDE.md (new — generated)\n'
   elif [ "$DRY_MARKER_STATE" = wellformed ]; then
-    printf '  CLAUDE.md — refresh the generated section only; your prose untouched\n'
+    # WRITABILITY IS ASKED **INSIDE** THIS ARM, NOT AHEAD OF THE WHOLE BLOCK — and the first version
+    # of this fix asked it ahead, which closed the reported divergence and opened a worse one. The
+    # only arm whose write CLAUDE.md's own mode can stop is this one: the merge. The marker-less arm
+    # below writes `CLAUDE.md.generated` and never touches `CLAUDE.md` at all, so a read-only
+    # CLAUDE.md does not select it — and a test in front of the block short-circuited before that
+    # arm's announcement, leaving the run to CREATE a project-root file the dry run never named.
+    # `tests/test-install-dryrun.sh`'s own first oracle is written for exactly that: *"the real run
+    # wrote X and the dry run never named it — an unannounced write at the project root."*
+    #
+    # ONE PREDICATE ASKED IN TWO PLACES IS ONE PREDICATE ONLY IF BOTH PLACES ASK IT AT THE SAME POINT
+    # IN THEIR OWN LOGIC. That is the lesson, and it is why this test sits where the real run's
+    # `merge_marked_region` call sits rather than where it was convenient to put it.
+    if ! can_replace "$PROJECT_DIR/CLAUDE.md"; then
+      # `NOT touched` is one of tests/test-install-dryrun.sh's recognised decline phrases; the
+      # sentence after it is the remedy the real run prints, so a reader comparing the two sees one
+      # answer.
+      printf '  CLAUDE.md is read-only — its generated section is NOT touched; make it writable to have it refreshed\n'
+    else
+      printf '  CLAUDE.md — refresh the generated section only; your prose untouched\n'
+    fi
   elif [ "$DRY_MARKER_STATE" != none ]; then
     # ONE LINE, ONE PATH. This arm writes nothing at all — not CLAUDE.md, not CLAUDE.md.generated —
     # so it names neither of the other two paths. `NOT touched` is one of the decline phrases
@@ -1309,7 +1372,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
     if [ -e "$PROJECT_DIR/CLAUDE.md.generated" ] && ! owned_by_installer 'CLAUDE.md.generated' ''; then
       printf '  CLAUDE.md.generated exists and is not ours — would leave alone, and generate nothing\n'
     elif ! can_replace "$PROJECT_DIR/CLAUDE.md.generated"; then
-      # The third of the three arms the real run gained a writability refusal in, announced with it.
+      # The `.generated` arm's own writability refusal, announced with the arm that makes it. Its
+      # ownership test comes first here exactly as it does in the real run — the file being read-only
+      # only matters once we know it is not the user's.
       printf '  CLAUDE.md.generated is read-only — it is NOT touched, and nothing is generated beside your CLAUDE.md\n'
     else
       printf '  CLAUDE.md.generated — generated beside your own CLAUDE.md, for you to merge by hand\n'
@@ -1347,7 +1412,17 @@ if [ "$DRY_RUN" -eq 1 ]; then
       # awk drains its input to the end, so this pipeline cannot SIGPIPE the writer.
       DRY_GITIGNORE_LIST="$(printf '%s\n' "$DRY_GITIGNORE_ADD" \
         | awk 'NF { if (n++) printf ", "; printf "%s", $0 } END { printf "\n" }')"
-      if [ -f "$GITIGNORE" ]; then
+      # WRITABILITY INSIDE THE ARM THAT WRITES, exactly as the two entry documents' announcements ask
+      # it — and this arm needed it the moment Step 7 gained the refusal, in the same commit.
+      # Measured before this line existed: `append 4 entries: …` from the dry run, `is read-only, so
+      # it was NOT written` from the run, one fixture. That is the divergence this whole block exists
+      # to prevent, reintroduced by the fix for a different member of the same class, which is the
+      # third time this wave has done it. `NOT touched` is one of tests/test-install-dryrun.sh's
+      # recognised decline phrases.
+      if ! can_replace "$GITIGNORE"; then
+        printf '  .gitignore is read-only — it is NOT touched, and none of its %s entries would be appended\n' \
+          "$DRY_GITIGNORE_N"
+      elif [ -f "$GITIGNORE" ]; then
         printf '  .gitignore — append %s entries: %s\n' "$DRY_GITIGNORE_N" "$DRY_GITIGNORE_LIST"
       else
         printf '  .gitignore (new) — create it, with %s entries: %s\n' "$DRY_GITIGNORE_N" "$DRY_GITIGNORE_LIST"
@@ -1516,12 +1591,25 @@ if [ "$DRY_RUN" -eq 1 ]; then
     # 2026-08-17 before this arm existed: `AGENTS.md — the Codex entry document (generated…)` from the
     # dry run, `warn AGENTS.md is read-only, so it was NOT regenerated` from the run, same fixture.
     DRY_AGENTS_STATE="$(marked_region_state "$PROJECT_DIR/AGENTS.md")"
-    if ! can_replace "$PROJECT_DIR/AGENTS.md"; then
-      printf '  AGENTS.md is read-only — it is NOT touched; make it writable to have it generated or refreshed\n'
-    elif [ ! -e "$PROJECT_DIR/AGENTS.md" ] || owned_by_installer 'AGENTS.md' ''; then
-      printf '  AGENTS.md — the Codex entry document (generated; Codex injects it whole)\n'
+    if [ ! -e "$PROJECT_DIR/AGENTS.md" ] || owned_by_installer 'AGENTS.md' ''; then
+      # WRITABILITY INSIDE THE ARM, for the reason the CLAUDE.md block above states at length: the
+      # arms this file's mode can stop are the two that WRITE it — the whole-file write here and the
+      # merge below. It cannot stop `kept-yours`, and asking ahead of the block made the dry run tell
+      # the owner of a read-only file of THEIRS to "make it writable to have it generated", which is
+      # false (making it writable leaves it kept) and contradicted the real run's own remedy in the
+      # same breath — N-4's defect, reintroduced in the announcement by the commit that fixed it in
+      # the run.
+      if ! can_replace "$PROJECT_DIR/AGENTS.md"; then
+        printf '  AGENTS.md is read-only — it is NOT touched; make it writable to have it regenerated\n'
+      else
+        printf '  AGENTS.md — the Codex entry document (generated; Codex injects it whole)\n'
+      fi
     elif [ "$DRY_AGENTS_STATE" = wellformed ] && receipt_has 'AGENTS.md'; then
-      printf '  AGENTS.md — refresh the generated section only; your prose untouched\n'
+      if ! can_replace "$PROJECT_DIR/AGENTS.md"; then
+        printf '  AGENTS.md is read-only — its generated section is NOT touched; make it writable to have it refreshed\n'
+      else
+        printf '  AGENTS.md — refresh the generated section only; your prose untouched\n'
+      fi
     elif [ "$DRY_AGENTS_STATE" != none ] && [ "$DRY_AGENTS_STATE" != absent ] \
          && [ "$DRY_AGENTS_STATE" != wellformed ]; then
       # `!= wellformed` for the reason the real run's decline arm carries it: a well-formed pair in a
@@ -2208,7 +2296,8 @@ else
 fi
 
 # ONE RECORDING POINT PER OUTCOME, KEYED ON THE VALUE THE BRANCHES ALREADY SET. `skipped` is reached
-# three ways — the generator is absent, or it failed on the fresh-file arm or the beside-yours arm —
+# several arms — the generator is absent, or it failed on the fresh-file arm or the beside-yours arm,
+# or the fresh arm's rename into place failed —
 # and each of those printed its own warn line naming which. Restating that here would be a second copy
 # of a decision made above, so the entry points at the warning instead and the `else` branch above
 # exists to guarantee there is one.
@@ -2248,7 +2337,7 @@ fi
 # self-clearing in the same way `separate` is: repair the pair and the next run is `refreshed`.
 case "$CLAUDE_MD_BRANCH" in
   skipped)
-    note_not_done "CLAUDE.md — not generated, so this project has no toolkit configuration file and the FILL: markers never landed. The warn line above says which of the three ways it failed; re-run install.sh once that is fixed."
+    note_not_done "CLAUDE.md — not generated, so this project has no toolkit configuration file and the FILL: markers never landed. The warn line above says how it failed; re-run install.sh once that is fixed."
     ;;
   # `refresh-failed` and `generated-not-written` record at their own sites, where the reason is still
   # in hand — see the header above.
@@ -2343,18 +2432,46 @@ case "${GITIGNORE_PLAN%%"$NL"*}" in
     # "already has our entries" — a write announced as a no-change.
     ok ".gitignore already has our entries." ;;
   append)
-    [ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; GITIGNORE_CREATED=1; info "Created .gitignore"; }
-    # Only append a newline first if the file does not already end with one; otherwise our header
-    # lands on the end of their last line.
-    [ -s "$GITIGNORE" ] && [ -n "$(tail -c1 "$GITIGNORE")" ] && printf '\n' >> "$GITIGNORE"
-    printf '\n# Claude Code local settings and session state\n' >> "$GITIGNORE"
-    ADDED=0
-    while IFS= read -r e; do
-      [ -n "$e" ] || continue
-      printf '%s\n' "$e" >> "$GITIGNORE"
-      ADDED=$((ADDED + 1))
-    done <<< "${GITIGNORE_PLAN#*"$NL"}"
-    ok "Updated .gitignore ($ADDED entries)" ;;
+    # THE READ-ONLY REFUSAL, AND THIS SITE IS WHY THE CLASS IS WRITES RATHER THAN `mv`. Measured
+    # 2026-08-17 on a project whose `.gitignore` is 0444 and lacks our entries: the bare
+    # `printf … >> "$GITIGNORE"` below died with `Permission denied`, `set -e` ended the run at
+    # **rc 1**, and everything after Step 7 — `.mcp.json`, `MCP-SETUP.md`, the whole Codex layer,
+    # `Next steps:` — never ran, with the payload already on disk. A `.gitignore` a VCS is holding
+    # read-only is the same trigger the two entry documents already handle; nothing about this file
+    # makes an abort more appropriate, and the cost of the abort is larger.
+    #
+    # ONE APPEND, NOT FOUR-PLUS, AND ITS STATUS IS READ. The old shape appended the separator, the
+    # header and each entry as separate redirections, so a failure part-way through left a
+    # `.gitignore` carrying half our block — a state nobody chose, in a file whose whole job is to be
+    # read line by line. The group redirect makes one open and one status to test, and `ADDED` is
+    # counted in the same pass so the reported number is the number of lines the group actually
+    # carried.
+    if ! can_replace_or_report "$GITIGNORE" ".gitignore" "install.sh"; then
+      note_not_done ".gitignore — the file is read-only, so this run appended none of its $GITIGNORE_ENTRY_COUNT entries and .claude/ local state (settings.local.json, the session file, uninstall backups) can still reach your commits. Make it writable and re-run install.sh."
+      # $GITIGNORE_PLAN IS NOT REWRITTEN HERE, and the first draft of this arm rewrote it. The `case`
+      # below reads the same variable to decide whether to add its own entry, and its `*)` arm says
+      # *"its plan could not be computed"* — which is false of this state twice over: the plan was
+      # computed correctly and this arm is acting on it. One outcome, one entry.
+    else
+      [ -f "$GITIGNORE" ] || { : > "$GITIGNORE"; GITIGNORE_CREATED=1; info "Created .gitignore"; }
+      ADDED=0
+      GITIGNORE_SEP=""
+      # Only append a newline first if the file does not already end with one; otherwise our header
+      # lands on the end of their last line.
+      if [ -s "$GITIGNORE" ] && [ -n "$(tail -c1 "$GITIGNORE")" ]; then GITIGNORE_SEP=$'\n'; fi
+      while IFS= read -r e; do
+        [ -n "$e" ] || continue
+        ADDED=$((ADDED + 1))
+      done <<< "${GITIGNORE_PLAN#*"$NL"}"
+      if { printf '%s\n# Claude Code local settings and session state\n' "$GITIGNORE_SEP"
+           printf '%s\n' "${GITIGNORE_PLAN#*"$NL"}" | grep -v '^$' || true
+         } >> "$GITIGNORE"; then
+        ok "Updated .gitignore ($ADDED entries)"
+      else
+        warn ".gitignore could not be appended to — the write failed, so it was left as it was."
+        note_not_done ".gitignore — the append failed, so this run added none of its $GITIGNORE_ENTRY_COUNT entries and .claude/ local state can still reach your commits."
+      fi
+    fi ;;
   *)
     # The dry run's `*)` arm announces this same outcome as a decline, so the two readers still
     # agree on the branch neither of them can reach today.
@@ -2487,7 +2604,18 @@ add_manifest_dependency() {
   fi
   # Surgical insert. The old installer round-tripped the JSON through a re-indenting dump, which
   # reformatted the user's whole manifest to add one line.
-  cp "$MANIFEST" "$MANIFEST.bak"
+  #
+  # THE BACKUP'S OWN STATUS. This `cp` is the first write of the edit and the one the rollback below
+  # depends on; as a bare command a failure ended the run before either. Declining the flag is the
+  # posture this function already takes when the backup is not ours to overwrite — same outcome, same
+  # shape of message, one line of remedy.
+  if ! cp "$MANIFEST" "$MANIFEST.bak"; then
+    warn "Could not write $MANIFEST_BAK_REL — declining $flag_name rather than editing the manifest"
+    warn "with no way back. Add this under \"dependencies\" yourself:"
+    warn "    \"$pkg_name\": \"$pkg_value\""
+    note_not_done "$flag_name — the pre-edit backup could not be written, so the manifest was left alone and $pkg_name was not added. Add \"$pkg_name\": \"$pkg_value\" under \"dependencies\" in Packages/manifest.json yourself."
+    return 0
+  fi
   if sed -i.tmp "s|\"dependencies\"[[:space:]]*:[[:space:]]*{|\"dependencies\": {\n    \"$pkg_name\": \"$pkg_value\",|" "$MANIFEST" 2>/dev/null && grep -q "$pkg_name" "$MANIFEST"; then
     rm -f "$MANIFEST.tmp"
     # If git already tracks the manifest, git IS the backup — keeping a .bak just drops untracked
@@ -2515,27 +2643,36 @@ add_manifest_dependency() {
       ok "Added $pkg_name to manifest.json (backup: manifest.json.bak)"
     fi
   else
-    # THE ROLLBACK'S OWN STATUS, READ SINCE 2026-08-17. This is the fourth member of the `mv` class
-    # and the only one whose failure leaves a USER file in a state neither the run nor the user chose:
-    # `sed -i` has already rewritten the manifest, and this rename is what puts the original back. A
-    # bare `mv` here failed silently into `set -e` — the run ended mid-way with an edited manifest,
-    # its backup still on disk, and no sentence anywhere saying which file held what. It is
-    # low-likelihood (this arm is only reached when the edit itself failed) and it is the one where
-    # being wrong is least recoverable, so it says exactly what is where.
+    # THE ROLLBACK'S OWN STATUS, READ SINCE 2026-08-17, AND THE MANIFEST IS UNCHANGED ON EVERY INPUT
+    # THAT REACHES HERE. Trace the two ways in: `sed -i` failed, so it wrote nothing; or `sed`
+    # succeeded and `grep -q` did not find the package, which means the substitution matched nothing
+    # and `sed` rewrote the file with identical bytes. Either way the manifest a user opens Unity with
+    # is byte-for-byte the one this run found — measured, sha unchanged.
     #
-    # IT IS THE ONE MEMBER OF THE CLASS NO FIXTURE ASSERTS, AND THAT IS STATED RATHER THAN LEFT AS A
-    # GREEN MUTATION. Reaching it needs two conditions at once — an edit that fails AND a rename that
-    # fails — and the second needs `Packages/` unwritable, which kills the `cp` four lines up before
-    # this arm is ever reached. Sealing the directory between the `cp` and the `mv` is a race, not a
-    # fixture. Measured: reverting this to a bare `mv` leaves both install test files green. The
-    # status read stays because it converts a silent `set -e` death into a named state on the one file
-    # a user opens Unity with; the absence of a guard under it is a known weaker half, not an oversight.
+    # SO WHAT THE ROLLBACK ACTUALLY RESTORES IS NOTHING, AND WHAT ITS FAILURE LEAVES IS A FILE, NOT A
+    # STATE. This block said the opposite for one commit: *"Packages/manifest.json is NOT as this run
+    # found it … restore it by hand before opening the project in Unity"*, and it suppressed the
+    # sibling entry's *"so it is unchanged"* as if that were the false one. It was the true one. The
+    # entry below is one sentence for one outcome, with the debris named as debris.
+    #
+    # AND THE CLAIM THAT NO FIXTURE COULD REACH THIS WAS FALSE. It read *"the second needs `Packages/`
+    # unwritable, which kills the `cp` four lines up … a race, not a fixture."* Overwriting an
+    # EXISTING file needs write permission on the file, not on the directory — and after any
+    # `--with-mcp` install on a project git does not track, `Packages/manifest.json.bak` already
+    # exists and is ours. `Packages/` at 555 then reaches this arm deterministically, first try, with
+    # no race: `cp` succeeds onto the existing backup, `sed -i` fails because it needs directory write
+    # for its temp, and the `mv` fails. `tests/test-install-not-done.sh` builds exactly that.
     MANIFEST_ROLLED_BACK=1
     if ! mv "$MANIFEST.bak" "$MANIFEST"; then
       MANIFEST_ROLLED_BACK=0
-      warn "Packages/manifest.json could not be restored from its backup — the edit failed AND the"
-      warn "rollback failed. $MANIFEST_BAK_REL still holds the manifest as it was before this run."
-      note_not_done "$flag_name — the manifest edit failed and so did the rollback, so Packages/manifest.json is NOT as this run found it. $MANIFEST_BAK_REL is the copy from before the edit: restore it by hand before opening the project in Unity."
+      warn "$MANIFEST_BAK_REL could not be moved back over the manifest — but the failed edit did not"
+      warn "change Packages/manifest.json either, so it is as this run found it and that file is a copy."
+      # RECORDED AS OURS, so the debris has a way out. Without this the flag stays 0, the row below is
+      # never written, and a backup this run created is permanent debris that `uninstall.sh` — which
+      # removes only receipt-listed paths — can never take away. That is the defect the row exists to
+      # close, arriving through the failure path instead of the success one.
+      MANIFEST_BAK_KEPT=1
+      note_not_done "$flag_name — the manifest could not be edited safely, so Packages/manifest.json is unchanged and $pkg_name was not added. The pre-edit backup could not be removed either, so $MANIFEST_BAK_REL is left beside it holding the same content; it is recorded as ours, so uninstall.sh will take it. Add \"$pkg_name\": \"$pkg_value\" under \"dependencies\" yourself."
     fi
     rm -f "$MANIFEST.tmp"
     # THE FLAG MUST NOT OUTLIVE THE FILE IT NAMES. The `mv` above has just consumed the backup, and
@@ -2546,7 +2683,11 @@ add_manifest_dependency() {
     # kill the run: it writes a row with an EMPTY checksum, which uninstall.sh silently declines to
     # act on. A row that removes nothing is indistinguishable on disk from no row at all, and worse
     # than one, because it reads as coverage.
-    MANIFEST_BAK_KEPT=0
+    #
+    # ONLY WHEN THE ROLLBACK CONSUMED IT. If the rename failed, the backup is still on disk and the
+    # arm above has just claimed it so `uninstall.sh` can take it away; clearing the flag here would
+    # throw that claim away one line later and put the debris back out of reach.
+    if [ "$MANIFEST_ROLLED_BACK" -eq 1 ]; then MANIFEST_BAK_KEPT=0; fi
     warn "Could not edit manifest.json safely — add this under \"dependencies\" yourself:"
     warn "    \"$pkg_name\": \"$pkg_value\""
     # THE THIRD MEMBER OF THE FAMILY THE COMMENT ABOVE ENUMERATES, and until now the only one of the
@@ -2555,10 +2696,11 @@ add_manifest_dependency() {
     # restores the original, so the run ends with the manifest byte-identical and the flag silently
     # gone. `$MANIFEST_BAK_REL` is not offered as a remedy here: the `mv` above has just consumed it.
     #
-    # CONDITIONAL SINCE 2026-08-17, BECAUSE ITS FIRST CLAUSE IS THE ROLLBACK'S. *"so it is
-    # unchanged"* is true only when the rename above succeeded; on the failed-rollback path the
-    # manifest is whatever `sed` left and the entry printed there says so instead. One outcome, one
-    # sentence — printing both would tell the user two different things about one file.
+    # CONDITIONAL, BECAUSE THE FAILED-ROLLBACK PATH PRINTS ITS OWN — one outcome, one entry, and the
+    # two say the same thing about the manifest. *"So it is unchanged"* is true on BOTH paths: this
+    # arm is reached only when the edit wrote nothing or wrote identical bytes. A version of this
+    # comment claimed the clause was the rollback's to make and suppressed it there; the sentence it
+    # promoted in its place — *"is NOT as this run found it"* — was false on every reachable input.
     if [ "$MANIFEST_ROLLED_BACK" -eq 1 ]; then
       note_not_done "$flag_name — the manifest could not be edited safely, so it is unchanged and $pkg_name was not added. Add \"$pkg_name\": \"$pkg_value\" under \"dependencies\" in Packages/manifest.json yourself."
     fi
@@ -2623,8 +2765,19 @@ if [ ! -f "$MCP_JSON" ]; then
   # `cat > ` rather than `cp`, so the file is created under the caller's umask the way the heredoc
   # that used to sit here did. `cp` would carry mktemp's 0600 across and contradict the 644 the
   # receipt row records.
-  cat "$MCP_JSON_REF" > "$MCP_JSON"
-  ok "Wrote .mcp.json (UnityMCP → http://localhost:8080/mcp)"
+  #
+  # THE STATUS IS READ, for the reason the write class's table gives: this creation fails on a
+  # project root the user has sealed, and as a bare command it took the whole run down at rc 1 with
+  # the payload already on disk. There is no `can_replace` test because this arm runs only when the
+  # path does not exist — there is no user file here to be read-only, only a directory that will not
+  # take a new entry.
+  if cat "$MCP_JSON_REF" > "$MCP_JSON"; then
+    ok "Wrote .mcp.json (UnityMCP → http://localhost:8080/mcp)"
+  else
+    rm -f "$MCP_JSON"
+    warn ".mcp.json could not be written — the project root would not take it."
+    note_not_done ".mcp.json — it could not be written, so the unity-* agents have no MCP server entry to reach. Check that the project root is writable and re-run install.sh."
+  fi
 elif grep -Eq '"(unityMCP|UnityMCP)"' "$MCP_JSON" 2>/dev/null; then
   ok ".mcp.json already has a unityMCP/UnityMCP entry — left alone."
 else
@@ -2655,8 +2808,16 @@ fi
 # in the summary below actually resolves.
 MCP_SETUP_MD="$PROJECT_DIR/MCP-SETUP.md"
 if [ -f "$SCRIPT_DIR/MCP-SETUP.md" ] && [ ! -f "$MCP_SETUP_MD" ]; then
-  cp "$SCRIPT_DIR/MCP-SETUP.md" "$MCP_SETUP_MD"
-  ok "Installed MCP-SETUP.md"
+  # Status read, same member of the same class as .mcp.json above: a copy into a sealed project root
+  # is a failure this run has to report rather than die on, and the summary a few hundred lines below
+  # points at this file by name whether or not it landed.
+  if cp "$SCRIPT_DIR/MCP-SETUP.md" "$MCP_SETUP_MD"; then
+    ok "Installed MCP-SETUP.md"
+  else
+    rm -f "$MCP_SETUP_MD"
+    warn "MCP-SETUP.md could not be written — the project root would not take it."
+    note_not_done "MCP-SETUP.md — it could not be written, so the bridge-setup guide the 'Next steps' summary points at is not in this project. Check that the project root is writable and re-run install.sh."
+  fi
 # THE ONLY KEEP IN THIS FILE THAT SAID NOTHING AT ALL. Every other one reports: `keeping yours` lists
 # the payload files, the CLAUDE.md.generated arm warns twice, .mcp.json prints the block it did not
 # write. This branch printed no line in the entire run, while the "Next steps" summary below went on
@@ -2965,6 +3126,16 @@ if [ "$CLIENT" = codex ]; then
   # a way to tell a document that descends from ours from one that merely looks like it. Recorded
   # rather than claimed away.
   #
+  # AND THE DESTRUCTIVE MEMBER, WHICH THIS PARAGRAPH RECORDED ONLY THE HARMLESS HALF OF. The example
+  # above costs a row on a file the installer declines to touch. The one that costs work is a
+  # user's own document that **documents** these markers — a `:begin` and an `:end` quoted in a fenced
+  # code block, in order. `marked_region_state`'s awk is unanchored, so that file is `wellformed`;
+  # with a path we once wrote, the refresh arm merges into it, replaces whatever sat between their
+  # two quoted lines with the generated facts, and prints `your prose untouched` while doing it.
+  # That is the pre-existing well-formed-coincidence merge (routed to the ledger), and it is what
+  # this criterion admits, so it belongs in the same paragraph as the harmless case rather than one
+  # document away.
+  #
   # This is the same shape as `owned_by_installer`'s two disjuncts — evidence in the file, or evidence
   # in the receipt — with the file half being the marker pair rather than a checksum, because a
   # per-project generated document has no shipped copy to compare against.
@@ -3128,11 +3299,35 @@ if [ "$CLIENT" = codex ]; then
     if bash "$CODEX_SHIM" --emit-config --project-dir "$PROJECT_DIR" > "$HCFG_TMP" 2>/dev/null; then
       HCFG_DEFECTS="$(codex_config_defects "$HCFG_TMP")"
       if [ -z "$HCFG_DEFECTS" ]; then
-        cat "$HCFG_TMP" > "$CODEX_HOOKS_JSON"
-        HOOKS_JSON_OK=1
-        ok "Wrote .codex/hooks.json (every command routed through the project's own shim)"
-        printf '.codex/hooks.json\t%s\t%s\ttoolkit\n' "$(sha_of "$CODEX_HOOKS_JSON")" \
-          "$(stat -c '%a' "$CODEX_HOOKS_JSON" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+        # THE FOURTH REFUSAL, AND THE ONE THAT WAS MISSING FROM A BLOCK BUILT OUT OF REFUSALS. This
+        # write was `cat "$HCFG_TMP" > "$CODEX_HOOKS_JSON"`: truncating, non-atomic, and unread.
+        # Measured 2026-08-17 with a read-only `.codex/hooks.json` of ours — the state a VCS puts
+        # every unopened file in — it died with `Permission denied` and `set -e` ended the run at
+        # **rc 1**, mid-Codex-layer, immediately after AGENTS.md had been regenerated.
+        #
+        # WORSE THAN ANY OF THE `mv` SITES, WHICH IS WHY IT MOVED TO A RENAME RATHER THAN GAINING A
+        # STATUS TEST ALONE. A truncating write that fails AFTER the open — ENOSPC, an I/O error —
+        # leaves a half-written hook config on disk. Codex cannot parse that, and per this block's
+        # own header an unparseable config is a silent ALLOW: the exact outcome the three refusals
+        # above it exist to prevent, arriving through the write instead of through the content. The
+        # temp file already exists three lines up, so a rename costs nothing and makes the file
+        # either the old one or the new one and never half of either.
+        #
+        # `chmod` BEFORE THE RENAME, not after: `mktemp` gives 0600 and the receipt row reads the
+        # mode off the file, so doing it in this order means the row cannot record a mode the file
+        # held only briefly.
+        if ! can_replace_or_report "$CODEX_HOOKS_JSON" ".codex/hooks.json" "install.sh --client codex"; then
+          note_not_done ".codex/hooks.json — the file is read-only, so this run did not regenerate it and it may not match this version's .claude/settings.json. Under Codex a stale hook config enforces whatever it still names and nothing else. Make it writable (under Perforce: check it out) and re-run install.sh --client codex."
+        elif chmod 644 "$HCFG_TMP" && mv "$HCFG_TMP" "$CODEX_HOOKS_JSON"; then
+          HOOKS_JSON_OK=1
+          ok "Wrote .codex/hooks.json (every command routed through the project's own shim)"
+          printf '.codex/hooks.json\t%s\t%s\ttoolkit\n' "$(sha_of "$CODEX_HOOKS_JSON")" \
+            "$(stat -c '%a' "$CODEX_HOOKS_JSON" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+        else
+          warn ".codex/hooks.json could not be written — the rename into place failed, so the"
+          warn "previous config (if any) is untouched rather than half-written."
+          note_not_done ".codex/hooks.json — it could not be written, so this project has no hook config from this run and is advisory rather than enforcing under Codex. Check that .codex/ is writable and re-run install.sh --client codex."
+        fi
       else
         # NOT INSTALLED, AND SAID ALOUD WITH THE OFFENDING PATHS IN IT. The usual cause is a kept
         # .claude/settings.json registering a hook this version no longer ships: under Claude Code
@@ -3173,8 +3368,14 @@ if [ "$CLIENT" = codex ]; then
 url = "http://localhost:8080/mcp"
 CODEXCFG
   if [ ! -f "$CODEX_CFG" ]; then
-    cat "$CODEX_CFG_REF" > "$CODEX_CFG"
-    ok "Wrote .codex/config.toml (UnityMCP → http://localhost:8080/mcp)"
+    # Status read — the same class member as .mcp.json, in the directory this arm has just created.
+    if cat "$CODEX_CFG_REF" > "$CODEX_CFG"; then
+      ok "Wrote .codex/config.toml (UnityMCP → http://localhost:8080/mcp)"
+    else
+      rm -f "$CODEX_CFG"
+      warn ".codex/config.toml could not be written — the directory would not take it."
+      note_not_done ".codex/config.toml — it could not be written, so a Codex session in this project reaches no Unity bridge. Check that .codex/ is writable and re-run install.sh --client codex."
+    fi
   elif grep -qF -- 'mcp_servers.UnityMCP' "$CODEX_CFG" 2>/dev/null; then
     ok ".codex/config.toml already has a UnityMCP server — left alone."
   else

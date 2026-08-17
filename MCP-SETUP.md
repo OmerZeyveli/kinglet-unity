@@ -88,11 +88,16 @@ disk is the one you chose — that is the ownership rule working, not work the i
 Three keeps are exceptions and *are* in the block, because the keep leaves something *else* absent or
 inert: a kept `.claude/settings.json` leaves this version's new hooks on disk and unregistered, since
 that file is the only place a hook is registered; a receipt row whose origin column cannot be read
-means the file was kept without anyone having chosen it; and an entry document — `CLAUDE.md`, or
-`AGENTS.md` on a `--client codex` install — whose generated region this run could not refresh, either
-because the file is read-only or because its `kinglet:generated` markers are not a pair the installer
-can bound. Your edit is kept and reported under `keeping yours:` as usual; the block is the other
-half, saying that the generated region beside it is a run behind.
+means the file was kept without anyone having chosen it; and an edited `AGENTS.md` on a
+`--client codex` install whose generated region this run could not refresh — because the file is
+read-only, or because its `kinglet:generated` markers are not a pair the installer can bound. Your
+edit is kept and reported under `keeping yours:` as usual; the block is the other half, saying the
+generated region beside it is a run behind.
+
+`CLAUDE.md` reaches the block the same way and is **not** one of those three, because it is not a
+keep at all: it has no receipt row, so it never appears under `keeping yours:` and `uninstall.sh` —
+`--purge` included — never touches it. When its generated region cannot be refreshed you get the
+block entry alone.
 
 **One exit-0 run is not an install and prints no block:** `--dry-run`, which ends with
 `Dry run complete — nothing written.` Answering *2* at the "existing `.claude/`" prompt is not the

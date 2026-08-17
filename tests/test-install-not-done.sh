@@ -570,6 +570,103 @@ printf '{ "notes": "my own pre-edit backup", "dependencies": {} }\n' > "$B7/Pack
 run_install "$B7" "B.7 (a manifest backup that is the user's)" --with-mcp
 assert_entry "B.7" '--with-mcp — declined: Packages/manifest.json.bak is not ours to overwrite'
 
+# ── B.7a: a read-only .gitignore ───────────────────────────────────────────
+# THE MEMBER THE `mv` REGEX COULD NOT SEE, AND THE ONE THAT COST THE MOST. Until 2026-08-17 Step 7
+# appended to `.gitignore` with bare redirections: on a project whose `.gitignore` is read-only —
+# what a VCS does to every unopened file, and the same trigger the two entry documents already handle
+# — the first `printf … >>` died with `Permission denied`, `set -e` ended the run at **rc 1**, and
+# everything after Step 7 never ran: `.mcp.json`, `MCP-SETUP.md`, the entire Codex layer, and the
+# `Next steps:` summary, with the payload already on disk.
+#
+# THE ASSERTIONS ARE THE THREE HALVES OF THAT: the run finishes, the file is untouched, and the work
+# it skipped is in the block rather than only in a warn line. The fourth — that the run got PAST
+# Step 7 — is what makes this different from a decline that happens to be last.
+B7A="$(new_fixture readonly-gitignore urp)"
+printf '/Builds/\n' > "$B7A/.gitignore"
+B7A_SHA="$(sha256sum "$B7A/.gitignore" | cut -d' ' -f1)"
+chmod 444 "$B7A/.gitignore"
+# THE ANNOUNCEMENT, BEFORE THE RUN. Teaching Step 7 to refuse without teaching its dry-run arm the
+# same question is how this wave has opened a dry/real divergence three times; measured on this exact
+# state before the arm existed — `append 4 entries: …` from the dry run, `is read-only, so it was NOT
+# written` from the run. This file is not the dry run's home, so the claim is checked at the coarsest
+# useful grain: the announcement must not promise the append the run is about to decline.
+B7A_DRY="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$INSTALLER" --project-dir "$B7A" --yes --dry-run 2>&1 </dev/null \
+  | sed $'s/\x1b\\[[0-9;]*m//g' | awk '$1 == ".gitignore" { print; exit }')"
+if [ -z "$B7A_DRY" ]; then
+  fail "B.7a: the dry run made no .gitignore claim at all for a project whose .gitignore the real run declines"
+elif grep -qF -- 'NOT touched' <<< "$B7A_DRY"; then
+  pass "B.7a: the dry run declines the read-only .gitignore rather than promising the append the real run refuses"
+else
+  fail "B.7a: the dry run promised a .gitignore write the real run declines — the announcement and the act are computed from one predicate, asked at the same point in each"
+fi
+run_install "$B7A" "B.7a (a read-only .gitignore)" --client codex
+chmod 644 "$B7A/.gitignore"
+assert_entry "B.7a" '.gitignore — the file is read-only'
+if [ "$B7A_SHA" = "$(sha256sum "$B7A/.gitignore" | cut -d' ' -f1)" ]; then
+  pass "B.7a: the read-only .gitignore is byte-for-byte as it was"
+else
+  fail "B.7a: the installer appended to a read-only .gitignore"
+fi
+if grep -qF -- 'Next steps:' <<< "$INSTALL_OUT"; then
+  pass "B.7a: …and the run reached its summary, which is the half the abort took away — every step after Step 7 used to be skipped"
+else
+  fail "B.7a: the run never reached 'Next steps:' — Step 7 ended it, and .mcp.json, MCP-SETUP.md and the whole Codex layer went with it"
+fi
+if [ -f "$B7A/AGENTS.md" ] && [ -f "$B7A/.codex/hooks.json" ]; then
+  pass "B.7a: …and the Codex layer this run was asked for is on disk, rather than lost to a decline about a different file"
+else
+  fail "B.7a: the Codex layer is missing — the .gitignore refusal took the rest of the install with it"
+fi
+
+# ── B.7b: the manifest edit fails AND the rollback fails ───────────────────
+# THE ARM A COMMIT CLAIMED NO FIXTURE COULD REACH, reached deterministically on the first try. That
+# claim read *"the second needs `Packages/` unwritable, which kills the `cp` four lines up … a race,
+# not a fixture."* Overwriting an EXISTING file needs write permission on the file, not on the
+# directory — and after a `--with-mcp` install on a project git does not track, `manifest.json.bak`
+# already exists and is ours. So: install once to make that backup, put the manifest back so the
+# edit is attempted again, seal `Packages/`, and run again. `cp` succeeds onto the existing backup,
+# `sed -i` fails (it needs directory write for its own temp), the failure arm is entered, and the
+# rollback rename fails.
+#
+# WHAT THE MISSING FIXTURE WAS HIDING IS THE POINT OF THE STATE, not the status read. With no test
+# here, the arm shipped an entry saying `Packages/manifest.json is NOT as this run found it …
+# restore it by hand`, and that is false on every input that reaches it: the arm runs when `sed`
+# wrote nothing or wrote identical bytes, so the manifest is byte-for-byte what the run found —
+# asserted below rather than argued.
+B7B="$(new_fixture rollback-fails urp)"
+run_install "$B7B" "B.7b install 1 (make a backup that is ours)" --with-mcp
+if [ -f "$B7B/Packages/manifest.json.bak" ]; then
+  pass "B.7b: install 1 kept a manifest backup of ours, so the cp below is an overwrite and needs no directory write"
+else
+  fail "B.7b: install 1 left no Packages/manifest.json.bak — the sealed-directory step below would die at the cp and this state would never be reached"
+fi
+cp "$B7B/Packages/manifest.json.bak" "$B7B/Packages/manifest.json"
+B7B_SHA="$(sha256sum "$B7B/Packages/manifest.json" | cut -d' ' -f1)"
+chmod 555 "$B7B/Packages"
+run_install "$B7B" "B.7b install 2 (Packages/ sealed)" --with-mcp
+# Restored immediately: the EXIT trap removes $SCRATCH as one named path and a 555 directory in it
+# would defeat that.
+chmod 755 "$B7B/Packages"
+assert_entry "B.7b" 'so Packages/manifest.json is unchanged'
+assert_entry "B.7b" 'manifest.json.bak is left beside it'
+if [ "$B7B_SHA" = "$(sha256sum "$B7B/Packages/manifest.json" | cut -d' ' -f1)" ]; then
+  pass "B.7b: the manifest really is byte-for-byte what the run found, so the entry's claim is measured rather than asserted"
+else
+  fail "B.7b: the manifest changed under a run that says it is unchanged — the entry is now the false one"
+fi
+if grep -qF -- 'NOT as this run found it' <<< "$INSTALL_OUT"; then
+  fail "B.7b: the run tells the user to restore a manifest by hand that it did not change — the sentence this state exists to keep out"
+else
+  pass "B.7b: …and the run does not tell them to restore it by hand"
+fi
+if awk -F'\t' '$1 == "Packages/manifest.json.bak" && $4 == "toolkit" { found = 1 } END { exit !found }' \
+     "$B7B/.claude/state/install-receipt.tsv" 2>/dev/null; then
+  pass "B.7b: the backup the failed rollback left behind is recorded as ours, so uninstall.sh can take it away"
+else
+  fail "B.7b: the leftover backup has no receipt row — it is permanent debris, which is the defect that row exists to close"
+fi
+
 # ── B.8: a receipt row whose origin column cannot be read ──────────────────
 # One of the keeps that DO belong in the block, and the discriminator is that nobody chose
 # anything: the row is corrupt, so the file on disk may be this version's copy or a stale one and the

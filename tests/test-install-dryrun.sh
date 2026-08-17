@@ -600,9 +600,22 @@ probe bare "$F_BARE" fresh
 #
 # "yours" and "NOT touched" are true of CLAUDE.md. The line's first field is the file this arm
 # CREATES. Oracle 1 sees the creation; the claim set says the run promised to leave it alone.
+#
+# AND IT IS READ-ONLY, WHICH IS ONE LINE AND THE WHOLE OF A CRITICAL. A 2026-08-17 commit taught the
+# real run to refuse a read-only entry document and taught the dry run the same test — but put it
+# ahead of the whole block rather than inside the arm that writes the file. On this state the two
+# then disagreed in the dangerous direction: the dry run said only `CLAUDE.md is read-only — NOT
+# touched` and the real run went on to CREATE `CLAUDE.md.generated`, a project-root file the
+# announcement never named. This file's own first oracle is written for exactly that — *"the real run
+# wrote X and the dry run never named it"* — and it could not fire, because no fixture here carried a
+# mode. `chmod 444` is the difference between an oracle that exists and an oracle that runs.
+#
+# It also keeps this fixture's original subject intact: 0444 does not change which arm the run takes
+# (marker state does), so the two-paths-one-run claim above is still what is being probed.
 F_USERMD="$SCRATCH/usermd"
 mkfixture usermd "$F_USERMD"
 printf '# My Game\n\nProse I wrote by hand. SENTINEL-KEEP-ME.\n' > "$F_USERMD/CLAUDE.md"
+chmod 444 "$F_USERMD/CLAUDE.md"
 probe usermd "$F_USERMD" fresh
 
 # ── Fixture: the user's own CLAUDE.md.generated as well ──────────────────────

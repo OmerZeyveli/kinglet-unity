@@ -1060,6 +1060,41 @@ if grep -qF -- 'prose untouched' <<< "$TIUC_OUT15"; then TIUC_CM15_FALSE=claimed
 tiuc_eq "none" "$TIUC_CM15_FALSE" \
   "7h: …and claims no refresh of either document, which is the whole point of reading the status rather than the predicate alone"
 
+# 7i — a read-only .codex/hooks.json, the write this class's criterion found and
+# no `mv` regex could.
+#
+# IT WAS THE WORST MEMBER OF THE CLASS AND THE LAST ONE TO BE GUARDED. The write
+# was `cat "$HCFG_TMP" > "$CODEX_HOOKS_JSON"`: truncating, non-atomic, unread. On
+# a read-only hook config of ours — a VCS holding an unopened file, the trigger
+# the whole task is about — it died with `Permission denied` and `set -e` ended
+# the run at rc 1, mid-Codex-layer, right after AGENTS.md had been regenerated.
+# And the truncating shape is worse than any rename in the class: a failure after
+# the open leaves a half-written config, which Codex cannot parse, which this
+# block's own header calls a silent ALLOW. It writes through a rename now, so the
+# file is the old one or the new one and never half of either.
+P16="$TIUC_ROOT/hooks-read-only"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P16" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P16" --client codex --yes >/dev/null 2>&1
+TIUC_SHA16="$(tiuc_sha "$P16/.codex/hooks.json")"
+if [ -n "$TIUC_SHA16" ]; then TIUC_PRE16=written; else TIUC_PRE16=absent; fi
+tiuc_eq "written" "$TIUC_PRE16" \
+  "7i: install 1 wrote a .codex/hooks.json, so there is a config of ours to make read-only and this arm is not about an absent file"
+chmod 444 "$P16/.codex/hooks.json"
+TIUC_RC16=0
+TIUC_OUT16="$(bash "$REPO_DIR/install.sh" --project-dir "$P16" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')" || TIUC_RC16=$?
+chmod 644 "$P16/.codex/hooks.json"
+tiuc_eq "0" "$TIUC_RC16" \
+  "7i: the run finishes — a bare truncating write onto that file ended the whole install at rc 1, mid-Codex-layer, with the payload and AGENTS.md already written"
+tiuc_eq "$TIUC_SHA16" "$(tiuc_sha "$P16/.codex/hooks.json")" \
+  "7i: …and the hook config is byte-for-byte as it was, rather than truncated to nothing by a write that could not finish"
+if grep -qF -- '.codex/hooks.json is read-only' <<< "$TIUC_OUT16"; then TIUC_WHY16=named; else TIUC_WHY16=silent; fi
+tiuc_eq "named" "$TIUC_WHY16" \
+  "7i: …and the run names the file and the reason"
+TIUC_ND16="$(awk '/^Not done:/ { inblock = 1; next } inblock && /^Next steps:/ { inblock = 0 } inblock' <<< "$TIUC_OUT16")"
+if grep -qF -- '.codex/hooks.json' <<< "$TIUC_ND16"; then TIUC_ND16_R=listed; else TIUC_ND16_R=absent; fi
+tiuc_eq "listed" "$TIUC_ND16_R" \
+  "7i: …and records it under 'Not done:', because a stale hook config enforces whatever it still names and nothing else"
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Arm 8 — merge_marked_region's own status contract, run from the extracted
 # function rather than from a re-spelling of it.
