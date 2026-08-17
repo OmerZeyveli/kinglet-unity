@@ -85,10 +85,14 @@ when stdout is a terminal, so inside `$( )` the block header is the plain bytes 
 **What is deliberately *not* in that block: a file kept because *you* edited it.** Those are reported
 separately, as `keeping yours:` with the paths listed under it. The payload landed and the file on
 disk is the one you chose — that is the ownership rule working, not work the installer abandoned.
-Two keeps are exceptions and *are* in the block, because the keep leaves something *else* absent or
+Three keeps are exceptions and *are* in the block, because the keep leaves something *else* absent or
 inert: a kept `.claude/settings.json` leaves this version's new hooks on disk and unregistered, since
-that file is the only place a hook is registered; and a receipt row whose origin column cannot be
-read means the file was kept without anyone having chosen it.
+that file is the only place a hook is registered; a receipt row whose origin column cannot be read
+means the file was kept without anyone having chosen it; and an entry document — `CLAUDE.md`, or
+`AGENTS.md` on a `--client codex` install — whose generated region this run could not refresh, either
+because the file is read-only or because its `kinglet:generated` markers are not a pair the installer
+can bound. Your edit is kept and reported under `keeping yours:` as usual; the block is the other
+half, saying that the generated region beside it is a run behind.
 
 **One exit-0 run is not an install and prints no block:** `--dry-run`, which ends with
 `Dry run complete — nothing written.` Answering *2* at the "existing `.claude/`" prompt is not the

@@ -55,7 +55,12 @@ usage() { sed -n '3,29p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 #
 # THERE ARE FEWER RECORDING POINTS THAN THERE ARE BRANCHES, and every collapse is one outcome reached
 # more than one way: each `add_manifest_dependency` site fires for either --with-* flag, and
-# CLAUDE.md's `skipped` is reached four ways that differ only in which warn line printed.
+# CLAUDE.md's `skipped` is reached by several arms that differ only in which warn line printed.
+# THE NUMBER IS NOT WRITTEN HERE, and it was — `four ways`, which went stale inside the commit that
+# split `refresh-failed` out of `skipped` and corrected the same figure at the recording point and
+# inside the entry while leaving this copy. Three sites, one number, one edit: exactly the shape the
+# paragraph below forbids, committed against the paragraph below. Derive it from the arms that assign
+# the value if you need it.
 #
 # NO COUNT IS WRITTEN HERE, and that is this comment's own rule applied to itself — the number went
 # stale at the emitter within one round of being written down, in the file that forbids quoting it.
@@ -1036,9 +1041,34 @@ merge_marked_region() {
 # rc 1, receipt written for what it had. Loud rather than false — the opposite failure to the merge's
 # — and the two arms answering the same condition in opposite ways is the inconsistency this closes.
 #
-# It does NOT test the parent directory, deliberately: a rename can still fail for reasons no
-# predicate can see beforehand, which is why the merge checks `mv`'s status as well. This is the test
-# that lets the caller name the file and print a remedy; the status check is the backstop.
+# IT DOES NOT TEST THE PARENT DIRECTORY, AND EVERY ARM IT GUARDS NOW READS `mv`'s STATUS TOO — the
+# second half of that sentence is what makes the first half a design rather than a hole. A rename can
+# fail for reasons no predicate can see beforehand: a 555 parent, a full filesystem, a cross-device
+# copy that dies part-way. This header claimed the backstop existed *"which is why the merge checks
+# `mv`'s status as well"* and that was true of the merge and false of both write arms it actually
+# guards — measured 2026-08-17 (W1): an `AGENTS.md` that is ours, unedited and WRITABLE, in a project
+# directory at 555, passes `can_replace`, and the bare `mv` then fails with `Permission denied` and
+# `set -e` ends the run — `err This install did not finish (exit 1)`, payload already on disk, which
+# is verbatim the failure this predicate was added to prevent. The class was derived rather than
+# spot-checked (`awk '!/^[[:space:]]*#/ && /(^|[^a-zA-Z_])mv[[:space:]]/' install.sh`) and every
+# member with a user-visible destination now reports instead of dying; the one that does not is the
+# `.claude/` backup rename, where continuing would install a payload over a tree we had just failed to
+# preserve, so the abort is the correct outcome and is documented at its site.
+#
+# So the division of labour is: this predicate is the test that can name the file and print a remedy
+# the user can act on before anything is written; the status check is what catches everything it
+# cannot see.
+#
+# ITS CLOSING SENTENCE ALSO OVER-CLAIMED AND IS NARROWED. It read *"forcing over a read-only file
+# would silently overwrite a file the user's VCS is holding closed, which is not the installer's
+# posture anywhere else. Every other unhandleable state in this file is declined out loud."* The
+# second sentence is false one flag away, measured (W4): with `Packages/manifest.json` at 0444,
+# `--with-mcp` runs `sed -i` over it, which needs directory write rather than file write, succeeds,
+# prints `ok Added …`, and leaves the file rewritten at mode 444. The posture stated here is the
+# posture for the two GENERATED ENTRY DOCUMENTS — the files this task is about, and the ones a Codex
+# or Claude Code session reads on every turn. Whether the manifest edit should join them is a
+# behaviour change on a flagged path with its own backup and decline logic, and it is recorded for the
+# ledger rather than made here.
 can_replace() {
   [ ! -e "$1" ] || [ -w "$1" ]
 }
@@ -1234,8 +1264,21 @@ if [ "$DRY_RUN" -eq 1 ]; then
   # only; your prose untouched` by the dry run and then amputated by the real run — the dry run
   # promising exactly the thing the real run destroyed, on the only step that can destroy work.
   # `marked_region_state` is called, not restated, for the reason this block's header gives.
+  #
+  # WRITABILITY IS ASKED FIRST, AND IT IS ASKED WITH THE RUN'S OWN PREDICATE. The read-only refusals
+  # were added to the real run on 2026-08-17 and this block was not taught about them in the same
+  # commit, which converted a shared error into a divergence: before, the announcement and the run
+  # both claimed a refresh and both were wrong; after, only the run was truthful, so the dry run
+  # promised a write the real run declines. That is the S3b defect this block's own header cites as
+  # its reason for existing, arriving through the fix for a different one. `can_replace` is called
+  # rather than restated for the reason every other predicate here is — a copy of a condition is a
+  # second definition of it.
   DRY_MARKER_STATE="$(marked_region_state "$PROJECT_DIR/CLAUDE.md")"
-  if [ "$DRY_MARKER_STATE" = absent ]; then
+  if ! can_replace "$PROJECT_DIR/CLAUDE.md"; then
+    # `NOT touched` is one of tests/test-install-dryrun.sh's recognised decline phrases; the sentence
+    # after it is the same remedy the real run prints, so a reader comparing the two sees one answer.
+    printf '  CLAUDE.md is read-only — it is NOT touched; make it writable to have it generated or refreshed\n'
+  elif [ "$DRY_MARKER_STATE" = absent ]; then
     printf '  CLAUDE.md (new — generated)\n'
   elif [ "$DRY_MARKER_STATE" = wellformed ]; then
     printf '  CLAUDE.md — refresh the generated section only; your prose untouched\n'
@@ -1265,6 +1308,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
     # call — '' for the reference copy, because this file is generated per project and has none.
     if [ -e "$PROJECT_DIR/CLAUDE.md.generated" ] && ! owned_by_installer 'CLAUDE.md.generated' ''; then
       printf '  CLAUDE.md.generated exists and is not ours — would leave alone, and generate nothing\n'
+    elif ! can_replace "$PROJECT_DIR/CLAUDE.md.generated"; then
+      # The third of the three arms the real run gained a writability refusal in, announced with it.
+      printf '  CLAUDE.md.generated is read-only — it is NOT touched, and nothing is generated beside your CLAUDE.md\n'
     else
       printf '  CLAUDE.md.generated — generated beside your own CLAUDE.md, for you to merge by hand\n'
     fi
@@ -1463,8 +1509,16 @@ if [ "$DRY_RUN" -eq 1 ]; then
     # DIRECTORY at that path makes `marked_region_state` say `absent` — it opens with `[ -f ]` — while
     # the real run's `[ -e ]` sees it and keeps it. Reading the token here would promise a generated
     # file for the one shape where `mv` would move our file INSIDE the user's directory.
+    #
+    # WRITABILITY FIRST, AND BEFORE OWNERSHIP. The real run refuses a read-only AGENTS.md in BOTH its
+    # arms — the merge (rc 2) and the whole-file write (`can_replace`) — so an announcement that asked
+    # about ownership first would promise to generate over a file the run declines. Measured
+    # 2026-08-17 before this arm existed: `AGENTS.md — the Codex entry document (generated…)` from the
+    # dry run, `warn AGENTS.md is read-only, so it was NOT regenerated` from the run, same fixture.
     DRY_AGENTS_STATE="$(marked_region_state "$PROJECT_DIR/AGENTS.md")"
-    if [ ! -e "$PROJECT_DIR/AGENTS.md" ] || owned_by_installer 'AGENTS.md' ''; then
+    if ! can_replace "$PROJECT_DIR/AGENTS.md"; then
+      printf '  AGENTS.md is read-only — it is NOT touched; make it writable to have it generated or refreshed\n'
+    elif [ ! -e "$PROJECT_DIR/AGENTS.md" ] || owned_by_installer 'AGENTS.md' ''; then
       printf '  AGENTS.md — the Codex entry document (generated; Codex injects it whole)\n'
     elif [ "$DRY_AGENTS_STATE" = wellformed ] && receipt_has 'AGENTS.md'; then
       printf '  AGENTS.md — refresh the generated section only; your prose untouched\n'
@@ -1544,6 +1598,12 @@ if [ "$DRY_RUN" -eq 1 ]; then
 fi
 
 # ── Step 5: Install ──────────────────────────────────────────────────────────
+# THE ONE `mv` IN THIS FILE THAT IS SUPPOSED TO END THE RUN, and it is stated here because every other
+# one now reports and continues. If this rename fails, the next statements write the payload over the
+# tree we have just failed to preserve; there is nothing to carry on with and nothing a `Not done:`
+# entry could offer the user. `set -e` on a bare command is the correct outcome, and the receipt trap
+# still writes what had been written. Its destination is also a path nothing else can hold — a fresh
+# timestamped backup directory — so it is the only member of the class with no user file underneath it.
 if [ -n "$BACKUP_DIR" ]; then
   mv "$CLAUDE_DIR" "$BACKUP_DIR"
   ok "Backed up existing .claude/ → $(basename "$BACKUP_DIR")"
@@ -1954,8 +2014,19 @@ if [ -f "$GEN" ]; then
   TMP_MD=$(mktemp)
   if [ "$CLAUDE_MD_MARKER_STATE" = absent ]; then
     if bash "$GEN" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
-      mv "$TMP_MD" "$CLAUDE_MD"; ok "Generated CLAUDE.md"
-      CLAUDE_MD_BRANCH="new"
+      # THE STATUS IS READ HERE TOO, and it was a bare `mv` until 2026-08-17. This arm needs no
+      # `can_replace` — it is reached only when `marked_region_state` said `absent`, so there is no
+      # regular file at that path to be read-only — but the RENAME can still fail: measured (W2) in a
+      # project directory at 555, `mv` failed and `set -e` ended the run at `exit 1` with the payload
+      # already written and no CLAUDE.md. `skipped` is the honest branch for it: the file did not
+      # exist before this arm and does not exist after it, which is exactly what that entry says.
+      if mv "$TMP_MD" "$CLAUDE_MD"; then
+        ok "Generated CLAUDE.md"
+        CLAUDE_MD_BRANCH="new"
+      else
+        rm -f "$TMP_MD"
+        warn "CLAUDE.md could not be written — the rename into place failed, so nothing was generated."
+      fi
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md generation failed — skipped."
     fi
@@ -2095,15 +2166,34 @@ if [ -f "$GEN" ]; then
       # CLAUDE.md.generated whenever a previous run wrote one, and a read-only file there prompts and
       # then kills the install exactly as the AGENTS.md write arm did — see `can_replace`. Declining
       # keeps the rest of the run alive and names the one action that clears it.
+      #
+      # ITS OWN BRANCH VALUE, AND THE FIRST VERSION OF THIS ARM BORROWED `kept-yours`. That token's
+      # entry reads *"CLAUDE.md.generated — yours was kept untouched, so no generated file was
+      # produced this run. Rename or delete it and re-run to get one."* Every clause is false here:
+      # the file is OURS (this arm is reached only after `owned_by_installer` failed to disown it),
+      # nothing was kept because the user chose it, and the remedy contradicts the `warn` line two
+      # lines above it — renaming or deleting a read-only file is not the action, making it writable
+      # is. That is the same defect this commit's sibling fixed for `skipped`, in the same commit,
+      # one arm over.
       rm -f "$TMP_MD"
       warn "CLAUDE.md.generated is read-only, so nothing was written beside your CLAUDE.md."
       warn "Make it writable (under Perforce: check it out) and re-run install.sh."
-      CLAUDE_MD_BRANCH="kept-yours"
+      CLAUDE_MD_BRANCH="generated-not-written"
+      note_not_done "CLAUDE.md.generated — the file is read-only, so this run wrote nothing beside your CLAUDE.md and it still holds an earlier run's content. Your own CLAUDE.md was not touched. Make it writable (under Perforce: check it out) and re-run install.sh."
     elif bash "$GEN" ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_MD" 2>/dev/null; then
-      mv "$TMP_MD" "$PROJECT_DIR/CLAUDE.md.generated"
-      warn "CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead."
-      warn "Yours was not touched. Merge by hand, or add the markers to let us refresh in place."
-      CLAUDE_MD_BRANCH="separate"
+      # The status, for the reason the fresh arm above reads it: `can_replace` cannot see a rename
+      # that fails on the directory rather than on the file.
+      if mv "$TMP_MD" "$PROJECT_DIR/CLAUDE.md.generated"; then
+        warn "CLAUDE.md exists and has no generated markers — wrote CLAUDE.md.generated instead."
+        warn "Yours was not touched. Merge by hand, or add the markers to let us refresh in place."
+        CLAUDE_MD_BRANCH="separate"
+      else
+        rm -f "$TMP_MD"
+        warn "CLAUDE.md.generated could not be written — the rename into place failed."
+        warn "Your own CLAUDE.md was not touched."
+        CLAUDE_MD_BRANCH="generated-not-written"
+        note_not_done "CLAUDE.md.generated — the rename into place failed, so this run wrote nothing beside your CLAUDE.md and none of the toolkit's configuration reached this project. Your own CLAUDE.md was not touched."
+      fi
     else
       rm -f "$TMP_MD"; warn "CLAUDE.md generation failed — skipped."
     fi
@@ -2160,8 +2250,9 @@ case "$CLAUDE_MD_BRANCH" in
   skipped)
     note_not_done "CLAUDE.md — not generated, so this project has no toolkit configuration file and the FILL: markers never landed. The warn line above says which of the three ways it failed; re-run install.sh once that is fixed."
     ;;
-  # `refresh-failed` records at its own site, where the reason is still in hand — see the header above.
-  refresh-failed)
+  # `refresh-failed` and `generated-not-written` record at their own sites, where the reason is still
+  # in hand — see the header above.
+  refresh-failed|generated-not-written)
     ;;
   kept-yours)
     note_not_done "CLAUDE.md.generated — yours was kept untouched, so no generated file was produced this run. Rename or delete it and re-run to get one."
@@ -2424,7 +2515,29 @@ add_manifest_dependency() {
       ok "Added $pkg_name to manifest.json (backup: manifest.json.bak)"
     fi
   else
-    mv "$MANIFEST.bak" "$MANIFEST"; rm -f "$MANIFEST.tmp"
+    # THE ROLLBACK'S OWN STATUS, READ SINCE 2026-08-17. This is the fourth member of the `mv` class
+    # and the only one whose failure leaves a USER file in a state neither the run nor the user chose:
+    # `sed -i` has already rewritten the manifest, and this rename is what puts the original back. A
+    # bare `mv` here failed silently into `set -e` — the run ended mid-way with an edited manifest,
+    # its backup still on disk, and no sentence anywhere saying which file held what. It is
+    # low-likelihood (this arm is only reached when the edit itself failed) and it is the one where
+    # being wrong is least recoverable, so it says exactly what is where.
+    #
+    # IT IS THE ONE MEMBER OF THE CLASS NO FIXTURE ASSERTS, AND THAT IS STATED RATHER THAN LEFT AS A
+    # GREEN MUTATION. Reaching it needs two conditions at once — an edit that fails AND a rename that
+    # fails — and the second needs `Packages/` unwritable, which kills the `cp` four lines up before
+    # this arm is ever reached. Sealing the directory between the `cp` and the `mv` is a race, not a
+    # fixture. Measured: reverting this to a bare `mv` leaves both install test files green. The
+    # status read stays because it converts a silent `set -e` death into a named state on the one file
+    # a user opens Unity with; the absence of a guard under it is a known weaker half, not an oversight.
+    MANIFEST_ROLLED_BACK=1
+    if ! mv "$MANIFEST.bak" "$MANIFEST"; then
+      MANIFEST_ROLLED_BACK=0
+      warn "Packages/manifest.json could not be restored from its backup — the edit failed AND the"
+      warn "rollback failed. $MANIFEST_BAK_REL still holds the manifest as it was before this run."
+      note_not_done "$flag_name — the manifest edit failed and so did the rollback, so Packages/manifest.json is NOT as this run found it. $MANIFEST_BAK_REL is the copy from before the edit: restore it by hand before opening the project in Unity."
+    fi
+    rm -f "$MANIFEST.tmp"
     # THE FLAG MUST NOT OUTLIVE THE FILE IT NAMES. The `mv` above has just consumed the backup, and
     # this function is called once per --with-* flag: on a two-flag run where the first caller
     # succeeded and kept its backup, MANIFEST_BAK_KEPT is already 1 when the second caller reaches
@@ -2441,7 +2554,14 @@ add_manifest_dependency() {
     # no "dependencies" key — a real shape, and the one the plan reproduced — and the failure arm
     # restores the original, so the run ends with the manifest byte-identical and the flag silently
     # gone. `$MANIFEST_BAK_REL` is not offered as a remedy here: the `mv` above has just consumed it.
-    note_not_done "$flag_name — the manifest could not be edited safely, so it is unchanged and $pkg_name was not added. Add \"$pkg_name\": \"$pkg_value\" under \"dependencies\" in Packages/manifest.json yourself."
+    #
+    # CONDITIONAL SINCE 2026-08-17, BECAUSE ITS FIRST CLAUSE IS THE ROLLBACK'S. *"so it is
+    # unchanged"* is true only when the rename above succeeded; on the failed-rollback path the
+    # manifest is whatever `sed` left and the entry printed there says so instead. One outcome, one
+    # sentence — printing both would tell the user two different things about one file.
+    if [ "$MANIFEST_ROLLED_BACK" -eq 1 ]; then
+      note_not_done "$flag_name — the manifest could not be edited safely, so it is unchanged and $pkg_name was not added. Add \"$pkg_name\": \"$pkg_value\" under \"dependencies\" in Packages/manifest.json yourself."
+    fi
   fi
 }
 
@@ -2778,12 +2898,27 @@ if [ "$CLIENT" = codex ]; then
   else
     TMP_AG=$(mktemp)
     if bash "$GEN" --client codex ${GEN_ARGS[@]+"${GEN_ARGS[@]}"} "$PROJECT_DIR" > "$TMP_AG" 2>/dev/null; then
-      mv "$TMP_AG" "$AGENTS_MD"
-      # `mv` from mktemp carries 0600 across; the receipt row reads the mode off the file, so this
-      # keeps the file readable AND keeps the row honest rather than hardcoding a mode.
-      chmod 644 "$AGENTS_MD"
-      ok "Generated AGENTS.md (the Codex entry document)"
-      AGENTS_BRANCH=written
+      # THE STATUS, FOR THE REASON `can_replace`'s HEADER NOW GIVES. That predicate answers for the
+      # FILE and this answers for everything else — measured (W1) in a project directory at 555 with a
+      # writable AGENTS.md of ours: `can_replace` says yes, the rename fails, and as a bare command it
+      # ended the whole install at rc 1 with the payload already on disk.
+      if mv "$TMP_AG" "$AGENTS_MD"; then
+        # `mv` from mktemp carries 0600 across; the receipt row reads the mode off the file, so this
+        # keeps the file readable AND keeps the row honest rather than hardcoding a mode.
+        chmod 644 "$AGENTS_MD"
+        ok "Generated AGENTS.md (the Codex entry document)"
+        AGENTS_BRANCH=written
+      else
+        rm -f "$TMP_AG"
+        warn "AGENTS.md could not be written — the rename into place failed, so it was left as it was."
+        AGENTS_BRANCH=write-failed
+        # ONE SENTENCE FOR BOTH STATES, because this arm cannot promise which one it is in and a
+        # branch value per state would be a third token for one outcome. An earlier run's document may
+        # be sitting there untouched, or there may be none at all; the entry says so rather than
+        # asserting the worse case, which is what `generation failed` above does correctly for a path
+        # where nothing can have been written.
+        note_not_done "AGENTS.md — the rename into place failed, so this run did not write it. If an earlier run wrote one it is still there, unchanged and a version behind; if not, this project has no Codex entry document and none of the toolkit's conventions reach a Codex session."
+      fi
     else
       rm -f "$TMP_AG"
       warn "AGENTS.md generation failed — skipped."
@@ -2816,11 +2951,19 @@ if [ "$CLIENT" = codex ]; then
   # unclaimed, immediately before claiming it"* — and it also made two states print identical output
   # with opposite `--purge` outcomes.
   #
-  # SO THE SECOND TEST IS THE MARKER PAIR, AND IT IS EVIDENCE OF DESCENT RATHER THAN OF INTENT. The
-  # user did not invent `kinglet:generated`; we wrote it. A file still carrying that pair — well
-  # formed, or damaged in a way this installer declines to bound — is the document we generated with
-  # the user's work in it. A file with no pair at all is theirs, whatever the path once held, and gets
-  # no row: `--purge` cannot reach it and the `keeping yours, untouched` sentence stays true.
+  # SO THE SECOND TEST IS THE MARKER PAIR, AND IT IS EVIDENCE RATHER THAN PROOF. The user did not
+  # invent `kinglet:generated`; we wrote it, so a file still carrying it — well formed, or damaged in
+  # a way this installer declines to bound — is *most likely* the document we generated with the
+  # user's work in it. A file with no pair at all is theirs, whatever the path once held, and gets no
+  # row: `--purge` cannot reach it and the `keeping yours, untouched` sentence stays true.
+  #
+  # IT IS NOT PROOF, AND THE FIRST VERSION OF THIS PARAGRAPH SAID *"is the document we generated"*
+  # FLATLY. Measured: a file of the user's own, at a path a run of ours once wrote, that merely quotes
+  # one `kinglet:generated:begin` line satisfies this test and gets a row that `--purge` acts on. The
+  # test narrows the previous condition rather than closing it — before it, EVERY file at such a path
+  # got the row, marker or not — and closing it properly needs something this installer does not have:
+  # a way to tell a document that descends from ours from one that merely looks like it. Recorded
+  # rather than claimed away.
   #
   # This is the same shape as `owned_by_installer`'s two disjuncts — evidence in the file, or evidence
   # in the receipt — with the file half being the marker pair rather than a checksum, because a
@@ -3718,6 +3861,11 @@ case "$CLAUDE_MD_BRANCH" in
   refresh-failed)
     CLAUDE_MD_STEP='CLAUDE.md was not refreshed this run — its generated block still carries an earlier run'"'"'s project facts, and your own prose was not touched. See the warning above.'
     ;;
+  # NOT `kept-yours`, which says the file was kept because it is yours. This one is ours and could not
+  # be written; the two need different sentences because they need different actions.
+  generated-not-written)
+    CLAUDE_MD_STEP='Nothing was written beside your CLAUDE.md this run — see the warning above. Your own CLAUDE.md was not touched.'
+    ;;
   # The decline. Sending the user to "the FILL: markers in CLAUDE.md.generated" here would point at a
   # file this run deliberately did not write, whose contents are the user's own and contain no
   # markers — defect 9's failure with the files swapped.
@@ -3776,6 +3924,7 @@ if [ "$CLIENT" = codex ]; then
     # AGENTS.md is on disk and merely a run behind on its facts.
     refresh-failed) AGENTS_MD_STEP='AGENTS.md was not refreshed this run — its generated section still carries an earlier run'"'"'s project facts, and the vision half you filled in was not touched. See the warning above.' ;;
     read-only)  AGENTS_MD_STEP='AGENTS.md is read-only, so this run left it exactly as it was. Make it writable (under Perforce: check it out) and re-run with --client codex.' ;;
+    write-failed) AGENTS_MD_STEP='AGENTS.md could not be written this run — see the warning above. Any earlier one is still in place, a version behind.' ;;
     malformed)  AGENTS_MD_STEP="$(marked_region_remedy "$AGENTS_MARKER_STATE" AGENTS.md 'install.sh --client codex') Nothing was written to it this run." ;;
     kept-yours) AGENTS_MD_STEP='Your own AGENTS.md was kept, so no Codex entry document was generated. Rename or delete it and re-run with --client codex to get one.' ;;
     *)          AGENTS_MD_STEP='No AGENTS.md was generated this run — see the warning above. Without it, none of these conventions reach a Codex session.' ;;

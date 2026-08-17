@@ -929,6 +929,15 @@ mkdir -p "$P12/Assets/Scripts"
 printf 'using VContainer;\npublic sealed class ReadOnlyProbe { }\n' > "$P12/Assets/Scripts/ReadOnlyProbe.cs"
 chmod 444 "$P12/AGENTS.md"
 TIUC_SHA12="$(tiuc_sha "$P12/AGENTS.md")"
+# THE DRY RUN FIRST, AND IT IS NOT A FOOTNOTE. Teaching the real run to refuse while leaving the
+# announcement promising a refresh does not fix the divergence, it creates one: before the refusal
+# both halves claimed a refresh and both were wrong; after it, only the run was truthful. Measured in
+# exactly that state — `AGENTS.md — refresh the generated section only; your prose untouched` from
+# the dry run, `warn AGENTS.md is read-only …` from the run, same fixture, same commit.
+TIUC_DRY12="$(tiuc_agents_line "$P12")"
+if grep -qF -- 'NOT touched' <<< "$TIUC_DRY12"; then TIUC_DRY12_R=decline; else TIUC_DRY12_R="$TIUC_DRY12"; fi
+tiuc_eq "decline" "$TIUC_DRY12_R" \
+  "7e: the dry run announces a decline for a read-only AGENTS.md — the same predicate the run refuses on, so the announcement and the act cannot disagree about the one state a Perforce project is in by default"
 TIUC_RC12=0
 TIUC_OUT12="$(bash "$REPO_DIR/install.sh" --project-dir "$P12" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')" || TIUC_RC12=$?
 tiuc_eq "$TIUC_SHA12" "$(tiuc_sha "$P12/AGENTS.md")" \
@@ -989,6 +998,12 @@ bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P14" >/dev/null 2>&1
 bash "$REPO_DIR/install.sh" --project-dir "$P14" --client codex --yes >/dev/null 2>&1
 chmod 444 "$P14/AGENTS.md"
 TIUC_SHA14="$(tiuc_sha "$P14/AGENTS.md")"
+# The announcement for the OTHER read-only state: here the file is ours and unedited, so the arm the
+# dry run would otherwise take is the `generated` one — the verdict that promises a whole-file write.
+TIUC_DRY14="$(tiuc_agents_line "$P14")"
+if grep -qF -- 'NOT touched' <<< "$TIUC_DRY14"; then TIUC_DRY14_R=decline; else TIUC_DRY14_R="$TIUC_DRY14"; fi
+tiuc_eq "decline" "$TIUC_DRY14_R" \
+  "7g: the dry run declines here too rather than promising to generate — writability is asked before ownership, because a read-only file of ours is one the run cannot replace either"
 TIUC_RC14=0
 TIUC_OUT14="$(bash "$REPO_DIR/install.sh" --project-dir "$P14" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')" || TIUC_RC14=$?
 tiuc_eq "0" "$TIUC_RC14" \
@@ -1000,6 +1015,50 @@ tiuc_eq "named" "$TIUC_WHY14" \
   "7g: …and the run says which file and why rather than skipping it quietly"
 tiuc_eq "$TIUC_SHA14" "$(tiuc_sha "$P14/AGENTS.md")" \
   "7g: …with its bytes as they were"
+
+# 7h — the rename fails while the FILE is writable, which is the case no
+# predicate can see beforehand and the one `can_replace` cannot answer.
+#
+# A project directory at 555 leaves every file inside it writable and makes every
+# rename INTO it fail — `rename(2)` checks the parent, not the target. So
+# `can_replace` returns true, the write arm's `mv` fails, and until 2026-08-17
+# that `mv` was a bare command: measured, `mv: cannot move …: Permission denied`
+# and `set -e` ended the install at rc 1 with the payload already on disk, which
+# is verbatim the failure `can_replace` was added to prevent. Its header even
+# claimed the backstop existed, and it existed only in the merge.
+#
+# `.claude/` KEEPS ITS OWN MODE, which is why the rest of the run still works:
+# only the project ROOT is sealed, so the receipt, the payload and the Codex layer
+# are all written normally and the two root documents are the only casualties.
+P15="$TIUC_ROOT/rename-fails"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$P15" >/dev/null 2>&1
+bash "$REPO_DIR/install.sh" --project-dir "$P15" --client codex --yes >/dev/null 2>&1
+TIUC_SHA15="$(tiuc_sha "$P15/AGENTS.md")"
+chmod 555 "$P15"
+TIUC_RC15=0
+TIUC_OUT15="$(bash "$REPO_DIR/install.sh" --project-dir "$P15" --client codex --yes 2>&1 | sed $'s/\x1b\\[[0-9;]*m//g')" || TIUC_RC15=$?
+chmod 755 "$P15"
+tiuc_eq "0" "$TIUC_RC15" \
+  "7h: a rename that fails does not end the install — the write arm reads mv's status and reports, where a bare mv took the whole run down at rc 1 with the payload already written"
+tiuc_eq "$TIUC_SHA15" "$(tiuc_sha "$P15/AGENTS.md")" \
+  "7h: …and AGENTS.md still holds the bytes it had"
+if grep -qF -- 'AGENTS.md could not be written' <<< "$TIUC_OUT15"; then TIUC_SAY15=named; else TIUC_SAY15=silent; fi
+tiuc_eq "named" "$TIUC_SAY15" \
+  "7h: …and the run says the write did not happen, in a sentence distinct from the read-only one, because the user's action differs"
+TIUC_ND15="$(awk '/^Not done:/ { inblock = 1; next } inblock && /^Next steps:/ { inblock = 0 } inblock' <<< "$TIUC_OUT15")"
+if grep -qF -- 'AGENTS.md' <<< "$TIUC_ND15"; then TIUC_ND15_R=listed; else TIUC_ND15_R=absent; fi
+tiuc_eq "listed" "$TIUC_ND15_R" \
+  "7h: …and records it under 'Not done:', so a caller running the documented check sees the abandonment"
+# The same run exercises the MERGE's rc-1 path end to end: CLAUDE.md is writable,
+# its pair is well formed, and only the rename into the sealed root fails. Arm 8
+# reaches that status by calling the function directly; this is the install doing
+# it, which is the half a direct call cannot prove.
+if grep -qF -- 'CLAUDE.md refresh failed' <<< "$TIUC_OUT15"; then TIUC_CM15=named; else TIUC_CM15=silent; fi
+tiuc_eq "named" "$TIUC_CM15" \
+  "7h: …and the CLAUDE.md merge reports the same failure through a real install rather than only through arm 8's direct call"
+if grep -qF -- 'prose untouched' <<< "$TIUC_OUT15"; then TIUC_CM15_FALSE=claimed; else TIUC_CM15_FALSE=none; fi
+tiuc_eq "none" "$TIUC_CM15_FALSE" \
+  "7h: …and claims no refresh of either document, which is the whole point of reading the status rather than the predicate alone"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Arm 8 — merge_marked_region's own status contract, run from the extracted

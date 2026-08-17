@@ -42,10 +42,12 @@
 #     the site reaches the block and not that the sentence after it describes the world. The
 #     consequence clauses ("they will never fire", "no MCP server to reach") are reasoned, not
 #     measured — tests/test-install-ownership.sh is where a claim about what is on disk gets checked.
-#   * THE FOUR WAYS `CLAUDE_MD_BRANCH=skipped` IS REACHED. One entry covers all four, so a fixture
-#     here proves one of them and the other three are covered by the shared recording point rather
-#     than by measurement. Only the generator-failure arm is exercised; the absent-generator arm was
-#     measured by hand on a scratch toolkit.
+#   * THE ARMS THAT REACH `CLAUDE_MD_BRANCH=skipped`. One entry covers them all, so a fixture here
+#     proves one and the rest are covered by the shared recording point rather than by measurement.
+#     Only the generator-failure arm is exercised; the absent-generator arm was measured by hand on a
+#     scratch toolkit. The number is deliberately not written: this bullet said FOUR and the set has
+#     moved twice since — a failed refresh left for its own `refresh-failed` branch, and the
+#     fresh-file arm gained a rename-failure path (`tests/test-install-ownership.sh` state S7).
 #   * ANYTHING ABOUT ORDER WITHIN THE BLOCK. Entries appear in the order the sites are reached, which
 #     is install.sh's line order and not a promise.
 # ============================================================================
@@ -569,7 +571,7 @@ run_install "$B7" "B.7 (a manifest backup that is the user's)" --with-mcp
 assert_entry "B.7" '--with-mcp — declined: Packages/manifest.json.bak is not ours to overwrite'
 
 # ── B.8: a receipt row whose origin column cannot be read ──────────────────
-# One of the two keeps that DO belong in the block, and the discriminator is that nobody chose
+# One of the keeps that DO belong in the block, and the discriminator is that nobody chose
 # anything: the row is corrupt, so the file on disk may be this version's copy or a stale one and the
 # run cannot say which. Hand-edited, deliberately — the state is reached by corruption or by a future
 # version writing an origin value this one does not know, and neither is producible from a fixture.
@@ -627,7 +629,10 @@ run_install "$B9" "B.9 install 2 (current version, payload shrank)"
 assert_entry "B.9" 'retired surface(s) listed above were NOT removed'
 
 # ── B.10: the generator does not produce a CLAUDE.md ────────────────────────
-# `CLAUDE_MD_BRANCH=skipped` is reached four ways and recorded once. This exercises the fresh-file
+# `CLAUDE_MD_BRANCH=skipped` is reached by several arms and recorded once — derive the number from
+# the arms that assign it rather than reading one here; this comment said `four ways` and went stale
+# on 2026-08-17, when a failed refresh moved to its own `refresh-failed` branch and the fresh-file
+# arm gained a rename-failure path. This exercises the fresh-file
 # arm; the absent-generator arm was measured by hand on a scratch toolkit with the script deleted,
 # and it is the arm that exposed the summary line "see the warning above" printing where no warning
 # had been printed — install.sh now warns there, so the entry's own pointer resolves.
