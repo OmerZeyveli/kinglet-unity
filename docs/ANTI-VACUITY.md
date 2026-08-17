@@ -599,7 +599,7 @@ found thirty-four rows nobody had looked for.
 The three restatements, each identified by reading the assertion rather than the wording:
 `test-bash32-compat.sh`'s and `test-no-mobile.sh`'s per-source census identities, each listed under
 *Converted* and again under *Identity floors*; and `DCE_VACUOUS`, listed under *Sites* and again
-inside the six-accumulator row under *Presence floors*. A fourth,
+inside the nine-accumulator row under *Presence floors*. A fourth,
 `test-pipeline-detector.sh`'s empty-index arm, was listed under *Sites* **and** *Presence floors*
 until 2026-08-14 and is now one row.
 
@@ -650,7 +650,7 @@ table as a census of sites will **overcount** — and, in one row, undercount. T
 sites: one `assert_eq` on `SCAN_STATE`, one on the census identity. The four
 `test-bash32-compat.sh` census rows — three under *Converted*, one repeated under *Identity floors* —
 are three. A third bound is restated across tables in different words: `DCE_VACUOUS` under *Sites*
-is one of the six accumulators under *Presence floors*, and is marked in its own row as cross-listed.
+is one of the nine accumulators under *Presence floors*, and is marked in its own row as cross-listed.
 Corrected from an earlier draft that got this exactly backwards: the four
 `test-bash-gate-precision.sh` rows are **four independent `assert_eq` calls, four sites.** And in the
 other direction, the `_VACUOUS` accumulators are **nine** sites in **one** row — not five, not six,
@@ -905,9 +905,11 @@ awk '/^### Added by the 2026-08-15/{f=1;next} /^## Proof/{f=0} f && /^\| `/{n++}
 ```
 
 Rows and sites and bounds are three different quantities here and always will be: one row carries two
-bounds (the skills/commands pair), exactly as `test-no-mobile.sh`'s per-source row does, and two rows
-are a single site each over many sources. Deriving any of the three means reading every row's
-assertion, which is the same ruling `## The floor set` opens with.
+bounds (the skills/commands pair), exactly as `test-no-mobile.sh`'s per-source row does, and **three**
+rows are a single site each over many sources — the tree-size, vacuity-census and word-numeral
+sentinels. That sentence said *two* until 2026-08-17, in the commit that added the third to the table
+directly above it and did not look down. Deriving any of the three quantities means reading every
+row's assertion, which is the same ruling `## The floor set` opens with.
 
 | Guard · assertion anchor | Subject | Mechanism | Bound |
 |---|---|---|---|
@@ -946,7 +948,7 @@ assertion, which is the same ruling `## The floor set` opens with.
 | `test-derived-counts.sh` · *every declared file is still scanned at its declared row count* (tree-size) | the claims table **vs** `DCT_DECLARED` | (d), **and it is the direction that catches emptiness**: measured on the emptied table, the `UNDECLARED` half fires only through the degenerate empty row while this half fires semantically | identity |
 | `test-derived-counts.sh` · *the vacuity-census figures are derived from a tree with files in it* | 3 sources, one sentinel, one site | (a) + (f) | ≥ 1 each |
 | `test-derived-counts.sh` · *every vacuity-census claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row |
-| `test-derived-counts.sh` · *the word-numeral figures are derived from a tree that has surfaces in it* | **14 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each — **and four of the fourteen only reach this sentinel because their derivation was given `\|\| true`**: two of them killed the file outright when mutated (a `grep` that matched nothing, a redirect from an absent file), so the floor never fired and a single-file run read 49 passes / 0 failures. Found by mutating each derivation, which is the only probe that sees it |
+| `test-derived-counts.sh` · *the word-numeral figures are derived from a tree that has surfaces in it* | **14 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each — **four of the fourteen were given `\|\| true` after mutation showed their derivation could fail before the floor read it**. The cell claimed those mutants *"killed the file outright … 49 passes / 0 failures"*: **withdrawn**. Re-measured under the gate, the suite reads `Failed: 2` with the floor's own sentence first and every assertion below it run; 49/0 reproduces only with errexit live inside the subshell, and `tests/run-tests.sh:341` turns it off (`$-` = `huB`, measured). The repairs stand — the shape is live in the 29 self-contained test files — but the consequence recorded here was a property of the measuring harness |
 | `test-derived-counts.sh` · *every declared file is still scanned at its declared row count* (word-numeral) | the claims table **vs** `DCW_DECLARED` | (d), same direction as the tree-size row above | identity |
 | `test-derived-counts.sh` · *every word-numeral claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row |
 
@@ -960,9 +962,20 @@ table is vacuous, which reads exactly like a floor. **C4 excludes it, and by mea
 by argument:** disabling the substitution inside `dcw_flat` reds **two** assertions, the probe and
 `DCW_VACUOUS`, so the assertions it guards do *not* pass over the broken subject. It adds diagnosis
 — it says *the normaliser is broken* where the vacuity arm says *a document was reworded*, which
-sends the next reader to the right half — but detection was already there. Contrast
-`test-codex-shim.sh`'s signal-extraction row two tables up, which is admitted: when that extraction
-returns nothing, everything below it genuinely passes.
+sends the next reader to the right half — but detection was already there.
+
+**The contrast this paragraph used to draw is deleted, because it was asserted and is false.** It
+read: *"contrast `test-codex-shim.sh`'s signal-extraction row two tables up, which is admitted: when
+that extraction returns nothing, everything below it genuinely passes."* Measured — break that
+extraction in the test (leaving the shim untouched) and the file reads **150 pass / 2 fail**: the
+floor and the one assertion it feeds. Identical shape, identical count, to the `DCW_PROBE`
+measurement above. **The two constructs are indistinguishable under C4 as written, and that leaves
+this table admitting one and excluding the other.** The exclusion above stands on its own
+measurement; the shim row is admitted on a ground this ruling does not supply. Recorded as an open
+inconsistency rather than resolved by picking whichever answer costs less — C4 says *"the assertions
+it guards would pass over the empty subject"*, both fail that test, and a clause distinguishing
+*detected only incidentally downstream* from *not detected at all* is the thing C4 does not have.
+This is a finding about the criterion, and it is not a fix round's to write.
 
 **What this sweep deliberately did not admit**, each rejected by a named clause rather than by
 judgement: `test-codex-surface.sh`'s *".codex/ is not tracked"* (`== 0` — **C4**, the claim is

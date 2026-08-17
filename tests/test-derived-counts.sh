@@ -1442,7 +1442,19 @@ DCT_TESTS_SH=$(ls -1 "$REPO_DIR"/tests/*.sh 2>/dev/null | grep -c . || true)
 # while `wc -l` does not, so the guard and its own printed remedy would disagree about the number
 # and the reader following the remedy would "fix" a correct figure. A guard whose repair instruction
 # computes a different quantity than the guard is a trap with a green suite in front of it.
-DCT_CMD_LINES=$(cat "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | wc -l | tr -d ' ')
+# `|| true`, AND IT IS THE STRUCTURAL TWIN OF `DCW_AGENTS_LINES` AT THE FOOT OF THIS FILE. Both take
+# a fallible substitution and back it with `[ -n "$V" ] || V=0` on the next line — which handles the
+# empty STRING and not the non-zero EXIT STATUS, so the backstop reads as safety and is not. An
+# unmatched glob makes `cat` exit 1 and `pipefail` carries it to the assignment. Inert here (errexit
+# is off in this file) and live in any file that sets `-euo pipefail`.
+#
+# It was missed by the pass that fixed the other three because that pass **enumerated the block, not
+# the shape**. Re-derived by shape 2026-08-17 — every `[ "$VAR" -op N ] || SENTINEL=` floor in the
+# tracked tree, each floor's variable resolved to its assignment **and one level of dataflow past
+# it** — the class is five, all in this file: this one, `DCK_DISK`, `DCK_REG`, `DCK_SKIP_NAMES` and
+# `DCT_SKIPPED_NAMES`. `DCK_REG`'s omission is deliberate and says so at its own site; the other
+# three are unexamined and are named here rather than swept in silently.
+DCT_CMD_LINES=$(cat "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | wc -l | tr -d ' ' || true)
 [ -n "$DCT_CMD_LINES" ] || DCT_CMD_LINES=0
 DCT_SKILL_DIRS=$(find "$REPO_DIR/.claude/skills" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | grep -c . || true)
 DCT_PIPE_SWEEP=$(git -C "$REPO_DIR" ls-files -- .claude/ scripts/ install.sh uninstall.sh 2>/dev/null | grep -c . || true)
@@ -1811,7 +1823,16 @@ assert_eq "0" "$(printf '%s' "$DCT_VACUOUS" | grep -c . || true)" \
 # on its own subject. An independent derivation found eight further live figures there, four of
 # them word numerals, and falsified five at once with the **full suite still reading Failed: 0**.
 # The remedy round 1 wrote down was *"convert it and add a row"*. That is a remedy per instance;
-# this is the remedy for the class, and it costs one flattener.
+# this one costs a flattener instead and applies wherever a row is written.
+#
+# **IT IS NOT A REMEDY FOR THE CLASS, AND THIS LINE SAID IT WAS.** The sentence read *"this is the
+# remedy for the class"* until 2026-08-17 — asserting, 1320 lines below the paragraph in this same
+# file that withdraws exactly that claim, the thing that paragraph withdraws. What this block is, is
+# a hand-maintained table plus a normaliser: it makes the class **reachable** by an ordinary `[0-9]+`
+# row, and reaching is not sweeping. Measured after it shipped: a new word-numeral figure inserted
+# into a file this table already reads is not caught, and an independent derivation found four more
+# live members. See the withdrawal at the surface-pool block for the full statement; a claim that
+# survives one screen away from its own retraction is how this repository loses arguments to itself.
 #
 # THE FLATTENER IS THIS BLOCK'S OWN, AND THAT IS THE WHOLE RISK CONTROL. Normalising word numerals
 # in the shared flatten would change the text every table above matches against, so a stray `one of
@@ -1898,11 +1919,33 @@ for dcw_a in "$REPO_DIR"/.claude/agents/*.md; do
   done
 done
 # `|| true` ON THE ASSIGNMENT, NOT INSIDE THE PIPELINE. `grep` exits 1 when it matches nothing, and
-# under `set -euo pipefail` that status becomes the substitution's, then the assignment's, and kills
-# the file — 49 passes, 0 failures, every assertion below unrun. Measured by mutating the key name:
-# the floor two lines down never got to fire. The suite still reds, because the runner counts a file
-# that exits non-zero without reporting a failure — but it reds as an exit code instead of as this
-# floor's sentence, which sends the reader to the wrong place.
+# under `set -euo pipefail` that status becomes the substitution's, then the assignment's, and at an
+# assignment site `set -e` kills the file. The repair is right and costs nothing.
+#
+# **THE CONSEQUENCE THIS COMMENT RECORDED IS WITHDRAWN.** It read *"kills the file — 49 passes, 0
+# failures, every assertion below unrun … it reds as an exit code instead of as this floor's
+# sentence"*. Measured under the gate instead: with the key broken, the full suite reads
+# `Total: 3959  Passed: 3954  Failed: 2`, both failures from this file, the first of them **this
+# floor's own sentence**, the last assertion of the block PASSes, and there is no
+# *"exited N without reporting a failure"* line. Nothing is unrun.
+#
+# **What it was measured under was a harness, not the gate.** `tests/run-tests.sh:341` does `set +e`
+# before `( source "$test_file" )`, and this file is runner-provided and sets no `-e` of its own:
+# `$-` inside it during a real suite run is **`huB`** — measured by injecting an `echo "[$-]"` and
+# reading it out of the log. The 49/0/rc-127 figure reproduces only with errexit live inside the
+# subshell (`$-` = `ehmtuBc`), which is what the measuring harness did and what the runner does not.
+#
+# **So the hazard is real and its blast radius is elsewhere: the 29 self-contained test files that
+# set `-euo pipefail` themselves.** Here it is inert, which two comments in this same file already
+# said — see the `dck_lvl` paragraph (*"the runner does `set +e` before sourcing"*) and the
+# `dck_extra` one (*"Inert under the runner"*). The round that wrote 49/0 asserted the opposite of a
+# comment 1250 lines above it, in the same file.
+#
+# **The pair is the lesson.** This is the second instrument in two rounds whose semantics differed
+# from its subject's: first a harvest that counted one of the suite's two FAIL token shapes, then a
+# harness that kept errexit alive where the gate turns it off. **An instrument that differs from its
+# subject in one flag produces a number that is true of nothing that ships** — and the number looks
+# exactly like a measurement, because it is one.
 DCW_TMOS="$(grep -oE '"timeout"[[:space:]]*:[[:space:]]*[0-9]+' "$REPO_DIR/.claude/settings.json" 2>/dev/null \
             | grep -oE '[0-9]+$' | sort -n)" || true
 DCW_TMO_MIN=$(( $(printf '%s\n' "$DCW_TMOS" | awk 'NR==1 { print $1 + 0 }') / 60 ))
@@ -1911,8 +1954,13 @@ DCW_SKILLREF=$(grep -o '`Skill` tool' "$REPO_DIR"/.claude/agents/*.md 2>/dev/nul
 DCW_AGENTS_LINES=$(wc -l < "$REPO_DIR/AGENTS.md" 2>/dev/null | tr -d ' ' || true)
 [ -n "$DCW_AGENTS_LINES" ] || DCW_AGENTS_LINES=0
 
-# THE DERIVATION HAS TO BE ABLE TO FAIL, and it has to be able to fail PER SOURCE. Eight sources
-# feed the rows below; a single total would clear while any one of them died.
+# THE DERIVATION HAS TO BE ABLE TO FAIL, and it has to be able to fail PER SOURCE — a single total
+# would clear while any one source died. **The number of sources is not written here**: it read
+# `Eight` while the block carried ten, then still `Eight` while it carried fourteen, and the same
+# commit that widened it to fourteen wrote `14 sources` into `docs/ANTI-VACUITY.md`'s floor-set row,
+# so the file and the document disagreed about one quantity. Derive it:
+#
+#   grep -cE '\|\| DCW_DERIVATION=' tests/test-derived-counts.sh
 DCW_DERIVATION="ok"
 [ "$DCW_SPINE"        -ge 1 ] || DCW_DERIVATION="no spine rules under \$REPO_DIR/.claude/rules (less pc-console.md)"
 [ "$DCW_NONNEG"       -ge 1 ] || DCW_DERIVATION="no NON-NEGOTIABLE/CRITICAL headings in the spine rules"
@@ -1926,13 +1974,24 @@ DCW_DERIVATION="ok"
 [ "$DCW_NARROW"      -ge 1 ] || DCW_DERIVATION="no agent narrows its tools — the tools: frontmatter may have moved"
 [ "$DCW_TMO_MIN"     -ge 1 ] || DCW_DERIVATION="no timeout: key in .claude/settings.json, so the minute figures are not derived"
 [ "$DCW_TMO_MAX"     -ge 1 ] || DCW_DERIVATION="the settings timeout maximum is under a minute once read as seconds"
-# NO BACKTICKS IN A FLOOR'S MESSAGE. This line read "no `Skill` tool reference…" for one
-# commit: inside double quotes those are COMMAND SUBSTITUTION, so the moment the floor fired
-# bash ran `Skill`, got 127, and killed the whole file at this line — 49 passes, 0 failures,
-# and every DCW assertion below never ran. The runner does add a failure for a file that
-# exits non-zero without reporting one, so the suite reds; but it reds as an exit code rather
-# than as this floor's sentence, and a single-file run reads as green. Found by mutating the
-# derivation this floor guards, which is the only probe that would have.
+# NO BACKTICKS IN A FLOOR'S MESSAGE. This line read "no `Skill` tool reference…" for one commit:
+# inside double quotes those are COMMAND SUBSTITUTION, so the moment the floor fires bash runs
+# `Skill`. Found by mutating the derivation this floor guards, which is the only probe that reaches
+# a failure-only-evaluated string.
+#
+# **WHAT IT ACTUALLY DOES HERE, measured under the gate rather than under the harness that first
+# reported it.** Errexit is off in this file (see the withdrawal above), so bash does not die. It
+# prints `Skill: command not found` to the suite log, and the floor fires with the word deleted from
+# its own message:
+#
+#     expected: ok
+#     actual:   no  tool reference under .claude/agents/
+#
+# A mangled diagnostic and a spurious error line, not a truncation. The earlier claim — *"killed the
+# whole file … 49 passes, 0 failures, every DCW assertion below never ran … a single-file run reads
+# as green"* — is **withdrawn**; it was true only with errexit live, which is the 29 self-contained
+# test files and not this one. Under `set -e` it does exit 127 at this line, which is why the repair
+# stays: the shape is wrong on its own terms wherever it is written.
 [ "$DCW_SKILLREF"    -ge 1 ] || DCW_DERIVATION="no Skill-tool reference under .claude/agents/"
 [ "$DCS_AGENTS"       -ge 1 ] || DCW_DERIVATION="no agents (shared with the surface-pool block)"
 assert_eq "ok" "$DCW_DERIVATION" \

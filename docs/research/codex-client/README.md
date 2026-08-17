@@ -212,8 +212,8 @@ rediscovering:**
   the vacuity shape `docs/ANTI-VACUITY.md`'s C4 excludes unless a floor is added
   under it. Excluded on cost and shape, not on the criterion — the one place those
   come apart, so it is named rather than folded into the list above. **Its companion
-  in the same sentence, `The 16 skill-tool references` / `All 16 are in
-  `.claude/agents/``, IS now guarded**, and the ruling is that the `0 == 0` exclusion
+  in the same sentence — the skill-tool reference count, stated twice in that row — IS now
+  guarded**, and the ruling is that the `0 == 0` exclusion
   does not extend to it: a positive count with a one-line derivation
   (`grep -o '\`Skill\` tool' .claude/agents/*.md | grep -c .`) is not the shape C4
   excludes. One sentence, two numerals, two different rulings — which is the arity
