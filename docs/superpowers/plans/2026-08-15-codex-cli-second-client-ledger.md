@@ -187,9 +187,34 @@ because this wave has already orphaned two batches of load generators doing exac
 written here without its conditions attached — which is how it came to read as *absent* rather than
 *absent under the two conditions we tried*. Both files now say which.
 
-**So: the signal block carries an unexplained red seen twice, and this entry says so rather than
-rounding it to zero.** Do not read a red there as expected; do read it as unexplained, and add the
-run to this list **with the load condition it occurred under**.
+### CLOSED 2026-08-17 — it was never load. It was how the run was launched.
+
+**`nohup` sets SIGHUP to `SIG_IGN`, and an ignored disposition is inherited** — by children and by
+grandchildren, which is what puts it inside the shim. Measured in both directions, twice, by two
+independent readers:
+
+| arm | `trap -p SIGHUP` | `bash tests/test-codex-shim.sh` |
+|---|---|---|
+| foreground | *(empty — default disposition)* | **0 of 3 red**, 152/0 |
+| under `nohup` | `trap -- '' SIGHUP` | **3 of 3 red**, `FAIL: SIGHUP did NOT refuse (exit 0, 0 bytes)` character for character |
+
+SIGTERM, SIGINT and SIGPIPE stay green in the `nohup` arm — the positive control this question never
+had. Grandchild control: rc **129** foreground against rc **7** under `nohup`. A third reader then
+reproduced all of it and reported seven plain-foreground runs with zero sightings.
+
+**So both sightings were an artifact of the launcher, not a fact about the shim, and the load
+hypothesis was never needed.** The paragraphs above are kept whole because the reasoning they record
+is worth more than the wrong conclusion: *"two sightings, two under external load, zero on a quiet
+host"* is a real correlation, and it is **the wrong variable** — both loaded runs were also launched
+through a wrapper, and nobody looked at the disposition. The 0-of-61 probe was measuring a condition
+that had nothing to do with the failure, which is why all four of its arms read zero.
+
+**What survives as method, and it is the whole lesson:** an instrument's *conditions* include how it
+was started, not only what else the host was doing. **Check `trap -p SIGHUP` before filing a signal
+finding.** `tests/test-codex-shim.sh` now carries the cause, both sightings as history, and that
+instruction.
+
+**Do not run this suite under `nohup`.**
 
 **The fix is NOT one line IN THE `BASHPID` SPELLING, which is why THAT one was correctly refused —
 and it is still refused today.** The obvious spelling —
@@ -570,7 +595,9 @@ The event stream shape, measured against the real binary:
 | WBR | Whole-branch review + fix loop | **CLOSED** | `599792f..e76b84e` | 3 rounds, closed by ruling at round 3 rather than at the cap; both Criticals discharged; see *The whole-branch review* below |
 | 12 | The installed project does not know it is on Codex | **DONE** | `195bbb1..40c3967` | general-purpose implementer; **3 fix rounds**, one of them prose-only; L-5 measured at 28 orphaned rows, not 16 |
 | 13 | The record documents — residuals, floors, criteria, the guard's edge | **DONE** | `7fcdadf..d9990e1` | general-purpose implementer, **fresh one from round 4**; **5 fix rounds**, the cap, closed on a CLOSE verdict not at the cap |
-| 14 | `AGENTS.md` has no marked-region merge | **OPEN** | — | added 2026-08-16 from Task 12's fix round, which closed the half it could and ruled the new write path a task rather than a round; Task 9's deliberate absence now needs reversing **with a reason**, because Task 12 made a correctness rule depend on the file |
+| 14 | `AGENTS.md` has no marked-region merge | **DONE** | `6400537..71361ad` | general-purpose implementer, **fresh one from round 4**; **5 fix rounds — the cap**, closed on a CLOSE verdict; the write class went 6 → 9 → 16 → 35 across four derivations |
+| 15 | The `.agents/` ownership rule is two rules | **OPEN** | — | added 2026-08-17, adjudicated out of Task 14 at the cap; pre-existing behaviour, not a Task 14 regression |
+| 16 | The write class's residue | **OPEN** | — | added 2026-08-17, same adjudication; start from syscall tracing, not source reading |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
 configuration natively, Tasks 3–6 shrink and Task 8's ship list changes. Re-plan rather than
@@ -1426,3 +1453,113 @@ one is already stale on purpose.
 | Item | Ruling | Owner |
 |---|---|---|
 | The 21/5/14 sentinel-source class is unguarded — correct and consistent today, and it moves only when someone edits a floor in the file that carries the derivation | Safe: guardedness did not regress, and the durable fix is for the sentence to point at the cells rather than restate them, which is a design change rather than a correction | **Task 14**, whose row already owns the analogous unguarded-numeral item |
+
+---
+
+## Task 14 — close: `AGENTS.md` gets the merge, and the write class gets found
+
+Implementer: **general-purpose**, replaced by a **fresh one at round 4** per this skill's rule after
+three rounds produced the same class. Report `DONE_WITH_CONCERNS`, then **five fix rounds — the cap** —
+closed on an explicit CLOSE verdict rather than adjudicated at it. Commit range `6400537..71361ad`.
+Gate at close: `Total: 4165 · Passed: 4162 · Failed: 0 · Skipped: 3`, `SUITE_RC=0`, 45 headers = 45
+files, `provenance OK`.
+
+### The decision, and the half of Task 9 that survived it
+
+**Merge, not argued refusal.** Task 9 declined on the ground that there is *"no established convention
+of hand-written prose in an `AGENTS.md` this installer wrote."* The premise had moved: **the
+installer's own Codex Next step 2 instructs that prose**, so it is not a convention but an
+instruction, and Task 12 then made a correctness rule depend on the file.
+
+**No `AGENTS.md.generated` sibling**, and that half of Task 9 is kept: `CLAUDE.md` has one because most
+projects already have a `CLAUDE.md`, whereas an `AGENTS.md` with no markers is *somebody else's* entry
+document, and a sibling Codex never injects is debris uninstall must own. Reversing the part whose
+premise moved and keeping the part whose premise held is the shape of a correct reversal.
+
+**The region was NOT widened**, and that is a decision, not an omission: everything inside a marked
+region is replaced wholesale on every run, so widening retroactively converts bytes a user may already
+have edited into bytes the installer overwrites — the exact loss this task exists to prevent. So **the
+merge maintains the project-facts block and nothing else, and the `/name` rule still relies on its
+second home in `using-kinglet`** — asserted, so widening reddens rather than silently falsifying three
+documents.
+
+### The write class: 6 → 9 → 16 → 35, and why
+
+Four independent enumerations, one criterion — *any write that can leave a user-visible path in a
+state nobody chose, or that fails unreported.* **The criterion was stable the whole time. The search
+was the weak part.**
+
+| derivation | method | members |
+|---|---|---|
+| round 2 | one `awk` regex for `mv` | 6 |
+| round 3 (review) | every write verb, by reading | ≥9 |
+| round 4 | write verbs **and** redirections to a variable path | 16 |
+| round 5 (review) | **runtime syscall tracing of a real install** | **35** user-visible paths |
+
+Only the last found `sed`'s own beside-the-destination temp — which is **why `sed -i` defeats a 0444
+file** — plus `manifest.json.tmp` and four temps a previous round had just relocated into the user's
+tree. `mv` was a proxy for the criterion, and a class derived from a proxy is only as wide as the
+proxy.
+
+**Three members were silent-failure paths, not merely unreported ones:**
+
+- **`.codex/hooks.json` was a truncating `>`.** A write that fails after the open leaves a config
+  Codex cannot parse, and an unparseable hooks config is a **silent ALLOW** — the exact failure the
+  surrounding block exists to refuse. Now written through a rename.
+- **`.gitignore`'s create was never covered**, because `can_replace` returns 0 for an absent path: the
+  guard answered *replacement* while the code did *creation*. A read-only `.gitignore` aborted the
+  install at rc 1 with the Codex layer never running.
+- **`.gitignore`'s append reported success on `/dev/full`** — `{ …; } >> f` exits with its last
+  command's status, and that ended `|| true`.
+
+### The orphaned-receipt-row defect, three generations of it
+
+Round 3's read-only refusal dropped `.codex/hooks.json`'s receipt row — the file stayed ours on disk
+and unowned in the receipt, so `uninstall.sh` could not remove it and the doctor stopped checking it.
+Round 4 found and fixed that, **and its own two new refusals did the same thing** to a read-only
+converted skill and an unprunable stale link. Round 5 fixed those.
+
+**Each generation fixed the instance and reproduced the pattern one arm over**, because *"refuse to
+write"* and *"still record what is there"* are separate thoughts and only the first one is what the
+finding asks for.
+
+### The instruments this task paid for
+
+- **A combination mutation is not a superset of its members.** Inside a ten-way combination, one
+  member was **masked**: another mutation made its arm unreachable, so the combination reddened for a
+  different reason and would have reddened with that member's fix intact. Only the member alone holds
+  the member. The final verification then built a combination *chosen so nothing could mask anything*
+  and got the exact sum, across two files.
+- **`AGRP` — the same four reverts — measured green at round 3 and red 12 at round 4.** Both readings
+  were right about their own tree; the difference is that the behaviours became asserted.
+- **A mutation harness that rewrites a file must preserve its mode.** `awk > tmp; mv` dropped the
+  executable bit and produced `FAIL install.sh is executable` — a harness failure that reads exactly
+  like the guard working.
+- **A batch killed by a timeout orphans a mutant.** Caught by `cmp` against a pristine copy before the
+  next measurement, which is the only reason the next number meant anything.
+- **"Cannot have a fixture" survived four rounds and was false.** `unshare -Urm` with an unprivileged
+  `tmpfs` gives a real ENOSPC at a real path, and `/dev/shm` is a second filesystem needing no
+  namespace at all. The round then **declined to build all three anyway**, with the reason written
+  down — a mount namespace and a skip guard in a closing round, on the suite's only host dependency,
+  to establish what the shape guards already establish. **Declining on a stated trade is a decision;
+  declining on a false impossibility is a defect**, and only the second one was wrong.
+- **`strace` corrected the mechanism everyone reasoned from.** A cross-device `mv` here does
+  `renameat2` EXDEV → `renameat` EXDEV → **`unlinkat` of the destination** → fresh
+  `openat(O_CREAT|O_EXCL)`. Not *"truncates in place"* — the old config is **deleted** before the copy
+  begins, which makes the fix more justified than the wrong mechanism suggested.
+
+### Adjudicated at the cap — two new tasks, and what each owns
+
+Seventeen items were carried out of the final verification. None is deferred to a role:
+
+| Item | Ruling | Owner |
+|---|---|---|
+| The prune's ownership test is **weaker than the link loop's**, so one run can print *"not ours, left alone"* and claim the same link in the receipt — and converted command skills for **retired** commands have no prune at all | Safe to carry: **pre-existing**, and Task 14's row produces the same outcome the existing prune already produces, deferred. But it is two readers of one ownership question in the one place where the answer decides whether a user's file is deleted | **Task 15** |
+| Six bare `rm` sites; one unguarded ownership disjunct; four temps now inside the user's tree with no class-table row; `manifest.json.tmp` and `sedXUvfOt`; nine items from round 4's §8 | Safe: each is defensible today and none is a silent-failure path. The sentence claiming *"the last bare write verb in the class"* is the part that is wrong | **Task 16** |
+| The `rm -f "$CODEX_HOOKS_JSON"` status read is unasserted — reverting it reds nothing, because reaching it needs a defective emitted config **and** a `.codex/` refusing the unlink at once. The final verification then **reached it in six lines** | Safe: the behaviour is correct and correctly reported; only the assertion is missing, and the fixture is now written down | **Task 7**, the only open task that still runs fixtures |
+
+**Why the loop went the full five rounds and still closed cleanly:** every round discharged its
+findings and the *class* kept widening under it — 6 to 35 members across four searches. That is not
+the same pathology as Task 13's, where the crop was false statements about the fix; here the fixes
+held and the enumeration was short. A loop is safe to run to its cap when each round's findings are
+new; it is not when they are the same finding restated.

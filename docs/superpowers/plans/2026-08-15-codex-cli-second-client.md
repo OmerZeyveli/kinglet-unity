@@ -2195,6 +2195,56 @@ generated regions current, and `uninstall.sh` still able to remove what it owns 
 
 ---
 
+## Task 15: The `.agents/` ownership rule is two rules
+
+**Added 2026-08-17**, adjudicated out of Task 14's fix loop at its five-round cap. Behaviour, not
+prose, and **pre-existing** — Task 14 did not introduce it and its own row produces the same outcome
+the existing prune already produces, deferred.
+
+**The conflict.** The prune's ownership test is **weaker than the link loop's**, so one run can print
+*"not ours, left alone"* and claim the same link in the receipt. Measured: `uninstall.sh` then deletes
+the user's link. Two readers of one ownership question, disagreeing — the defect class this branch has
+now paid for five times, here in the one place where the answer decides whether a user's file is
+deleted.
+
+**The missing prune.** Converted command skills for **retired** commands have no prune at all: 1 row
+→ 0, the file stays on disk, and nothing can ever remove it. That is verbatim the leak Task 14's last
+round closed, in a sibling it did not enumerate.
+
+**What this task must do:** derive the ownership question once, answer it in one place, and make the
+prune and the link loop consult that answer. Then enumerate every `.agents/` path class — linked
+skills, converted command skills, retired commands — and confirm each is prunable. **The guard is an
+upgrade fixture**: install, retire a command from the payload, install again, and assert every file
+on disk is named by a receipt row and every row is removable.
+
+---
+
+## Task 16: The write class's residue
+
+**Added 2026-08-17**, same adjudication. Task 14 closed the write class for every member anyone had
+enumerated; these are what four derivations and one syscall trace left over.
+
+- **Six bare `rm` sites remain.** Each is defensible for a reason the sentence claiming *"the last
+  bare write verb in the class"* does not give. Give the reason per site or fix the site.
+- **One unguarded disjunct.** `B.7f` is carried by the receipt half of its ownership test; dropping
+  the **reference-copy** disjunct leaves the suite green.
+- **Four temps inside the user's tree.** Task 14's `mktemp_beside` moved five renames to
+  destination-local temps, which is correct for atomicity and puts four temporary files under paths
+  the user can see, none with a class-table row.
+- **`Packages/manifest.json.tmp` and `sed`'s own `sedXUvfOt`** — found only by syscall tracing, and
+  the second is *why* `sed -i` defeats a 0444 file.
+- **Nine carried items** from Task 14's fourth re-review §8: the `.agents/skills/` per-path dry-run
+  oracle, the skip-guarded namespace fixtures, `mktemp_beside`'s untested fallback arm,
+  `~/.codex/config.toml`'s truncating write behind `--codex-trust`, the `mv`-onto-a-directory shape,
+  `CLAUDE.md.generated`'s 0600, the well-formed-coincidence merge, and the silent backup-rename abort.
+
+**The method this task should start from, because it is what finally converged the class:** four
+independent source-derived enumerations produced 6, 9, 16 and 35 members. **The criterion was stable
+the whole time; the search was the weak part.** Trace the syscalls of a real install rather than
+reading the source.
+
+---
+
 ## Notes for the controller
 
 - **Write each brief just before its task is dispatched, not up front.** Tasks 4
