@@ -700,6 +700,36 @@ else
   fi
 fi
 
+# ── Codex layer: bridged but not enforcing ───────────────────────────────────
+# A POSITIVE CHECK, because the receipt cannot see this state at all.
+#
+# Everything above verifies paths that HAVE a receipt row. `install.sh` writes the row for
+# `.codex/hooks.json` gated on `[ -f "$CODEX_HOOKS_JSON" ]`, so when the hook config was never
+# written there is no row, nothing is missing, and this script said nothing. That is precisely the
+# state a Codex user needs told: the skills are bridged, so the toolkit looks installed and its
+# guidance is reachable, and NOTHING enforces it — `Input.GetKey` is not blocked, and no hook runs.
+#
+# Two documents added on this branch asserted that this script already reported it —
+# `docs/GETTING-STARTED.md` § Hooks Not Firing → Under Codex CLI, and
+# `docs/research/codex-client/findings.md`. Both were false when written: the only route that
+# covered it was `.claude/commands/unity-doctor.md` Check 3b, which is model-driven, not this
+# script. Reproduced 2026-09-08 by installing into a path containing an apostrophe, which
+# `--emit-config` cannot escape: the run correctly skipped the hook config, wrote no row, and this
+# script reported `0 failure(s)` with the project silently advisory. Making the script true was the
+# right repair rather than softening the sentence, because the sentence describes what a user needs.
+#
+# WARN, NOT FAIL, and for the same reason Check 3b says WARNING: the state is legitimate. A user may
+# not want hooks, and the installer reaches it deliberately on a path it cannot quote. A failure
+# count is for something that is wrong; this is something that is not what you may think it is.
+if [ -d "$PROJECT_DIR/.agents/skills" ] && [ ! -f "$PROJECT_DIR/.codex/hooks.json" ]; then
+  dr_bridged=$(find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${dr_bridged:-0}" -gt 0 ]; then
+    warn ".agents/skills/ is bridged ($dr_bridged entr(ies)) but .codex/hooks.json is absent —"
+    warn "     this project is ADVISORY under Codex, not enforcing: no hook runs, and legacy"
+    warn "     Input.GetKey is not blocked. Re-run install.sh --client codex to write it."
+  fi
+fi
+
 # ── Payload sanity ───────────────────────────────────────────────────────────
 if [ -d "$CLAUDE_DIR" ]; then
   # THE OTHER HALF OF THE PIPEFAIL TRAP, and the half no needle in the suite looks for. Everything

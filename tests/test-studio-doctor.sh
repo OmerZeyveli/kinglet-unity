@@ -809,3 +809,78 @@ assert_eq "1" "$TSD_SYM_GONE_RC" \
 rm -rf "$TSD_SYM"
 
 rm -rf "$TSD_MOCK"
+
+# ============================================================================
+# Bridged but not enforcing — a POSITIVE check, because the receipt cannot see
+# this state at all.
+#
+# install.sh writes the receipt row for `.codex/hooks.json` gated on the file
+# existing, so a config that was never written has no row, nothing is missing,
+# and every receipt-driven check above stays silent while the project is
+# advisory: guidance reachable, nothing enforced, legacy Input.GetKey allowed.
+#
+# Two documents on this branch asserted the doctor already reported it. Both
+# were false when written — the only route that covered it was
+# `.claude/commands/unity-doctor.md` Check 3b, which is model-driven, not this
+# script. Reproduced 2026-09-08 by installing into a path containing an
+# apostrophe, which `--emit-config` cannot escape: the run correctly skipped the
+# hook config and the doctor reported `0 failure(s)`.
+#
+# WARN, not fail, so the two controls below both assert the count as well as the
+# text — a check that fired on every project would satisfy the positive arm just
+# as well as a correct one does.
+# ============================================================================
+
+tsd_advisory() { grep -c "ADVISORY under Codex" <<< "$1" || true; }
+
+# The control first: a complete Codex install must NOT trip it.
+TSD_ADV_OK="/tmp/kinglet-doctor-advisory-ok-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_ADV_OK" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_ADV_OK" --client codex --yes >/dev/null 2>&1
+TSD_ADV_OK_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_ADV_OK" 2>&1)
+assert_eq "0" "$(tsd_advisory "$TSD_ADV_OK_OUT")" \
+    "a complete Codex install is not called advisory — the check does not fire on every project"
+rm -rf "$TSD_ADV_OK"
+
+# THE STATE IS REACHED THE WAY A USER REACHES IT, NOT BY DELETING THE FILE AFTERWARDS. Those are
+# two different states and only one of them is this check's subject: a config deleted after a
+# successful install still HAS its receipt row, so the row-based check above reports it missing and
+# this positive check is redundant. The state that needs a positive check is the one where the file
+# was NEVER written, and the installer reaches it on a project path containing a single quote —
+# `--emit-config` cannot escape one, so the run correctly skips the hook config, writes no row, and
+# leaves the skills bridged. An earlier draft of this section deleted the file instead and its
+# no-row assertion failed, correctly: the fixture was not in the state the assertions described.
+TSD_ADV="/tmp/kinglet-doctor-advisory-$$'q"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_ADV" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_ADV" --client codex --yes >/dev/null 2>&1
+
+if [ ! -f "$TSD_ADV/.codex/hooks.json" ] && [ -d "$TSD_ADV/.agents/skills" ]; then TSD_ADV_STATE=1; else TSD_ADV_STATE=0; fi
+assert_eq "1" "$TSD_ADV_STATE" \
+    "the fixture reaches the state under test — skills bridged, hook config never written"
+
+assert_eq "0" "$(cut -f1 "$TSD_ADV/.claude/state/install-receipt.tsv" 2>/dev/null | grep -cF '.codex/hooks.json' || true)" \
+    "…and the receipt carries no row for it, which is why a positive check is needed at all"
+
+TSD_ADV_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_ADV" 2>&1)
+assert_eq "1" "$(tsd_advisory "$TSD_ADV_OUT")" \
+    "a bridged Codex layer with no .codex/hooks.json is reported as advisory rather than enforcing"
+
+assert_contains "$TSD_ADV_OUT" "Input.GetKey is not blocked" \
+    "…and says what stops being enforced, not just that a file is missing"
+
+# The receipt-driven half must stay quiet about it, which is the whole reason this
+# check had to be positive: delete the row-based path and this state is invisible.
+assert_eq "" "$(tsd_missing "$TSD_ADV_OUT")" \
+    "…and no receipted file is reported missing, because the row for that file was never written"
+
+rm -rf "$TSD_ADV"
+
+# The second control: a Claude-only project has no .agents/skills/ at all and must
+# never see this line, or the check would fire on every non-Codex install.
+TSD_ADV_CLAUDE="/tmp/kinglet-doctor-advisory-claude-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_ADV_CLAUDE" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_ADV_CLAUDE" --yes >/dev/null 2>&1
+TSD_ADV_CLAUDE_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_ADV_CLAUDE" 2>&1)
+assert_eq "0" "$(tsd_advisory "$TSD_ADV_CLAUDE_OUT")" \
+    "a Claude-only project is never called advisory — it has no Codex layer to be advisory about"
+rm -rf "$TSD_ADV_CLAUDE"

@@ -2195,8 +2195,12 @@ of every entry `hooks/list` returns, so a *registered*-but-untrusted hook report
 itself and a config edited since it was trusted reports `"modified"`; what stays
 invisible is an untrusted **project** (empty list, no entry) and a hook Codex **times
 out** (`trusted`, and the allow is silent). And the toolkit now ships a route for the
-case in this sentence: `studio-doctor.sh` reports a missing `.codex/hooks.json` by
-path. `README.md` § *Hook trust* carries the full boundary; do not re-quote this
+case in this sentence: `studio-doctor.sh` warns when `.agents/skills/` is bridged and
+`.codex/hooks.json` is absent, naming the file and saying the project is advisory
+rather than enforcing. It is a POSITIVE check, not a receipt one — the row for that
+file is written only when the file exists, so a config that was never written has no
+row to be missing, and until 2026-09-08 this sentence described a route that did not
+exist. `README.md` § *Hook trust* carries the full boundary; do not re-quote this
 sentence without it.
 
 ---
