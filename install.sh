@@ -3389,15 +3389,38 @@ if [ "$CLIENT" = codex ]; then
   done
   # A skill this payload no longer ships leaves a dangling entry behind, and Codex lists what it can
   # resolve and says nothing about the rest — so a dangling entry is invisible rather than noisy.
-  # Only OUR links are pruned, identified by the target prefix we write, and only when the target is
-  # gone: anything else in this directory belongs to someone else.
+  # Only OUR links are pruned, identified by the SAME equality the link loop uses — the target must
+  # be exactly `../../.claude/skills/<the link's own name>` — and only when that skill is gone:
+  # anything else in this directory belongs to someone else.
   SKILLS_PRUNED=0; SKILLS_PRUNE_FAILED=0
   for slink in "$CODEX_SKILL_ROOT"/*; do
     [ -L "$slink" ] || continue
+    sname=$(basename "$slink")
     starget="$(readlink "$slink")"
-    case "$starget" in
-      ../../.claude/skills/*)
-        if [ ! -d "$CLAUDE_DIR/skills/${starget#../../.claude/skills/}" ]; then
+    # THE LINK LOOP'S OWNERSHIP TEST, SPELLED THE SAME WAY, AND THAT IS THE WHOLE FIX.
+    #
+    # This was `case "$starget" in ../../.claude/skills/*)` — a PREFIX where the loop above uses an
+    # EQUALITY against `../../.claude/skills/$sname`. A prefix is strictly weaker, so the two loops
+    # disagreed about exactly one shape: a link whose NAME is a payload skill's and whose TARGET is
+    # some other skill. The loop above calls that "not ours" and leaves it; this loop called it ours
+    # and deleted it.
+    #
+    # Measured 2026-09-08, before this change, in ONE run on one fixture:
+    #
+    #     ok  Skill root: 15 link(s) in .agents/skills/, 1 pruned
+    #     warn 1 entr(ies) in .agents/skills/ are not ours — left alone, ...
+    #     -> the link was DELETED
+    #
+    # "Left alone" and the deletion, in the same breath. That is the worst shape available for it:
+    # the output tells the user the file was kept, so nothing invites them to look, and a link they
+    # placed on purpose is gone silently. Two readers of one ownership question, in the one place
+    # where the answer decides whether a user's file is deleted — so they are now one reader.
+    #
+    # The prune itself is unchanged in what it exists for: OUR link, for a skill the payload no
+    # longer ships, still goes. `tests/test-install-prune.sh` pins both directions, and the control
+    # is the half that matters — without it these assertions pass under a prune that does nothing.
+    if [ "$starget" = "../../.claude/skills/$sname" ]; then
+        if [ ! -d "$CLAUDE_DIR/skills/$sname" ]; then
           # THE DELETE READS ITS STATUS FOR THE SAME REASON THE TWO CREATES DO. `rm -f` is silent
           # about a missing file and NOT about a directory that refuses the unlink, so on a sealed
           # `.agents/skills/` this was an abort — and this loop runs after the links and rows above
@@ -3415,15 +3438,16 @@ if [ "$CLIENT" = codex ]; then
             # it. Measured 2026-08-17: 1 row before, **0** after, the link still on disk, and
             # `uninstall.sh --yes` walking past it — a link of ours that nothing can now remove.
             #
-            # THE PREFIX IS THE OWNERSHIP TEST, and it is the one this loop already trusts. The `case`
-            # above admits only targets we write, and on that evidence alone this block is willing to
-            # DELETE the link; recording a row for one it failed to delete is strictly weaker than
-            # deleting it, and it is what lets `uninstall.sh` finish the job the seal prevented.
+            # THE EQUALITY ABOVE IS THE OWNERSHIP TEST, and it is the one the link loop already
+            # trusts. It admits only a link pointing exactly where we point ours, and on that
+            # evidence alone this block is willing to DELETE the link; recording a row for one it
+            # failed to delete is strictly weaker than deleting it, and it is what lets
+            # `uninstall.sh` finish the job the seal prevented.
             printf '.agents/skills/%s\t%s\tsymlink\ttoolkit\n' \
               "$(basename "$slink")" "$starget" >> "$RECEIPT_TMP"
           fi
-        fi ;;
-    esac
+        fi
+    fi
   done
   ok "Skill root: $SKILLS_LINKED link(s) in .agents/skills/$([ "$SKILLS_PRUNED" -gt 0 ] && printf ', %s pruned' "$SKILLS_PRUNED")"
   if [ "$SKILLS_KEPT" -gt 0 ]; then
