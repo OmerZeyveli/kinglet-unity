@@ -394,9 +394,43 @@ if grep -qxF -- "$TIUC_GONE_REL" <<< "$TIUC_GONE_BLOCK"; then TIUC_INS_NAMED=yes
 tiuc_eq "yes" "$TIUC_INS_NAMED" \
   "…and when the default client then drops that row, the GONE-from-disk block names the path it dropped rather than only counting what it kept"
 
-if grep -qF -- '--client codex' <<< "$TIUC_INS"; then TIUC_INS_FIX=yes; else TIUC_INS_FIX=no; fi
+# BLOCK-SCOPED FOR THE SAME REASON THE ASSERTION ABOVE IS, and it was not until
+# 2026-09-08. This read `grep -qF -- '--client codex' <<< "$TIUC_INS"` over the
+# WHOLE run — and `--client codex` is a literal an ordinary carry-forward run
+# prints anyway, so the assertion could not fail. Mutation-proven on a `git
+# archive` copy of HEAD: delete the remedy sentence from install.sh's warn AND
+# replace the entire note_not_done entry with `:`, and this file still reported
+# 102 passed, 0 failed. The whole remedy could be removed and no test noticed.
+#
+# The sharp part is that the comment in install.sh beside that warn already
+# says this arm was hollow and had been repaired — true of the naming assertion
+# one block up, and false of this one. The fix was applied to one of the two
+# assertions and the note claimed the arm. So: scope the remedy to the region
+# the drop actually prints, and assert the `Not done:` entry separately, because
+# the mutation above removed BOTH and one assertion cannot see the other's loss.
+TIUC_FIX_BLOCK="$(awk '
+  /GONE from disk:/ { inblock = 1 }
+  /^Not done:$/     { inblock = 0 }
+  inblock           { print }
+' <<< "$TIUC_INS")"
+if grep -qF -- '--client codex' <<< "$TIUC_FIX_BLOCK"; then TIUC_INS_FIX=yes; else TIUC_INS_FIX=no; fi
 tiuc_eq "yes" "$TIUC_INS_FIX" \
-  "…and points at the invocation that would restore it"
+  "…and points at the invocation that would restore it, in the drop's own block rather than anywhere in the run"
+
+# The control for the assertion above: the literal must NOT be satisfiable from
+# the block alone if the block is empty. If `GONE from disk:` never printed,
+# TIUC_FIX_BLOCK is empty and the assertion above fails — which is the property
+# that makes it real. Asserted rather than assumed.
+tiuc_eq "yes" "$([ -n "$TIUC_FIX_BLOCK" ] && echo yes || echo no)" \
+  "…and that block is non-empty, so the assertion above is measuring the drop and not an empty set"
+
+TIUC_INS_NOTE="$(awk '
+  /^Not done:$/ { f = 1; next }
+  f && /--client codex/ { hit = 1 }
+  END { if (hit) print "found" }
+' <<< "$TIUC_INS")"
+tiuc_eq "found" "$TIUC_INS_NOTE" \
+  "…and the Not done: entry for the drop carries the same remedy, so deleting it reddens something"
 
 TIUC_P4_GHOST=0
 while IFS= read -r tiuc_r; do
