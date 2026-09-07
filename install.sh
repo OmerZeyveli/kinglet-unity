@@ -4353,11 +4353,71 @@ count_hooks() {
 #
 # COUNTED FROM DISK AT THIS POINT, like every other figure here, and NOT from the SKILLS_LINKED /
 # CMDSKILL_W accumulators above: those are what THIS RUN wrote, and on a re-install that keeps a
-# user's edited file the accumulator and the tree disagree. `-type l` does not follow the link, so
-# the two arms partition the root exactly: symlinks are the bridged skills, directories are the
-# converted commands.
-count_agents_root() {   # $1 = find predicate
-  find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 "$@" 2>/dev/null | wc -l | tr -d ' '
+# user's edited file the accumulator and the tree disagree.
+#
+# THE TWO ARMS DO NOT PARTITION THE ROOT, and this comment said they did until 2026-09-08. `-type l`
+# and `-type d` are exhaustive only over a directory containing nothing else and nothing foreign:
+#   * a symlink someone else put here is `-type l` and was NOT bridged by us;
+#   * a plain directory someone else put here is `-type d` and is NOT a converted command — the run
+#     may have declined it three lines earlier and still counted it as one;
+#   * a plain FILE here (a stray README) is in the unqualified total and in neither arm, so the
+#     parenthesised halves stop summing.
+# Measured: with a foreign `.agents/skills/physics/` present, the summary read
+# `Skills 25 (15 bridged, 10 commands converted)` four lines under `Converted 9 command(s)`.
+#
+# So `bridged` now applies the SAME ownership test the link loop and the prune use — the target must
+# be exactly `../../.claude/skills/<the entry's own name>` — and anything the two arms cannot claim
+# is reported as `not ours` rather than absorbed into one of them. A number that cannot account for
+# itself is worse than a number that admits a remainder, and this is the line a user screenshots.
+count_agents_root() {   # $1... = find predicate; no args = everything
+  # `|| true` ON THE WRITER, and it is load-bearing since these became assignments. `find` returns 1
+  # for a path it cannot read — a sealed project root is exactly that — `2>/dev/null` hides the
+  # message and not the status, and `pipefail` promotes it to the pipeline's. Inside a `printf`
+  # argument that was harmless because `printf` still succeeded; in `X=$(count_agents_root)` under
+  # `set -e` it ends the run at the summary, with everything already written. Caught by
+  # tests/test-install-not-done.sh B.7c, which builds that sealed root on purpose.
+  { find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 "$@" 2>/dev/null || true; } \
+    | wc -l | tr -d ' '
+}
+
+# Links that are OURS: a symlink whose target is exactly the skill of the same name.
+count_agents_bridged() {
+  local n=0 entry
+  for entry in "$PROJECT_DIR/.agents/skills"/*; do
+    [ -L "$entry" ] || continue
+    [ "$(readlink "$entry")" = "../../.claude/skills/$(basename "$entry")" ] && n=$((n + 1))
+  done
+  printf '%s' "$n"
+}
+
+# Converted command skills that are OURS, read from the receipt rather than guessed from the mode
+# bits. `-type d` cannot tell a directory this run wrote from one the user put there — and the run
+# may have declined that very directory three lines earlier while still counting it as a command it
+# converted. The receipt is written at Step 9, above this block, so it is current and it is the only
+# thing on disk that records ownership.
+count_agents_converted() {
+  [ -f "$RECEIPT" ] || { printf '0'; return; }
+  awk -F'\t' '$1 ~ /^\.agents\/skills\/[^/]+\// {
+    split($1, seg, "/"); seen[seg[3]] = 1
+  } END { n = 0; for (k in seen) n++; printf "%d", n }' < "$RECEIPT" 2>/dev/null || printf '0'
+}
+
+# Registered hook entries in a Codex hook config, counted WITHOUT assuming jq's spacing.
+#
+# This was `grep -c '"type": "command"' FILE 2>/dev/null || echo 0`, which had two defects in one
+# expression. `grep -c` prints `0` AND exits 1 when it matches nothing, so the `|| echo 0` fired as
+# well and the substitution expanded to TWO lines — `printf '    Hooks     %s  %s\n'` then broke
+# across two lines with the trust sentence stranded on the second. Measured, not theorised:
+#     Hooks     0
+#   0  in .codex/hooks.json — NOT trusted yet, so they will not run
+# And the pattern matched jq's exact pretty-printed spacing, so a `.codex/hooks.json` the installer
+# correctly KEPT because it is the user's — written by something else, with its own formatting —
+# counted 0 whether it registered no hooks or ten. Those are the two cases this line exists to tell
+# apart. awk, so there is no early-exiting reader in a pipeline and no exit status to rescue.
+count_codex_hooks() {
+  local f="$PROJECT_DIR/.codex/hooks.json"
+  [ -f "$f" ] || { printf '0'; return; }
+  awk '{ gsub(/[ \t]/, ""); total += gsub(/"type":"command"/, "") } END { printf "%d", total + 0 }'     "$f" 2>/dev/null || printf '0'
 }
 printf '\n%s\n' "${BOLD}${GREEN}Installation complete.${NC}"
 if [ "$CLIENT" = codex ]; then
@@ -4368,10 +4428,13 @@ if [ "$CLIENT" = codex ]; then
   printf '    Hooks     %s\n'   "$(count_hooks)"
   printf '    Rules     %s\n'   "$(count_in rules '*.md')"
   printf '  %sCodex CLI — what crosses%s\n' "$CYAN" "$NC"
-  printf '    Skills    %s  (%s bridged from .claude/skills/, %s commands converted)\n' \
-    "$(count_agents_root)" "$(count_agents_root -type l)" "$(count_agents_root -type d)"
+  AGENTS_TOTAL=$(count_agents_root); AGENTS_BRIDGED=$(count_agents_bridged)
+  AGENTS_CONVERTED=$(count_agents_converted); AGENTS_OTHER=$((AGENTS_TOTAL - AGENTS_BRIDGED - AGENTS_CONVERTED))
+  printf '    Skills    %s  (%s bridged from .claude/skills/, %s commands converted%s)\n' \
+    "$AGENTS_TOTAL" "$AGENTS_BRIDGED" "$AGENTS_CONVERTED" \
+    "$([ "$AGENTS_OTHER" -ne 0 ] && printf ', %s not ours' "$AGENTS_OTHER" || true)"
   printf '    Hooks     %s  %s\n' \
-    "$([ -f "$PROJECT_DIR/.codex/hooks.json" ] && grep -c '"type": "command"' "$PROJECT_DIR/.codex/hooks.json" 2>/dev/null || echo 0)" \
+    "$(count_codex_hooks)" \
     "$(if [ "${TRUST_N:-0}" -gt 0 ] && [ "${CODEX_TRUST_GRANT:-0}" -eq 1 ]; then printf 'in .codex/hooks.json, trusted'; else printf 'in .codex/hooks.json — NOT trusted yet, so they will not run'; fi)"
   printf '    Commands  0  no command surface exists in Codex; the nine crossed as skills above\n'
   printf '    Agents    0  excluded on purpose — Codex has no per-agent tool allowlist\n'
