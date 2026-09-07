@@ -596,7 +596,7 @@ The event stream shape, measured against the real binary:
 | 12 | The installed project does not know it is on Codex | **DONE** | `195bbb1..40c3967` | general-purpose implementer; **3 fix rounds**, one of them prose-only; L-5 measured at 28 orphaned rows, not 16 |
 | 13 | The record documents — residuals, floors, criteria, the guard's edge | **DONE** | `7fcdadf..d9990e1` | general-purpose implementer, **fresh one from round 4**; **5 fix rounds**, the cap, closed on a CLOSE verdict not at the cap |
 | 14 | `AGENTS.md` has no marked-region merge | **DONE** | `6400537..71361ad` | general-purpose implementer, **fresh one from round 4**; **5 fix rounds — the cap**, closed on a CLOSE verdict; the write class went 6 → 9 → 16 → 35 across four derivations |
-| 15 | The `.agents/` ownership rule is two rules | **OPEN** | — | added 2026-08-17, adjudicated out of Task 14 at the cap; pre-existing behaviour, not a Task 14 regression |
+| 15 | The `.agents/` ownership rule is two rules | **HALF CLOSED** | `ead3198` | the link/prune disagreement is fixed and pinned by 6 assertions; the retired-command orphan is measured and briefed below, deliberately unfixed |
 | 16 | The write class's residue | **OPEN** | — | added 2026-08-17, same adjudication; start from syscall tracing, not source reading |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
@@ -1067,6 +1067,64 @@ against 132-versus-131 previously.
 | Mutant **M9** is caught by the *count* rather than by a semantic assertion. The reviewer agrees that is the right discrimination — unbounded churn is a count defect — but notes the count **conflates** "no backup on a no-op" with "the bound": tighten the bound to 1 while still backing up on no-ops and M9 slips through. **The direct witness is the mtime, verified by hand, and nothing asserts it** | Safe today; the gap is a guard gap, not a behaviour one | **Task 11**, same block of code |
 
 ---
+
+## Task 15 — half closed: the weaker of two ownership readers was deleting the user's link
+
+**Closed half, `ead3198`.** `.agents/skills/` answered *"is this link ours?"* in two places forty
+lines apart and they did not agree. The link loop tested by EXACT target — ours only when `readlink`
+equals `../../.claude/skills/<the link's own name>`. The stale prune tested by target PREFIX. A
+prefix is strictly weaker, so exactly one shape fell between them: a link whose NAME is a payload
+skill's and whose TARGET is some other skill.
+
+**Measured before the change, on one fixture, in ONE run:**
+
+```
+ok  Skill root: 15 link(s) in .agents/skills/, 1 pruned
+warn 1 entr(ies) in .agents/skills/ are not ours — left alone, ...
+-> the link was DELETED
+```
+
+*"Left alone"* and the deletion in the same breath. **That is the worst available shape**: the output
+tells the user the file was kept, so nothing in it invites them to look, and a link they placed on
+purpose is gone silently. This is the one place in the installer where an ownership answer decides
+whether a user's file is deleted, so it now has one reader rather than two.
+
+Two comments in the prune block described the prefix as the ownership test and were corrected rather
+than left — a file that misdescribes its own code is how the next reader re-derives the defect.
+
+**The control is the half that matters.** Without it, all three assertions about the foreign link
+pass under a prune that does nothing at all. Suite after: `Total 4170  Passed 4167  Failed 0
+Skipped 3`; before the fix the same suite read `Failed: 2`.
+
+### The open half — brief, ready to dispatch
+
+**A converted command skill for a RETIRED command is never removed, and loses its receipt row.**
+Measured 2026-09-08 on a fixture: plant `.agents/skills/unity-retired/SKILL.md` with a `toolkit`
+receipt row, re-run `install.sh --client codex`, and the file is **still on disk** while the receipt
+no longer claims it. So `uninstall.sh` will not take it either — it is an orphan nothing can now
+remove, which is the same leak two earlier rounds of this wave repaired elsewhere.
+
+**Why it was not fixed alongside the other half, and this is the reason rather than an excuse:**
+closing it means adding a NEW DELETION PATH to the installer. That path has to decide, for a
+directory under `.agents/skills/` that is not a symlink, whether it is (a) ours and retired, (b) ours
+and merely absent from this run's converter output for some other reason, or (c) the user's. Getting
+that wrong deletes a user's directory — which is precisely the defect the closed half repairs.
+Writing it unreviewed at 2am would have been the same mistake in a new place.
+
+**What the brief should require:**
+
+- The prune must key on the PREVIOUS receipt's rows, not on what is on disk — the same discipline
+  Step 5's payload prune already uses — and must decline anything `is_modified`.
+- It must not fire on a fresh install where there is no previous receipt at all: absence is not
+  retirement. That is the arm most likely to be written backwards.
+- A control assertion is mandatory and is the point of the task: without one, an assertion that
+  "the user's converted skill survives" passes under a prune that does nothing.
+- Decide explicitly what happens when the directory is present but its receipt row was already lost
+  by this very defect — a tree that has upgraded once since the converter shipped is in that state,
+  so the fix cannot assume a row exists to read.
+
+Found while auditing this branch on 2026-09-08; the measurement is reproducible from the fixture
+shape above.
 
 ## Deferred and parked findings
 
