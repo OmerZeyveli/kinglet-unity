@@ -108,7 +108,7 @@
 # that binds perfectly, applied to nothing, is the shape being closed here.
 #
 # One guard for all three, because all three read the same index: if `.claude/` is listable and
-# populated, `*.md` and `docs/` are being listed by the same machinery. The floor is 30 against 62
+# populated, `*.md` and `docs/` are being listed by the same machinery. The floor is 30 against 63
 # tracked paths under `.claude/` today — below any plausible surface removal, far enough above zero
 # that a pathspec which stops matching is caught rather than rounded off.
 TMDI_INDEX_ERR="$(mktemp "${TMPDIR:-/tmp}/tmdi-index-err.XXXXXX")"

@@ -197,8 +197,8 @@ it — a narrowing to 17 files **does** fire a floor of 30, and raising 30 to 10
 
 Two of the eleven above are green for exactly this reason, and they are the two converted here:
 
-- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **283** tracked files
-  today (`.claude` 62, `docs` 196, `scripts` 11, `examples` 4, `templates` 10; re-derived
+- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **284** tracked files
+  today (`.claude` 63, `docs` 196, `scripts` 11, `examples` 4, `templates` 10; re-derived
   2026-08-16 — it read **271** when this bullet was written and **273** through the Codex wave, and
   the guard then printed its own answer, `the mobile sweep has roots to read (271 file(s))`).
   `docs/` alone holds **196**, so the floor cleared with **zero files under `.claude/`**. Measured

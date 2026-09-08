@@ -476,8 +476,8 @@ fi
 # tests/test-derived-counts.sh's tree-size block, against this file's own `payload_paths()`.
 #
 # WHAT THIS DOES NOT COVER, and it is deliberate, not an oversight. It reads ONE file. The payload
-# has 69 entries, 44 Markdown (rules 1-3) and 25 not; this is one of the 25. Applying the same
-# criterion to the other 24 leaves TWENTY-FIVE unmarked repository-only citation sites -- DERIVED
+# has 70 entries, 44 Markdown (rules 1-3) and 26 not; this is one of the 26. Applying the same
+# criterion to the other 25 leaves TWENTY-FIVE unmarked repository-only citation sites -- DERIVED
 # 2026-08-17, and read it as a dated derivation rather than a live figure, because nothing computes
 # it at run time. The two payload totals in the sentence before it ARE live and ARE guarded, in
 # tests/test-derived-counts.sh's tree-size block; these three are not, and the difference is the
