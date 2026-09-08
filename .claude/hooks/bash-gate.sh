@@ -195,7 +195,17 @@ find_exec_is_read_only() {
         *) return 1 ;;
     esac
     set -f
-    # shellcheck disable=SC2086 -- deliberate word splitting over an already-tokenised list
+    # Deliberate word splitting: $_args is an already-tokenised list and `set -f` above turns
+    # globbing off for exactly this line.
+    #
+    # THE EXPLANATION IS ON ITS OWN LINE, and that is the fix rather than the style. This read
+    # `disable=SC2086 -- deliberate word splitting ...`, and ShellCheck parses everything after
+    # the code as further directive keys: SC1073 `Couldn't parse this shellcheck directive` and
+    # SC1072 `Expected '=' after directive key`. Both are ERRORS, so `shellcheck -x` exited
+    # non-zero and the `validate` job failed at its first step -- which meant `Shellcheck our
+    # scripts`, the step that covers install.sh and the suite, never ran at all. One malformed
+    # comment was masking the coverage of every other script in the repository.
+    # shellcheck disable=SC2086
     set -- $_args
     set +f
     while [ "$#" -gt 0 ]; do
