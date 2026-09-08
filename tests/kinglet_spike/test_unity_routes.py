@@ -705,12 +705,22 @@ class CallOrderingTests(_TempCase):
             seen["record"] = read_lease(self.path)
             return record
 
-        fake = FakeUnity(pid=5150, pgid=5150)
+        # DERIVED FROM THE LIVE PID, NOT A CONSTANT. This read `FakeUnity(pid=5150, pgid=5150)` and
+        # then asserted `assertNotEqual(os.getpid(), record.pgid)` — which is only meaningful while
+        # the constant differs from the controller's own pid. CI drew pid 5150 on 2026-09-08 and the
+        # row failed with `AssertionError: 5150 == 5150`: a real one-in-N collision, not a product
+        # change. Deriving the fake from `os.getpid()` makes the collision impossible.
+        fake_pid = os.getpid() + 1
+        self.assertNotEqual(os.getpid(), fake_pid)  # the fixture's own precondition, stated once
+        fake = FakeUnity(pid=fake_pid, pgid=fake_pid)
         with mock.patch.object(WorkspaceLease, "bind_holder", bind_holder):
             self.run_headless(fake)
-        self.assertEqual(5150, seen["record"].pid)
-        self.assertEqual(5150, seen["record"].pgid)
-        self.assertNotEqual(os.getpid(), seen["record"].pgid)
+        self.assertEqual(fake_pid, seen["record"].pid)
+        # THE LOAD-BEARING ONE. A lease that recorded the controller instead of the launched group
+        # would carry `os.getpid()`, which `fake_pid` cannot equal — so this single equality is the
+        # whole check, and the old trailing `assertNotEqual` is implied by it rather than repeated.
+        # Repeating it after deriving the constant would be an assertion that cannot fail.
+        self.assertEqual(fake_pid, seen["record"].pgid)
 
 
 class StartBoundTests(_TempCase):
