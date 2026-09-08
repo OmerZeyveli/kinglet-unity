@@ -657,4 +657,10 @@ if [ "$KINGLET_RUNHOST_LIB" = "1" ]; then
   return 0 2> /dev/null || exit 0
 fi
 
+# shellcheck disable=SC2317
+# Reachable, and ShellCheck's flow analysis cannot see it. The guard above is `return … || exit …`,
+# which is one statement that terminates whether the file was sourced or executed; ShellCheck reads
+# the pair as an unconditional terminator and concludes nothing after the `if` can run. The `if` is
+# conditional on KINGLET_RUNHOST_LIB, so with the variable unset this line is the script's whole
+# point.
 main

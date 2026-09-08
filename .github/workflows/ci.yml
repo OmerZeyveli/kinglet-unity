@@ -24,10 +24,12 @@ jobs:
         run: shellcheck --severity=warning -x install.sh uninstall.sh scripts/*.sh tests/*.sh tests/fixtures/*.sh
 
       - name: Shellcheck spike scripts
-        run: |
-          find spikes -name '*.sh' | while IFS= read -r f; do
-            shellcheck -x "$f"
-          done
+        # ONE STATUS FOR THE WHOLE SET. This was `find … | while read; do shellcheck "$f"; done`,
+        # whose exit status is the LAST iteration's — so a finding in any file but the last one was
+        # reported in the log and passed the step. Measured 2026-09-08, when the two steps above it
+        # were repaired and this one became reachable for the first time. `-exec … +` hands every
+        # path to one shellcheck invocation, which fails if any file does.
+        run: find spikes -name '*.sh' -exec shellcheck -x {} +
 
       - name: Validate settings.json
         run: jq . .claude/settings.json > /dev/null
