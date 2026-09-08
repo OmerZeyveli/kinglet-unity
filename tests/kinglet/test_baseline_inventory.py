@@ -26,11 +26,18 @@ EXPECTED_COUNTS = {
     "claude_templates": 0,
     "code_templates": 10,
 }
-FULL_CLAUDE_TREE_COUNT = 62
+FULL_CLAUDE_TREE_COUNT = 63
+# Tracked .claude paths that belong to no category. Two of them live under
+# .claude/hooks/ and neither is a hook: _lib.sh is the shared library, and
+# .shellcheckrc is the config that makes the hooks checkable in an installed
+# project (they arrive without this repository's root one). The category is
+# `.sh` under .claude/hooks/ less _lib.sh — see category_paths in
+# tools/kinglet_build/baseline.py.
 OMITTED_FROM_SEVEN_CATEGORIES = {
     ".claude/NOTICE.md",
     ".claude/UPSTREAM",
     ".claude/VERSION",
+    ".claude/hooks/.shellcheckrc",
     ".claude/hooks/_lib.sh",
     ".claude/settings.json",
     ".claude/settings.local.json.template",
