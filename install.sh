@@ -416,6 +416,9 @@ info "Payload: $PAYLOAD_COUNT files"
 # "scripts/ and tests/ into .claude/" line, which was fixed while this one was left standing.
 NEW_PATHS=$(
   printf '%s\n' "$PAYLOAD_FILES" | sed 's|^|.claude/|'
+  # shellcheck disable=SC2043
+  # One group today, and deliberately a list: see the paragraph above, which records the round where
+  # this named a `tests` group that has never existed.
   for group in scripts; do
     [ -d "$SCRIPT_DIR/$group" ] || continue
     for f in "$SCRIPT_DIR/$group"/*.sh; do
@@ -1073,6 +1076,23 @@ mktemp_beside() {   # $1 = the directory the file will be renamed into, $2 = a n
   mktemp "$1/$2.XXXXXX" 2>/dev/null || mktemp
 }
 
+# count_paths — how many paths a glob matched.
+#
+# `ls -1 GLOB 2>/dev/null | grep -c . || true` was the idiom here, in fifteen places. It is correct
+# on this repository's own filenames and ShellCheck still flags every one (SC2010), which mattered
+# from 2026-09-08: the `Shellcheck our scripts` CI step had never run before then, because the step
+# ahead of it died on a malformed directive, so twenty findings landed at once the moment it did.
+#
+# An unmatched glob arrives as its own literal, which is what turns "no matches" into 0 here —
+# the same job the `grep -c .` was doing, without `ls` in the pipeline.
+count_paths() {
+  local n=0 p
+  for p in "$@"; do
+    if [ -e "$p" ]; then n=$((n + 1)); fi
+  done
+  printf '%s' "$n"
+}
+
 # ── Can this run replace what is at that path? ───────────────────────────────
 # True when nothing is there, or when what is there is writable. It answers for the WHOLE-FILE write
 # arms what `merge_marked_region`'s own `-w` test answers for the merge, and it exists because the
@@ -1692,8 +1712,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
     else
       printf '  AGENTS.md exists and is not ours — would keep yours, and generate nothing\n'
     fi
-    DRY_SKILL_N=$(ls -d "$SCRIPT_DIR/.claude/skills"/*/ 2>/dev/null | grep -c . || true)
-    DRY_CMD_N=$(ls -1 "$SCRIPT_DIR/.claude/commands"/*.md 2>/dev/null | grep -c . || true)
+    DRY_SKILL_N=$(count_paths "$SCRIPT_DIR/.claude/skills"/*/)
+    DRY_CMD_N=$(count_paths "$SCRIPT_DIR/.claude/commands"/*.md)
     printf '  .agents/skills/ — %s symlink(s) into .claude/skills/ and %s converted command skill(s)\n' \
       "$DRY_SKILL_N" "$DRY_CMD_N"
     # FOUR VERDICTS HERE TOO, AND THIS LINE WAS AN UNCONDITIONAL PROMISE UNTIL 2026-08-17 — WRITTEN
@@ -2013,6 +2033,8 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 # field 1, these rows are written as `.claude/scripts/<name>`, and is_modified matches whole lines
 # (`grep -qxF`). Change either form and the test below silently never matches — a no-op that reads
 # as a fix.
+# shellcheck disable=SC2043
+# One group today, and deliberately a list — same seam as the NEW_PATHS loop above.
 for group in scripts; do
   [ -d "$SCRIPT_DIR/$group" ] || continue
   mkdir -p "$CLAUDE_DIR/$group"
@@ -4445,14 +4467,18 @@ count_hooks() {
 # be exactly `../../.claude/skills/<the entry's own name>` — and anything the two arms cannot claim
 # is reported as `not ours` rather than absorbed into one of them. A number that cannot account for
 # itself is worse than a number that admits a remainder, and this is the line a user screenshots.
-count_agents_root() {   # $1... = find predicate; no args = everything
+# NO PARAMETERS, since 2026-09-08. This took a `find` predicate so the caller could ask for
+# `-type d`; the converted-command count now comes from the receipt instead, and nothing has passed
+# an argument since. `"$@"` on an always-empty parameter list is a seam that reads as configurable
+# and is not, which is what SC2120 exists to say.
+count_agents_root() {
   # `|| true` ON THE WRITER, and it is load-bearing since these became assignments. `find` returns 1
   # for a path it cannot read — a sealed project root is exactly that — `2>/dev/null` hides the
   # message and not the status, and `pipefail` promotes it to the pipeline's. Inside a `printf`
   # argument that was harmless because `printf` still succeeded; in `X=$(count_agents_root)` under
   # `set -e` it ends the run at the summary, with everything already written. Caught by
   # tests/test-install-not-done.sh B.7c, which builds that sealed root on purpose.
-  { find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 "$@" 2>/dev/null || true; } \
+  { find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 2>/dev/null || true; } \
     | wc -l | tr -d ' '
 }
 

@@ -36,8 +36,25 @@ DC_ORIGINAL=$(awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $6 == "original"' "$REPO
 # the rules rows name README.md and docs/GETTING-STARTED.md only. `templates/` is the repo-root C#
 # scaffold directory, not `.claude/templates/`, which does not exist; README.md says so in the same
 # row it quotes the number.
-DCS_RULES=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -c . || true)
-DCS_TEMPLATES=$(ls -1 "$REPO_DIR"/templates/* 2>/dev/null | grep -c . || true)
+# count_paths — how many paths a glob matched.
+#
+# `ls -1 GLOB 2>/dev/null | grep -c . || true` was the idiom here, in fifteen places. It is correct
+# on this repository's own filenames and ShellCheck still flags every one (SC2010), which mattered
+# from 2026-09-08: the `Shellcheck our scripts` CI step had never run before then, because the step
+# ahead of it died on a malformed directive, so twenty findings landed at once the moment it did.
+#
+# An unmatched glob arrives as its own literal, which is what turns "no matches" into 0 here —
+# the same job the `grep -c .` was doing, without `ls` in the pipeline.
+count_paths() {
+  local n=0 p
+  for p in "$@"; do
+    if [ -e "$p" ]; then n=$((n + 1)); fi
+  done
+  printf '%s' "$n"
+}
+
+DCS_RULES=$(count_paths "$REPO_DIR"/.claude/rules/*.md)
+DCS_TEMPLATES=$(count_paths "$REPO_DIR"/templates/*)
 
 # Every prose file that quotes the split. Adding a fourth quoting file without adding it here
 # recreates the gap, so the list is short and explicit rather than a glob.
@@ -406,9 +423,9 @@ echo "--- derived counts: the surface pool ---"
 # on the right-hand side of these pipes. Skills are counted as SKILL.md files exactly one level deep,
 # which is the only depth Claude Code discovers; a nested skill is test-skill-discovery.sh §1's
 # business, not this file's, and would show up here as a shortfall rather than as a wrong number.
-DCS_AGENTS=$(ls -1 "$REPO_DIR"/.claude/agents/*.md 2>/dev/null | grep -c . || true)
-DCS_COMMANDS=$(ls -1 "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | grep -c . || true)
-DCS_SKILLS=$(ls -1 "$REPO_DIR"/.claude/skills/*/SKILL.md 2>/dev/null | grep -c . || true)
+DCS_AGENTS=$(count_paths "$REPO_DIR"/.claude/agents/*.md)
+DCS_COMMANDS=$(count_paths "$REPO_DIR"/.claude/commands/*.md)
+DCS_SKILLS=$(count_paths "$REPO_DIR"/.claude/skills/*/SKILL.md)
 DCS_TOTAL=$((DCS_AGENTS + DCS_COMMANDS + DCS_SKILLS))
 
 # The derivation itself has to be able to fail. Run from the wrong directory, or against a tree where
@@ -587,13 +604,18 @@ echo "--- derived counts: hooks and installed scripts ---"
 # Hooks on disk. `_lib.sh` is a sourced library, not a hook — it is the one file in this directory
 # that settings.json must NOT name, and CLAUDE.md says so. It is also why a naive
 # `grep -l HOOK_PROFILE_LEVEL=` overcounts: _lib.sh defines the constant it reads.
-DCK_DISK=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | sed 's|.*/||' | grep -vx '_lib.sh' | sort)
+DCK_DISK=$(for dck_f in "$REPO_DIR"/.claude/hooks/*.sh; do
+             [ -e "$dck_f" ] || continue
+             dck_b=$(basename "$dck_f")
+             [ "$dck_b" = "_lib.sh" ] && continue
+             printf '%s\n' "$dck_b"
+           done | sort)
 DCK_HOOKS=$(printf '%s\n' "$DCK_DISK" | grep -c . || true)
 # Files in the directory INCLUDING _lib.sh. README.md quotes both numbers in one row and derives one
 # from the other in prose ("N files on disk — _lib.sh is a shared library, not a hook"), so the row
 # was internally consistent and wrong in both halves for a day: 27/28 against a tree of 12/13.
 # Falsifying it further, to 999 registered / 777 files, left the whole suite green.
-DCK_HOOK_FILES=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | grep -c . || true)
+DCK_HOOK_FILES=$(count_paths "$REPO_DIR"/.claude/hooks/*.sh)
 
 # How many hooks get the kill switches by sourcing _lib.sh. The complement carries them inline;
 # tests/test-hooks.sh asserts that every hook does one or the other, and this is the number three
@@ -708,7 +730,7 @@ DCK_DROPPED_DOC=$(
 DCK_SKIP_NAMES=$(grep -oE '\[ "\$b" = "[^"]+" \] && continue' "$REPO_DIR/install.sh" 2>/dev/null \
                  | sed 's/.*= "//; s/" \].*//' | sort -u)
 DCK_SKIPPED=$(printf '%s\n' "$DCK_SKIP_NAMES" | grep -c . || true)
-DCK_REPO_SCRIPTS=$(ls -1 "$REPO_DIR"/scripts/*.sh 2>/dev/null | grep -c . || true)
+DCK_REPO_SCRIPTS=$(count_paths "$REPO_DIR"/scripts/*.sh)
 DCK_INSTALLED_SCRIPTS=$((DCK_REPO_SCRIPTS - DCK_SKIPPED))
 
 # How many installed scripts are named, by INSTALLED path, from a shipped surface. Same question
@@ -1230,9 +1252,9 @@ assert_eq "0" "$(printf '%s' "$DCE_MISSING" | grep -c . || true)" \
 echo "--- derived counts: the bash-4 census in docs/ANTI-VACUITY.md ---"
 
 DCV_DOC="docs/ANTI-VACUITY.md"
-DCV_HOOKS=$(ls -1 "$REPO_DIR"/.claude/hooks/*.sh 2>/dev/null | grep -c . || true)
-DCV_SCRIPTS=$(ls -1 "$REPO_DIR"/scripts/*.sh 2>/dev/null | grep -c . || true)
-DCV_TESTS=$(ls -1 "$REPO_DIR"/tests/*.sh 2>/dev/null | grep -c . || true)
+DCV_HOOKS=$(count_paths "$REPO_DIR"/.claude/hooks/*.sh)
+DCV_SCRIPTS=$(count_paths "$REPO_DIR"/scripts/*.sh)
+DCV_TESTS=$(count_paths "$REPO_DIR"/tests/*.sh)
 DCV_TOTAL=$((DCV_HOOKS + DCV_SCRIPTS + DCV_TESTS + 2))
 DCV_PIPE=$((DCV_HOOKS + DCV_SCRIPTS + 2))
 
@@ -1435,7 +1457,7 @@ DCT_SCRIPTS=$(git -C "$REPO_DIR" ls-files 'scripts/*' 2>/dev/null | grep -c . ||
 DCT_EXAMPLES=$(git -C "$REPO_DIR" ls-files examples 2>/dev/null | grep -c . || true)
 DCT_TEMPLATES=$(git -C "$REPO_DIR" ls-files templates 2>/dev/null | grep -c . || true)
 DCT_ROOTS=$((DCT_CLAIM_ROOT + DCT_DOCS + DCT_SCRIPTS + DCT_EXAMPLES + DCT_TEMPLATES))
-DCT_TESTS_SH=$(ls -1 "$REPO_DIR"/tests/*.sh 2>/dev/null | grep -c . || true)
+DCT_TESTS_SH=$(count_paths "$REPO_DIR"/tests/*.sh)
 # `wc -l`, NOT `grep -c ''`, AND THE REASON IS THAT THE FAILURE MESSAGE BELOW TELLS THE READER TO
 # RE-DERIVE WITH `wc -l`. The two agree today only because every `.claude/commands/*.md` ends
 # in a newline; one file without a trailing newline and `grep -c ''` counts the final partial line
@@ -1503,7 +1525,7 @@ DCT_PAY_NONMD=$((DCT_PAY_TOTAL - DCT_PAY_MD))
 # floor itself is green and correct. The hooks half of that census is guarded — by `DCV_HOOKS`, in
 # the block above, keyed to `docs/ANTI-VACUITY.md`, which is the file that quotes it. Deleted rather
 # than given a row, because the row would have duplicated a live guard instead of closing a gap.
-DCT_SCRIPTS_SH=$(ls -1 "$REPO_DIR"/scripts/*.sh 2>/dev/null | grep -c . || true)
+DCT_SCRIPTS_SH=$(count_paths "$REPO_DIR"/scripts/*.sh)
 
 # THE STRANDED-MACHINERY FIGURES IN `findings.md`, selected by that directory's live-vs-pinned
 # criterion (`docs/research/codex-client/README.md` § *Live and pinned*). Each is stated twice
@@ -1910,10 +1932,18 @@ dcw_flat() {
 #   arg commands — commands whose frontmatter declares `args:`
 #   events       — distinct event keys in settings.json
 #   matchers     — distinct non-empty tool-name matchers, and the entries they cover
-DCW_SPINE=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -vc 'pc-console' || true)
-DCW_NONNEG=$(ls -1 "$REPO_DIR"/.claude/rules/*.md 2>/dev/null | grep -v 'pc-console' | tr '\n' '\0' \
-             | xargs -0 grep -hcE '^#+ .*(NON-NEGOTIABLE|CRITICAL)' 2>/dev/null | awk '{s+=$1} END{print s+0}' || true)
-DCW_ADVISORY=$(ls -1 "$REPO_DIR"/.claude/hooks/warn-*.sh 2>/dev/null | grep -c . || true)
+DCW_SPINE=$(for dcw_f in "$REPO_DIR"/.claude/rules/*.md; do
+              [ -e "$dcw_f" ] || continue
+              case "$dcw_f" in *pc-console*) continue ;; esac
+              printf 'x\n'
+            done | grep -c . || true)
+DCW_NONNEG=$(for dcw_f in "$REPO_DIR"/.claude/rules/*.md; do
+               [ -e "$dcw_f" ] || continue
+               case "$dcw_f" in *pc-console*) continue ;; esac
+               printf '%s\0' "$dcw_f"
+             done | xargs -0 grep -hcE '^#+ .*(NON-NEGOTIABLE|CRITICAL)' 2>/dev/null \
+             | awk '{s+=$1} END{print s+0}' || true)
+DCW_ADVISORY=$(count_paths "$REPO_DIR"/.claude/hooks/warn-*.sh)
 DCW_ARGCMDS=$(grep -lE '^args:' "$REPO_DIR"/.claude/commands/*.md 2>/dev/null | grep -c . || true)
 DCW_EVENTS=$(printf '%s\n' "$DCK_REG_TRIPLES" | awk -F'\t' '$2 != "" { print $2 }' | sort -u | grep -c . || true)
 DCW_MATCHERS=$(printf '%s\n' "$DCK_REG_TRIPLES" \
