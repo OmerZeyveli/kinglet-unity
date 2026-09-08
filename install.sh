@@ -1165,6 +1165,22 @@ can_replace() {
 #   .agents/skills/ stale prune    .agents/skills/<name>   status               counts, reports, rows
 #   .agents/skills/ command copy   .agents/skills/<c>/…    status               counts, reports, rows
 #   .agents/ retired-command rm    .agents/skills/<c>/     status               counts, reports, drops the row
+#
+# AND THE TEMPS, which are writes into the user's tree too and had no rows here until
+# 2026-09-08. `mktemp_beside` puts each one beside its destination so the rename that follows is
+# a rename and not a cross-device copy — correct for atomicity, and it means four files the user
+# can see. None is a silent-failure path: `mktemp_beside` falls back to `$TMPDIR` when the
+# destination refuses, and every caller tests the result before writing through it. They are
+# listed because a write verb that is not in this table is how the class stops being enumerable,
+# which is the one thing this table exists to prevent.
+#
+#   CLAUDE.md merge temp          .kinglet-claude-md.*    fallback + caller     removed on both paths
+#   AGENTS.md merge temp          .kinglet-agents-md.*    fallback + caller     removed on both paths
+#   hook-config temp              .codex/.hooks.json.*    fallback + caller     removed on both paths
+#   manifest edit temp            Packages/manifest.json.tmp  status            reports; `sed -i` also
+#                                                                              leaves its own sedXXXXXX
+#                                                                              in that directory, found
+#                                                                              only by syscall tracing
 #   .codex/ stale-config delete    .codex/hooks.json       status               reports, keeps the row
 #   .codex/ mkdir                  .codex/                 status               becomes a skip reason
 #

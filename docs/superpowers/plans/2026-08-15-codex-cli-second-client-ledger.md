@@ -596,8 +596,8 @@ The event stream shape, measured against the real binary:
 | 12 | The installed project does not know it is on Codex | **DONE** | `195bbb1..40c3967` | general-purpose implementer; **3 fix rounds**, one of them prose-only; L-5 measured at 28 orphaned rows, not 16 |
 | 13 | The record documents — residuals, floors, criteria, the guard's edge | **DONE** | `7fcdadf..d9990e1` | general-purpose implementer, **fresh one from round 4**; **5 fix rounds**, the cap, closed on a CLOSE verdict not at the cap |
 | 14 | `AGENTS.md` has no marked-region merge | **DONE** | `6400537..71361ad` | general-purpose implementer, **fresh one from round 4**; **5 fix rounds — the cap**, closed on a CLOSE verdict; the write class went 6 → 9 → 16 → 35 across four derivations |
-| 15 | The `.agents/` ownership rule is two rules | **HALF CLOSED** | `ead3198` | the link/prune disagreement is fixed and pinned by 6 assertions; the retired-command orphan is measured and briefed below, deliberately unfixed |
-| 16 | The write class's residue | **OPEN** | — | added 2026-08-17, same adjudication; start from syscall tracing, not source reading |
+| 15 | The `.agents/` ownership rule is two rules | **DONE** | `ead3198`, `74fd007` | both halves: the link/prune disagreement, and the retired-command orphan that outlived its own receipt row; 14 assertions, controls first |
+| 16 | The write class's residue | **OPEN, and two of its three claims are REFUTED** | — | see *Task 16 — the brief measured* below; what survives is the four temps (now in the class table) and the six `rm` sites its own ruling calls defensible |
 
 **Re-planning is expected, not a failure.** If Task 2 measures that Codex imports a `.claude/`
 configuration natively, Tasks 3–6 shrink and Task 8's ship list changes. Re-plan rather than
@@ -1125,6 +1125,42 @@ Writing it unreviewed at 2am would have been the same mistake in a new place.
 
 Found while auditing this branch on 2026-09-08; the measurement is reproducible from the fixture
 shape above.
+
+## Task 16 — the brief measured, and two of its claims did not survive
+
+Opened 2026-09-08 by running the brief's own assertions rather than reading them. Both of the two
+things it names as wrong are themselves wrong.
+
+**Claim 1 — "the sentence claiming *the last bare write verb in the class*" is the part that is
+wrong.** There is no such sentence. `grep` over the tree finds the phrase only in this ledger and in
+the plan's own Task 16 entry, and `git log -S"bare write verb" -- install.sh uninstall.sh` returns
+**no commit that ever added or removed it from either file**. The brief was describing a claim in its
+own words rather than quoting one. So there is nothing to correct, and the instruction "give the
+reason per site or fix the site" stands on its own.
+
+**Claim 2 — "dropping the reference-copy disjunct leaves the suite green".** It does not. Measured on
+a real `git clone` at `5cf46cd`, control and mutant back to back:
+
+| | Total | Passed | Failed |
+|---|---|---|---|
+| control | 4187 | 4163 | **1** (environmental: the disposable `CODEX_HOME` lands under a temp dir when the checkout is itself under `/tmp`) |
+| `owned_by_installer`'s reference-copy arm deleted | 4152 | 4097 | **32** |
+
+Thirty-one assertions beyond the environmental one, across Codex-layer ownership, receipt row shape
+and `uninstall.sh`'s removals. The disjunct is covered, and well. Either later tasks added the
+coverage after the brief was written, or the claim was never run.
+
+**A note on how the first attempt at this got it wrong**, because the method matters more than the
+answer. The mutation was first run against a `git archive` extraction, which has no `.git` — so
+eight git-dependent tests failed in the CONTROL too, and the mutant's four failures were a *subset*
+of the control's. Fewer failures in the mutant than in the control is not a result, it is a broken
+instrument, and it read as "the mutation changed nothing". **A mutation test needs a control on the
+same instrument, and the control is what said the instrument was wrong.**
+
+**What survives of Task 16:** the six bare `rm` sites, which its own adjudication already calls
+defensible per site; and the four destination-local temps, which now have rows in the write class's
+table in `install.sh` together with `Packages/manifest.json.tmp` and `sed`'s own `sedXXXXXX`. None is
+a silent-failure path. The task stays open for the per-site reasons, not for a defect.
 
 ## Deferred and parked findings
 
