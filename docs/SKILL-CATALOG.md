@@ -97,7 +97,17 @@ cannot do unaided. `provenance-skip.tsv` has the full list and the reasoning for
 
 ## How Skills Are Loaded
 
-One way, and only one: the model invokes the `Skill` tool with the skill's name.
+**In Claude Code, one way and only one: the model invokes the `Skill` tool with the skill's name.**
+
+**In Codex CLI there is no `Skill` tool at all** — `ThreadItem`'s variant list carries no skill item
+— and a skill is loaded by the model *reading its `SKILL.md`* with the shell tool. Discovery still
+has to happen first, and it happens through a different door: `install.sh --client codex` builds
+`.agents/skills/` as one symlink per skill into `.claude/skills/`, because Codex does not read
+`.claude/skills/` at all. The listing hands the model the real `.claude/` path, so there is no second
+copy to keep in sync. What survives unchanged is the sentence this section ends on: **nothing loads a
+skill for you under either client.** The mechanism differs; the failure mode does not.
+
+The rest of this section is Claude Code's mechanism.
 
 Two things have to be true for that to happen. The skill must be **discoverable** — flat at
 `.claude/skills/<name>/SKILL.md`, or it is not registered and the tool cannot name it. And it must be

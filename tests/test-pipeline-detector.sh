@@ -188,8 +188,20 @@ sweep() {
   # NOT `xargs -0 grep`. Measured: xargs exits 123 when its child exits non-zero, so a perfectly
   # ordinary "this needle matches nothing" comes back as 123 and is indistinguishable from a real
   # error in the rc>=2 branch below — sweep C, whose correct answer IS no match, would have been
-  # permanently misreported. Build the argv in bash instead. 91 tracked paths is nowhere near
+  # permanently misreported. Build the argv in bash instead. 75 tracked paths is nowhere near
   # ARG_MAX, and `${files[@]}` is guarded from `set -u` by the -s test above.
+  #
+  # THAT FIGURE READ 91 UNTIL 2026-08-16 and is the one member of its class that did NOT go stale by
+  # this branch's additions — it went stale DOWNWARD, in the 2026-08-13 surface cut, and this branch
+  # then moved it back up by 3 (72 at the branch base, 75 now). Worth recording because it is the
+  # counter-example to the wave's own pattern: the sweep that found the other seven keyed on
+  # "off by exactly what the branch added", and this one is off in the other direction by an older
+  # cut, so a sweep tuned to the branch's delta would have missed it. It is derived and guarded now,
+  # in tests/test-derived-counts.sh's tree-size block, against this function's own pathspec.
+  #
+  # The number is a SCALE remark, not a bound — the ARG_MAX argument survives any value this
+  # repository will ever have — so nothing about the code changes with it. That is exactly why it
+  # rotted unnoticed for two waves: a figure no assertion depends on is a figure nobody re-reads.
   local files=() f
   while IFS= read -r -d '' f; do files+=("$f"); done < "$SWEEP_LIST"
 

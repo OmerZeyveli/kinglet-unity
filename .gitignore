@@ -75,3 +75,14 @@ spikes/platform/unity/fixture/Build/
 spikes/platform/unity/fixture/*.csproj
 spikes/platform/unity/fixture/*.sln
 spikes/platform/unity/fixture/Packages/packages-lock.json
+
+# Codex probe evidence: raw transcripts and disposable CODEX_HOMEs.
+# The verdicts are committed in findings.md / codex-facts.md; the transcripts
+# are large, non-deterministic, and a disposable home holds a copied credential.
+docs/research/codex-client/evidence/*
+!docs/research/codex-client/evidence/.gitkeep
+
+# Codex skill root: created per project by install.sh, never in this repository.
+# provenance-skip.tsv carries it as rule=absent; this entry stops `git add -A` from
+# committing nine generated SKILL.md files if the converter is run here by accident.
+.agents/

@@ -92,7 +92,7 @@ SCAN_DIRS=(.claude/ docs/ scripts/ examples/ templates/)
 #
 # The roots check above USED TO BE `SCAN_FILES=$(find "${SCAN_DIRS[@]}" -type f | wc -l)` followed
 # by `[ "$SCAN_FILES" -ge 1 ]`. One number over five roots. `docs/` alone held 186 files when this
-# was measured and holds 189 tracked today — DERIVE IT, `git ls-files docs | wc -l`; the argument
+# was measured and holds 196 tracked today — DERIVE IT, `git ls-files docs | wc -l`; the argument
 # does not depend on the size and the number is here only to make the scale concrete — so that
 # floor cleared with every one of `.claude/agents`, `.claude/commands`, `.claude/hooks`,
 # `.claude/rules` and `.claude/skills` emptied — MEASURED 2026-08-14 in a clone with ZERO files
@@ -101,6 +101,12 @@ SCAN_DIRS=(.claude/ docs/ scripts/ examples/ templates/)
 # made that green look plausible. See docs/ANTI-VACUITY.md: a floor over a summed multi-source
 # subject cannot detect one source dying, however tight the number — 1 or 60, the union floor sees
 # `docs/` and stops.
+#
+# THAT FIGURE READ 189 UNTIL 2026-08-16 — the Codex branch added 7 files to `docs/` and it was off by
+# exactly 7 — and "DERIVE IT" was already written in the same sentence when it went stale. It is now
+# derived by a guard rather than by a request: `tests/test-derived-counts.sh`'s tree-size block reds
+# when this comment disagrees with `git ls-files docs | wc -l`. The instruction stays because it
+# tells a reader what to run; the guard is what makes the sentence true.
 #
 # THE SOURCE SET IS DECLARED **AND** DERIVED, and the declared half is what closes DELETION.
 #

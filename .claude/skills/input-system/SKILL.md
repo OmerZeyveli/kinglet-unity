@@ -10,7 +10,9 @@ description: "New Input System — action maps, PlayerInput component, generated
 ## Boundary with the rules
 
 `.claude/rules/unity-specifics.md` binds the New Input System as mandatory (legacy
-`Input.*` is blocked by a hook) and the Enable/Disable lifecycle — enable in `OnEnable`, disable in
+`Input.*` is blocked by a hook under Claude Code, and under Codex CLI only once `.codex/hooks.json`
+is installed and trusted — that rule states the condition; the mandate itself does not change with
+the client, only whether anything catches a breach) and the Enable/Disable lifecycle — enable in `OnEnable`, disable in
 `OnDisable`, every `+=` matched by a `-=`. `.claude/rules/architecture.md` binds the InputView pattern: InputView
 is the only class that owns `PlayerControls`, and Systems are input-agnostic (`SetMoveInput(Vector2)`,
 `Jump()`, never the device). This skill carries action map structure, the PlayerInput component modes,

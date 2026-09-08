@@ -330,3 +330,78 @@ assert_eq "$((UPG_REG_TOTAL - UPG_CUT_N))" "$(printf '%s\n' "$CTL_OUT" | sed -n 
   "the honest count collapses to a bare number when no registration is dead"
 
 rm -rf "$UPG_ROOT"
+
+# ============================================================================
+# The .agents/ skill root reads ownership TWICE, and the two readers disagree.
+#
+# The link loop tests a symlink by EXACT target: ours only if `readlink` equals
+# `../../.claude/skills/<its own name>`. The stale prune, forty lines later,
+# tests the same link by target PREFIX: `../../.claude/skills/*`. A prefix is
+# strictly weaker than an equality, so a link the first loop calls "not ours"
+# is a link the second loop is willing to delete.
+#
+# Measured 2026-09-08 before the fix, on one fixture, in ONE run:
+#
+#     ok  Skill root: 15 link(s) in .agents/skills/, 1 pruned
+#     warn 1 entr(ies) in .agents/skills/ are not ours — left alone, ...
+#     -> the link was DELETED
+#
+# The run says "left alone" and deletes it in the same breath. That is the worst
+# available shape for this bug: the user is told the file was kept, so nothing
+# in the output invites them to look, and the loss is silent until they go
+# looking for a link they placed on purpose.
+#
+# Reachability is not exotic. `.agents/skills/<shipped-name>` pointing at a
+# skill this payload does not ship is what a rename in the user's own skills
+# tree leaves behind, and the link loop only ever iterates PAYLOAD names — so
+# a link whose name is a payload name and whose target is not is seen by both
+# loops, with opposite verdicts.
+#
+# The fix makes the prune use the link loop's rule. Both these assertions fail
+# before it: the second on the deletion, the first because the count is 1.
+# ============================================================================
+
+CODEX_PRUNE_DIR="/tmp/kinglet-codex-prune-$$"
+mkdir -p "$CODEX_PRUNE_DIR/Assets/Scripts" "$CODEX_PRUNE_DIR/ProjectSettings" "$CODEX_PRUNE_DIR/Packages"
+printf 'm_EditorVersion: 6000.0.23f1\nm_EditorVersionWithRevision: 6000.0.23f1 (b2c3d4e5f6a7)\n' \
+  > "$CODEX_PRUNE_DIR/ProjectSettings/ProjectVersion.txt"
+printf '{\n  "dependencies": {\n    "com.unity.ugui": "2.0.0"\n  }\n}\n' \
+  > "$CODEX_PRUNE_DIR/Packages/manifest.json"
+
+bash "$REPO_DIR/install.sh" --project-dir "$CODEX_PRUNE_DIR" --client codex >/dev/null 2>&1
+
+# A shipped skill's NAME, carrying a target this payload does not ship. Both
+# loops see it; only the prune acts on it.
+CODEX_SKILL_NAME="$(ls "$CODEX_PRUNE_DIR/.claude/skills" | head -1)"
+CODEX_FOREIGN_TARGET="../../.claude/skills/a-skill-this-payload-does-not-ship"
+rm -f "$CODEX_PRUNE_DIR/.agents/skills/$CODEX_SKILL_NAME"
+ln -s "$CODEX_FOREIGN_TARGET" "$CODEX_PRUNE_DIR/.agents/skills/$CODEX_SKILL_NAME"
+
+CODEX_PRUNE_OUT=$(bash "$REPO_DIR/install.sh" --project-dir "$CODEX_PRUNE_DIR" --client codex 2>&1)
+
+assert_eq "0" "$(printf '%s\n' "$CODEX_PRUNE_OUT" | grep -c 'pruned' || true)" \
+  "a link the run calls 'not ours' is not also counted as pruned in the same run"
+
+assert_eq "$CODEX_FOREIGN_TARGET" \
+  "$(readlink "$CODEX_PRUNE_DIR/.agents/skills/$CODEX_SKILL_NAME" 2>/dev/null || echo DELETED)" \
+  "a symlink at our path pointing somewhere we never pointed is left on disk, as the run says it is"
+
+assert_eq "0" \
+  "$(cut -f1 "$CODEX_PRUNE_DIR/.claude/state/install-receipt.tsv" 2>/dev/null | grep -cxF ".agents/skills/$CODEX_SKILL_NAME" || true)" \
+  "and no receipt row claims it, so uninstall.sh will not take it either"
+
+# The control, and without it the three above pass under a prune that does
+# nothing at all. Our OWN link, for a skill the payload no longer ships, must
+# still be pruned — that is the behaviour the loop exists for.
+CODEX_STALE="$CODEX_PRUNE_DIR/.agents/skills/retired-skill"
+ln -s "../../.claude/skills/retired-skill" "$CODEX_STALE"
+
+CODEX_CTL_OUT=$(bash "$REPO_DIR/install.sh" --project-dir "$CODEX_PRUNE_DIR" --client codex 2>&1)
+
+assert_eq "DELETED" "$(readlink "$CODEX_STALE" 2>/dev/null || echo DELETED)" \
+  "our own dangling link is still pruned — the fix narrows ownership, it does not disable the prune"
+
+assert_eq "1" "$(printf '%s\n' "$CODEX_CTL_OUT" | grep -c '1 pruned' || true)" \
+  "and that prune is still reported"
+
+rm -rf "$CODEX_PRUNE_DIR"

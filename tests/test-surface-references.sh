@@ -887,6 +887,14 @@ assert_eq "$UK_FRONTMATTER_EXPECTED" "$(awk '
 # because this file's whole failure mode is being long enough to substitute for what it points at.
 # The round-1 report of this task wrote "I would not add a seventh section without deleting one" and
 # that sentence protected nothing: a report is not a constraint. This is.
+#
+# IT HELD ON 2026-08-16, WHICH IS THE ONLY EVIDENCE THAT IT DOES ANYTHING. Task 12 wrote a sixth
+# section — `## On Codex CLI, every /name above is a skill` — translating the chain's slash tokens
+# for a client that has no slash-command surface. This assertion reddened, the arithmetic was run,
+# and the section was DELETED rather than traded for one: the generated `AGENTS.md` is injected whole
+# before the turn begins and already carries that translation, so the sixth section would have been
+# a second copy of a rule the reader has already been given, in the one file whose length is its
+# failure mode. What survived is one clause in the intro block, which had to change anyway.
 UK_SECTIONS_EXPECTED='# Using Kinglet
 ## The rule
 ## The chain
@@ -1193,14 +1201,34 @@ assert_eq "$UK_REDFLAGS_EXPECTED" \
 # fail. A line-by-line sweep of the WHOLE file then found what that proof cannot: two sections with
 # no needle pointing at them at all. Both are injected at every session start and both carry
 # behaviour, so both are now compared whole.
-UK_RULES_EXPECTED='Kinglet is a Unity 6 PC/console toolkit. Five rules in `.claude/rules/` load automatically and
-bind: `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`,
-`unity-specifics.md`. `pc-console.md` adds platform specifics on top; it does not override them.
+# CHANGED 2026-08-16, DELIBERATELY, AND THE OLD TEXT IS THE REASON. It read *"Five rules in
+# `.claude/rules/` load automatically and bind"* — true under Claude Code and **false under Codex**,
+# where the branch measured `.claude/rules/` opened 0 times in 24 runs without an explicit pointer.
+# This file is symlinked VERBATIM into `.agents/skills/using-kinglet`, so it never receives
+# `scripts/codex-command-to-skill.sh`'s caveat banner: it is the orientation surface telling a Codex
+# session the rules are already loaded, which is exactly why that session then does not read them.
+# The block stays compared whole; what moved is the text it is compared against, and that is the
+# two-line act this guard exists to force.
+UK_RULES_EXPECTED='Kinglet is a Unity 6 PC/console toolkit. Five rules in `.claude/rules/` bind: `architecture.md`,
+`csharp-unity.md`, `performance.md`, `serialization.md`, `unity-specifics.md`. `pc-console.md` adds
+platform specifics on top; it does not override them.
 
-**Which of those rules apply to this project is stated in `CLAUDE.md`'"'"'s generated block.** It is
-detected from the project'"'"'s own code, not assumed. Read it before asserting that a rule binds.'
+**Whether they are in front of you depends on the client, and this is the one line in this file that
+is not the same for both.** Under **Claude Code** the rule files load automatically — they are
+already in context and you do not open them. Under **Codex CLI** nothing loads them: measured on
+`codex-cli 0.145.0`, `.claude/rules/` was opened **0 times in 24 runs** without an explicit pointer,
+and the failure mode was not "no conventions" but confidently wrong ones. **If you are on Codex —
+you are, if the injected entry document you were given is `AGENTS.md` rather than `CLAUDE.md` — read
+the rule file that covers what you are about to do before you do it.**
+
+**Which of those rules apply to this project is stated in the generated block** — in `CLAUDE.md`
+under Claude Code, in `AGENTS.md` under Codex. Both files carry one and both are readable; only the
+client'"'"'s own is injected. It is detected from the project'"'"'s own code, not assumed. Read it before
+asserting that a rule binds. `AGENTS.md` also carries the one translation the chain below needs
+there: Codex has no slash-command surface, so every `/name` is a skill of that name — read it, do
+not skip it.'
 assert_eq "$UK_RULES_EXPECTED" "$(uk_section '# Using Kinglet' | ub_trim)" \
-  "the session brief still names the five binding rules and points at the generated block"
+  "the session brief still names the five binding rules, forks the loading claim by client, and points at the generated block"
 
 UK_OFFER_EXPECTED='When a unit of work finishes, name what would sensibly come next and offer it — a review after an
 implementation, a test after a fix, a profile after an optimisation. **Offer; do not act.** Starting
@@ -1541,6 +1569,10 @@ docs_sections_expected() {
 ### Hook Summary
 ### Hook Input
 ## How Rules Work
+## The Second Client — Codex CLI
+### The shape, and why it is not a second payload
+### What the classes do on Codex
+### The failure mode to know
 ## The MCP Integration
 ### The batch_execute Pattern
 ## Agent Interaction Pattern
@@ -1561,6 +1593,7 @@ DOCS_ARCHITECTURE_SECTIONS
       cat <<'DOCS_HOOK_REFERENCE_SECTIONS'
 # Hook Reference
 ## Overview
+## Everything below assumes Claude Code. What Codex CLI changes
 ## Hook Profiles
 ### What `minimal` actually costs
 ## Kill Switches
@@ -1604,7 +1637,7 @@ DOCS_HOOK_REFERENCE_SECTIONS
 ### MCP Not Connecting
 ### Permission Issues
 ### Commands Not Showing Up
-### Claude Does Not Know About Unity
+### The Model Does Not Know About Unity
 DOCS_GETTING_STARTED_SECTIONS
       ;;
   esac

@@ -117,7 +117,32 @@ installer. `.claude/VERSION` is **2.0.0** — ours, and a major bump because the
 
 ## What shipped
 
-Counts verified against disk, not against anyone's README:
+**This table is a record of what the standalone merge produced on its date. It is not a running
+total and no row in it is maintained** — the 2026-08-03 surface cut removed the whole
+design/production layer and 15 of 27 hooks. Two rows do still match the tree, `Rules` and the
+templates row's parenthetical, and they match by accident rather than by upkeep: nothing has
+compared them since the merge, and the first draft of this paragraph said *"every figure in it is
+stale by construction"*, a universal its own table refutes in two places. **Unmaintained is the
+claim; stale is only its usual consequence.** Do not read a row here as a statement about the
+current toolkit; derive that instead:
+
+```bash
+ls .claude/agents/*.md | wc -l ; ls .claude/commands/*.md | wc -l ; ls -d .claude/skills/*/ | wc -l
+```
+
+The drift is not uniform either, and a single ratio would hide that: agents 8 of 28 and commands
+9 of 36 are around a quarter, while skills 16 of 39 and hooks 12 of 25 are around **twice** that.
+A first draft said *"roughly a quarter of these numbers"* — the mean of four rows presented as a
+property of all four, which is the same move as a total presented as a figure.
+
+The disclaimer is repeated **here**, at the head of the table, rather than only in the
+*"records of what a wave produced on a date, not running totals"* sentence far below — that sentence
+is scoped *"in this section"* and its section is a different one, so the exclusion was defensible and
+undocumented at exactly the point a reader needs it. That is why these rows are outside
+`tests/test-derived-counts.sh`'s reach and must stay outside it: bringing them under the guard would
+re-derive them and destroy the record. Stated 2026-08-17.
+
+Counts verified against disk on the merge date, not against anyone's README:
 
 | | Count | Notes |
 |---|---|---|

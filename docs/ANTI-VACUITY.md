@@ -113,33 +113,73 @@ A reader who fixes one of these still ships the others. They are different.
 The floor sees the sum. One source can reach zero and the survivors carry the total over the bar.
 
 **Tightening the number moves the boundary; it does not close the class.** Worked on the real subject
-this shape was found in — `tests/test-bash32-compat.sh`'s bash-4 sweep, whose five sources measure
-**13 + 7 + 42 + 1 + 1 = 64** files (`.claude/hooks`, `scripts`, `tests`, `install.sh`,
-`uninstall.sh`), which is the guard's own printed census on 2026-08-15 — *"SHIPPED:.claude/hooks=13
-SHIPPED:scripts=7 SHIPPED:tests=42 SHIPPED:install.sh=1 SHIPPED:uninstall.sh=1 … (64 shipped, 22 in
-the early-exit-reader scope)"*. It read `40` / `62` here until 2026-08-15, from the derivation at
-`5881463`; `tests/` has gained two `.sh` files since. Against a hypothetical floor of `>= 55`:
+this shape was found in — `tests/test-bash32-compat.sh`'s bash-4 sweep, whose five sources
+(`.claude/hooks`, `scripts`, `tests`, `install.sh`, `uninstall.sh`) measure
+**13 + 10 + 46 + 1 + 1 = 71** files. That is the guard's own printed census rather than a count taken
+by hand — *"SHIPPED:.claude/hooks=13 SHIPPED:scripts=10 SHIPPED:tests=46 SHIPPED:install.sh=1
+SHIPPED:uninstall.sh=1 … (71 shipped, 25 in the early-exit-reader scope)"*.
 
-| source that dies | total left | verdict |
+**That figure is live, it has rotted three times, and it is the one number in this document under a
+guard.** It read `40` / `62` until 2026-08-15 (the derivation at `5881463`), and then **64** —
+`13`, `7` and `42` across the first three sources — until 2026-08-16; both times a sweep found it
+rather than a failing test, in the file whose whole subject is numbers that rot. (Those two prior
+readings are deliberately *not* written in the live figure's own `a + b + c + 1 + 1 = d` form: a
+pinned figure that looks byte-identical to a live one is the ambiguity this whole step exists to
+remove, and the guard below would otherwise be checking a union of the two.) `tests/test-derived-counts.sh` now
+derives all five sources from the tree and reds when this section disagrees, so the next `.sh` file
+added to any of them fails here instead of quietly widening the gap. One trap that produced an
+earlier mis-statement: `tests/*.sh` is **not** `tests/test-*.sh` — it counts `run-tests.sh`, which is
+why the tests figure sits one above the suite's file count.
+
+**More than one region of this document is guarded, and the difference from the rest is not that
+everything else is pinned.** This section is one. The tree-size figures in the worked-example
+bullets of `### Shape 1` — the five-root total, its `docs` and `scripts` components, and the
+`tests/*.sh` count — are another, added 2026-08-16 after they went stale by the same mechanism as
+this census, in the same wave. Both are guarded by `tests/test-derived-counts.sh`; **ask that file
+which figures here it reads, rather than trusting this paragraph to have kept up.** Its tree-size
+block prints every claim it checks when one goes wrong, and a row naming this document is what makes
+the claim above true.
+
+That sentence read *"the guard covers this section and nothing else in this document"* until
+2026-08-16, and it was falsified by the round that widened the guard rather than by any later drift.
+Its replacement then said **"Two regions"** — a count, in the document that rules a count must be
+derived and never quoted, describing a set that grows every time someone adds a row. The count is
+gone for that reason: a list with no number cannot disagree with the tree about how long it is, and
+the pointer to the guard is what a reader should follow anyway. Some other figures are pinned —
+`## The measured class` records a past
+sweep whose own table sums to 39, and `15 hooks and 4 scripts were cut` records a past wave — but
+`## The floor set`'s `Today` columns are **dated snapshots that are known to be stale**, including
+this same census in per-source form, and that section says so at the point of use with the specific
+cells named. Neither class may be edited to match today's tree: a pinned figure is *about* another
+tree, and a stale snapshot needs the whole column re-derived from one gating run rather than one cell
+patched. The distinction was written here as a blanket *"everything else is pinned"* for one round,
+which asserted that a column headed `Today` was intentionally historical — the exact ambiguity this
+file exists to remove, restated one level up.
+
+No single constant catches every source. The table says which floor each one would need:
+
+| source that dies | total left | the smallest floor that would catch it |
 |---|---|---|
-| `.claude/hooks` (13) | 51 | **caught** — 51 is below 55 |
-| `scripts` (7) | 57 | **missed** |
-| `install.sh` or `uninstall.sh` (1) | 63 | **missed** |
+| `tests` (46) | 25 | 26 |
+| `.claude/hooks` (13) | 58 | 59 |
+| `scripts` (10) | 61 | 62 |
+| `install.sh` or `uninstall.sh` (1) | 70 | 71 |
 
 A floor of `F` over a total of `T` catches exactly the sources **larger than `T - F`**; every source
 inside that slack dies green. Raising `F` shrinks the slack and catches more sources, so tightening
-is not useless — but the only constant that catches all five is `T` itself, 64, and that is not a
-threshold sized against a narrowing. It is a hand-written copy of today's tree, red on the next file
-legitimately added or removed, and stale by construction. **For any constant a maintainer would
-actually ship there is a smaller source above it.** That is what the heading means by *however tight
-the number*: no constant short of the identity closes the class, and the identity is not a constant.
+is not useless — but the last row is the whole argument: catching the smallest source requires `F` to
+be `T` itself, and that is not a threshold sized against a narrowing. It is a hand-written copy of
+today's tree, red on the next file legitimately added or removed, and stale by construction. **For
+any constant a maintainer would actually ship there is a smaller source above it.** That is what the
+heading means by *however tight the number*: no constant short of the identity closes the class, and
+the identity is not a constant.
 
 **This paragraph read *"Tightening the number does not help: with sources of 13, 7 and 40, a floor of
 55 out of 60 still passes with the 13 gone"* for four rounds, and it was wrong in every clause.**
 13 + 7 + 40 is 60, and 60 - 13 = **47**, which is *below* 55: the floor fires. It fires on every
 single-source death in that example (47, 53, 20), so the example demonstrated the opposite of its own
-sentence. The subject it was drawn from has **five** sources totalling **64**, not three totalling
-60. And the consequence was not cosmetic — as written it told a maintainer that tightening the union
+sentence. The subject it was drawn from has **five** sources, not the three totalling
+60 the sentence assumed. And the consequence was not cosmetic — as written it told a maintainer that tightening the union
 floor is futile *and* that no other move exists, when F3 two sections down says to convert the union
 to per-source. **The sole worked justification for this shape inverted the rule it justifies.**
 Recorded rather than quietly replaced: a file about unchecked numbers that silently repairs its own
@@ -157,16 +197,24 @@ it — a narrowing to 17 files **does** fire a floor of 30, and raising 30 to 10
 
 Two of the eleven above are green for exactly this reason, and they are the two converted here:
 
-- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **273** tracked files
-  today (`.claude` 62, `docs` 189, `scripts` 8, `examples` 4, `templates` 10; re-derived
-  2026-08-15 — it was **271** with `docs/` at 187 when this bullet was written, and the guard then
-  printed its own answer, `the mobile sweep has roots to read (271 file(s))`). `docs/` alone holds
-  **189**, so the floor cleared with **zero files under `.claude/`**. Measured in a clone:
-  **17 passed, 0 failed, rc 0** — identical in verdict to a healthy tree.
+- `tests/test-no-mobile.sh` — `SCAN_FILES >= 1` over five roots summing to **283** tracked files
+  today (`.claude` 62, `docs` 196, `scripts` 11, `examples` 4, `templates` 10; re-derived
+  2026-08-16 — it read **271** when this bullet was written and **273** through the Codex wave, and
+  the guard then printed its own answer, `the mobile sweep has roots to read (271 file(s))`).
+  `docs/` alone holds **196**, so the floor cleared with **zero files under `.claude/`**. Measured
+  in a clone: **17 passed, 0 failed, rc 0** — identical in verdict to a healthy tree.
 - `tests/test-bash32-compat.sh` — `SS_ALL_N > 0` over five sources and `SS_PIPE_N > 0` over four.
-  `tests/` holds **42** `.sh` files (40 when this was written), so both totals cleared with
+  `tests/` holds **46** `.sh` files (40 when this was written), so both totals cleared with
   `.claude/hooks/` — the directory the file was originally written for — completely empty. Measured:
   **8 passed, 0 failed, rc 0**.
+
+  **These four figures — the five-root total, its `docs`/`scripts` components and the `tests/` count
+  — are now GUARDED**, by the tree-size block in `tests/test-derived-counts.sh` alongside the bash-4
+  census. They are the fourth and fifth live figures in this document, and they went stale by the
+  same mechanism as the census did and in the same wave: the Codex branch added 3 files to
+  `scripts/`, 7 to `docs/` and 3 to `tests/`, and every one of these numbers was off by exactly
+  that. They are live, not pinned — the pinned readings kept beside them (271, 273, 40) are dated
+  and stay.
 
 **The fix is one shape for both: assert per source, not per union.** Both are converted; the
 mutations are recorded under [Proof](#proof) below.
@@ -426,7 +474,9 @@ over a sweep with nothing in its scope, from the block written to stop exactly t
 
 The same shape sat in the converted `tests/test-bash32-compat.sh`: emptying `SHIPPED_SCRIPT_DIRS`
 removes three rows from **both sides** of the census identity at once, so the identity holds, every
-surviving per-source count is ≥ 1, and the bash-4 sweep silently falls from 64 files to two.
+surviving per-source count is ≥ 1, and the bash-4 sweep silently falls to `install.sh` and
+`uninstall.sh` alone. (No count is written here on purpose: the live one lives in Shape 1, where a
+guard checks it.)
 
 Both are closed with an **absolute** floor on the array itself. The rule generalises: when you write
 a floor, ask what the reference is made of, and whether the failure you are guarding against moves
@@ -531,15 +581,25 @@ unstated gets read as a guarantee:**
 
 ## The floor set
 
-The tables below carry **83 rows**, one per BOUND. **Three of those rows restate a bound another row
-already carries**, so: **at least 80 distinct bounds** meet the criterion in the current tree. **This
-is a lower bound and is written as one deliberately** — the count has now been wrong three times, and
-a fourth confident total would be the artifact repeating its own subject's defect.
+**The row total is no longer written here. Derive it:**
+
+```bash
+awk '/^## The floor set/{f=1;next} /^## Proof/{f=0} f && /^\| `/{n++} END{print n}' docs/ANTI-VACUITY.md
+```
+
+**It read "83 rows" until 2026-08-17, and the derivation answered 85 the first time anyone ran it —
+before that day's sweep added anything.** That is the fourth time this total has been wrong, in the
+section that says a fourth confident total would be the artifact repeating its own subject's defect;
+the defect was not the number chosen but the decision to write one down at all, in a file whose whole
+argument is that a figure nothing compares is a rumour. Three rows restate a bound another row
+already carries, so **distinct bounds = the derived row count minus three, as a lower bound** —
+a lower bound deliberately, because the sweep has never been exhaustive and the 2026-08-17 pass
+found thirty-four rows nobody had looked for.
 
 The three restatements, each identified by reading the assertion rather than the wording:
 `test-bash32-compat.sh`'s and `test-no-mobile.sh`'s per-source census identities, each listed under
 *Converted* and again under *Identity floors*; and `DCE_VACUOUS`, listed under *Sites* and again
-inside the six-accumulator row under *Presence floors*. A fourth,
+inside the nine-accumulator row under *Presence floors*. A fourth,
 `test-pipeline-detector.sh`'s empty-index arm, was listed under *Sites* **and** *Presence floors*
 until 2026-08-14 and is now one row.
 
@@ -548,7 +608,7 @@ sites"* until 2026-08-14: 83 is the row count, stated in the unit the *"one row 
 below explicitly forbids — the section warning that rows are not sites opened by counting rows and
 calling them sites. It then read *"at least 81 distinct bounds"* for one round, from a restatement
 set of two that was really four. Rows and sites diverge in **both** directions here (five rows are
-two `assert_eq` calls in `tests/test-no-mobile.sh`; one row is the six `_VACUOUS` accumulators), so
+two `assert_eq` calls in `tests/test-no-mobile.sh`; one row is the nine `_VACUOUS` accumulators), so
 no site total is written down. Deriving one means reading every row's assertion, which nobody has
 done.
 
@@ -566,6 +626,13 @@ done.
   says which — for one round it meant neither, and a reader could not tell the two apart.
 - The ~28 was low for a different reason: a window scan with no written criterion, which had already
   lost 14 members to an `awk` `getline` window and looked complete.
+- **And the whole set was 2026-08-14's tree.** The Codex wave added four test files and two floors
+  inside modified ones, and **not one row here named any of them** while this file was itself edited
+  twice in that wave for its census figures. Swept and tabled 2026-08-17 under the criterion below;
+  the new rows are the last table in this section. Zero rows from a *file* means the same thing zero
+  rows from a *segment* means, and until that sweep ran, `tests/*.sh` had rows, so nothing
+  distinguished *"swept"* from *"four new files never swept"* — the rule this document states about
+  segments does not extend to files, which is the hole the wave fell through.
 
 **Re-derive rather than trusting the number.** Enumerate C2's clauses (a)–(g) over every file in the
 scope; **build the window from an array, never with `getline`**; and key C3 by **propagating the
@@ -583,11 +650,13 @@ table as a census of sites will **overcount** — and, in one row, undercount. T
 sites: one `assert_eq` on `SCAN_STATE`, one on the census identity. The four
 `test-bash32-compat.sh` census rows — three under *Converted*, one repeated under *Identity floors* —
 are three. A third bound is restated across tables in different words: `DCE_VACUOUS` under *Sites*
-is one of the six accumulators under *Presence floors*, and is marked in its own row as cross-listed.
+is one of the nine accumulators under *Presence floors*, and is marked in its own row as cross-listed.
 Corrected from an earlier draft that got this exactly backwards: the four
 `test-bash-gate-precision.sh` rows are **four independent `assert_eq` calls, four sites.** And in the
-other direction, the `_VACUOUS` accumulators are **six** sites in **one** row — not five, and not
-one.
+other direction, the `_VACUOUS` accumulators are **nine** sites in **one** row — not five, not six,
+and not one. That number has now been wrong three times in the same cell, always low and always
+because a commit added an accumulator and did not come here; it is the cheapest possible instance of
+this file's own subject, and it is why the row now carries the command that derives it.
 
 **RUN THE DEDUP. It takes five seconds and it has already caught a duplicate this paragraph missed:**
 
@@ -646,6 +715,26 @@ or your own diff invalidates it between measurement and write-down. All four are
 the **safe** direction (the subject grew, or the floor's slack widened), which is why no gate moved
 and why nothing but this comparison would have found them. A stale *Today* is not cosmetic: the
 *Ratio* and *Survives* columns are computed from it, and those are the whole argument.
+
+**The whole column is undated since 2026-08-14 and has NOT been re-derived in this wave, so no cell
+in it should be trusted without re-running the command above.** **A fifth cell went stale on the
+Codex branch itself and is recorded here rather than patched:** the `test-bash-gate-precision.sh`
+*"payloads an earlier hook version blocked"* row reads *"170 (of 219 carrying a historic block)"*
+while that file's live assertion is now `assert_eq "220" "$tbg_hist2"` — 219 → 220 on this branch.
+It is left wrong on purpose, under the same ruling as the other four: this column is re-derived
+**whole, from one gating suite log**, and a column that is part fresh and part 2026-08-14 with
+nothing saying which is worse than one that is uniformly stale and says so. How many are stale is
+unknown —
+that is what re-deriving would establish — but **at least four** are, found by inspection rather than
+by the sweep: the `test-bash32-compat.sh` per-source row reads `13/7/42/1/1 + 13/7/1/1` where the tree
+derives `13/10/45/1/1 + 13/10/1/1`; the *What they replaced* paragraph below reads *"over 64 and 22
+files"* where those are now 70 and 25; and **both** `run-tests.sh` identity rows read `41 == 41`
+against a suite of 44 files. **That is stale, not pinned** — the distinction Shape 1 draws — and it is
+deliberately not repaired here: this column must be re-derived **whole, from one gating suite log**,
+and patching the cells a reader happened to notice produces a column that is part fresh and part
+2026-08-14 with nothing saying which. Shape 1's rendering of the bash-4 census is now guarded; the two
+renderings of that same census below are not, and neither is anything else in this column. Recorded as
+a residual owned by a re-derivation pass, rather than left as an accident.
 
 ### Converted or added by this pass
 
@@ -747,7 +836,7 @@ feature is that the first scan's C2 had no clause for them.**
 | `tests/test-install-ownership.sh` · *F: git does not track the manifest* | the fixture's git state | **(g)** | tracked |
 | `tests/test-install-ownership.sh` · *L: the fixture has no manifest* | the fixture | **(g)** | present |
 | `tests/test-install-ownership.sh` · *install 1 did not produce exactly one marker pair* | the thing the mutation damages | **(g)** + (a) | == 1 |
-| `tests/test-derived-counts.sh` · `DCE_VACUOUS` | ECU-survival phrasing, per quoting file | (a) | 3 files — **cross-listed**: one of the six `_VACUOUS` accumulators tabled under *Presence floors*. Kept in both because this table records what the first sweep missed and that one records the set; **counted once** |
+| `tests/test-derived-counts.sh` · `DCE_VACUOUS` | ECU-survival phrasing, per quoting file | (a) | 3 files — **cross-listed**: one of the nine `_VACUOUS` accumulators tabled under *Presence floors*. Kept in both because this table records what the first sweep missed and that one records the set; **counted once** |
 
 **And the residual this row set exposes**: `scripts/check-provenance.sh`'s `ENFORCED` counter — the
 number of `rule=absent` entries it enforces — has **no floor**. An unreadable or reshaped
@@ -765,7 +854,7 @@ was in the worked example's. Not fixed here; it is the second gate of every task
 | `test-derived-counts.sh` · *still has a readable hook Summary Table* | the table's profile column |
 | `test-derived-counts.sh` · *still has a readable Tracking Files writer column* | `docs/ARCHITECTURE.md`'s writer column |
 | `test-derived-counts.sh` · *still has a readable Event Types table* | `docs/ARCHITECTURE.md`'s event table |
-| `test-derived-counts.sh` · the **six** `…_VACUOUS` accumulators (`DC_PAIR`, `DC`, `DCF`, `DCE`, `DCS`, `DCK`) | one per claim row / quoting file — **this is where the F6 union lived**. An earlier draft said five. |
+| `test-derived-counts.sh` · the **nine** `…_VACUOUS` accumulators (`DC_PAIR`, `DC`, `DCF`, `DCE`, `DCS`, `DCK`, `DCT`, `DCV`, `DCW`) | one per claim row / quoting file — **this is where the F6 union lived**. An earlier draft said five, then six. **It read six until 2026-08-17 and the file held nine**: `DCT_` and `DCV_` arrived with the tree-size and vacuity-census blocks and `DCW_` with the word-numeral block, and none of the three commits that added them touched this cell. Derive the list — `grep -oE '[A-Z_]+_VACUOUS' tests/test-derived-counts.sh \| sort -u` — rather than reading it here. |
 | `test-hook-behaviour.sh` · *probe for X carries a non-empty needle* | the needle, per hook — **see F5 for what this predicate does not cover** |
 | `test-provenance-origins.sh` · *carries exactly one 40-hex pin* | the ECU pin in `provenance.tsv` |
 | `test-stack-arbitration.sh` · *the generator still emits the block every surface now points at* | the heading in `scripts/generate-claude-md.sh` |
@@ -778,6 +867,176 @@ first derivation missed*, set by the one `[ ! -s "$SWEEP_LIST" ]` in the file. T
 because it carries the mechanism clause and the sentinel name, and because that guard's other two
 arms live beside it — splitting one arm of a three-arm block into a different table is what made two
 rows look like two bounds for three rounds, and is why the third arm's absence went unnoticed.
+
+### Added by the 2026-08-15 Codex wave, swept 2026-08-17
+
+**The criterion for this table, written before the count:** C1–C4 above, at this document's own unit
+(*one floor = one assertion site that can red on its own*), applied to every file in the declared
+scope that the branch `9a2ebec..HEAD` **added or introduced a floor into**, minus anything an
+existing row already carries. The candidate sweep was checked against eight known members already
+tabled elsewhere in this file before it was trusted; two of the eight first read as misses and both
+were errors in the *verification string*, not the sweep — **the bound and its failure message sit on
+different lines**, so a line-keyed candidate list cannot be checked by grepping the message.
+
+**Six files.** Four of them are new (`test-codex-surface.sh`, `test-codex-shim.sh`,
+`test-codex-probe.sh`, `test-install-upgrade-client.sh`) and two gained floors while being modified.
+The review that raised this said *"at least six"* bounds; that was a lower bound from a hand-count of
+**three** files, and the fourth new file — `test-install-upgrade-client.sh` — was not in it, because
+a review that enumerates by reading cannot see a file it did not open.
+
+**AND THE SWEEP THAT WROTE THIS SECTION THEN CREATED FLOORS AND DID NOT COME BACK TO IT.** The commit
+that added the word-numeral block to `tests/test-derived-counts.sh` — a file inside the declared scope
+— created three qualifying floors and added **zero** rows here, in the same commit that re-dated this
+section *swept 2026-08-17*. Its predecessor had done it correctly for the tree-size and
+vacuity-census blocks, so this was a regression inside the pass whose own brief opens with *"the
+branch added test files carrying floors and added no rows."* **Nothing in the suite reads this list**,
+so the omission was silent by construction: the gate was green with the floors present and the rows
+absent, and it would have stayed green forever. The rows are below; the mechanism that let them go
+missing is not fixed, because there is no mechanism — a hand-maintained list must grow in the same
+commit or it is an assertion that decays without a signal, which is this document's own subject
+committed against this document.
+
+**No row total is written here, for the reason this section's own opening gives.** The first draft of
+this paragraph wrote one — spelled out as a word, three paragraphs after the ruling that deleted
+`83 rows`, and out of reach of every digit sweep in the repository. Derive it with the same command:
+
+```bash
+awk '/^### Added by the 2026-08-15/{f=1;next} /^## Proof/{f=0} f && /^\| `/{n++} END{print n}' docs/ANTI-VACUITY.md
+```
+
+Rows and sites and bounds are three different quantities here and always will be: one row carries two
+bounds (the skills/commands pair), exactly as `test-no-mobile.sh`'s per-source row does, and **three**
+rows are a single site each over many sources — the tree-size, vacuity-census and word-numeral
+sentinels. That sentence said *two* until 2026-08-17, in the commit that added the third to the table
+directly above it and did not look down. Deriving any of the three quantities means reading every
+row's assertion, which is the same ruling `## The floor set` opens with.
+
+| Guard · assertion anchor | Subject | Mechanism | Bound |
+|---|---|---|---|
+| `test-codex-surface.sh` · *the ship list section is present and substantive* | `## Ship list` in `findings.md`, extracted by `awk` | (a) | ≥ 20 lines |
+| `test-codex-surface.sh` · *the tracked Codex payload is non-empty* | `git ls-files AGENTS.md .codex/* .agents/*` | (a) | ≥ 1 |
+| `test-codex-surface.sh` · *install.sh's script-skip list was extracted* | the skip names read out of `install.sh` | (a) + (f) | ≥ 1 |
+| `test-codex-surface.sh` · *the install payload carries N Codex script(s)* | payload scripts matching the ship list | (a) | ≥ 2 — **dual-purpose**: also the substantive claim that both Codex scripts ship |
+| `test-codex-surface.sh` · *the ship list names N repository script/test path(s)* | backticked `scripts/`+`tests/` paths in the ship list | (a) | ≥ 3 |
+| `test-codex-surface.sh` · *settings.json registers N hook entr(ies)* | hook entries in `.claude/settings.json` | (a) | ≥ 1 |
+| `test-codex-surface.sh` · *the emitted Codex hook config names N hook(s)* | hooks in the emitted `hooks.json` | (a) | ≥ 1 |
+| `test-codex-surface.sh` · *the default root is `.agents/skills/`* | converted commands seen | (a), **fused with the claim** — `DEF_SEEN ≥ 1` **and** `-z DEF_MISSING` in one site | ≥ 1 |
+| `test-codex-surface.sh` · *the converter emitted N skill(s)* | skill directories the converter wrote | (a) + (g) | ≥ 1 |
+| `test-codex-surface.sh` · *control: N source command(s) do carry an argument placeholder* | `.claude/commands/*.md` matching the placeholder | (a) | ≥ 1 — a **positive control** under an assertion that 0 in the output is a strip rather than an empty input |
+| `test-codex-surface.sh` · *the Codex entry document inlines all N non-negotiables* | tokens swept for | (a), fused as above | ≥ 5 |
+| `test-codex-surface.sh` · *control: the default entry document still names the Skill tool* | the generated Claude-arm document | (b)/(c) | present |
+| `test-codex-surface.sh` · *derived N skill(s) and M command(s)* | two derivations, **two bounds, one site** | (a) | ≥ 1 each |
+| `test-codex-shim.sh` · *there were wrapped entries to check* | wrapped entries in the emitted config | (a) | ≥ 1 |
+| `test-codex-shim.sh` · *the emitted config actually carries hook entries* | entries in the emitted config | (a) | ≥ 1 |
+| `test-codex-shim.sh` · *there were tool-event hooks to route* | tool-event hooks | (a) | ≥ 1 |
+| `test-codex-shim.sh` · *the injected-fault copy really carries the fault* | the marker in the mutated shim copy | (a) + (g) | == 1 |
+| `test-codex-shim.sh` · *the shim's kill of the watchdog killer was located* | the signal extracted **from the shim** | (b) + (f) | non-empty |
+| `test-codex-shim.sh` · *install.sh's script-skip pattern matched something* | the skip names | (a) + (f) | ≥ 1 |
+| `test-codex-probe.sh` · *the seed carries a nested path* | seed paths at all depths **vs** top-level entries | (a), **relative** — like `check-provenance.sh`'s | `ALL > TOP` |
+| `test-codex-probe.sh` · *a killed run leaves its disposable home behind* | the orphan the reclamation arm needs | **(g)** | present |
+| `test-codex-probe.sh` · *a running probe holds a disposable home with a credential* | the live probe the survival arm needs | **(g)** | present |
+| `test-install-upgrade-client.sh` · *the Codex install produced a layer to be consistent ABOUT* | Codex-layer paths after `--client codex` | (a) | ≥ 25 |
+| `test-install-upgrade-client.sh` · *…over a layer that actually exists* | the same, second install path | (a) | ≥ 25 |
+| `test-install-upgrade-client.sh` · *the receipt carries non-symlink Codex-layer rows to edit* | non-symlink rows | (a) | ≥ 3 |
+| `test-install-upgrade-client.sh` · *…and they span more than one top-level prefix* | distinct first path segments of those rows | (a) | ≥ 2 |
+| `test-install-upgrade-client.sh` · *the criterion markers still delimit a real function* | lines between the named markers | (a) + (b) | ≥ 4 **and** the function name present |
+| `test-install-upgrade-client.sh` · *install 1 wrote an AGENTS.md carrying exactly one marker pair* | begin/end markers in the generated entry document | **(g)** + (a) | == one of each |
+| `test-install-upgrade-client.sh` · *…and it carries the FILL: markers Next step 2 tells the user to fill in* | `FILL:` occurrences before the edit | (a) | > 0 |
+| `test-install-upgrade-client.sh` · *the second install refreshed AGENTS.md in place rather than declining it* | the branch the run announced | **(g)** | announced |
+| `test-install-upgrade-client.sh` · *the extraction found a real region in the refreshed AGENTS.md* | lines between the markers after the merge | (a) | ≥ 10 |
+| `test-install-upgrade-client.sh` · *…and it MOVED* | the same region, before **vs** after a fact-changing edit to the project | (c) + (e) | changed — **the row that stops a no-op merge passing**: on an unchanged project the region a refresh writes back is the one install 1 wrote, so the equality above holds for a merge that ran, one that did nothing, and a branch that declined |
+| `test-install-upgrade-client.sh` · *7d: an untouched AGENTS.md of ours is still rewritten whole* | the branch the run announced | **(g)** | announced — the anti-*decline-everything* control, without which 7a–7c pass over an installer that keeps every file |
+| `test-install-upgrade-client.sh` · *there is a Codex layer on disk to be consistent ABOUT* | Codex-layer paths after the instructed edit and two more installs | (a) | ≥ 25 — arm 6's counterpart to arm 1's floor; the two `== 0` set comparisons under it are both satisfied by an empty derivation |
+| `test-install-upgrade-client.sh` · *7f: install 1 claimed the path* | the receipt row the arm's whole premise rests on | (b) | non-empty — without it *"a run of ours wrote here once"* is false and every row in 7f passes for the wrong reason |
+| `test-install-upgrade-client.sh` · *the merge-function markers still delimit a real function* | lines between the named markers | (a) + (b) | ≥ 8 **and** the function name present — an empty `eval` defines nothing and reds nothing on its own |
+| `test-install-upgrade-client.sh` · *8: a writable target … merges and returns 0* | the function's own success path | **(g)** | rc 0 — the control under the two failure-status rows, which a function that refused everything would satisfy |
+| `test-install-upgrade-client.sh` · *the marked region holds the project facts and NOT the /name translation* | the needle's presence in the FILE, beside its absence from the region | (b), as a conjunct | present in the file — the `out == 0` half is satisfied by a needle that is nowhere, so the floor is the same needle found outside the pair |
+| `test-install-ownership.sh` · *S5: the dry run made no CLAUDE.md claim at all* | the dry run's line for that path | **(g)** + (b) | non-empty — the two verdict tests under it are `grep`s over a string, and both are satisfied by the empty one |
+| `test-install-ownership.sh` · *S6: install 1 took the beside-yours arm and wrote CLAUDE.md.generated* | the file this state is about | **(g)** | present — every assertion in S6 is about a file the arm may never have written |
+| `test-install-ownership.sh` · *S8: install 1 wrote CLAUDE.md.generated* | the file the sealed-root rename is about | **(g)** | present — the rename-failure assertions under it are about an arm that would otherwise never run |
+| `test-install-not-done.sh` · *B.7b: install 1 kept a manifest backup of ours* | the `.bak` that makes the later `cp` an overwrite | **(g)** | present — without it the sealed-directory step dies at the `cp` and the rollback arm is never reached, so every row in B.7b passes for the wrong reason |
+| `test-install-not-done.sh` · *B.7a: the dry run made no .gitignore claim at all* | the dry run's line for that path | **(g)** + (b) | non-empty — the verdict test under it is a `grep` over a string and is satisfied by the empty one |
+| `test-install-upgrade-client.sh` · *7i: install 1 wrote a .codex/hooks.json* | the config this arm makes read-only | **(g)** | present — `tiuc_sha` of an absent file is the empty string, which would make the unchanged-bytes row true of nothing |
+| `test-install-upgrade-client.sh` · *7i: …and it is still 0444* | the mode, beside the bytes | (d), and it is the row that makes the arm discriminating | 444 — **not a floor but its neighbour: a row measured VACUOUS and replaced rather than removed.** With the refusal made unreachable the byte-comparison row still PASSED, twice over — install 2 regenerates byte-identical content, and `mv` onto a 0444 file in a writable directory succeeds at mode 644. So the arm's strongest-sounding assertion was satisfied by a run that replaced the file, and only the message row detected the missing refusal |
+| `test-install-not-done.sh` · *B.7c: the five project-root paths the sealed run must create are all absent* | the fixture's starting state | **(g)** | absent — every *could not be created* assertion under it is otherwise about a REPLACE, which is a different arm with a different guard |
+| `test-install-not-done.sh` · *B.7d: no manifest backup in the way* | the fixture's starting state | **(g)** | absent — with a `.bak` present the `cp` is an overwrite that SUCCEEDS inside the sealed directory, which is B.7b's state and not this one |
+| `test-install-not-done.sh` · *B.7f: install 1 produced a converted command skill* | the file install 2 is made to fail on | **(g)** | present — with no converted skill on disk there is nothing for the read-only arm to reach and the entry assertion is about a state the run never entered |
+| `test-install-not-done.sh` · *B.7g: there is a dangling link of ours for the prune to reach* | the stale link **and** the absence of its target | **(g)** | link present, target absent — the prune loop skips every link that still resolves, so without both halves the arm below is about a branch that never ran |
+| `test-install-not-done.sh` · *B.7a: the installer announces N entries … and the fixture plants 2* | the gap between *total* and *missing* | (a) + (f) | missing ≥ 1 and planted == 2 — the check under it compares the dry run's number with the run's, and on a `.gitignore` holding NONE of our entries the two coincide whichever variable each half reads. The planted set is derived from the installer's own dry-run announcement rather than written down, so it cannot go stale against the list it is about |
+| `test-install-dryrun.sh` · *codex: the dry run announces N symlink(s) and M converted command skill(s)* | the two numbers on the `.agents/skills/` line | (b) + (f) | numeric — the count oracle below it compares two shell variables, and an unparsed line makes both comparisons about the empty string |
+| `test-install-dryrun.sh` · *codex: …and both counts are real* | links and SKILL.md files on disk | (a) | ≥ 10 links **and** ≥ 5 command skills — the two equalities above are satisfied by zero announced against zero written, which is the whole of what a `--client claude` run would produce |
+| `test-install-dryrun.sh` · *codexro: install 1 wrote a .codex/hooks.json of ours* | the config the read-only arm is about | **(g)** | present — otherwise the probe measures a fresh Codex layer and the dry-run refusal it exists to check is never announced |
+| `test-studio-doctor.sh` · *the codex fixture's receipt actually carries symlink rows* | symlink rows in a `--client codex` receipt | (a) | > 0 |
+| `test-derived-counts.sh` · *the tree-size figures are derived from a tree that has files in it* | **21 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each |
+| `test-derived-counts.sh` · *the region above this block was actually read* | path literals before the block | (a) + (f) | ≥ 10 |
+| `test-derived-counts.sh` · *…reaches N path(s) this file does not mention above* | the scanned set minus the mentioned set | (a) | ≥ 1 |
+| `test-derived-counts.sh` · *every tree-size claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row — **derive the count, do not read it here**; it was written as `20`, then as `30`, and the table has moved again since each |
+| `test-derived-counts.sh` · *every declared file is still scanned at its declared row count* (tree-size) | the claims table **vs** `DCT_DECLARED` | (d), **and it is the direction that catches emptiness**: measured on the emptied table, the `UNDECLARED` half fires only through the degenerate empty row while this half fires semantically | identity |
+| `test-derived-counts.sh` · *the vacuity-census figures are derived from a tree with files in it* | 5 sources, one sentinel, one site | (a) + (f) | ≥ 1 each |
+| `test-derived-counts.sh` · *every vacuity-census claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row |
+| `test-derived-counts.sh` · *the word-numeral figures are derived from a tree that has surfaces in it* | **14 sources**, one sentinel, one site | (a) + (f) | ≥ 1 each — **four of the fourteen were given `\|\| true` after mutation showed their derivation could fail before the floor read it**. The cell claimed those mutants *"killed the file outright … 49 passes / 0 failures"*: **withdrawn**. Re-measured under the gate, the suite reads `Failed: 2` with the floor's own sentence first and every assertion below it run; 49/0 reproduces only with errexit live inside the subshell, and `tests/run-tests.sh:341` turns it off (`$-` = `huB`, measured). The repairs stand — the shape is live in the 29 self-contained test files — but the consequence recorded here was a property of the measuring harness |
+| `test-derived-counts.sh` · *every declared file is still scanned at its declared row count* (word-numeral) | the claims table **vs** `DCW_DECLARED` | (d), same direction as the tree-size row above | identity |
+| `test-derived-counts.sh` · *every word-numeral claim row matches exactly one site* (F6) | sites per claim row | == 1 | one row per claim row |
+
+**Row count versus site count, since this section's own rules demand the distinction:** the two
+`derived N skill(s) and M command(s)` bounds are **one** site; the three `test-derived-counts.sh`
+sentinel rows are **one site each over 21, 5 and 14 sources** — tree-size, vacuity-census and
+word-numeral, in the order they appear above; everything else is one row per site.
+
+**This sentence said *two … over 19 and 3* until 2026-08-17, and the two source figures were never
+true — not stale by drift, wrong on the day they were written.** Measured across the branch rather
+than assumed: the commit that first wrote this sentence wrote both cells with it, and at that same
+commit the tree already derived **21** and **5**. It had moved the tree-size sources from 17 to 21
+itself and then wrote 19 beside them; the vacuity-census count has read 5 at every commit since that
+block existed and no commit on this branch ever derived 3. The third sentinel joined the table two
+commits later and this sentence still said two. The round then dispatched to fix precisely this line
+edited the paraphrase in the paragraph above the table instead and left this one, so for one commit
+the section stated the same quantity two ways. **Re-derive rather than trust any of it** — that is
+the whole ruling of the paragraph above the table, applied to the paragraph below it:
+
+```bash
+grep -cE '\|\| DCT_DERIVATION=' tests/test-derived-counts.sh   # and DCV_, and DCW_
+```
+
+**One construct in the word-numeral block was examined and NOT admitted, and it is the interesting
+one.** `DCW_PROBE` asserts that the normaliser turns words into digits — without it every row in that
+table is vacuous, which reads exactly like a floor. **C4 excludes it, and by measurement rather than
+by argument:** disabling the substitution inside `dcw_flat` reds **two** assertions, the probe and
+`DCW_VACUOUS`, so the assertions it guards do *not* pass over the broken subject. It adds diagnosis
+— it says *the normaliser is broken* where the vacuity arm says *a document was reworded*, which
+sends the next reader to the right half — but detection was already there.
+
+**The contrast this paragraph used to draw is deleted, because it was asserted and is false.** It
+read: *"contrast `test-codex-shim.sh`'s signal-extraction row two tables up, which is admitted: when
+that extraction returns nothing, everything below it genuinely passes."* Measured — break that
+extraction in the test (leaving the shim untouched) and the file reads **150 pass / 2 fail**: the
+floor and the one assertion it feeds. Identical shape, identical count, to the `DCW_PROBE`
+measurement above. **The two constructs are indistinguishable under C4 as written, and that leaves
+this table admitting one and excluding the other.** The exclusion above stands on its own
+measurement; the shim row is admitted on a ground this ruling does not supply. Recorded as an open
+inconsistency rather than resolved by picking whichever answer costs less — C4 says *"the assertions
+it guards would pass over the empty subject"*, both fail that test, and a clause distinguishing
+*detected only incidentally downstream* from *not detected at all* is the thing C4 does not have.
+This is a finding about the criterion, and it is not a fix round's to write.
+
+**What this sweep deliberately did not admit**, each rejected by a named clause rather than by
+judgement: `test-codex-surface.sh`'s *".codex/ is not tracked"* (`== 0` — **C4**, the claim is
+emptiness); its *"the home config was backed up"* (the arm's claim, not a floor under a later
+sweep); every elapsed-time bound in `test-codex-shim.sh` (`-lt 6`, `-le 5`, `-le 8` — **C1**, a
+duration is not a tree read, and **C2**, an upper bound); and `test-bash-gate-precision.sh`'s new
+`assert_eq "220" "$tbg_hist2"`, which is an equality against a **literal** rather than against a
+second derivation, so **C2(d)** fails and **C4** excludes it as the claim under test.
+
+**`scripts/*.sh` GREW BY THREE FILES ON THIS BRANCH AND HOLDS NO FLOOR — swept 2026-08-17, and said
+so rather than left to be assumed.** `codex-command-to-skill.sh`, `codex-hook-shim.sh` and
+`codex-probe.sh` carry only argument and input preconditions (`[ -d "$CMD_DIR" ] || die`,
+`[ -f "$SETTINGS" ] || exit 1`, `[ $# -ge 2 ] || die`); the actual vacuity hole in each — a
+zero-result run — reaches only `info`, so **C3** fails exactly as it does for `install.sh`. The
+segment's answer is unchanged at *exactly one, `scripts/check-provenance.sh`'s* — and it was
+unchanged **and unrestated** through a wave that added three files to it, in the document whose rule
+is that a swept-and-empty segment says which. `install.sh`, `uninstall.sh` and
+`.claude/hooks/bash-gate.sh` were also modified on the branch and nothing added to them reaches an
+assertion, so those segments' standing "none" holds too.
 
 ---
 

@@ -85,10 +85,19 @@ when stdout is a terminal, so inside `$( )` the block header is the plain bytes 
 **What is deliberately *not* in that block: a file kept because *you* edited it.** Those are reported
 separately, as `keeping yours:` with the paths listed under it. The payload landed and the file on
 disk is the one you chose — that is the ownership rule working, not work the installer abandoned.
-Two keeps are exceptions and *are* in the block, because the keep leaves something *else* absent or
+Three keeps are exceptions and *are* in the block, because the keep leaves something *else* absent or
 inert: a kept `.claude/settings.json` leaves this version's new hooks on disk and unregistered, since
-that file is the only place a hook is registered; and a receipt row whose origin column cannot be
-read means the file was kept without anyone having chosen it.
+that file is the only place a hook is registered; a receipt row whose origin column cannot be read
+means the file was kept without anyone having chosen it; and an edited `AGENTS.md` on a
+`--client codex` install whose generated region this run could not refresh — because the file is
+read-only, or because its `kinglet:generated` markers are not a pair the installer can bound. Your
+edit is kept and reported under `keeping yours:` as usual; the block is the other half, saying the
+generated region beside it is a run behind.
+
+`CLAUDE.md` reaches the block the same way and is **not** one of those three, because it is not a
+keep at all: it has no receipt row, so it never appears under `keeping yours:` and `uninstall.sh` —
+`--purge` included — never touches it. When its generated region cannot be refreshed you get the
+block entry alone.
 
 **One exit-0 run is not an install and prints no block:** `--dry-run`, which ends with
 `Dry run complete — nothing written.` Answering *2* at the "existing `.claude/`" prompt is not the
@@ -102,7 +111,10 @@ same case — it prints the block, with the whole installation in it.
 - **Python 3.10 or newer.**
 - **[uv](https://docs.astral.sh/uv/getting-started/installation/)** — the Python package manager
   the MCP server runs under.
-- **Claude Code** (this CLI).
+- **A client.** **Claude Code**, or **Codex CLI** if this project was installed with
+  `--client codex`. The Unity-side half of this guide — the package, the wizard, the bridge on
+  `localhost:8080` — is identical for both; only the last step differs, and § *3. Verify from Claude
+  Code* says what Codex changes.
 
 No API key is required. The open-source bridge is fully free under MIT — API keys are only relevant
 to Coplay's separate commercial hosted product, which you do **not** need here.
@@ -263,6 +275,21 @@ If MCP is connected, Claude reads the live scene (via tools like `manage_scene`,
 `read_console`). If it can't, check that (a) the Unity Editor is open, (b) the bridge is started in
 the MCP window, and (c) `python3 --version` ≥ 3.10 and `uv --version` both succeed.
 `.claude/scripts/studio-doctor.sh` checks all of these for you.
+
+### If your client is Codex CLI
+
+Everything above this section applies unchanged — the Unity package, the wizard, the bridge, the
+port. Two things differ, and the second is the one to read before you trust a result:
+
+- **The configuration lives in `.codex/config.toml`, not `.mcp.json`.** `install.sh --client codex`
+  writes the `[mcp_servers.UnityMCP]` row for you; `.mcp.json` is still written and is what Claude
+  Code reads. Neither removes the other.
+- **Nothing has measured how the bridge's routes behave under Codex's MCP client.** The
+  configuration row is measured; that a call resolves, that reads and writes split the same way, and
+  that a failure surfaces rather than being swallowed are all open questions. **Do not read Claude
+  Code's MCP behaviour onto Codex** — if a call reports success and the Editor did not change,
+  suspect the client and verify in Unity. `README.md` § *Kinglet on Codex CLI* → *What is not
+  measured* is the standing record of this.
 
 ---
 

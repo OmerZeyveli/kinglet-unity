@@ -500,14 +500,23 @@ done <<< "$dead_scan"
 # reach for that `case` first, and a request is not a guard.
 #
 # The scripts/ floor moved from 8 to 5 on 2026-08-13. `scripts/` held 12 tracked files when the floor
-# was written and holds 8 now: the surface criterion removed 5 in one commit and round 2 restored one
-# of them (scripts/detect-missing-refs.sh), leaving 4 recorded `rule=absent` in provenance-skip.tsv
-# and enforced path by path by scripts/check-provenance.sh.
+# was written and holds 11 now: the surface criterion removed 5 in one commit, round 2 restored one
+# of them (scripts/detect-missing-refs.sh) leaving 4 recorded `rule=absent` in provenance-skip.tsv
+# and enforced path by path by scripts/check-provenance.sh, and the Codex wave then added 3.
 #
 # THAT SENTENCE READ "holds 7 now ... removed 5" UNTIL 2026-08-14, and both numbers were falsified by
 # this same wave's own round 2 — a lowered coverage floor defended by an arithmetic that no longer
 # held, in the file whose subject is guards that stopped reading their subject. This file's own
-# runtime output contradicted it on every run (`8 scripts`). Derive both, never transcribe:
+# runtime output contradicted it on every run (`8 scripts`).
+#
+# IT THEN READ "holds 8 now" UNTIL 2026-08-16 AND WENT STALE BY THE SAME MECHANISM, ONE WAVE LATER,
+# in the paragraph that had just been written about it going stale — three files added to `scripts/`
+# by the Codex branch, and the figure off by exactly three. "Derive it" was the instruction, in this
+# same sentence, and it was not enough on its own: the figure is now DERIVED BY A GUARD, in
+# `tests/test-derived-counts.sh`'s tree-size block, which reds when this comment disagrees with
+# `git ls-files`. That is the difference between an instruction and an oracle, and the argument for
+# it is that this one slot has now carried three values — 7, then 8, then 11. Derive both, never
+# transcribe:
 #
 #   git ls-files 'scripts/*' | wc -l
 #   awk -F'\t' '$0 !~ /^#/ && $1 != "path" && $3 == "absent" && $1 ~ /^scripts\//' provenance-skip.tsv | wc -l

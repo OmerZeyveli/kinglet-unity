@@ -111,6 +111,9 @@
 #   S3a both markers on one line               declined, and NOT diagnosed as an ordering fault
 #   S3b the dry run for S's project            promises nothing the real run declines
 #   S4  a well-formed pair, four installs      the refresh still runs, and is idempotent byte-for-byte
+#   S5  a well-formed pair on a READ-ONLY file the refresh is refused, loudly, and the dry run agrees
+#   S6  a read-only CLAUDE.md.generated        its own sentence, not the one about a file that is yours
+#   S7  the fresh arm's rename fails           reported, not fatal — the file is writable, the DIRECTORY is not
 #
 # WHAT THIS FILE CANNOT SEE
 #   * Named paths, not an enumeration. A–D assert MCP-SETUP.md and .mcp.json; E, F and J assert
@@ -844,8 +847,9 @@ assert_gone "$G_ODD" "$G_UNTOUCHED2" "G (unreadable origin, a well-formed toolki
 #
 # WHAT STATE H CANNOT SEE
 #   * Two of the scripts install.sh ships, in one arrangement. How many it ships is not written
-#     here on purpose — the shipped set is `scripts/*.sh` less `check-provenance.sh`, so derive it
-#     (`ls scripts/*.sh | grep -vc check-provenance`). This line carried the number until
+#     here on purpose — the shipped set is `scripts/*.sh` less the names install.sh skips
+#     (`check-provenance.sh` and, since 2026-08-15, `codex-probe.sh`), so derive it
+#     (`ls scripts/*.sh | grep -cvE 'check-provenance|codex-probe'`). This line carried the number until
 #     2026-08-13: it said "nine" from the day Task 1 wrote it, Task 5's detect-pipeline.sh made that
 #     ten without revisiting the sentence, and nothing in the suite watches a script count, so the
 #     next script to join will do it again. A fix keyed on the two names together, or on "the first
@@ -2624,7 +2628,7 @@ fi
 #   * A malformed pair inside a file the user WROTE, rather than one this installer generated and the
 #     user then damaged. The distinction is invisible to install.sh — it reads markers, not history —
 #     but it is the difference between "repair the pair" being good advice and being confusing.
-#   * Duplicate markers (two begins, or two ends). `claude_md_marker_state` classifies them
+#   * Duplicate markers (two begins, or two ends). `marked_region_state` classifies them
 #     `malformed-count` by construction and no fixture here produces one, so that token's message is
 #     reasoned about, not measured. Review round 1 ran both by hand and both decline.
 #   * CRLF line endings, and a marker appearing inside a fenced code block in the user's own prose —
@@ -2859,6 +2863,230 @@ if grep -qF -- "SENTINEL-USER-PROSE-state-s4" "$S4_DIR/CLAUDE.md"; then
   pass "S4: …with the user's own line below the region still in it"
 else
   fail "S4: the refresh deleted the user's own line below the region"
+fi
+
+# ── State S5: a well-formed pair the installer cannot write ──────────────────
+# THE CLAUDE.md HALF OF THE READ-ONLY REFUSAL, AND IT SHIPPED WITH NO ASSERTION AT ALL. The
+# 2026-08-17 wave taught `merge_marked_region` to refuse an unwritable target and taught both callers
+# to give that refusal its own sentence — then guarded only the AGENTS.md caller. Measured by the
+# re-review: disabling BOTH CLAUDE.md-side arms left the whole suite green at 4021/4018/0/3. Same
+# code, same commit, one side asserted; this state and S6 are the other side.
+#
+# WHY IT MATTERS ON THIS FILE RATHER THAN THE CODEX ONE. Perforce keeps every unopened file read-only,
+# so on a P4-managed project CLAUDE.md is 0444 whenever it is not checked out — no user edit involved,
+# no Codex layer involved, and it is the file every Claude Code session reads. Before the refusal, a
+# tty run put `mv`'s own overwrite prompt in front of the user and reported `ok Refreshed the
+# generated section` when it was declined.
+#
+# The 0444 is applied AFTER install 1, so the fixture is a real generated CLAUDE.md with a real
+# region and the user's own line below it — the same shape S4 proves the refresh normally rewrites.
+S5_DIR="$SCRATCH/state-s5"
+bash "$REPO/tests/fixtures/mkproject.sh" "$S5_DIR" >/dev/null
+run_install_flags "$S5_DIR" "S5 install 1"
+printf '\n## My Own Notes\n\nSENTINEL-USER-PROSE-state-s5\n' >> "$S5_DIR/CLAUDE.md"
+# The project moves on, so a refresh that DID run would change the region and the sha below would
+# move. Without it "the file is unchanged" is satisfied by a refresh that had nothing to write.
+mkdir -p "$S5_DIR/Assets/Scripts"
+printf 'using VContainer;\npublic sealed class S5Probe { }\n' > "$S5_DIR/Assets/Scripts/S5Probe.cs"
+chmod 444 "$S5_DIR/CLAUDE.md"
+S5_SHA="$(sha_of "$S5_DIR/CLAUDE.md")"
+# The dry run FIRST, and it is half of this state rather than a footnote: teaching the run to refuse
+# while leaving the announcement promising a refresh is the S3b defect with the files swapped, and it
+# is what this wave did for one commit.
+S5_DRY="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$REPO/install.sh" --project-dir "$S5_DIR" --yes --dry-run </dev/null 2>&1 \
+  | sed $'s/\x1b\\[[0-9;]*m//g' | awk '$1 == "CLAUDE.md" { print; exit }')"
+if [ -z "$S5_DRY" ]; then
+  fail "S5: the dry run made no CLAUDE.md claim at all for a project whose CLAUDE.md the real run declines"
+elif grep -qF -- "$S_MARKED_MSG" <<< "$S5_DRY"; then
+  fail "S5: the dry run promised '$S_MARKED_MSG' for a read-only CLAUDE.md the real run refuses to touch — the announcement and the act must be computed from one predicate"
+elif grep -qF -- 'NOT touched' <<< "$S5_DRY"; then
+  pass "S5: the dry run announces a decline for a read-only CLAUDE.md, in a phrasing tests/test-install-dryrun.sh reads as one"
+else
+  fail "S5: the dry run's CLAUDE.md line carries none of the recognised decline phrasings, so that guard would read it as a promise of a write"
+fi
+run_install_flags "$S5_DIR" "S5 install 2"
+S5_AFTER="$(sha_of "$S5_DIR/CLAUDE.md")"
+if [ "$S5_SHA" = "$S5_AFTER" ]; then
+  pass "S5: the real run left the read-only CLAUDE.md byte-for-byte alone"
+else
+  fail "S5: the installer rewrote a read-only CLAUDE.md ($S5_SHA -> $S5_AFTER)"
+fi
+if grep -qF -- "$S_MARKED_MSG" <<< "$INSTALL_OUT"; then
+  fail "S5: the run claimed '$S_MARKED_MSG' about a file it never wrote — a merge that reports success over an untouched file is the defect this refusal exists for"
+else
+  pass "S5: …and made no 'prose untouched' claim about a merge it did not perform"
+fi
+if grep -qF -- 'CLAUDE.md is read-only' <<< "$INSTALL_OUT"; then
+  pass "S5: …and said which file and why, rather than reporting a generic failure the user cannot act on"
+else
+  fail "S5: the run declined without naming the read-only file — 'refresh failed' sends a Perforce user looking for a bug instead of checking the file out"
+fi
+S5_BLOCK="$(s_not_done_block)"
+if grep -qF -- 'CLAUDE.md' <<< "$S5_BLOCK"; then
+  pass "S5: …and recorded it under 'Not done:', which is the contract MCP-SETUP.md states for work the installer was asked for and did not do"
+else
+  fail "S5: the refusal printed no 'Not done:' entry naming CLAUDE.md — a caller scripting the documented check would read this run as complete"
+fi
+if grep -qF -- 'markers never landed' <<< "$S5_BLOCK"; then
+  fail "S5: the entry says the FILL: markers never landed, about a project whose CLAUDE.md exists and carries them — that is the 'skipped' sentence on a path it is false of"
+else
+  pass "S5: …with the entry for a stale block rather than the one for a file that was never generated"
+fi
+if grep -qF -- "SENTINEL-USER-PROSE-state-s5" "$S5_DIR/CLAUDE.md"; then
+  pass "S5: …and the user's own line below the region is still there"
+else
+  fail "S5: the user's own line below the region is gone from a file the run said it did not touch"
+fi
+
+# ── State S6: a read-only CLAUDE.md.generated, and the sentence it used to borrow ──
+# THE BESIDE-YOURS ARM'S OWN READ-ONLY REFUSAL. It reached for `kept-yours`, whose entry reads
+# "CLAUDE.md.generated — yours was kept untouched, so no generated file was produced this run. Rename
+# or delete it and re-run to get one." The file here is OURS (the arm is only reached after
+# `owned_by_installer` failed to disown it), nobody chose to keep it, and "rename or delete it"
+# contradicts the warn line printed two lines above it, which says to make it writable. Same defect
+# the same commit fixed for `skipped`, one arm over.
+#
+# The fixture is I's shape: a CLAUDE.md of the user's with no markers, so install 1 takes the
+# beside-yours arm and writes CLAUDE.md.generated. Making that file read-only is then the only change.
+S6_DIR="$SCRATCH/state-s6"
+bash "$REPO/tests/fixtures/mkproject.sh" "$S6_DIR" >/dev/null
+printf '# My own CLAUDE.md\n\nNO-MARKERS-HERE\n' > "$S6_DIR/CLAUDE.md"
+run_install_flags "$S6_DIR" "S6 install 1"
+if [ -f "$S6_DIR/$CLAUDE_GEN_REL" ]; then
+  pass "S6: install 1 took the beside-yours arm and wrote $CLAUDE_GEN_REL, so there is a file of ours to make read-only"
+else
+  fail "S6: install 1 wrote no $CLAUDE_GEN_REL — this state's whole subject is absent and every assertion below is vacuous"
+fi
+chmod 444 "$S6_DIR/$CLAUDE_GEN_REL"
+S6_SHA="$(sha_of "$S6_DIR/$CLAUDE_GEN_REL")"
+run_install_flags "$S6_DIR" "S6 install 2"
+if [ "$S6_SHA" = "$(sha_of "$S6_DIR/$CLAUDE_GEN_REL")" ]; then
+  pass "S6: the read-only $CLAUDE_GEN_REL is byte-for-byte as it was"
+else
+  fail "S6: the installer rewrote a read-only $CLAUDE_GEN_REL"
+fi
+if grep -qF -- 'CLAUDE.md.generated is read-only' <<< "$INSTALL_OUT"; then
+  pass "S6: …and the run said which file and why"
+else
+  fail "S6: the run did not name the read-only $CLAUDE_GEN_REL"
+fi
+S6_BLOCK="$(s_not_done_block)"
+if grep -qF -- 'yours was kept untouched' <<< "$S6_BLOCK"; then
+  fail "S6: the block says 'yours was kept untouched' about a file that is OURS and merely read-only, with a remedy contradicting the warn line above it"
+else
+  pass "S6: …and the 'Not done:' entry is not the one about a file the user chose to keep"
+fi
+if grep -qF -- 'read-only' <<< "$S6_BLOCK"; then
+  pass "S6: …it names the cause, so the remedy in the block and the remedy in the warn line agree"
+else
+  fail "S6: the block records the outcome without the cause, so a caller reading only the block is told to rename or delete a file it should make writable"
+fi
+
+# ── State S7: the fresh arm's rename fails, and it is not the file's fault ───
+# THE CASE `can_replace` CANNOT ANSWER, ON THE ONE ARM THAT DOES NOT CALL IT. The fresh-file arm is
+# reached only when `marked_region_state` says `absent`, so there is no file to be read-only — and the
+# RENAME can still fail, because `rename(2)` checks the parent directory. A project root at 555 with a
+# writable `.claude/` inside it is that state exactly, and until 2026-08-17 the `mv` there was a bare
+# command: `set -e` ended the run at exit 1 with the payload already written and no CLAUDE.md.
+#
+# S5 AND S6 COVER NEITHER THIS SITE NOR ANY OTHER STATUS READ: those two exercise PREDICATES —
+# `merge_marked_region`'s `-w` and `can_replace` — and neither asserts a rename's status at all. A
+# sentence here used to call this arm *the only one* they do not cover and then list three more they
+# also do not cover; the covering fixtures are named instead, since a claim about which member is
+# uncovered goes stale every time the class gains one. The `mv` sites this wave taught to report are
+# asserted at: this state (the fresh arm), S8 (beside-yours), 7h in
+# tests/test-install-upgrade-client.sh (the AGENTS.md write), 7i there (`.codex/hooks.json`), and
+# B.7b in tests/test-install-not-done.sh (the manifest rollback). Mutating this arm back to a
+# bare `mv` left both install test files green before this state existed.
+#
+# THE ROOT IS SEALED AFTER INSTALL 1 AND CLAUDE.md IS REMOVED FIRST, so the run really does take the
+# fresh arm rather than the refresh one, and `.claude/` — whose own mode is untouched — still receives
+# the payload and the receipt. The mode is restored immediately: the EXIT trap removes $SCRATCH as one
+# path, and a 555 directory inside it would defeat that.
+S7_DIR="$SCRATCH/state-s7"
+bash "$REPO/tests/fixtures/mkproject.sh" "$S7_DIR" >/dev/null
+run_install_flags "$S7_DIR" "S7 install 1"
+rm -f "$S7_DIR/CLAUDE.md"
+chmod 555 "$S7_DIR"
+S7_RC=0
+S7_OUT="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$REPO/install.sh" --project-dir "$S7_DIR" --yes </dev/null 2>&1 \
+  | sed $'s/\x1b\\[[0-9;]*m//g')" || S7_RC=$?
+chmod 755 "$S7_DIR"
+if [ "$S7_RC" -eq 0 ]; then
+  pass "S7: a rename that fails does not end the install — the fresh arm reads mv's status and reports, where a bare mv took the run down at exit 1 with the payload already written"
+else
+  fail "S7: install.sh exited $S7_RC on a failed rename instead of reporting it — the payload is on disk and the run died part-way"
+fi
+if [ -e "$S7_DIR/CLAUDE.md" ]; then
+  fail "S7: a CLAUDE.md exists after a rename this run reported as failed"
+else
+  pass "S7: …and no CLAUDE.md was left behind by the failed rename"
+fi
+if grep -qF -- 'CLAUDE.md could not be written' <<< "$S7_OUT"; then
+  pass "S7: …and the run says the write did not happen, in a sentence distinct from a generation failure"
+else
+  fail "S7: the run did not report the failed rename — a caller reading the output cannot tell this from a successful install"
+fi
+if grep -qF -- 'CLAUDE.md' <<< "$(awk '/^Not done:/ { f = 1 } f && /^Next steps:/ { f = 0 } f' <<< "$S7_OUT")"; then
+  pass "S7: …and recorded it under 'Not done:', so the documented caller check sees the abandonment"
+else
+  fail "S7: the failed rename printed no 'Not done:' entry naming CLAUDE.md"
+fi
+
+# ── State S8: the beside-yours rename fails, and the dry run says so first ───
+# THE THIRD OF THIS WAVE'S STATUS READS AND THE LAST ONE WITH NO FIXTURE. Reverting this arm's `mv`
+# to a bare command — together with the manifest rollback's and the dry run's `.generated`
+# writability arm — left the WHOLE gate green and byte-identical to unmutated. Three behaviours, no
+# guard between them; this state and B.7b in tests/test-install-not-done.sh are two of the three.
+#
+# The shape is S6's with the mode moved: instead of the existing `CLAUDE.md.generated` being
+# read-only, the DIRECTORY it must be renamed into is sealed. So `can_replace` passes — the file is
+# writable, or absent — and only the rename fails, which is the half a predicate cannot see. It also
+# reaches the dry run's third writability arm, which announces the decline for a read-only
+# `.generated` before the run declines it.
+S8_DIR="$SCRATCH/state-s8"
+bash "$REPO/tests/fixtures/mkproject.sh" "$S8_DIR" >/dev/null
+printf '# My own CLAUDE.md\n\nNO-MARKERS-HERE\n' > "$S8_DIR/CLAUDE.md"
+run_install_flags "$S8_DIR" "S8 install 1"
+if [ -f "$S8_DIR/$CLAUDE_GEN_REL" ]; then
+  pass "S8: install 1 wrote $CLAUDE_GEN_REL, so install 2 below really does take the arm this state is about"
+else
+  fail "S8: install 1 wrote no $CLAUDE_GEN_REL — every assertion below is about an arm that never runs"
+fi
+# The dry run's third writability arm, on the state it is for: the file itself read-only.
+chmod 444 "$S8_DIR/$CLAUDE_GEN_REL"
+S8_DRY="$(KINGLET_USER_SETTINGS="$SCRATCH/absent-user-settings.json" \
+  bash "$REPO/install.sh" --project-dir "$S8_DIR" --yes --dry-run </dev/null 2>&1 \
+  | sed $'s/\x1b\\[[0-9;]*m//g' | awk '$1 == "CLAUDE.md.generated" { print; exit }')"
+if [ -z "$S8_DRY" ]; then
+  fail "S8: the dry run made no CLAUDE.md.generated claim at all for a project whose beside-yours arm it is about to decline"
+elif grep -qF -- 'NOT touched' <<< "$S8_DRY"; then
+  pass "S8: the dry run announces a decline for a read-only CLAUDE.md.generated rather than promising to write it"
+else
+  fail "S8: the dry run promised to generate a CLAUDE.md.generated the real run refuses to write — the announcement and the act computed from one predicate is this block's whole rule"
+fi
+chmod 644 "$S8_DIR/$CLAUDE_GEN_REL"
+# Now the rename half: the file is writable and the directory is not.
+S8_SHA="$(sha_of "$S8_DIR/$CLAUDE_GEN_REL")"
+chmod 555 "$S8_DIR"
+run_install_flags "$S8_DIR" "S8 install 2 (project root sealed)"
+chmod 755 "$S8_DIR"
+if [ "$S8_SHA" = "$(sha_of "$S8_DIR/$CLAUDE_GEN_REL")" ]; then
+  pass "S8: the failed rename left $CLAUDE_GEN_REL byte-for-byte as it was"
+else
+  fail "S8: $CLAUDE_GEN_REL changed under a rename the run could not complete"
+fi
+if grep -qF -- 'CLAUDE.md.generated could not be written' <<< "$INSTALL_OUT"; then
+  pass "S8: …and the run says the write did not happen, in a sentence distinct from the read-only one"
+else
+  fail "S8: the run did not report the failed rename — with a bare mv this arm ended the whole install at exit 1 instead"
+fi
+if grep -qF -- 'yours was kept untouched' <<< "$(s_not_done_block)"; then
+  fail "S8: the block borrows the sentence about a file the user chose to keep, for a file that is ours and a rename that failed"
+else
+  pass "S8: …and its 'Not done:' entry is not the one about a file the user chose to keep"
 fi
 
 [ "$FAILURES" -eq 0 ] || exit 1

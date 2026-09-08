@@ -94,11 +94,29 @@ Kinglet installer from the toolkit checkout.
 
 ## Check 3: What the doctor script does not read
 
-Check 2 covers the install. These four are outside what it **reports** — and only these, so the
-duplication Check 2 removed does not creep back in. The list was five until 2026-08-14: the
-payload-directory item is gone because the script issues that verdict itself now, and that is the
-direction to take every time one of these becomes something the script reports — delete the item,
-do not keep both.
+Check 2 covers the install. These four are outside what it **reports**, and they are the only ones
+*this* check carries — the duplication Check 2 removed does not creep back in here. The list was
+five until 2026-08-14: the payload-directory item is gone because the script issues that verdict
+itself now, and that is the direction to take every time one of these becomes something the script
+reports — delete the item, do not keep both.
+
+**"And only these" used to close the sentence, and it was wrong twice over.** The second client is
+also outside this list, and it is covered by **Check 3b**, behind its own skip gate — so the
+membership is these four plus 3b's five, not four. If you add an item, decide which of the two checks
+owns it and say so; a closed-world claim in one of them is what went wrong the first time.
+
+**The ground that was reached for is itself false, and it is recorded here rather than quietly
+dropped, because this paragraph's whole subject is exactly that.** A version of this text shipped on
+2026-08-16 reading *"`scripts/studio-doctor.sh` contains zero occurrences of `codex`, `AGENTS.md` or
+`.agents`, so the whole second-client surface is outside what it reports too."* Both halves are
+wrong. Derived with that sentence's own pattern, `/usr/bin/grep -cE 'codex|AGENTS\.md|\.agents'
+scripts/studio-doctor.sh` answers a non-zero number today and already did on the day the sentence was
+written. And the script **does** report on the second client: it verifies **every** receipt row, and
+a Codex install has rows outside `.claude/` — delete `.codex/hooks.json` and it prints
+`FAIL … receipted file(s) missing`, names the path, and now names `--client codex` as the remedy.
+What Check 3b still owns is what the receipt cannot see: the shim paths resolving, the timeout unit,
+the skill root, and trust. **Do not restate that as a count or a closed set** — derive it, or say
+what the script does and does not read.
 
 1. **Hooks on disk that nothing registers.** The script checks `settings.json` → file. Check the
    other direction: for every `.sh` in `.claude/hooks/` except `_lib.sh`, confirm it appears in
@@ -122,6 +140,92 @@ do not keep both.
    match neither. Misplaced → **WARNING**.
 4. **Frontmatter.** Each file in `.claude/commands/` has `name` and `description`; each in
    `.claude/agents/` has `name`, `description`, `model` and `tools`. Invalid → **WARNING**.
+
+## Check 3b: The second client, and only if the project asked for one
+
+**Skip this whole check unless the project root has a `.codex/` directory *or* an `.agents/skills/`
+directory.** A project installed for Claude Code alone has neither, and reporting their absence
+would fail every healthy install.
+
+**The gate is a disjunction and that is the whole point of it.** The first version read
+*"unless `.codex/` exists"*, which made step 1 below unreachable in the exact case it was written
+for: a project with the skills bridge and **no** `.codex/` at all is the advisory-not-enforcing
+install, and gating on `.codex/` skips the check precisely when the answer is "the hook layer is
+missing". Either directory means someone installed a Codex layer; only running the check tells you
+whether they installed all of it.
+
+If either exists, the project has a Codex CLI layer, and that layer has one failure mode worth
+checking by hand because it is **silent**: hooks that are registered, listed, and never run.
+
+1. **`.codex/hooks.json` exists.** Absent while `.agents/skills/` is present → **WARNING**: the
+   skills bridge was installed and the hook layer was not, so this project is advisory rather than
+   enforcing under Codex. Say that in those words.
+2. **The shim each entry points at resolves.** Read the paths out of `.codex/hooks.json` itself and
+   test *those*, not the relative `.claude/scripts/codex-hook-shim.sh` — the config carries
+   **absolute** paths, so a moved or renamed project directory breaks every entry at once while the
+   relative path is still perfectly present. Checking the relative one passes in exactly the
+   scenario this step exists to catch. Any absolute path in the config that is not an existing file,
+   or that points outside the project directory → **ERROR**: under Codex a hook whose command cannot
+   run is not an error the user sees, it is an allow. The fix for both is to regenerate, per step 3.
+3. **The timeouts are seconds, not milliseconds.** Read `.codex/hooks.json` and check every
+   `timeout`. `.claude/settings.json` declares milliseconds; Codex reads seconds. A value in the
+   thousands → **ERROR**: that is an unconverted millisecond figure, and a hook that should die in
+   three seconds will hold the turn for fifty minutes. The fix is to regenerate rather than edit:
+
+   ```bash
+   bash .claude/scripts/codex-hook-shim.sh --emit-config > .codex/hooks.json
+   ```
+
+   Report it as **ERROR** rather than **WARNING** even though nothing is broken today, because the
+   symptom only appears when a hook hangs — which is exactly when the timeout mattered.
+
+   **Say this whenever you tell the user to regenerate.** The trust hash covers a hook's
+   *declaration* — its command string, timeout, matcher and event — not its script, so regenerating
+   `.codex/hooks.json` changes every entry's hash and drops each one to *"modified since last
+   trusted"*, which Codex treats as untrusted and does not run. Measured. Regenerating by hand
+   therefore fixes the timeout and silently removes the enforcement. The command that does both is
+   the installer, run from the kinglet-unity checkout:
+
+   ```bash
+   ./install.sh --project-dir <this project> --client codex --codex-trust
+   ```
+4. **The skill root resolves.** `.agents/skills/` should hold one entry per directory in
+   `.claude/skills/`, and each entry should resolve to a file. A dangling entry → **WARNING**: Codex
+   lists what it can resolve and says nothing about the rest. If commands were converted, each also
+   has an entry; regenerate with:
+
+   ```bash
+   bash .claude/scripts/codex-command-to-skill.sh
+   ```
+
+5. **Hook trust is not in this project, and the state of it is partly knowable and partly not.**
+   A registered hook does not run until its entry is trusted in the user's own `CODEX_HOME` config,
+   which lives in their home directory. **Never read that file and never write it** — that
+   prohibition is unchanged and it is absolute.
+
+   This step used to end *"do not report its state"*, full stop, and that was too wide. The route
+   that answers without touching the home is `hooks/list`: it takes `cwds` — the project — and
+   `trustStatus` is a **required** field of every entry it returns, from
+   `["managed", "untrusted", "trusted", "modified"]`. Enumerated rather than counted, because the
+   boundary is what matters: an **untrusted project** returns an empty list, so there is no entry to
+   carry a status and that state is genuinely invisible; a **registered-but-untrusted hook** reports
+   `trustStatus: "untrusted"`; a **config edited since it was trusted** reports `"modified"`, which
+   Codex treats as untrusted. **Trust state answers nothing outside itself** — a hook Codex times out
+   is `enabled: true` and `"trusted"`, and its allow is as silent as it ever was.
+
+   **Do not run that call as part of this check.** Reaching it means driving `codex app-server`
+   over JSON-RPC, and that protocol has two measured traps that each return something shaped like an
+   answer: passing `cwd` instead of `cwds` yields a well-formed reply **about the wrong repository**,
+   and a `printf … | codex app-server` pipeline that closes stdin loses the reply entirely — 12 of 12
+   runs. A diagnostic that improvises a two-trap protocol and reports the result confidently is worse
+   than one that declines, and this whole check exists to avoid exactly that claim. It also needs the
+   `codex` binary on PATH, which a Claude Code user running `/unity-doctor` may not have.
+
+   **So report it this way:** trust is granted at install time by
+   `./install.sh --project-dir <this project> --client codex --codex-trust`, that grant covers
+   per-hook trust and **not** project trust (for which the user runs `codex` once in the project and
+   accepts the prompt), and `hooks/list` with `cwds` is where the user verifies it themselves.
+   Say that the hook layer's enforcement is **unverified from here**, not that it is fine.
 
 ## Check 4: Unity Project Structure
 

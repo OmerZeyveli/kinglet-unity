@@ -61,6 +61,27 @@ print_first_5() {
   awk 'NF && NR <= 5 { printf "       %s\n", $0 }' <<< "$1"
 }
 
+# ── Which receipted paths only a `--client codex` run writes ─────────────────
+#
+# A BYTE-IDENTICAL COPY OF `install.sh`'s DEFINITION, AND THE COPY IS DELIBERATE. This script ships
+# into a project; `install.sh` does not, so there is no file both can source. The two are held
+# together by `tests/test-install-upgrade-client.sh`, which extracts both marked regions and
+# compares them character for character — so a change to one that is not made to the other is a red
+# suite, not a silent divergence. The markers are what it extracts; do not rename them, and do not
+# "tidy" this copy.
+#
+# What it answers is one question — *will a plain `install.sh` write this path?* — and it decides
+# which remedy a missing receipted file is given below. See `install.sh`'s copy for the two measured
+# failures that came from spelling this as `not under .claude/` instead.
+# kinglet:codex-layer-criterion:begin
+codex_layer_path() {   # $1 = project-relative path; 0 = written only by `--client codex`
+  case "$1" in
+    AGENTS.md|.agents/skills/*|.codex/*|.claude/state/codex-trust.tsv) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+# kinglet:codex-layer-criterion:end
+
 usage() { sed -n '3,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0; }
 
 PROJECT_DIR="$(pwd)"
@@ -398,12 +419,100 @@ else
   # The sha comparison stays fail-closed the same way uninstall.sh's `sha_of` is: an unreadable file
   # yields the empty string, which never equals a recorded checksum, so the row lands in MODIFIED and
   # is reported rather than silently passed.
+  #
+  # THE EXISTENCE TEST IS `-e` OR `-L`, NOT `-f`, AND THE MODE COLUMN IS READ RATHER THAN DISCARDED.
+  # `.agents/skills/<name>` is a symlink to a DIRECTORY. `-f` follows the link and then asks "is the
+  # target a regular file", which is false — so every one of those rows counted as MISSING. Measured
+  # 2026-08-16 on a clean `--client codex --yes` fixture, run immediately after the installer
+  # reported success: `FAIL 16 receipted file(s) missing — re-run install.sh`, rc=1, with all 16
+  # present on disk. The remedy that message prints reproduces the identical state, so a user who
+  # follows install.sh's own Next step 4 loops.
+  #
+  # `-L` IS THE SECOND DISJUNCT RATHER THAN A REPLACEMENT BECAUSE `-e` IS FALSE THROUGH A DANGLING
+  # LINK — and what that buys is that such a row is not called MISSING, which would be wrong twice
+  # over: the link is on disk and it is still ours, and the remedy `re-run install.sh` would be
+  # printed for something install.sh's own prune loop already handles.
+  #
+  # WHAT IT DOES NOT BUY, STATED BECAUSE THIS COMMENT CLAIMED THE OPPOSITE FOR ONE COMMIT. It said
+  # "a dangling link of ours is a real defect this check should name rather than skip". This check
+  # does not name it. A link still pointing where we pointed it passes the `readlink` test in the
+  # `toolkit` arm below and is counted VERIFIED, target or no target. Measured 2026-08-16 on a
+  # `--client codex` fixture with `.claude/skills/addressables/` deleted and that skill's own receipt
+  # rows removed so the link row was the only thing that could report:
+  # `PASS Install intact: 98 file(s) verified against the receipt`, rc 0, with a dangling link on
+  # disk.
+  #
+  # THAT IS THE RIGHT BEHAVIOUR HERE AND THE COMMENT WAS THE DEFECT, for three reasons. (1) The link
+  # row's question is ownership — "does it still point where we pointed it" — and it is deliberately
+  # the same question `uninstall.sh` asks, so that one receipt is not read two ways; making this file
+  # answer a different one re-opens the drift this fix closed. (2) In the shipped configuration the
+  # state IS named, by the target's own rows: with the receipt intact, deleting that skill directory
+  # gives `FAIL 1 receipted file(s) missing`, rc 1. The silent reading above requires deleting those
+  # rows, which is not a state install.sh can produce. (3) A third bucket — present, ours, pointing
+  # at nothing — is a new count and a new message on a shipped health check, which is a behaviour
+  # change and not a comment fix.
+  #
+  # The residual, so it is not rediscovered: a receipt that has lost a skill's own rows while keeping
+  # its link row reports that link as verified. `uninstall.sh` is the file whose paragraph says a
+  # dangling link "is exactly what we most want to remove" — and it does remove it. That sentence is
+  # true there and was copied here, where it is not.
+  #
+  # This is uninstall.sh's grammar, deliberately — see its classifier's own `-e`/`-L` paragraph,
+  # which records the same defect on that side and fixed it there first.
+  #
+  # WHERE THE OTHER READERS OF THIS RECEIPT STAND, since "only the doctor was wrong" is the obvious
+  # summary and it is too coarse to be useful. There are four readers of the origin column and this
+  # is the third of them to be visited about symlinks:
+  #
+  #   install.sh, the skill-root loop (8d.2)  — WRITES these rows and owns them correctly: `-L` plus
+  #                                             a `readlink` comparison against the target it wrote,
+  #                                             and someone else's link at our path is kept, not
+  #                                             clobbered, and given no row.
+  #   uninstall.sh's classifier               — `-e` OR `-L`, then the same mode-column split. Fixed
+  #                                             there first, and the shape copied from here.
+  #   install.sh, the MODIFIED_FILES scan     — carries `[ -f "$PROJECT_DIR/$rel" ] || continue` and
+  #                                             therefore skips every symlink row. HARMLESS TODAY
+  #                                             AND NOT A SECOND BUG — but the reason is stated below
+  #                                             at its real size, because the first version of this
+  #                                             row gave half of it.
+  #   this file                               — was the one that reached a user with it.
+  #
+  # The fourth row sat alone below a paragraph until 2026-08-17: a round inserted the explanation of
+  # the third row BETWEEN the third and the fourth, and a table whose last row is stranded past a
+  # paragraph reads as a footnote rather than as a member. The explanation now follows the whole
+  # table, which is where an explanation of one row belongs when the table is the point.
+  #
+  # WHAT THAT SCAN ACTUALLY FEEDS, enumerated rather than characterised. `is_modified` reads
+  # `MODIFIED_FILES` and is called from FIVE sites: the orphan sweep, the `.claude/**` payload loop,
+  # the `scripts/` copy loop, the `settings.json` write, and the converted-command-skill loop, which
+  # calls it with `.agents/skills/<name>/SKILL.md`. This row read *"that scan feeds the `.claude/**`
+  # payload loops, the symlink rows are `.agents/`"*, which is one clause too narrow: the scan does
+  # reach `.agents/`. The conclusion is unchanged and now rests on the right fact — those converted
+  # skills are REGULAR FILES, so `[ -f ]` passes them; the only `.agents/` rows `[ -f ]` drops are the
+  # DIRECTORY symlinks, and the loop that writes those (the skill-root loop) is the one call site that
+  # never consults `is_modified` at all, doing its own `-L` plus `readlink` check instead.
+  #
+  # THE COUNT SAID FOUR AND THEN NAMED FIVE, in the paragraph whose stated point is enumerating
+  # rather than characterising, until 2026-08-17. Derive it — `grep -n 'is_modified' install.sh`
+  # less the one definition line — rather than reading it off this comment, and note that the
+  # enumeration was the half that was right: the number was written first and the list grew past it.
+  #
+  # It is the same shape as the defect this file just fixed, one edit away from mattering, which is
+  # why it is named here rather than left for someone to rediscover — and a safety argument that
+  # describes half its own subject is exactly what this wave keeps finding, so the enumeration above
+  # is the point of the correction rather than the verdict, which did not change.
+  #
+  # The third column stopped being `_mode` in the same change. A symlink to a directory has no
+  # sha256 — `sha256sum` fails and the substitution is empty — so fixing existence alone moves all
+  # 16 rows from MISSING to MODIFIED and the run still misreports a correct install, just under a
+  # different heading. What install.sh records for these rows is the LINK TARGET, and that is what
+  # the `toolkit` arm below compares: the link is ours while it still points where we pointed it.
   VERIFIED=0; MODIFIED=0; MISSING=0; UNREADABLE=0; REVERTED=0; STICKY=0
   MODIFIED_LIST=""; MISSING_LIST=""; UNREADABLE_LIST=""; REVERTED_LIST=""
-  while IFS=$'\t' read -r rel recorded _mode origin; do
+  while IFS=$'\t' read -r rel recorded mode origin; do
     case "$rel" in ''|\#*|path) continue ;; esac
     abs="$PROJECT_DIR/$rel"
-    if [ ! -f "$abs" ]; then
+    if [ ! -e "$abs" ] && [ ! -L "$abs" ]; then
       MISSING=$((MISSING + 1)); MISSING_LIST="${MISSING_LIST}${rel}"$'\n'
       continue
     fi
@@ -454,7 +563,16 @@ else
         fi
         ;;
       toolkit)
-        if [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
+        # TWO PROOFS OF OWNERSHIP FOR TWO KINDS OF FILE, chosen by the mode column — the same split
+        # uninstall.sh's `toolkit` arm makes, for the same reason and in the same order, so the two
+        # readers of this receipt cannot drift into disagreeing about the same row.
+        if [ "$mode" = symlink ]; then
+          if [ -L "$abs" ] && [ "$(readlink "$abs")" = "$recorded" ]; then
+            VERIFIED=$((VERIFIED + 1))
+          else
+            MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
+          fi
+        elif [ "$(sha256sum "$abs" 2>/dev/null | cut -d' ' -f1)" = "$recorded" ]; then
           VERIFIED=$((VERIFIED + 1))
         else
           MODIFIED=$((MODIFIED + 1)); MODIFIED_LIST="${MODIFIED_LIST}${rel}"$'\n'
@@ -469,8 +587,44 @@ else
   if [ "$MISSING" -eq 0 ]; then
     pass "Install intact: $VERIFIED file(s) verified against the receipt"
   else
-    fail "$MISSING receipted file(s) missing — re-run install.sh"
-    print_first_5 "$MISSING_LIST"
+    # THE REMEDY HAS TO NAME THE CLIENT, BECAUSE `install.sh` WITHOUT `--client codex` DOES NOT
+    # RESTORE A CODEX-LAYER PATH — IT DROPS THE ROW. Measured 2026-08-16: delete
+    # `.codex/hooks.json` and one `.agents/skills/*` entry from a clean Codex install, run this
+    # script (correctly `FAIL 2 receipted file(s) missing`, rc 1), then follow the bare remedy
+    # `install.sh --project-dir X --yes`. Step 8e carries forward only rows whose path still exists,
+    # so the two rows are dropped and this script then reports `8 passed · 0 failure(s)` with both
+    # files still gone. A remedy that turns a loud failure into a silent one is worse than the
+    # original defect on this branch, which at least kept complaining.
+    #
+    # THE CLASSIFIER IS `codex_layer_path`, DEFINED ABOVE, AND IT IS A BYTE-IDENTICAL COPY OF
+    # `install.sh`'s. It read `grep -vE '^\.claude/'` until 2026-08-16, under a comment claiming that
+    # was "the criterion Step 8e uses, spelled the same way" — it was neither, and it was wrong in
+    # both directions. `.mcp.json` and `MCP-SETUP.md` sit outside `.claude/` on a project that has
+    # never had a Codex layer, so deleting one produced `re-run install.sh --client codex` and three
+    # false explanatory lines, and a user who followed that remedy got `AGENTS.md`, `.agents/` and
+    # `.codex/` created in a project that had asked for neither. In the other direction
+    # `.claude/state/codex-trust.tsv` IS Codex-only and IS under `.claude/`, so the one row where the
+    # concealing remedy actually applies was the one row that got the bare form.
+    #
+    # ONE `fail` FOR ONE PROBLEM. The explanation goes out through `printf`, not through `fail` —
+    # `fail` increments FAIL_C, and the summary line is what `.claude/commands/unity-doctor.md`
+    # tells the model to read first, so three lines about one missing pair would report
+    # `3 failure(s)` for one fault. The count is the finding, not the sentence count.
+    dr_codex=0
+    while IFS= read -r dr_m; do
+      [ -n "$dr_m" ] || continue
+      if codex_layer_path "$dr_m"; then dr_codex=$((dr_codex + 1)); fi
+    done <<< "$MISSING_LIST"
+    if [ "$dr_codex" -gt 0 ]; then
+      fail "$MISSING receipted file(s) missing — re-run install.sh --client codex"
+      print_first_5 "$MISSING_LIST"
+      printf '       %s\n' "$dr_codex of these are written only by --client codex."
+      printf '       %s\n' "A plain install.sh will NOT restore them — it drops their rows instead,"
+      printf '       %s\n' "and this check then passes with the files still missing."
+    else
+      fail "$MISSING receipted file(s) missing — re-run install.sh"
+      print_first_5 "$MISSING_LIST"
+    fi
   fi
   if [ "$MODIFIED" -gt 0 ]; then
     # Not a failure. Editing the toolkit in place is legitimate; you just want to know you did,
@@ -543,6 +697,36 @@ else
     warn "     Neither toolkit nor user-modified in the receipt's fourth column. uninstall.sh keeps"
     warn "     such a file; install.sh classifies it by bytes and not by that column, and what that"
     warn "     means for the file depends on which write path its row is on."
+  fi
+fi
+
+# ── Codex layer: bridged but not enforcing ───────────────────────────────────
+# A POSITIVE CHECK, because the receipt cannot see this state at all.
+#
+# Everything above verifies paths that HAVE a receipt row. `install.sh` writes the row for
+# `.codex/hooks.json` gated on `[ -f "$CODEX_HOOKS_JSON" ]`, so when the hook config was never
+# written there is no row, nothing is missing, and this script said nothing. That is precisely the
+# state a Codex user needs told: the skills are bridged, so the toolkit looks installed and its
+# guidance is reachable, and NOTHING enforces it — `Input.GetKey` is not blocked, and no hook runs.
+#
+# Two documents added on this branch asserted that this script already reported it —
+# `docs/GETTING-STARTED.md` § Hooks Not Firing → Under Codex CLI, and
+# `docs/research/codex-client/findings.md`. Both were false when written: the only route that
+# covered it was `.claude/commands/unity-doctor.md` Check 3b, which is model-driven, not this
+# script. Reproduced 2026-09-08 by installing into a path containing an apostrophe, which
+# `--emit-config` cannot escape: the run correctly skipped the hook config, wrote no row, and this
+# script reported `0 failure(s)` with the project silently advisory. Making the script true was the
+# right repair rather than softening the sentence, because the sentence describes what a user needs.
+#
+# WARN, NOT FAIL, and for the same reason Check 3b says WARNING: the state is legitimate. A user may
+# not want hooks, and the installer reaches it deliberately on a path it cannot quote. A failure
+# count is for something that is wrong; this is something that is not what you may think it is.
+if [ -d "$PROJECT_DIR/.agents/skills" ] && [ ! -f "$PROJECT_DIR/.codex/hooks.json" ]; then
+  dr_bridged=$(find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${dr_bridged:-0}" -gt 0 ]; then
+    warn ".agents/skills/ is bridged ($dr_bridged entr(ies)) but .codex/hooks.json is absent —"
+    warn "     this project is ADVISORY under Codex, not enforcing: no hook runs, and legacy"
+    warn "     Input.GetKey is not blocked. Re-run install.sh --client codex to write it."
   fi
 fi
 

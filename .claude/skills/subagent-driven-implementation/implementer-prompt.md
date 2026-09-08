@@ -3,6 +3,11 @@
 One dispatch, one task, one `unity-coder` invocation via the `Agent` tool. This is the shape — fill
 it in per task, do not paste this file verbatim.
 
+**Under Codex CLI there is no `Agent` tool and no `unity-coder`** — see the degraded path in
+`.claude/skills/subagent-driven-implementation/SKILL.md`, just above *"Per task, in plan order"*.
+Everything below still applies; only the dispatch does not. This file is reachable there directly,
+which is why the pointer is here rather than only in the skill.
+
 ## What the dispatch contains
 
 1. **Where this fits.** One line: the plan's name and this task's number and title. Enough for the

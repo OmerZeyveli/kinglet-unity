@@ -24,8 +24,9 @@ the contradiction is a bug in this file; report it.
 - **Primary inputs are keyboard + mouse and gamepad.** There is no touch, no on-screen joystick, no
   gyro, no safe area. Do not add touch controls or 44×44 tap-target reasoning.
 - Use the **New Input System** as `unity-specifics.md` mandates (legacy `Input.*` is blocked by a
-  hook). Author action maps that work for **both** keyboard/mouse and gamepad; the `InputView` is the
-  only place that touches `PlayerControls`.
+  hook under Claude Code; under Codex CLI only once `.codex/hooks.json` is installed and trusted —
+  `unity-specifics.md` states the condition). Author action maps that work for **both**
+  keyboard/mouse and gamepad; the `InputView` is the only place that touches `PlayerControls`.
 - **Support rebinding** (key + button remapping). It is a baseline expectation on PC and a common
   console requirement. Drive it from the `InputView`; keep Systems input-agnostic — they receive
   `SetMoveInput(Vector2)`, `Jump()`, and never learn the device.

@@ -145,6 +145,141 @@ directory-as-provenance.
 Precedence: the five spine rules bind. `pc-console.md` adds platform specifics on top; it does not
 override them.
 
+### When a surface needs a Codex qualification — the criterion, so it is not decided per file
+
+There are two clients now, and the wave that added the second one measured it honestly into
+`README.md` and `docs/ARCHITECTURE.md` and never went back to the Claude-Code-era surfaces those
+measurements falsified. A whole-branch review found the result: *"Can a reader tell what Kinglet on
+Codex enforces and what it does not? From `README.md`, yes. From inside the installed project, no."*
+The repair was **not** to add a `codex` mention to every shipped surface — that is noise in files a
+session pays to read, and it is a worse outcome than none. It was this criterion, applied 2026-08-16.
+
+**A shipped surface gets a Codex qualification when, and only when, a reader who can reach it under
+Codex would act on a sentence in it that is false or unreachable there.** Both halves are required.
+
+1. **Can a Codex reader reach it at all? Reachability is about being BRIDGED, not about being
+   installed** — and getting that wrong once carried the largest exclusion in this section on a
+   false premise. `.claude/agents/` **is** installed under `--client codex`: the files are copied and
+   the receipt carries a row for each. What it is not is **bridged** — `.agents/skills/` contains no
+   agent entry, so nothing surfaces an agent to a Codex session, which is why their `Skill`-tool and
+   sub-agent sentences have no Codex reader and need no edit. (`README.md` has the durable wording:
+   *"the agents are excluded from the Codex layer entirely."*) `.claude/commands/` reaches a Codex
+   reader only through `scripts/codex-command-to-skill.sh`, which prepends a caveat banner, so a
+   command-body claim is qualified **once, in the banner**, not once per command file. `docs/` does
+   not ship into a project at all; it is qualified for the human evaluating the toolkit, which is a
+   different reader and a different bar.
+
+   **Bridged means the whole directory, not the `SKILL.md`.** `.agents/skills/<name>` is a symlink to
+   the skill *directory*, so every sibling file inside it is reachable verbatim and none of them gets
+   the converter's banner. That is how `subagent-driven-implementation/implementer-prompt.md` and
+   `task-reviewer-prompt.md` — whose opening sentences both name the `Agent` tool — are members while
+   nothing else under `.claude/skills/` is. Run the predicate over **every file** in a skill
+   directory, never over `SKILL.md` alone.
+2. **Does it assert a Claude Code mechanism as automatic, or route somewhere Codex has not got?**
+   *"loads automatically"*, *"always loaded"*, *"blocked by a hook"*, *"the `Skill` tool"*, an
+   `Agent`-tool dispatch. A surface carrying only Unity/C# knowledge — `physics`, `object-pooling`,
+   `addressables`, `urp-pipeline`, `save-system`, `state-machine`, `assembly-definitions` — asserts
+   nothing about the client and gets nothing.
+
+**One exception, and it is about the user rather than the model:** a document the *installer sends a
+Codex user to* is in scope whatever it says about mechanisms, because the installer chose the
+destination. That is `MCP-SETUP.md` and `scripts/studio-doctor.sh`.
+
+**One deliberate exclusion, and it is what keeps this from carpet-bombing.** A claim that a
+generated, always-injected document already corrects is corrected **there**, once — not in every
+surface that makes it. `/name` is the case: Codex has no slash-command surface, but every command in
+`.claude/commands/` is installed there as a skill of the same name, so a `/unity-review` in a skill body is
+a *spelling* difference and not a dead reference. The generated `AGENTS.md` carries the translation
+rule and Codex injects it whole, so `unity-brainstorming` and `verification-before-completion` — both
+of which name slash commands as live routes — are correctly left alone. `using-kinglet` states the
+rule inline in its intro block, which had to change anyway; a whole *section* restating it was
+written, measured against `tests/test-surface-references.sh`'s five-section budget, and **deleted** —
+a second copy in the one file whose length is its failure mode.
+
+**The exclusion has a known load path, and it is not single-copy — check that before you lean on it
+again.** It rests on the rule being somewhere a Codex session cannot fail to meet. Today that is two
+places: the generated `AGENTS.md`, injected whole before every turn, and `using-kinglet`'s intro
+block, which states the rule inline rather than pointing at it.
+
+**A user edit no longer freezes the `AGENTS.md` copy SILENTLY, and it still freezes most of it.** Read
+that as two claims, because a shorter version of this sentence — *"a user edit no longer freezes
+either of them"* — stood here for a day and was falsified by measurement within it. This paragraph has
+now been wrong three times in the same place: it called the skill *"a symlinked skill, which no
+install branch can freeze"*, then said the two freeze *"by the same mechanism"*, then said the freeze
+was over. What was true until 2026-08-17, measured on one fixture by editing both files and re-running
+`--client codex`, is the left column of this table; the right column is what `AGENTS.md` did **before
+it was given `CLAUDE.md`'s marked-region merge**, and it is kept because the argument for two homes is
+only legible against it:
+
+| | `.claude/skills/using-kinglet/SKILL.md` | `AGENTS.md`, until 2026-08-17 |
+|---|---|---|
+| what decides | `is_modified` in the Step-5 payload loop | `owned_by_installer 'AGENTS.md' ''` in Step 8d.1, alone |
+| receipt row after | `user-modified` — **kept** | **none at all** |
+| `studio-doctor.sh` | *"1 file(s) modified since install"*, named | never mentioned; it left the verified set entirely |
+| `uninstall.sh` | `keep 1 file(s) you modified` — left on disk **and reported** | **never reached**, left on disk and not reported |
+
+**The receipt row was the sharpest difference and not the only one, and the sentence here said
+"the whole difference" for a day.** Re-measured 2026-08-17 on a urp fixture — install, fill in the
+`FILL:` markers the installer's own Codex Next step 2 asks for, install twice more: the row vanished
+on run 2, and from run 3 on the installer could no longer list the file under local edits either,
+because that list is built from the receipt. The generated block stopped being generated at all —
+Project Facts refreshes included — and the freeze was permanent across every later install, not one
+run's loss. The doctor's verified count fell by one file (its `99 → 97` was a two-file figure
+standing in a single-file column; `AGENTS.md` alone is one). Every one of those errors ran in the
+same direction — they **understated** the asymmetry — so nothing built on the sentence over-claimed.
+
+**What the merge changed, stated at its real size.** Step 8d.1 refreshes between the markers exactly
+as Step 6 does for `CLAUDE.md` — same predicate, same diagnosis, same remedy, and the same merge
+function rather than a second copy of it — so the vision half the user filled in survives
+byte-for-byte while the Project Facts follow the project, and an edited `AGENTS.md` now keeps a
+`user-modified` receipt row, which is what puts it back inside `studio-doctor.sh`'s report and
+`uninstall.sh`'s reach. An `AGENTS.md` no run of ours wrote, or one whose marker pair is gone because
+the user replaced the document wholesale, still gets no row — `--purge` must not reach a file that is
+not ours. `tests/test-install-upgrade-client.sh` arms 6 and 7 hold all of it, including the direction
+that costs the user work.
+
+**Two things that sentence must not be read as saying.** `CLAUDE.md` gets **no receipt row at all** —
+it is never in the local-edits list and `--purge` has never reached it, so the two files are alike in
+the merge and unlike in the ownership claim; `tests/test-install-ownership.sh`'s S…S4 header is the
+durable statement of that. And **the marked region is only the Project Facts block.** Measured
+2026-08-17 with a sentinel line patched in above the `/name` bullet in the generator: it lands on a
+fresh install and does **not** land on an upgrade over a filled-in `AGENTS.md`. `## Running under
+Codex CLI`, the hooks-and-trust paragraph, the sub-agents paragraph and `## Non-negotiables not
+covered by a gate` all sit outside the pair and are written by the full generate only — so every
+Codex-specific *rule* in that document is still frozen by the instructed edit. Widening the region
+was considered and refused: everything inside it is replaced wholesale on every run, so widening
+would retroactively convert bytes users may already have edited into bytes the installer overwrites.
+
+**So the argument for two homes is stronger after the fix than before it, not weaker.** The `/name`
+rule is precisely the kind of sentence the merge does **not** reach: it lives outside the marked
+region, and the measurement above says an upgrade over a filled-in `AGENTS.md` never updates it. Three
+further ways the `AGENTS.md` copy fails to arrive, all of them now loud rather than silent — the file
+can be declined (a marker pair the installer cannot bound is left alone with a diagnosis), the refresh
+can be refused (a read-only file, which is every unopened file on a Perforce project), and the user
+can replace the document wholesale. The skill copy can be kept as the user's. **If you add a surface
+whose only correction lives in `AGENTS.md`, put it in a skill too** — that instruction is unchanged,
+and the reason it is unchanged is that the freeze this task closed was never the one that threatened
+this exclusion.
+
+The membership that criterion selected, 2026-08-16 — **every member, including the ones handled
+elsewhere**, because a member that appears in the rule and vanishes from the result is the one thing
+this section must not do:
+
+| Member | Selected by | Where it was handled |
+|---|---|---|
+| `.claude/skills/using-kinglet/SKILL.md` | test 2 — *"load automatically"* | here |
+| `.claude/skills/input-system/SKILL.md` | test 2 — *"blocked by a hook"* | here |
+| `.claude/skills/subagent-driven-implementation/SKILL.md` | test 2 — `Agent`-tool dispatch | here |
+| …`/implementer-prompt.md`, …`/task-reviewer-prompt.md` | test 2, and reachable because the **directory** is symlinked | here |
+| `.claude/rules/unity-specifics.md` (×2), `pc-console.md` | test 2 — *"blocked by a hook"* | here |
+| `.claude/commands/unity-doctor.md` | test 2, and it is Check 3b's own home | here |
+| `MCP-SETUP.md` | the exception — installer's Next step | here |
+| `scripts/studio-doctor.sh` | the exception — installer's Next step | **the previous round**: the `-f`→`-e` symlink fix and Check 3b; this round added the `--client codex` remedy for a missing Codex-layer path |
+
+**Re-run the criterion, do not copy this table** — it is the answer for one tree on one date. What is
+worth copying is the negative half, because it is what would have shown a carpet-bomb: the other
+skills, the other rules and the other commands were run through test 2 and selected **nothing**.
+
 ## Shell conventions
 
 Everything here is bash. A macOS host pass is planned (`.claude/UPSTREAM` currently claims exactly

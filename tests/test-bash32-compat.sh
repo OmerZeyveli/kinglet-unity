@@ -137,11 +137,26 @@ shipped_scripts() {
 #
 # The first fix was two totals: `SS_ALL_N > 0` over SHIPPED_SCRIPT_DIRS + ROOT_SCRIPTS, and
 # `SS_PIPE_N > 0` over PIPE_CHECK_DIRS + PIPE_CHECK_FILES. Five sources summed into one number and
-# four into another. `tests/` alone holds 39 files and `scripts/` holds 8, so BOTH totals cleared
-# with `.claude/hooks/` — the directory this file was originally written for — completely empty.
-# MEASURED 2026-08-14 in a clone with ZERO files under `.claude/`: **8 passed, 0 failed, rc 0**,
-# byte-identical in verdict to a healthy tree. The bash-4 and early-exit sweeps certified a payload
-# that was not there.
+# four into another. `tests/` alone HELD 39 files and `scripts/` HELD 8 **on 2026-08-14**, so BOTH
+# totals cleared with `.claude/hooks/` — the directory this file was originally written for —
+# completely empty. MEASURED that day in a clone with ZERO files under `.claude/`: **8 passed,
+# 0 failed, rc 0**, byte-identical in verdict to a healthy tree. The bash-4 and early-exit sweeps
+# certified a payload that was not there.
+#
+# THOSE TWO NUMBERS ARE PINNED, AND UNTIL 2026-08-16 THEY DID NOT SAY SO — they read "`tests/` alone
+# holds 39 files and `scripts/` holds 8", present tense, while THIS FILE'S OWN RUNTIME OUTPUT prints
+# `SHIPPED:tests=46 SHIPPED:scripts=10` on every single run. A whole-branch review flagged the
+# contradiction; the ruling is that the figures are pinned and the TENSE was the defect, not the
+# values. The reason is what the sentence is for: it explains why the FIRST fix — a design this file
+# no longer has — was insufficient, and that argument was made against the tree of 2026-08-14.
+# Re-deriving them to 46 and 10 would attach today's tree to a claim about a superseded design,
+# which is exactly the error `docs/ANTI-VACUITY.md` names when it rules that a pinned figure is
+# *about another tree* and must not be edited to match this one. So the verbs are past tense and the
+# date now governs both numbers explicitly.
+#
+# The live counterpart is the per-source census below, which writes no number down at all and
+# asserts only "at least one, each" — the property that cannot go stale. If you want today's
+# figures, read that line's output; do not update this paragraph.
 #
 # A floor over a summed multi-source subject cannot detect one source dying, however tight the
 # number — see docs/ANTI-VACUITY.md. So the census is per source: every directory in either array
@@ -206,8 +221,10 @@ assert_eq \
 # ...AND EACH ARRAY IS NON-EMPTY, which the identity above cannot see. A FLOOR WHOSE REFERENCE THE
 # MUTATION ALSO MOVES IS NOT A FLOOR: emptying `SHIPPED_SCRIPT_DIRS` drops three rows from BOTH
 # sides at once, so the identity still holds, every surviving per-source count is >= 1, and the
-# bash-4 sweep quietly falls from 62 files to install.sh and uninstall.sh — green over a scope that
-# lost three directories. The same mutation on tests/test-no-mobile.sh's SCAN_DIRS was measured at
+# bash-4 sweep quietly falls to install.sh and uninstall.sh alone — green over a scope that
+# lost three directories. (No file count is written here: this comment carried a stale one for two
+# waves. The live census is docs/ANTI-VACUITY.md's Shape 1, and tests/test-derived-counts.sh guards
+# that one against this file's own derivation.) The same mutation on tests/test-no-mobile.sh's SCAN_DIRS was measured at
 # 17 pass / 0 fail before its own absolute floor was added. Four arrays, four floors, no relative
 # reference. docs/ANTI-VACUITY.md records this as rule F4.
 SS_ARRAYS="ok"

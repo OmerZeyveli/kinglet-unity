@@ -654,4 +654,233 @@ assert_eq "1" "$TSD_PAY_HOOKS_RC" \
     "…and the doctor exits 1 with the whole payload gutted"
 rm -rf "$TSD_PAY"
 
+# ── A receipted DIRECTORY SYMLINK is not a missing file ────────────────────
+#
+# `if [ ! -f "$abs" ]` was the receipt loop's existence test, and `-f` follows a symlink and then
+# asks whether the TARGET is a regular file. `.agents/skills/<name>` points at a DIRECTORY, so every
+# one of those rows answered "missing". Measured 2026-08-16 on a clean `--client codex --yes`
+# fixture, run immediately after the installer printed `Installation complete`:
+#
+#   FAIL 16 receipted file(s) missing — re-run install.sh
+#   7 passed · 1 warning(s) · 1 failure(s)                     rc=1
+#
+# All 16 were on disk. The remedy in that message reproduces the state it is remedying, so a user
+# following install.sh's own Next step 4 loops — and `.claude/commands/unity-doctor.md` maps a FAIL
+# line to ERROR, so `/unity-doctor` reported an ERROR on a correct install. Four shipped surfaces
+# send users here.
+#
+# WHY THE FIX IS TWO CHANGES AND THIS SECTION ASSERTS BOTH. `-e`/`-L` alone moves all 16 rows from
+# MISSING to MODIFIED: `sha256sum` on a directory symlink fails, the substitution is empty, and no
+# recorded value equals the empty string. The run would still misreport a correct install, under a
+# different heading and without the exit code to make it obvious. So the mode column — written by
+# install.sh, read by uninstall.sh, and discarded here as `_mode` until this change — decides which
+# proof of ownership applies, exactly as it does in uninstall.sh's classifier.
+#
+# THE ASSERTIONS ARE FOUR STATES OF ONE LINK, and the last three are what stop the fix degenerating
+# into "anything at that path passes":
+#
+#   intact          → verified, and the verified count equals every data row in the receipt
+#   repointed       → MODIFIED (someone else's link at our path), and specifically NOT missing
+#   dangling        → still not missing. This is the `-L` disjunct: `-e` is false THROUGH a broken
+#                     link, so `-e` alone would call it missing — and a dangling link of ours is a
+#                     real defect worth naming rather than a file worth not seeing.
+#   removed         → missing, counted. The negative control: without it, `[ -e ] || [ -L ]` could
+#                     be deleted outright and everything above would still be green.
+echo ""
+echo "--- Test: a receipted directory symlink is not reported missing ---"
+TSD_SYM="/tmp/kinglet-doctor-symlink-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_SYM" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_SYM" --client codex --yes >/dev/null 2>&1
+TSD_SYM_RECEIPT="$TSD_SYM/.claude/state/install-receipt.tsv"
+
+# Counts, never verdict lines — see the helper section above for why a verdict token must not reach
+# an assertion's arguments. Each of these reduces the doctor's output to a number before it leaves.
+tsd_missing() { awk '{ for (i = 1; i <= NF; i++) if ($i == "receipted") print $(i - 1) } END { }' <<< "$1"; }
+tsd_verified() { awk '/Install intact:/ { for (i = 1; i <= NF; i++) if ($i == "file(s)") print $(i - 1) }' <<< "$1"; }
+tsd_modified() { awk '/modified since install/ { for (i = 1; i <= NF; i++) if ($i == "file(s)") print $(i - 1) }' <<< "$1"; }
+
+# THE FLOOR, FIRST. Every assertion below is vacuously green over a receipt with no symlink rows in
+# it — which is precisely the state a `--client codex` install failing silently would produce, and
+# the state this file's own `--yes` fixtures are in. The number is derived from the receipt rather
+# than written down, and the bound is `-gt 0` plus an equality against the skill directory count, so
+# it moves with the tree instead of pinning 16.
+TSD_SYM_ROWS=$(awk -F'\t' '$3 == "symlink" { n++ } END { print n + 0 }' "$TSD_SYM_RECEIPT")
+TSD_SYM_SKILLS=$(find "${REPO_DIR}/.claude/skills" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+if [ "$TSD_SYM_ROWS" -gt 0 ]; then TSD_SYM_HAVE=1; else TSD_SYM_HAVE=0; fi
+assert_eq "1" "$TSD_SYM_HAVE" \
+    "the codex fixture's receipt actually carries symlink rows — without this floor every assertion in this section is green over a receipt that has none"
+assert_eq "$TSD_SYM_SKILLS" "$TSD_SYM_ROWS" \
+    "…one per skill directory, so the subject grows with .claude/skills/ rather than being pinned to the count of the day"
+
+TSD_SYM_ALL_ROWS=$(grep -v '^#' "$TSD_SYM_RECEIPT" | awk -F'\t' 'NF > 1 && $1 != "path" { n++ } END { print n + 0 }')
+TSD_SYM_OK_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_SYM" 2>&1)
+TSD_SYM_OK_RC=$?
+assert_eq "" "$(tsd_missing "$TSD_SYM_OK_OUT")" \
+    "a correct --client codex install has no missing receipted files — the defect this section exists for reported 16"
+assert_eq "$TSD_SYM_ALL_ROWS" "$(tsd_verified "$TSD_SYM_OK_OUT")" \
+    "…and every data row in the receipt is VERIFIED, symlinks included: an existence fix alone would leave the 16 in 'modified since install' and this equality is what refuses that"
+assert_eq "" "$(tsd_modified "$TSD_SYM_OK_OUT")" \
+    "…with nothing reported as modified, so the verified count above is not carrying a bucket that quietly absorbed them"
+assert_eq "0" "$TSD_SYM_OK_RC" \
+    "…and the doctor exits 0 on the install install.sh's own Next step 4 tells the user to check — measured at rc=1 before this fix"
+
+# Repointed: ours no longer. `-e` and `-L` are both true, so this cannot be answered by existence —
+# only by reading the mode column and comparing the target.
+TSD_SYM_ONE=$(awk -F'\t' '$3 == "symlink" { print $1; exit }' "$TSD_SYM_RECEIPT")
+TSD_SYM_WANT=$(awk -F'\t' '$3 == "symlink" { print $2; exit }' "$TSD_SYM_RECEIPT")
+TSD_SYM_SKILL=$(basename "$TSD_SYM_ONE")
+TSD_SYM_OTHER=$(awk -F'\t' '$3 == "symlink" { n++; if (n == 2) { print $2; exit } }' "$TSD_SYM_RECEIPT")
+rm -f "$TSD_SYM/$TSD_SYM_ONE"
+ln -s "$TSD_SYM_OTHER" "$TSD_SYM/$TSD_SYM_ONE"
+assert_eq "$TSD_SYM_OTHER" "$(readlink "$TSD_SYM/$TSD_SYM_ONE")" \
+    "the fixture reaches the state under test — one receipted link now points somewhere else, at a target that exists"
+TSD_SYM_REPOINT_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_SYM" 2>&1)
+assert_eq "" "$(tsd_missing "$TSD_SYM_REPOINT_OUT")" \
+    "a repointed link is not missing — it is on disk, and calling it missing would send the user to re-run an installer that deliberately leaves other people's links alone"
+assert_eq "1" "$(tsd_modified "$TSD_SYM_REPOINT_OUT")" \
+    "…it is MODIFIED, decided by the recorded target and not by a checksum a directory symlink cannot have"
+
+# Repointed at a target that does not exist. THIS STATE WAS LABELLED `dangling` UNTIL 2026-08-16 AND
+# THAT WAS WRONG in a way worth keeping the correction for: the link here points somewhere we never
+# pointed it, so the verdict comes from the `readlink` comparison and NOT from the `-L` disjunct,
+# and the row would be MODIFIED whether `-L` were present or not. It tests the target comparison
+# under a broken target, which is worth testing — it just is not the `-L` case, and calling it that
+# left the `-L` disjunct with no assertion of its own. The state below is the real one.
+rm -f "$TSD_SYM/$TSD_SYM_ONE"
+ln -s "../../.claude/skills/no-such-skill-$$" "$TSD_SYM/$TSD_SYM_ONE"
+if [ -L "$TSD_SYM/$TSD_SYM_ONE" ] && [ ! -e "$TSD_SYM/$TSD_SYM_ONE" ]; then TSD_SYM_DANGLE=1; else TSD_SYM_DANGLE=0; fi
+assert_eq "1" "$TSD_SYM_DANGLE" \
+    "the fixture reaches the state under test — the link points at a target that does not exist, so -e is false and -L is true"
+TSD_SYM_DANGLE_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_SYM" 2>&1)
+assert_eq "" "$(tsd_missing "$TSD_SYM_DANGLE_OUT")" \
+    "a link with a broken target is still not a missing file — an -e-only existence test would count it gone and send the user to re-run the installer"
+assert_eq "1" "$(tsd_modified "$TSD_SYM_DANGLE_OUT")" \
+    "…and it is reported, as modified, because the target it names is not the one we recorded"
+
+# TRULY DANGLING — the state the round's first version never built. The link is UNTOUCHED and still
+# points exactly where install.sh pointed it; the TARGET DIRECTORY is what is gone. `readlink`
+# therefore still matches the recorded value, so the TARGET COMPARISON CANNOT SEPARATE THIS FROM A
+# HEALTHY LINK and `-L` is the only test that sees anything unusual at all.
+#
+# THAT IS THE DISTINCTION, AND IT IS NOT THE ONE THIS COMMENT FIRST CLAIMED. It said this was "the
+# only state in this section where dropping `-L` changes the verdict" — measured false in the same
+# hour by the mutation that was supposed to confirm it: `-e`-only reds FOUR assertions, two here and
+# two in the repointed state above, because `-e` is false through ANY broken link and both states
+# have one. `-L` is load-bearing in both. What is unique here is what happens AFTER existence: the
+# repointed link is then caught by the target comparison, and this one is not — so this is the state
+# whose entire verdict rests on `-L`, rather than the only state that needs it.
+#
+# THE ASSERTED OUTCOME IS `VERIFIED`, AND THAT IS A DELIBERATE LIMIT RATHER THAN AN OVERSIGHT. The
+# link row's question is ownership, the same question uninstall.sh asks of the same row; naming a
+# missing target is the job of the target's OWN receipt rows, which fire as MISSING in any receipt
+# install.sh actually writes. This section removes them on purpose so that the link row is the only
+# thing that can speak — see scripts/studio-doctor.sh's own paragraph, which states the residual.
+# If a later change makes the doctor name this state, this assertion is the one that must be
+# rewritten, and it should be, rather than deleted.
+rm -f "$TSD_SYM/$TSD_SYM_ONE"
+ln -s "$TSD_SYM_WANT" "$TSD_SYM/$TSD_SYM_ONE"
+rm -rf "$TSD_SYM/.claude/skills/$TSD_SYM_SKILL"
+grep -v "^\.claude/skills/$TSD_SYM_SKILL/" "$TSD_SYM_RECEIPT" > "$TSD_SYM_RECEIPT.tmp" && mv "$TSD_SYM_RECEIPT.tmp" "$TSD_SYM_RECEIPT"
+if [ -L "$TSD_SYM/$TSD_SYM_ONE" ] && [ ! -e "$TSD_SYM/$TSD_SYM_ONE" ] \
+   && [ "$(readlink "$TSD_SYM/$TSD_SYM_ONE")" = "$TSD_SYM_WANT" ]; then TSD_SYM_TRUE=1; else TSD_SYM_TRUE=0; fi
+assert_eq "1" "$TSD_SYM_TRUE" \
+    "the fixture reaches the state under test — the link still points where install.sh pointed it and the target directory is gone, which is the only state where -L alone decides"
+TSD_SYM_TRUE_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_SYM" 2>&1)
+TSD_SYM_TRUE_RC=$?
+assert_eq "" "$(tsd_missing "$TSD_SYM_TRUE_OUT")" \
+    "a truly dangling receipted link is NOT reported missing — this is the -L disjunct doing its whole job, and without it the link on disk would be called gone"
+assert_eq "" "$(tsd_modified "$TSD_SYM_TRUE_OUT")" \
+    "…and not modified either: it points where we pointed it, so by the receipt's own ownership test it is still ours"
+assert_eq "0" "$TSD_SYM_TRUE_RC" \
+    "…and the doctor exits 0 over it — the documented limit, measured, not assumed: naming the missing target belongs to that skill's own receipt rows, which this state deleted"
+
+# Removed: the negative control. Delete `[ -e ] || [ -L ]` entirely and every assertion above stays
+# green; this one does not.
+rm -f "$TSD_SYM/$TSD_SYM_ONE"
+if [ ! -e "$TSD_SYM/$TSD_SYM_ONE" ] && [ ! -L "$TSD_SYM/$TSD_SYM_ONE" ]; then TSD_SYM_GONE=1; else TSD_SYM_GONE=0; fi
+assert_eq "1" "$TSD_SYM_GONE" \
+    "the fixture reaches the state under test — the receipted link is gone from disk by both tests"
+TSD_SYM_GONE_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_SYM" 2>&1)
+TSD_SYM_GONE_RC=$?
+assert_eq "1" "$(tsd_missing "$TSD_SYM_GONE_OUT")" \
+    "a receipted link that is genuinely gone IS reported missing — the existence test was widened, not deleted"
+assert_eq "1" "$TSD_SYM_GONE_RC" \
+    "…and the doctor still exits 1 for it, so the fix did not buy its green run by never failing"
+rm -rf "$TSD_SYM"
+
 rm -rf "$TSD_MOCK"
+
+# ============================================================================
+# Bridged but not enforcing — a POSITIVE check, because the receipt cannot see
+# this state at all.
+#
+# install.sh writes the receipt row for `.codex/hooks.json` gated on the file
+# existing, so a config that was never written has no row, nothing is missing,
+# and every receipt-driven check above stays silent while the project is
+# advisory: guidance reachable, nothing enforced, legacy Input.GetKey allowed.
+#
+# Two documents on this branch asserted the doctor already reported it. Both
+# were false when written — the only route that covered it was
+# `.claude/commands/unity-doctor.md` Check 3b, which is model-driven, not this
+# script. Reproduced 2026-09-08 by installing into a path containing an
+# apostrophe, which `--emit-config` cannot escape: the run correctly skipped the
+# hook config and the doctor reported `0 failure(s)`.
+#
+# WARN, not fail, so the two controls below both assert the count as well as the
+# text — a check that fired on every project would satisfy the positive arm just
+# as well as a correct one does.
+# ============================================================================
+
+tsd_advisory() { grep -c "ADVISORY under Codex" <<< "$1" || true; }
+
+# The control first: a complete Codex install must NOT trip it.
+TSD_ADV_OK="/tmp/kinglet-doctor-advisory-ok-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_ADV_OK" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_ADV_OK" --client codex --yes >/dev/null 2>&1
+TSD_ADV_OK_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_ADV_OK" 2>&1)
+assert_eq "0" "$(tsd_advisory "$TSD_ADV_OK_OUT")" \
+    "a complete Codex install is not called advisory — the check does not fire on every project"
+rm -rf "$TSD_ADV_OK"
+
+# THE STATE IS REACHED THE WAY A USER REACHES IT, NOT BY DELETING THE FILE AFTERWARDS. Those are
+# two different states and only one of them is this check's subject: a config deleted after a
+# successful install still HAS its receipt row, so the row-based check above reports it missing and
+# this positive check is redundant. The state that needs a positive check is the one where the file
+# was NEVER written, and the installer reaches it on a project path containing a single quote —
+# `--emit-config` cannot escape one, so the run correctly skips the hook config, writes no row, and
+# leaves the skills bridged. An earlier draft of this section deleted the file instead and its
+# no-row assertion failed, correctly: the fixture was not in the state the assertions described.
+TSD_ADV="/tmp/kinglet-doctor-advisory-$$'q"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_ADV" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_ADV" --client codex --yes >/dev/null 2>&1
+
+if [ ! -f "$TSD_ADV/.codex/hooks.json" ] && [ -d "$TSD_ADV/.agents/skills" ]; then TSD_ADV_STATE=1; else TSD_ADV_STATE=0; fi
+assert_eq "1" "$TSD_ADV_STATE" \
+    "the fixture reaches the state under test — skills bridged, hook config never written"
+
+assert_eq "0" "$(cut -f1 "$TSD_ADV/.claude/state/install-receipt.tsv" 2>/dev/null | grep -cF '.codex/hooks.json' || true)" \
+    "…and the receipt carries no row for it, which is why a positive check is needed at all"
+
+TSD_ADV_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_ADV" 2>&1)
+assert_eq "1" "$(tsd_advisory "$TSD_ADV_OUT")" \
+    "a bridged Codex layer with no .codex/hooks.json is reported as advisory rather than enforcing"
+
+assert_contains "$TSD_ADV_OUT" "Input.GetKey is not blocked" \
+    "…and says what stops being enforced, not just that a file is missing"
+
+# The receipt-driven half must stay quiet about it, which is the whole reason this
+# check had to be positive: delete the row-based path and this state is invisible.
+assert_eq "" "$(tsd_missing "$TSD_ADV_OUT")" \
+    "…and no receipted file is reported missing, because the row for that file was never written"
+
+rm -rf "$TSD_ADV"
+
+# The second control: a Claude-only project has no .agents/skills/ at all and must
+# never see this line, or the check would fire on every non-Codex install.
+TSD_ADV_CLAUDE="/tmp/kinglet-doctor-advisory-claude-$$"
+bash "${REPO_DIR}/tests/fixtures/mkproject.sh" "$TSD_ADV_CLAUDE" --variant urp >/dev/null 2>&1
+bash "${REPO_DIR}/install.sh" --project-dir "$TSD_ADV_CLAUDE" --yes >/dev/null 2>&1
+TSD_ADV_CLAUDE_OUT=$(bash "$TSD_DOCTOR" --project-dir "$TSD_ADV_CLAUDE" 2>&1)
+assert_eq "0" "$(tsd_advisory "$TSD_ADV_CLAUDE_OUT")" \
+    "a Claude-only project is never called advisory — it has no Codex layer to be advisory about"
+rm -rf "$TSD_ADV_CLAUDE"

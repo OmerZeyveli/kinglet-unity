@@ -5,12 +5,24 @@ description: "Use at the start of every session in a Unity project — establish
 
 # Using Kinglet
 
-Kinglet is a Unity 6 PC/console toolkit. Five rules in `.claude/rules/` load automatically and
-bind: `architecture.md`, `csharp-unity.md`, `performance.md`, `serialization.md`,
-`unity-specifics.md`. `pc-console.md` adds platform specifics on top; it does not override them.
+Kinglet is a Unity 6 PC/console toolkit. Five rules in `.claude/rules/` bind: `architecture.md`,
+`csharp-unity.md`, `performance.md`, `serialization.md`, `unity-specifics.md`. `pc-console.md` adds
+platform specifics on top; it does not override them.
 
-**Which of those rules apply to this project is stated in `CLAUDE.md`'s generated block.** It is
-detected from the project's own code, not assumed. Read it before asserting that a rule binds.
+**Whether they are in front of you depends on the client, and this is the one line in this file that
+is not the same for both.** Under **Claude Code** the rule files load automatically — they are
+already in context and you do not open them. Under **Codex CLI** nothing loads them: measured on
+`codex-cli 0.145.0`, `.claude/rules/` was opened **0 times in 24 runs** without an explicit pointer,
+and the failure mode was not "no conventions" but confidently wrong ones. **If you are on Codex —
+you are, if the injected entry document you were given is `AGENTS.md` rather than `CLAUDE.md` — read
+the rule file that covers what you are about to do before you do it.**
+
+**Which of those rules apply to this project is stated in the generated block** — in `CLAUDE.md`
+under Claude Code, in `AGENTS.md` under Codex. Both files carry one and both are readable; only the
+client's own is injected. It is detected from the project's own code, not assumed. Read it before
+asserting that a rule binds. `AGENTS.md` also carries the one translation the chain below needs
+there: Codex has no slash-command surface, so every `/name` is a skill of that name — read it, do
+not skip it.
 
 ## The rule
 
