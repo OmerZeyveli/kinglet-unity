@@ -371,7 +371,7 @@ assert_eq "2" "$(tbg_run 'rm -f ProjectSettings/QualitySettings.asset')" \
 tbg_stderr() {
     printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":%s}}' \
         "$(printf '%s' "$1" | jq -Rs .)" \
-        | UNITY_HOOK_STATE_DIR="$TBG_STATE_DIR" bash "$TBG_HOOK" 2>&1 >/dev/null || true
+        | { UNITY_HOOK_STATE_DIR="$TBG_STATE_DIR" bash "$TBG_HOOK" >/dev/null; } 2>&1 || true
 }
 
 # --- the alias-bypass spelling, every route ---------------------------------------------

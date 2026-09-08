@@ -416,6 +416,9 @@ info "Payload: $PAYLOAD_COUNT files"
 # "scripts/ and tests/ into .claude/" line, which was fixed while this one was left standing.
 NEW_PATHS=$(
   printf '%s\n' "$PAYLOAD_FILES" | sed 's|^|.claude/|'
+  # shellcheck disable=SC2043
+  # One group today, and deliberately a list: see the paragraph above, which records the round where
+  # this named a `tests` group that has never existed.
   for group in scripts; do
     [ -d "$SCRIPT_DIR/$group" ] || continue
     for f in "$SCRIPT_DIR/$group"/*.sh; do
@@ -1073,6 +1076,23 @@ mktemp_beside() {   # $1 = the directory the file will be renamed into, $2 = a n
   mktemp "$1/$2.XXXXXX" 2>/dev/null || mktemp
 }
 
+# count_paths — how many paths a glob matched.
+#
+# `ls -1 GLOB 2>/dev/null | grep -c . || true` was the idiom here, in fifteen places. It is correct
+# on this repository's own filenames and ShellCheck still flags every one (SC2010), which mattered
+# from 2026-09-08: the `Shellcheck our scripts` CI step had never run before then, because the step
+# ahead of it died on a malformed directive, so twenty findings landed at once the moment it did.
+#
+# An unmatched glob arrives as its own literal, which is what turns "no matches" into 0 here —
+# the same job the `grep -c .` was doing, without `ls` in the pipeline.
+count_paths() {
+  local n=0 p
+  for p in "$@"; do
+    if [ -e "$p" ]; then n=$((n + 1)); fi
+  done
+  printf '%s' "$n"
+}
+
 # ── Can this run replace what is at that path? ───────────────────────────────
 # True when nothing is there, or when what is there is writable. It answers for the WHOLE-FILE write
 # arms what `merge_marked_region`'s own `-w` test answers for the merge, and it exists because the
@@ -1144,6 +1164,23 @@ can_replace() {
 #   .agents/skills/ link           .agents/skills/<name>   status               counts, reports
 #   .agents/skills/ stale prune    .agents/skills/<name>   status               counts, reports, rows
 #   .agents/skills/ command copy   .agents/skills/<c>/…    status               counts, reports, rows
+#   .agents/ retired-command rm    .agents/skills/<c>/     status               counts, reports, drops the row
+#
+# AND THE TEMPS, which are writes into the user's tree too and had no rows here until
+# 2026-09-08. `mktemp_beside` puts each one beside its destination so the rename that follows is
+# a rename and not a cross-device copy — correct for atomicity, and it means four files the user
+# can see. None is a silent-failure path: `mktemp_beside` falls back to `$TMPDIR` when the
+# destination refuses, and every caller tests the result before writing through it. They are
+# listed because a write verb that is not in this table is how the class stops being enumerable,
+# which is the one thing this table exists to prevent.
+#
+#   CLAUDE.md merge temp          .kinglet-claude-md.*    fallback + caller     removed on both paths
+#   AGENTS.md merge temp          .kinglet-agents-md.*    fallback + caller     removed on both paths
+#   hook-config temp              .codex/.hooks.json.*    fallback + caller     removed on both paths
+#   manifest edit temp            Packages/manifest.json.tmp  status            reports; `sed -i` also
+#                                                                              leaves its own sedXXXXXX
+#                                                                              in that directory, found
+#                                                                              only by syscall tracing
 #   .codex/ stale-config delete    .codex/hooks.json       status               reports, keeps the row
 #   .codex/ mkdir                  .codex/                 status               becomes a skip reason
 #
@@ -1691,8 +1728,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
     else
       printf '  AGENTS.md exists and is not ours — would keep yours, and generate nothing\n'
     fi
-    DRY_SKILL_N=$(ls -d "$SCRIPT_DIR/.claude/skills"/*/ 2>/dev/null | grep -c . || true)
-    DRY_CMD_N=$(ls -1 "$SCRIPT_DIR/.claude/commands"/*.md 2>/dev/null | grep -c . || true)
+    DRY_SKILL_N=$(count_paths "$SCRIPT_DIR/.claude/skills"/*/)
+    DRY_CMD_N=$(count_paths "$SCRIPT_DIR/.claude/commands"/*.md)
     printf '  .agents/skills/ — %s symlink(s) into .claude/skills/ and %s converted command skill(s)\n' \
       "$DRY_SKILL_N" "$DRY_CMD_N"
     # FOUR VERDICTS HERE TOO, AND THIS LINE WAS AN UNCONDITIONAL PROMISE UNTIL 2026-08-17 — WRITTEN
@@ -2012,6 +2049,8 @@ chmod +x "$CLAUDE_DIR/hooks/"*.sh 2>/dev/null || true
 # field 1, these rows are written as `.claude/scripts/<name>`, and is_modified matches whole lines
 # (`grep -qxF`). Change either form and the test below silently never matches — a no-op that reads
 # as a fix.
+# shellcheck disable=SC2043
+# One group today, and deliberately a list — same seam as the NEW_PATHS loop above.
 for group in scripts; do
   [ -d "$SCRIPT_DIR/$group" ] || continue
   mkdir -p "$CLAUDE_DIR/$group"
@@ -3522,6 +3561,81 @@ if [ "$CLIENT" = codex ]; then
         fi
       done <<< "$(find "$CONV_TMP" -type f 2>/dev/null | sort)"
       ok "Converted $CMDSKILL_W command(s) into .agents/skills/$([ "$CMDSKILL_K" -gt 0 ] && printf ', kept %s of yours' "$CMDSKILL_K")"
+      # ── 8d.3b retired commands: prune the skills they left behind ─────────
+      # A command this payload no longer ships leaves its converted skill on disk forever, AND the
+      # row for it is not rewritten -- the loop above only visits what the converter just produced.
+      # So the file stayed and the receipt stopped claiming it: an orphan `uninstall.sh` cannot take
+      # either. Measured 2026-09-08 on a fixture before this block existed -- plant
+      # `.agents/skills/unity-retired/SKILL.md` with a toolkit row, re-run, and the file is still
+      # there with zero rows naming it. Same leak two earlier rounds of this wave repaired elsewhere.
+      #
+      # THREE THINGS DECIDE WHAT GOES, and each is a way this could delete a user's directory:
+      #
+      #   1. INSIDE the converter's success branch. A converter that failed produces an empty
+      #      CONV_TMP, and "nothing was converted" would read as "everything was retired". Absence is
+      #      not retirement, and putting the block here makes that structural instead of a check.
+      #   2. Only names the PREVIOUS receipt claimed as `toolkit`. Ownership is read from the
+      #      receipt, never from the mode bits: a directory under this root that no row of ours ever
+      #      named is somebody else's and is not ours to remove. That is also the standing limit of
+      #      this repair -- a skill orphaned by the defect ITSELF lost its row, so nothing can now
+      #      prove it was ours and it stays. `uninstall.sh --purge` and a re-install is the clean
+      #      route for those, and it is stated rather than guessed at.
+      #   3. Unmodified, by `is_modified`, file by file. A retired command the user edited is theirs.
+      #      Its rows are carried forward as `user-modified` so the file keeps an owner and
+      #      `uninstall.sh` still reports it, rather than being silently dropped a second time.
+      CMDSKILL_P=0; CMDSKILL_PF=0; CMDSKILL_PK=0
+      if [ -f "$RECEIPT" ]; then
+        CMDSKILL_LIVE=""
+        for cdir in "$CONV_TMP"/*/; do
+          [ -d "$cdir" ] || continue
+          CMDSKILL_LIVE="$CMDSKILL_LIVE$(basename "$cdir")
+"
+        done
+        CMDSKILL_PREV="$(awk -F'\t' '$1 ~ /^\.agents\/skills\/[^\/]+\// && $4 == "toolkit" { split($1, g, "/"); print g[3] }' < "$RECEIPT" 2>/dev/null | sort -u)"
+
+        while IFS= read -r cretired; do
+          [ -n "$cretired" ] || continue
+          # A here-string, not a pipe: `grep -q` exits on its first match without draining stdin, and
+          # under `set -euo pipefail` that SIGPIPEs the writer on a long list.
+          if grep -qxF -- "$cretired" <<< "$CMDSKILL_LIVE"; then continue; fi
+
+          cret_dir="$PROJECT_DIR/.agents/skills/$cretired"
+          [ -d "$cret_dir" ] || continue
+          cret_rows="$(awk -F'\t' -v n="$cretired" 'index($1, ".agents/skills/" n "/") == 1 { print $1 }' < "$RECEIPT" 2>/dev/null)"
+
+          cret_edited=0
+          while IFS= read -r cret_rel; do
+            [ -n "$cret_rel" ] || continue
+            if is_modified "$cret_rel"; then cret_edited=1; fi
+          done <<< "$cret_rows"
+
+          if [ "$cret_edited" -eq 1 ]; then
+            CMDSKILL_PK=$((CMDSKILL_PK + 1))
+            while IFS= read -r cret_rel; do
+              [ -n "$cret_rel" ] || continue
+              [ -f "$PROJECT_DIR/$cret_rel" ] || continue
+              printf '%s\t%s\t%s\tuser-modified\n' "$cret_rel" \
+                "$(sha_of "$PROJECT_DIR/$cret_rel")" \
+                "$(stat -c '%a' "$PROJECT_DIR/$cret_rel" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+            done <<< "$cret_rows"
+            continue
+          fi
+
+          if rm -rf "$cret_dir" 2>/dev/null; then
+            CMDSKILL_P=$((CMDSKILL_P + 1))
+          else
+            CMDSKILL_PF=$((CMDSKILL_PF + 1))
+          fi
+        done <<< "$CMDSKILL_PREV"
+      fi
+      if [ "$CMDSKILL_P" -gt 0 ] || [ "$CMDSKILL_PK" -gt 0 ]; then
+        ok "Retired command skills: $CMDSKILL_P removed from .agents/skills/$([ "$CMDSKILL_PK" -gt 0 ] && printf ', %s kept because you edited them' "$CMDSKILL_PK")"
+      fi
+      if [ "$CMDSKILL_PF" -gt 0 ]; then
+        warn "$CMDSKILL_PF retired command skill(s) in .agents/skills/ could not be removed."
+        note_not_done "$CMDSKILL_PF converted command skill(s) for commands this payload no longer ships are still in .agents/skills/ and could not be removed, so a Codex session still lists them and they resolve to guidance the toolkit has retired. Make .agents/skills/ writable (under Perforce: check it out) and re-run install.sh --client codex, or delete them by hand."
+      fi
+
       if [ "$CMDSKILL_F" -gt 0 ]; then
         warn "$CMDSKILL_F converted command skill(s) could not be written into .agents/skills/."
         note_not_done "$CMDSKILL_F of the converted command skills could not be written into .agents/skills/ — the file or its directory is read-only — so under Codex those Unity diagnostics are either absent or a version behind. Whichever of ours is still at that path keeps its receipt row, so uninstall.sh can still take it. Make .agents/skills/ and its contents writable (under Perforce: check them out) and re-run install.sh --client codex."
@@ -4369,14 +4483,18 @@ count_hooks() {
 # be exactly `../../.claude/skills/<the entry's own name>` — and anything the two arms cannot claim
 # is reported as `not ours` rather than absorbed into one of them. A number that cannot account for
 # itself is worse than a number that admits a remainder, and this is the line a user screenshots.
-count_agents_root() {   # $1... = find predicate; no args = everything
+# NO PARAMETERS, since 2026-09-08. This took a `find` predicate so the caller could ask for
+# `-type d`; the converted-command count now comes from the receipt instead, and nothing has passed
+# an argument since. `"$@"` on an always-empty parameter list is a seam that reads as configurable
+# and is not, which is what SC2120 exists to say.
+count_agents_root() {
   # `|| true` ON THE WRITER, and it is load-bearing since these became assignments. `find` returns 1
   # for a path it cannot read — a sealed project root is exactly that — `2>/dev/null` hides the
   # message and not the status, and `pipefail` promotes it to the pipeline's. Inside a `printf`
   # argument that was harmless because `printf` still succeeded; in `X=$(count_agents_root)` under
   # `set -e` it ends the run at the summary, with everything already written. Caught by
   # tests/test-install-not-done.sh B.7c, which builds that sealed root on purpose.
-  { find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 "$@" 2>/dev/null || true; } \
+  { find "$PROJECT_DIR/.agents/skills" -mindepth 1 -maxdepth 1 2>/dev/null || true; } \
     | wc -l | tr -d ' '
 }
 

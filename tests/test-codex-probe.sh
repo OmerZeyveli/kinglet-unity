@@ -440,7 +440,7 @@ rm -rf "$LIVE_OUT/.home-live.$live"
 # the behavioural check it cannot be.
 PROBE_SRC="$REPO_DIR/scripts/codex-probe.sh"
 for arm in HUP INT TERM; do
-  if /usr/bin/grep -qE "^trap[[:space:]]+'on_signal[[:space:]]+[0-9]+'[[:space:]]+$arm[[:space:]]*$" "$PROBE_SRC"; then
+  if /usr/bin/grep -qE "^trap[[:space:]]+'on_signal[[:space:]]+[0-9]+'[[:space:]]+${arm}[[:space:]]*$" "$PROBE_SRC"; then
     ok "STRUCTURAL (presence, not behaviour): codex-probe.sh arms $arm"
   else
     bad "STRUCTURAL (presence, not behaviour): codex-probe.sh no longer arms $arm — on this host the EXIT trap covers it, so nothing else in this suite would notice; on bash 3.2 and for the 128+signo exit status it is the only cover there is"

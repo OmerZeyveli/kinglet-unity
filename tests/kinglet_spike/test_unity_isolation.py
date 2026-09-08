@@ -935,9 +935,15 @@ class IsolatedHeadlessRouteTests(_IsolationCase):
                 bound["pgid"] = record.pgid
                 return super().wait(timeout_seconds)
 
-        self.run_route(Binder(pid=5150, pgid=5150))
-        self.assertEqual(5150, bound["pid"])
-        self.assertEqual(5150, bound["pgid"])
+        # Derived, for the reason test_unity_routes.py records at its own site: a constant that can
+        # equal the controller's live pid makes this pair pass VACUOUSLY on the run where it
+        # collides — the code could have written `os.getpid()` and this would still be green. The
+        # sibling row failed loudly on that collision; this one would not have.
+        fake_pid = os.getpid() + 1
+        self.assertNotEqual(os.getpid(), fake_pid)
+        self.run_route(Binder(pid=fake_pid, pgid=fake_pid))
+        self.assertEqual(fake_pid, bound["pid"])
+        self.assertEqual(fake_pid, bound["pgid"])
 
 
 class ContractBindingTests(unittest.TestCase):

@@ -47,6 +47,9 @@ export UNITY_HOOK_PROFILE=strict
 # under the profile this test actually exports. A hook that is genuinely exercised produces
 # strictly more trace lines under the real profile than under a profile guaranteed to gate it out;
 # one that is still silently gated produces the same (short) trace either way.
+# shellcheck disable=SC2043
+# One hook today, and deliberately a list: the paragraph above states the shape this probe tests,
+# and a second advisory hook joins it here without restructuring the loop.
 for hae_hook in session-save; do
     hae_out=$(printf '%s' "$HAE_PAYLOAD" \
         | bash "${HAE_HOOKS}/${hae_hook}.sh" 2>&1)

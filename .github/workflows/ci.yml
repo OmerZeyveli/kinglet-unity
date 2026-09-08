@@ -24,10 +24,12 @@ jobs:
         run: shellcheck --severity=warning -x install.sh uninstall.sh scripts/*.sh tests/*.sh tests/fixtures/*.sh
 
       - name: Shellcheck spike scripts
-        run: |
-          find spikes -name '*.sh' | while IFS= read -r f; do
-            shellcheck -x "$f"
-          done
+        # ONE STATUS FOR THE WHOLE SET. This was `find … | while read; do shellcheck "$f"; done`,
+        # whose exit status is the LAST iteration's — so a finding in any file but the last one was
+        # reported in the log and passed the step. Measured 2026-09-08, when the two steps above it
+        # were repaired and this one became reachable for the first time. `-exec … +` hands every
+        # path to one shellcheck invocation, which fails if any file does.
+        run: find spikes -name '*.sh' -exec shellcheck -x {} +
 
       - name: Validate settings.json
         run: jq . .claude/settings.json > /dev/null
@@ -224,10 +226,19 @@ jobs:
           python3 -m json.tool spikes/platform/contracts/matrix-v1.json > /dev/null
 
       - name: Verify spike report regeneration
+        # v2, NOT v1. This passed `matrix-v1.json`, which `matrix-v2.json` supersedes
+        # (`"supersedes": "kinglet.spike.matrix/v1"`), and v1 carries no `amendments` — so every cell
+        # the two committed amendments move to `deferred` or `dropped` regenerated as `required`,
+        # and the step could only ever fail. It never ran to say so: three broken shellcheck steps
+        # stood in front of it.
+        #
+        # THE FLAG CANNOT SIMPLY BE DROPPED, which was tried first: `report` requires `--matrix`.
+        # The v2 default at cli.py:51 belongs to a different subcommand, so this line and
+        # `tests/kinglet_spike/test_coverage_pin.py`'s MATRIX must be moved together when a v3 lands.
         run: |
           python3 -m tools.kinglet_spike report \
             --repo-root . \
-            --matrix spikes/platform/contracts/matrix-v1.json
+            --matrix spikes/platform/contracts/matrix-v2.json
           git diff --exit-code -- \
             docs/research/platform-spike/reports/coverage.json \
             docs/research/platform-spike/reports/coverage.md

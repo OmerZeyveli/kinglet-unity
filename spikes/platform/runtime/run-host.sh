@@ -654,6 +654,14 @@ main() {
 }
 
 if [ "$KINGLET_RUNHOST_LIB" = "1" ]; then
+  # THE `|| exit 0` IS REACHABLE AND ShellCheck CANNOT SEE IT (SC2317). `return` outside a function
+  # only works in a SOURCED script; when this file is executed it fails, which is the whole reason the
+  # `||` is here, and `2>/dev/null` swallows bash's "can only `return' from a function or sourced
+  # script" on that path. ShellCheck assumes `return 0` succeeds and calls the `exit 0` dead.
+  #
+  # The directive is the LAST comment line on purpose: above the paragraph it does not bind, and the
+  # finding is reported anyway — measured on CI 2026-09-08, one push apart.
+  # shellcheck disable=SC2317
   return 0 2> /dev/null || exit 0
 fi
 

@@ -838,9 +838,33 @@ printf '#!/usr/bin/env bash\nsleep 45\n' > "$SIGHOOK"; chmod +x "$SIGHOOK"
 # with it. Codex spawns hooks as ordinary children with default dispositions,
 # which is the `set -m` column. Job-control chatter goes to the subshell's own
 # stderr, not the shim's capture file.
+# AND ONE MORE DISPOSITION THE LOOP CANNOT SEE FROM INSIDE, measured on CI 2026-09-08.
+# `SIGPIPE did NOT refuse (exit 0, 0 bytes)` on BOTH the ubuntu and the macOS runner, green on a
+# developer machine every time. `set -m` above clears the SIG_IGN that job control installs for
+# INT/QUIT; it does not clear one INHERITED from the launcher, because SIG_IGN survives fork and
+# exec. GitHub's runner starts the job with SIGPIPE ignored, the shim inherits it, `kill -PIPE` is
+# therefore a no-op, and the shim runs to completion and exits 0.
+#
+# Reproduced in one line on a machine where the row passes: `( trap '' PIPE; bash tests/test-codex-shim.sh )`
+# fails on exactly that row and no other.
+#
+# THIS FILE ALREADY KNOWS THE SHAPE — the paragraph above records it for SIGHUP under `nohup`, down
+# to "three sibling rows staying green is exactly what a genuine intermittent single-signal
+# regression would look like, and it is also what a launcher that ignores exactly one signal
+# produces, every single time", and to the distinguishing command being `trap -p`. What it did not
+# have was the guard. A row that cannot deliver its signal measures the LAUNCHER, not the shim, so
+# it is skipped and says which signal and why — the same ruling the INT row's comment reaches.
+#
+# The skip is deliberately narrow: only when the disposition is inherited-ignored. A signal that is
+# deliverable and does not refuse is still a failure, which is the whole point of these four rows.
 for sig in TERM INT HUP PIPE; do
   sig_err="$WORK/sig.$sig.err"
   : > "$sig_err"
+  if [ -n "$(trap -p "SIG$sig")" ] && case "$(trap -p "SIG$sig")" in *"'' SIG$sig"*|*"'' $sig"*) true ;; *) false ;; esac; then
+    printf '  SKIP: SIG%s is ignored by this launcher and SIG_IGN is inherited across exec, so the signal cannot be delivered to the shim at all — this row would measure the launcher. Reproduce with: ( trap %s PIPE; bash tests/test-codex-shim.sh )\n' \
+      "$sig" "''"
+    continue
+  fi
   (
     set -m
     printf '%s' "$PATCH_OK" | bash "$SHIM" --hook "$SIGHOOK" --timeout 60 >/dev/null 2>"$sig_err" &
