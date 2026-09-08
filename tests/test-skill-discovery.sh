@@ -306,7 +306,10 @@ assert_eq "$(printf '%s' "$FM_BAD" | grep -c . || true)" "0" "every skill's fron
 # `.claude/skills/` emptied, `ls -d` errors, `grep -c .` returns 0, the loop body never runs, and
 # the equality passes — the exact "green because it scanned nothing" shape this whole change exists
 # to remove, reintroduced inside the fix for it. A floor is what makes the equality mean something.
-FM_DIRS=$(ls -d .claude/skills/*/ 2>/dev/null | grep -c . || true)
+FM_DIRS=0
+for fm_d in .claude/skills/*/; do
+    [ -d "$fm_d" ] && FM_DIRS=$((FM_DIRS + 1))
+done
 FM_FLOOR_STATE="ok"
 [ "$FM_DIRS" -ge 1 ] || FM_FLOOR_STATE="no skill directories found under .claude/skills/ at all"
 assert_eq "$FM_FLOOR_STATE" "ok" "there are skills to check — an empty .claude/skills/ must not read as a clean one"

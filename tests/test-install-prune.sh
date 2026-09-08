@@ -433,7 +433,10 @@ assert_eq "0" "$(printf '%s\n' "$CP_FRESH_OUT" | grep -c 'Retired command skills
   "a fresh install prunes nothing — with no previous receipt, absence is not retirement"
 
 CP_RECEIPT="$CP_DIR/.claude/state/install-receipt.tsv"
-CP_LIVE_BEFORE=$(ls -d "$CP_DIR/.agents/skills"/*/ 2>/dev/null | wc -l | tr -d ' ')
+CP_LIVE_BEFORE=0
+for cp_d in "$CP_DIR/.agents/skills"/*/; do
+  [ -d "$cp_d" ] && CP_LIVE_BEFORE=$((CP_LIVE_BEFORE + 1))
+done
 
 # Three planted states, and only the first may be touched.
 mkdir -p "$CP_DIR/.agents/skills/unity-retired" \
@@ -474,7 +477,13 @@ assert_eq "present" \
   "a directory no row of ours ever named is left alone — ownership is read from the receipt, not from the mode bits"
 
 # And the prune must not have eaten the live payload on its way past.
-assert_eq "$CP_LIVE_BEFORE" "$(ls -d "$CP_DIR/.agents/skills"/*/ 2>/dev/null | grep -vcF -e unity-edited -e not-ours || true)" \
+CP_LIVE_AFTER=0
+for cp_d in "$CP_DIR/.agents/skills"/*/; do
+  [ -d "$cp_d" ] || continue
+  case "$cp_d" in *unity-edited*|*not-ours*) continue ;; esac
+  CP_LIVE_AFTER=$((CP_LIVE_AFTER + 1))
+done
+assert_eq "$CP_LIVE_BEFORE" "$CP_LIVE_AFTER" \
   "…and every command this payload still ships is still there"
 
 rm -rf "$CP_DIR"
