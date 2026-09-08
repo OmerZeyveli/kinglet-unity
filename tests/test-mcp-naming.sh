@@ -44,7 +44,7 @@ SHIPPED_SERVER=$(awk -F'"' '/^ *"[A-Za-z]*MCP": \{/ {print $2; exit}' "$REPO_DIR
 #
 # The rc is captured rather than promoted, and the list is counted. An unreadable index is a named
 # failure; a list that is merely SHORT is a floor failure. The pathspecs list
-# 86 tracked paths: `.claude/*` 62, `scripts/*` 11, `docs/*` (less research/ and superpowers/) 7, and
+# 87 tracked paths: `.claude/*` 63, `scripts/*` 11, `docs/*` (less research/ and superpowers/) 7, and
 # the six named root files. The floor is 40 — below `.claude/*` alone, so no plausible surface
 # removal trips it, and above every other root combined, so a pathspec typo that drops `.claude/*`
 # (the root carrying the agents whose `tools:` lines are the original defect) does.

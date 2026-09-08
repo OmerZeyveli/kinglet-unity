@@ -188,7 +188,7 @@ sweep() {
   # NOT `xargs -0 grep`. Measured: xargs exits 123 when its child exits non-zero, so a perfectly
   # ordinary "this needle matches nothing" comes back as 123 and is indistinguishable from a real
   # error in the rc>=2 branch below — sweep C, whose correct answer IS no match, would have been
-  # permanently misreported. Build the argv in bash instead. 75 tracked paths is nowhere near
+  # permanently misreported. Build the argv in bash instead. 76 tracked paths is nowhere near
   # ARG_MAX, and `${files[@]}` is guarded from `set -u` by the -s test above.
   #
   # THAT FIGURE READ 91 UNTIL 2026-08-16 and is the one member of its class that did NOT go stale by

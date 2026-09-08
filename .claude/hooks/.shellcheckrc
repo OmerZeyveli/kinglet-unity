@@ -1,0 +1,31 @@
+# ShellCheck config for the hooks, SHIPPED BESIDE THEM ON PURPOSE.
+#
+# This repository already has a `.shellcheckrc` at its root, and CI runs from the root, so
+# `shellcheck -x .claude/hooks/*.sh` is clean here. THAT FILE IS NOT INSTALLED. In a Unity project
+# the hooks arrive without it, and the same command over the same bytes reports 29 findings —
+# measured 2026-09-08 on a real install: 16 × SC2034 and 11 × SC1091, exit 1, against exit 0 in this
+# repository. Byte-identical files, opposite verdicts, and the difference was a file the reader
+# could not see.
+#
+# ShellCheck looks for `.shellcheckrc` in the checked file's directory and upward, so one placed
+# beside the hooks is found from the project root and from inside this directory alike (both
+# measured; with the file absent the same run exits 1, which is the control).
+#
+# The two suppressions are the root file's and they are not style:
+#
+#   source-path=SCRIPTDIR — every hook resolves `_lib.sh` through
+#     `SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"`. ShellCheck cannot evaluate that,
+#     so without this it cannot follow the source and reports SC1091 for each hook.
+#
+#   disable=SC2034 — the hook convention is cross-file indirection: a hook sets
+#     HOOK_PROFILE_LEVEL and `_lib.sh` reads it; `_lib.sh` exports UNITY_* paths that hooks
+#     dereference. Each side looks unused from the other's file.
+#
+# Both are properties of how these hooks are written, so they travel with the hooks. Do not "fix"
+# the findings this silences by editing the hooks — the sourcing pattern is what makes a hook
+# runnable from any working directory, which is the one thing a PreToolUse hook cannot assume.
+
+external-sources=true
+source-path=SCRIPTDIR
+
+disable=SC2034

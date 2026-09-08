@@ -161,10 +161,20 @@ def category_paths(category: str, paths: Sequence[str]) -> list[str]:
             if path.startswith(".claude/skills/") and path.endswith("/SKILL.md")
         ]
     elif category == "hooks":
+        # A hook is a `.sh` file under .claude/hooks/ that is not the shared
+        # library — the definition CLAUDE.md states and settings.json registers.
+        # This arm read "everything under .claude/hooks/ except _lib.sh", which
+        # was the same set only for as long as the directory held nothing but
+        # scripts. Adding .shellcheckrc there made it a hook by accident: the
+        # category's own executability test failed on a 644 config file, which
+        # is the right refusal for the wrong reason. Requiring `.sh` states the
+        # rule instead of enumerating the exceptions to it, and selects the same
+        # twelve files it selected before.
         selected = [
             path
             for path in paths
             if path.startswith(".claude/hooks/")
+            and path.endswith(".sh")
             and path != ".claude/hooks/_lib.sh"
         ]
     elif category == "rules":
