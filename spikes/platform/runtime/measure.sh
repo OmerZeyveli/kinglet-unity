@@ -67,7 +67,10 @@ host_platform() { uname -s; }
 # A seam: tests redefine it with canned BSD/GNU output so measure_peak_rss_kb, the
 # real dispatch, is executed rather than merely inspected.
 capture_time_output() {
-  /usr/bin/time "$1" "$2" "$3" 2>&1 1>/dev/null || true
+  # stderr is the point: `/usr/bin/time` writes its measurement there and the command's own output
+  # is noise. `2>&1 1>/dev/null` is that swap, and it reads as the classic mistake (SC2069), so it is
+  # spelled in the form that cannot be misread instead of suppressed.
+  { /usr/bin/time "$1" "$2" "$3" 1>/dev/null; } 2>&1 || true
 }
 
 # measure_peak_rss_kb <exe> <version_arg> — peak RSS in KILOBYTES on both platforms.
@@ -148,6 +151,14 @@ now_ms() {
 }
 
 if [ "$KINGLET_MEASURE_LIB" = "1" ]; then
+  # THE `|| exit 0` IS REACHABLE AND ShellCheck CANNOT SEE IT (SC2317). `return` outside a function
+  # only works in a SOURCED script; when this file is executed it fails, which is the whole reason the
+  # `||` is here, and `2>/dev/null` swallows bash's "can only `return' from a function or sourced
+  # script" on that path. ShellCheck assumes `return 0` succeeds and calls the `exit 0` dead.
+  #
+  # The directive is the LAST comment line on purpose: above the paragraph it does not bind, and the
+  # finding is reported anyway — measured on CI 2026-09-08, one push apart.
+  # shellcheck disable=SC2317
   return 0 2> /dev/null || exit 0
 fi
 
