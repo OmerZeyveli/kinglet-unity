@@ -405,3 +405,76 @@ assert_eq "1" "$(printf '%s\n' "$CODEX_CTL_OUT" | grep -c '1 pruned' || true)" \
   "and that prune is still reported"
 
 rm -rf "$CODEX_PRUNE_DIR"
+
+# ============================================================================
+# Retired command skills — Task 15's other half.
+#
+# A converted command skill for a command the payload no longer ships used to
+# stay on disk forever AND lose its receipt row, because the copy loop only
+# visits what the converter just produced. File kept, row dropped: an orphan
+# `uninstall.sh` could never take. Measured on a fixture before the prune
+# existed — plant `.agents/skills/unity-retired/SKILL.md` with a toolkit row,
+# re-run, and the file is still there with zero rows naming it.
+#
+# The prune deletes directories, so every assertion below is really about the
+# three ways it could delete the wrong one: a fresh install with no previous
+# receipt (absence is not retirement), a directory no row of ours ever named
+# (somebody else's), and one the user edited (theirs, whoever wrote it first).
+# ============================================================================
+
+CP_DIR="/tmp/kinglet-cmdprune-$$"
+bash "$REPO_DIR/tests/fixtures/mkproject.sh" "$CP_DIR" --variant urp >/dev/null 2>&1
+
+# The control that has to come first: a FRESH install has no previous receipt,
+# so nothing is retired and nothing may be removed. Without this, every
+# assertion below passes under a prune that fires indiscriminately.
+CP_FRESH_OUT=$(bash "$REPO_DIR/install.sh" --project-dir "$CP_DIR" --client codex --yes 2>&1)
+assert_eq "0" "$(printf '%s\n' "$CP_FRESH_OUT" | grep -c 'Retired command skills' || true)" \
+  "a fresh install prunes nothing — with no previous receipt, absence is not retirement"
+
+CP_RECEIPT="$CP_DIR/.claude/state/install-receipt.tsv"
+CP_LIVE_BEFORE=$(ls -d "$CP_DIR/.agents/skills"/*/ 2>/dev/null | wc -l | tr -d ' ')
+
+# Three planted states, and only the first may be touched.
+mkdir -p "$CP_DIR/.agents/skills/unity-retired" \
+         "$CP_DIR/.agents/skills/unity-edited" \
+         "$CP_DIR/.agents/skills/not-ours"
+printf -- '---\nname: unity-retired\n---\nfrom an older payload\n' > "$CP_DIR/.agents/skills/unity-retired/SKILL.md"
+printf -- '---\nname: unity-edited\n---\nfrom an older payload\n'  > "$CP_DIR/.agents/skills/unity-edited/SKILL.md"
+printf -- '---\nname: not-ours\n---\nthe user wrote this\n'        > "$CP_DIR/.agents/skills/not-ours/SKILL.md"
+for cp_n in unity-retired unity-edited; do
+  printf '.agents/skills/%s/SKILL.md\t%s\t644\ttoolkit\n' "$cp_n" \
+    "$(sha256sum "$CP_DIR/.agents/skills/$cp_n/SKILL.md" | cut -d' ' -f1)" >> "$CP_RECEIPT"
+done
+# `not-ours` deliberately gets NO row. That is the whole ownership test.
+printf 'a line the user added\n' >> "$CP_DIR/.agents/skills/unity-edited/SKILL.md"
+
+bash "$REPO_DIR/install.sh" --project-dir "$CP_DIR" --client codex --yes >/dev/null 2>&1
+
+assert_eq "removed" \
+  "$([ -e "$CP_DIR/.agents/skills/unity-retired" ] && echo present || echo removed)" \
+  "a converted command skill the payload no longer ships is removed on upgrade"
+
+assert_eq "0" "$(cut -f1 "$CP_RECEIPT" | grep -cxF '.agents/skills/unity-retired/SKILL.md' || true)" \
+  "…and the receipt stops claiming it, so it is not reported as an orphan next run"
+
+assert_eq "present" \
+  "$([ -f "$CP_DIR/.agents/skills/unity-edited/SKILL.md" ] && echo present || echo removed)" \
+  "a retired command skill the user edited is kept — theirs, whoever wrote it first"
+
+assert_eq "1" "$(grep -c 'a line the user added' "$CP_DIR/.agents/skills/unity-edited/SKILL.md" 2>/dev/null || echo 0)" \
+  "…with the edit intact"
+
+assert_eq "user-modified" \
+  "$(grep -F '.agents/skills/unity-edited/SKILL.md' "$CP_RECEIPT" | cut -f4 | head -1)" \
+  "…and it keeps an owner: the row is carried forward as user-modified, so uninstall.sh still reports it"
+
+assert_eq "present" \
+  "$([ -f "$CP_DIR/.agents/skills/not-ours/SKILL.md" ] && echo present || echo removed)" \
+  "a directory no row of ours ever named is left alone — ownership is read from the receipt, not from the mode bits"
+
+# And the prune must not have eaten the live payload on its way past.
+assert_eq "$CP_LIVE_BEFORE" "$(ls -d "$CP_DIR/.agents/skills"/*/ 2>/dev/null | grep -vcF -e unity-edited -e not-ours || true)" \
+  "…and every command this payload still ships is still there"
+
+rm -rf "$CP_DIR"

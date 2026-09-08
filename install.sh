@@ -1144,6 +1144,7 @@ can_replace() {
 #   .agents/skills/ link           .agents/skills/<name>   status               counts, reports
 #   .agents/skills/ stale prune    .agents/skills/<name>   status               counts, reports, rows
 #   .agents/skills/ command copy   .agents/skills/<c>/…    status               counts, reports, rows
+#   .agents/ retired-command rm    .agents/skills/<c>/     status               counts, reports, drops the row
 #   .codex/ stale-config delete    .codex/hooks.json       status               reports, keeps the row
 #   .codex/ mkdir                  .codex/                 status               becomes a skip reason
 #
@@ -3522,6 +3523,81 @@ if [ "$CLIENT" = codex ]; then
         fi
       done <<< "$(find "$CONV_TMP" -type f 2>/dev/null | sort)"
       ok "Converted $CMDSKILL_W command(s) into .agents/skills/$([ "$CMDSKILL_K" -gt 0 ] && printf ', kept %s of yours' "$CMDSKILL_K")"
+      # ── 8d.3b retired commands: prune the skills they left behind ─────────
+      # A command this payload no longer ships leaves its converted skill on disk forever, AND the
+      # row for it is not rewritten -- the loop above only visits what the converter just produced.
+      # So the file stayed and the receipt stopped claiming it: an orphan `uninstall.sh` cannot take
+      # either. Measured 2026-09-08 on a fixture before this block existed -- plant
+      # `.agents/skills/unity-retired/SKILL.md` with a toolkit row, re-run, and the file is still
+      # there with zero rows naming it. Same leak two earlier rounds of this wave repaired elsewhere.
+      #
+      # THREE THINGS DECIDE WHAT GOES, and each is a way this could delete a user's directory:
+      #
+      #   1. INSIDE the converter's success branch. A converter that failed produces an empty
+      #      CONV_TMP, and "nothing was converted" would read as "everything was retired". Absence is
+      #      not retirement, and putting the block here makes that structural instead of a check.
+      #   2. Only names the PREVIOUS receipt claimed as `toolkit`. Ownership is read from the
+      #      receipt, never from the mode bits: a directory under this root that no row of ours ever
+      #      named is somebody else's and is not ours to remove. That is also the standing limit of
+      #      this repair -- a skill orphaned by the defect ITSELF lost its row, so nothing can now
+      #      prove it was ours and it stays. `uninstall.sh --purge` and a re-install is the clean
+      #      route for those, and it is stated rather than guessed at.
+      #   3. Unmodified, by `is_modified`, file by file. A retired command the user edited is theirs.
+      #      Its rows are carried forward as `user-modified` so the file keeps an owner and
+      #      `uninstall.sh` still reports it, rather than being silently dropped a second time.
+      CMDSKILL_P=0; CMDSKILL_PF=0; CMDSKILL_PK=0
+      if [ -f "$RECEIPT" ]; then
+        CMDSKILL_LIVE=""
+        for cdir in "$CONV_TMP"/*/; do
+          [ -d "$cdir" ] || continue
+          CMDSKILL_LIVE="$CMDSKILL_LIVE$(basename "$cdir")
+"
+        done
+        CMDSKILL_PREV="$(awk -F'\t' '$1 ~ /^\.agents\/skills\/[^\/]+\// && $4 == "toolkit" { split($1, g, "/"); print g[3] }' < "$RECEIPT" 2>/dev/null | sort -u)"
+
+        while IFS= read -r cretired; do
+          [ -n "$cretired" ] || continue
+          # A here-string, not a pipe: `grep -q` exits on its first match without draining stdin, and
+          # under `set -euo pipefail` that SIGPIPEs the writer on a long list.
+          if grep -qxF -- "$cretired" <<< "$CMDSKILL_LIVE"; then continue; fi
+
+          cret_dir="$PROJECT_DIR/.agents/skills/$cretired"
+          [ -d "$cret_dir" ] || continue
+          cret_rows="$(awk -F'\t' -v n="$cretired" 'index($1, ".agents/skills/" n "/") == 1 { print $1 }' < "$RECEIPT" 2>/dev/null)"
+
+          cret_edited=0
+          while IFS= read -r cret_rel; do
+            [ -n "$cret_rel" ] || continue
+            if is_modified "$cret_rel"; then cret_edited=1; fi
+          done <<< "$cret_rows"
+
+          if [ "$cret_edited" -eq 1 ]; then
+            CMDSKILL_PK=$((CMDSKILL_PK + 1))
+            while IFS= read -r cret_rel; do
+              [ -n "$cret_rel" ] || continue
+              [ -f "$PROJECT_DIR/$cret_rel" ] || continue
+              printf '%s\t%s\t%s\tuser-modified\n' "$cret_rel" \
+                "$(sha_of "$PROJECT_DIR/$cret_rel")" \
+                "$(stat -c '%a' "$PROJECT_DIR/$cret_rel" 2>/dev/null || echo 644)" >> "$RECEIPT_TMP"
+            done <<< "$cret_rows"
+            continue
+          fi
+
+          if rm -rf "$cret_dir" 2>/dev/null; then
+            CMDSKILL_P=$((CMDSKILL_P + 1))
+          else
+            CMDSKILL_PF=$((CMDSKILL_PF + 1))
+          fi
+        done <<< "$CMDSKILL_PREV"
+      fi
+      if [ "$CMDSKILL_P" -gt 0 ] || [ "$CMDSKILL_PK" -gt 0 ]; then
+        ok "Retired command skills: $CMDSKILL_P removed from .agents/skills/$([ "$CMDSKILL_PK" -gt 0 ] && printf ', %s kept because you edited them' "$CMDSKILL_PK")"
+      fi
+      if [ "$CMDSKILL_PF" -gt 0 ]; then
+        warn "$CMDSKILL_PF retired command skill(s) in .agents/skills/ could not be removed."
+        note_not_done "$CMDSKILL_PF converted command skill(s) for commands this payload no longer ships are still in .agents/skills/ and could not be removed, so a Codex session still lists them and they resolve to guidance the toolkit has retired. Make .agents/skills/ writable (under Perforce: check it out) and re-run install.sh --client codex, or delete them by hand."
+      fi
+
       if [ "$CMDSKILL_F" -gt 0 ]; then
         warn "$CMDSKILL_F converted command skill(s) could not be written into .agents/skills/."
         note_not_done "$CMDSKILL_F of the converted command skills could not be written into .agents/skills/ — the file or its directory is read-only — so under Codex those Unity diagnostics are either absent or a version behind. Whichever of ours is still at that path keeps its receipt row, so uninstall.sh can still take it. Make .agents/skills/ and its contents writable (under Perforce: check them out) and re-run install.sh --client codex."
